@@ -19,6 +19,7 @@ export interface QuotationCustomersState {
   hasMore: boolean;
   loadMore: () => void;
   error: NormalizedApiError | null;
+  retry: () => void;
 }
 
 /**
@@ -43,10 +44,14 @@ export function useQuotationCustomers(
 ): QuotationCustomersState {
   const [options, setOptions] = useState<QuotationCustomerOption[]>([]);
   const [search, setSearch] = useState("");
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<{ headersKey: string; value: string } | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [loadedHeadersKey, setLoadedHeadersKey] = useState<string | null>(null);
+  const headersKey = JSON.stringify(Object.entries(headers).sort(([left], [right]) => left.localeCompare(right)));
+  const requestCursor = cursor?.headersKey === headersKey ? cursor.value : null;
 
   const load = useCallback(
     async (signal: AbortSignal, activeCursor: string | null, activeSearch: string) => {
@@ -58,7 +63,9 @@ export function useQuotationCustomers(
           headers,
           maxResponseBytes: TRADE_LIST_RESPONSE_BYTES,
         });
+        if (signal.aborted) return;
         const page = parseQuotationCustomerPage(result.data);
+        setLoadedHeadersKey(headersKey);
         setOptions((current) => (activeCursor === null ? page.items : [...current, ...page.items]));
         // Guarding on a *different* cursor is what stops the silent-ignore
         // behaviour from becoming an endless "load more" that re-appends the
@@ -71,7 +78,7 @@ export function useQuotationCustomers(
         if (!signal.aborted) setIsLoading(false);
       }
     },
-    [headers],
+    [headers, headersKey],
   );
 
   useEffect(() => {
@@ -80,25 +87,27 @@ export function useQuotationCustomers(
     // Deferred to a microtask so the loader's first `setState` is not
     // synchronous with the effect body.
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal, cursor, search);
+      if (!controller.signal.aborted) void load(controller.signal, requestCursor, search);
     });
     return () => controller.abort();
-  }, [load, isEnabled, cursor, search]);
+  }, [load, isEnabled, requestCursor, search, retryCount]);
 
   return {
-    options,
+    options: loadedHeadersKey === headersKey ? options : [],
     search,
     setSearch: (next: string) => {
+      if (next === search && cursor === null) return;
       setOptions([]);
       setCursor(null);
       setNextCursor(null);
       setSearch(next);
     },
     isLoading,
-    hasMore: nextCursor !== null,
+    hasMore: loadedHeadersKey === headersKey && nextCursor !== null,
     loadMore: () => {
-      if (nextCursor !== null) setCursor(nextCursor);
+      if (nextCursor !== null && loadedHeadersKey === headersKey) setCursor({ headersKey, value: nextCursor });
     },
     error,
+    retry: () => setRetryCount((current) => current + 1),
   };
 }

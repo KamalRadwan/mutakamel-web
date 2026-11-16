@@ -20,13 +20,18 @@ const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 } as 
  * nothing else: each is a `GET` with a fixed widget set, its own response
  * shape, and no `datePreset`/`compare` — `DashboardQueryDto` carries neither.
  */
-export function usePrebuiltReport(reportKey: PrebuiltReportKey, branchId: string | null) {
+export function usePrebuiltReport(
+  reportKey: PrebuiltReportKey,
+  branchId: string | null,
+  enabled: boolean,
+) {
   const [result, setResult] = useState<PrebuiltReportResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (!enabled) return;
       const report = PREBUILT_REPORTS.find((candidate) => candidate.key === reportKey);
       if (!report) return;
       setIsLoading(true);
@@ -45,16 +50,17 @@ export function usePrebuiltReport(reportKey: PrebuiltReportKey, branchId: string
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [reportKey, branchId],
+    [reportKey, branchId, enabled],
   );
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) void load(controller.signal);
     });
     return () => controller.abort();
-  }, [load]);
+  }, [enabled, load]);
 
   return { result, isLoading, error, reload: () => load() };
 }

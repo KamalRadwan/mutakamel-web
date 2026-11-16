@@ -57,6 +57,7 @@ vi.mock("@/design-system", async () => {
   return {
     ...tokens,
     ...cnMod,
+    ...(await import("@/design-system/lib/icons")),
     ...cardColorMod,
     ...errorFormatting,
     ...buttonMod,
@@ -131,6 +132,10 @@ const mockProfile: CustomerProfileDetail = {
   profileType: "CORPORATE",
   status: "ACTIVE_CUSTOMER",
   displayName: "Al-Amal Hospital",
+  firstName: null,
+  lastName: null,
+  honorificTitle: null,
+  jobTitle: null,
   companyName: "Al-Amal Healthcare Co.",
   companyEmail: "info@alamal.med.sa",
   companyPhone: "+966112345678",
@@ -159,6 +164,18 @@ afterEach(() => {
 });
 
 describe("CustomerProfileDetailWorkspace", () => {
+  it("identifies the current record with a full-name crumb and RTL separator", () => {
+    vi.mocked(useCustomerProfileDetail).mockReturnValue({
+      profile: mockProfile, card: null, isLoading: false, isNotFound: false,
+      isForbidden: false, error: null, reload: vi.fn(), setProfile: vi.fn(), setCard: vi.fn(),
+    });
+    render(<CustomerProfileDetailWorkspace profileId={mockProfile.id} />);
+    const crumb = screen.getByTitle(mockProfile.displayName);
+    expect(crumb).toHaveAttribute("aria-current", "page");
+    expect(crumb.previousElementSibling).toHaveClass("size-3", "rtl:-scale-x-100");
+    expect(crumb.previousElementSibling).toHaveAttribute("aria-hidden", "true");
+  });
+
   it.each(["rating", "colour"])("shows translated feedback after a forbidden %s save", async (field) => {
     const setProfile = vi.fn();
     const setCard = vi.fn();

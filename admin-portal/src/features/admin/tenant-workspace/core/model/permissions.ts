@@ -1,6 +1,7 @@
 import {
   adminCan,
   adminCanAll,
+  ADMIN_RBAC_CRITICAL,
   type AdminAuthorizationContext,
 } from "@/lib/auth/rbac";
 import type { TenantCorePermissions } from "../types";
@@ -8,12 +9,12 @@ import type { TenantCorePermissions } from "../types";
 export const TENANT_PERMISSION_REQUIREMENTS = {
   read: ["admin.tenants.read"],
   update: ["admin.tenants.update"],
-  lifecycle: ["admin.tenants.suspend", "admin.tenants.critical"],
-  provisioning: ["admin.tenants.reprovision", "admin.tenants.critical"],
-  softDelete: ["admin.tenants.delete", "admin.tenants.critical"],
-  restore: ["admin.tenants.restore", "admin.tenants.critical"],
-  destroy: ["admin.tenants.destroy", "admin.tenants.critical"],
-  manageFqdns: ["admin.tenants.manage_fqdns", "admin.tenants.critical"],
+  lifecycle: ADMIN_RBAC_CRITICAL.TENANTS_SUSPEND,
+  provisioning: ADMIN_RBAC_CRITICAL.TENANTS_REPROVISION,
+  softDelete: ADMIN_RBAC_CRITICAL.TENANTS_DELETE,
+  restore: ADMIN_RBAC_CRITICAL.TENANTS_RESTORE,
+  destroy: ADMIN_RBAC_CRITICAL.TENANTS_DESTROY,
+  manageFqdns: ADMIN_RBAC_CRITICAL.TENANTS_MANAGE_FQDNS,
 } as const;
 
 export function readTenantCorePermissions(

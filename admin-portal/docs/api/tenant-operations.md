@@ -660,6 +660,19 @@ offered."
 
 ### Apply selected updates
 
+Confirmation source review: **2026-10-31** (AUDIT29X-APW-2; automated checks
+and authenticated runtime pending lead verification).
+
+The workspace's **Apply selected** button opens the existing confirmation
+dialog in Arabic or English. It lists each selected component key and target
+release version, warns that the live database/release upgrade cannot be
+cancelled once running, and explains that Core may include dependent or
+incompatible components. Opening or dismissing the dialog sends no request.
+Only confirmation calls the retained apply callback for the reviewed selection
+and release evidence. A synchronous in-flight guard prevents duplicate
+confirmation requests; confirmation and dismissal stay disabled until the
+request settles.
+
 `POST /api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply`
 
 ```ts
@@ -1064,12 +1077,19 @@ seconds and to 60 s after a further quiet minute, and returns to 3 s on any
 observed change, command, selection, manual refresh, or return to the tab.
 "Quiet" compares the operations, the selected detail's statuses, steps and
 stall reason, and prerequisite states — never `ageSeconds`. It pauses while the
-page is hidden or a confirmation dialog is open (the badge reads "Auto-refresh
+page is hidden or an operation-action confirmation dialog is open (the badge reads "Auto-refresh
 paused"), and a refresh merges page one into the operations and timeline pages
 already loaded instead of discarding "Load older".
 
 Updates copy the current and target release evidence returned by Core, and the
 Updates note says Core can move further lagging components with the selection.
+**Apply selected** opens the shared confirmation dialog listing each selected
+component key and target release version before sending a request. The dialog
+retains the selection and command evidence from when it opened while background
+refresh continues; confirming
+submits once and disables dismissal while the command is in flight. Cancelling
+the dialog sends nothing. Copy is available in Arabic and English (source
+review: **2026-10-31**, AUDIT29X-APW-2; checks/runtime pending lead verification).
 After an apply the workspace opens the new operation, whose detail lists the
 components the update moves and, apart, those Core added because they were
 behind. A step or operation error keeps its raw safe code and gains a line of

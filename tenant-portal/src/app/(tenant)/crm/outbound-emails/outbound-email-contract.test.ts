@@ -20,6 +20,13 @@ const CONTACT_ID = "01900500-0000-7000-8000-000000000004";
 const TEMPLATE_VERSION_ID = "01900500-0000-7000-8000-000000000005";
 
 describe("CRM outbound-email contract", () => {
+  it("normalizes retry reasons and enforces Unicode scalar and control-character bounds", () => {
+    expect(buildRetryRequest("  cafe\u0301  ")).toEqual({ reason: "café" });
+    expect(buildRetryRequest("😀".repeat(500))).toEqual({ reason: "😀".repeat(500) });
+    expect(() => buildRetryRequest("😀".repeat(501))).toThrow("CRM_EMAIL_RETRY_REASON_INVALID");
+    expect(() => buildRetryRequest("Reviewed\nrecipient")).toThrow("CRM_EMAIL_RETRY_REASON_INVALID");
+    expect(() => buildRetryRequest("\t ")).toThrow("CRM_EMAIL_RETRY_REASON_INVALID");
+  });
   it("treats QUEUED and DISPATCHING as not-yet-delivered", () => {
     expect(isPendingDelivery("QUEUED")).toBe(true);
     expect(isPendingDelivery("DISPATCHING")).toBe(true);

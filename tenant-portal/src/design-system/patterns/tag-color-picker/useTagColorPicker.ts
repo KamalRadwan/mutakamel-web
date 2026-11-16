@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   TAG_COLOR_MIN_CONTRAST,
   TAG_COLOR_PRESETS,
@@ -25,49 +25,58 @@ const CUSTOM_SEED: TagColor = TAG_COLOR_PRESETS.find((preset) => preset.key === 
  *
  * The value is owned by the caller; this hook owns only the two hex DRAFTS,
  * because a half-typed `#1D4` is not a colour and must not reach `onChange`.
- * A draft commits the moment it parses, paired with the other side's current
- * colour — the backend accepts both or neither, never one.
+ * A pair commits only when both visible drafts parse. A valid channel cannot
+ * silently replace the other invalid draft with its previous saved value.
  */
-export function useTagColorPicker(value: TagColor | null, onChange: (next: TagColor | null) => void) {
+export function useTagColorPicker(value: TagColor | null, onChange: (next: TagColor | null) => void, onValidityChange?: (valid: boolean) => void) {
   const [drafts, setDrafts] = useState<TagColor>(value ?? CUSTOM_SEED);
   const [previousValue, setPreviousValue] = useState(value);
 
   // A preset press, a reset from the parent, or a committed draft: the text
-  // boxes follow the value. Clearing to "none" keeps the drafts, so switching
-  // back to custom resumes from the last pair rather than from the seed.
+  // boxes follow the value. Choosing None or a preset explicitly resets an
+  // invalid draft, including when the chosen pair equals the controlled value.
   if (!sameTagColor(value, previousValue)) {
     setPreviousValue(value);
     if (value !== null) setDrafts(value);
   }
 
   const preset = findTagColorPreset(value);
-  const radioValue = value === null ? TAG_COLOR_NONE : (preset?.key ?? "");
+  const isValid = normalizeTagHexColor(drafts.backgroundColor) !== null && normalizeTagHexColor(drafts.textColor) !== null;
+  const radioValue = !isValid ? "" : value === null ? TAG_COLOR_NONE : (preset?.key ?? "");
   const contrast = value === null ? null : tagColorContrast(value);
 
+  useEffect(() => { onValidityChange?.(isValid); }, [isValid, onValidityChange]);
+
   // The committed side of each channel: the value when there is one, else a
-  // parsed draft, else the seed. Used to complete a pair from one edit.
+  // parsed draft, else the seed. The native color well keeps the last valid
+  // appearance while a visible text draft is incomplete.
   function committed(channel: TagColorChannel): string {
     return value?.[channel] ?? normalizeTagHexColor(drafts[channel]) ?? CUSTOM_SEED[channel];
   }
 
   function handleRadioChange(next: string) {
     if (next === TAG_COLOR_NONE) {
+      setDrafts(value ?? CUSTOM_SEED);
+      onValidityChange?.(true);
       onChange(null);
       return;
     }
     const chosen = TAG_COLOR_PRESETS.find((candidate) => candidate.key === next);
-    if (chosen) onChange({ backgroundColor: chosen.backgroundColor, textColor: chosen.textColor });
+    if (chosen) {
+      const pair = { backgroundColor: chosen.backgroundColor, textColor: chosen.textColor };
+      setDrafts(pair);
+      onValidityChange?.(true);
+      onChange(pair);
+    }
   }
 
   function handleChannelChange(channel: TagColorChannel, raw: string) {
-    setDrafts((current) => ({ ...current, [channel]: raw }));
-    const parsed = normalizeTagHexColor(raw);
-    if (parsed === null) return;
-    onChange(
-      channel === "backgroundColor"
-        ? { backgroundColor: parsed, textColor: committed("textColor") }
-        : { backgroundColor: committed("backgroundColor"), textColor: parsed },
-    );
+    const next = { ...drafts, [channel]: raw };
+    setDrafts(next);
+    const backgroundColor = normalizeTagHexColor(next.backgroundColor);
+    const textColor = normalizeTagHexColor(next.textColor);
+    onValidityChange?.(backgroundColor !== null && textColor !== null);
+    if (backgroundColor !== null && textColor !== null) onChange({ backgroundColor, textColor });
   }
 
   return {

@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ErrorState,
+  hasPermission,
   PermissionGate,
   Skeleton,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { useTenantAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
@@ -20,12 +22,25 @@ import { DashboardWorkspace } from "../dashboards/[id]/components/dashboard-work
 const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 } as const;
 
 export default function CrmDefaultDashboardPage() {
+  const { user } = useTenantAuth();
+  const enabled = Boolean(user?.isTenantOwner) ||
+    hasPermission(user?.permissions ?? [], "crm.dashboards.read", true);
+
+  return (
+    <PermissionGate require={user?.isTenantOwner ? [] : "crm.dashboards.read"} scoped>
+      <DefaultDashboardContent enabled={enabled} />
+    </PermissionGate>
+  );
+}
+
+function DefaultDashboardContent({ enabled }: { enabled: boolean }) {
   const { t } = useI18n();
   const [dashboardId, setDashboardId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const loadDefaultDashboard = useCallback(async (signal?: AbortSignal) => {
+    if (!enabled) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -55,9 +70,10 @@ export default function CrmDefaultDashboardPage() {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) {
@@ -65,10 +81,9 @@ export default function CrmDefaultDashboardPage() {
       }
     });
     return () => controller.abort();
-  }, [loadDefaultDashboard]);
+  }, [enabled, loadDefaultDashboard]);
 
   return (
-    <PermissionGate require="crm.dashboards.read" scoped>
       <div className="flex flex-col gap-4">
         {isLoading && !dashboardId ? (
           <div className="flex flex-col gap-3">
@@ -92,11 +107,9 @@ export default function CrmDefaultDashboardPage() {
           <DashboardWorkspace
             key={dashboardId}
             dashboardId={dashboardId}
-            hideHeader
             onSelectDashboard={(nextId) => setDashboardId(nextId)}
           />
         ) : null}
       </div>
-    </PermissionGate>
   );
 }

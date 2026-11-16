@@ -14,7 +14,7 @@ vi.mock("../../useTradeScope", () => ({ useTradeScopeRequest: () => mocks.scope 
 const ID = "0192f3a0-0000-7000-8000-000000000001";
 function response(purpose = "PURCHASE", status = "ACTIVE") {
   return { data: { items: [{
-    id: ID, code: "BOOK", purpose, currencyCode: "EGP", status, version: 1, versions: [],
+    id: ID, code: "BOOK", purpose, currencyCode: "EGP", status, version: 1, versionCount: 0, versions: [],
   }], total: 1, page: 1, limit: 25 } };
 }
 

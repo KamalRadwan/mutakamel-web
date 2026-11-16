@@ -58,10 +58,10 @@ describe("SettingField", () => {
       <SettingField
         lang="en"
         setting={{
-          key: "asterisk.websocket_url",
-          value: "wss://sip.example.com",
-          description: "Websocket URL",
-          descriptionI18n: { en: "Websocket URL", ar: "رابط الويب سوكيت" },
+          key: "platform.support_email",
+          value: "support@example.com",
+          description: "Support email",
+          descriptionI18n: { en: "Support email", ar: "بريد الدعم" },
           isDefault: false,
           readOnly: false,
           error: "This setting could not be saved safely. Error code: GW.UPSTREAM_TIMEOUT",
@@ -69,13 +69,13 @@ describe("SettingField", () => {
           idempotencyKey: "0191a6b0-aaaa-7000-8000-000000000001",
           correlationId: "corr-ambiguous-1",
           uiMeta: {
-            key: "asterisk.websocket_url",
-            titleEn: "Websocket URL",
-            titleAr: "رابط الويب سوكيت",
+            key: "platform.support_email",
+            titleEn: "Support email",
+            titleAr: "بريد الدعم",
             inputType: "string",
             defaultValue: "",
-            descEn: "Websocket URL",
-            descAr: "رابط الويب سوكيت",
+            descEn: "Support email",
+            descAr: "بريد الدعم",
           },
         }}
         onUpdate={vi.fn()}

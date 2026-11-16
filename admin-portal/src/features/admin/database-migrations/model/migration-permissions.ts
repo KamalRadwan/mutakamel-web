@@ -1,9 +1,8 @@
-import { adminCan, type AdminAuthorizationContext } from "@/lib/auth/rbac";
+import { adminCan, ADMIN_RBAC_CRITICAL, type AdminAuthorizationContext } from "@/lib/auth/rbac";
 import type { MigrationPermissions } from "../types/database-migrations";
 
 export const MIGRATION_READ_PERMISSION = "admin.migrations.read";
-export const MIGRATION_EXECUTE_PERMISSION = "admin.migrations.manage";
-export const MIGRATION_CRITICAL_PERMISSION = "admin.migrations.critical";
+export const [MIGRATION_EXECUTE_PERMISSION, MIGRATION_CRITICAL_PERMISSION] = ADMIN_RBAC_CRITICAL.MIGRATIONS_MANAGE;
 
 /**
  * Derives the operator surface's visibility from `/auth/me` permissions.

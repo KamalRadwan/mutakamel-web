@@ -147,7 +147,7 @@ describe.each(["en", "ar"] as const)("OpportunityExecutiveBoardView v3 (%s)", (l
     const { container, unmount, props } = renderBoard([item], [stage]);
     expect(screen.getByTestId("crm-card-activity-bar")).toHaveClass("bg-activity-none");
     expect(container.querySelector(".bg-activity-none-surface")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: formatTemplate(dictionaries[lang].crmLeads.card.activityOpen, { state: dictionaries[lang].statusValues[`OpportunityStatus.${flag}`] }) }));
+    fireEvent.click(screen.getByRole("button", { name: formatTemplate(dictionaries[lang].crmLeads.card.activityOpen, { state: dictionaries[lang].crmLeads.card.activityStates.OVERDUE }) }));
     expect(props.onOpenActivities).toHaveBeenCalledWith(item);
     expect(screen.queryByRole("button", { name: `${dictionaries[lang].crmOpportunityDetail.createAction}: ${localizedName(stage, lang)}` })).toBeNull();
     unmount();
@@ -187,7 +187,7 @@ describe.each(["en", "ar"] as const)("OpportunityExecutiveBoardView v3 (%s)", (l
     fireEvent.change(screen.getByPlaceholderText(t.crmOpportunities.titleExample), { target: { value: "Renewal" } });
     fireEvent.change(screen.getByPlaceholderText("0.00"), { target: { value: "125.25" } });
     fireEvent.click(screen.getByRole("button", { name: t.crmOpportunities.fullForm }));
-    expect(props.onOpenFullCreate).toHaveBeenCalledWith(boardStage.id, expect.objectContaining({ title: "Renewal", amount: "125.25", importance: "2", stageId: boardStage.id }));
+    expect(props.onOpenFullCreate).toHaveBeenCalledWith(boardStage.id, expect.objectContaining({ title: "Renewal", amount: "125.25", importance: "0", stageId: boardStage.id }));
   });
 
   it.each(["WON", "LOST"] as const)("routes native drops into %s through the parent's terminal move flow", (flag) => {

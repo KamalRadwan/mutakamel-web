@@ -13,6 +13,7 @@ import {
   Textarea,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatNumber } from "@/lib/format/number";
 import type { CrmActionCapability } from "../crm-capabilities";
 import { crmCapabilityAllowsOwner } from "../crm-capabilities";
 import { CRM_NOTE_BODY_MAX_LENGTH, type CrmNoteSourceType } from "../notes-contract";
@@ -60,7 +61,7 @@ function RecordNotesContent({
   createCapability,
   readOnly = false,
 }: RecordNotesSectionProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
   const appliedLabels = useAppliedUnreadableLabels();
@@ -140,7 +141,7 @@ function RecordNotesContent({
             />
           )}
 
-          {notes.isLoading && (
+          {notes.isLoading && notes.notes.length === 0 && (
             <div className="flex flex-col gap-1.5">
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
@@ -163,8 +164,8 @@ function RecordNotesContent({
             />
           )}
 
-          {!notes.isLoading && !notes.loadError && notes.notes.length > 0 && (
-            <ul className="flex flex-col gap-2">
+          {notes.notes.length > 0 && (
+            <ul className="flex flex-col gap-2" aria-busy={notes.isLoading}>
               {notes.notes.map((note) => (
                 <NoteRow
                   key={note.id}
@@ -178,6 +179,21 @@ function RecordNotesContent({
                 />
               ))}
             </ul>
+          )}
+          {notes.notes.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-caption text-muted-foreground" role="status">
+                {t.crmNotes.showing
+                  .replace("{shown}", formatNumber(notes.notes.length, lang))
+                  .replace("{total}", formatNumber(notes.total, lang))}
+              </p>
+              {notes.hasNext && (
+                <Button variant="outline" size="sm" onClick={notes.loadMore}
+                  disabled={notes.isLoading || notes.isSaving || notes.pendingId !== null}>
+                  {notes.isLoading ? t.crmNotes.loadingMore : t.crmNotes.loadMore}
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}

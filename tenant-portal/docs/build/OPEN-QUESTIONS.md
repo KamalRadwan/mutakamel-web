@@ -1,6 +1,22 @@
 # Open Questions
 
-Last review: **2026-08-31**
+Last review: **2026-11-01**
+
+## Q143 — Price books have no cross-company list contract
+
+**Resolved for the current UI, 2026-11-01.** The user chose a frontend-only
+change and removal of All companies. The selector now restores a concrete saved
+company or selects the first accessible one; search, filters, and view controls
+remain visible even before company selection or when the list has no data.
+
+Source-verified **2026-11-01**: `PricingController.list` still declares
+`TradeScopeTarget.COMPANY`; company defaults use that same scope. There is no
+proven tenant-wide price-book listing or aggregate pagination/KPI contract.
+The frontend requires a company before loading books. It does not invent a route or
+fan out company requests to simulate a cross-company result. The Trade backend
+owner can settle the aggregate read contract if All companies must list books
+across companies. Named selectors, local directory search, and company-to-branch
+filtering use the existing Core organization contract.
 
 Questions the documentation cannot answer. **Add to this file rather than
 guessing or asking a human mid-build.** An entry here is a bug in the docs.
@@ -2514,7 +2530,7 @@ product decision outstanding.
 the Core activity projection's overdue bucket, and send the same filters to
 list/search and board before count/pagination. Do not invent a DTO key before
 the backend contract exists. See
-[the KPI route](../api/crm-leads.md#post-leadskpis--the-kpi-strip-2026-10-14).
+[the KPI route](../api/crm-leads.md#post-leadskpis--headline-count-api-2026-10-14).
 
 **Related, Q133:** the inline primary-phone editors now send the lead's whole
 list with only the first number replaced (`lead-phone-patch.ts`), so a lead's
@@ -2522,3 +2538,197 @@ other numbers survive an edit. An individual's `phones` write still syncs
 `MOBILE` methods only, so a `PHONE`-typed number on a person is re-sent as a
 `MOBILE` value; Q133's settlement covers it.
 
+## Q141 — Core empty-list pagination metadata emits two hasPrev values
+
+Core paginated endpoints wrap repository results through `ResponseEnvelopeInterceptor`
+(`../backend/mutakamel-apps/shared-libs/packages/common/src/interceptors/response-envelope.interceptor.ts`)
+into `{ success: true, data: T[], meta: { page, limit, total, totalPages, hasNext, hasPrev } }`.
+When `total === 0` and `page > 1`, two legitimate backend helpers currently produce
+different `meta.hasPrev` booleans:
+
+- `BaseRepository.envelope`
+  (`../backend/mutakamel-apps/shared-libs/packages/database/src/repositories/base.repository.ts`)
+  computes `hasPrev = page > 1`, returning `true` on `page >= 2` even when `total === 0`.
+- `emptyPage`
+  (`../backend/mutakamel-apps/shared-libs/packages/database/src/query-engine/query-result.helpers.ts`),
+  used when an actor's company or branch scope resolves to empty in `TaxesService`,
+  `NumberingSequencesService`, `OrganizationService` and `TenantUsersService`,
+  hard-codes `hasPrev: false`.
+
+Both return `hasPrev: false` on `page === 1`, and non-empty totals (`total > 0`)
+always run through `BaseRepository.envelope` (`hasPrev = page > 1`).
+
+**What was done instead:** `parseCorePageMeta` in
+`src/app/(tenant)/core/contracts/core-page.ts` accepts both `hasPrev: true` and
+`hasPrev: false` **only** when `total === 0 && page > 1`, while still rejecting
+`hasPrev: true` on `page === 1` and `hasPrev: false` whenever `total > 0 && page > 1`
+(as well as malformed `totalPages` or `hasNext` on empty pages). See
+[Core settings envelope](../api/core-settings.md#paginated-response-envelope-and-empty-list-metadata).
+
+**Settle with:** align `emptyPage` and `BaseRepository.envelope` in
+`@mutakamel/database` on one zero-total `hasPrev` rule, then tighten
+`parseCorePageMeta` to that single boolean.
+
+## Q142 — Provisioning updates checkedAt is dropped by ResponseEnvelopeInterceptor
+
+`TenantSelfServiceProvisioningService.listAvailableUpdates`
+(`../backend/mutakamel-apps/core-app/src/tenant/provisioning/tenant-self-service-provisioning.service.ts`)
+returns `{ items, total, page, limit, totalPages, hasNext, hasPrev, checkedAt }`.
+Because the payload matches `isPaginatedResult` (`items` array plus numeric
+`total`, `page`, `limit`), `ResponseEnvelopeInterceptor` projects it into
+`{ success: true, data: items, meta: { page, limit, total, totalPages, hasNext, hasPrev }, correlationId, timestamp }`
+and drops sibling fields outside `items` and the six pager keys — so `checkedAt`
+never reaches the HTTP response body (only envelope `timestamp` is emitted).
+
+**What was done instead:** the Tenant Portal updates contract
+(`src/app/(tenant)/core/settings/updates/provisioning-updates-contract.ts`) and
+`/core/settings/updates` UI read the canonical `{ data, meta }` page through
+`readCorePage` + `parseCorePageMeta` and omit any `checkedAt` display rather
+than fabricating a client timestamp or repurposing envelope metadata. See
+[Self-service component updates](../api/core-settings.md#self-service-component-updates--3-routes).
+
+**Settle with:** if a server discovery timestamp is required in the UI, expose
+it in a non-paginated wrapper DTO or documented response field that survives
+`ResponseEnvelopeInterceptor`.
+
+## Q143 — Live role assignment-options read returns 500
+
+**Resolved 2026-11-01:** the user explicitly authorized this bounded backend
+repair. `BaseTenantRepository.getRepository()` throws by design; the options
+service now uses its public tenant-scoped transaction callback for both reads.
+Core was rebuilt and recreated, is healthy, and all 2,904 watched source files
+match their containers. Targeted Core tests: 181 passed (including the related
+organization filter fixes). The authenticated endpoint now returns 18 choices
+and three labels; the actual Grant and Edit scoped roles dialogs load, and a
+valid selection enables Grant. No real access was granted during QA.
+Evidence: `C:/mutakamel.ai/designs/organization-tenant-study-v1/implementation/verification/visual-v2-live/assignment-options-after.json`
+and `role-grant-ready-fixed-en-light.jpg`. The updated PostgreSQL fixture remains
+**PG pending release gate**, per the repository's once-per-release rule.
+
+Observed 2026-11-01 against the authenticated tenant on port 5002 after a
+successful production frontend rebuild (HTTP 200):
+`GET /api/tenant/core/v1/users/:userId/assignment-options?search=&page=1&limit=100`
+returns HTTP 500, `COMMON.GENERIC.INTERNAL_ERROR`. Support reference:
+`01a19745-5afc-7946-a1a6-988ee8d588b3`. Core logs record the same unhandled
+exception and route; their sanitized record does not establish its cause.
+
+The source contract exists in Gateway's `core.tenant.users.assignment-options.list`
+and Core's `TenantRolesController.assignmentOptions` /
+`TenantRolesService.assignmentOptions`. Existing branch and scoped assignments
+can be read. The failing companion read prevents safe live grant editing.
+
+The frontend retains existing grant summaries, disables edits while options
+are unavailable, offers retry and exposes the localized support reference.
+It does not fabricate branch-role pairs or bypass per-branch containment. A
+server 403 renders PermissionGate. Mocked authority/DTO/failure tests pass;
+they did not prove this live endpoint worked. At that initial observation no
+backend file had been changed.
+
+The original live-read blocker is closed by the resolution above. This does not
+constitute testing a real grant mutation or implementing the proposed role
+permission profiles that differ by branch.
+
+## Q144 — Pipeline assignment-options rejects its documented numeric query
+
+**Resolved 2026-11-04 with explicit user authorization to repair the backend.**
+
+The original HTTP 400 on `GET /api/tenant/crm/v1/pipelines/assignment-options?limit=50`
+was caused by `PipelineAssignmentOptionsQueryDto.limit` being inferred as
+`design:type Object`. HTTP `"50"` stayed a string and failed `IsInt/Min/Max`.
+The owning DTO now uses `@Type(() => Number)` and `limit: number = 50`, matching
+other CRM numeric query DTOs. No frontend query omission or validation bypass
+was introduced; the default 50 and range 1–100 remain unchanged.
+
+The regression was reproduced with the application's ValidationPipe settings:
+the three valid HTTP strings failed before the fix. After the fix, four focused
+backend suites passed **140 tests**, including string inputs, defaults, bounds,
+malformed/multiple values and whitelist/search validation. Typecheck and scoped
+ESLint passed; container sync checked 2,919 files with zero drift.
+
+Authenticated Playwright MCP verified 200 for limits 1/50/100 and the omitted
+limit, and 400 for 0/101/1.5. A temporary non-default pipeline and empty team were
+created through the UI. User+team RESTRICTED replacement returned 200 and survived
+a full reload; ALL replacement reviewed both removals, required acknowledgement,
+returned 200 and persisted empty target arrays. Both temporary records were
+deleted through their UI (204), then read back as 404. The original default
+pipeline remained active with ALL access and six stages.
+
+Evidence and screenshots:
+`C:/mutakamel.ai/designs/crm-pipeline-access-fix-2026-11-04/`.
+Historical diagnosis:
+`C:/mutakamel.ai/designs/crm-settings-suite-2026-11-03/implementation/live-contract-investigation.md`.
+
+
+## Q145 — CRM service repeatedly exhausts its Node heap during live reads
+
+**Resolved for the current development runtime — 2026-11-04.** The user
+authorized the owning backend repair. Plain `ts-node` retained the TypeScript
+compiler graph in the serving process: a controlled import measured 503.86 MiB
+heap versus 124.89 MiB with `--transpile-only`, before Nest bootstrap. CRM now
+uses the latter command while retaining its separate typecheck/build gates and
+decorator-metadata regression. The CRM-only image was rebuilt/recreated with
+the existing 1 GiB limit. A 20-sample, ten-minute check recorded healthy/200
+readiness, zero restarts and 286.9–298.7 MiB memory. Authenticated catalogue,
+Tags and all 12 icon reads returned 200. A temporary source also passed create,
+icon upload/replacement and cleanup after the separate multipart-boundary fix;
+the original 12 source IDs/order were restored. Preserve the UI's existing
+failure/retry and uncertain-write boundaries. Repair and runtime evidence:
+`C:/mutakamel.ai/designs/crm-reliability-fixes-2026-11-04/RESULT.md`.
+
+Historical observations before this repair:
+
+Observed 2026-11-03: CRM logs report JavaScript heap exhaustion, followed by
+Gateway502 `GW.UPSTREAM.UNAVAILABLE` / upstream connection refusal for Tags and
+Custom Fields. The container recovered automatically under its existing
+`on-failure` policy; subsequent live reads returned the actual Tag catalogue and
+empty Custom Fields/Outbound Email states. Later reads again showed explicit
+unavailable states, so a single recovery does not establish lasting stability.
+
+No backend/configuration changes or manual restart were made. Keep the UI's
+failure and retry boundaries; do not present service failure as an empty list.
+Settle through a backend memory investigation and a sustained authenticated
+read check. Timing of concurrent icon requests alone does not establish a
+memory-leak cause. Evidence:
+`C:/mutakamel.ai/designs/crm-settings-suite-2026-11-03/implementation/live-contract-investigation.md`.
+
+Reconfirmed 2026-11-04 during Acquisition Sources implementation: fatal heap
+exhaustion at 18:03:29, 18:05:13 and 18:08:55 Cairo preceded reorder and follow-up
+catalogue read failures. Gateway logs identify `ECONNREFUSED` and
+`GW.UPSTREAM.UNAVAILABLE`; those reorder requests never reached the service.
+An earlier full-catalogue reorder (including an inactive source) returned 200.
+Do not infer that an unknown write failed to commit or enable another write
+until a validated catalogue read succeeds. Evidence:
+`C:/mutakamel.ai/designs/settings-bilingual-sources-2026-11-04/implementation/crm-runtime-diagnostic.md`.
+
+## Q146 — Separate Arabic and English columns need stored names on five settings catalogues
+
+Source verified 2026-11-04 during the design-only settings bilingual study.
+Lead Stages, Pipelines, Opportunity Stages, Acquisition Sources and Custom
+Fields already project `nameAr` and `nameEn`; CRM static options project
+`label.ar` and `label.en`. Their independent columns can be implemented
+without changing the backend contract.
+
+Tags, dashboard definitions, widget definitions, currencies and taxes expose
+one stored `name`, with no second writable or returned name. Repeating that
+value in two columns or translating it in the browser would misrepresent
+persisted data. Currency `code`, tax `code`, dashboard template bilingual
+labels and widget metric labels are not translations of those record names.
+
+Evidence: CRM `tags/dto/tag.dto.ts:36`,
+`dashboards/dto/dashboard-builder.dto.ts:232,313`; Core
+`tenant/currencies/dto/create-currency.dto.ts:35` and
+`tenant/taxes/dto/create-tax.dto.ts:28`; frontend runtime contracts
+`crm/shared/tag-contract.ts`, `crm/dashboards/dashboard-contract.ts`,
+`crm/dashboards/widget-contract.ts`, `core/settings/currencies/currency-contract.ts`
+and `core/settings/taxes/tax-contract.ts`.
+
+Two persisted names on those five lists need a separately authorized owning
+backend/schema/DTO/response change and data policy. This tenant portal task
+keeps backend files read-only. Forms, email history, numbering codes and
+component-update labels do not become bilingual entity catalogues merely
+because they are reachable from Settings. No application change is applied
+by this study. Scope ownership leaves Pipelines, Tags and Custom Fields to
+their dedicated chats and Static Data to its separately assigned design.
+Design and exact source ledger:
+`C:/mutakamel.ai/designs/settings-bilingual-sources-2026-11-04/PLAN.md` and
+`C:/mutakamel.ai/designs/settings-bilingual-sources-2026-11-04/source-ledger.json`.

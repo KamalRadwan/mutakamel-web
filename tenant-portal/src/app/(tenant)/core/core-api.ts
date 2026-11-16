@@ -29,7 +29,7 @@ export async function coreGet(
   path: CorePath,
   config?: TenantApiRequestConfig,
 ): Promise<CoreResult> {
-  const response = await axiosClient.get<unknown>(path, { cache: "no-store", ...config });
+  const response = await coreGetResponse(path, config);
   return { data: coreEnvelopeData(response.data), headers: response.headers, status: response.status };
 }
 
@@ -38,7 +38,7 @@ export async function corePost(
   body?: unknown,
   config?: TenantApiRequestConfig,
 ): Promise<CoreResult> {
-  const response = await axiosClient.post<unknown>(path, body, { cache: "no-store", ...config });
+  const response = await corePostResponse(path, body, config);
   return { data: coreEnvelopeData(response.data), headers: response.headers, status: response.status };
 }
 
@@ -47,7 +47,7 @@ export async function corePatch(
   body: unknown,
   config?: TenantApiRequestConfig,
 ): Promise<CoreResult> {
-  const response = await axiosClient.patch<unknown>(path, body, { cache: "no-store", ...config });
+  const response = await corePatchResponse(path, body, config);
   return { data: coreEnvelopeData(response.data), headers: response.headers, status: response.status };
 }
 
@@ -66,4 +66,19 @@ export async function coreDelete(
 ): Promise<CoreResult> {
   const response = await axiosClient.delete<unknown>(path, { cache: "no-store", ...config });
   return { data: coreEnvelopeData(response.data), headers: response.headers, status: response.status };
+}
+
+/** Preserve raw transport evidence for writes requiring a coherent owner receipt. */
+export function corePatchResponse(path: CorePath, body: unknown, config?: TenantApiRequestConfig) {
+  return axiosClient.patch<unknown>(path, body, { cache: "no-store", ...config });
+}
+
+/** Preserve the raw owner read response until its runtime validator admits it. */
+export function coreGetResponse(path: CorePath, config?: TenantApiRequestConfig) {
+  return axiosClient.get<unknown>(path, { cache: "no-store", ...config });
+}
+
+/** The owner also exposes read-like POSTs (for example template search). */
+export function corePostResponse(path: CorePath, body?: unknown, config?: TenantApiRequestConfig) {
+  return axiosClient.post<unknown>(path, body, { cache: "no-store", ...config });
 }

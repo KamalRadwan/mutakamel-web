@@ -21,6 +21,8 @@ import {
 
 // @MaxLength(80) on nameAr and nameEn.
 export const OPPORTUNITY_STAGE_NAME_MAX_LENGTH = 80;
+// OpportunityStagesService.MAX_OPPORTUNITY_STAGES bounds the whole catalogue.
+export const OPPORTUNITY_STAGE_LIMIT = 500;
 
 const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -88,9 +90,8 @@ export function buildCreateOpportunityStageRequest(
  *
  * A system stage refuses a flag change or a deactivation with a 422
  * `OPPORTUNITY_STAGE_SYSTEM_PROTECTED`, and any stage assigned to a pipeline
- * refuses both with a 409 `OPPORTUNITY_STAGE_IN_USE` — so those two fields are
- * dropped from the body when the stage cannot accept them, leaving the rename
- * that is always legal.
+ * refuses both with a 409 `OPPORTUNITY_STAGE_IN_USE`. Membership is not in the
+ * read projection, so the server remains authoritative for that refusal.
  */
 export function buildUpdateOpportunityStageRequest(
   input: OpportunityStageFormInput,

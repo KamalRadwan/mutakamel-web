@@ -82,6 +82,7 @@ export function CreateTagModal({
         <TagColorPicker
           value={modal.color}
           onChange={modal.handleColorChange}
+          onValidityChange={modal.handleColorValidityChange}
           previewLabel={modal.name}
           disabled={modal.isSubmitting}
         />

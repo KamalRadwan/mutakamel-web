@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import {
-  Badge,
+  StatusBadge,
   Button,
   FormSection,
   Select,
@@ -96,9 +96,7 @@ export function PipelineStagePickerSection({
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                 {localizedName(stage, lang)}
               </span>
-              <Badge tone="neutral">
-                {t.statusValues[`OpportunityStageFlag.${stage.flag}`] ?? stage.flag}
-              </Badge>
+              <StatusBadge kind="OpportunityStageFlag" value={stage.flag} />
               <div className="flex items-center gap-1">
                 <Button
                   type="button"

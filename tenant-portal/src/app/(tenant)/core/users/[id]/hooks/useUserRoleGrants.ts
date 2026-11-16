@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { computeReplacementDiff, type ReplacementDiff } from "@/design-system";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { isUUIDv7 } from "@/lib/uuid";
 import {
   addBranchRoleAssignment,
   branchRoleAssignmentKey,
-  fetchBranchRoleAssignments,
-  fetchScopeRoleAssignments,
   removeBranchRoleAssignment,
   replaceBranchRoleAssignments,
   replaceScopeRoleAssignments,
@@ -17,19 +15,16 @@ import {
   type ScopeRoleAssignment,
   type ScopeRoleAssignmentInput,
 } from "../../../contracts/role-assignment-contract";
+import { useUserRoleGrantsData } from "./useUserRoleGrantsData";
 
-/**
- * The two grant models a Core user can hold, loaded independently.
- *
- * They are a **union**, not alternatives: `tenant_user_branch_roles` scopes one
- * role to one branch and supports add/remove, `tenant_user_scope_roles` scopes a
- * role to TENANT / COMPANY / BRANCH and is replaced atomically by an owner. A
- * separate request each, so a 403 on the owner-only scope list cannot blank the
- * branch grants the caller is allowed to see.
- */
 export interface BranchRoleGrant {
   branchId: string;
   roleId: string;
+}
+
+interface ScopedState<T> {
+  userId: string;
+  value: T;
 }
 
 function toAssignmentInput(assignment: ScopeRoleAssignment): ScopeRoleAssignmentInput {
@@ -41,87 +36,111 @@ function toAssignmentInput(assignment: ScopeRoleAssignment): ScopeRoleAssignment
   };
 }
 
-export function useUserRoleGrants(userId: string, enabled: boolean, isTenantOwnerActor: boolean) {
-  const [branchRoles, setBranchRoles] = useState<BranchRoleAssignment[]>([]);
-  const [branchError, setBranchError] = useState<NormalizedApiError | null>(null);
-  const [isBranchLoading, setIsBranchLoading] = useState(enabled);
+function scopedForUser<T>(state: ScopedState<T> | null, userId: string): T | null {
+  return state?.userId === userId ? state.value : null;
+}
 
-  const [scopeRoles, setScopeRoles] = useState<ScopeRoleAssignment[]>([]);
-  const [scopeError, setScopeError] = useState<NormalizedApiError | null>(null);
-  const [isScopeLoading, setIsScopeLoading] = useState(enabled && isTenantOwnerActor);
+/**
+ * Coordinates atomic replacement and single-grant mutations over
+ * `useUserRoleGrantsData`. Every draft, review flag, and pending removal is
+ * keyed to the `userId` that opened it so switching targets can never commit a
+ * previous user's draft, while same-user drafts survive reload/write failures.
+ */
+export function useUserRoleGrants(
+  userId: string,
+  enabled: boolean,
+  isTenantOwnerActor: boolean,
+) {
+  const data = useUserRoleGrantsData(userId, enabled, isTenantOwnerActor);
+  const { branchRoles, scopeRoles, branchReady, scopeReady, reload } = data;
 
-  const [writeError, setWriteError] = useState<NormalizedApiError | null>(null);
+  const [writeErrorState, setWriteErrorState] =
+    useState<ScopedState<NormalizedApiError> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [pendingRemoval, setPendingRemoval] = useState<BranchRoleAssignment | null>(null);
-  const [draft, setDraft] = useState<ScopeRoleAssignmentInput[] | null>(null);
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [branchDraft, setBranchDraft] = useState<BranchRoleGrant[] | null>(null);
-  const [isReviewingBranch, setIsReviewingBranch] = useState(false);
+  const [removalState, setRemovalState] =
+    useState<ScopedState<BranchRoleAssignment> | null>(null);
+  const [draftState, setDraftState] =
+    useState<ScopedState<ScopeRoleAssignmentInput[]> | null>(null);
+  const [reviewUserId, setReviewUserId] = useState<string | null>(null);
+  const [branchDraftState, setBranchDraftState] =
+    useState<ScopedState<BranchRoleGrant[]> | null>(null);
+  const [branchReviewUserId, setBranchReviewUserId] = useState<string | null>(null);
+
+  const writeError = scopedForUser(writeErrorState, userId);
+  const pendingRemoval = scopedForUser(removalState, userId);
+  const draft = scopedForUser(draftState, userId);
+  const branchDraft = scopedForUser(branchDraftState, userId);
+
+  const inFlightRef = useRef(false);
+  const latestRef = useRef({
+    userId,
+    enabled,
+    isTenantOwnerActor,
+    branchReady,
+    scopeReady,
+    branchRoles,
+    scopeRoles,
+    removalState,
+    branchDraftState,
+    draftState,
+  });
 
   useEffect(() => {
-    // Deferred past the effect body on purpose: a synchronous setState there
-    // cascades an extra render (react-hooks/set-state-in-effect), and the abort
-    // check means a torn-down screen never writes at all.
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      if (!enabled || !isUUIDv7(userId)) {
-        setIsBranchLoading(false);
-        setIsScopeLoading(false);
-        return;
-      }
-      setIsBranchLoading(true);
-      setIsScopeLoading(isTenantOwnerActor);
-      setBranchError(null);
-      setScopeError(null);
+    latestRef.current = {
+      userId,
+      enabled,
+      isTenantOwnerActor,
+      branchReady,
+      scopeReady,
+      branchRoles,
+      scopeRoles,
+      removalState,
+      branchDraftState,
+      draftState,
+    };
+  });
 
-      fetchBranchRoleAssignments(userId, controller.signal)
-        .then((result) => {
-          if (!controller.signal.aborted) setBranchRoles(result);
-        })
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) return;
-          setBranchRoles([]);
-          setBranchError(normalizeApiError(error));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setIsBranchLoading(false);
-        });
+  const clearWriteError = useCallback(() => setWriteErrorState(null), []);
 
-      if (!isTenantOwnerActor) {
-        setScopeRoles([]);
-        return;
-      }
+  const setBranchDraft: Dispatch<SetStateAction<BranchRoleGrant[] | null>> = useCallback(
+    (action) => {
+      const targetUserId = latestRef.current.userId;
+      const prev = scopedForUser(latestRef.current.branchDraftState, targetUserId);
+      const next = typeof action === "function" ? action(prev) : action;
+      const scoped = next ? { userId: targetUserId, value: next } : null;
+      latestRef.current.branchDraftState = scoped;
+      setBranchDraftState(scoped);
+    },
+    [],
+  );
 
-      fetchScopeRoleAssignments(userId, controller.signal, { suppressForbiddenToast: true })
-        .then((result) => {
-          if (!controller.signal.aborted) setScopeRoles(result);
-        })
-        .catch((error: unknown) => {
-          if (controller.signal.aborted) return;
-          setScopeRoles([]);
-          setScopeError(normalizeApiError(error));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setIsScopeLoading(false);
-        });
-    });
-    return () => controller.abort();
-  }, [enabled, isTenantOwnerActor, reloadToken, userId]);
-
-  const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  const setDraft: Dispatch<SetStateAction<ScopeRoleAssignmentInput[] | null>> = useCallback(
+    (action) => {
+      const targetUserId = latestRef.current.userId;
+      const prev = scopedForUser(latestRef.current.draftState, targetUserId);
+      const next = typeof action === "function" ? action(prev) : action;
+      const scoped = next ? { userId: targetUserId, value: next } : null;
+      latestRef.current.draftState = scoped;
+      setDraftState(scoped);
+    },
+    [],
+  );
 
   const runWrite = useCallback(
-    async (work: () => Promise<void>) => {
+    async (targetUserId: string, work: () => Promise<void>): Promise<boolean> => {
+      if (inFlightRef.current) return false;
+      inFlightRef.current = true;
       setIsSubmitting(true);
-      setWriteError(null);
+      setWriteErrorState(null);
       try {
         await work();
         reload();
+        return true;
       } catch (error) {
-        setWriteError(normalizeApiError(error));
+        setWriteErrorState({ userId: targetUserId, value: normalizeApiError(error) });
+        return false;
       } finally {
+        inFlightRef.current = false;
         setIsSubmitting(false);
       }
     },
@@ -129,122 +148,154 @@ export function useUserRoleGrants(userId: string, enabled: boolean, isTenantOwne
   );
 
   const addBranchRole = useCallback(
-    (body: { branchId: string; roleId: string }) =>
-      runWrite(async () => {
-        await addBranchRoleAssignment(userId, body);
-      }),
-    [runWrite, userId],
+    (body: { branchId: string; roleId: string }): Promise<boolean> => {
+      const state = latestRef.current;
+      if (inFlightRef.current || !state.branchReady) return Promise.resolve(false);
+      return runWrite(state.userId, async () => {
+        await addBranchRoleAssignment(state.userId, body);
+      });
+    },
+    [runWrite],
   );
 
-  const removeBranchRole = useCallback(() => {
-    const target = pendingRemoval;
-    if (!target) return Promise.resolve();
-    return runWrite(async () => {
-      await removeBranchRoleAssignment(userId, target.id);
-      setPendingRemoval(null);
+  const removeBranchRole = useCallback((): Promise<boolean> => {
+    const state = latestRef.current;
+    const activeRemoval = scopedForUser(state.removalState, state.userId);
+    if (inFlightRef.current || !activeRemoval || !state.branchReady) {
+      if (!state.enabled) setRemovalState(null);
+      return Promise.resolve(false);
+    }
+    return runWrite(state.userId, async () => {
+      await removeBranchRoleAssignment(state.userId, activeRemoval.id);
+      latestRef.current.removalState = null;
+      setRemovalState(null);
     });
-  }, [pendingRemoval, runWrite, userId]);
+  }, [runWrite]);
 
-  const commitBranchRoles = useCallback(() => {
-    const next = branchDraft;
-    if (!next) return Promise.resolve();
-    return runWrite(async () => {
-      await replaceBranchRoleAssignments(userId, next);
+  const commitBranchRoles = useCallback((): Promise<boolean> => {
+    const state = latestRef.current;
+    const activeDraft = scopedForUser(state.branchDraftState, state.userId);
+    if (inFlightRef.current || !activeDraft || !state.branchReady) {
+      if (!state.enabled) setBranchReviewUserId(null);
+      return Promise.resolve(false);
+    }
+    return runWrite(state.userId, async () => {
+      await replaceBranchRoleAssignments(state.userId, activeDraft);
       setBranchDraft(null);
-      setIsReviewingBranch(false);
+      setBranchReviewUserId(null);
     });
-  }, [branchDraft, runWrite, userId]);
+  }, [runWrite, setBranchDraft]);
 
   const branchDiff = useCallback(
     (describe: (grant: BranchRoleGrant) => { label: string; hint?: string }): ReplacementDiff =>
       computeReplacementDiff(
-        branchRoles.map((assignment) => ({
-          id: branchRoleAssignmentKey(assignment),
-          ...describe(assignment),
-        })),
-        (branchDraft ?? []).map((grant) => ({
-          id: branchRoleAssignmentKey(grant),
-          ...describe(grant),
-        })),
+        branchRoles.map((a) => ({ id: branchRoleAssignmentKey(a), ...describe(a) })),
+        (branchDraft ?? []).map((g) => ({ id: branchRoleAssignmentKey(g), ...describe(g) })),
       ),
     [branchDraft, branchRoles],
   );
 
-  const commitScopeRoles = useCallback(() => {
-    const next = draft;
-    if (!next) return Promise.resolve();
-    return runWrite(async () => {
-      await replaceScopeRoleAssignments(userId, next);
+  const commitScopeRoles = useCallback((): Promise<boolean> => {
+    const state = latestRef.current;
+    const activeDraft = scopedForUser(state.draftState, state.userId);
+    if (inFlightRef.current || !activeDraft || !state.scopeReady) {
+      if (!state.enabled || !state.isTenantOwnerActor) setReviewUserId(null);
+      return Promise.resolve(false);
+    }
+    return runWrite(state.userId, async () => {
+      await replaceScopeRoleAssignments(state.userId, activeDraft);
       setDraft(null);
-      setIsReviewing(false);
+      setReviewUserId(null);
     });
-  }, [draft, runWrite, userId]);
+  }, [runWrite, setDraft]);
 
   const scopeDiff = useCallback(
-    (describe: (assignment: ScopeRoleAssignmentInput) => { label: string; hint?: string }): ReplacementDiff =>
+    (describe: (item: ScopeRoleAssignmentInput) => { label: string; hint?: string }): ReplacementDiff =>
       computeReplacementDiff(
-        // The stored row carries `null` where the DTO carries `undefined`; the
-        // key function treats them identically, so the diff lines up.
-        scopeRoles.map((assignment) => ({
-          id: scopeRoleAssignmentKey(assignment),
-          ...describe(toAssignmentInput(assignment)),
-        })),
-        (draft ?? []).map((assignment) => ({
-          id: scopeRoleAssignmentKey(assignment),
-          ...describe(assignment),
-        })),
+        scopeRoles.map((a) => ({ id: scopeRoleAssignmentKey(a), ...describe(toAssignmentInput(a)) })),
+        (draft ?? []).map((a) => ({ id: scopeRoleAssignmentKey(a), ...describe(a) })),
       ),
     [draft, scopeRoles],
   );
 
   return {
     branchRoles,
-    branchError,
-    isBranchLoading,
+    branchError: data.branchError,
+    isBranchLoading: data.isBranchLoading,
     scopeRoles,
-    scopeError,
-    isScopeLoading,
+    scopeError: data.scopeError,
+    isScopeLoading: data.isScopeLoading,
     writeError,
+    clearWriteError,
     isSubmitting,
     reload,
     addBranchRole,
     pendingRemoval,
-    requestRemoval: setPendingRemoval,
-    cancelRemoval: () => setPendingRemoval(null),
+    requestRemoval: (target: BranchRoleAssignment | null) => {
+      const state = latestRef.current;
+      if (target && (inFlightRef.current || !state.branchReady)) return;
+      setWriteErrorState(null);
+      const scoped = target ? { userId: state.userId, value: target } : null;
+      latestRef.current.removalState = scoped;
+      setRemovalState(scoped);
+    },
+    cancelRemoval: () => {
+      if (inFlightRef.current) return;
+      latestRef.current.removalState = null;
+      setRemovalState(null);
+      setWriteErrorState(null);
+    },
     removeBranchRole,
     branchDraft,
     setBranchDraft,
-    startBranchReplace: () =>
-      setBranchDraft(
-        branchRoles.map(({ branchId, roleId }) => ({ branchId, roleId })),
-      ),
-    cancelBranchReplace: () => {
-      setBranchDraft(null);
-      setIsReviewingBranch(false);
+    startBranchReplace: () => {
+      const state = latestRef.current;
+      if (inFlightRef.current || !state.branchReady) return;
+      setWriteErrorState(null);
+      setBranchDraft(state.branchRoles.map(({ branchId, roleId }) => ({ branchId, roleId })));
     },
-    isReviewingBranch,
-    reviewBranch: () => setIsReviewingBranch(true),
-    closeBranchReview: () => setIsReviewingBranch(false),
+    cancelBranchReplace: () => {
+      if (inFlightRef.current) return;
+      setBranchDraft(null);
+      setBranchReviewUserId(null);
+      setWriteErrorState(null);
+    },
+    isReviewingBranch: branchReviewUserId === userId && enabled && branchDraft !== null,
+    reviewBranch: () => {
+      const state = latestRef.current;
+      if (!inFlightRef.current && state.branchReady && scopedForUser(state.branchDraftState, state.userId)) {
+        setBranchReviewUserId(state.userId);
+      }
+    },
+    closeBranchReview: () => {
+      if (!inFlightRef.current) setBranchReviewUserId(null);
+    },
     commitBranchRoles,
     branchDiff,
     draft,
     setDraft,
-    startScopeEdit: () =>
-      setDraft(
-        scopeRoles.map(({ scopeTarget, roleId, companyId, branchId }) => ({
-          scopeTarget,
-          roleId,
-          companyId: companyId ?? undefined,
-          branchId: branchId ?? undefined,
-        })),
-      ),
-    cancelScopeEdit: () => {
-      setDraft(null);
-      setIsReviewing(false);
+    startScopeEdit: () => {
+      const state = latestRef.current;
+      if (inFlightRef.current || !state.scopeReady) return;
+      setWriteErrorState(null);
+      setDraft(state.scopeRoles.map(toAssignmentInput));
     },
-    isReviewing,
-    review: () => setIsReviewing(true),
-    closeReview: () => setIsReviewing(false),
+    cancelScopeEdit: () => {
+      if (inFlightRef.current) return;
+      setDraft(null);
+      setReviewUserId(null);
+      setWriteErrorState(null);
+    },
+    isReviewing: reviewUserId === userId && enabled && isTenantOwnerActor && draft !== null,
+    review: () => {
+      const state = latestRef.current;
+      if (!inFlightRef.current && state.scopeReady && scopedForUser(state.draftState, state.userId)) {
+        setReviewUserId(state.userId);
+      }
+    },
+    closeReview: () => {
+      if (!inFlightRef.current) setReviewUserId(null);
+    },
     commitScopeRoles,
     scopeDiff,
   };

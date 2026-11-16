@@ -31,6 +31,10 @@ export interface TradeRenderJob {
   renderJobId: string;
   status: string;
   attemptCount: number;
+  quotationId?: string;
+  quotationRevisionId?: string;
+  templateDefinitionId?: string;
+  templateVersionId?: string;
   /**
    * Present when the worker reported a failure.
    *
@@ -45,12 +49,8 @@ export interface TradeRenderJob {
   /**
    * The canonical poll path, built by the service itself.
    *
-   * The 202 also sets a `Location` header, and it must be ignored: on the PDF
-   * routes the Gateway's `assertPublicLocationContract` requires a prefix
-   * trade-app does not emit, and on the sales-order confirm route the header
-   * carries a path with no Gateway mapping at all (Q34, Q36). `statusUrl`
-   * already carries the canonical form and is unaffected by whichever side is
-   * corrected.
+   * Poll requests are rebuilt from validated resource IDs, so a response can
+   * never redirect a read to an unrelated document or origin.
    */
   statusUrl: string;
   artifact: TradeRenderArtifact | null;
@@ -67,8 +67,9 @@ export function parseTradeRenderJob(payload: unknown): TradeRenderJob {
   if (
     !job ||
     !isUUIDv7(job.renderJobId) ||
-    !isBoundedString(job.status, 32) ||
-    typeof job.attemptCount !== "number" ||
+    !["PENDING", "RETRYING", "COMPLETED", "FAILED"].includes(String(job.status)) ||
+    typeof job.status !== "string" ||
+    typeof job.attemptCount !== "number" || !Number.isSafeInteger(job.attemptCount) || job.attemptCount < 0 ||
     !isBoundedString(job.statusUrl, 300) ||
     !job.statusUrl.startsWith("/api/tenant/trade/v1/")
   ) {
@@ -81,7 +82,24 @@ export function parseTradeRenderJob(payload: unknown): TradeRenderJob {
     failure: parseFailure(job.failure),
     statusUrl: job.statusUrl,
     artifact: parseArtifact(job.artifact),
+    ...optionalJobIds(job),
   };
+}
+
+function optionalJobIds(job: Record<string, unknown>): Pick<TradeRenderJob, "quotationId" | "quotationRevisionId" | "templateDefinitionId" | "templateVersionId"> {
+  const ids: Pick<TradeRenderJob, "quotationId" | "quotationRevisionId" | "templateDefinitionId" | "templateVersionId"> = {};
+  for (const key of ["quotationId", "quotationRevisionId", "templateDefinitionId", "templateVersionId"] as const) {
+    if (job[key] === undefined) continue;
+    if (!isUUIDv7(job[key])) tradeInvalidResponse();
+    ids[key] = job[key];
+  }
+  return ids;
+}
+
+/** Branch-authorized binary endpoint; no caller-controlled storage URL. */
+export function quotationRenderArtifactPath(quotationId: string, jobId: string): TradePath {
+  if (!isUUIDv7(quotationId) || !isUUIDv7(jobId)) tradeInvalidResponse();
+  return `/api/tenant/trade/v1/quotations/${quotationId}/render-jobs/${jobId}/artifact`;
 }
 
 /**
@@ -115,11 +133,23 @@ function parseArtifact(value: unknown): TradeRenderArtifact | null {
   if (!artifact) return null;
   if (
     !isBoundedString(artifact.checksum, 200) ||
-    typeof artifact.sizeBytes !== "number" ||
-    typeof artifact.pageCount !== "number" ||
+    typeof artifact.sizeBytes !== "number" || !Number.isSafeInteger(artifact.sizeBytes) || artifact.sizeBytes < 1 ||
+    typeof artifact.pageCount !== "number" || !Number.isSafeInteger(artifact.pageCount) || artifact.pageCount < 1 ||
     !isTradeTimestamp(artifact.completedAt) ||
     !isBoundedString(artifact.downloadUrl, 4_000) ||
     !isTradeTimestamp(artifact.downloadExpiresAt)
+  ) {
+    tradeInvalidResponse();
+  }
+  let downloadUrl: URL;
+  try {
+    downloadUrl = new URL(artifact.downloadUrl);
+  } catch {
+    tradeInvalidResponse();
+  }
+  if (
+    downloadUrl.protocol !== "https:" &&
+    !(downloadUrl.protocol === "http:" && typeof window !== "undefined" && window.location.protocol === "http:")
   ) {
     tradeInvalidResponse();
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
 import { Button } from "./Button";
@@ -12,6 +13,7 @@ export interface StepperStep {
   /** Already translated — a primitive never reads the dictionary. */
   label: string;
   description?: string;
+  icon?: ReactNode;
   state: StepState;
 }
 
@@ -21,6 +23,7 @@ export interface StepperProps {
   label: string;
   /** Makes steps activatable. Omit for a read-only progress indicator. */
   onStepSelect?: (id: string) => void;
+  layout?: "inline" | "stacked";
   className?: string;
 }
 
@@ -44,20 +47,23 @@ const LABEL_BY_STATE: Record<StepState, string> = {
   invalid: "text-destructive font-medium",
 };
 
-export function Stepper({ steps, label, onStepSelect, className }: StepperProps) {
+export function Stepper({ steps, label, onStepSelect, layout = "inline", className }: StepperProps) {
+  const stacked = layout === "stacked";
+  const contentLayout = stacked ? "flex-col justify-center gap-2 text-center" : "gap-2 text-start";
   return (
     <nav aria-label={label} className={className}>
       {/* An <ol> carries the order semantically, so RTL ordering is the
           browser's job — flex mirrors under dir and nothing here reverses it
           by hand. */}
-      <ol className="flex w-full items-center gap-1">
+      <ol className={cn("w-full items-center", stacked ? "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:gap-0" : "flex gap-1")}>
         {steps.map((step, index) => {
           const content = (
             <>
               <span
                 aria-hidden="true"
                 className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums",
+                  "flex shrink-0 items-center justify-center rounded-full border text-xs tabular-nums",
+                  stacked ? "size-10" : "size-6",
                   MARKER_BY_STATE[step.state],
                 )}
               >
@@ -66,11 +72,11 @@ export function Stepper({ steps, label, onStepSelect, className }: StepperProps)
                 ) : step.state === "invalid" ? (
                   <X className="size-3.5" />
                 ) : (
-                  index + 1
+                  step.icon ?? index + 1
                 )}
               </span>
-              <span className="flex min-w-0 flex-col text-start">
-                <span className={cn("truncate text-sm", LABEL_BY_STATE[step.state])}>{step.label}</span>
+              <span className="flex min-w-0 flex-col">
+                <span className={cn("text-sm", !stacked && "truncate", LABEL_BY_STATE[step.state])}>{step.label}</span>
                 {step.description && (
                   <span className="truncate text-xs text-muted-foreground">{step.description}</span>
                 )}
@@ -82,22 +88,27 @@ export function Stepper({ steps, label, onStepSelect, className }: StepperProps)
             <li
               key={step.id}
               aria-current={step.state === "current" ? "step" : undefined}
-              className="flex min-w-0 flex-1 items-center gap-1"
+              className={cn("flex min-w-0 flex-1 items-center gap-1", stacked && "relative justify-center")}
             >
               {onStepSelect ? (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onStepSelect(step.id)}
-                  className={cn("h-auto min-w-0 cursor-pointer justify-start gap-2 py-1 font-normal", focusRing)}
+                  className={cn("h-auto min-w-0 cursor-pointer font-normal", contentLayout, focusRing,
+                    stacked ? "min-h-20 whitespace-normal rounded-lg border border-transparent px-3 py-2"
+                      : "justify-start py-1",
+                    stacked && step.state === "current" && "border-border bg-card shadow-xs")}
                 >
                   {content}
                 </Button>
               ) : (
-                <span className="flex min-w-0 items-center gap-2">{content}</span>
+                <span className={cn("flex min-w-0 items-center", contentLayout, stacked && "min-h-20 py-2")}>{content}</span>
               )}
               {index < steps.length - 1 && (
-                <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-border" />
+                <span aria-hidden="true" className={cn("h-px bg-border", stacked
+                  ? "pointer-events-none absolute -end-[calc(50%_-_3.75rem)] start-[calc(50%_+_3.75rem)] top-7 hidden lg:block"
+                  : "min-w-4 flex-1")} />
               )}
             </li>
           );

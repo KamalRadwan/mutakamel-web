@@ -270,7 +270,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
             <TenantProfilePanel locale={lang} workspace={core} />
           </div>
         ) : null}
-        {activeTab === "provisioning" ? <TenantProvisioningWorkspace tenantId={tenantId} /> : null}
+        {activeTab === "provisioning" ? <TenantProvisioningWorkspace key={tenantId} tenantId={tenantId} tenantName={tenant.name} /> : null}
         {activeTab === "access" && databaseReady ? (
           <TenantAccessPanel tenantId={tenantId} tenantStatus={tenant.status} enabled locale={lang} />
         ) : null}

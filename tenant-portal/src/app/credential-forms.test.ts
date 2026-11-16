@@ -60,12 +60,16 @@ describe("credential forms never submit as GET", () => {
     expect(credentialFiles).toEqual([
       "(tenant)/core/profile/components/ProfileMfa.tsx",
       "(tenant)/core/settings/email/components/EmailProviderFields.tsx",
+      "(tenant)/crm/settings/components/TelephonyServerList.tsx",
       "login/page.tsx",
       "tenant/components/ActionTokenScreen.tsx",
     ]);
   });
 
-  it.each(credentialFiles)("every <form> in %s posts", (relative) => {
+  // Telephony fields live in a portaled Sheet with no native form. Audit its
+  // owner too, so a future wrapper cannot accidentally serialize credentials.
+  const credentialOwners = ["(tenant)/crm/settings/components/TelephonyDrawer.tsx"];
+  it.each([...credentialFiles, ...credentialOwners])("every <form> in %s posts", (relative) => {
     const source = stripComments(readFileSync(join(APP_DIR, relative), "utf8"));
     const forms = source.match(FORM_OPEN) ?? [];
     // EmailProviderFields renders fields into a parent form and opens none of

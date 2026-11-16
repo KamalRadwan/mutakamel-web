@@ -5,18 +5,24 @@ import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
 import { OwnerGate } from "../../components/OwnerGate";
 import { canSelectCommercialOffer, commercialOfferKey } from "../commercial-cart";
+import { commercialLabel, withCommercialOffers, type CommercialLabels } from "../commercial-labels";
 import type { SubscriptionView } from "../subscription-read";
+import type { SubscriptionOffer } from "../subscription-offers";
 import { useCommercialCart } from "../hooks/useCommercialCart";
 import type { useCommercialChange } from "../hooks/useCommercialChange";
 import { useSubscriptionOffers } from "../hooks/useSubscriptionOffers";
 import { CommercialChangeList } from "./CommercialChangeList";
 import { SubscriptionOfferCard } from "./SubscriptionOfferCard";
 
-export function CommercialCartEditor({ view, change }: { view: SubscriptionView; change: ReturnType<typeof useCommercialChange> }) {
+export function CommercialCartEditor({ view, change, labels, onRememberOffers }: {
+  view: SubscriptionView; change: ReturnType<typeof useCommercialChange>; labels: CommercialLabels;
+  onRememberOffers: (offers: readonly SubscriptionOffer[]) => void;
+}) {
   const { t, lang, dir } = useI18n();
   const copy = t.commercialPurchase;
   const offers = useSubscriptionOffers();
   const form = useCommercialCart(view, change.canStart && !offers.denied, offers.data?.items ?? []);
+  const cartLabels = withCommercialOffers(labels, [...(offers.data?.items ?? []), ...form.cart.offers.map((row) => row.offer)]);
   return <OwnerGate denied={offers.denied}><div className="flex min-w-0 flex-col gap-4">
     <section className="flex min-w-0 flex-col gap-3 rounded-md border border-border p-4" aria-label={copy.currentItems}>
       <h2 className="text-sm font-semibold">{copy.currentItems}</h2>
@@ -25,7 +31,7 @@ export function CommercialCartEditor({ view, change }: { view: SubscriptionView;
         <Input size="sm" type="text" inputMode="numeric" maxLength={6} placeholder={formatNumber(item.seats, lang)} value={form.cart.quantities[item.id]?.seats ?? ""}
           disabled={!change.canStart} onChange={(event) => form.quantity(item.id, event.target.value)} />
       </Field>)}
-      {view.addonSelections.map((item) => <Field key={item.id} label={item.addonKey}>
+      {view.addonSelections.map((item) => <Field key={item.id} label={commercialLabel(cartLabels, { sourceKind: "ADDON", addonSelectionId: item.id }, item.addonKey)}>
         <Input size="sm" type="text" inputMode="numeric" maxLength={6} placeholder={formatNumber(item.seats, lang)} value={form.cart.quantities[item.id]?.seats ?? ""}
           disabled={!change.canStart} onChange={(event) => form.quantity(item.id, event.target.value)} />
       </Field>)}
@@ -55,14 +61,14 @@ export function CommercialCartEditor({ view, change }: { view: SubscriptionView;
           {offers.data.items.length === 0 && <EmptyState title={t.subscriptionOffers.empty} />}
           {offers.data.items.map((offer) => <div className="flex min-w-0 flex-col gap-2" key={`${commercialOfferKey(offer)}:${offer.sourceKind === "APPLICATION" ? offer.tier.id : offer.addon.definitionVersionId}`}>
             <SubscriptionOfferCard offer={offer} onSelectTier={offers.selectTier} />
-            <div><Button size="sm" variant="outline" disabled={!change.canStart || !canSelectCommercialOffer(offer, view)} onClick={() => form.select(offer)}>{copy.selectOffer}</Button></div>
+            <div><Button size="sm" variant="outline" disabled={!change.canStart || !canSelectCommercialOffer(offer, view)} onClick={() => { onRememberOffers([offer]); form.select(offer); }}>{copy.selectOffer}</Button></div>
           </div>)}
           <Pagination page={offers.data.meta} onPageChange={offers.changePage} labels={offers.paginationLabels} className="flex-wrap" />
         </>}
     </section>
     <Dialog open={!!form.request && change.canStart} onOpenChange={form.closeReview}>
       <DialogContent dir={dir} className="p-3 sm:p-3.5 max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>{copy.review}</DialogTitle><DialogDescription>{copy.prepareNotice}</DialogDescription></DialogHeader>
-        {form.request && <CommercialChangeList request={form.request} />}
+        {form.request && <CommercialChangeList request={form.request} labels={cartLabels} />}
         <DialogFooter><Button size="sm" variant="outline" onClick={form.closeReview}>{t.common.cancel}</Button>
           <Button size="sm" variant="outline" disabled={!change.canStart || !form.request} onClick={() => form.request && void change.start(form.request)}>{copy.prepare}</Button></DialogFooter>
       </DialogContent>

@@ -8,6 +8,7 @@ import {
   parseTenantWallet,
 } from "./billing-contract";
 import {
+  checkoutUrl,
   parseActiveIntent,
   parseInvoicePaymentIntent,
   parseInvoicePaymentQuote,
@@ -145,6 +146,37 @@ describe("wallet and summary parsing", () => {
 });
 
 describe("payment flow parsing", () => {
+  it.each([
+    "https://a@b.test/x",
+    "https://user:secret@checkout.provider.test/p",
+    "https://:secret@checkout.provider.test/p",
+    "https:// x",
+    "https:///x",
+    "https://",
+    "https://[invalid]/x",
+    "javascript:",
+    "http://checkout.provider.test/p",
+    "https://checkout.provider.test/p\n",
+    "https://check\tout.provider.test/p",
+    "https://checkout.provider.test/\u0000p",
+    "https://checkout.provider.test/\u007fp",
+    "https://checkout.provider.test/\u0085p",
+    "https://checkout.provider.test/p id=1",
+    `https://checkout.provider.test/${"x".repeat(2048)}`,
+  ])("rejects an unsafe checkout URL: %j", (value) => {
+    expect(() => checkoutUrl({ checkoutUrl: value })).toThrow("Invalid Core billing response.");
+  });
+
+  it("preserves valid checkout URLs and the optional URL contract", () => {
+    const value = "https://checkout.provider.test/p?id=1";
+    expect(checkoutUrl({ checkoutUrl: value })).toBe(value);
+    const limit = value + "x".repeat(2048 - value.length);
+    expect(checkoutUrl({ checkoutUrl: limit })).toBe(limit);
+    expect(checkoutUrl({})).toBeNull();
+    expect(checkoutUrl({ checkoutUrl: null })).toBeNull();
+    expect(() => checkoutUrl({ checkoutUrl: 42 })).toThrow("Invalid Core billing response.");
+  });
+
   it("reads a quote's frozen figures and its expiry", () => {
     const quote = parseInvoicePaymentQuote({
       quoteId: UUID,
@@ -253,7 +285,7 @@ describe("payment flow parsing", () => {
 });
 
 describe("public branding parsing", () => {
-  it("reads exactly the fields PublicBrandingView carries", () => {
+  it("reads the portal branding fields and ignores custom login markup", () => {
     const branding = parsePublicBranding({
       appName: "Acme",
       tabTitle: "Acme Portal",
@@ -266,7 +298,16 @@ describe("public branding parsing", () => {
     });
     expect(branding.logoUrl).toBe("/api/tenant/core/v1/branding/public/logo");
     expect(branding.iconUrl).toBeNull();
-    expect(branding.loginHtml).toBe("<p>Welcome</p>");
+    expect(branding).not.toHaveProperty("loginHtml");
+  });
+
+  it("does not validate unused custom login markup", () => {
+    for (const loginHtml of ["x".repeat(20_001), { unused: true }]) {
+      expect(parsePublicBranding({ appName: "Acme", loginHtml })).toEqual(
+        expect.objectContaining({ appName: "Acme" }),
+      );
+      expect(parsePublicBranding({ loginHtml })).not.toHaveProperty("loginHtml");
+    }
   });
 
   it("refuses an asset path that is not the exact route Core emits", () => {

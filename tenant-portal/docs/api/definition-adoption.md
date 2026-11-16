@@ -2,11 +2,13 @@
 
 Status: **source-verified discovery and command contracts; consumer checks and authenticated runtime acceptance pending**
 
-Last source verification: **2026-09-09**. Owning backend app: **core-app**.
+Last source verification: **2026-10-29** (route authority and PREPARE rejection recovery). Owning backend app: **core-app**.
+
+Preparation-rejection recovery source review: **2026-10-29** (AUDIT29-TP-1); executable checks pending lead verification.
 
 Source integration: **2026-09-09**. Coordinated Tenant executable checks and authenticated runtime acceptance are pending for this packet. The Gateway discovery packet independently passed production TypeScript, scoped lint and 61 existing cases; those checks do not verify this consumer.
 
-The mounted page is `/core/subscription/definition-adoption`. The existing Application access navigation item also admits the exact `applications.addon_definitions.adopt` permission. Its entry link appears on that landing page for a current Owner or the exact ADOPT permission, outside the unchanged activation-read gate. Ordinary subscription detail, items, offers and purchase pages remain Owner-only. This page does not request their APIs.
+The mounted page is `/core/subscription/definition-adoption`. Its Application access landing-page entry and discovery/command hooks use `canAdoptDefinitions(user)`: current Owner or a genuine tenant-wide `applications.addon_definitions.adopt` grant. Company/Branch-scoped grants alone show no entry link and produce the denied state without dispatch. This entry is outside the unchanged activation-read gate. Ordinary subscription detail, items, offers and purchase pages remain Owner-only. This page does not request their APIs.
 
 ## Discovery
 
@@ -25,7 +27,7 @@ Each page contains at most 50 rows in strictly increasing ID order after the req
 
 Each page is a fresh revision observation. A changed subscription revision or selected current-definition metadata clears fresh draft choices and requires an explicit discovery refresh. Same-revision pages may contribute to a draft of at most 100 distinct Addon selections. Refresh and actor/session changes retire unsent reviews; they never replace a retained unresolved command.
 
-Core uses current Tenant ADOPT/session/placement checks before and after its read-only snapshot. Gateway supplies current Tenant audience/session admission and validates path/query/body framing. The browser mirrors the actual Owner-or-exact-ADOPT RBAC rule for discovery and commands. This administrative RBAC exception does not bypass Company, source, preparation or current-history checks. Every server 403 is rendered as a permission denial, not an empty list. Missing subscription or Addon, unavailable source and malformed response remain distinct from successful empty discovery.
+Core uses current Tenant ADOPT/session/placement checks before and after its read-only snapshot. Gateway supplies current Tenant audience/session admission and validates path/query/body framing. The browser mirrors the actual Owner-or-tenant-wide-ADOPT RBAC rule for discovery and commands. This administrative RBAC exception does not bypass Company, source, preparation or current-history checks. Every server 403 is rendered as a permission denial, not an empty list. Missing subscription or Addon, unavailable source and malformed response remain distinct from successful empty discovery.
 
 ## Preparation, preview and confirmation
 
@@ -55,6 +57,8 @@ The closed receipt preserves the existing nine-field shape, with homogeneous ADO
 ADOPT uses its own actor-scoped session-storage namespace. An ordinary purchase intent cannot be restored into the ADOPT editor. The journal contains the original request/key, discovery source pins, known preparation/preview references and previous rejected or expired request references. It contains no configuration values or credentials.
 
 Unknown outcomes retain their exact original body/key. No automatic command retry or operation polling runs. Manual current-progress reads are available without an Owner subscription read. Actual COMMITTED plus its verified receipt, or actual ABORTED, resolves the journal. A generic conflict, unavailable response or network failure does not clear it or permit a replacement.
+
+A first PREPARE dispatched from an empty journal, with no known operation or earlier uncertain attempt, clears its retained intent and returns to the editable idle state only for these source-proven status/code pairs: 400 `COMMERCIAL_CONTRACT_INVALID`, 409 `COMMERCIAL_TARGET_INCOMPATIBLE`, 422 `COMMERCIAL_PRICE_UNAVAILABLE`, 409 `COMMERCIAL_CAPACITY_OCCUPIED`, or 409 `ADDON_PREPARATION_STALE`. The mapped bilingual error remains visible (the invalid-contract code uses the safe generic fallback). Restored intents and same-key retries remain uncertain even for these codes. Network failures, 5xx (including 503 `COMMERCIAL_COMMAND_UNAVAILABLE`), unknown conflicts and mismatched status/code pairs preserve the original body/key. Failed journal removal shows the storage boundary and does not permit a new change. The same rule applies to ordinary purchases; there is no general discard action.
 
 Operation status and full receipt access have different authority requirements. When ADOPT status verifies COMMITTED but the subsequent full receipt is denied or unavailable, the UI preserves that verified operation and the original unresolved journal. Receipt-only 403 appears inside its receipt panel; it does not hide Tenant-authorized status. The retained command is shown as saved, with manual status/receipt refresh available, and no new mutation is admitted for that verified terminal operation. COMMITTED status alone never fabricates a receipt or clears the journal. An actual operation GET 403 still denies the status view; ordinary Owner history error behavior is unchanged.
 

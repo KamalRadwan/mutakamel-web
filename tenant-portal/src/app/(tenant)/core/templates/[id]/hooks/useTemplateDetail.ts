@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
@@ -47,10 +47,15 @@ export function useTemplateDetail(templateId: string) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const router = useRouter();
-  const { user } = useTenantAuth();
+  const { user, realtimeAuthGeneration } = useTenantAuth();
   const permissions = user?.permissions ?? [];
   const copy = t.coreOperations.templates;
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
+  const latestTemplate = useRef<TemplateDetail | null>(null);
+  const commitTemplate = useCallback((next: TemplateDetail) => {
+    latestTemplate.current = next;
+    setTemplate(next);
+  }, []);
   const target = template?.scope.type === "BRANCH"
     ? { branchId: template.scope.branchId, companyId: template.scope.companyId }
     : { companyId: template?.scope.type === "COMPANY" ? template.scope.companyId : null };
@@ -66,6 +71,16 @@ export function useTemplateDetail(templateId: string) {
     canManageAssets: permitted(TEMPLATE_ASSETS_PERMISSION),
     canManageAssignments: permitted(TEMPLATE_ASSIGNMENTS_PERMISSION),
   };
+
+  const lifecycleAuthority = useMemo(
+    () => ({ templateId: templateId.toLowerCase(), actorId: user?.id, realtimeAuthGeneration, canArchive: grants.canArchive }),
+    [templateId, user?.id, realtimeAuthGeneration, grants.canArchive],
+  );
+  const activeLifecycleAuthority = useRef<typeof lifecycleAuthority | null>(null);
+  useLayoutEffect(() => {
+    activeLifecycleAuthority.current = lifecycleAuthority;
+    return () => { activeLifecycleAuthority.current = null; };
+  }, [lifecycleAuthority]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isMissing, setIsMissing] = useState(false);
@@ -88,7 +103,7 @@ export function useTemplateDetail(templateId: string) {
       setLoadError(null);
       setIsMissing(false);
       try {
-        setTemplate(await fetchTemplate(templateId, signal));
+        commitTemplate(await fetchTemplate(templateId, signal));
         setIsEntitlementBlocked(false);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -100,7 +115,7 @@ export function useTemplateDetail(templateId: string) {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [grants.canRead, templateId],
+    [grants.canRead, templateId, commitTemplate],
   );
 
   useEffect(() => {
@@ -133,7 +148,7 @@ export function useTemplateDetail(templateId: string) {
       setIsSubmitting(true);
       setFormError(null);
       try {
-        setTemplate(await updateTemplate(template.id, patch, template.etag));
+        commitTemplate(await updateTemplate(template.id, patch, template.etag));
         setIsEditOpen(false);
         toast.success(copy.savedTitle, copy.updated);
         return true;
@@ -144,23 +159,46 @@ export function useTemplateDetail(templateId: string) {
         setIsSubmitting(false);
       }
     },
-    [template, grants.canUpdate, isSubmitting, toast, copy, report],
+    [template, grants.canUpdate, isSubmitting, toast, copy, report, commitTemplate],
   );
 
   const changeLifecycle = useCallback(
     async (action: "archive" | "restore"): Promise<void> => {
-      if (!template || !grants.canArchive || pendingAction) return;
+      if (!template || template.id !== lifecycleAuthority.templateId || !lifecycleAuthority.canArchive || pendingAction) return;
+      const matchesTarget = (detail: TemplateDetail): boolean =>
+        detail.id === template.id &&
+        detail.scope.type === template.scope.type &&
+        detail.scope.companyId === template.scope.companyId &&
+        detail.scope.branchId === template.scope.branchId;
+      const currentDefinition = () => {
+        const current = latestTemplate.current;
+        return activeLifecycleAuthority.current === lifecycleAuthority && current && matchesTarget(current) &&
+          current.definitionRevision === template.definitionRevision && current.etag === template.etag ? current : null;
+      };
+      if (!currentDefinition()) return;
+      const failureTitle = action === "archive" ? copy.archiveFailed : copy.restoreFailed;
       setPendingAction(action);
       try {
-        setTemplate(await setTemplateLifecycle(template.id, action, template.etag));
+        const { correlationId, ...reply } = await setTemplateLifecycle(template.id, action, template.etag);
+        const current = currentDefinition();
+        if (!current) return;
+        const expectedStatus = action === "archive" ? "ARCHIVED" : "ACTIVE";
+        if (!matchesTarget(reply) || reply.lifecycleStatus !== expectedStatus ||
+          reply.definitionRevision < current.definitionRevision) {
+          toast.errorFromApi(failureTitle, { status: 0, message: copy.invalidLifecycleReply, correlationId });
+          return;
+        }
+        const preserveDraft = current.currentDraft.draftId === reply.currentDraft.draftId &&
+          current.currentDraft.revision > reply.currentDraft.revision;
+        commitTemplate(preserveDraft ? { ...reply, draft: current.draft, currentDraft: current.currentDraft } : reply);
         toast.success(copy.savedTitle, action === "archive" ? copy.archived : copy.restored);
       } catch (error) {
-        report(error, action === "archive" ? copy.archiveFailed : copy.restoreFailed);
+        if (currentDefinition()) report(error, failureTitle);
       } finally {
         setPendingAction(null);
       }
     },
-    [template, grants.canArchive, pendingAction, toast, copy, report],
+    [template, lifecycleAuthority, pendingAction, toast, copy, report, commitTemplate],
   );
 
   const remove = useCallback(async (): Promise<void> => {

@@ -7,6 +7,7 @@ import {
   requiredTimestamp,
   requiredUuidV7,
 } from "../contracts/core-page";
+import { isUUIDv7 } from "@/lib/uuid";
 
 // Versions, validation runs, publish preconditions, recovery snapshots and the
 // three preview shapes.
@@ -49,6 +50,9 @@ export interface TemplateVersion {
   publishedAt: string;
   retiredAt: string | null;
   changeNote: string | null;
+  publisherName?: string;
+  publisherActorId?: string;
+  locale?: string;
   templateContentChecksum: string;
   dataSourceKey: string;
   /** Detail-only fields — the list projection does not carry them. */
@@ -99,10 +103,18 @@ interface TemplatePreviewPin {
 export interface TemplateHtmlPreview extends TemplatePreviewPin {
   kind: "HTML";
   html: string;
+  draftId?: string;
+  versionEvidence?: {
+    versionNumber: number;
+    compiledArtifactChecksum: string;
+    outputChecksum: string;
+    publishedPreviewFixture?: { fixtureKey: string; fixturePayloadChecksum: string };
+  };
 }
 
 export interface TemplateEmailPreview extends TemplatePreviewPin {
   kind: "EMAIL";
+  draftId?: string;
   subject: string;
   preheader: string | null;
   html: string;
@@ -135,6 +147,11 @@ function nullableTimestamp(source: Record<string, unknown>, key: string): string
 export function parseTemplateVersion(payload: unknown): TemplateVersion {
   const row = record(payload);
   if (!row) invalidCoreResponse();
+  const publisher = record(row.publishedBy);
+  const publisherActorId = publisher?.kind === "USER" && isUUIDv7(publisher.actorId) ? publisher.actorId : undefined;
+  const publisherName = publisherActorId && typeof publisher?.displayName === "string" &&
+    publisher.displayName.trim().length > 0 && publisher.displayName.length <= 200 ? publisher.displayName : undefined;
+  const locale = typeof row.locale === "string" && row.locale.length > 0 && row.locale.length <= 35 ? row.locale : undefined;
   return {
     id: requiredUuidV7(row, "templateVersionId"),
     versionNumber: positiveInteger(row, "versionNumber"),
@@ -142,6 +159,9 @@ export function parseTemplateVersion(payload: unknown): TemplateVersion {
     publishedAt: requiredTimestamp(row, "publishedAt"),
     retiredAt: nullableTimestamp(row, "retiredAt"),
     changeNote: nullableText(row, "changeNote", TEMPLATE_CHANGE_NOTE_MAX),
+    ...(publisherName ? { publisherName } : {}),
+    ...(publisherActorId ? { publisherActorId } : {}),
+    ...(locale ? { locale } : {}),
     templateContentChecksum: requiredText(row, "templateContentChecksum", 128),
     dataSourceKey: requiredText(row, "dataSourceKey", 64),
     compilerVersion: nullableText(row, "compilerVersion", 64),
@@ -209,14 +229,40 @@ function parsePin(row: Record<string, unknown>): TemplatePreviewPin {
 export function parseHtmlPreview(payload: unknown): TemplateHtmlPreview {
   const row = record(payload);
   if (!row) invalidCoreResponse();
-  return { ...parsePin(row), kind: "HTML", html: requiredText(row, "html", 4_000_000) };
+  const source = record(row.source);
+  if (!source || (source.kind !== "DRAFT" && source.kind !== "VERSION") ||
+    row.kind !== "HTML" || row.renderTarget !== "HTML") invalidCoreResponse();
+  const pin = parsePin(row);
+  const html = requiredText(row, "html", 4_000_000);
+  if (pin.sourceKind === "DRAFT") return { ...pin, kind: "HTML", html, draftId: requiredUuidV7(source, "draftId") };
+  const compiledArtifactChecksum = requiredText(row, "compiledArtifactChecksum", 64);
+  const outputChecksum = requiredText(row, "outputChecksum", 64);
+  if (![pin.templateContentChecksum, compiledArtifactChecksum, outputChecksum]
+    .every(checksum => /^[0-9a-f]{64}$/.test(checksum))) invalidCoreResponse();
+  let publishedPreviewFixture: NonNullable<TemplateHtmlPreview["versionEvidence"]>["publishedPreviewFixture"];
+  if (row.publishedPreviewFixture !== undefined) {
+    const fixture = record(row.publishedPreviewFixture);
+    if (!fixture) invalidCoreResponse();
+    const fixturePayloadChecksum = requiredText(fixture, "fixturePayloadChecksum", 64);
+    if (!/^[0-9a-f]{64}$/.test(fixturePayloadChecksum)) invalidCoreResponse();
+    publishedPreviewFixture = { fixtureKey: requiredText(fixture, "fixtureKey", 100), fixturePayloadChecksum };
+  }
+  return { ...pin, kind: "HTML", html, versionEvidence: {
+    versionNumber: positiveInteger(source, "versionNumber"),
+    compiledArtifactChecksum,
+    outputChecksum,
+    ...(publishedPreviewFixture ? { publishedPreviewFixture } : {}),
+  } };
 }
 
 export function parseEmailPreview(payload: unknown): TemplateEmailPreview {
   const row = record(payload);
-  if (!row) invalidCoreResponse();
+  if (!row || row.kind !== "EMAIL" || row.renderTarget !== "EMAIL") invalidCoreResponse();
+  const source = record(row.source);
+  if (!source || (source.kind !== "DRAFT" && source.kind !== "VERSION")) invalidCoreResponse();
   return {
     ...parsePin(row),
+    ...(source.kind === "DRAFT" ? { draftId: requiredUuidV7(source, "draftId") } : {}),
     kind: "EMAIL",
     subject: requiredText(row, "subject", 2000),
     preheader: nullableText(row, "preheader", 2000),

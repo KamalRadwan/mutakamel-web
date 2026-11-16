@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
 import { runIdempotentWrite } from "@/lib/api/idempotent-write";
-import { opportunityPath, opportunityStageHistoryPath, parseOpportunityDetailResponse } from "../opportunity-contract";
+import { opportunityPath, parseOpportunityDetailResponse } from "../opportunity-contract";
 import { OpportunityPhoneActions, OpportunityQuickEditModal, type OpportunityQuickEditModalProps } from "./OpportunityQuickEditModal";
+
+const recordHistoryTabSpy = vi.hoisted(() => vi.fn());
 
 const auth = vi.hoisted(() => ({ permissions: [] as string[], canMutate: true }));
 vi.mock("@/hooks/useAccessMode", () => ({ useAccessMode: () => ({ canMutate: auth.canMutate }) }));
@@ -31,8 +33,12 @@ vi.mock("../hooks/useOpportunityDocumentCounts", () => ({
   useOpportunityDocumentCounts: () => ({ countsByParty: new Map() }),
 }));
 vi.mock("@/components/activities/RecordActivitiesPanel", () => ({ RecordActivitiesPanel: () => null }));
-vi.mock("@/components/audit/EntityHistoryCard", () => ({ EntityHistoryCard: () => null }));
-vi.mock("@/components/audit/RecordHistoryTab", () => ({ RecordHistoryTab: () => null }));
+vi.mock("@/components/audit/RecordHistoryTab", () => ({
+  RecordHistoryTab: (props: Record<string, unknown>) => {
+    recordHistoryTabSpy(props);
+    return <div data-testid="record-history-template" />;
+  },
+}));
 vi.mock("@/components/audit/hooks/useAuditAccess", () => ({ useAuditAccess: () => true }));
 vi.mock("../../shared/components/CustomFieldsCard", () => ({ CustomFieldsCard: () => null }));
 vi.mock("../../shared/components/RecordNotesSection", () => ({ RecordNotesSection: () => null }));
@@ -78,26 +84,41 @@ beforeEach(() => {
 });
 
 describe("Opportunity quick-edit write outcomes", () => {
-  it("loads older stage changes only on request", async () => {
-    const entry = {
-      id: "01900100-0000-7000-8000-000000000080", changedAt: detail.createdAt,
-      fromStageSnapshot: null, toStageSnapshot: null, reason: "First history page",
+  it("renders the unified RecordHistoryTab template with related parties and localized stage labels", async () => {
+    recordHistoryTabSpy.mockClear();
+    const customerPartyId = "01900100-0000-7000-8000-000000000041";
+    const contactPartyId = "01900100-0000-7000-8000-000000000042";
+    const stage = {
+      id: detail.stageId,
+      pipelineId: detail.pipelineId,
+      opportunityStageId: "01900100-0000-7000-8000-000000000055",
+      nameEn: "Qualification",
+      nameAr: "تأهيل",
+      flag: "QUALIFICATION" as const,
+      category: "OPEN",
+      rank: 1,
+      isActive: true,
+      isSystem: false,
     };
-    vi.mocked(axiosClient.get).mockImplementation(async (path) => response(
-      path === opportunityPath(detail.id) ? detail
-        : path === opportunityStageHistoryPath(detail.id) ? { items: [entry], nextCursor: "older_cursor" }
-          : path === opportunityStageHistoryPath(detail.id, "older_cursor")
-            ? { items: [{ ...entry, id: "01900100-0000-7000-8000-000000000081", reason: "Older history page" }], nextCursor: null }
-            : [],
-    ));
-    render(<OpportunityQuickEditModal {...props} />);
+    vi.mocked(axiosClient.get).mockImplementation(async (path) =>
+      response(
+        path === opportunityPath(detail.id)
+          ? { ...detail, customerPartyId, contactPartyId }
+          : [],
+      ),
+    );
+    render(<OpportunityQuickEditModal {...props} stages={[stage]} />);
     await screen.findByRole("button", { name: en.crmLeadDetail.edit });
     fireEvent.click(screen.getByRole("tab", { name: en.crmOpportunityDetail.historyTitle }));
-    expect(await screen.findByText("First history page")).toBeTruthy();
-    expect(screen.queryByText("Older history page")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: en.crmOpportunityDetail.historyLoadMore }));
-    expect(await screen.findByText("Older history page")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: en.crmOpportunityDetail.historyLoadMore })).toBeNull();
+    expect(await screen.findByTestId("record-history-template")).toBeInTheDocument();
+    expect(recordHistoryTabSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        entityType: "Opportunity",
+        entityId: detail.id,
+        relatedPartyIds: [customerPartyId, contactPartyId],
+        valueLabels: { stageId: { [detail.stageId]: "Qualification" } },
+      }),
+    );
   });
   const tag = {
     id: "01900100-0000-7000-8000-000000000061", name: "Renewal",

@@ -149,7 +149,8 @@ describe("useLeadStages — the reorder write", () => {
       "Disqualified",
       "Converted",
     ]);
-    expect(result.current.error).toBe(en.crmShared.errorOffline);
+    expect(result.current.error).toContain(en.crmShared.errorOffline);
+    expect(result.current.error).toContain(en.crmLeadStages.orderRestored);
   });
 
   // Both refusals `assertExactOrder` answers 422 for. Neither costs a round

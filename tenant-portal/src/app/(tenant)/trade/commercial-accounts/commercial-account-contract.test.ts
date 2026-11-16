@@ -32,6 +32,14 @@ const row = {
 };
 
 describe("buildCreateAccountRequest", () => {
+  it("omits deferred payment terms from create and update payloads", () => {
+    const values = { ...EMPTY_ACCOUNT_FORM, partyId: PARTY_ID, paymentTermsId: ACCOUNT_ID };
+    expect(buildCreateAccountRequest(values)).not.toHaveProperty("paymentTermsId");
+    expect(buildUpdateAccountRequest(values)).not.toHaveProperty("paymentTermsId");
+    expect(toAccountForm(parseAccountResponse({ ...row, paymentTermsId: ACCOUNT_ID })))
+      .not.toHaveProperty("paymentTermsId");
+  });
+
   it("requires a party id", () => {
     expect(() => buildCreateAccountRequest(EMPTY_ACCOUNT_FORM)).toThrow("ACCOUNT_FORM_PARTY");
   });

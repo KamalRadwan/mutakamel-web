@@ -23,7 +23,9 @@ export function useLeadDetailsEdit(lead: LeadDetail, canEdit: boolean, onSaved: 
   const inFlight = useRef(false);
   // A refresh during a pending write must not unlock a later uncertain result.
   if (reconciliation.lead !== lead) setReconciliation({ lead, pending: false });
-  const editable = canEdit && lead.status !== "CONVERTED" && !reconciliation.pending;
+  // D-024 permits tag changes after conversion; uncertain writes still lock them.
+  const tagsEditable = canEdit && !reconciliation.pending;
+  const editable = tagsEditable && lead.status !== "CONVERTED";
   // Clean fields follow fresh server props; only actual edits pin a baseline.
   const activeDraft = draft?.lead.id === lead.id && hasChanges(draft.form, draft.baseline) ? draft : null;
   const baseline = activeDraft?.baseline ?? toLeadDetailsForm(lead);
@@ -79,7 +81,7 @@ export function useLeadDetailsEdit(lead: LeadDetail, canEdit: boolean, onSaved: 
       setSaving(false);
     }
   };
-  return { form, saving, error, errors, editable, isDirty, cancel, change, validate, save, clearError: () => setError(null) };
+  return { form, saving, error, errors, editable, tagsEditable, isDirty, cancel, change, validate, save, clearError: () => setError(null) };
 }
 
 function hasChanges(form: LeadDetailsForm, baseline: LeadDetailsForm): boolean {

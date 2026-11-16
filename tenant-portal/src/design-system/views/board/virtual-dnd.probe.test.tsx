@@ -41,7 +41,10 @@ const VIEWPORT_PX = 400;
 const ROW_PX = 64;
 
 function VirtualColumn() {
+  "use no memo";
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/incompatible-library -- This uncompiled probe deliberately exercises TanStack Virtual's mutable API.
   const virtualizer = useVirtualizer({
     count: CARDS.length,
     getScrollElement: () => scrollRef.current,

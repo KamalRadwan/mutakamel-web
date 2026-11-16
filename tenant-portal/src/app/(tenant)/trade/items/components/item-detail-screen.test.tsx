@@ -3,6 +3,8 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { resolveTradeScope, type TradeOperatingContext } from "../../trade-scope";
+import type { TradeScopeValue } from "../../useTradeScope";
 import { ItemDetailScreen } from "./item-detail-screen";
 
 const { standardCost } = vi.hoisted(() => ({ standardCost: vi.fn() }));
@@ -17,6 +19,7 @@ vi.mock("@/design-system", async (importOriginal) => ({
 }));
 
 vi.mock("../../TradeScopeBar", () => ({ TradeScopeBar: () => null }));
+vi.mock("../../useTradeScope", () => ({ useTradeScope: () => scope }));
 vi.mock("./ItemIdentityDetails", () => ({ ItemIdentityDetails: () => <div>Identity</div> }));
 vi.mock("./ItemImageManager", () => ({ ItemImageManager: () => null }));
 vi.mock("./ItemStandardCostSection", () => ({
@@ -32,6 +35,19 @@ vi.mock("./ItemProfileDrawers", () => ({
 }));
 
 const ITEM_ID = "0192f3a0-0000-7000-8000-000000000003";
+const COMPANY_ID = "0192f3a0-0000-7000-8000-000000000001";
+const BRANCH_ID = "0192f3a0-0000-7000-8000-000000000002";
+const context: TradeOperatingContext = { companyId: COMPANY_ID, branchId: BRANCH_ID, channelId: null };
+// Match the route group's resolved operating scope; profile bootstrap remains the behavior under test.
+const scope: TradeScopeValue = {
+  context, companyIds: [COMPANY_ID], branchIds: [BRANCH_ID], channels: [],
+  isLoadingChannels: false, channelsError: null,
+  isLoadingBranches: false, branchesError: null, refreshBranches: vi.fn(),
+  contextLocked: false, registerContextGuard: vi.fn(() => vi.fn()), applyContextChange: vi.fn(), selectContext: vi.fn(),
+  refreshChannels: vi.fn(), selectCompany: vi.fn(), selectBranch: vi.fn(), selectChannel: vi.fn(),
+  headersFor: target => { const resolved = resolveTradeScope(target, context); return resolved.ok ? resolved.headers : {}; },
+  gapFor: target => { const resolved = resolveTradeScope(target, context); return resolved.ok ? null : resolved.gap; },
+};
 const item = {
   id: ITEM_ID,
   canonicalCode: "SKU-1",

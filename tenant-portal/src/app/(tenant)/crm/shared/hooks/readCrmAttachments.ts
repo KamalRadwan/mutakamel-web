@@ -5,6 +5,7 @@ import {
 } from "../attachments-contract";
 
 const PAGE_SIZE = 50;
+const MAX_PAGES = 40;
 
 export async function readAllCrmAttachments(source: {
   branchId: string; sourceType: CrmAttachmentSourceType; sourceId: string;
@@ -32,6 +33,7 @@ export async function readAllCrmAttachments(source: {
         attachments.push(attachment);
       }
       if (!result.hasNext) return attachments;
+      if (page >= MAX_PAGES) throw new Error("Invalid attachment pagination.");
     } catch (caught) {
       // The server answered; preserve that evidence instead of reporting offline.
       throw new TenantApiClientError(

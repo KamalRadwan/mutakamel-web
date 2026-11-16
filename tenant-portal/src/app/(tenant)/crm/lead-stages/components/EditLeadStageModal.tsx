@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import {
   Button,
   Field,
@@ -12,35 +11,28 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
-  useBlurValidation,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   CREATABLE_LEAD_STAGE_FLAGS,
   LEAD_STAGE_CATEGORIES,
-  isProtectedLeadStage,
-  toUpdateLeadStageForm,
   type LeadStageCategory,
   type LeadStageFlag,
   type LeadStageItem,
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
+import { useEditLeadStageForm } from "../hooks/useLeadStageForm";
 
 interface EditLeadStageModalProps {
   stage: LeadStageItem | null;
   isSubmitting: boolean;
+  submitBlocked?: boolean;
+  isReloading?: boolean;
+  onReload?: () => void;
   error: string | null;
   onClose: () => void;
   onSubmit: (form: UpdateLeadStageFormData) => Promise<boolean>;
 }
-
-const EMPTY: UpdateLeadStageFormData = {
-  nameAr: "",
-  nameEn: "",
-  flag: "CONTACTED",
-  category: "IN_PROGRESS",
-  isActive: true,
-};
 
 // PATCH /lead-stages/:id — task 8.17. `isDefault` is not here: the DTO has no
 // such field and the service writes the stored value back over any patch. The
@@ -48,36 +40,15 @@ const EMPTY: UpdateLeadStageFormData = {
 export function EditLeadStageModal({
   stage,
   isSubmitting,
+  submitBlocked,
+  isReloading,
+  onReload,
   error,
   onClose,
   onSubmit,
 }: EditLeadStageModalProps) {
   const { t } = useI18n();
-  // Seeded once; the caller remounts this drawer per stage it opens for.
-  const [form, setForm] = useState<UpdateLeadStageFormData>(() =>
-    stage ? toUpdateLeadStageForm(stage) : EMPTY,
-  );
-
-  const validateName = useCallback(
-    (value: string): string | undefined => {
-      const trimmed = value.trim();
-      if (!trimmed) return t.crmLeadStages.nameRequired;
-      if (trimmed.length > 80) return t.crmLeadStages.nameTooLong;
-      return undefined;
-    },
-    [t],
-  );
-
-  const arabicName = useBlurValidation(form.nameAr, validateName);
-  const englishName = useBlurValidation(form.nameEn, validateName);
-
-  const baseline = stage ? toUpdateLeadStageForm(stage) : EMPTY;
-  const isDirty = JSON.stringify(form) !== JSON.stringify(baseline);
-  // The three lifecycle anchors are protected end to end. The list does not
-  // offer this modal for them; this read-only fallback also protects a stale
-  // open surface if the catalogue changes under it.
-  const isProtected = stage ? isProtectedLeadStage(stage) : false;
-  const canDeactivate = !isProtected && !(stage?.isDefault ?? false);
+  const { form, setForm, arabicName, englishName, isDirty, isProtected, canDeactivate, submit, reset } = useEditLeadStageForm(stage, onSubmit);
 
   return (
     <FormModal
@@ -91,14 +62,9 @@ export function EditLeadStageModal({
       density="compact"
       isDirty={isDirty}
       isSubmitting={isSubmitting}
-      error={error ?? undefined}
-      submitDisabled={isProtected}
-      onSubmit={() => {
-        arabicName.reveal();
-        englishName.reveal();
-        if (!arabicName.isValid || !englishName.isValid) return;
-        void onSubmit(form);
-      }}
+      error={submitBlocked ? `${error ?? ""} ${t.crmLeadStages.reloadRequired}`.trim() : error ?? undefined}
+      submitDisabled={isProtected || submitBlocked || !isDirty}
+      onSubmit={submit}
       labels={{
         submit: t.common.save,
         cancel: t.common.cancel,
@@ -111,27 +77,32 @@ export function EditLeadStageModal({
         close: t.common.close,
       }}
       footerLeading={
-        isDirty && !isProtected ? (
+        submitBlocked && onReload ? (
+          <Button type="button" variant="outline" size="sm" loading={isReloading} onClick={onReload}>
+            {t.crmLeadStages.reload}
+          </Button>
+        ) : isDirty && !isProtected ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             disabled={isSubmitting}
-            onClick={() => setForm(baseline)}
+            onClick={reset}
           >
             {t.crmLeadStages.revert}
           </Button>
         ) : undefined
       }
     >
-      <Field
+      <Field showLabel
         label={t.crmLeadStages.arabicName}
         error={arabicName.error}
         readOnly={isProtected}
-        hint={isProtected ? t.crmLeadStages.protectedHint : undefined}
+        hint={isProtected ? t.crmLeadStages.protectedHint : t.crmLeadStages.nameLimit}
         required
       >
         <Input size="sm" placeholder={t.crmLeadStages.arabicName}
+          dir="rtl"
           value={form.nameAr}
           maxLength={80}
           readOnly={isProtected}
@@ -143,13 +114,15 @@ export function EditLeadStageModal({
         />
       </Field>
 
-      <Field
+      <Field showLabel
         label={t.crmLeadStages.englishName}
         error={englishName.error}
         readOnly={isProtected}
+        hint={t.crmLeadStages.nameLimit}
         required
       >
         <Input size="sm" placeholder={t.crmLeadStages.englishName}
+          dir="ltr"
           value={form.nameEn}
           maxLength={80}
           readOnly={isProtected}
@@ -161,7 +134,7 @@ export function EditLeadStageModal({
         />
       </Field>
 
-      <Field
+      <Field showLabel
         label={t.crmLeadStages.flag}
         readOnly={isProtected}
         hint={isProtected ? t.crmLeadStages.protectedHint : t.crmLeadStages.flagChangeHint}
@@ -186,7 +159,7 @@ export function EditLeadStageModal({
         </Select>
       </Field>
 
-      <Field
+      <Field showLabel
         label={t.crmLeadStages.category}
         readOnly={isProtected}
         hint={isProtected ? t.crmLeadStages.protectedHint : undefined}
@@ -214,7 +187,7 @@ export function EditLeadStageModal({
         </Select>
       </Field>
 
-      <Field
+      <Field showLabel
         label={t.common.status}
         readOnly={!canDeactivate}
         hint={canDeactivate ? undefined : t.crmLeadStages.cannotDeactivate}

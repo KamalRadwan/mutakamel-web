@@ -1,14 +1,15 @@
 "use client";
 
 import { useId, useMemo, useRef } from "react";
-import { Bell, Clock, Columns3, FolderGit2, UserCheck } from "lucide-react";
+import Link from "next/link";
+import { Bell, Clock, Columns3, FolderGit2, UserCheck, Volume2, VolumeX } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantAuth } from "@/context/AuthContext";
 import { can } from "@/lib/auth/permission-scope";
 import { useLanguage } from "@/i18n/useLanguage";
 import { INTL_LOCALE } from "@/lib/format/locale";
 import { formatTemplate } from "@/lib/format/template";
-import { auditNotificationText } from "@/lib/audit/notification-text";
+import { notificationHref, notificationText } from "@/lib/notifications/notification-presentation";
 import { useNotificationsDropdown } from "./hooks/useNotificationsDropdown";
 import { Badge } from "../primitives/Badge";
 import { Button } from "../primitives/Button";
@@ -39,7 +40,7 @@ function AuthorizedNotificationsDropdown() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { t } = useI18n();
   const lang = useLanguage();
-  const { open, pending, failed, snapshot, handleOpenChange, retry, handleMarkAllRead, handleMarkRead } = useNotificationsDropdown();
+  const { open, pending, failed, snapshot, handleOpenChange, retry, handleMarkAllRead, handleMarkRead, soundEnabled, toggleSound } = useNotificationsDropdown();
 
   const formatter = useMemo(
     () => new Intl.DateTimeFormat(INTL_LOCALE[lang], { dateStyle: "medium", timeStyle: "short" }),
@@ -71,7 +72,12 @@ function AuthorizedNotificationsDropdown() {
           variant="ghost"
           size="sm"
           aria-label={triggerLabel}
-          className="relative size-9 rounded-full border border-nav-chrome-line bg-white/8 px-0 text-nav-foreground not-disabled:hover:bg-white/15 not-disabled:hover:text-nav-foreground-strong"
+          className={cn(
+            "relative size-9 origin-top rounded-full border border-nav-chrome-line bg-white/8 px-0 text-nav-foreground not-disabled:hover:bg-white/15 not-disabled:hover:text-nav-foreground-strong",
+            // The requested bell cue stays enabled when Windows disables
+            // decorative animations; the exception is limited to this control.
+            snapshot.unreadCount > 0 && !open && "animate-[notification-bell-shake_10s_ease-in-out_infinite]!",
+          )}
         >
           <Bell className="size-4 shrink-0" aria-hidden="true" />
           {snapshot.unreadCount > 0 && (
@@ -87,7 +93,7 @@ function AuthorizedNotificationsDropdown() {
       </span>
       <PopoverContent
         align="end"
-        className="w-96 p-0"
+        className="w-96 max-w-[calc(100vw-1rem)] p-0"
         aria-labelledby={headingId}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
@@ -99,6 +105,12 @@ function AuthorizedNotificationsDropdown() {
             <h3 ref={headingRef} id={headingId} tabIndex={-1} className="truncate text-xs font-semibold text-foreground">{t.common.notifications}</h3>
             {snapshot.unreadCount > 0 && <Badge tone="negative">{snapshot.unreadCount}</Badge>}
           </div>
+          <Button variant="ghost" size="sm" onClick={toggleSound}
+            aria-label={soundEnabled ? t.coreNotifications.muteSound : t.coreNotifications.enableSound}
+            title={soundEnabled ? t.coreNotifications.muteSound : t.coreNotifications.enableSound}
+            aria-pressed={soundEnabled} className="ms-auto size-8 shrink-0 px-0">
+            {soundEnabled ? <Volume2 className="size-4" aria-hidden="true" /> : <VolumeX className="size-4" aria-hidden="true" />}
+          </Button>
           {snapshot.unreadCount > 0 && snapshot.loadState !== "forbidden" && (
             <Button variant="link" size="sm" onClick={() => void handleMarkAllRead()} disabled={pending} className="text-xs">
               {t.common.markAllRead}
@@ -138,12 +150,12 @@ function AuthorizedNotificationsDropdown() {
           ) : snapshot.items.length === 0 && snapshot.loadState === "ready" ? (
             <p className="p-8 text-center text-xs text-muted-foreground">{t.common.noData}</p>
           ) : (
-            snapshot.items.map((item) => (
-              <button
+            snapshot.items.map((item) => {
+              const text = notificationText(item, t.audit.recordMessages, t.coreNotifications, t.activities.types, INTL_LOCALE[lang]);
+              return <Link
                 key={item.id}
-                type="button"
+                href={notificationHref(item)}
                 onClick={() => void handleMarkRead(item)}
-                disabled={pending || item.readAt !== null}
                 className={cn(
                   "flex w-full cursor-pointer items-start gap-2 border-b border-border px-3 py-2.5 text-start transition-colors last:border-b-0",
                   "hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:cursor-default",
@@ -154,17 +166,15 @@ function AuthorizedNotificationsDropdown() {
                   <NotificationTypeIcon type={item.notificationType} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center justify-between gap-1">
-                    <span className="truncate text-xs font-medium text-foreground">{auditNotificationText(item, t.audit.recordMessages).title}</span>
-                    <span className="shrink-0 font-mono text-2xs text-muted-foreground">
+                  <span className="block whitespace-normal break-words text-xs font-medium text-foreground">{text.title}</span>
+                    <span className="mt-0.5 block text-2xs text-muted-foreground">
                       {formatter.format(new Date(item.createdAt))}
                     </span>
-                  </span>
-                  <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{auditNotificationText(item, t.audit.recordMessages).body}</span>
+                  <span className="mt-1 block whitespace-pre-line break-words text-xs text-muted-foreground">{text.body}</span>
                 </span>
                 {item.readAt === null && <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand-500" aria-hidden="true" />}
-              </button>
-            ))
+              </Link>;
+            })
           )}
         </ScrollArea>
       </PopoverContent>

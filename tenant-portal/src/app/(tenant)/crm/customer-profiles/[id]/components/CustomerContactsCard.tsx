@@ -40,6 +40,19 @@ function getContactInitials(name: string): string {
   return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
 }
 
+function individualDraftFromProfile(profile: CustomerProfileDetail) {
+  const parts = profile.displayName.trim().split(/\s+/);
+  const hasNameParts = profile.firstName !== null || profile.lastName !== null;
+  return {
+    honorificTitle: profile.honorificTitle ?? "",
+    jobTitle: profile.jobTitle ?? "",
+    firstName: hasNameParts ? profile.firstName ?? "" : parts[0] ?? "",
+    lastName: hasNameParts ? profile.lastName ?? "" : parts.slice(1).join(" "),
+    email: profile.email ?? "",
+    phones: profile.phones.length > 0 ? [...profile.phones] : [""],
+  };
+}
+
 export function CustomerContactsCard({
   profile,
   canEdit,
@@ -62,21 +75,16 @@ export function CustomerContactsCard({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Individual Contact Draft
-  const [individualDraft, setIndividualDraft] = useState(() => {
-    const parts = profile.displayName.trim().split(/\s+/);
-    return {
-      firstName: parts[0] ?? profile.displayName,
-      lastName: parts.slice(1).join(" "),
-      email: profile.email ?? "",
-      phones: profile.phones.length > 0 ? [...profile.phones] : [""],
-    };
-  });
+  const [individualDraft, setIndividualDraft] = useState(() =>
+    individualDraftFromProfile(profile),
+  );
 
   // Corporate Contacts Draft
   const [corporateDraft, setCorporateDraft] = useState(() =>
     sortedContacts.map((c) => ({
       partyId: c.partyId,
       displayName: c.displayName,
+      honorificTitle: c.honorificTitle ?? "",
       firstName: c.firstName ?? c.displayName.split(/\s+/)[0] ?? "",
       lastName: c.lastName ?? c.displayName.split(/\s+/).slice(1).join(" "),
       jobTitle: c.jobTitle ?? "",
@@ -103,6 +111,7 @@ export function CustomerContactsCard({
         sortedContacts.map((c) => ({
           partyId: c.partyId,
           displayName: c.displayName,
+          honorificTitle: c.honorificTitle ?? "",
           firstName: c.firstName ?? c.displayName.split(/\s+/)[0] ?? "",
           lastName: c.lastName ?? c.displayName.split(/\s+/).slice(1).join(" "),
           jobTitle: c.jobTitle ?? "",
@@ -112,13 +121,7 @@ export function CustomerContactsCard({
         })),
       );
     } else {
-      const parts = profile.displayName.trim().split(/\s+/);
-      setIndividualDraft({
-        firstName: parts[0] ?? profile.displayName,
-        lastName: parts.slice(1).join(" "),
-        email: profile.email ?? "",
-        phones: profile.phones.length > 0 ? [...profile.phones] : [""],
-      });
+      setIndividualDraft(individualDraftFromProfile(profile));
     }
     setIsEditing(true);
   };
@@ -151,6 +154,8 @@ export function CustomerContactsCard({
         body = {
           ...(composedName ? { displayName: composedName } : {}),
           primaryContact: {
+            honorificTitle: individualDraft.honorificTitle.trim(),
+            jobTitle: individualDraft.jobTitle.trim(),
             firstName: individualDraft.firstName.trim(),
             ...(individualDraft.lastName.trim()
               ? { lastName: individualDraft.lastName.trim() }
@@ -538,91 +543,49 @@ export function CustomerContactsCard({
                         {detail.primaryContact}
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <Input
-                        size="sm"
-                        value={contact.jobTitle}
-                        onChange={(e) =>
-                          setCorporateDraft((list) =>
-                            list.map((item, i) =>
-                              i === idx
-                                ? { ...item, jobTitle: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                        placeholder={t.crmLeads.create.contactJobTitle}
-                      />
-                      <Input
-                        size="sm"
-                        type="tel"
-                        dir="ltr"
-                        value={contact.phone}
-                        readOnly
-                        placeholder={t.crmLeads.phone}
-                        className="font-mono"
-                      />
-                      <Input
-                        size="sm"
-                        type="email"
-                        dir="ltr"
-                        value={contact.email}
-                        readOnly
-                        placeholder={t.crmCustomerProfiles.email}
-                      />
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+                      <div className="sm:col-span-6">
+                        <Field label={t.crmLeads.phone} readOnly showLabel>
+                          <Input size="sm" type="tel" dir="ltr" value={contact.phone} className="font-mono" />
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Field label={detail.honorificTitle} readOnly showLabel>
+                          <Input size="sm" value={contact.honorificTitle} />
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Field label={detail.firstName} readOnly showLabel>
+                          <Input size="sm" value={contact.firstName} />
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Field label={detail.lastName} readOnly showLabel>
+                          <Input size="sm" value={contact.lastName} />
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-3">
+                        <Field label={t.crmCustomerProfiles.email} readOnly showLabel>
+                          <Input size="sm" type="email" dir="ltr" value={contact.email} />
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-3">
+                        <Field label={t.crmLeads.create.contactJobTitle} showLabel>
+                          <Input
+                            size="sm"
+                            value={contact.jobTitle}
+                            onChange={(e) => setCorporateDraft((list) => list.map((item, i) =>
+                              i === idx ? { ...item, jobTitle: e.target.value } : item,
+                            ))}
+                          />
+                        </Field>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="space-y-2.5">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="dossier-field-box">
-                    <Field label={`${t.crmLeads.create.firstName} *`}>
-                      <Input
-                        size="sm"
-                        value={individualDraft.firstName}
-                        onChange={(e) =>
-                          setIndividualDraft((d) => ({
-                            ...d,
-                            firstName: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                  </div>
-                  <div className="dossier-field-box">
-                    <Field label={t.crmLeads.create.lastName}>
-                      <Input
-                        size="sm"
-                        value={individualDraft.lastName}
-                        onChange={(e) =>
-                          setIndividualDraft((d) => ({
-                            ...d,
-                            lastName: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                  </div>
-                  <div className="dossier-field-box sm:col-span-2">
-                    <Field label={t.crmCustomerProfiles.email}>
-                      <Input
-                        size="sm"
-                        type="email"
-                        dir="ltr"
-                        value={individualDraft.email}
-                        onChange={(e) =>
-                          setIndividualDraft((d) => ({
-                            ...d,
-                            email: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                  </div>
-                </div>
-
                 <div className="dossier-phone-box-edit space-y-1.5 p-2.5">
                   <div className="flex items-center justify-between">
                     <span className="dossier-phone-box-label">
@@ -682,6 +645,58 @@ export function CustomerContactsCard({
                     </div>
                   ))}
                 </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+                  <div className="dossier-field-box sm:col-span-2">
+                    <Field label={detail.honorificTitle} showLabel>
+                      <Input
+                        size="sm"
+                        maxLength={40}
+                        value={individualDraft.honorificTitle}
+                        onChange={(e) => setIndividualDraft((d) => ({ ...d, honorificTitle: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                  <div className="dossier-field-box sm:col-span-2">
+                    <Field label={`${t.crmLeads.create.firstName} *`} showLabel>
+                      <Input
+                        size="sm"
+                        value={individualDraft.firstName}
+                        onChange={(e) => setIndividualDraft((d) => ({ ...d, firstName: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                  <div className="dossier-field-box sm:col-span-2">
+                    <Field label={t.crmLeads.create.lastName} showLabel>
+                      <Input
+                        size="sm"
+                        value={individualDraft.lastName}
+                        onChange={(e) => setIndividualDraft((d) => ({ ...d, lastName: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                  <div className="dossier-field-box sm:col-span-3">
+                    <Field label={t.crmCustomerProfiles.email} showLabel>
+                      <Input
+                        size="sm"
+                        type="email"
+                        dir="ltr"
+                        value={individualDraft.email}
+                        onChange={(e) => setIndividualDraft((d) => ({ ...d, email: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                  <div className="dossier-field-box sm:col-span-3">
+                    <Field label={t.crmLeads.create.contactJobTitle} showLabel>
+                      <Input
+                        size="sm"
+                        maxLength={120}
+                        value={individualDraft.jobTitle}
+                        disabled={saving}
+                        onChange={(e) => setIndividualDraft((d) => ({ ...d, jobTitle: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -703,7 +718,6 @@ export function CustomerContactsCard({
                 email={contact.email}
                 country={profile.address?.country ?? undefined}
                 isPrimary={contact.isPrimary}
-                showJobTitle
                 onEdit={canEdit && onSaved ? handleStartEdit : undefined}
               />
             ))
@@ -711,7 +725,7 @@ export function CustomerContactsCard({
         ) : (
           <CustomerContactReadCard
             name={profile.displayName}
-            jobTitle={null}
+            jobTitle={profile.jobTitle}
             phones={
               profile.phones.length > 0
                 ? profile.phones
@@ -721,7 +735,6 @@ export function CustomerContactsCard({
             }
             email={profile.email}
             country={profile.address?.country ?? undefined}
-            showJobTitle={false}
             onEdit={canEdit && onSaved ? handleStartEdit : undefined}
           />
         )}
@@ -738,7 +751,6 @@ function CustomerContactReadCard({
   email,
   country,
   isPrimary,
-  showJobTitle = true,
   onEdit,
 }: {
   name: string;
@@ -748,7 +760,6 @@ function CustomerContactReadCard({
   email: string | null;
   country?: string;
   isPrimary?: boolean;
-  showJobTitle?: boolean;
   onEdit?: () => void;
 }) {
   const { t } = useI18n();
@@ -767,10 +778,7 @@ function CustomerContactReadCard({
       <dl className="grid grid-cols-1 gap-2 sm:grid-cols-12">
         {/* Row 1, Col 1: Full Name */}
         <div
-          className={cn(
-            "dossier-field-box flex min-w-0 flex-col justify-center",
-            showJobTitle ? "sm:col-span-6" : "sm:col-span-7",
-          )}
+          className="dossier-field-box flex min-w-0 flex-col justify-center sm:col-span-6"
         >
           <dt className="dossier-field-label">{t.crmLeadDetail.fullName}</dt>
           <dd className="dossier-field-val mt-0.5 min-w-0 text-xs text-foreground">
@@ -823,32 +831,27 @@ function CustomerContactReadCard({
           </dd>
         </div>
 
-        {/* Row 1, Col 2: Job Title (Corporate) */}
-        {showJobTitle && (
-          <div className="dossier-field-box flex min-w-0 flex-col justify-center sm:col-span-3">
-            <dt className="dossier-field-label">
-              {t.crmLeadConvert.contactJobTitle}
-            </dt>
-            <dd className="dossier-field-val mt-0.5 min-w-0 wrap-anywhere text-xs text-foreground">
-              {jobTitle ? (
-                <span className="inline-flex items-center rounded-md border border-swatch-teal-soft bg-swatch-teal-soft px-2 py-0.5 text-2xs font-semibold text-swatch-teal-deep">
-                  {jobTitle}
-                </span>
-              ) : (
-                <span className="dossier-field-empty">
-                  {t.detail.notRecorded}
-                </span>
-              )}
-            </dd>
-          </div>
-        )}
+        {/* Row 1, Col 2: Job Title */}
+        <div className="dossier-field-box flex min-w-0 flex-col justify-center sm:col-span-3">
+          <dt className="dossier-field-label">
+            {t.crmLeadConvert.contactJobTitle}
+          </dt>
+          <dd className="dossier-field-val mt-0.5 min-w-0 wrap-anywhere text-xs text-foreground">
+            {jobTitle ? (
+              <span className="inline-flex items-center rounded-md border border-swatch-teal-soft bg-swatch-teal-soft px-2 py-0.5 text-2xs font-semibold text-swatch-teal-deep">
+                {jobTitle}
+              </span>
+            ) : (
+              <span className="dossier-field-empty">
+                {t.detail.notRecorded}
+              </span>
+            )}
+          </dd>
+        </div>
 
         {/* Row 1, Col 3: Email */}
         <div
-          className={cn(
-            "dossier-field-box flex min-w-0 flex-col justify-center",
-            showJobTitle ? "sm:col-span-3" : "sm:col-span-5",
-          )}
+          className="dossier-field-box flex min-w-0 flex-col justify-center sm:col-span-3"
         >
           <dt className="dossier-field-label">{t.crmLeads.email}</dt>
           <dd className="dossier-field-val mt-0.5 min-w-0 wrap-anywhere text-xs text-foreground">

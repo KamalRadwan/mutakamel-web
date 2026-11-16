@@ -47,6 +47,7 @@ import type {
   UpdateTierDto,
 } from "../types";
 import { CatalogueResourceDialog } from "./CatalogueResourceDialog";
+import { TemplateDesignerBasePolicy } from "./TemplateDesignerBasePolicy";
 
 type Tab = "tiers" | "features" | "grants" | "pricing" | "audit";
 
@@ -95,7 +96,7 @@ export function reseatBracketLadder(rows: PriceTierInput[]): PriceTierInput[] {
 }
 
 export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, canRead, canCreate, canMutate }: Props) {
-  const { lang, dir } = useI18n();
+  const { lang, dir, t } = useI18n();
   const copy = catalogueCopy(lang);
   const catalogue = useApplicationCatalogue(canRead ? applicationId : null);
   const [tab, setTab] = useState<Tab>("tiers");
@@ -107,6 +108,8 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   const [brackets, setBrackets] = useState<PriceTierInput[]>(unconfiguredLadder);
   /** Whether the *stored* ladder for `cycle` exists; set in lockstep with `brackets`. */
   const [ladderConfigured, setLadderConfigured] = useState(false);
+  const [pricingRevision, setPricingRevision] = useState<string | null>(null);
+  const [priceReason, setPriceReason] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -124,8 +127,13 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
       setGrantConfig({});
       setBrackets(unconfiguredLadder());
       setLadderConfigured(false);
+      setPricingRevision(null);
     });
   }, [applicationId]);
+
+  useEffect(() => {
+    queueMicrotask(() => setPriceReason(""));
+  }, [applicationId, catalogue.selectedTierId, cycle]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -138,6 +146,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
     queueMicrotask(() => {
       const rows = catalogue.prices.filter((row) => row.billingCycle === cycle);
       setLadderConfigured(rows.length > 0);
+      setPricingRevision(rows.length ? rows[0].pricingRevision : "UNCONFIGURED");
       setBrackets(rows.length
         ? rows.map((row) => ({ minUsers: row.minUsers, maxUsers: row.maxUsers, unitPrice: row.unitPrice }))
         : unconfiguredLadder());
@@ -216,7 +225,16 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
       if (index < brackets.length - 1 && row.maxUsers === null) return setFormError(copy.onlyFinalOpen);
       if (index === brackets.length - 1 && row.maxUsers !== null) return setFormError(copy.finalMustOpen);
     }
-    await catalogue.replacePrices(selectedTier.id, { billingCycle: cycle, brackets });
+    const reason = priceReason.trim();
+    if (!reason || reason.length > 256) return setFormError(t.tierPricing.reasonRequired);
+    if (!pricingRevision) return;
+    try {
+      await catalogue.replacePrices(selectedTier.id, {
+        billingCycle: cycle, brackets, expectedPricingRevision: pricingRevision, reason,
+      });
+    } catch {
+      // The catalogue hook reports the failure and reloads authoritative rows.
+    }
   };
 
   const tabs: Array<{ id: Tab; label: string; icon: typeof Boxes }> = [
@@ -331,6 +349,10 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
               onDelete={(resource) => setDeleteTarget({ kind: "tier", resource })}
             />
           ) : tab === "features" ? (
+            <div className="space-y-4">
+              {applicationKey === "core" ? catalogue.features
+                .filter((feature) => feature.key === "core.template_designer" && feature.moduleId === applicationId)
+                .map((feature) => <TemplateDesignerBasePolicy key={`${applicationId}:${feature.id}`} applicationId={applicationId} feature={feature} canMutate={canMutate} onRefresh={() => catalogue.loadCatalogue(true)} />) : null}
             <ResourceTable
               title={copy.applicationFeatures}
               emptyText={copy.noFeatures}
@@ -349,6 +371,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
               onEdit={(resource) => setDialog({ kind: "feature", resource })}
               onDelete={(resource) => setDeleteTarget({ kind: "feature", resource })}
             />
+            </div>
           ) : tab === "grants" ? (
             <div className="space-y-4">
               <TierSelector
@@ -538,6 +561,28 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                     </div>
                   ))}
                   {canMutate ? (
+                    <Field
+                      label={t.tierPricing.reason}
+                      hint={t.tierPricing.reasonHint}
+                      error={formError === t.tierPricing.reasonRequired ? formError : undefined}
+                    >
+                      {(field) => (
+                        <Textarea
+                          {...field}
+                          required
+                          maxLength={256}
+                          value={priceReason}
+                          disabled={Boolean(catalogue.pendingAction)}
+                          onChange={(event) => {
+                            setFormError(null);
+                            setPriceReason(event.target.value);
+                          }}
+                          rows={2}
+                        />
+                      )}
+                    </Field>
+                  ) : null}
+                  {canMutate ? (
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <Button size="sm"
                         type="button"
@@ -561,7 +606,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                         type="button"
                         variant="primary"
                         loading={Boolean(catalogue.pendingAction)}
-                        disabled={!tierContextReady}
+                        disabled={!tierContextReady || !pricingRevision || !priceReason.trim()}
                         onClick={() => void validateAndSavePrices()}
                       >
                         {copy.replaceLadder(cycle)}

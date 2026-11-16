@@ -2,9 +2,11 @@ import { isUUIDv7 } from "@/lib/uuid";
 
 // One organization-scope resolver for all three apps — MASTER-PLAN S2 / L4-3.
 //
-// 77 Gateway routes carry a scope requirement (34 BRANCH_REQUIRED, 43
-// OPTIONAL_COMPANY_BRANCH) and 28 more are explicitly NONE. They are NOT a
-// CRM-only concern: the split is core 41, trade 32, crm 4.
+// Gateway routes that carry a scope requirement (BRANCH_REQUIRED or
+// OPTIONAL_COMPANY_BRANCH) and the routes explicitly NONE are listed in the
+// generated inventory tenant-portal/docs/generated/tenant-api-routes.json, and
+// organization-scope.test.ts asserts that inventory. Treat those as the source
+// of truth for counts and per-app split. They are NOT a CRM-only concern.
 //
 // The scope travels as two request headers, and the Gateway validates their
 // SHAPE against the route's policy before the request reaches any app —

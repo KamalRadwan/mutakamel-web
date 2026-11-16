@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import {
   normalizeApiError,
@@ -82,10 +82,7 @@ export function useLoggingConsole() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const ownerId = user?.id ?? null;
   const canRead = adminCan(user, "admin.logging.read");
-  const canUpdate = adminCanAll(user, [
-    "admin.logging.update",
-    "admin.logging.critical",
-  ]);
+  const canUpdate = adminCanAll(user, ADMIN_RBAC_CRITICAL.LOGGING_UPDATE);
   const [directoryDraft, setDirectoryDraft] =
     useState<DirectoryFilterDraft>(DIRECTORY_DRAFT);
   const [directoryQuery, setDirectoryQuery] =

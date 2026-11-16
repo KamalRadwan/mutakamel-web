@@ -6,6 +6,13 @@ Last source verification: **2026-09-11**
 
 ## Permission semantics
 
+Critical permission registry source review: **2026-10-30**.
+`ADMIN_RBAC_CRITICAL` in `src/lib/auth/rbac.ts` owns critical permission
+requirements. Feature policies reference these readonly sets, composing extra
+read/create requirements where needed. Permission hints derive their key names
+from the same registry. ALL semantics and super-admin behavior are unchanged;
+each registry entry must have a production caller.
+
 A permission list joined with `+` requires ALL permissions. The FQDN validation
 route is the single explicit ANY-permission route in the current 240-route
 Admin Core inventory.

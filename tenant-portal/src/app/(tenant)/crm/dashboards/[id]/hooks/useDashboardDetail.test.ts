@@ -6,6 +6,8 @@ import { TenantApiClientError } from "@/lib/api/axiosClient";
 import { dashboardPath, dashboardRunPath } from "../../dashboard-contract";
 import { useDashboardDetail } from "./useDashboardDetail";
 
+vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { id: "01900300-0000-7000-8000-000000000001", isTenantOwner: true, permissions: [], accessibleBranches: [], teamMemberships: [] } }) }));
+
 const { get, post, patch } = vi.hoisted(() => ({
   get: vi.fn(), post: vi.fn(), patch: vi.fn(),
 }));
@@ -97,7 +99,7 @@ describe("dashboard selection changes", () => {
     expect(result.current.detail).toBeNull();
     expect(result.current.run).toBeNull();
     expect(result.current.selection).toEqual(emptySelection);
-    expect(post).toHaveBeenLastCalledWith(dashboardRunPath(B), {}, expect.any(Object));
+    expect(post).toHaveBeenLastCalledWith(dashboardRunPath(B), { includePopulationOptions: true }, expect.any(Object));
     await act(async () => {
       expect((await result.current.rename("Wrong revision", "")).ok).toBe(false);
     });
@@ -135,7 +137,8 @@ describe("dashboard selection changes", () => {
     await act(async () => { await result.current.reload(); });
     expect(result.current.selection).toEqual(filters);
     expect(post).toHaveBeenLastCalledWith(
-      dashboardRunPath(A), { filters: { currencyCode: "EGP" } }, expect.any(Object),
+      dashboardRunPath(A), { filters: { currencyCode: "EGP" }, includePopulationOptions: true }, expect.any(Object),
     );
   });
 });
+

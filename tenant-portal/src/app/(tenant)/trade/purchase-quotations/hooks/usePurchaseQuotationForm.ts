@@ -1,26 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
-import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { tradeGet, tradeIfMatch, tradePatch, tradePost } from "../../trade-api";
+import type { NormalizedApiError } from "@/lib/api/errors";
+import { tradeIfMatch, tradePatch, tradePost } from "../../trade-api";
 import {
   TRADE_ACTION_RESPONSE_BYTES,
-  TRADE_LIST_RESPONSE_BYTES,
+  partyDisplayName,
   tradeDocumentPath,
 } from "../../documents/trade-document-contract";
-import { isAbortError } from "../../documents/hooks/useTradeDocumentList";
 import { useTradeLineDraft, type TradeLineDraftState } from "../../documents/hooks/useTradeLineDraft";
 import { useTradeWrite, type TradeWriteState } from "../../documents/hooks/useTradeWrite";
 import {
   PURCHASE_QUOTATIONS_PATH,
   buildCreatePurchaseQuotation,
   buildUpdatePurchaseQuotation,
-  parseSupplierAccounts,
-  supplierAccountsPath,
   type PurchaseQuotationDetail,
   type SupplierAccountOption,
 } from "../purchase-quotation-contract";
+import { usePurchaseQuotationSuppliers } from "./usePurchaseQuotationSuppliers";
 
 interface PurchaseQuotationFormValues {
   supplierPartyId: string;
@@ -39,6 +37,9 @@ export interface PurchaseQuotationFormState {
   suppliers: SupplierAccountOption[];
   suppliersError: NormalizedApiError | null;
   isLoadingSuppliers: boolean;
+  canUseSupplierPicker: boolean;
+  searchSuppliers: (search: string) => void;
+  selectedSupplierLabel: string;
   lineDraft: TradeLineDraftState;
   write: TradeWriteState;
   formError: string | null;
@@ -72,9 +73,8 @@ export function usePurchaseQuotationForm(
   const write = useTradeWrite();
   const [isOpen, setIsOpen] = useState(false);
   const [values, setValues] = useState<PurchaseQuotationFormValues>(EMPTY);
-  const [suppliers, setSuppliers] = useState<SupplierAccountOption[]>([]);
-  const [suppliersError, setSuppliersError] = useState<NormalizedApiError | null>(null);
-  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  const supplierLookup = usePurchaseQuotationSuppliers(headers, canReadSuppliers);
+  const [selectedSupplierLabel, setSelectedSupplierLabel] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   const lineDraft = useTradeLineDraft(
@@ -85,39 +85,12 @@ export function usePurchaseQuotationForm(
     isOpen,
   );
 
-  useEffect(() => {
-    if (!isOpen || !canReadSuppliers) return undefined;
-    const controller = new AbortController();
-    // Deferred to a microtask so the first `setState` is not synchronous with
-    // the effect body.
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      setIsLoadingSuppliers(true);
-      void (async () => {
-        try {
-          const result = await tradeGet(supplierAccountsPath(), {
-            signal: controller.signal,
-            headers,
-            maxResponseBytes: TRADE_LIST_RESPONSE_BYTES,
-          });
-          setSuppliers(parseSupplierAccounts(result.data));
-        } catch (error) {
-          if (isAbortError(error)) return;
-          setSuppliersError(normalizeApiError(error));
-        } finally {
-          if (!controller.signal.aborted) setIsLoadingSuppliers(false);
-        }
-      })();
-    });
-    return () => controller.abort();
-  }, [isOpen, canReadSuppliers, headers]);
-
   const linesReady =
     lineDraft.invalidLineIndex === null &&
     lineDraft.lines.every((line) => line.itemId !== "" && line.uomId !== "");
 
   const submit = useCallback(async (): Promise<void> => {
-    if (write.isBlocked) return;
+    if (write.isBlocked || !supplierLookup.canUseSupplierPicker) return;
     setFormError(null);
     try {
       const input = {
@@ -164,13 +137,15 @@ export function usePurchaseQuotationForm(
     } catch (error) {
       setFormError(formMessage(error, t));
     }
-  }, [values, lineDraft, write, existing, t, headers, onSaved]);
+  }, [values, lineDraft, write, existing, t, headers, onSaved, supplierLookup.canUseSupplierPicker]);
 
   return {
     isOpen,
     open: () => {
-      if (write.isBlocked) return;
+      if (write.isBlocked || !supplierLookup.canUseSupplierPicker) return;
       setFormError(null);
+      setSelectedSupplierLabel(existing ? partyDisplayName(existing.partySnapshot) ?? "" : "");
+      supplierLookup.searchSuppliers("");
       lineDraft.reset(
         existing
           ? existing.lines.map((line) => ({
@@ -202,14 +177,20 @@ export function usePurchaseQuotationForm(
       setIsOpen(false);
     },
     values,
-    setValue: (patch) => setValues((current) => ({ ...current, ...patch })),
-    suppliers,
-    suppliersError,
-    isLoadingSuppliers,
+    setValue: (patch) => {
+      if (patch.supplierPartyId !== undefined) {
+        setSelectedSupplierLabel(supplierLookup.suppliers.find((supplier) =>
+          supplier.partyId === patch.supplierPartyId)?.displayName ?? "");
+      }
+      setValues((current) => ({ ...current, ...patch }));
+    },
+    ...supplierLookup,
+    selectedSupplierLabel,
     lineDraft,
     write,
     formError,
     canSubmit:
+      supplierLookup.canUseSupplierPicker &&
       linesReady &&
       values.supplierPartyId !== "" &&
       values.currencyCode.trim().length === 3 &&

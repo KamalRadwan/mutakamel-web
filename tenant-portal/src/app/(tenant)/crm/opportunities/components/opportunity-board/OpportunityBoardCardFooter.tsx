@@ -20,7 +20,7 @@ export function OpportunityBoardCardFooter({ props, effective, canOpenActivities
   const flag = props.stage.flag;
   const terminal = flag === "WON" || flag === "LOST";
   const state = opportunityBoardActivityState(effective);
-  const label = flag === "WON" || flag === "LOST" ? t.statusValues[`OpportunityStatus.${flag}`] : t.crmLeads.card.activityStates[state];
+  const label = t.crmLeads.card.activityStates[state];
   const pill = <CrmActivityPill state={state} label={label} neutral={terminal} />;
   return (
     <>

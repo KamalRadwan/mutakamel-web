@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import type {
   ApplicationCatalogueVisibility,
   ApplicationCommercialMode,
@@ -35,7 +36,7 @@ export function useApplicationOnboardingForm({
   onCreate: (dto: CreateApplicationDto) => Promise<unknown>;
   onOnboard: (dto: OnboardApplicationDto) => Promise<unknown>;
 }) {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const validationCopy = onboardingValidationCopy(lang);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -130,7 +131,7 @@ export function useApplicationOnboardingForm({
       setFormData(initialFormData);
       onClose();
     } catch (error) {
-      setSubmissionError(readSubmissionMessage(error, validationCopy.failed));
+      setSubmissionError(localizeApplicationError(error, t));
     } finally {
       setIsSubmitting(false);
     }
@@ -151,11 +152,6 @@ export function useApplicationOnboardingForm({
   };
 }
 
-function readSubmissionMessage(value: unknown, fallback: string) {
-  if (value instanceof Error) return value.message;
-  if (value && typeof value === "object" && "message" in value && typeof value.message === "string") return value.message;
-  return fallback;
-}
 
 function onboardingValidationCopy(lang: "ar" | "en") {
   return lang === "ar"

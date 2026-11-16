@@ -14,7 +14,7 @@ vi.mock("@/lib/branding/apply-branding", () => ({ applyBrandingTokens: vi.fn() }
 
 const saved: PublicBranding = {
   appName: "New name", tabTitle: "New title", primaryColor: "#2563eb",
-  secondaryColor: null, fontFamily: null, loginHtml: null,
+  secondaryColor: null, fontFamily: null,
   logoUrl: PUBLIC_BRANDING_LOGO_PATH, iconUrl: PUBLIC_BRANDING_ICON_PATH,
 };
 

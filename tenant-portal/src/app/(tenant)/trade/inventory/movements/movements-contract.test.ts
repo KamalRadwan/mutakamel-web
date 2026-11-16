@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildDeliveryRequest, buildOpeningBalanceRequest, buildReceiptRequest,
-  buildReservationRequest, parseReservation, buildReleaseRequest, buildReversalRequest,
-  parseMovementLines, parseMovementStatus,
-} from "./movements-contract";
+import { buildDeliveryRequest, buildOpeningBalanceRequest, buildReceiptRequest,
+  buildReservationRequest, buildReleaseRequest, buildReversalRequest } from "./movement-request-builders";
+import { parseReservation, parseMovementLines, parseMovementStatus } from "./movements-contract";
 import { inventoryFormMessage } from "../inventory-messages";
 import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";

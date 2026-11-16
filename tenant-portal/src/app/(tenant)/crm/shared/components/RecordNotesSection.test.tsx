@@ -9,7 +9,7 @@ import { RecordNotesSection } from "./RecordNotesSection";
 
 const state = vi.hoisted(() => ({ canEdit: false, canDelete: false }));
 vi.mock("./CrmScopeGate", () => ({ CrmScopeGate: () => null }));
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
 vi.mock("../hooks/useCrmErrorText", () => ({ useCrmErrorText: () => () => null }));
 vi.mock("../hooks/useAmbiguousOutcomeLabels", () => ({
   useAmbiguousOutcomeLabels: () => ({}), useAppliedUnreadableLabels: () => ({}),
@@ -18,6 +18,7 @@ vi.mock("../hooks/useCrmNotes", () => ({ useCrmNotes: () => ({
   notes: [{ id: "note", body: "Saved note", updatedAt: "2026-10-17T00:00:00Z", ...state }],
   isLoading: false, loadError: null, writeError: null, ambiguity: null, appliedUnreadable: null,
   pendingId: null,
+  total: 1, hasNext: false,
 }) }));
 vi.mock("@/design-system", () => ({
   PermissionGate: ({ children }: { children: ReactNode }) => <>{children}</>,

@@ -620,6 +620,10 @@ The active source:
   server read before another lifecycle decision;
 - contains no password reveal or one-time-file workflow.
 
+Lifecycle confirmation source update **2026-10-31**: Drain and Take Offline
+require the operator to type the exact server name before confirmation is
+enabled. Activate retains a plain confirmation without name typing.
+
 Source integration and focused tests are not authenticated browser, live
 PostgreSQL privilege, multi-replica convergence, deployment, or release proof.
 

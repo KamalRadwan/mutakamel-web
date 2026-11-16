@@ -1,13 +1,14 @@
 import type { Language } from "@/i18n/I18nContext";
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export const LOGGING_COPY = {
   en: {
     title: "Runtime logging",
     readPermission: "Required permission: admin.logging.read",
     updatePermission:
-      "Required permissions: admin.logging.update + admin.logging.critical",
+      `Required permissions: ${ADMIN_RBAC_CRITICAL.LOGGING_UPDATE.join(" + ")}`,
     livePermission:
-      "Required permissions: admin.logging.read + admin.logging.critical",
+      `Required permissions: ${ADMIN_RBAC_CRITICAL.LOGGING_LIVE.join(" + ")}`,
     directory: "Override directory",
     directoryHelp:
       "Active rows are ordered by most recently updated. Pagination is cursorless because Core returns a bounded array without totals.",
@@ -127,9 +128,9 @@ export const LOGGING_COPY = {
     title: "سجلات التشغيل",
     readPermission: "الصلاحية المطلوبة: admin.logging.read",
     updatePermission:
-      "الصلاحيات المطلوبة: admin.logging.update + admin.logging.critical",
+      `الصلاحيات المطلوبة: ${ADMIN_RBAC_CRITICAL.LOGGING_UPDATE.join(" + ")}`,
     livePermission:
-      "الصلاحيات المطلوبة: admin.logging.read + admin.logging.critical",
+      `الصلاحيات المطلوبة: ${ADMIN_RBAC_CRITICAL.LOGGING_LIVE.join(" + ")}`,
     directory: "دليل التجاوزات",
     directoryHelp:
       "تُرتب الصفوف النشطة حسب آخر تحديث. التقسيم دون إجمالي لأن Core يعيد مصفوفة محدودة فقط.",

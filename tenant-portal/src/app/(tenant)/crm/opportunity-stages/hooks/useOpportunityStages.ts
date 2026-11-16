@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -36,20 +37,31 @@ export interface StageWriteResult {
  *
  * **All five routes require `crm.pipelines.manage`, not `crm.pipelines.read`.**
  * Verified on every handler in
- * crm-app/src/crm/pipelines/opportunity-stages.controller.ts — the read
- * permission in docs/api/crm-opportunities.md's table is wrong for this
- * family, so gating the route on `read` would show an actor a screen whose
- * every request 403s.
+ * crm-app/src/crm/pipelines/opportunity-stages.controller.ts. Read admission
+ * remains separate from the tenant policy that may prohibit mutations.
  */
 export function useOpportunityStages() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("crm.pipelines.manage") ?? false;
+  const { canMutate } = useAccessMode();
+  const canRead = user?.permissions.includes("crm.pipelines.manage") ?? false;
+  const [writeDenied, setWriteDenied] = useState(false);
+  const writeDeniedRef = useRef(false);
+  const canManage = canRead && canMutate && !writeDenied;
   const { items, setItems, hasLoaded, isLoading, queryError, reload: load } =
-    useOpportunityStageCatalogue(true);
+    useOpportunityStageCatalogue(canRead);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const writeInFlight = useRef(false);
+  const writeError = (error: unknown): StageWriteResult => {
+    const normalized = normalizeApiError(error);
+    if (normalized.status === 403) {
+      writeDeniedRef.current = true;
+      setWriteDenied(true);
+    }
+    return { ok: false, replayed: false, error: normalized };
+  };
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
@@ -64,13 +76,15 @@ export function useOpportunityStages() {
   const create = async (
     input: OpportunityStageFormInput,
   ): Promise<StageWriteResult> => {
-    if (!canManage) return forbidden();
+    if (!canManage || writeDeniedRef.current) return forbidden();
+    if (writeInFlight.current) return { ok: false, replayed: false, error: null };
     let body: Record<string, unknown>;
     try {
       body = buildCreateOpportunityStageRequest(input);
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    writeInFlight.current = true;
     setIsSubmitting(true);
     try {
       const response = await axiosClient.post<unknown>(
@@ -86,8 +100,9 @@ export function useOpportunityStages() {
       await load();
       return { ok: true, replayed: isIdempotentReplay(response.headers), error: null };
     } catch (error) {
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
+      return writeError(error);
     } finally {
+      writeInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -96,13 +111,15 @@ export function useOpportunityStages() {
     stage: OpportunityStageDefinition,
     input: OpportunityStageFormInput,
   ): Promise<StageWriteResult> => {
-    if (!canManage) return forbidden();
+    if (!canManage || writeDeniedRef.current) return forbidden();
+    if (writeInFlight.current) return { ok: false, replayed: false, error: null };
     let body: Record<string, unknown>;
     try {
       body = buildUpdateOpportunityStageRequest(input, stage);
     } catch (error) {
       return { ok: false, replayed: false, error: localError(error) };
     }
+    writeInFlight.current = true;
     setIsSubmitting(true);
     try {
       const response = await axiosClient.patch<unknown>(
@@ -116,14 +133,17 @@ export function useOpportunityStages() {
       );
       return { ok: true, replayed: isIdempotentReplay(response.headers), error: null };
     } catch (error) {
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
+      return writeError(error);
     } finally {
+      writeInFlight.current = false;
       setIsSubmitting(false);
     }
   };
 
   const remove = async (id: string): Promise<StageWriteResult> => {
-    if (!canManage) return forbidden();
+    if (!canManage || writeDeniedRef.current) return forbidden();
+    if (writeInFlight.current) return { ok: false, replayed: false, error: null };
+    writeInFlight.current = true;
     setPendingId(id);
     try {
       // 204 No Content.
@@ -134,9 +154,11 @@ export function useOpportunityStages() {
       setItems((current) => current.filter((entry) => entry.id !== id));
       return { ok: true, replayed: isIdempotentReplay(response.headers), error: null };
     } catch (error) {
+      const result = writeError(error);
       await load();
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
+      return result;
     } finally {
+      writeInFlight.current = false;
       setPendingId(null);
     }
   };
@@ -145,12 +167,15 @@ export function useOpportunityStages() {
     t,
     lang,
     items: filteredItems,
+    total: items.length,
     hasLoaded,
     isLoading,
     isSubmitting,
     pendingId,
     queryError,
     canManage,
+    canRead,
+    readOnly: canRead && (!canMutate || writeDenied),
     searchQuery,
     setSearchQuery,
     create,

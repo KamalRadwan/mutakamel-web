@@ -33,7 +33,8 @@ vi.mock("@/context/AuthContext", () => ({
     isLoading: mocks.authLoading,
   }),
 }));
-vi.mock("@/lib/auth/rbac", () => ({
+vi.mock("@/lib/auth/rbac", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/auth/rbac")>(),
   adminCanAll: (_user: unknown, required: readonly string[]) =>
     required.every((permission) => mocks.permissions.includes(permission)),
 }));

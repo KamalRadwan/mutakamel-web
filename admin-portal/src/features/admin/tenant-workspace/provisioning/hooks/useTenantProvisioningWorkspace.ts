@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../model/operation-actions";
 import type {
   CreateAddApplicationOperationDto,
+  CreateDecommissionOperationDto,
   CreateRepairOperationDto,
   SeedConflictDecision,
   TenantComponentInstallation,
@@ -67,15 +68,20 @@ export interface ManagedTargetDraft {
   targetManifestChecksum: string;
 }
 
-export function useTenantProvisioningWorkspace(tenantId: string) {
+export function useTenantProvisioningWorkspace(tenantId: string, tenantName: string) {
   const { lang, dir, t } = useI18n();
   const toast = useToast();
   const [confirmation, setConfirmation] =
     useState<ProvisioningConfirmation | null>(null);
+  const [decommissionConfirmation, setDecommissionConfirmation] = useState<{
+    targetName: string;
+    dto: CreateDecommissionOperationDto;
+  } | null>(null);
+  const decommissionInFlight = useRef(false);
   // An open confirmation holds background refresh so the state the operator
   // is deciding on does not shift underneath the dialog.
   const provisioning = useTenantProvisioning(tenantId, {
-    paused: confirmation !== null,
+    paused: confirmation !== null || decommissionConfirmation !== null,
   });
   const latestOperation = provisioning.operations.data.items.reduce(
     (latest, candidate) => !latest || candidate.generation > latest.generation ? candidate : latest,
@@ -322,7 +328,11 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     }
   }, [confirmation, provisioning, t, toast]);
 
-  const submitDecommission = useCallback(async () => {
+  const requestDecommission = useCallback(() => {
+    if (
+      commandInFlight || hasOpenOperation ||
+      !provisioning.permissions.canDecommission
+    ) return;
     setLocalError(null);
     const component = provisioning.components.data.items.find(
       (row) => row.id === effectiveDecommissionComponentId,
@@ -332,24 +342,52 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
       return;
     }
     try {
-      await provisioning.decommission(
-        buildDecommissionOperationDto(
-          component,
-          decommissionReasonCode,
-          retentionAcknowledged,
-        ),
+      const dto = buildDecommissionOperationDto(
+        component,
+        decommissionReasonCode,
+        retentionAcknowledged,
       );
-      setRetentionAcknowledged(false);
-      setSection("operations");
+      // Confirm the same tenant/component and evidence that will be submitted.
+      setDecommissionConfirmation({
+        targetName: `${tenantName} · ${component.componentKey}`,
+        dto,
+      });
     } catch (error) {
       setLocalError(readLocalError(error));
     }
   }, [
+    commandInFlight,
     decommissionReasonCode,
     effectiveDecommissionComponentId,
+    hasOpenOperation,
     provisioning,
     retentionAcknowledged,
+    tenantName,
   ]);
+
+  const dismissDecommissionConfirmation = useCallback(() => {
+    if (commandInFlight || decommissionInFlight.current) return;
+    setDecommissionConfirmation(null);
+  }, [commandInFlight]);
+
+  const submitDecommission = useCallback(async () => {
+    if (
+      !decommissionConfirmation || commandInFlight || decommissionInFlight.current ||
+      hasOpenOperation || !provisioning.permissions.canDecommission || !retentionAcknowledged
+    ) return;
+    decommissionInFlight.current = true;
+    setLocalError(null);
+    try {
+      await provisioning.decommission(decommissionConfirmation.dto);
+      setRetentionAcknowledged(false);
+      setSection("operations");
+    } catch (error) {
+      setLocalError(readLocalError(error));
+    } finally {
+      setDecommissionConfirmation(null);
+      decommissionInFlight.current = false;
+    }
+  }, [commandInFlight, decommissionConfirmation, hasOpenOperation, provisioning, retentionAcknowledged]);
 
   const submitAddApplication = useCallback(async () => {
     setLocalError(null);
@@ -436,6 +474,9 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     operationActions,
     repairAction,
     confirmation,
+    decommissionConfirmation,
+    requestDecommission,
+    dismissDecommissionConfirmation,
     requestCancel,
     requestRetry,
     requestRecovery,

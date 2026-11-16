@@ -5,11 +5,6 @@ import { tradeGet } from "../../trade-api";
 import { useTradeScopeRequest } from "../../useTradeScope";
 import { ACCOUNTS_PATH } from "../commercial-account-contract";
 
-interface PaymentTermLookupOption {
-  id: string;
-  source: string;
-}
-
 interface CreditPolicyLookupOption {
   id: string;
   code: string;
@@ -21,25 +16,14 @@ interface CreditPolicyLookupOption {
 }
 
 export interface CommercialAccountLookupsData {
-  paymentTerms: PaymentTermLookupOption[];
   creditPolicies: CreditPolicyLookupOption[];
 }
 
 export function parseCommercialAccountLookups(raw: unknown): CommercialAccountLookupsData {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { paymentTerms: [], creditPolicies: [] };
+    return { creditPolicies: [] };
   }
   const obj = raw as Record<string, unknown>;
-  const paymentTerms: PaymentTermLookupOption[] = Array.isArray(obj.paymentTerms)
-    ? obj.paymentTerms
-        .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
-        .filter((item) => typeof item.id === "string")
-        .map((item) => ({
-          id: String(item.id),
-          source: typeof item.source === "string" ? item.source : "existing_commercial_accounts",
-        }))
-    : [];
-
   const creditPolicies: CreditPolicyLookupOption[] = Array.isArray(obj.creditPolicies)
     ? obj.creditPolicies
         .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
@@ -55,13 +39,12 @@ export function parseCommercialAccountLookups(raw: unknown): CommercialAccountLo
         }))
     : [];
 
-  return { paymentTerms, creditPolicies };
+  return { creditPolicies };
 }
 
 export function useCommercialAccountLookups(enabled = true) {
   const read = useTradeScopeRequest("COMPANY_OR_BRANCH");
   const [lookups, setLookups] = useState<CommercialAccountLookupsData>({
-    paymentTerms: [],
     creditPolicies: [],
   });
   const [isLoading, setIsLoading] = useState(false);

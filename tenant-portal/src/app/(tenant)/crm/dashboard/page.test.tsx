@@ -7,9 +7,18 @@ import { en } from "@/i18n/dictionaries/en";
 import CrmDefaultDashboardPage from "./page";
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock("@/lib/api/axiosClient", () => ({ axiosClient: { get } }));
+vi.mock("@/lib/api/axiosClient", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api/axiosClient")>()),
+  axiosClient: { get },
+}));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
-vi.mock("@/design-system", () => ({
+vi.mock("@/context/AuthContext", () => ({
+  useTenantAuth: () => ({
+    user: { permissions: ["crm.dashboards.read.own"], isTenantOwner: false },
+  }),
+}));
+vi.mock("@/design-system", async (importOriginal) => ({
+  hasPermission: (await importOriginal<typeof import("@/design-system")>()).hasPermission,
   PermissionGate: ({ children }: { children: ReactNode }) => <>{children}</>,
   Skeleton: () => <div>Loading</div>,
   ErrorState: () => <div>Failed</div>,

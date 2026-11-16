@@ -11,7 +11,7 @@ import { DashboardWorkspace } from "./dashboard-workspace";
 
 const DICT_BY_LANG = { en, ar } as const;
 const state = vi.hoisted(() => ({
-  lang: "en" as "en" | "ar", permissions: ["crm.dashboards.read.own"],
+  generation: 0, lang: "en" as "en" | "ar", permissions: ["crm.dashboards.read.own"],
   get: vi.fn(), put: vi.fn(), toastError: vi.fn(), navigate: vi.fn(),
 }));
 const ID = "01900300-0000-7000-8000-000000000001";
@@ -24,7 +24,7 @@ const dashboard = {
 const names = { en: "Sales from catalogue", ar: "المبيعات من الكتالوج" };
 
 vi.mock("@/context/AuthContext", () => ({
-  useTenantAuth: () => ({ user: { permissions: state.permissions, accessibleBranches: [] } }),
+  useTenantAuth: () => ({ realtimeAuthGeneration: state.generation, user: { id: ID, permissions: state.permissions, accessibleBranches: [] } }),
 }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ t: DICT_BY_LANG[state.lang], lang: state.lang }),
@@ -38,9 +38,9 @@ vi.mock("@/design-system", async (importOriginal) => {
   const { hasPermission } = await importOriginal<typeof import("@/design-system")>();
   const Slot = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
-    hasPermission, useToast: () => ({ error: state.toastError }),
+    Badge: Slot, hasPermission, useToast: () => ({ error: state.toastError }),
     Button: Slot, DetailHeader: () => null,
-    ConflictDialog: () => null, DegradedBanner: () => null, EmptyState: () => null,
+    ConfirmActionModal: () => null, ConflictDialog: () => null, DegradedBanner: () => null, EmptyState: () => null,
     ErrorState: ({ title, onRetry, retryLabel }: { title: string; onRetry: () => void; retryLabel: string }) =>
       <div role="alert">{title}<button onClick={onRetry}>{retryLabel}</button></div>,
     NotFoundState: () => null, PermissionGate: Slot, Skeleton: () => null,
@@ -50,7 +50,7 @@ vi.mock("@/design-system", async (importOriginal) => {
 vi.mock("../hooks/useDashboardDetail", () => ({
   useDashboardDetail: () => ({ detail: dashboard, run: null, selection: {}, availableCurrencies: [], isLoading: false }),
 }));
-vi.mock("../hooks/useDashboardLayout", () => ({ useDashboardLayout: () => ({ canEdit: false }) }));
+vi.mock("../hooks/useDashboardLayout", () => ({ useDashboardLayout: () => ({ canEdit: false, setIsEditing: vi.fn() }) }));
 vi.mock("../hooks/useDashboardShares", () => ({ useDashboardShares: () => ({}) }));
 vi.mock("../hooks/useAvailableWidgets", () => ({ useAvailableWidgets: () => ({ widgets: [], error: null }) }));
 vi.mock("../hooks/useWidgetDrilldown", () => ({ useWidgetDrilldown: () => ({}) }));
@@ -70,6 +70,7 @@ vi.mock("./DrilldownSheet", () => ({ DrilldownSheet: () => null }));
 vi.mock("./WidgetTile", () => ({ WidgetTile: () => null }));
 
 beforeEach(() => {
+  state.generation++;
   state.lang = "en";
   state.permissions = ["crm.dashboards.read.own"];
   state.get.mockImplementation(async (path: string) => ({ data: path === DASHBOARDS_PATH ? { items: [dashboard], nextCursor: null } : {
@@ -89,7 +90,7 @@ describe("dashboard template selection", () => {
 
   it.each(["en", "ar"] as const)("shows catalogue copy and a translated toast for a template 500 in %s", async (lang) => {
     state.lang = lang;
-    state.permissions.push("crm.dashboards.create");
+    state.permissions.push("crm.dashboards.create", "crm.widgets.create");
     state.put.mockRejectedValue(new TenantApiClientError("Server error", {
       status: 500, statusText: "Internal Server Error", headers: new Headers(), data: {},
     }));
@@ -102,7 +103,7 @@ describe("dashboard template selection", () => {
   });
 
   it("navigates to the provisioned dashboard on success", async () => {
-    state.permissions.push("crm.dashboards.create");
+    state.permissions.push("crm.dashboards.create", "crm.widgets.create");
     state.put.mockResolvedValue({ data: { ...dashboard, id: NEXT_ID, sourceTemplateKey: "SALES_PIPELINE" } });
     render(<DashboardWorkspace dashboardId={ID} onSelectDashboard={state.navigate} />);
     await screen.findByRole("option", { name: names.en });
@@ -120,3 +121,7 @@ describe("dashboard template selection", () => {
     await waitFor(() => expect(state.get).toHaveBeenCalledTimes(4));
   });
 });
+
+
+
+

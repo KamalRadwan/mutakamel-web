@@ -80,4 +80,10 @@ describe("AmbiguousOutcomePanel", () => {
     screen.getByRole("button", { name: labels.dismiss }).click();
     expect(props.onDismiss).not.toHaveBeenCalled();
   });
+
+  it("offers only reconciliation when dismissing would unlock an unresolved command", () => {
+    renderPanel({ onDismiss: undefined });
+    expect(screen.queryByRole("button", { name: labels.dismiss })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: labels.retry })).toBeEnabled();
+  });
 });

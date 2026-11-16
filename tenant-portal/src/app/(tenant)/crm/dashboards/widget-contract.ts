@@ -9,15 +9,11 @@
 // `pipelines/pipeline-contract.ts`.
 
 import { isUUIDv7 } from "@/lib/uuid";
-import { parseDefinitionPage, type DefinitionPage } from './definition-pagination';
+export { parseWidgetDefinition } from "./widget-response";
 import {
-  boundedArray,
   finiteNumber,
   invalidResponse,
-  nonEmptyString,
-  optionalString,
   record,
-  timestamp,
 } from "./dashboard-parse";
 
 export const WIDGETS_PATH = "/api/tenant/crm/v1/widgets";
@@ -25,9 +21,17 @@ export const WIDGET_CATALOG_PATH = "/api/tenant/crm/v1/widgets/catalog";
 export const WIDGET_PREVIEW_PATH = "/api/tenant/crm/v1/widgets/preview";
 export const WIDGET_SHARE_TARGETS_PATH =
   "/api/tenant/crm/v1/widgets/share-targets";
+export const CRM_WIDGET_SOURCE_RESOURCES = ["leads", "opportunities", "activities", "customer_profiles", "targets"] as const;
+export type WidgetSourceResource = typeof CRM_WIDGET_SOURCE_RESOURCES[number];
 
 /** `@MaxLength(120)` on every `name` in dashboard-builder.dto.ts. */
-export const WIDGET_NAME_MAX_LENGTH = 120;
+const WIDGET_NAME_MAX_LENGTH = 120;
+/** DashboardDisplaySpecDto trims these two strings, and no scalar option. */
+export function normalizeWidgetDisplaySpec(display: Record<string, unknown>): Record<string, unknown> {
+  return { ...display,
+    ...(typeof display.title === "string" ? { title: display.title.trim() } : {}),
+    ...(typeof display.subtitle === "string" ? { subtitle: display.subtitle.trim() } : {}) };
+}
 /** `LIMIT 21` guards on every placement query; more than 20 is a 409. */
 export const DASHBOARD_WIDGET_LIMIT = 20;
 
@@ -38,7 +42,7 @@ const CRM_VISUALIZATIONS = [
   "SEMI_CIRCLE_GAUGE", "THREE_QUARTER_GAUGE", "CIRCULAR_PROGRESS_GAUGE",
   "DETAILED_SPEEDOMETER", "TABLE", "FUNNEL", "HEATMAP", "MULTI_KPI",
   "PROGRESS_CARD", "BULLET", "STACKED_BAR_100", "COMBO", "WATERFALL",
-  "TREEMAP", "LEADERBOARD", "SCORECARD", "HISTOGRAM", "CALENDAR", "TIMELINE",
+  "TREEMAP", "LEADERBOARD", "SCORECARD", "HISTOGRAM", "BOX_PLOT", "CALENDAR", "TIMELINE",
   "CALENDAR_HEATMAP", "ALERT_LIST", "ACTIVITY_FEED",
 ] as const;
 export type CrmVisualization = (typeof CRM_VISUALIZATIONS)[number];
@@ -46,7 +50,7 @@ export type CrmVisualization = (typeof CRM_VISUALIZATIONS)[number];
 /** `CrmDashboardDataShape` — dashboard-catalog.ts. */
 const CRM_DATA_SHAPES = [
   "SCALAR", "TIME_SERIES", "CATEGORY", "XY", "INTERVAL", "GRAPH", "ROWS",
-  "HIERARCHY", "BINNED_DISTRIBUTION", "WATERFALL", "EVENT_STREAM",
+  "HIERARCHY", "BINNED_DISTRIBUTION", "DURATION_DISTRIBUTION", "WATERFALL", "EVENT_STREAM",
 ] as const;
 export type CrmDataShape = (typeof CRM_DATA_SHAPES)[number];
 
@@ -57,7 +61,9 @@ export type CrmMetricUnit = (typeof CRM_METRIC_UNITS)[number];
 export const TIME_GRAINS = ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] as const;
 export type TimeGrain = (typeof TIME_GRAINS)[number];
 
-type ComparisonType = "PREVIOUS_PERIOD" | "PREVIOUS_YEAR" | "TARGET" | "NONE";
+export type ComparisonType = "PREVIOUS_PERIOD" | "PREVIOUS_YEAR" | "TARGET" | "NONE" | "DATASETS" | "GOVERNED_TARGET";
+export type ComparisonDatasetBasis = "PERIOD" | "BRANCH";
+export interface ComparisonDatasetSelection { datePreset?: string; dateFrom?: string; dateTo?: string; branchId?: string }
 
 const ACCESS_LEVELS = ["OWNER", "EDIT", "VIEW"] as const;
 export type ResourceAccessLevel = (typeof ACCESS_LEVELS)[number];
@@ -81,7 +87,8 @@ export interface WidgetQuerySpec {
   series: Array<{ metricKey: string; axis?: "LEFT" | "RIGHT"; label?: string; color?: string }>;
   dimension?: { key: string; grain?: TimeGrain };
   filters?: Record<string, unknown>;
-  comparison?: { type: ComparisonType; target?: number };
+  comparison?: { type: ComparisonType; target?: number; basis?: ComparisonDatasetBasis; datasets?: ComparisonDatasetSelection[];
+    governedTarget?: import("./won-target-evidence").GovernedTargetBinding };
   topN?: number;
   maxPoints?: number;
 }
@@ -115,33 +122,21 @@ interface WidgetPlacementUsage {
 }
 
 /** `DashboardWidgetsService.usage` — `activeShareCount` is OWNER-only. */
-interface WidgetUsage {
+export interface WidgetUsage {
   placementCount: number;
   dashboardCount: number;
   activeShareCount: number | null;
   hiddenPlacementCount: number;
   placements: WidgetPlacementUsage[];
-}
-
-export interface WidgetDetail extends WidgetDefinition {
-  usage: WidgetUsage | null;
-}
-
-/** `PATCH /widgets/:id` also reports what it did to other dashboards. */
-export interface WidgetUpdateResult extends WidgetDefinition {
-  dashboardRevisions: Record<string, number>;
-  layoutAdjustments: Array<{
-    placementId: string;
-    dashboardId: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }>;
+  nextCursor: string | null;
 }
 
 export function widgetPath(id: string): string {
   return `${WIDGETS_PATH}/${encodeId(id)}`;
+}
+
+export function widgetUsagePath(id: string, cursor: string | null): string {
+  return cursor ? `${widgetPath(id)}?usageCursor=${encodeId(cursor)}` : widgetPath(id);
 }
 
 export function widgetClonePath(id: string): string {
@@ -149,7 +144,7 @@ export function widgetClonePath(id: string): string {
 }
 
 /**
- * `POST /widgets` body — `CreateWidgetDto`.
+ * Definition fields for `POST /widgets/preview`.
  *
  * `displaySpec` is omitted rather than sent as `{}`: it is `@IsOptional()`, and
  * the service already stores `{}` when it is absent.
@@ -166,30 +161,8 @@ export function buildCreateWidgetRequest(input: {
     querySpec: input.querySpec,
   };
   if (input.displaySpec && Object.keys(input.displaySpec).length > 0) {
-    body.displaySpec = input.displaySpec;
+    body.displaySpec = normalizeWidgetDisplaySpec(input.displaySpec);
   }
-  return body;
-}
-
-/**
- * `PATCH /widgets/:id` body — `UpdateWidgetDto`.
- *
- * `revision` is **required** and is the optimistic-concurrency token; a stale
- * one is a `409 CRM_WIDGET_REVISION_CONFLICT`. There is no `If-Match` and no
- * `ETag` anywhere in crm-app.
- */
-export function buildUpdateWidgetRequest(input: {
-  revision: number;
-  name?: string;
-  visualizationType?: CrmVisualization;
-  querySpec?: WidgetQuerySpec;
-  displaySpec?: Record<string, unknown>;
-}): Record<string, unknown> {
-  const body: Record<string, unknown> = { revision: input.revision };
-  if (input.name !== undefined) body.name = requiredName(input.name);
-  if (input.visualizationType !== undefined) body.visualizationType = input.visualizationType;
-  if (input.querySpec !== undefined) body.querySpec = input.querySpec;
-  if (input.displaySpec !== undefined) body.displaySpec = input.displaySpec;
   return body;
 }
 
@@ -197,115 +170,6 @@ export function buildUpdateWidgetRequest(input: {
 export function buildCloneWidgetRequest(name: string): Record<string, unknown> {
   const trimmed = name.trim();
   return trimmed.length > 0 ? { name: requiredName(trimmed) } : {};
-}
-
-export function parseWidgetsResponse(payload: unknown): DefinitionPage<WidgetDefinition> {
-  return parseDefinitionPage(payload, parseWidgetDefinition);
-}
-
-export function parseWidgetDetailResponse(payload: unknown): WidgetDetail {
-  const source = record(payload);
-  if (!source) invalidResponse("widget");
-  return {
-    ...parseWidgetDefinition(source),
-    usage: source.usage === undefined ? null : parseUsage(source.usage),
-  };
-}
-
-export function parseWidgetUpdateResponse(payload: unknown): WidgetUpdateResult {
-  const source = record(payload);
-  if (!source) invalidResponse("widget");
-  const revisions = record(source.dashboardRevisions) ?? {};
-  const adjustments = boundedArray(source.layoutAdjustments, DASHBOARD_WIDGET_LIMIT)
-    ? source.layoutAdjustments
-    : [];
-  return {
-    ...parseWidgetDefinition(source),
-    dashboardRevisions: Object.fromEntries(
-      Object.entries(revisions).filter(
-        (entry): entry is [string, number] => finiteNumber(entry[1]),
-      ),
-    ),
-    layoutAdjustments: adjustments.flatMap((entry) => {
-      const box = parseBox(entry);
-      const row = record(entry);
-      return box && row && isUUIDv7(row.placementId) && isUUIDv7(row.dashboardId)
-        ? [{ placementId: row.placementId, dashboardId: row.dashboardId, ...box }]
-        : [];
-    }),
-  };
-}
-
-export function parseWidgetDefinition(payload: unknown): WidgetDefinition {
-  const source = record(payload);
-  if (
-    !source ||
-    !isUUIDv7(source.id) ||
-    !isUUIDv7(source.ownerUserId) ||
-    !nonEmptyString(source.name) ||
-    !isVisualization(source.visualizationType) ||
-    !timestamp(source.updatedAt) ||
-    !finiteNumber(source.revision)
-  ) {
-    invalidResponse("widget");
-  }
-  return {
-    id: source.id,
-    ownerUserId: source.ownerUserId,
-    ownerName: optionalString(source.ownerName),
-    name: source.name,
-    visualizationType: source.visualizationType,
-    querySpec: parseQuerySpec(source.querySpec),
-    displaySpec: record(source.displaySpec) ?? {},
-    schemaVersion: finiteNumber(source.schemaVersion) ? source.schemaVersion : 1,
-    revision: source.revision,
-    createdAt: timestamp(source.createdAt) ? source.createdAt : source.updatedAt,
-    updatedAt: source.updatedAt,
-    accessLevel: isAccessLevel(source.accessLevel) ? source.accessLevel : "VIEW",
-    isShared: source.isShared === true,
-  };
-}
-
-/**
- * The stored spec is echoed back on update, so it is preserved verbatim and
- * only `series` — the one part the screen reads — is validated.
- */
-function parseQuerySpec(payload: unknown): WidgetQuerySpec {
-  const source = record(payload);
-  if (!source || !boundedArray(source.series, 4) || source.series.length === 0) {
-    invalidResponse("widget query spec");
-  }
-  const series = source.series.map((entry) => {
-    const item = record(entry);
-    if (!item || !nonEmptyString(item.metricKey)) invalidResponse("widget query spec");
-    return { ...item, metricKey: item.metricKey } as WidgetQuerySpec["series"][number];
-  });
-  return { ...(source as object), series } as WidgetQuerySpec;
-}
-
-function parseUsage(payload: unknown): WidgetUsage {
-  const source = record(payload);
-  if (!source || !Array.isArray(source.placements)) invalidResponse("widget usage");
-  return {
-    placementCount: finiteNumber(source.placementCount) ? source.placementCount : 0,
-    dashboardCount: finiteNumber(source.dashboardCount) ? source.dashboardCount : 0,
-    activeShareCount: finiteNumber(source.activeShareCount) ? source.activeShareCount : null,
-    hiddenPlacementCount: finiteNumber(source.hiddenPlacementCount)
-      ? source.hiddenPlacementCount
-      : 0,
-    placements: source.placements.flatMap((entry) => {
-      const row = record(entry);
-      const box = parseBox(entry);
-      if (!row || !box || !isUUIDv7(row.placementId) || !isUUIDv7(row.dashboardId)) return [];
-      return [{
-        placementId: row.placementId,
-        dashboardId: row.dashboardId,
-        dashboardName: nonEmptyString(row.dashboardName) ? row.dashboardName : row.dashboardId,
-        dashboardRevision: finiteNumber(row.dashboardRevision) ? row.dashboardRevision : 0,
-        ...box,
-      }];
-    }),
-  };
 }
 
 export function parseBox(

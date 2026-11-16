@@ -1,172 +1,102 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import type { NormalizedApiError } from "@/lib/api/errors";
-import {
-  createWriteAttempt,
-  runIdempotentWrite,
-  type AppliedUnreadable,
-  type WriteAttempt,
-} from "@/lib/api/idempotent-write";
+import { useMemo, useRef, useState } from "react";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { createWriteAttempt, runIdempotentWrite, type AppliedUnreadable, type WriteAttempt } from "@/lib/api/idempotent-write";
 import type { OpportunityPipeline } from "../../hooks/pipeline-types";
-import {
-  opportunityPipelinePath,
-  parseOpportunityDetailResponse,
-  type OpportunityDetail,
-} from "../../opportunity-contract";
-import { buildTransferPipelineRequest } from "../../opportunity-write-contract";
+import { opportunityPath, opportunityPipelinePath, parseOpportunityDetailResponse, type OpportunityDetail } from "../../opportunity-contract";
+import { buildTransferPipelineRequest, type TransferPipelineRequest } from "../../opportunity-write-contract";
 
-/**
- * Stage flags a transfer must not land on.
- *
- * The transfer itself is not a stage move, but it accepts an optional
- * `stageId`, and dropping an opportunity straight into a WON or LOST stage of
- * another pipeline would close it as a side effect of a reorganisation. The
- * selector offers only open stages; leaving it empty uses the target
- * pipeline's entry stage, which is what the confirmation warns about.
- */
-const TERMINAL_STAGE_FLAGS = ["WON", "LOST"];
+export interface PipelineTransferAmbiguity { attempt: WriteAttempt; error: NormalizedApiError; replay: () => Promise<void> }
+interface PendingTransfer { origin: OpportunityDetail; body: TransferPipelineRequest; attempt: WriteAttempt; applied: boolean; uncertain: boolean }
 
-export interface PipelineTransferAmbiguity {
-  attempt: WriteAttempt;
-  error: NormalizedApiError;
-  replay: () => Promise<void>;
-}
-
-/**
- * `PUT /opportunities/:id/pipeline` — MASTER-PLAN 8.12.
- *
- * Distinct from a stage move, and a `PUT` rather than a `POST`. It is
- * destructive to stage position: the opportunity lands in the target
- * pipeline's entry stage unless an explicit stage is chosen, so the dialog
- * confirms before sending.
- */
-export function usePipelineTransfer(
-  item: OpportunityDetail | null,
-  pipelines: OpportunityPipeline[],
-  /**
-   * Re-read the record from the server — defect D2. Used when a write applied
-   * but its response body could not be parsed: there is no value to hand the
-   * success callback, the record has nonetheless changed, and the one thing
-   * that must NOT happen is a form left open with a Save the user presses
-   * again.
-   */
-  onReconcile: () => void,
-) {
+/** A transfer's identity survives unknown outcomes; every recovery reads the saved record first. */
+export function usePipelineTransfer(item: OpportunityDetail | null, pipelines: OpportunityPipeline[], onReconcile: () => void) {
   const [open, setOpen] = useState(false);
-  const [pipelineId, setPipelineId] = useState("");
-  const [stageId, setStageId] = useState("");
-  const [reason, setReason] = useState("");
+  const [pipelineId, setPipeline] = useState("");
+  const [stageId, setStage] = useState("");
+  const [reason, setReasonDraft] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
-  const [ambiguity, setAmbiguity] = useState<PipelineTransferAmbiguity | null>(
-    null,
-  );
-  // D2: the write applied and its receipt could not be read. Its own state,
-  // because `error` invites a second Save and that is exactly what a
-  // non-idempotent route cannot take.
-  const [appliedUnreadable, setAppliedUnreadable] =
-    useState<AppliedUnreadable | null>(null);
+  const [ambiguity, setAmbiguity] = useState<PipelineTransferAmbiguity | null>(null);
+  const [appliedUnreadable, setAppliedUnreadable] = useState<AppliedUnreadable | null>(null);
+  const active = useRef<PendingTransfer | null>(null);
+  const sending = useRef(false);
+  const targetPipelines = useMemo(() => pipelines.filter((pipeline) => pipeline.id !== item?.pipelineId && pipeline.isActive), [item?.pipelineId, pipelines]);
+  const targetStages = useMemo(() => (targetPipelines.find(({ id }) => id === pipelineId)?.stages ?? []).filter((stage) => stage.isActive && stage.flag !== "WON" && stage.flag !== "LOST"), [pipelineId, targetPipelines]);
 
-  /** The opportunity's current pipeline is never a transfer target. */
-  const targetPipelines = useMemo(
-    () => pipelines.filter(({ id }) => id !== item?.pipelineId),
-    [item?.pipelineId, pipelines],
-  );
+  function completed() {
+    active.current = null; setAmbiguity(null); setAppliedUnreadable(null); setError(null); setOpen(false); onReconcile();
+  }
 
-  const targetStages = useMemo(() => {
-    const pipeline = targetPipelines.find(({ id }) => id === pipelineId);
-    return (pipeline?.stages ?? []).filter(
-      (stage) => !TERMINAL_STAGE_FLAGS.includes(stage.flag),
-    );
-  }, [pipelineId, targetPipelines]);
-
-  const openDialog = useCallback(() => {
-    setPipelineId("");
-    setStageId("");
-    setReason("");
-    setError(null);
-    setAmbiguity(null);
-    setOpen(true);
-  }, []);
-
-  const closeDialog = useCallback(() => {
-    setOpen(false);
-    setError(null);
-  }, []);
-
-  const submit = useCallback(async () => {
-    if (!item || pipelineId.length === 0 || isSubmitting) return;
-    const attempt = createWriteAttempt();
-    const body = buildTransferPipelineRequest({ pipelineId, stageId, reason });
-
-    const send = async (): Promise<void> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        const outcome = await runIdempotentWrite({
-          attempt,
-          method: "put",
-          path: opportunityPipelinePath(item.id),
-          body,
-          parse: parseOpportunityDetailResponse,
-          config: { maxResponseBytes: 512 * 1024 },
-        });
-        if (outcome.kind === "success") {
-          setAmbiguity(null);
-          setOpen(false);
-          onReconcile();
-          return;
-        }
-        if (outcome.kind === "ambiguous") {
-          setAmbiguity({ attempt, error: outcome.error, replay: send });
-          return;
-        }
-        if (outcome.kind === "applied_unreadable") {
-          // A transfer moves the opportunity and writes stage history. Sending
-          // it again is not a repeat of the same intent, so the dialog closes
-          // and the screen re-reads where the record actually landed.
-          setAmbiguity(null);
-          setError(null);
-          setOpen(false);
-          setAppliedUnreadable({ attempt, error: outcome.error });
-          onReconcile();
-          return;
-        }
-        setError(outcome.error);
-      } finally {
-        setIsSubmitting(false);
+  async function readBack(retry: boolean): Promise<void> {
+    const intent = active.current;
+    if (!intent || sending.current) return;
+    sending.current = true; setIsSubmitting(true);
+    let resend = false;
+    try {
+      const response = await axiosClient.get<unknown>(opportunityPath(intent.origin.id), { cache: "no-store", maxResponseBytes: 512 * 1024 });
+      const fresh = parseOpportunityDetailResponse(response.data);
+      if (fresh.id !== intent.origin.id) throw new Error("Opportunity identity changed");
+      if (intent.applied || fresh.pipelineId === intent.body.pipelineId) { completed(); return; }
+      const unchanged = fresh.pipelineId === intent.origin.pipelineId && fresh.stageId === intent.origin.stageId && fresh.updatedAt === intent.origin.updatedAt;
+      // Gateway marks pipeline PUT idempotent. Only an unchanged read permits
+      // the exact original body/key to be replayed; never silently transfer a newer record.
+      if (retry && unchanged) resend = true;
+      else {
+        active.current = null; setAmbiguity(null); setAppliedUnreadable(null);
+        setError(unchanged ? null : { status: 409 });
+        onReconcile();
       }
-    };
+    } catch (caught) {
+      const failure = normalizeApiError(caught);
+      setError(failure);
+      if (intent.applied) setAppliedUnreadable({ attempt: intent.attempt, error: failure });
+      else setAmbiguity({ attempt: intent.attempt, error: failure, replay: () => readBack(true) });
+    } finally { sending.current = false; setIsSubmitting(false); }
+    if (resend && active.current === intent) await send(intent);
+  }
 
-    await send();
-    // `onReconcile` is called on the applied_unreadable path and belongs here,
-    // because without this dependency the callback keeps
-    // the first one the parent passed and reconciles against a stale closure.
-  }, [isSubmitting, item, onReconcile, pipelineId, reason, stageId]);
+  async function send(intent: PendingTransfer): Promise<void> {
+    if (sending.current || active.current !== intent) return;
+    sending.current = true; setIsSubmitting(true); setError(null);
+    try {
+      const outcome = await runIdempotentWrite({ attempt: intent.attempt, method: "put", path: opportunityPipelinePath(intent.origin.id), body: intent.body, parse: parseOpportunityDetailResponse, config: { maxResponseBytes: 512 * 1024 } });
+      if (outcome.kind === "success") completed();
+      else if (outcome.kind === "ambiguous") { intent.uncertain = true; setAmbiguity({ attempt: intent.attempt, error: outcome.error, replay: () => readBack(true) }); }
+      else if (outcome.kind === "applied_unreadable") {
+        intent.applied = true; setAmbiguity(null); setAppliedUnreadable({ attempt: intent.attempt, error: outcome.error });
+        // Keep recovery reachable in this dialog until a valid read succeeds.
+        setOpen(true); onReconcile();
+      } else if (intent.uncertain) {
+        setAmbiguity({ attempt: intent.attempt, error: outcome.error, replay: () => readBack(true) });
+        setError(outcome.error);
+      } else { active.current = null; setError(outcome.error); }
+    } catch (caught) {
+      intent.uncertain = true;
+      setAmbiguity({ attempt: intent.attempt, error: normalizeApiError(caught), replay: () => readBack(true) });
+    } finally { sending.current = false; setIsSubmitting(false); }
+  }
+
+  async function submit(): Promise<void> {
+    if (!item || !pipelineId || sending.current || active.current) return;
+    const intent: PendingTransfer = { origin: item, body: buildTransferPipelineRequest({ pipelineId, stageId, reason }), attempt: createWriteAttempt(), applied: false, uncertain: false };
+    active.current = intent;
+    await send(intent);
+  }
 
   return {
-    open,
-    pipelineId,
-    setPipelineId: (next: string) => {
-      setPipelineId(next);
-      setStageId("");
-    },
-    stageId,
-    setStageId,
-    reason,
-    setReason,
-    targetPipelines,
-    targetStages,
-    isSubmitting,
-    error,
-    ambiguity,
-    dismissAmbiguity: () => setAmbiguity(null),
-    appliedUnreadable,
-    dismissAppliedUnreadable: () => setAppliedUnreadable(null),
-    reconcile: onReconcile,
-    openDialog,
-    closeDialog,
+    open, pipelineId, stageId, reason, targetPipelines, targetStages, isSubmitting, error, ambiguity, appliedUnreadable,
+    locked: isSubmitting || ambiguity !== null || appliedUnreadable !== null,
+    setPipelineId: (value: string) => { if (!active.current) { setPipeline(value); setStage(""); } },
+    setStageId: (value: string) => { if (!active.current) setStage(value); },
+    setReason: (value: string) => { if (!active.current) setReasonDraft(value); },
+    openDialog: () => { if (!active.current) { setPipeline(""); setStage(""); setReasonDraft(""); setError(null); } setOpen(true); },
+    closeDialog: () => { if (!active.current && !sending.current) { setOpen(false); setError(null); } },
     submit,
+    reconcile: () => readBack(false),
+    dismissAmbiguity: () => { void readBack(false); },
+    dismissAppliedUnreadable: () => { void readBack(false); },
   };
 }

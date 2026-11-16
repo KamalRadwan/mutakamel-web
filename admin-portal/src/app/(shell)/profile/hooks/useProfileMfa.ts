@@ -38,8 +38,10 @@ export function useProfileMfa() {
 
   useEffect(() => {
     let cancelled = false;
+    // The ref object is stable; the counter must be bumped as it is at unmount.
+    const generationRef = loadGeneration;
     queueMicrotask(() => { if (!cancelled) void reload(); });
-    return () => { cancelled = true; loadGeneration.current++; };
+    return () => { cancelled = true; generationRef.current++; };
   }, [reload]);
 
   const submit = async (event: FormEvent) => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { localizedName, type BilingualName } from "@/lib/format/localized";
@@ -11,6 +12,9 @@ import { PIPELINES_PATH, parsePipelinesResponse } from "../../pipelines/pipeline
 export function useCrmSettingsNames(stageId: string | null | undefined, pipelineId: string | undefined) {
   const { lang, t } = useI18n();
   const { user } = useTenantAuth();
+  const scope = useAuthScopeKey(user);
+  const catalogueKey = JSON.stringify([scope, stageId, pipelineId]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [stages, setStages] = useState<(BilingualName & { id: string })[]>([]);
   const [pipelines, setPipelines] = useState<(BilingualName & { id: string })[]>([]);
   const canReadStages = user?.permissions.includes("crm.lead_stages.read") ?? false;
@@ -21,6 +25,7 @@ export function useCrmSettingsNames(stageId: string | null | undefined, pipeline
     const config = { signal: controller.signal, cache: "no-store", maxResponseBytes: 512 * 1024 } as const;
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
+      setLoadedKey(catalogueKey);
       setStages([]);
       setPipelines([]);
       if (stageId && canReadStages) {
@@ -38,11 +43,11 @@ export function useCrmSettingsNames(stageId: string | null | undefined, pipeline
       }
     });
     return () => controller.abort();
-  }, [stageId, pipelineId, canReadStages, canReadPipelines]);
+  }, [stageId, pipelineId, canReadStages, canReadPipelines, catalogueKey]);
 
   return {
     stageName: stageId == null ? t.crmSettings.notSet :
-      localizedName(canReadStages ? stages.find((item) => item.id === stageId) : null, lang) || t.crmSettings.nameUnavailable,
-    pipelineName: localizedName(canReadPipelines ? pipelines.find((item) => item.id === pipelineId) : null, lang) || t.crmSettings.nameUnavailable,
+      localizedName(canReadStages && loadedKey === catalogueKey ? stages.find((item) => item.id === stageId) : null, lang) || t.crmSettings.nameUnavailable,
+    pipelineName: localizedName(canReadPipelines && loadedKey === catalogueKey ? pipelines.find((item) => item.id === pipelineId) : null, lang) || t.crmSettings.nameUnavailable,
   };
 }

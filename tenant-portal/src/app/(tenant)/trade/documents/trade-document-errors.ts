@@ -68,6 +68,7 @@ const CODE_TO_KEY: Record<string, string> = {
   "TRADE.INVENTORY.NODE_CONFLICT": "inventoryNodeInvalid",
 
   // Purchase orders
+  "TRADE.PURCHASE_ORDER.DELIVERY_RETRY_NOT_ALLOWED": "purchaseOrderDeliveryRetryNotAllowed",
   "TRADE.PURCHASE_ORDER.APPROVAL_INVALID": "purchaseOrderApprovalInvalid",
   "TRADE.PURCHASE_ORDER.CONFIRM_NOT_ALLOWED": "purchaseOrderConfirmNotAllowed",
   "TRADE.PURCHASE_ORDER.CANCEL_NOT_ALLOWED": "purchaseOrderCancelNotAllowed",

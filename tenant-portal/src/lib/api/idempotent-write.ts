@@ -17,13 +17,12 @@
 //    `AmbiguousOutcomePanel` with the key, and the retry replays that key.
 
 import {
-  TenantApiClientError,
   axiosClient,
   type AxiosResponse,
   type TenantApiRequestConfig,
 } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { isIdempotentReplay } from "@/lib/api/outcomes";
+import { isIdempotentReplay, requiresSameKeyRecovery } from "@/lib/api/outcomes";
 import { generateUUIDv7 } from "@/lib/uuid";
 
 export const IDEMPOTENCY_KEY_HEADER = "x-idempotency-key";
@@ -58,12 +57,12 @@ type WriteMethod = "post" | "patch" | "put" | "delete";
 /**
  * True when the request never reached a definite server answer.
  *
- * A `TenantApiClientError` below 500 is a decision the server made and the
- * write did not happen. Anything else — a network drop, a timeout, a 5xx —
- * leaves the outcome unknown.
+ * A processing response may still commit and needs the original key. Other
+ * `TenantApiClientError` responses below 500 are definite refusals. A network
+ * drop, a timeout or a 5xx also leaves the outcome unknown.
  */
 export function isAmbiguousWriteFailure(error: unknown): boolean {
-  return !(error instanceof TenantApiClientError) || error.response.status >= 500;
+  return requiresSameKeyRecovery(normalizeApiError(error));
 }
 
 export interface WriteOptions<T> {

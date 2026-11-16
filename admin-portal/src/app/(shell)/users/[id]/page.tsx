@@ -124,6 +124,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const permissions = useUserPermissions(id, status, user?.isSuperAdmin);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [statusAction, setStatusAction] = useState<"suspend" | "activate" | null>(null);
   const [showSipPassword, setShowSipPassword] = useState(false);
   const [isEditingWebphone, setIsEditingWebphone] = useState(false);
   const webphoneFieldRefs = {
@@ -196,13 +197,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               </Button>
             )}
             {permissions.canSuspend && (
-              <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => handleStatusChange("SUSPENDED")}>
+              <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => setStatusAction("suspend")}>
                 <Ban className="size-3.5" />
                 {t.users.suspendAccount}
               </Button>
             )}
             {permissions.canActivate && (
-              <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => handleStatusChange("ACTIVE")}>
+              <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => setStatusAction("activate")}>
                 <RefreshCw className="size-3.5" />
                 {t.users.activateAccount}
               </Button>
@@ -598,6 +599,26 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
       </div>
+
+      {statusAction && (
+        <DestructiveActionModal
+          isOpen={statusAction === "suspend" ? permissions.canSuspend : permissions.canActivate}
+          onClose={() => setStatusAction(null)}
+          onConfirm={() => {
+            if (isSaving || !(statusAction === "suspend" ? permissions.canSuspend : permissions.canActivate)) return;
+            setStatusAction(null);
+            void handleStatusChange(statusAction === "suspend" ? "SUSPENDED" : "ACTIVE");
+          }}
+          title={statusAction === "suspend" ? t.users.suspendActionTitle : t.users.activateActionTitle}
+          description={statusAction === "suspend"
+            ? t.users.suspendActionDescription(`${firstName} ${lastName}`.trim() || email)
+            : t.users.activateActionDescription(`${firstName} ${lastName}`.trim() || email)}
+          targetName={`${firstName} ${lastName}`.trim() || email}
+          actionType={statusAction}
+          requireNameTyping={false}
+          isSubmitting={isSaving}
+        />
+      )}
 
       <DestructiveActionModal
         isOpen={isDeleteModalOpen && permissions.canDelete}

@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   opportunityPath,
   opportunityPipelinePath,
-  opportunityStageHistoryPath,
   parseOpportunityDetailResponse,
-  parseOpportunityStageHistory,
 } from "./opportunity-contract";
 import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";
@@ -29,9 +27,7 @@ const BRANCH = "01900100-0000-7000-8000-000000000099";
 const PROFILE = "01900100-0000-7000-8000-000000000040";
 const PIPELINE = "01900100-0000-7000-8000-000000000050";
 const STAGE = "01900100-0000-7000-8000-000000000051";
-const OTHER_STAGE = "01900100-0000-7000-8000-000000000052";
 const OWNER = "01900100-0000-7000-8000-000000000020";
-const HISTORY_ID = "01900100-0000-7000-8000-000000000070";
 
 const opportunity = {
   id: ID,
@@ -94,80 +90,8 @@ describe("opportunity detail contract", () => {
 
   it("builds each id-scoped path and refuses a malformed id", () => {
     expect(opportunityPath(ID)).toBe(`/api/tenant/crm/v1/opportunities/${ID}`);
-    expect(opportunityStageHistoryPath(ID)).toContain("/stage-history");
     expect(opportunityPipelinePath(ID)).toContain("/pipeline");
     expect(() => opportunityPath("capabilities")).toThrow();
-  });
-});
-
-describe("opportunity stage history", () => {
-  const row = {
-    id: HISTORY_ID,
-    opportunityId: ID,
-    fromStageId: STAGE,
-    fromStatus: "IN_PROGRESS",
-    toStageId: OTHER_STAGE,
-    toStatus: "WON",
-    changedByUserId: OWNER,
-    reason: "Signed",
-    changedAt: "2026-06-24T15:15:00.000Z",
-    fromStageSnapshot: {
-      pipelineNameAr: "المسار الافتراضي",
-      pipelineNameEn: "Default pipeline",
-      stageNameAr: "تأهيل",
-      stageNameEn: "Qualification",
-      flag: "QUALIFICATION",
-    },
-    toStageSnapshot: {
-      pipelineNameAr: "المسار الافتراضي",
-      pipelineNameEn: "Default pipeline",
-      stageNameAr: "تم الفوز",
-      stageNameEn: "Won",
-      flag: "WON",
-    },
-  };
-
-  const parseHistory = (items: unknown[]) => parseOpportunityStageHistory({ items, nextCursor: null }).items;
-
-  it("reads a cursor page", () => {
-    const [entry] = parseHistory([row]);
-    expect(entry.toStatus).toBe("WON");
-    expect(entry.toStageSnapshot?.stageNameEn).toBe("Won");
-  });
-
-  it("preserves the server's order rather than re-sorting", () => {
-    const older = { ...row, id: ID, changedAt: "2026-06-01T00:00:00.000Z" };
-    const parsed = parseHistory([row, older]);
-    expect(parsed.map(({ id }) => id)).toEqual([HISTORY_ID, ID]);
-  });
-
-  it("falls back to createdAt when changedAt is absent", () => {
-    const [entry] = parseHistory([
-      { ...row, changedAt: null, createdAt: "2026-06-01T00:00:00.000Z" },
-    ]);
-    expect(entry.changedAt).toBe("2026-06-01T00:00:00.000Z");
-  });
-
-  it("tolerates a snapshot the server could not resolve", () => {
-    const [entry] = parseHistory([
-      { ...row, fromStageSnapshot: null },
-    ]);
-    expect(entry.fromStageSnapshot).toBeNull();
-  });
-
-  it("rejects a row with no id", () => {
-    expect(() => parseHistory([{ ...row, id: null }])).toThrow();
-  });
-
-  it("preserves opaque cursors and rejects malformed or unbounded pages", () => {
-    expect(parseOpportunityStageHistory({ items: [row], nextCursor: "opaque_cursor" }).nextCursor).toBe("opaque_cursor");
-    for (const payload of [[row], { items: [row] }, { items: [], nextCursor: "loop" },
-      { items: [row], nextCursor: 1 }, { items: [row, row], nextCursor: null },
-      { items: Array(101).fill(row), nextCursor: null }]) {
-      expect(() => parseOpportunityStageHistory(payload)).toThrow();
-    }
-    const [entry] = parseHistory([{ ...row, fromStageId: null, fromStageSnapshot: null }]);
-    expect(entry.fromStageSnapshot).toBeNull();
   });
 });
 
@@ -246,10 +170,10 @@ describe("opportunity write payloads", () => {
         BRANCH,
       ),
     ).toThrow(MONEY_OUT_OF_RANGE);
-    expect(
-      buildCreateOpportunityRequest({ ...form, amount: MONEY_MAX_AMOUNT }, BRANCH)
-        .amount,
-    ).toBe(9999999999999.99);
+    expect(() => buildCreateOpportunityRequest({ ...form, amount: MONEY_MAX_AMOUNT }, BRANCH))
+      .toThrow(MONEY_OUT_OF_RANGE);
+    expect(buildCreateOpportunityRequest({ ...form, currencyCode: "KWD", amount: "8796093022207.999" }, BRANCH).amount)
+      .toBe(8796093022207.999);
   });
 
   it("round-trips a decimal string through the form without formatting it", () => {

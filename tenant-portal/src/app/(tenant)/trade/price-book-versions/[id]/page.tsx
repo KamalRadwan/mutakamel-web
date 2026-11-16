@@ -1,498 +1,258 @@
 "use client";
 
 import { use } from "react";
+import { Building2 } from "lucide-react";
 import {
-  CheckCircle2,
-  FlaskConical,
-  Layers,
-  Send,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
-import {
-  Badge,
-  Button,
-  DataTable,
-  DetailHeader,
-  DetailSection,
+  EmptyState,
   ErrorState,
-  Field,
-  Input,
-  IdentifierText,
-  Money,
   NotFoundState,
   PermissionGate,
-  SWATCH_SURFACE_PALETTES,
   Skeleton,
-  cn,
-  type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDateTime } from "@/lib/format/date";
-import { formatDecimalString } from "@/lib/format/number";
-import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import { tradeStatusLabel } from "../../trade-advanced-validation";
+import { PriceBookLeaveDialog } from "../../price-books/workspace/PriceBookLeaveDialog";
+import { PRICING_READ_PERMISSION } from "../../price-books/pricing-contract";
+import { PriceBookVersionTimeline } from "../../price-books/workspace/PriceBookVersionTimeline";
+import { VersionGovernanceSideRail } from "../../price-books/workspace/VersionGovernanceSideRail";
 import {
-  PRICING_READ_PERMISSION,
-  type PriceEntry,
-  type PromotionRow,
-} from "../../price-books/pricing-contract";
+  VersionWorkspaceTabs,
+  type WorkspaceTabKey,
+} from "../../price-books/workspace/VersionWorkspaceTabs";
+import { VersionPublishModal } from "./components/VersionPublishModal";
+import {
+  VersionDetailHeaderBar,
+  VersionStandaloneFallback,
+} from "./components/VersionStandaloneFallback";
 import { usePriceBookVersion } from "./hooks/usePriceBookVersion";
+import { usePriceBookWorkspaceUi } from "../../price-books/workspace/hooks/usePriceBookWorkspaceUi";
 
-export default function PriceBookVersionPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+function readInitialTab(): WorkspaceTabKey {
+  if (typeof window === "undefined") return "prices";
+  return new URLSearchParams(window.location.search).get("diff") === "1" ? "comparison" : "prices";
+}
+
+export default function PriceBookVersionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { t } = useI18n();
+  const vm = usePriceBookVersion(id);
   const {
-    lang,
-    canRead,
-    canTest,
-    canPublish,
-    supersedesVersionId,
-    setSupersedesVersionId,
-    publishDisabledReasons,
-    detail,
-    isLoading,
-    queryError,
-    isNotFound,
-    pending,
-    testReport,
-    test,
-    publish,
-    reload,
-  } = usePriceBookVersion(id);
+    user, scope, isOffline = false, canRead, canManage = false,
+    canPublishGrant = false, canTest, canPublish, canRetire = false,
+    canDeleteDraft = false, isEditableStatus = false, isDirty = false,
+    isMakerSameAsActor = false, soloEligible = false,
+    savedEvidenceMatchesChecksum = false, publishDisabledReasons = [],
+    detail, draft, setDraft, discardDraft, conflictReport = null,
+    isLoading, queryError, isNotFound, pending, testReport,
+    supersedesVersionId, setSupersedesVersionId,
+    soloOwnerAttestation = false, setSoloOwnerAttestation,
+    approvalNotes = "", setApprovalNotes,
+    diffResult = null, isDiffLoading = false,
+    ambiguous = null, replayNotice = null,
+    staleConflict = null, acceptServerReloadOnConflict,
+    reference, navigateToVersion,
+    reload, saveDraft, test, publish, retire, deleteDraft, loadDiff,
+  } = vm;
 
-  const entryColumns: ColumnDef<PriceEntry>[] = [
-    {
-      id: "itemId",
-      header: t.tradePricing.itemId,
-      cell: (entry) => (
-        <IdentifierText className="text-xs font-semibold text-foreground">
-          {entry.itemId}
-        </IdentifierText>
-      ),
-    },
-    {
-      id: "uomId",
-      header: t.tradePricing.uomId,
-      cell: (entry) => <IdentifierText className="text-xs">{entry.uomId}</IdentifierText>,
-    },
-    {
-      id: "minimumQuantity",
-      header: t.tradePricing.minimumQuantity,
-      numeric: true,
-      cell: (entry) =>
-        formatDecimalString(entry.minimumQuantity, lang, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 8,
-        }),
-    },
-    {
-      id: "maximumQuantity",
-      header: t.tradePricing.maximumQuantity,
-      numeric: true,
-      cell: (entry) =>
-        entry.maximumQuantity === null
-          ? "∞"
-          : formatDecimalString(entry.maximumQuantity, lang, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 8,
-            }),
-    },
-    {
-      id: "unitPrice",
-      header: t.tradePricing.unitPrice,
-      numeric: true,
-      cell: (entry) => (
-        <Money
-          value={entry.unitPrice}
-          currency={entry.currencyCode}
-          language={lang}
-          minimumFractionDigits={2}
-          maximumFractionDigits={8}
-        />
-      ),
-    },
-    {
-      id: "minimumAllowedPrice",
-      header: t.tradePricing.minimumAllowedPrice,
-      numeric: true,
-      cell: (entry) =>
-        entry.minimumAllowedPrice === null ? (
-          "—"
-        ) : (
-          <Money
-            value={entry.minimumAllowedPrice}
-            currency={entry.currencyCode}
-            language={lang}
-            minimumFractionDigits={2}
-            maximumFractionDigits={8}
-          />
-        ),
-    },
-    {
-      id: "priority",
-      header: t.tradePricing.priority,
-      numeric: true,
-      cell: (entry) => <IdentifierText className="tabular-nums">{String(entry.priority)}</IdentifierText>,
-    },
-  ];
+  const ui = usePriceBookWorkspaceUi({ scopeKey: JSON.stringify([id, user?.id, scope?.headers]),
+    unknownWrite: Boolean(ambiguous), isDirty, initialTab: readInitialTab });
+  const { activeTab, setActiveTab, publishOpen, setPublishOpen, retireOpen, setRetireOpen, deleteOpen, setDeleteOpen } = ui;
+  const backHref = detail?.book.id
+    ? `${TENANT_ROUTES.tradePriceBooks}/${encodeURIComponent(detail.book.id)}?versionId=${encodeURIComponent(detail.version.id)}`
+    : TENANT_ROUTES.tradePriceBooks;
 
-  const promotionColumns: ColumnDef<PromotionRow>[] = [
-    {
-      id: "code",
-      header: t.tradePricing.promotionCode,
-      cell: (row) => (
-        <IdentifierText className="text-xs font-semibold text-foreground">{row.code}</IdentifierText>
-      ),
-    },
-    { id: "name", header: t.tradePricing.promotionName, cell: (row) => row.name },
-    {
-      id: "status",
-      header: t.common.status,
-      cell: (row) => (
-        <Badge tone={row.status === "ACTIVE" ? "positive" : "neutral"}>
-          {tradeStatusLabel(t.tradeStatus, row.status, t.common.unknownCode)}
-        </Badge>
-      ),
-    },
-    {
-      id: "stackGroup",
-      header: t.tradePricing.stackGroup,
-      cell: (row) => <IdentifierText className="text-xs">{row.stackGroup}</IdentifierText>,
-    },
-    {
-      id: "exclusive",
-      header: t.tradePricing.exclusive,
-      cell: (row) => (
-        <Badge tone={row.exclusive ? "caution" : "neutral"}>
-          {row.exclusive ? t.tradePricing.exclusive : "—"}
-        </Badge>
-      ),
-    },
-    {
-      id: "priority",
-      header: t.tradePricing.priority,
-      numeric: true,
-      cell: (row) => <IdentifierText className="tabular-nums">{String(row.priority)}</IdentifierText>,
-    },
-  ];
-
-  const tableLabels = {
-    retry: t.common.retry,
-    errorTitle: t.tradePricing.versionLoadFailed,
-    emptyTitle: t.tradePricing.noEntries,
-    selectAll: t.common.actions,
-    selectRow: t.common.actions,
-    sortAscending: t.common.actions,
-    sortDescending: t.common.actions,
-    notSorted: t.common.actions,
-    pagination: {
-      previous: t.common.previousPage,
-      next: t.common.nextPage,
-      summary: (from: number, to: number, total: number) =>
-        formatTemplate(t.common.showingOf, { from, to, total }),
-    },
-  };
-
-  const floorProtectedCount = detail
-    ? detail.entries.filter((e) => e.minimumAllowedPrice !== null).length
-    : 0;
-
-  const content = (
-    <div className="flex flex-col gap-4">
-      <DetailHeader
-        title={
-          detail
-            ? `${detail.book.code} · v${detail.version.versionNumber}`
-            : t.tradePricing.versionDetailTitle
-        }
-        subtitle={detail ? `${detail.book.purpose} · ${detail.book.currencyCode}` : undefined}
-        status={
-          detail ? (
-            <Badge
-              tone={
-                detail.version.status === "PUBLISHED"
-                  ? "positive"
-                  : detail.version.status === "TESTED"
-                    ? "brand"
-                    : "neutral"
-              }
-            >
-              {tradeStatusLabel(t.tradeStatus, detail.version.status, t.common.unknownCode)}
-            </Badge>
-          ) : undefined
-        }
+  const leaveDialog = <PriceBookLeaveDialog guard={ui.leaveGuard} unknownWrite={Boolean(ambiguous)} />;
+  if (isNotFound) {
+    return (
+      <>
+        {leaveDialog}
+      <NotFoundState
+        title={t.tradePricing.versionNotFound}
+        description={t.tradePricing.versionNotFoundDescription}
         backLabel={t.tradePricing.backToBooks}
-        backHref={TENANT_ROUTES.tradePriceBooks}
-        secondaryActions={
-          detail ? (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!canTest || pending !== null}
-                loading={pending === "test"}
-                onClick={() => void test()}
-              >
-                <FlaskConical className="size-4" aria-hidden="true" />
-                {t.tradePricing.runTest}
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                disabled={!canPublish || pending !== null}
-                aria-describedby={!canPublish ? "price-book-publish-reasons" : undefined}
-                loading={pending === "publish"}
-                onClick={() => void publish()}
-              >
-                <Send className="size-4" aria-hidden="true" />
-                {t.tradeCommon.publish}
-              </Button>
-            </>
-          ) : undefined
-        }
+        backHref={backHref}
+      />
+      </>
+    );
+  }
+
+  if (scope && !scope.isResolved) {
+    return (
+      <>
+        {leaveDialog}
+      <div className="p-6">
+        <EmptyState
+          icon={Building2}
+          title={t.tradePricing.selectCompanyTitle}
+          description={t.tradePricing.selectCompanyDescription}
+        />
+      </div>
+      </>
+    );
+  }
+
+  if (!canRead || queryError?.status === 403) {
+    return (
+      <>
+        {leaveDialog}
+      <PermissionGate require={PRICING_READ_PERMISSION} denied={queryError?.status === 403}>
+        {null}
+      </PermissionGate>
+      </>
+    );
+  }
+
+  if (isLoading && !detail) return <>{leaveDialog}<Skeleton className="h-96" /></>;
+
+  if (queryError && !detail) {
+    return (
+      <>
+        {leaveDialog}
+      <ErrorState
+        title={t.tradePricing.versionLoadFailed}
+        description={queryError.message}
+        onRetry={() => void reload()}
+        retryLabel={t.common.retry}
+      />
+      </>
+    );
+  }
+
+  if (!detail) return leaveDialog;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <VersionDetailHeaderBar
+        isUnavailable={Boolean(queryError || ambiguous || isLoading) || vm.mutationError?.status === 403}
+        detail={detail}
+        backHref={backHref}
+        hasDraft={Boolean(draft)}
+        isDirty={isDirty}
+        isOffline={isOffline}
+        canManage={canManage}
+        canTest={canTest}
+        canPublish={canPublish}
+        canPublishGrant={canPublishGrant}
+        canRetire={canRetire}
+        canDeleteDraft={canDeleteDraft}
+        publishDisabledReasons={publishDisabledReasons}
+        pending={pending}
+        onSaveDraft={() => void saveDraft?.()}
+        onDiscardDraft={discardDraft}
+        onRunTest={() => void test()}
+        onOpenPublishModal={() => setPublishOpen(true)}
+        onDirectPublish={() => void publish()}
+        onOpenRetire={() => setRetireOpen(true)}
+        onOpenDeleteDraft={() => setDeleteOpen(true)}
       />
 
-      {detail && publishDisabledReasons.length > 0 ? (
-        <ul id="price-book-publish-reasons" aria-live="polite" className="list-disc ps-5 text-sm text-muted-foreground">
-          {publishDisabledReasons.map((reason) => <li key={reason}>{reason}</li>)}
-        </ul>
-      ) : null}
-
-      {isNotFound ? (
-        <NotFoundState
-          title={t.tradePricing.versionNotFound}
-          description={t.tradePricing.versionNotFoundDescription}
-          backLabel={t.tradePricing.backToBooks}
-          backHref={TENANT_ROUTES.tradePriceBooks}
+      {!draft ? (
+        <VersionStandaloneFallback
+          canPublish={canPublish}
+          publishDisabledReasons={publishDisabledReasons}
+          supersedesVersionId={supersedesVersionId}
+          onChangeSupersedesVersionId={setSupersedesVersionId}
+          pending={pending}
+          testReport={testReport}
         />
-      ) : isLoading ? (
-        <Skeleton className="h-80" />
-      ) : queryError ? (
-        <ErrorState
-          title={t.tradePricing.versionLoadFailed}
-          description={queryError.message}
-          onRetry={() => void reload()}
-          retryLabel={t.common.retry}
-        />
-      ) : detail ? (
+      ) : (
         <>
-          {canPublish ? (
-            <Field showLabel label={t.tradeCommon.supersedesVersionId} hint={t.tradeCommon.supersedesVersionHint}>
-              <Input value={supersedesVersionId} onChange={(event) => setSupersedesVersionId(event.target.value)} disabled={pending !== null} />
-            </Field>
+          {(detail.book.versions ?? []).length > 0 ? (
+            <PriceBookVersionTimeline
+              versions={detail.book.versions ?? []}
+              selectedVersionId={detail.version.id}
+              isDirty={isDirty}
+              canManage={false}
+              isOffline={isOffline}
+              onSelectVersion={(nextId) => navigateToVersion?.(nextId)}
+              onCreateDraft={() => {}}
+            />
           ) : null}
-          {/* 4-Card Version Dossier KPI Strip */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div
-              className={cn(
-                "flex items-start justify-between gap-3 rounded-lg border border-s-4 bg-card p-3.5 shadow-2xs",
-                SWATCH_SURFACE_PALETTES.indigo.accentBorder,
-              )}
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.tradePricing.versionKpiEntries}
-                </span>
-                <IdentifierText className="text-xl font-semibold tabular-nums text-foreground">
-                  {String(detail.entries.length)}
-                </IdentifierText>
-                <span className="text-xs text-muted-foreground">{detail.book.currencyCode}</span>
-              </div>
-              <span
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-lg border",
-                  SWATCH_SURFACE_PALETTES.indigo.iconBoxIdle,
-                )}
-              >
-                <Layers className="size-4" aria-hidden="true" />
-              </span>
-            </div>
 
-            <div
-              className={cn(
-                "flex items-start justify-between gap-3 rounded-lg border border-s-4 bg-card p-3.5 shadow-2xs",
-                SWATCH_SURFACE_PALETTES.purple.accentBorder,
-              )}
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.tradePricing.versionKpiPromotions}
-                </span>
-                <IdentifierText className="text-xl font-semibold tabular-nums text-foreground">
-                  {String(detail.promotions.length)}
-                </IdentifierText>
-                <span className="text-xs text-muted-foreground">{t.tradePricing.promotions}</span>
-              </div>
-              <span
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-lg border",
-                  SWATCH_SURFACE_PALETTES.purple.iconBoxIdle,
-                )}
-              >
-                <Sparkles className="size-4" aria-hidden="true" />
-              </span>
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+            <div className="lg:col-span-8 xl:col-span-9">
+              <VersionWorkspaceTabs isRefreshing={isLoading} versionError={queryError} onRetryVersion={() => void reload()} mutationError={vm.mutationError} mutationPermission={vm.mutationPermission}
+                activeTab={activeTab}
+                onChangeTab={setActiveTab}
+                detail={detail}
+                allVersions={detail.book.versions ?? []}
+                draft={draft}
+                onChangeDraft={(updater) => setDraft?.((prev) => (prev ? updater(prev) : prev))}
+                editable={isEditableStatus && canManage}
+                canManage={canManage}
+                canTest={canTest}
+                isDirty={isDirty}
+                isOffline={isOffline}
+                pending={pending}
+                savedEvidenceMatchesChecksum={savedEvidenceMatchesChecksum}
+                conflictReport={conflictReport}
+                testReport={testReport}
+                diffResult={diffResult}
+                isDiffLoading={isDiffLoading}
+                referenceData={reference?.data ?? null}
+                channelBranchIdsByChannel={reference?.channelBranchIdsByChannel}
+                referenceError={reference?.error ?? null}
+                ambiguous={ambiguous}
+                replayNotice={replayNotice}
+                staleConflict={staleConflict}
+                retireOpen={retireOpen}
+                onRetireOpenChange={setRetireOpen}
+                deleteOpen={deleteOpen}
+                onDeleteOpenChange={setDeleteOpen}
+                onSaveDraft={() => void saveDraft?.()}
+                onDiscardDraft={() => discardDraft?.()}
+                onRunTest={() => void test()}
+                onConfirmRetire={(reason) => (retire ? retire(reason) : Promise.resolve(false))}
+                onConfirmDelete={() => (deleteDraft ? deleteDraft() : Promise.resolve(false))}
+                onLoadDiff={(otherId) => (loadDiff ? loadDiff(otherId) : Promise.resolve())}
+                onRetryReference={() => reference?.reload()}
+                onAcceptServerReload={() => (acceptServerReloadOnConflict ? acceptServerReloadOnConflict() : Promise.resolve())}
+              />
             </div>
-
-            <div
-              className={cn(
-                "flex items-start justify-between gap-3 rounded-lg border border-s-4 bg-card p-3.5 shadow-2xs",
-                SWATCH_SURFACE_PALETTES.amber.accentBorder,
-              )}
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.tradePricing.versionKpiFloorProtected}
-                </span>
-                <IdentifierText className="text-xl font-semibold tabular-nums text-foreground">
-                  {`${floorProtectedCount} / ${detail.entries.length}`}
-                </IdentifierText>
-                <span className="text-xs text-muted-foreground">
-                  {t.tradePricing.minimumAllowedPrice}
-                </span>
-              </div>
-              <span
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-lg border",
-                  SWATCH_SURFACE_PALETTES.amber.iconBoxIdle,
-                )}
-              >
-                <ShieldCheck className="size-4" aria-hidden="true" />
-              </span>
-            </div>
-
-            <div
-              className={cn(
-                "flex items-start justify-between gap-3 rounded-lg border border-s-4 bg-card p-3.5 shadow-2xs",
-                detail.latestTestEvidence?.passed
-                  ? SWATCH_SURFACE_PALETTES.green.accentBorder
-                  : SWATCH_SURFACE_PALETTES.blue.accentBorder,
-              )}
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {t.tradePricing.versionKpiGovernance}
-                </span>
-                <span className="text-base font-semibold text-foreground">
-                  {tradeStatusLabel(t.tradeStatus, detail.version.status, t.common.unknownCode)}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {detail.latestTestEvidence
-                    ? `${detail.latestTestEvidence.passed ? t.tradePricing.testPassedShort : t.tradePricing.testFailedShort}`
-                    : t.tradeCommon.notSet}
-                </span>
-              </div>
-              <span
-                className={cn(
-                  "flex size-9 items-center justify-center rounded-lg border",
-                  detail.latestTestEvidence?.passed
-                    ? SWATCH_SURFACE_PALETTES.green.iconBoxIdle
-                    : SWATCH_SURFACE_PALETTES.blue.iconBoxIdle,
-                )}
-              >
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-              </span>
+            <div className="lg:col-span-4 xl:col-span-3">
+              <VersionGovernanceSideRail
+                detail={detail}
+                draft={draft}
+                isDirty={isDirty}
+                canTest={canTest}
+                canPublish={canPublish}
+                canPublishGrant={canPublishGrant}
+                isMakerSameAsActor={isMakerSameAsActor}
+                soloEligible={soloEligible}
+                savedEvidenceMatchesChecksum={savedEvidenceMatchesChecksum}
+                isOffline={isOffline}
+                pending={pending}
+                testReport={testReport}
+                onRunTest={() => void test()}
+                onOpenPublish={() => setPublishOpen(true)}
+              />
             </div>
           </div>
 
-          <DetailSection
-            title={t.tradeCommon.overview}
-            emptyValueLabel={t.tradeCommon.notSet}
-            fields={[
-              {
-                label: t.tradePricing.effectiveFrom,
-                value: formatDateTime(detail.version.effectiveFrom, lang),
-              },
-              {
-                label: t.tradePricing.effectiveTo,
-                value: detail.version.effectiveTo
-                  ? formatDateTime(detail.version.effectiveTo, lang)
-                  : null,
-              },
-              { label: t.tradeCommon.version, value: String(detail.version.version) },
-              {
-                label: t.tradeCommon.eligibilityEnds,
-                value: detail.version.supersededAt ? formatDateTime(detail.version.supersededAt, lang) : null,
-              },
-              {
-                label: t.tradePricing.checksumLabel,
-                value: (
-                  <IdentifierText className="text-xs">{detail.version.checksum}</IdentifierText>
-                ),
-              },
-              {
-                label: t.tradePricing.lastTest,
-                value: detail.latestTestEvidence
-                  ? `${
-                      detail.latestTestEvidence.passed
-                        ? t.tradePricing.testPassedShort
-                        : t.tradePricing.testFailedShort
-                    } · ${formatDateTime(detail.latestTestEvidence.testedAt, lang)}`
-                  : null,
-              },
-            ]}
+          <VersionPublishModal
+            open={publishOpen}
+            onOpenChange={setPublishOpen}
+            detail={detail}
+            siblingVersions={detail.book.versions ?? []}
+            currentUserId={user?.id}
+            currentUserDisplayName={([user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email)}
+            currentUserEmail={user?.email}
+            canPublishGrant={canPublishGrant}
+            savedEvidenceMatchesChecksum={savedEvidenceMatchesChecksum}
+            canPublish={canPublish}
+            publishDisabledReasons={publishDisabledReasons}
+            supersedesVersionId={supersedesVersionId}
+            onChangeSupersedesVersionId={setSupersedesVersionId}
+            soloOwnerAttestation={soloOwnerAttestation}
+            onChangeSoloOwnerAttestation={(val) => setSoloOwnerAttestation?.(val)}
+            approvalNotes={approvalNotes}
+            onChangeApprovalNotes={(val) => setApprovalNotes?.(val)}
+            isPublishing={pending === "publish"}
+            onConfirmPublish={() => publish()}
           />
-
-          {testReport ? (
-            <DetailSection title={t.tradePricing.lastTest}>
-              <div role={testReport.passed ? "status" : "alert"} className="flex flex-col gap-3">
-                <Badge tone={testReport.passed ? "positive" : "negative"}>
-                  {testReport.passed ? t.tradePricing.testPassedShort : t.tradePricing.testFailedShort}
-                </Badge>
-                {testReport.entryCount === 0 ? <p>{t.tradePricing.noEntries}</p> : null}
-                {[
-                  { label: t.tradePricing.entryConflicts, conflicts: testReport.conflicts },
-                  { label: t.tradePricing.promotionConflicts, conflicts: testReport.promotionConflicts },
-                ].map((group) => group.conflicts.length > 0 ? (
-                  <div key={group.label}>
-                    <h3 className="text-sm font-medium">{group.label}</h3>
-                    <ul aria-label={group.label} className="flex flex-col gap-1">
-                      {group.conflicts.map((conflict, index) => (
-                        <li key={`${conflict}-${index}`}>
-                          <IdentifierText className="break-all text-xs">{conflict}</IdentifierText>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null)}
-              </div>
-            </DetailSection>
-          ) : null}
-
-          <DetailSection title={t.tradePricing.entries}>
-            <DataTable
-              density="compact"
-              columns={entryColumns}
-              rows={detail.entries}
-              isLoading={false}
-              rowKey={(entry) => entry.id}
-              labels={tableLabels}
-            />
-          </DetailSection>
-
-          <DetailSection title={t.tradePricing.promotions}>
-            <DataTable
-              density="compact"
-              columns={promotionColumns}
-              rows={detail.promotions}
-              isLoading={false}
-              rowKey={(row) => row.id}
-              labels={{ ...tableLabels, emptyTitle: t.tradePricing.noPromotions }}
-            />
-          </DetailSection>
         </>
-      ) : null}
+      )}
+      {leaveDialog}
     </div>
-  );
-
-  return canRead ? (
-    content
-  ) : (
-    <PermissionGate require={PRICING_READ_PERMISSION}>{content}</PermissionGate>
   );
 }

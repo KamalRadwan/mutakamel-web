@@ -2,9 +2,15 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-11**; tenant ledger loader reverified **2026-10-18** (CXADMIN-110); confirmation recovery source reviewed **2026-10-18** (CXADMIN-104).
+Last source verification: **2026-08-11**; tenant ledger loader reverified **2026-10-18** (CXADMIN-110); confirmation recovery source reviewed **2026-10-18** (CXADMIN-104); preview draft matching and bilingual signed-effect display source reviewed **2026-10-31** (AUDIT29X-APB-1).
 
 Owner: **Core**
+
+### Billing display localization (source reviewed 2026-10-31)
+
+Tenant billing renders ledger direction/reason and payment status/purpose/provider
+with Arabic or English labels. Each cell retains the exact wire enum in its
+`title` attribute; financial values and API contracts are unchanged.
 
 ## Routes
 
@@ -38,6 +44,15 @@ interface PreviewWalletAdjustmentDto {
 
 The server returns the authoritative currency conversion and quote. Never
 calculate wallet FX in the browser.
+
+The portal accepts a preview only when its direction, source amount and source
+currency match the submitted draft. Amount comparison preserves decimal strings
+and ignores trailing fractional zero padding; it never uses floating-point
+conversion. A mismatch clears the prior preview and reports local conflict
+`WALLET_PREVIEW_MISMATCH`, leaving no quote available for confirmation. The
+preview card shows the localized credit/debit direction and manual reason
+(including its reason code), source and USD amounts, balances before and after,
+and expiry in Arabic and English. Draft edits still invalidate pending previews.
 
 ## Confirmation request
 
@@ -83,6 +98,7 @@ verification remain lead gates.
 
 | Local error code | Operator feedback (English / Arabic) |
 | --- | --- |
+| `WALLET_PREVIEW_MISMATCH` | Review the draft and request a new preview; the returned adjustment differs / راجع البيانات واطلب معاينة جديدة؛ التعديل المُعاد لا يطابق المطلوب |
 | `WALLET_CONFIRM_UNRESOLVED` | Recover the original adjustment before starting another / استعد التعديل الأصلي قبل بدء تعديل آخر |
 | `WALLET_RECOVERY_UNAVAILABLE` | Restore browser storage access and refresh; preserve unresolved evidence / أعد إتاحة تخزين المتصفح ثم حدّث الصفحة مع الاحتفاظ بالسجل غير المحسوم |
 

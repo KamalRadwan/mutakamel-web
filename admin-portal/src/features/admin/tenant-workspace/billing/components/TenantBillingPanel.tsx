@@ -23,7 +23,13 @@ import {
 } from "@/design-system";
 import type { UseTenantBillingWorkspaceResult } from "../hooks/useTenantBillingWorkspace";
 import { localeForLanguage } from "@/i18n/locale";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import type {
+  LedgerDirection,
+  LedgerReason,
+  PaymentProvider,
+  PaymentPurpose,
+  PaymentStatus,
   PaymentReconciliationAction,
   PaymentStatusView,
   SubscriptionItemView,
@@ -248,7 +254,14 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
                 variant="destructive"
                 size="sm"
                 disabled={!cancelConfirmed || Boolean(workspace.mutation.name)}
-                onClick={() => void workspace.cancelSubscription()}
+                onClick={async () => {
+                  setCancelConfirmed(false);
+                  try {
+                    await workspace.cancelSubscription();
+                  } finally {
+                    setCancelConfirmed(false);
+                  }
+                }}
               >
                 {copy.cancelSubscription}
               </Button>
@@ -320,7 +333,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
       key: "direction",
       headerEn: copy.direction,
       headerAr: copy.direction,
-      cell: (entry) => entry.direction,
+      cell: (entry) => <span title={entry.direction}>{copy.ledgerDirections[entry.direction]}</span>,
     },
     {
       key: "amount",
@@ -342,7 +355,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
       key: "reason",
       headerEn: copy.reason,
       headerAr: copy.reason,
-      cell: (entry) => entry.reason,
+      cell: (entry) => <span title={entry.reason}>{copy.ledgerReasons[entry.reason]}</span>,
     },
     {
       key: "balanceAfter",
@@ -450,6 +463,16 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
             <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
               <div className="grid gap-2 md:grid-cols-4">
                 <Metric
+                  label={copy.direction}
+                  value={copy.adjustmentDirections[workspace.walletPreview.direction]}
+                  compact
+                />
+                <Metric
+                  label={copy.reason}
+                  value={`${copy.adjustmentReasons[workspace.walletPreview.reasonCode]} (${workspace.walletPreview.reasonCode})`}
+                  compact
+                />
+                <Metric
                   label={copy.sourceAmount}
                   value={`${workspace.walletPreview.sourceCurrencyCode} ${workspace.walletPreview.sourceAmount}`}
                   compact
@@ -457,6 +480,11 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 <Metric
                   label={copy.usdAmount}
                   value={`USD ${workspace.walletPreview.amountUsd}`}
+                  compact
+                />
+                <Metric
+                  label={copy.balanceBefore}
+                  value={`USD ${workspace.walletPreview.balanceBeforeUsd}`}
                   compact
                 />
                 <Metric
@@ -577,19 +605,19 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
       key: "status",
       headerEn: copy.status,
       headerAr: copy.status,
-      cell: (payment) => payment.status,
+      cell: (payment) => <span title={payment.status}>{copy.paymentStatuses[payment.status]}</span>,
     },
     {
       key: "purpose",
       headerEn: copy.purpose,
       headerAr: copy.purpose,
-      cell: (payment) => payment.purpose,
+      cell: (payment) => <span title={payment.purpose}>{copy.paymentPurposes[payment.purpose]}</span>,
     },
     {
       key: "provider",
       headerEn: copy.provider,
       headerAr: copy.provider,
-      cell: (payment) => payment.provider,
+      cell: (payment) => <span title={payment.provider}>{copy.paymentProviders[payment.provider]}</span>,
     },
     {
       key: "amount",
@@ -613,7 +641,7 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
           {workspace.permissions.canRefundPayment &&
           payment.status === "SUCCEEDED" ? (
             <>
-              <Field id={`refund-note-${payment.paymentId}`} label={copy.refundNote} hideLabel>
+              <Field id={`refund-note-${payment.paymentId}`} label={copy.refundNote}>
                 {(field) => (
                   <Input
                     {...field}
@@ -627,6 +655,8 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
                         [payment.paymentId]: event.target.value,
                       }))
                     }
+                    required
+                    minLength={10}
                     maxLength={500}
                   />
                 )}
@@ -643,7 +673,7 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
                     }))
                   }
                 />
-                {copy.confirmRefund}
+                {copy.confirmRefund}: {payment.providerCurrencyCode} {payment.providerAmount}
               </label>
               <Button
                 type="button"
@@ -651,14 +681,27 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
                 size="sm"
                 disabled={
                   !refundConfirmations[payment.paymentId] ||
+                  (refundNotes[payment.paymentId]?.trim().length ?? 0) < 10 ||
+                  (refundNotes[payment.paymentId]?.trim().length ?? 0) > 500 ||
                   Boolean(workspace.mutation.name)
                 }
-                onClick={() =>
-                  void workspace.refundPayment(
-                    payment.paymentId,
-                    refundNotes[payment.paymentId],
-                  )
-                }
+                onClick={async () => {
+                  setRefundConfirmations((current) => ({
+                    ...current,
+                    [payment.paymentId]: false,
+                  }));
+                  try {
+                    await workspace.refundPayment(
+                      payment.paymentId,
+                      refundNotes[payment.paymentId],
+                    );
+                  } finally {
+                    setRefundConfirmations((current) => ({
+                      ...current,
+                      [payment.paymentId]: false,
+                    }));
+                  }
+                }}
               >
                 {copy.refund}
               </Button>
@@ -1161,13 +1204,7 @@ function ErrorNotice({
       tabIndex={-1}
       className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <p className="font-medium">{
-        error.errorCode === "WALLET_RECOVERY_UNAVAILABLE"
-          ? billingCopy[lang].walletRecoveryUnavailable
-          : error.errorCode === "WALLET_CONFIRM_UNRESOLVED"
-            ? billingCopy[lang].walletRecoveryHelp
-            : error.message
-      }</p>
+      <p className="font-medium">{getLocalizedApiErrorMessage(error, lang)}</p>
       <p className="mt-1 font-mono text-xs">
         {error.errorCode}
         {error.correlationId
@@ -1280,6 +1317,11 @@ function isFutureInstant(value: string): boolean {
 
 const billingCopy = {
   en: {
+    ledgerDirections: { CREDIT: "Credit", DEBIT: "Debit" },
+    ledgerReasons: { TOP_UP: "Top-up", SUBSCRIPTION_CHARGE: "Subscription charge", PRORATION_CREDIT: "Proration credit", REFUND: "Refund", PROMO: "Promotion", ADJUSTMENT: "Adjustment" },
+    paymentStatuses: { CREATED: "Created", PENDING: "Pending", SUCCEEDED: "Succeeded", FAILED: "Failed", EXPIRED: "Expired", REQUIRES_REVIEW: "Requires review", REFUND_PENDING: "Refund pending", REFUNDED: "Refunded" },
+    paymentPurposes: { WALLET_TOP_UP: "Wallet top-up", INVOICE_SETTLEMENT: "Invoice settlement" },
+    paymentProviders: { PAYMOB: "Paymob", INTERNAL: "Internal", OFFLINE: "Offline" },
     title: "Subscription, wallet & payments",
     subtitle: "Authoritative billing state and reviewed financial commands.",
     refresh: "Refresh",
@@ -1343,10 +1385,13 @@ const billingCopy = {
     fxAuthority:
       "Conversion and resulting balance are calculated only by the server.",
     direction: "Direction",
+    adjustmentDirections: { CREDIT: "Credit", DEBIT: "Debit" },
+    adjustmentReasons: { MANUAL_CREDIT: "Manual credit", MANUAL_DEBIT: "Manual debit" },
     sourceAmount: "Source amount",
     currency: "Input currency",
     previewAdjustment: "Preview adjustment",
     usdAmount: "USD amount",
+    balanceBefore: "Balance before",
     balanceAfter: "Balance after",
     auditNote: "Audit note",
     confirmAdjustment: "Confirm adjustment",
@@ -1376,7 +1421,7 @@ const billingCopy = {
     purpose: "Purpose",
     provider: "Provider",
     actions: "Actions",
-    refundNote: "Optional refund note",
+    refundNote: "Refund audit note (10–500 characters)",
     confirmRefund: "I confirm this critical refund",
     refund: "Refund",
     reconcile: "Open reconciliation",
@@ -1414,6 +1459,11 @@ const billingCopy = {
     page: "Page",
   },
   ar: {
+    ledgerDirections: { CREDIT: "إضافة", DEBIT: "خصم" },
+    ledgerReasons: { TOP_UP: "شحن الرصيد", SUBSCRIPTION_CHARGE: "رسوم الاشتراك", PRORATION_CREDIT: "إضافة نسبية", REFUND: "استرداد", PROMO: "عرض ترويجي", ADJUSTMENT: "تعديل" },
+    paymentStatuses: { CREATED: "أُنشئت", PENDING: "قيد الانتظار", SUCCEEDED: "ناجحة", FAILED: "فاشلة", EXPIRED: "منتهية الصلاحية", REQUIRES_REVIEW: "تتطلب مراجعة", REFUND_PENDING: "الاسترداد قيد الانتظار", REFUNDED: "مستردة" },
+    paymentPurposes: { WALLET_TOP_UP: "شحن المحفظة", INVOICE_SETTLEMENT: "تسوية فاتورة" },
+    paymentProviders: { PAYMOB: "باي موب", INTERNAL: "داخلي", OFFLINE: "خارجي" },
     title: "الاشتراك والمحفظة والمدفوعات",
     subtitle: "حالة فوترة موثوقة وأوامر مالية بعد المراجعة.",
     refresh: "تحديث",
@@ -1473,10 +1523,13 @@ const billingCopy = {
     walletAdjustment: "تعديل يدوي للمحفظة",
     fxAuthority: "الخادم وحده يحسب التحويل والرصيد الناتج.",
     direction: "الاتجاه",
+    adjustmentDirections: { CREDIT: "إضافة", DEBIT: "خصم" },
+    adjustmentReasons: { MANUAL_CREDIT: "إضافة يدوية", MANUAL_DEBIT: "خصم يدوي" },
     sourceAmount: "المبلغ المصدر",
     currency: "عملة الإدخال",
     previewAdjustment: "معاينة التعديل",
     usdAmount: "المبلغ بالدولار",
+    balanceBefore: "الرصيد قبل",
     balanceAfter: "الرصيد بعد",
     auditNote: "ملاحظة التدقيق",
     confirmAdjustment: "تأكيد التعديل",
@@ -1505,7 +1558,7 @@ const billingCopy = {
     purpose: "الغرض",
     provider: "المزوّد",
     actions: "الإجراءات",
-    refundNote: "ملاحظة استرداد اختيارية",
+    refundNote: "ملاحظة تدقيق الاسترداد (10–500 حرف)",
     confirmRefund: "أؤكد هذا الاسترداد المالي الحرج",
     refund: "استرداد",
     reconcile: "فتح التسوية",
@@ -1539,4 +1592,11 @@ const billingCopy = {
     next: "التالي",
     page: "صفحة",
   },
-} as const;
+} as const satisfies Record<"ar" | "en", {
+  ledgerDirections: Record<LedgerDirection, string>;
+  ledgerReasons: Record<LedgerReason, string>;
+  paymentStatuses: Record<PaymentStatus, string>;
+  paymentPurposes: Record<PaymentPurpose, string>;
+  paymentProviders: Record<PaymentProvider, string>;
+  [key: string]: unknown;
+}>;

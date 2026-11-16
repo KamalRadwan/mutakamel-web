@@ -44,6 +44,12 @@ const itemsEnvelope = z.object({ ...envelope, data: itemsView }).strict();
 export type SubscriptionView = z.infer<typeof view>;
 export type SubscriptionItems = z.infer<typeof itemsView>;
 
+/** Mirrors Core subscription-items.service.ts assertPlanChangeLifecycle. */
+export function canChangePlan(view: SubscriptionView | null): boolean {
+  return !!view && (view.subscription.status === "TRIAL" || view.subscription.status === "ACTIVE")
+    && view.subscription.currentCollectionInvoiceId === null;
+}
+
 function validCollections(value: Pick<SubscriptionView, "baseItems" | "addonSelections">): boolean {
   const { baseItems, addonSelections } = value;
   const unique = (values: string[]) => new Set(values).size === values.length;

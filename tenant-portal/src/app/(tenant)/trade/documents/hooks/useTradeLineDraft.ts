@@ -1,36 +1,37 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { generateUUIDv7 } from "@/lib/uuid";
-import { tradeGet } from "../../trade-api";
+import { findDuplicateClientLineId, computeDocumentTotals } from "../document-totals";
 import { canonicalizeDecimalInput } from "../fixed-decimal";
-import { computeDocumentTotals, findDuplicateClientLineId } from "../document-totals";
 import {
-  TRADE_LOOKUP_RESPONSE_BYTES,
-  TRADE_ITEM_SEARCH_MAX_LENGTH,
-  parseTradeItems,
-  parseTradeUoms,
-  tradeItemsPath,
-  tradeUomCataloguePath,
   isItemEligibleForPurpose,
-  type TradeItemOption,
-  type TradePricePurpose,
-  type TradeUomOption,
+  type TradeItemOption, type TradePriceDecision, type TradePricePurpose, type TradeUomOption,
 } from "../trade-lookup-contract";
-import { isAbortError } from "./useTradeDocumentList";
+import {
+  canonicalTradeQuantity, validateTradeLine, TRADE_DOCUMENT_MAX_LINES,
+  type TradeLineInputErrors,
+} from "../trade-line-validation";
 import { useTradeDocumentPricing } from "./useTradeDocumentPricing";
+import { useTradeLineCatalog } from "./useTradeLineCatalog";
+import type { NormalizedApiError } from "@/lib/api/errors";
 
-interface TradeLineDraft {
-  /** UUID v7 — `@Matches(UUID_V7_PATTERN)` on every line DTO. */
+export interface TradeLineDraft {
   clientLineId: string;
   itemId: string;
   uomId: string;
   quantity: string;
-  /** The server-resolved price, for the running total only. Never submitted. */
   unitPrice: string | null;
+  priceBreakdown?: TradePriceDecision | null;
   isPricing: boolean;
   priceError: string | null;
+}
+
+export interface TradeLineSelection { itemId: string; uomId: string; quantity: string }
+export interface TradeLineDraftSnapshot {
+  lines: TradeLineDraft[];
+  items: TradeItemOption[];
+  uomsByItem: Record<string, TradeUomOption[]>;
 }
 
 export interface TradeLineDraftState {
@@ -40,10 +41,9 @@ export interface TradeLineDraftState {
   uomsByItem: Record<string, TradeUomOption[]>;
   lookupError: NormalizedApiError | null;
   isLoadingItems: boolean;
-  /** null until every line has a price; the running total otherwise. */
   runningTotal: string | null;
-  /** The first reason the server would refuse this line set, if any. */
   invalidLineIndex: number | null;
+  lineErrors: TradeLineInputErrors[];
   purpose: TradePricePurpose;
   searchItems: (query: string) => void;
   addLine: () => void;
@@ -53,180 +53,111 @@ export interface TradeLineDraftState {
   setQuantity: (index: number, quantity: string) => void;
   commitQuantity: (index: number) => void;
   reset: (lines: TradeLineDraft[]) => void;
+  appendItems: (items: TradeLineSelection[]) => void;
+  ensureItemUoms: (itemId: string) => Promise<TradeUomOption[]>;
+  retryLookups: () => void;
+  restore: (snapshot: TradeLineDraftSnapshot) => void;
 }
 
-function emptyLineDraft(): TradeLineDraft {
-  return {
-    clientLineId: generateUUIDv7(),
-    itemId: "",
-    uomId: "",
-    quantity: "1",
-    unitPrice: null,
-    isPricing: false,
-    priceError: null,
-  };
+export function emptyTradeLine(): TradeLineDraft {
+  return { clientLineId: generateUUIDv7(), itemId: "", uomId: "", quantity: "1",
+    unitPrice: null, isPricing: false, priceError: null };
 }
 
-/**
- * The line set behind every document line editor — MASTER-PLAN 11.20.
- *
- * The running total is real, not decorative. `CommercialLineInputDto` and
- * `PurchaseQuotationLineDto` carry `clientLineId`, `itemId`, `uomId`,
- * `quantity` and an optional `priceBookId` and **no price at all**, so the only
- * way to show a person what they are about to commit to is to ask the pricing
- * engine per line — `POST /pricing/evaluate` — and multiply through the same
- * fixed-decimal arithmetic the server uses. Nothing computed here is submitted
- * on these two families; it is a preview of what the server will write.
- *
- * On the families that *do* submit figures the same arithmetic is what makes
- * the submission acceptable, which is why it lives in one module rather than
- * two.
- */
 export function useTradeLineDraft(
-  headers: Record<string, string>,
-  currencyCode: string,
-  partyId: string | null,
-  purpose: TradePricePurpose,
-  isEnabled: boolean,
+  headers: Record<string, string>, currencyCode: string, partyId: string | null,
+  purpose: TradePricePurpose, isEnabled: boolean, resetOnScopeChange = false, pricingEnabled = true,
 ): TradeLineDraftState {
-  const [drafts, setLines] = useState<TradeLineDraft[]>([emptyLineDraft()]);
-  const [items, setItems] = useState<TradeItemOption[]>([]);
-  const [itemsById, setItemsById] = useState<Record<string, TradeItemOption>>({});
-  const [itemSearch, setItemSearch] = useState("");
-  const [uomsByItem, setUomsByItem] = useState<Record<string, TradeUomOption[]>>({});
-  const [lookupError, setLookupError] = useState<NormalizedApiError | null>(null);
-  const [isLoadingItems, setIsLoadingItems] = useState(false);
-
+  const key = JSON.stringify([Object.entries(headers).sort(), purpose]);
+  // A new operating scope needs new client-line identities, even before the first edit.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const empty = useMemo(() => [emptyTradeLine()], [key]);
+  const [state, setState] = useState(() => ({ key, lines: empty }));
+  const drafts = !resetOnScopeChange || state.key === key ? state.lines : empty;
+  const catalog = useTradeLineCatalog(headers, purpose, isEnabled);
+  const { restoreCatalog, ensureItemUoms } = catalog;
+  const setLines = useCallback((change: (current: TradeLineDraft[]) => TradeLineDraft[]) => {
+    setState((current) => ({ key, lines: change(!resetOnScopeChange || current.key === key ? current.lines : empty) }));
+  }, [key, empty, resetOnScopeChange]);
+  const itemIds = [...new Set(drafts.map((line) => line.itemId).filter(Boolean))].join(",");
   useEffect(() => {
-    if (!isEnabled) return undefined;
-    const controller = new AbortController();
-    // Deferred to a microtask so the first `setState` is not synchronous with
-    // the effect body, which cascades a render — the same shape every other
-    // list loader in this app uses.
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      setIsLoadingItems(true);
-      void (async () => {
-        try {
-          const result = await tradeGet(tradeItemsPath(1, purpose, itemSearch), {
-            signal: controller.signal,
-            headers,
-            maxResponseBytes: TRADE_LOOKUP_RESPONSE_BYTES,
-          });
-          const page = parseTradeItems(result.data, purpose);
-          setItems(page.items);
-          setItemsById((current) => ({
-            ...current,
-            ...Object.fromEntries(page.items.map((item) => [item.id, item])),
-          }));
-          setLookupError(null);
-        } catch (error) {
-          if (isAbortError(error)) return;
-          setItems([]);
-          setLookupError(normalizeApiError(error));
-        } finally {
-          if (!controller.signal.aborted) setIsLoadingItems(false);
-        }
-      })();
-    });
-    return () => controller.abort();
-  }, [headers, isEnabled, itemSearch, purpose]);
-
-  const loadUoms = useCallback(
-    async (itemId: string): Promise<void> => {
-      if (uomsByItem[itemId]) return;
-      try {
-        const result = await tradeGet(tradeUomCataloguePath(itemId, purpose), {
-          headers,
-          maxResponseBytes: TRADE_LOOKUP_RESPONSE_BYTES,
-        });
-        setUomsByItem((current) => ({ ...current, [itemId]: parseTradeUoms(result.data).items }));
-      } catch (error) {
-        setLookupError(normalizeApiError(error));
-      }
-    },
-    [headers, purpose, uomsByItem],
-  );
-
-  // Keep preview evidence tied to the complete request, including line IDs and
-  // scope. The shared lifecycle clears obsolete prices before effects run and
-  // discards late successes and failures, even when line positions are reused.
+    if (isEnabled && itemIds) itemIds.split(",").forEach((id) => { void ensureItemUoms(id); });
+  }, [ensureItemUoms, isEnabled, itemIds]);
   const pricing = useTradeDocumentPricing({
-    headers, currencyCode, partyId, purpose, enabled: isEnabled,
+    headers, currencyCode, partyId, purpose, enabled: isEnabled && pricingEnabled,
     lines: drafts.map(({ clientLineId, itemId, uomId, quantity }) => ({
-      clientLineId, itemId, uomId, quantity,
+      clientLineId, itemId, uomId, quantity: canonicalTradeQuantity(quantity) ?? quantity,
     })),
   });
   const lines = drafts.map((line, index) => ({
     ...line,
     unitPrice: pricing.prices[index]?.unitPrice ?? null,
+    priceBreakdown: pricing.prices[index]?.decision ?? null,
     isPricing: pricing.prices[index]?.isPricing ?? false,
-    priceError: pricing.prices[index]?.error ? (pricing.prices[index]?.error?.code ?? "") : null,
+    priceError: pricing.prices[index]?.error?.code ?? null,
   }));
-
-  const update = useCallback(
-    (index: number, patch: Partial<TradeLineDraft>): void => {
-      const line = drafts[index];
-      if (!line) return;
-      const next = { ...line, ...patch, unitPrice: null };
-      setLines((current) =>
-        current.map((entry, position) => (position === index ? next : entry)),
-      );
-    },
-    [drafts],
-  );
-
+  const lineErrors = lines.map(validateTradeLine);
+  const firstInvalid = lineErrors.findIndex((error) => Object.keys(error).length > 0);
+  const duplicate = findDuplicateClientLineId(lines.map((line) => line.clientLineId));
   const priced = lines.every((line) => line.unitPrice !== null);
-  const outcome = priced
-    ? computeDocumentTotals({
-        dialect: "ORDER",
-        lines: lines.map((line) => ({
-          quantity: canonicalizeDecimalInput(line.quantity) ?? line.quantity,
-          unitPrice: canonicalizeDecimalInput(line.unitPrice ?? "0") ?? (line.unitPrice ?? "0"),
-          discountTotal: "0",
-          chargeTotal: "0",
-          taxTotal: "0",
-        })),
-        roundingTotal: "0",
-      })
-    : null;
-
-  const duplicateIndex = findDuplicateClientLineId(lines.map((line) => line.clientLineId));
+  const outcome = priced && firstInvalid === -1
+    ? computeDocumentTotals({ dialect: "ORDER", lines: lines.map((line) => ({
+      quantity: canonicalTradeQuantity(line.quantity) ?? line.quantity,
+      unitPrice: canonicalizeDecimalInput(line.unitPrice ?? "0") ?? (line.unitPrice ?? "0"),
+      discountTotal: "0", chargeTotal: "0", taxTotal: "0",
+    })), roundingTotal: "0" }) : null;
+  const update = useCallback((index: number, patch: Partial<TradeLineDraft>) => {
+    setLines((current) => current.map((line, position) => position === index
+      ? { ...line, ...patch, unitPrice: null, priceBreakdown: null } : line));
+  }, [setLines]);
+  const reset = useCallback((next: TradeLineDraft[]) => {
+    setLines(() => next.length > 0 ? next.slice(0, TRADE_DOCUMENT_MAX_LINES) : [emptyTradeLine()]);
+  }, [setLines]);
+  const restore = useCallback((snapshot: TradeLineDraftSnapshot) => {
+    restoreCatalog(snapshot.items, snapshot.uomsByItem);
+    reset(snapshot.lines.map((line) => ({ ...line, unitPrice: null, priceBreakdown: null,
+      isPricing: false, priceError: null })));
+  }, [restoreCatalog, reset]);
 
   return {
-    lines,
-    items,
-    itemsById,
-    uomsByItem,
-    lookupError,
-    isLoadingItems,
+    ...catalog, lines, lineErrors,
     runningTotal: outcome?.ok ? outcome.value.totals.grandTotal : null,
-    invalidLineIndex:
-      duplicateIndex ?? (outcome && !outcome.ok ? (outcome.lineIndex ?? null) : null),
+    invalidLineIndex: duplicate ?? (firstInvalid >= 0 ? firstInvalid
+      : outcome && !outcome.ok ? outcome.lineIndex ?? 0 : null),
     purpose,
-    searchItems: (query: string) => setItemSearch(query.slice(0, TRADE_ITEM_SEARCH_MAX_LENGTH)),
-    addLine: () => setLines((current) => [...current, emptyLineDraft()]),
-    removeLine: (index: number) =>
-      setLines((current) =>
-        current.length > 1 ? current.filter((_, position) => position !== index) : current,
-      ),
-    setItem: (index: number, itemId: string) => {
-      const item = itemsById[itemId];
+    addLine: () => setLines((current) => current.length < TRADE_DOCUMENT_MAX_LINES
+      ? [...current, emptyTradeLine()] : current),
+    removeLine: (index) => setLines((current) => current.length > 1
+      ? current.filter((_, position) => position !== index) : [emptyTradeLine()]),
+    setItem: (index, itemId) => {
+      if (itemId === "") { update(index, { itemId: "", uomId: "" }); return; }
+      const item = catalog.itemsById[itemId];
       if (!item || !isItemEligibleForPurpose(item, purpose)) return;
-      void loadUoms(itemId);
-      // The UOM set is item-scoped, so keeping the previous one would submit a
-      // pairing `/catalog/uoms` never authorised.
+      void catalog.ensureItemUoms(itemId);
       update(index, { itemId, uomId: "" });
     },
-    setUom: (index: number, uomId: string) => update(index, { uomId }),
-    // Rewriting intermediate text such as "1." would turn the next "5" into "15".
-    setQuantity: (index: number, quantity: string) => update(index, { quantity }),
-    commitQuantity: (index: number) => {
-      const quantity = drafts[index]?.quantity;
-      if (quantity === undefined) return;
-      const canonical = canonicalizeDecimalInput(quantity);
-      if (canonical !== null && canonical !== quantity) update(index, { quantity: canonical });
+    setUom: (index, uomId) => update(index, { uomId }),
+    setQuantity: (index, quantity) => update(index, { quantity }),
+    commitQuantity: (index) => {
+      const canonical = canonicalizeDecimalInput(drafts[index]?.quantity ?? "");
+      if (canonical !== null) update(index, { quantity: canonical });
     },
-    reset: (next: TradeLineDraft[]) => setLines(next.length > 0 ? next : [emptyLineDraft()]),
+    appendItems: (inputs) => {
+      if (inputs.length === 0) return;
+      const selected = inputs.filter((input) => {
+        const item = catalog.itemsById[input.itemId];
+        return item && isItemEligibleForPurpose(item, purpose)
+          && canonicalTradeQuantity(input.quantity) !== null
+          && catalog.uomsByItem[input.itemId]?.some((unit) => unit.id === input.uomId);
+      });
+      if (selected.length !== inputs.length) return;
+      setLines((current) => {
+        const existing = current.filter((line) => line.itemId || line.uomId || line.quantity !== "1");
+        if (existing.length + selected.length > TRADE_DOCUMENT_MAX_LINES) return current;
+        return [...existing, ...selected.map((input) => ({ ...emptyTradeLine(), ...input,
+          quantity: canonicalTradeQuantity(input.quantity) ?? input.quantity }))];
+      });
+    },
+    reset, restore,
   };
 }

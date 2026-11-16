@@ -1,118 +1,110 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTradeBranchSelection } from "../../../trade-advanced-scope";
+import { useTenantOrganizationOptions } from "@/hooks/useTenantOrganizationOptions";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { formatDateTime } from "@/lib/format/date";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { tradeGet } from "../../../trade-api";
-import { isUuidV7, parseTradeOffsetPage } from "../../../trade-advanced-validation";
+import { hasTradePermission, useTradeBranchSelection, useTradeScope } from "../../../trade-advanced-scope";
+import { isUuidV7, parseTradeOffsetPage, tradeStatusLabel } from "../../../trade-advanced-validation";
 import { useInventoryPagination } from "../../hooks/useInventoryPagination";
-import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import { INVENTORY_READ_PERMISSION, invalidResponse } from "../../inventory-contract";
-import {
-  inventoryDecisionsListPath,
-  parseInventoryDecision,
-  type InventoryDecision,
-  type InventoryPolicyKind,
-} from "../../inventory-governance-contract";
+import { inventoryMessage } from "../../inventory-messages";
+import { inventoryDecisionsListPath, parseInventoryDecision, type InventoryDecision, type InventoryPolicyKind } from "../../inventory-governance-contract";
 
-const LIST_RESPONSE_LIMIT_BYTES = 200_000;
+interface DecisionFilters { policyKind: InventoryPolicyKind | undefined; aggregateId: string }
+const EMPTY: DecisionFilters = { policyKind: undefined, aggregateId: "" };
 
-/**
- * `GET /inventory/decisions` is the only decision **list** in Trade.
- * `GET /decisions/:id` on Policy Studio is by id only, so a receipt outside
- * inventory can be reached only from a response that already carries its id.
- */
 export function useInventoryDecisions() {
   const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
+  const { user, realtimeAuthGeneration } = useTenantAuth();
+  const pathname = usePathname();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const detailId = pathname.startsWith(`${TENANT_ROUTES.tradeInventoryDecisions}/`) ? pathname.slice(TENANT_ROUTES.tradeInventoryDecisions.length + 1) : undefined;
   const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
+  const canRead = hasTradePermission(scope.permissions, scope.isTenantOwner, INVENTORY_READ_PERMISSION);
+  const selectionKey = JSON.stringify([scope.headers, user?.id, realtimeAuthGeneration]);
+  const [filterState, setFilterState] = useState({ selectionKey, draft: EMPTY, filters: EMPTY });
+  const draft = filterState.selectionKey === selectionKey ? filterState.draft : EMPTY;
+  const filters = filterState.selectionKey === selectionKey ? filterState.filters : EMPTY;
+  const [view, setView] = useState<"table" | "card">("table");
+  const [referenceFailed, setReferenceFailed] = useState(false);
+  const referenceError = referenceFailed && draft.aggregateId.trim() && !isUuidV7(draft.aggregateId.trim()) ? t.tradeInventory.readViews.referenceInvalid : null;
+  const queryKey = JSON.stringify([scope.headers, user?.id, realtimeAuthGeneration, canRead, lang, filters]);
+  const { page, pagination, setPage, setTotal } = useInventoryPagination(queryKey);
+  const key = useMemo(() => ({ queryKey, page }), [queryKey, page]);
+  const currentKey = useRef(key);
+  useLayoutEffect(() => { currentKey.current = key; }, [key]);
+  const [result, setResult] = useState<{ key: typeof key | null; items: InventoryDecision[] }>({ key: null, items: [] });
+  const [failure, setFailure] = useState<{ key: typeof key; error: NormalizedApiError } | null>(null);
+  const [pending, setPending] = useState<typeof key | null>(null);
+  const items = useMemo(() => result.key === key ? result.items : [], [result, key]);
+  const queryError = failure?.key === key ? failure.error : null;
+  const isStale = items.length > 0 && Boolean(queryError && (queryError.status === 0 || queryError.status >= 500));
+  const errorMessage = queryError ? inventoryMessage(queryError, t) ?? t.tradeInventory.decisionsLoadFailed : undefined;
+  const branches = useTenantOrganizationOptions("branch", useMemo(() => [...new Set(items.flatMap((item) => item.branchId ? [item.branchId] : []))], [items]));
 
-  const [items, setItems] = useState<InventoryDecision[]>([]);
-  const [policyKind, setPolicyKind] = useState<InventoryPolicyKind | undefined>(undefined);
-  const [aggregateIdFilter, setAggregateIdFilter] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
-
-  const canRead = hasTradePermission(
-    scope.permissions,
-    scope.isTenantOwner,
-    INVENTORY_READ_PERMISSION,
-  );
-
-  const validAggregateId = isUuidV7(aggregateIdFilter.trim())
-    ? aggregateIdFilter.trim()
-    : undefined;
-  const { page, pagination, setPage, setTotal } = useInventoryPagination(
-    JSON.stringify([scope.headers, policyKind, validAggregateId]),
-  );
-
-  const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      if (!scope.isResolved) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      setQueryError(null);
-      try {
-        const response = await tradeGet(
-          inventoryDecisionsListPath(policyKind, validAggregateId, page),
-          {
-            signal,
-            headers: scope.headers,
-            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-          },
-        );
-        if (signal?.aborted) return;
-        const result = parseTradeOffsetPage(response.data, parseInventoryDecision, invalidResponse);
-        setItems(result.items);
-        setTotal(result.total);
-        setHasLoaded(true);
-      } catch (error) {
-        if (signal?.aborted || isAbortError(error)) return;
-        setQueryError(normalizeApiError(error));
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
-      }
-    },
-    [scope.isResolved, scope.headers, policyKind, validAggregateId, page, setTotal],
-  );
+  const load = useCallback(async (signal?: AbortSignal) => {
+    if (!scope.isResolved || !canRead) return;
+    setPending(key);
+    setFailure(null);
+    try {
+      const response = await tradeGet(inventoryDecisionsListPath(filters.policyKind, filters.aggregateId || undefined, page), {
+        signal, headers: scope.headers, maxResponseBytes: 500_000,
+      });
+      if (signal?.aborted || currentKey.current !== key) return;
+      const parsed = parseTradeOffsetPage(response.data, parseInventoryDecision, invalidResponse);
+      setResult({ key, items: parsed.items });
+      setTotal(parsed.total);
+    } catch (error) {
+      if (!signal?.aborted && currentKey.current === key) setFailure({ key, error: normalizeApiError(error) });
+    } finally { if (!signal?.aborted && currentKey.current === key) setPending(null); }
+  }, [scope.isResolved, scope.headers, canRead, key, filters, page, setTotal]);
 
   useEffect(() => {
     const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
+    queueMicrotask(() => { if (!controller.signal.aborted) void load(controller.signal); });
     return () => controller.abort();
   }, [load]);
 
-  return {
-    t,
-    lang,
-    canRead,
-    isScopeResolved: scope.isResolved,
-    branchIds,
-    branchId,
-    selectBranch,
-    items,
-    pagination,
-    setPage,
-    policyKind,
-    aggregateIdFilter,
-    isLoading: isLoading && !hasLoaded,
-    isRefreshing: isLoading,
-    queryError,
-    setPolicyKind,
-    setAggregateIdFilter,
-    reload: () => load(),
+  const aggregateLabel = (type: string) => tradeStatusLabel(t.tradeInventory.readViews.aggregates, type, t.common.unknownCode);
+  const sourceOptions = [...new Map(items.filter((item) => item.aggregateId).map((item) => [item.aggregateId, {
+    value: item.aggregateId, label: `${aggregateLabel(item.aggregateType)} · ${formatDateTime(item.evaluatedAt, lang)}`,
+  }])).values()];
+  const applyFilters = () => {
+    const reference = draft.aggregateId.trim();
+    if (reference && !isUuidV7(reference)) { setReferenceFailed(true); return; }
+    setReferenceFailed(false);
+    setFilterState({ selectionKey, draft, filters: { ...draft, aggregateId: reference } });
   };
+  const clearFilters = () => { setReferenceFailed(false); setFilterState({ selectionKey, draft: EMPTY, filters: EMPTY }); };
+  const setFilter = <K extends keyof DecisionFilters>(field: K, value: DecisionFilters[K]) => setFilterState((previous) => {
+    const active = previous.selectionKey === selectionKey ? previous : { selectionKey, draft: EMPTY, filters: EMPTY };
+    return { ...active, draft: { ...active.draft, [field]: value } };
+  });
+  const openDecision = (id: string) => {
+    if (!isUuidV7(id)) return;
+    const target = `${TENANT_ROUTES.tradeInventoryDecisions}/${encodeURIComponent(id)}`;
+    if (window.location.pathname === target) return;
+    const active = document.activeElement;
+    returnFocus.current = active instanceof HTMLElement && active !== document.body && active !== document.documentElement ? active : null;
+    window.history.pushState(null, "", target);
+  };
+  const closeDecision = () => window.history.replaceState(null, "", TENANT_ROUTES.tradeInventoryDecisions);
+  const restoreFocus = (event: Event) => {
+    event.preventDefault();
+    const target = returnFocus.current?.isConnected ? returnFocus.current : headingRef.current;
+    target?.focus({ preventScroll: true });
+  };
+  const branchLabel = (id: string | null) => id ? branches.find((branch) => branch.value === id)?.label ?? t.common.nameUnavailable : t.tradeInventory.readViews.notSet;
+  return { t, lang, canRead, isScopeResolved: scope.isResolved, branchIds, branchId, selectBranch, items, pagination, setPage,
+    draft, filters, view, setView, setFilter, applyFilters, clearFilters, referenceError, sourceOptions, aggregateLabel, branchLabel,
+    queryError, isStale, errorMessage, isLoading: scope.isResolved && canRead && result.key !== key && !queryError, isRefreshing: pending === key,
+    reload: () => load(), openDecision, closeDecision, detailId, headingRef, restoreFocus };
 }
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-

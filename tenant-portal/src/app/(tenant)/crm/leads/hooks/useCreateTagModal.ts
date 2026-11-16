@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { TagColor } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
@@ -38,6 +38,12 @@ export function useCreateTagModal({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [colorValid, setColorValid] = useState(true);
+  const colorValidity = useRef(true);
+  const handleColorValidityChange = useCallback((valid: boolean) => {
+    colorValidity.current = valid;
+    setColorValid(valid);
+  }, []);
 
   // Sync state during render when modal open status transitions
   if (open !== prevOpen) {
@@ -98,6 +104,10 @@ export function useCreateTagModal({
     const err = validate(name);
     setFieldError(err);
     if (err || isSubmitting) return;
+    if (!colorValidity.current) {
+      setServerError(t.crmTags.errors.colorIncomplete);
+      return;
+    }
 
     setIsSubmitting(true);
     setServerError(null);
@@ -140,9 +150,9 @@ export function useCreateTagModal({
     }
   };
 
-  const isDirty = trimmed.length > 0 || color !== null;
+  const isDirty = !colorValid || trimmed.length > 0 || color !== null;
   const isSubmitDisabled =
-    isSubmitting || trimmed.length === 0 || [...trimmed].length > CRM_TAG_NAME_MAX_LENGTH;
+    !colorValid || isSubmitting || trimmed.length === 0 || [...trimmed].length > CRM_TAG_NAME_MAX_LENGTH;
 
   return {
     name,
@@ -156,6 +166,7 @@ export function useCreateTagModal({
     isSubmitDisabled,
     handleNameChange,
     handleColorChange,
+    handleColorValidityChange,
     handleBlur,
     handleSubmit,
   };

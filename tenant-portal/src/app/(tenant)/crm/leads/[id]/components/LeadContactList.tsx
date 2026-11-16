@@ -194,18 +194,19 @@ export function LeadContactFields({
     label: string;
     value: ReactNode;
     span2?: boolean;
+    third?: boolean;
     orderClass?: string;
   }>;
 }) {
   const { t } = useI18n();
   return (
-    <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {fields.map(({ label, value, span2, orderClass }) => (
+    <dl className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+      {fields.map(({ label, value, span2, third, orderClass }) => (
         <div
           key={label}
           className={cn(
             "dossier-field-box min-w-0",
-            span2 && "sm:col-span-2",
+            span2 ? "sm:col-span-6" : third ? "sm:col-span-2" : "sm:col-span-3",
             orderClass,
           )}
         >

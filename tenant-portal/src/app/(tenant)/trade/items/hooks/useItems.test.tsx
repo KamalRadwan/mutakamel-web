@@ -18,6 +18,17 @@ const { get, post, auth, toast, write } = vi.hoisted(() => ({
   write: vi.fn(),
 }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: auth }));
+vi.mock("@/app/(tenant)/core/contracts/organization-contract", async (original) => ({
+  ...await original<typeof import("@/app/(tenant)/core/contracts/organization-contract")>(),
+  fetchOrgNodes: vi.fn(async (level: string) => ({
+    items: level === "companies" ? [{ id: COMPANY, code: "COMPANY", name: "Trading company", status: "ACTIVE",
+      createdAt: "2026-11-04T00:00:00.000Z", updatedAt: "2026-11-04T00:00:00.000Z", legalName: null,
+      taxNumber: null, currencyCode: "EGP" }] : [{ id: BRANCH, companyId: COMPANY, code: "CAIRO", name: "Cairo",
+      status: "ACTIVE", createdAt: "2026-11-04T00:00:00.000Z", updatedAt: "2026-11-04T00:00:00.000Z",
+      address: null, phone: null, isHeadquarters: false }],
+    page: 1, limit: 100, total: 1, totalPages: 1, hasNext: false, hasPrev: false,
+  })),
+}));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
 vi.mock("@/design-system", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/design-system")>(),
@@ -142,12 +153,27 @@ describe("Items operating context", () => {
   });
 
   it("lets an empty company view reach unassigned tenant items and retains that choice on reload", async () => {
+    const CHANNEL = "0192f3a0-0000-7000-8000-000000000005";
+    // selectChannel ignores ids the company's channel list does not contain.
+    const channel = {
+      id: CHANNEL, companyId: COMPANY, code: "STORE", name: "Store", channelType: "INTERNAL_SALES",
+      status: "ACTIVE", configurationProfileVersionId: null, version: 1, updatedAt: "2026-09-27T09:00:00.000Z",
+    };
+    get.mockImplementation(async (path: string, options: { headers: Record<string, string> }) => {
+      if (path.includes("/channels?")) return { data: { items: [channel], total: 1, page: 1, limit: 100 } };
+      if (path === `/api/tenant/trade/v1/channels/${CHANNEL}`) return { data: { ...channel, branches: [{
+        id: "0192f3a0-0000-7000-8000-000000000006", channelId: CHANNEL, companyId: COMPANY,
+        branchId: BRANCH, isActive: true, version: 1, updatedAt: "2026-11-04T00:00:00.000Z",
+      }] } };
+      return page(options.headers["x-mutakamel-company-id"] ? [] : [ITEM]);
+    });
     localStorage.setItem("tenant_trade_branch", BRANCH);
-    localStorage.setItem("tenant_trade_channel", "0192f3a0-0000-7000-8000-000000000005");
+    localStorage.setItem("tenant_trade_channel", CHANNEL);
     const first = mount();
     await waitFor(() => expect(first.result.current.scope.context.branchId).toBe(BRANCH));
+    await waitFor(() => expect(first.result.current.scope.channels).toHaveLength(1));
     await waitFor(() => expect(first.result.current.items.isRefreshing).toBe(false));
-    act(() => first.result.current.scope.selectChannel("0192f3a0-0000-7000-8000-000000000005"));
+    act(() => first.result.current.scope.selectChannel(CHANNEL));
     expect(first.result.current.scope.context.channelId).not.toBeNull();
     expect(first.result.current.items.items).toEqual([]);
     expect(first.result.current.items.emptyTitle).toBe(en.trade.itemScopeEmpty);
@@ -172,6 +198,7 @@ describe("Items operating context", () => {
   it("resets pagination when company/branch scope changes", async () => {
     const { result } = mount();
     await waitFor(() => expect(result.current.scope.context.companyId).toBe(COMPANY));
+    await waitFor(() => expect(result.current.scope.branchIds).toContain(BRANCH));
     act(() => result.current.items.setPage(4));
     await waitFor(() => expect(result.current.items.pageInfo.page).toBe(4));
     get.mockClear();

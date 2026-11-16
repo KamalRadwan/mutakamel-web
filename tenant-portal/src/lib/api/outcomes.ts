@@ -20,6 +20,9 @@ import type { NormalizedApiError } from "./errors";
 //     IDEMPOTENCY_REQUEST_PROCESSING  409
 //     IDEMPOTENCY_BODY_MISMATCH       422
 //
+//   trade-app/src/common/domain-idempotency.service.ts
+//     TRADE.IDEMPOTENCY.IN_FLIGHT     409
+//
 // Both families reach the browser: the Gateway reserves first, and a request
 // that clears the Gateway can still hit Core's own interceptor. Matching only
 // one of them would leave the other rendering as a generic failure.
@@ -32,7 +35,7 @@ import type { NormalizedApiError } from "./errors";
 const RATE_LIMITED_CODE = "GW.RATE.LIMIT_EXCEEDED";
 const RATE_LIMITER_DOWN_CODE = "GW.RATE.UNAVAILABLE";
 
-const IDEMPOTENCY_PROCESSING_CODES = ["GW.IDEM.IN_FLIGHT", "IDEMPOTENCY_REQUEST_PROCESSING"];
+const IDEMPOTENCY_PROCESSING_CODES = ["GW.IDEM.IN_FLIGHT", "IDEMPOTENCY_REQUEST_PROCESSING", "TRADE.IDEMPOTENCY.IN_FLIGHT"];
 const IDEMPOTENCY_MISMATCH_CODES = ["GW.IDEM.MISMATCH", "IDEMPOTENCY_BODY_MISMATCH"];
 
 export type ApiOutcomeKind =
@@ -56,6 +59,12 @@ export function classifyApiOutcome(error: NormalizedApiError): ApiOutcomeKind {
   if (IDEMPOTENCY_PROCESSING_CODES.includes(code)) return "idempotencyProcessing";
   if (IDEMPOTENCY_MISMATCH_CODES.includes(code)) return "idempotencyMismatch";
   return "other";
+}
+
+/** No definite write receipt: retain its original key, body and scope. */
+export function requiresSameKeyRecovery(error: NormalizedApiError): boolean {
+  return error.status === 0 || error.status >= 500 || error.code === "CLIENT_REQUEST_TIMEOUT"
+    || classifyApiOutcome(error) === "idempotencyProcessing";
 }
 
 /**

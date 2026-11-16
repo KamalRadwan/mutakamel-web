@@ -288,36 +288,6 @@ function AccountFields({
 
       {/* Lookups-backed Reference Pointers */}
       <div className="grid grid-cols-1 gap-3">
-        <Field label={t.trade.accountPaymentTerms}>
-          <Input
-            size="sm"
-            placeholder={t.trade.accountPaymentTerms}
-            dir="ltr"
-            className="font-mono"
-            value={values.paymentTermsId}
-            onChange={(event) => onChange({ paymentTermsId: event.target.value })}
-            disabled={isSubmitting}
-          />
-          {lookups.paymentTerms.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
-              <span className="text-xs text-muted-foreground">{copy.availablePaymentTerms}</span>
-              {lookups.paymentTerms.slice(0, 4).map((pt) => (
-                <Button
-                  key={pt.id}
-                  type="button"
-                  size="xs"
-                  variant={values.paymentTermsId === pt.id ? "primary" : "outline"}
-                  disabled={isSubmitting}
-                  onClick={() => onChange({ paymentTermsId: pt.id })}
-                  className="px-1.5 py-0.5 font-mono text-xs"
-                >
-                  {pt.id.slice(0, 8)}…
-                </Button>
-              ))}
-            </div>
-          )}
-        </Field>
-
         <Field
           label={t.trade.accountPriceBook}
           hint={t.trade.accountPriceBookPurposeHint}

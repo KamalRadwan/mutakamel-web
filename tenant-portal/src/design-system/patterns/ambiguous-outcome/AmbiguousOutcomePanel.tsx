@@ -17,15 +17,15 @@ export interface AmbiguousOutcomeLabels {
 export interface AmbiguousOutcomePanelProps {
   /** The write that may or may not have applied — already translated. */
   operation: string;
-  /** The key the original request carried. Retrying with it is what makes the retry safe. */
+  /** Evidence carried by the original request; replay safety depends on the route contract. */
   idempotencyKey: string;
   description: string;
   /**
    * The one action offered beside the evidence. What it must be depends on
    * which outcome raised the panel:
    *
-   * - **unknown outcome** — replay the SAME idempotency key. A fresh key is a
-   *   second write, not a retry.
+   * - **unknown outcome** — read back non-replayable commands first. Replay
+   *   only when the route guarantees it, retaining the original key and body.
    * - **applied but unreadable** (defect D2) — reload or reconcile. The write
    *   is on the server; there is nothing to send again, and a replay would
    *   return the same body this client already could not read.
@@ -33,8 +33,8 @@ export interface AmbiguousOutcomePanelProps {
    * Either way, nothing wired here may start a fresh intent.
    */
   onRetry: () => void;
-  /** The user resolving the condition — the only thing that removes this panel. */
-  onDismiss: () => void;
+  /** Omit when the command must remain locked until reconciliation succeeds. */
+  onDismiss?: () => void;
   correlationId?: string;
   retrying?: boolean;
   className?: string;
@@ -42,8 +42,8 @@ export interface AmbiguousOutcomePanelProps {
 }
 
 // A write that timed out, or failed after the request was already sent, may or
-// may not have applied. Its idempotency key is the only way to retry safely,
-// so that evidence must NOT live in a 4-second toast — it renders in-body and
+// may not have applied. Recovery depends on the endpoint's replay contract,
+// so its evidence must NOT live in a 4-second toast — it renders in-body and
 // persists until the user resolves it. See
 // docs/design/patterns.md#ambiguous-outcomes.
 //
@@ -100,9 +100,9 @@ export function AmbiguousOutcomePanel({
         <Button variant="outline" size="sm" onClick={onRetry} loading={retrying}>
           {labels.retry}
         </Button>
-        <Button variant="ghost" size="sm" onClick={onDismiss} disabled={retrying}>
+        {onDismiss && <Button variant="ghost" size="sm" onClick={onDismiss} disabled={retrying}>
           {labels.dismiss}
-        </Button>
+        </Button>}
       </div>
     </section>
   );

@@ -2,7 +2,6 @@ import type { TradePath } from "@/lib/api/envelope";
 import {
   INVENTORY_CODE_PATTERN,
   isBoundedInteger,
-  isMemberOf,
   isNonEmptyString,
   isOptionalText,
   isTimestamp,
@@ -49,6 +48,7 @@ export interface InventoryPeriod {
   status: string;
   maxBackdateDays: number;
   closedAt: string | null;
+  closedBy?: string | null;
   closeReason: string | null;
   version: number;
 }
@@ -65,6 +65,11 @@ export interface InventoryUomConversion {
   status: string;
   effectiveFrom: string;
   version: number;
+  contentHash?: string | null;
+  publishedAt?: string | null;
+  publishedBy?: string | null;
+  retiredAt?: string | null;
+  retiredBy?: string | null;
 }
 
 export interface InventorySerial {
@@ -74,6 +79,8 @@ export interface InventorySerial {
   serialKey: string;
   state: string;
   currentFulfillmentNodeId: string | null;
+  currentUomId: string | null;
+  currentReservationId: string | null;
   lastTransitionAt: string;
   version: number;
 }
@@ -82,6 +89,14 @@ interface InventorySerialLifecycleEntry {
   id: string;
   eventType: string;
   occurredAt: string;
+  fromState: string | null;
+  toState: string | null;
+  fulfillmentNodeId: string | null;
+  uomId: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  ledgerEntryId: string | null;
+  reservationId: string | null;
 }
 
 export interface InventorySerialDetail extends InventorySerial {
@@ -103,6 +118,11 @@ export interface InventoryDecision {
   explanation: string | null;
   evaluatedAt: string;
   correlationId: string | null;
+  selectedValue: unknown;
+  companyId: string | null;
+  branchId: string | null;
+  policyVersions: unknown[];
+  matchedRules: string[];
 }
 
 export interface PeriodFormValues {
@@ -307,6 +327,7 @@ export function parseInventoryPeriod(payload: unknown): InventoryPeriod {
     status: row.status,
     maxBackdateDays: row.maxBackdateDays,
     closedAt: isTimestamp(row.closedAt) ? row.closedAt : null,
+    closedBy: optionalReference(row.closedBy),
     closeReason: (row.closeReason as string | null | undefined) ?? null,
     version: row.version,
   };
@@ -340,6 +361,11 @@ export function parseInventoryUomConversion(payload: unknown): InventoryUomConve
     status: row.status,
     effectiveFrom: row.effectiveFrom,
     version: row.version,
+    contentHash: optionalHash(row.contentHash),
+    publishedAt: optionalTimestamp(row.publishedAt),
+    publishedBy: optionalReference(row.publishedBy),
+    retiredAt: optionalTimestamp(row.retiredAt),
+    retiredBy: optionalReference(row.retiredBy),
   };
 }
 
@@ -366,6 +392,8 @@ export function parseInventorySerial(payload: unknown): InventorySerial {
     currentFulfillmentNodeId: isUuidV7(row.currentFulfillmentNodeId)
       ? row.currentFulfillmentNodeId
       : null,
+    currentUomId: optionalReference(row.currentUomId),
+    currentReservationId: optionalReference(row.currentReservationId),
     lastTransitionAt: row.lastTransitionAt,
     version: row.version,
   };
@@ -383,6 +411,14 @@ export function parseInventorySerialDetail(payload: unknown): InventorySerialDet
         id: item.id,
         eventType: typeof item.eventType === "string" ? item.eventType : "",
         occurredAt: item.occurredAt,
+        fromState: optionalState(item.fromState),
+        toState: optionalState(item.toState),
+        fulfillmentNodeId: optionalReference(item.fulfillmentNodeId),
+        uomId: optionalReference(item.uomId),
+        sourceType: optionalState(item.sourceType),
+        sourceId: optionalReference(item.sourceId),
+        ledgerEntryId: optionalReference(item.ledgerEntryId),
+        reservationId: optionalReference(item.reservationId),
       };
     }),
   };
@@ -412,35 +448,48 @@ export function parseInventoryDecision(payload: unknown): InventoryDecision {
     explanation: typeof row.explanation === "string" ? row.explanation : null,
     evaluatedAt: row.evaluatedAt,
     correlationId: typeof row.correlationId === "string" ? row.correlationId : null,
+    selectedValue: result.selectedValue ?? null,
+    companyId: optionalReference(row.companyId),
+    branchId: optionalReference(row.branchId),
+    policyVersions: optionalArray(row.policyVersions),
+    matchedRules: optionalRules(row.matchedRules),
   };
 }
 
-export function isPeriodStatus(value: unknown): value is PeriodStatus {
-  return isMemberOf(value, PERIOD_STATUSES);
+function optionalReference(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (!isUuidV7(value)) invalidResponse();
+  return value;
 }
 
-export const PERIOD_REASON_PRESETS = [
-  "MONTH_END_CLOSE",
-  "QUARTER_AUDIT_LOCK",
-  "PHYSICAL_COUNT_FREEZE",
-  "AUDIT_ADJUSTMENT_REOPEN",
-] as const;
+function optionalState(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (!isNonEmptyString(value, 80)) invalidResponse();
+  return value;
+}
 
-export const CONVERSION_REASON_PRESETS = [
-  "INITIAL_CATALOG_PUBLISH",
-  "SUPPLIER_PACK_CHANGE",
-  "WAREHOUSE_REPACK_SPEC",
-  "OBSOLETE_PACK_RETIRED",
-] as const;
+function optionalArray(value: unknown): unknown[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value)) invalidResponse();
+  return value;
+}
 
-export const PERIOD_BACKDATE_PRESETS = [0, 3, 7, 14, 30] as const;
+function optionalRules(value: unknown): string[] {
+  const rules = optionalArray(value);
+  if (!rules.every((rule): rule is string => typeof rule === "string")) invalidResponse();
+  return rules;
+}
 
-export function computePeriodDays(startsOn: string, endsOn: string): number | null {
-  if (!ISO_DATE.test(startsOn) || !ISO_DATE.test(endsOn) || endsOn < startsOn) return null;
-  const startMs = Date.parse(`${startsOn}T00:00:00Z`);
-  const endMs = Date.parse(`${endsOn}T00:00:00Z`);
-  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return null;
-  return Math.round((endMs - startMs) / 86_400_000) + 1;
+function optionalTimestamp(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (!isTimestamp(value)) invalidResponse();
+  return value;
+}
+
+function optionalHash(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/u.test(value)) invalidResponse();
+  return value;
 }
 
 function gcd(a: bigint, b: bigint): bigint {
@@ -484,15 +533,27 @@ export function suggestIntegerFraction(
 }
 
 export function convertQuantityPreview(
-  inputQty: number,
+  inputQty: string,
   factorNumerator: string,
   factorDenominator: string,
-): string {
-  const num = Number(factorNumerator);
-  const den = Number(factorDenominator);
-  if (!Number.isFinite(inputQty) || !Number.isFinite(num) || !Number.isFinite(den) || den <= 0) {
-    return "0.0000";
+): string | null {
+  const quantity = /^(0|[1-9]\d{0,15})(?:\.(\d{1,8}))?$/u.exec(inputQty.trim());
+  if (
+    !quantity ||
+    !POSITIVE_INTEGER_STRING.test(factorNumerator) ||
+    !POSITIVE_INTEGER_STRING.test(factorDenominator)
+  ) {
+    return null;
   }
-  return ((inputQty * num) / den).toFixed(4);
+  const fraction = quantity[2] ?? "";
+  const magnitude = BigInt(`${quantity[1]}${fraction}`);
+  const scale = BigInt(100_000_000);
+  // Inventory persists numeric(24,8); a fractional remainder cannot be rounded away.
+  const numerator = magnitude * BigInt(factorNumerator) * scale;
+  const denominator = BigInt(factorDenominator) * BigInt(10) ** BigInt(fraction.length);
+  if (numerator % denominator !== BigInt(0)) return null;
+  const exact = numerator / denominator;
+  if (exact > BigInt("999999999999999999999999")) return null;
+  return `${exact / scale}.${String(exact % scale).padStart(8, "0")}`;
 }
 

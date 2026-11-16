@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { BookOpenCheck, CheckCircle2, CircleDashed, Clock } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import type { Dictionary } from "@/i18n/dictionaries/ar";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import {
   Badge,
   Button,
@@ -113,7 +115,7 @@ export function ApplicationPublishActivateDialog({
         setPublishOutcome({ state: "DONE", detail: null });
       } catch (error) {
         setPublishOutcome({ state: "PENDING", detail: null });
-        setSubmissionError(readMessage(error, copy.failed));
+        setSubmissionError(localizeApplicationError(error, t));
         queueMicrotask(() => submissionErrorRef.current?.focus());
         return;
       }
@@ -128,6 +130,7 @@ export function ApplicationPublishActivateDialog({
             catalogueRevision,
             normalizedReason,
             activationBlockedReason,
+            t,
           )
         : { state: "SKIPPED", detail: null },
     );
@@ -242,6 +245,7 @@ async function runActivation(
   catalogueRevision: string,
   reason: string,
   activationBlockedReason: string | null,
+  t: Dictionary,
 ): Promise<StepOutcome> {
   if (activationBlockedReason) {
     return { state: "DEFERRED", detail: activationBlockedReason };
@@ -250,7 +254,7 @@ async function runActivation(
     await onActivate(catalogueRevision, reason);
     return { state: "DONE", detail: null };
   } catch (error) {
-    return { state: "DEFERRED", detail: readMessage(error, null) };
+    return { state: "DEFERRED", detail: localizeApplicationError(error, t) };
   }
 }
 
@@ -322,16 +326,3 @@ const STEP_PRESENTATION = {
     text: "stateDeferred",
   },
 } as const;
-
-function readMessage(value: unknown, fallback: string | null): string | null {
-  if (value instanceof Error) return value.message;
-  if (
-    value &&
-    typeof value === "object" &&
-    "message" in value &&
-    typeof value.message === "string"
-  ) {
-    return value.message;
-  }
-  return fallback;
-}

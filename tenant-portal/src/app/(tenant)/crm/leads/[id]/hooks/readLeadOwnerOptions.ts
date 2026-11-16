@@ -3,6 +3,7 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { isUUIDv7 } from "@/lib/uuid";
 import { parseLeadDetailsUser, type LeadDetailsUser } from "../lead-details-edit-contract";
 const USERS_PATH = "/api/tenant/core/v1/users";
+const MAX_PAGES = 40;
 
 /** Core's branch-visible ACTIVE users are candidates, not assignment authority. */
 export async function readOwnerOptions(branchId: string, signal: AbortSignal): Promise<LeadDetailsUser[]> {
@@ -19,6 +20,7 @@ export async function readOwnerOptions(branchId: string, signal: AbortSignal): P
     if (next.some((user) => users.some(({ id }) => id === user.id)) || (meta.hasNext && next.length === 0)) throw new Error("Invalid user list response.");
     users.push(...next);
     if (!meta.hasNext) return users;
+    if (page >= MAX_PAGES) throw new Error("Invalid user list pagination.");
   }
 }
 
@@ -27,7 +29,7 @@ export async function readAssignableLeadOwners(branchId: string, action: "create
   const users: LeadDetailsUser[] = [];
   const seen = new Set<string>();
   let cursor: string | null = null;
-  for (;;) {
+  for (let pageNumber = 1; ; pageNumber += 1) {
     // AssignableOwnersQueryDto permits 1-200; the service orders by user ID.
     const query = new URLSearchParams({ branchId, resource: "leads", action, limit: "100" });
     if (cursor) query.set("cursor", cursor);
@@ -48,6 +50,7 @@ export async function readAssignableLeadOwners(branchId: string, action: "create
       users.push({ id: owner.id, firstName: owner.displayName, lastName: "" });
     }
     if (page.nextCursor === null) return users;
+    if (pageNumber >= MAX_PAGES) throw new Error("Invalid assignable owners pagination.");
     if (page.items.length === 0 || page.nextCursor !== previousId) throw new Error("Invalid assignable owners cursor.");
     cursor = page.nextCursor as string;
   }

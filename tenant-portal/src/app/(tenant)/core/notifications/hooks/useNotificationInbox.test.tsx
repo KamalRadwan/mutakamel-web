@@ -42,9 +42,39 @@ function deferred<T>() {
 }
 
 beforeEach(() => { vi.resetAllMocks(); });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  tenantNotificationRuntime.clear();
+  vi.useRealTimers();
+});
 
 describe("notification inbox pagination ownership", () => {
+  it("reloads the loaded pages once for a runtime event burst", async () => {
+    tenantNotificationRuntime.bindGeneration("inbox-burst");
+    mocks.get.mockResolvedValueOnce(page([notification(1)], "next"))
+      .mockResolvedValueOnce(page([notification(2)], "older"));
+    const { result } = renderHook(() => useNotificationInbox());
+    await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+    await act(async () => { await result.current.loadMore(); });
+    mocks.get.mockResolvedValueOnce(page([notification(3)], "new-next", 5))
+      .mockResolvedValueOnce(page([notification(2)], "new-older", 5));
+    vi.useFakeTimers();
+    act(() => {
+      for (let revision = 1; revision <= 5; revision++) {
+        tenantNotificationRuntime.applyUnreadCount(
+          "inbox-burst", revision, revision, "2026-10-17T12:00:00.000Z",
+        );
+      }
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(399); });
+    expect(mocks.get).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(mocks.get).toHaveBeenCalledTimes(4);
+    expect(mocks.get.mock.calls[3][0]).toBe(notificationsListPath("new-next", false));
+    expect(result.current.items).toEqual([notification(3), notification(2)]);
+    expect(result.current.unreadCount).toBe(5);
+  });
+
   it("revalidates the loaded history and count on creation, read and dismissal invalidations", async () => {
     mocks.get.mockResolvedValueOnce(page([notification(1)], "next"))
       .mockResolvedValueOnce(page([notification(2)], "older"));

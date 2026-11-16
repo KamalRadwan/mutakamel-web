@@ -72,6 +72,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
               correlationId={transfer.ambiguity.error.correlationId}
               onRetry={() => void transfer.ambiguity?.replay()}
               onDismiss={transfer.dismissAmbiguity}
+              retrying={transfer.isSubmitting}
               labels={ambiguousLabels}
             />
           )}
@@ -84,19 +85,21 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
               correlationId={transfer.appliedUnreadable.error.correlationId}
               onRetry={() => transfer.reconcile()}
               onDismiss={transfer.dismissAppliedUnreadable}
+              retrying={transfer.isSubmitting}
               labels={appliedLabels}
             />
           )}
 
           <Field
             label={t.crmOpportunityDetail.targetPipeline}
+            showLabel
             required
             error={errorText ?? undefined}
           >
             <Select
               value={transfer.pipelineId}
               onValueChange={transfer.setPipelineId}
-              disabled={transfer.isSubmitting}
+              disabled={transfer.locked}
             >
               <SelectTrigger size="sm">
                 <SelectValue placeholder={t.crmOpportunities.selectPipeline} />
@@ -113,6 +116,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
 
           <Field
             label={t.crmOpportunityDetail.targetStage}
+            showLabel
             hint={t.crmOpportunityDetail.targetStageHint}
           >
             <Select
@@ -121,7 +125,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
                 transfer.setStageId(value === ENTRY_STAGE_VALUE ? "" : value)
               }
               disabled={
-                transfer.isSubmitting || transfer.targetStages.length === 0
+                transfer.locked || transfer.targetStages.length === 0
               }
             >
               <SelectTrigger size="sm">
@@ -142,6 +146,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
 
           <Field
             label={t.crmOpportunityDetail.transferReason}
+            showLabel
             hint={t.crmOpportunityDetail.transferReasonHint}
           >
             <Textarea
@@ -149,7 +154,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
               placeholder={t.crmOpportunityDetail.transferReason}
               onChange={(event) => transfer.setReason(event.target.value)}
               maxLength={1000}
-              disabled={transfer.isSubmitting}
+              disabled={transfer.locked}
             />
           </Field>
         </div>
@@ -159,7 +164,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
             size="sm"
             variant="ghost"
             onClick={transfer.closeDialog}
-            disabled={transfer.isSubmitting}
+            disabled={transfer.locked}
           >
             {t.common.cancel}
           </Button>
@@ -167,7 +172,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
             size="sm"
             variant="primary"
             onClick={() => void transfer.submit()}
-            disabled={transfer.pipelineId.length === 0}
+            disabled={transfer.locked || transfer.pipelineId.length === 0}
             loading={transfer.isSubmitting}
           >
             {t.crmOpportunityDetail.transferConfirm}
@@ -177,3 +182,4 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
     </Dialog>
   );
 }
+

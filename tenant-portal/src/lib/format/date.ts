@@ -16,6 +16,11 @@ export function formatDate(value: string, lang: Language): string {
   return new Intl.DateTimeFormat(INTL_LOCALE[lang], { dateStyle: "medium" }).format(date);
 }
 
+export function formatCivilDateRange(from: string, to: string, lang: Language): string {
+  const formatter = new Intl.DateTimeFormat(INTL_LOCALE[lang], { dateStyle: "medium", timeZone: "UTC" });
+  return formatter.formatRange(new Date(`${from}T00:00:00Z`), new Date(`${to}T00:00:00Z`));
+}
+
 /**
  * All digits: `06/09/2026 08:01 AM`.
  *

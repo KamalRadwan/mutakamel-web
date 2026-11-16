@@ -5,6 +5,7 @@ import { CircleX, RefreshCw, TriangleAlert, Undo2 } from "lucide-react";
 import { Button, CodeRef, cn } from "@/design-system";
 import { formatLocaleNumber, localeForLanguage } from "@/i18n/locale";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import {
   isTenantDestroyAdvancing,
   tenantDestroyHaltedPhase,
@@ -70,7 +71,7 @@ export function TenantDestroyStatus({
           <CircleX className="size-3.5 shrink-0" aria-hidden="true" />
           {text.destroyLoadFailed}
         </p>
-        <ErrorEvidence error={loadError} correlationLabel={text.correlation} />
+        <ErrorEvidence error={loadError} locale={locale} correlationLabel={text.correlation} />
         <Button type="button" size="xs" variant="outline" onClick={onRefresh}>
           {text.destroyRefresh}
         </Button>
@@ -165,7 +166,7 @@ export function TenantDestroyStatus({
       {loadError ? (
         <div className="space-y-1">
           <p>{text.destroyRefreshFailed}</p>
-          <ErrorEvidence error={loadError} correlationLabel={text.correlation} />
+          <ErrorEvidence error={loadError} locale={locale} correlationLabel={text.correlation} />
         </div>
       ) : null}
 
@@ -207,14 +208,16 @@ function SafeCode({ locale, code }: { locale: TenantWorkspaceLocale; code: strin
 
 function ErrorEvidence({
   error,
+  locale,
   correlationLabel,
 }: {
   error: NormalizedApiError;
+  locale: TenantWorkspaceLocale;
   correlationLabel: string;
 }) {
   return (
     <>
-      <p className="break-words">{error.message}</p>
+      <p className="break-words">{getLocalizedApiErrorMessage(error, locale)}</p>
       <p className="flex flex-wrap items-center gap-1.5">
         <CodeRef value={error.errorCode} />
         {error.correlationId ? (

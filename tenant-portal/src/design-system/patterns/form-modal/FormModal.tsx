@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  type DialogContentProps,
 } from "../../primitives/Dialog";
 import { ConfirmActionModal } from "../confirm-action/ConfirmActionModal";
 import { FormErrorSummary } from "../form-shell/FormErrorSummary";
@@ -51,8 +52,8 @@ export interface FormModalProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
-  /** `full` is the viewport less 20px. `wide` and `card` are centred surfaces without a section index. */
-  size?: "full" | "wide" | "card";
+  /** `document` is a centred 1120px authoring surface; all card sizes fit the viewport. */
+  size?: "full" | "wide" | "card" | "permissions" | "document";
   density?: "standard" | "compact";
   isDirty: boolean;
   isSubmitting: boolean;
@@ -85,6 +86,8 @@ export interface FormModalProps {
   submitIcon?: React.ReactNode;
   /** Optional class override for the primary submit button (e.g. green completion style). */
   submitClassName?: string;
+  /** Optional open auto-focus override forwarded to `DialogContent` when a form's first tabbable node is not its first editable field. */
+  onOpenAutoFocus?: DialogContentProps["onOpenAutoFocus"];
   labels: FormModalLabels;
   children: React.ReactNode;
 }
@@ -114,6 +117,7 @@ export function FormModal({
   footerLeading,
   submitIcon,
   submitClassName,
+  onOpenAutoFocus,
   labels,
   children,
 }: FormModalProps) {
@@ -224,9 +228,12 @@ export function FormModal({
               : cn(
                   "flex max-h-[94dvh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-lg p-0 sm:p-0",
                   size === "wide" && (asideSlot ? "max-w-[1180px]" : "max-w-[940px]"),
+                  size === "document" && "max-w-[1120px]",
+                  size === "permissions" && "h-[760px] max-w-[1080px]",
                 )
           }
           closeLabel={labels.close}
+          onOpenAutoFocus={onOpenAutoFocus}
           onEscapeKeyDown={(event) => {
             event.preventDefault();
             shell.requestClose();
@@ -251,7 +258,7 @@ export function FormModal({
                 {headerIcon && <div className="shrink-0">{headerIcon}</div>}
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <DialogTitle className={density === "compact" ? "text-sm" : "text-base"}>
+                    <DialogTitle className={size === "document" ? "text-xl" : density === "compact" ? "text-sm" : "text-base"}>
                       {title}
                     </DialogTitle>
                     {titleBadge}

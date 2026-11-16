@@ -26,7 +26,10 @@ vi.mock("@/context/AuthContext", () => ({
     isLoading: false,
   }),
 }));
-vi.mock("@/lib/auth/rbac", () => ({ adminCanAll: () => true }));
+vi.mock("@/lib/auth/rbac", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/auth/rbac")>(),
+  adminCanAll: () => true,
+}));
 vi.mock("@/lib/utils/uuid", () => ({ generateUUIDv7: mocks.uuid }));
 vi.mock("@/lib/api/axiosClient", () => ({
   axiosClient: {

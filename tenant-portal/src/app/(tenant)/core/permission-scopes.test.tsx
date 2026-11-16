@@ -5,7 +5,10 @@ import { en } from "@/i18n/dictionaries/en";
 import type { PermissionScope } from "@/lib/auth/permission-scope";
 
 const { auth, io, toast } = vi.hoisted(() => ({
-  auth: { user: { permissions: [] as string[], permissionScopes: {} as Record<string, PermissionScope> } },
+  auth: {
+    user: { permissions: [] as string[], permissionScopes: {} as Record<string, PermissionScope> },
+    retryBootstrap: vi.fn(),
+  },
   io: {
     get: vi.fn(), post: vi.fn(), patch: vi.fn(), remove: vi.fn(),
     listCompanies: vi.fn(), createCompany: vi.fn(), deleteCompany: vi.fn(),
@@ -15,15 +18,27 @@ const { auth, io, toast } = vi.hoisted(() => ({
   },
   toast: { success: vi.fn(), error: vi.fn(), errorFromApi: vi.fn(), outcomeFromApi: vi.fn() },
 }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => auth }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
-vi.mock("@/design-system", async () => ({
-  ...await import("@/design-system/patterns/permission-gate/useCan"),
+vi.mock("@/design-system", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/design-system")>()),
   useToast: () => toast,
   useRealtimeResync: () => undefined,
 }));
 vi.mock("./core-api", () => ({
   coreGet: io.get, corePost: io.post, corePatch: io.patch, coreDelete: io.remove,
+}));
+// Settings list/companion reads now consume the canonical data + meta envelope.
+// Keep the same controllable IO boundary for success and rejected-read cases.
+vi.mock("@/lib/api/envelope", async (original) => ({
+  ...await original<typeof import("@/lib/api/envelope")>(),
+  readCorePage: io.get,
+  writeCoreData: async (method: string, path: string, body: unknown, options: unknown) => {
+    const write = method === "post" ? io.post : method === "patch" ? io.patch : io.remove;
+    const envelope = await write(path, body, options);
+    return envelope.data;
+  },
 }));
 vi.mock("./contracts/organization-contract", async (original) => ({
   ...await original<typeof import("./contracts/organization-contract")>(),
@@ -37,7 +52,8 @@ vi.mock("./contracts/role-contract", async (original) => ({
   fetchPermissionCatalogue: io.permissionCatalogue,
 }));
 
-import { EMPTY_ORG_NODE_FORM, useOrganizationLevel } from "./organization/hooks/useOrganizationLevel";
+import { useOrganizationLevel } from "./organization/hooks/useOrganizationLevel";
+import { EMPTY_ORG_NODE_FORM } from "./organization/organization-payloads";
 import { useTenantRoles } from "./roles/hooks/useTenantRoles";
 import { useRolePermissionEditor } from "./roles/[id]/hooks/useRolePermissionEditor";
 import { useTaxes } from "./settings/taxes/hooks/useTaxes";
@@ -50,10 +66,20 @@ const OTHER_COMPANY = "01900100-0000-7000-8000-000000000002";
 const ROLE = "01900100-0000-7000-8000-000000000003";
 const BRANCH = "01900100-0000-7000-8000-000000000004";
 const KEYS = ["org.company.manage", "roles.role.create", "roles.role.update", "roles.role.delete",
-  "roles.permission.read", "taxes.tax.manage", "numbering.manage"];
+  "roles.permission.read", "taxes.tax.read", "taxes.tax.manage", "numbering.read", "numbering.manage"];
 const role = { id: ROLE, name: "Delegated", nameAr: "Delegated", nameEn: "Delegated",
-  descriptionAr: null, descriptionEn: null, isSystem: false, permissionIds: [],
+  descriptionAr: null, descriptionEn: null, isSystem: false, permissionMode: "GLOBAL" as const, permissionIds: [],
   createdAt: "2026-10-17T00:00:00.000Z", updatedAt: "2026-10-17T00:00:00.000Z" };
+const PERMISSION = "01900100-0000-7000-8000-000000000005";
+const grantablePermission = {
+  id: PERMISSION,
+  key: "org.company.manage",
+  group: "org",
+  nameAr: "إدارة الشركات",
+  nameEn: "Manage companies",
+  groupNameAr: "الهيكل التنظيمي",
+  groupNameEn: "Organization",
+};
 
 function setGrants(tenantWide: boolean) {
   auth.user = {
@@ -67,6 +93,7 @@ function setGrants(tenantWide: boolean) {
 beforeEach(() => {
   vi.clearAllMocks();
   setGrants(false);
+  auth.retryBootstrap.mockResolvedValue(undefined);
   io.listCompanies.mockResolvedValue({ items: [{ id: COMPANY }], page: 1, limit: 25, total: 1 });
   io.listRoles.mockResolvedValue({ items: [role], page: 1, limit: 25, total: 1 });
   io.readRole.mockResolvedValue(role);
@@ -75,14 +102,34 @@ beforeEach(() => {
   io.updateRole.mockResolvedValue(role);
   io.setPermissions.mockResolvedValue(role);
   io.permissionCatalogue.mockResolvedValue({ items: [], hasNext: false });
-  io.post.mockResolvedValue({ data: {}, headers: new Headers() });
-  io.get.mockImplementation(async (path: string) => ({
-    data: { items: path.includes("/organization/companies") ? [
-      { id: COMPANY, code: "A", name: "Company A" },
-      { id: OTHER_COMPANY, code: "B", name: "Company B" },
-    ] : [], total: 0, page: 1, limit: 25 },
+  io.post.mockImplementation(async (path: string, request: Record<string, unknown>) => ({
+    data: path === "/api/tenant/core/v1/numbering" ? {
+      id: ROLE, code: request.code, prefix: request.prefix ?? null,
+      padding: request.padding ?? 5, nextValue: "1",
+      companyId: request.companyId ?? null, updatedAt: role.updatedAt,
+    } : path === "/api/tenant/core/v1/taxes" ? {
+      id: ROLE, code: request.code, name: request.name, rate: String(request.rate),
+      isInclusive: request.isInclusive ?? false, status: "ACTIVE",
+      companyId: request.companyId ?? null, updatedAt: role.updatedAt,
+    } : {},
     headers: new Headers(),
   }));
+  io.get.mockImplementation(async (path: string, query = "") => {
+    const params = new URLSearchParams(query);
+    const page = Number(params.get("page") ?? 1);
+    const limit = Number(params.get("limit") ?? 25);
+    const data = path.includes("/organization/companies") ? [
+      { id: COMPANY, code: "A", name: "Company A" },
+      { id: OTHER_COMPANY, code: "B", name: "Company B" },
+    ] : [];
+    const total = data.length;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+    return {
+      data,
+      meta: { page, limit, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 && totalPages > 0 },
+      headers: new Headers(),
+    };
+  });
 });
 afterEach(cleanup);
 
@@ -151,17 +198,29 @@ describe("tenant-wide company and role actions", () => {
 
   it("keeps tenant-wide holders able to create and edit roles", async () => {
     setGrants(true);
+    io.permissionCatalogue.mockResolvedValue({ items: [grantablePermission], hasNext: false });
+    io.updateRole.mockResolvedValue({ ...role, name: "Example" });
+    io.setPermissions.mockResolvedValue({ ...role, name: "Example", permissionIds: [PERMISSION] });
     const { result } = renderHook(useCompanyAndRoles);
     await waitFor(() => expect(result.current.editor.role?.id).toBe(ROLE));
     await waitFor(() => expect(result.current.editor.canSavePermissions).toBe(true));
+    act(() => {
+      result.current.editor.toggle(PERMISSION);
+    });
+    expect(result.current.editor.isDirty).toBe(true);
     await act(async () => {
       expect(await result.current.roles.handleCreate({ name: "Example" })).toBe(true);
       expect(await result.current.editor.rename({ name: "Example" })).toBe(true);
+    });
+    await act(async () => {
       await result.current.editor.save();
     });
     expect(io.createRole).toHaveBeenCalledOnce();
     expect(io.updateRole).toHaveBeenCalledOnce();
     expect(io.setPermissions).toHaveBeenCalledOnce();
+    expect(io.setPermissions).toHaveBeenCalledWith(ROLE, [PERMISSION]);
+    expect(auth.retryBootstrap).toHaveBeenCalledOnce();
+    expect(result.current.editor.role?.permissionIds).toEqual([PERMISSION]);
   });
 });
 

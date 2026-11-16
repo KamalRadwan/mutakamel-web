@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { createElement, type ButtonHTMLAttributes, type ReactNode } from "react";
+import Link from "next/link";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
@@ -8,16 +9,22 @@ import type { OpportunityActionCapability, OpportunityPipeline } from "../hooks/
 import { CreateOpportunityModal, type CreateOpportunityModalProps } from "./CreateOpportunityModal";
 import { OpportunityExecutiveBoardView } from "./OpportunityExecutiveBoardView";
 
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/crm/opportunities" }));
+
 vi.mock("@/context/AuthContext", () => ({
   useTenantAuth: () => ({ user: { id: "self", firstName: "My", lastName: "Name", email: "me@example.com" } }),
 }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
-vi.mock("../../leads/[id]/hooks/readLeadOwnerOptions", () => ({
-  readOwnerOptions: async () => [
-    { id: "self", firstName: "My", lastName: "Name" },
-    { id: "team", firstName: "Team", lastName: "Mate" },
-    { id: "other", firstName: "Other", lastName: "Person" },
-  ],
+vi.mock("../hooks/useOpportunityFormLookups", () => ({
+  useOpportunityFormLookups: () => ({
+    owners: { items: [
+      { id: "self", displayName: "My Name", avatarUrl: null },
+      { id: "team", displayName: "Team Mate", avatarUrl: null },
+      { id: "other", displayName: "Other Person", avatarUrl: null },
+    ], isLoading: false, error: null, reload: vi.fn() },
+    customer: { contacts: [], sourceLeads: [], isLoading: false, error: null, leadError: null, reload: vi.fn() },
+  }),
 }));
 vi.mock("../../leads/hooks/useCreateLeadTags", () => ({
   useCreateLeadTags: () => ({ items: [{ id: "tag-id", name: "Priority", backgroundColor: "#eee", textColor: "#111" }], canManage: false }),
@@ -40,10 +47,10 @@ vi.mock("@/design-system", async (importOriginal) => {
   const Children = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
     ...actual,
-    FormModal: ({ headerAside, children, footerLeading, submitDisabled, isSubmitting, onSubmit, labels }: {
-      headerAside: ReactNode; children: ReactNode; footerLeading: ReactNode;
+    DossierFormSurface: ({ children, footerLeading, submitDisabled, isSubmitting, onSubmit, labels }: {
+      children: ReactNode; footerLeading: ReactNode;
       submitDisabled: boolean; isSubmitting: boolean; onSubmit: () => void; labels: { submit: string };
-    }) => <>{headerAside}{children}{footerLeading}
+    }) => <>{children}{footerLeading}
       {createElement("button", { disabled: submitDisabled || isSubmitting, onClick: onSubmit }, labels.submit)}
     </>,
     Field: Children, Select: Children, SelectContent: Children,
@@ -78,7 +85,7 @@ const pipeline: OpportunityPipeline = {
     rank: 1, isActive: true, isSystem: true }],
 };
 const create = {
-  open: true, isSubmitting: false, isDirty: false, errors: {}, selectableStages: pipeline.stages,
+  open: true, view: "full", isSubmitting: false, isDirty: false, errors: {}, selectableStages: pipeline.stages,
   form: { customerProfileId: "", pipelineId: "pipeline", stageId: "stage", title: "", amount: "",
     currencyCode: "", probabilityPercent: "", expectedCloseDate: "", importance: "0",
     ownerUserId: "", tagIds: [], description: "", customFields: {} },
@@ -187,10 +194,10 @@ it("blocks both fresh create actions and only offers replay or hide while uncert
     updateCapability: scopes[2].capability,
   };
   const { rerender } = render(<CreateOpportunityModal {...props} />);
-  await waitFor(() => expect(screen.getByRole("button", { name: en.common.create })).toBeDisabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: en.crmOpportunityDetail.createOperation })).toBeDisabled());
   const createAnother = screen.getByRole("button", { name: en.crmOpportunities.createAndAddAnother });
   expect(createAnother).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: en.common.create }));
+  fireEvent.click(screen.getByRole("button", { name: en.crmOpportunityDetail.createOperation }));
   fireEvent.click(createAnother);
   expect(submit).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Retry original create" }));
@@ -200,4 +207,39 @@ it("blocks both fresh create actions and only offers replay or hide while uncert
   rerender(<CreateOpportunityModal {...props} create={{ ...pending, isSubmitting: true }} />);
   expect(screen.getByRole("button", { name: "Retry original create" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Hide uncertainty" })).toBeDisabled();
+});
+
+it("guards Full create navigation once and leaves Fast create to its modal guard", async () => {
+  router.push.mockClear();
+  const model = { ...create, view: "full" as const, isDirty: true };
+  const props = { create: model, pipelines: [pipeline], branchId, customFields,
+    createCapability: scopes[2].capability, updateCapability: scopes[2].capability };
+  const { rerender } = render(<><CreateOpportunityModal {...props} /><Link href="/crm/leads">Leave create</Link></>);
+  const unload = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(unload);
+  expect(unload.defaultPrevented).toBe(true);
+  fireEvent.click(screen.getByRole("link", { name: "Leave create" }));
+  expect(screen.getAllByRole("alertdialog")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+  expect(router.push).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("link", { name: "Leave create" }));
+  fireEvent.click(screen.getByRole("button", { name: en.common.discardConfirm }));
+  expect(router.push).toHaveBeenCalledWith("/crm/leads");
+  rerender(<CreateOpportunityModal {...props} create={{ ...model, view: "fast" }} />);
+  const fastUnload = new Event("beforeunload", { cancelable: true });
+  window.dispatchEvent(fastUnload);
+  expect(fastUnload.defaultPrevented).toBe(false);
+});
+
+it("reveals Full view before rejecting an error in a hidden Fast-create field", () => {
+  const setView = vi.fn();
+  const submit = vi.fn().mockResolvedValue(false);
+  render(<CreateOpportunityModal create={{ ...create, view: "fast", setView, submit,
+    allErrors: { probabilityPercent: "Choose a whole number from 0 to 100." } }}
+    pipelines={[pipeline]} branchId={branchId} customFields={customFields}
+    createCapability={scopes[2].capability} updateCapability={scopes[2].capability} />);
+  fireEvent.click(screen.getByRole("button", { name: en.crmOpportunityDetail.createOperation }));
+  expect(setView).toHaveBeenCalledWith("full");
+  expect(submit).toHaveBeenCalledWith({ keepOpenAfterSuccess: false });
+  expect(setView.mock.invocationCallOrder[0]).toBeLessThan(submit.mock.invocationCallOrder[0]);
 });

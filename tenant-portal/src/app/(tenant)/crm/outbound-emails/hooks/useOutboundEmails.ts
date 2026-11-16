@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
 import { hasPermission } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
@@ -35,10 +36,12 @@ export function canSendOutboundEmail(permissions: readonly string[] | undefined)
 export function useOutboundEmails() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
+  const authScope = useAuthScopeKey(user);
+  const scope = `${authScope}:${user?.featureEntitlements?.["crm.outbound_email"]}`;
   // POST /outbound-emails and /retry require `crm.email.send`; the reads
   // require `crm.activities.read`. There is no capabilities endpoint for this
   // family, so the send permission is the only signal available.
-  const canSend = canSendOutboundEmail(user?.permissions);
+  const canSend = canSendOutboundEmail(user?.permissions) && user?.featureEntitlements?.["crm.outbound_email"] !== false;
   const [items, setItems] = useState<OutboundEmailListItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
@@ -47,6 +50,12 @@ export function useOutboundEmails() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
+  const [retainedError, setRetainedError] = useState<NormalizedApiError | null>(null);
+  const [dataScope, setDataScope] = useState(scope);
+  const liveScope = useRef(scope);
+  useLayoutEffect(() => { liveScope.current = scope; }, [scope]);
+  const loadingCursor = useRef<string | null>(null);
+  const loaded = useRef(false);
   const generation = useRef(0);
   const requests = useRef(new Set<AbortController>());
 
@@ -58,13 +67,15 @@ export function useOutboundEmails() {
 
   const fetchPage = useCallback(
     async (nextCursor: string | null) => {
+      if (nextCursor && loadingCursor.current === nextCursor) return;
       const isFirstPage = nextCursor === null;
       if (isFirstPage) invalidate();
+      loadingCursor.current = nextCursor;
       const requestGeneration = generation.current;
       const controller = new AbortController();
       requests.current.add(controller);
       const isCurrent = () =>
-        requestGeneration === generation.current && !controller.signal.aborted;
+        requestGeneration === generation.current && !controller.signal.aborted && liveScope.current === scope;
       if (isFirstPage) {
         setIsLoading(true);
         setIsLoadingMore(false);
@@ -72,6 +83,7 @@ export function useOutboundEmails() {
         setHasNext(false);
       } else setIsLoadingMore(true);
       setQueryError(null);
+      setRetainedError(null);
       try {
         const query = buildOutboundEmailListQuery({ status }, nextCursor);
         const response = await axiosClient.get<unknown>(
@@ -81,30 +93,38 @@ export function useOutboundEmails() {
         if (!isCurrent()) return;
         const parsed = parseListResponse(response.data);
         setItems((current) =>
-          isFirstPage ? parsed.items : [...current, ...parsed.items],
+          isFirstPage ? parsed.items : [...current, ...parsed.items.filter((item) => !current.some((row) => row.outboundEmailId === item.outboundEmailId))],
         );
+        setDataScope(scope);
         setCursor(parsed.nextCursor);
         setHasNext(parsed.hasNext);
         setHasLoaded(true);
+        loaded.current = true;
       } catch (error) {
         if (!isCurrent() || isAbortError(error)) return;
-        if (isFirstPage) setItems([]);
-        setQueryError(normalizeApiError(error));
+        const failure = normalizeApiError(error);
+        if (loaded.current && failure.status !== 403 && failure.status !== 401) setRetainedError(failure);
+        else { setItems([]); setDataScope(scope); setQueryError(failure); }
       } finally {
         requests.current.delete(controller);
         if (isCurrent()) {
+          loadingCursor.current = null;
           setIsLoading(false);
           setIsLoadingMore(false);
         }
       }
     },
-    [status, invalidate],
+    [status, invalidate, scope],
   );
 
   useEffect(() => {
+    loaded.current = false;
     const effectGeneration = generation.current;
     queueMicrotask(() => {
-      if (generation.current === effectGeneration) void fetchPage(null);
+      if (generation.current === effectGeneration) {
+        setHasLoaded(false); setItems([]);
+        void fetchPage(null);
+      }
     });
     return invalidate;
   }, [fetchPage, invalidate]);
@@ -112,12 +132,13 @@ export function useOutboundEmails() {
   return {
     t,
     lang,
-    items,
-    hasLoaded,
+    items: dataScope === scope ? items : [],
+    hasLoaded: dataScope === scope && hasLoaded,
     hasNext,
-    isLoading,
+    isLoading: isLoading || dataScope !== scope,
     isLoadingMore,
     queryError,
+    retainedError,
     canSend,
     status,
     setStatus: (nextStatus: OutboundEmailStatus | "") => {

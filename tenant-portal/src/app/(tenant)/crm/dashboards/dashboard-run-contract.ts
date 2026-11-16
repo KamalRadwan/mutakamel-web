@@ -7,6 +7,7 @@
 
 import {
   boundedArray,
+  civilDateRange,
   finiteNumber,
   invalidResponse,
   nonEmptyString,
@@ -15,151 +16,144 @@ import {
   stringArray,
   timestamp,
 } from "./dashboard-parse";
+export { DRILLDOWN_FIELDS, parseDrilldownResponse, type DrilldownRecord } from "./dashboard-drilldown-response";
 import { DASHBOARD_WIDGET_LIMIT, isDataShape, isMetricUnit, type CrmDataShape, type CrmMetricUnit } from "./widget-contract";
+import { parseCurrencyValues, parseScalarComparison, parseWidgetSeries, type WidgetCurrencyValue, type WidgetScalarComparison, type WidgetSeries } from "./dashboard-series-contract";
+import { parseGovernedTargetEvidence, type GovernedTargetEvidence } from "./won-target-evidence";
+import { LEAD_INQUIRY_CLASSIFICATION, readInquiryClassification } from "./widget-acquisition-quality";
+import { isLifecycleTimeZone, isLifecycleWidget, readLeadLifecycle } from "./widget-lead-lifecycle";
+import { canonicalOrganizationIds, matchesOrganizationIds, parseDashboardOrganizationScope,
+  type DashboardOrganizationSelection } from "./dashboard-organization-scope";
+import { isUUIDv7 } from "@/lib/uuid";
+export type { WidgetPoint, WidgetSeries } from "./dashboard-series-contract";
 
-/** `DashboardFiltersDto.datePreset`. */
-export const DATE_PRESETS = ["CURRENT_MONTH", "CURRENT_QUARTER", "CURRENT_YEAR", "LAST_30_DAYS"] as const;
+// `DashboardFiltersDto.datePreset`.
+export const DATE_PRESETS = [
+  "TODAY", "CURRENT_WEEK", "CURRENT_MONTH", "CURRENT_QUARTER", "CURRENT_YEAR",
+  "LAST_MONTH", "LAST_3_COMPLETE_MONTHS", "LAST_QUARTER", "LAST_YEAR", "LAST_7_DAYS", "LAST_30_DAYS", "LAST_90_DAYS", "CUSTOM",
+] as const;
 type DatePreset = (typeof DATE_PRESETS)[number];
 
-/** `DashboardFiltersDto.compare`. */
+// `DashboardFiltersDto.compare`.
 export const COMPARE_MODES = ["NONE", "PREVIOUS_PERIOD", "PREVIOUS_YEAR"] as const;
 type CompareMode = (typeof COMPARE_MODES)[number];
 
-/**
- * `CURRENCIES:` is a **prefix carrying data**, not a constant warning — the
- * codes present follow it, comma-separated. The eleven keys
- * `validateDashboardFilters` allows are documented in
- * docs/api/crm-dashboards.md; the four this screen offers are above.
- */
-const WIDGET_WARNING_CURRENCIES_PREFIX = "CURRENCIES:";
-
-/** `@Max(100)` on the drill-down `limit`; the DTO default is 25. */
+// `@Max(100)` on the drill-down `limit`; the DTO default is 25.
 const DRILLDOWN_PAGE_SIZE = 25;
 
-/** `CRM_DASHBOARD_DRILLDOWN_PROJECTION_FIELDS`, in server order. */
-export const DRILLDOWN_FIELDS = [
-  "id", "entityType", "title", "status", "stageName", "ownerName", "branchName",
-  "pipelineName", "sourceName", "activityType", "reason", "amount",
-  "currencyCode", "rank", "value", "occurredAt", "createdAt", "updatedAt",
-  "dueAt", "closedAt", "convertedAt",
-] as const;
-type DrilldownField = (typeof DRILLDOWN_FIELDS)[number];
+interface DashboardPopulationSelection {
+  teamIds?: string[];
+  ownerUserIds?: string[];
+}
 
-export interface DashboardFilterSelection {
+export interface DashboardFilterSelection extends DashboardOrganizationSelection, DashboardPopulationSelection {
   datePreset: DatePreset | null;
   compare: CompareMode | null;
   branchId: string | null;
   currencyCode: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
-/**
- * One plotted point.
- *
- * `value` is always a **JS number** — `toPoints` runs every row through
- * `Number()`, including money. See
- * docs/api/crm-dashboards.md#money-is-a-number-here-not-a-decimal-string.
- */
-interface WidgetPoint {
-  key: string;
-  label: string;
-  value: number;
-  /** `XY` shapes only. */
-  secondaryValue: number | null;
-  /** `INTERVAL` shapes only. */
-  start: string | null;
-  end: string | null;
-  /** The row the point was built from — the drill-down selection reads `key`. */
-  meta: Record<string, unknown>;
-}
-
-export interface WidgetSeries {
-  key: string;
-  label: string;
-  unit: CrmMetricUnit | null;
-  axis: "LEFT" | "RIGHT";
-  currency: string | null;
-  points: WidgetPoint[];
-  /**
-   * True when the server appended this series as a period comparison — its key
-   * ends `:PREVIOUS_PERIOD` or `:PREVIOUS_YEAR` (`canonicalSeries` keySuffix).
-   */
-  isComparison: boolean;
-}
+const WIDGET_STATES = ["READY", "EMPTY", "UNAVAILABLE", "RETIRED", "FAILED", "DEADLINE_EXCEEDED"] as const;
+export type WidgetState = typeof WIDGET_STATES[number];
 
 export interface WidgetResult {
   widgetId: string;
-  state?: "RETIRED";
+  state?: WidgetState;
   shape: CrmDataShape;
-  /** SCALAR widgets only, and only when the metric produced exactly one point. */
+  // SCALAR widgets only, and only when the metric produced exactly one point.
   value: number | null;
   previousValue: number | null;
   target: number | null;
+  governedTarget?: GovernedTargetEvidence;
   series: WidgetSeries[];
-  /** `TABLE` visualizations and `ROWS` metrics. */
+  // `TABLE` visualizations and `ROWS` metrics.
   rows: Array<Record<string, unknown>>;
-  /** The typed P2 result for HIERARCHY / BINNED_DISTRIBUTION / WATERFALL / EVENT_STREAM / ROWS. */
+  // The typed P2 result for hierarchy, distributions, waterfall, event stream and rows.
   typedResult: Record<string, unknown> | null;
   unit: CrmMetricUnit | null;
   currency: string | null;
   generatedAt: string;
   warnings: string[];
-  /**
-   * Set only on the failure path, where the server rolls back to a savepoint
-   * and still returns the widget. `null` means the widget executed.
-   */
+  // A failed widget is returned beside successful widgets.
   errorCode: string | null;
+  comparison?: WidgetScalarComparison;
+  details?: Record<string, unknown>;
+  otherCurrencies?: WidgetCurrencyValue[];
+  breakdown?: WidgetCurrencyValue[];
+  partialAccess?: boolean;
+  ignoredFilters?: string[];
+  timeBasis?: string;
+  effectivePeriod?: { from: string; to: string; timeZone: string };
 }
 
-export interface DashboardRunResult {
-  dashboardId: string;
-  revision: number | null;
+export interface DashboardExecutionResult {
   generatedAt: string;
   filters: Record<string, unknown>;
   widgets: Record<string, WidgetResult>;
+  organizationScope?: DashboardOrganizationScope;
+  populationScope?: DashboardPopulationScope;
+}
+
+export interface DashboardRunResult extends DashboardExecutionResult {
+  dashboardId: string;
+  revision: number | null;
   unavailablePlacementCount: number;
 }
 
-export interface DrilldownRecord {
-  id: string;
-  fields: Partial<Record<DrilldownField, string | number | boolean | null>>;
+export type DashboardOrganizationScope = Pick<ReturnType<typeof parseDashboardOrganizationScope>, "companies" | "branches">;
+interface DashboardPopulationOption { id: string; name: string; branchIds: string[] }
+export interface DashboardPopulationScope {
+  state: "READY" | "SOURCE_NOT_READY" | "TOO_BROAD";
+  teams: DashboardPopulationOption[];
+  owners: DashboardPopulationOption[];
 }
 
-export interface DrilldownPage {
-  widgetId: string;
-  widgetRevision: number;
-  records: DrilldownRecord[];
-  hasMore: boolean;
-  nextCursor: string | null;
-}
-
-/**
- * `RunDashboardDto`.
- *
- * A filter is omitted when unset rather than sent as `null` —
- * `forbidNonWhitelisted` plus `@IsOptional()` means a `null` is a 422, and the
- * server merges dashboard defaults under whatever is sent.
- */
-export function buildRunRequest(selection: DashboardFilterSelection): Record<string, unknown> {
+// `RunDashboardDto`.
+export function buildRunRequest(selection: DashboardFilterSelection, includePopulationOptions = false): Record<string, unknown> {
   const filters = buildFilters(selection);
-  return Object.keys(filters).length > 0 ? { filters } : {};
+  return { ...(Object.keys(filters).length > 0 ? { filters } : {}), ...(includePopulationOptions ? { includePopulationOptions } : {}) };
+}
+
+export function customDateRangeError(from: string, to: string): "required" | "invalid" | null {
+  if (!from || !to) return "required";
+  const valid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  return !valid(from) || !valid(to) || from > to ? "invalid" : null;
 }
 
 function buildFilters(selection: DashboardFilterSelection): Record<string, unknown> {
   const filters: Record<string, unknown> = {};
   if (selection.datePreset) filters.datePreset = selection.datePreset;
+  if (selection.datePreset === "CUSTOM") {
+    if (customDateRangeError(selection.dateFrom ?? "", selection.dateTo ?? "")) {
+      throw new Error("CRM_DASHBOARD_DATE_RANGE_INVALID");
+    }
+    filters.dateFrom = selection.dateFrom;
+    filters.dateTo = selection.dateTo;
+  }
   if (selection.compare) filters.compare = selection.compare;
   if (selection.branchId) filters.branchId = selection.branchId;
+  const fail = () => { throw new Error("CRM_DASHBOARD_FILTER_INVALID"); };
+  const companyIds = canonicalOrganizationIds(selection.companyIds, fail);
+  const branchIds = canonicalOrganizationIds(selection.branchIds, fail);
+  const teamIds = canonicalOrganizationIds(selection.teamIds, fail);
+  const ownerUserIds = canonicalOrganizationIds(selection.ownerUserIds, fail);
+  if ((selection.companyId && companyIds) || (selection.branchId && branchIds)) return fail();
+  if (companyIds) filters.companyIds = companyIds;
+  if (branchIds) filters.branchIds = branchIds;
+  if (teamIds) filters.teamIds = teamIds;
+  if (ownerUserIds) filters.ownerUserIds = ownerUserIds;
+  if (selection.companyId) {
+    if (!isUUIDv7(selection.companyId)) throw new Error("CRM_DASHBOARD_FILTER_INVALID");
+    filters.companyId = selection.companyId;
+  }
   if (selection.currencyCode) filters.currencyCode = selection.currencyCode;
   return filters;
 }
 
-/**
- * `DashboardDrilldownRequestDto`.
- *
- * `expectedWidgetRevision` is sent so a widget edited in another tab answers
- * `409 CRM_WIDGET_REVISION_CONFLICT` instead of silently drilling into a
- * different query than the one on screen.
- */
+// `DashboardDrilldownRequestDto`.
 export function buildDrilldownRequest(input: {
   pointKey: string;
   seriesKey: string | null;
@@ -168,37 +162,96 @@ export function buildDrilldownRequest(input: {
   selection: DashboardFilterSelection;
 }): Record<string, unknown> {
   const pointKey = input.pointKey.trim();
-  if (pointKey.length === 0 || pointKey.length > 256) throw new Error("CRM_DRILLDOWN_SELECTION_INVALID");
+  if (pointKey.length === 0 || pointKey.length > 256 || /[\u0000-\u001f\u007f]/u.test(pointKey)
+    || !Number.isSafeInteger(input.expectedWidgetRevision) || input.expectedWidgetRevision < 1
+    || (input.seriesKey !== null && (!input.seriesKey.trim() || input.seriesKey.length > 160 || /[\u0000-\u001f\u007f]/u.test(input.seriesKey)))
+    || (input.cursor !== null && (!/^[A-Za-z0-9_-]+$/.test(input.cursor) || input.cursor.length > 1024))) {
+    throw new Error("CRM_DRILLDOWN_SELECTION_INVALID");
+  }
   const body: Record<string, unknown> = {
     pointKey,
     limit: DRILLDOWN_PAGE_SIZE,
     expectedWidgetRevision: input.expectedWidgetRevision,
   };
-  if (input.seriesKey) body.seriesKey = input.seriesKey.slice(0, 160);
+  if (input.seriesKey) body.seriesKey = input.seriesKey.trim();
   if (input.cursor) body.cursor = input.cursor;
   const filters = buildFilters(input.selection);
   if (Object.keys(filters).length > 0) body.filters = filters;
   return body;
 }
 
-export function parseRunResponse(payload: unknown): DashboardRunResult {
+export function parseRunResponse(payload: unknown, selection?: DashboardOrganizationSelection & DashboardPopulationSelection): DashboardRunResult {
   const source = record(payload);
-  const widgets = record(source?.widgets);
-  if (!source || !widgets || !nonEmptyString(source.dashboardId) || !timestamp(source.generatedAt)) {
-    invalidResponse("dashboard run");
-  }
+  if (!source || !nonEmptyString(source.dashboardId)) invalidResponse("dashboard run");
   return {
+    ...parseDashboardExecutionResponse(source, selection),
     dashboardId: source.dashboardId,
     revision: finiteNumber(source.revision) ? source.revision : null,
+    unavailablePlacementCount: Array.isArray(source.unavailablePlacements) ? source.unavailablePlacements.length : 0,
+  };
+}
+
+export function parseDashboardExecutionResponse(payload: unknown, selection?: DashboardOrganizationSelection & DashboardPopulationSelection,
+  requireScope = false): DashboardExecutionResult {
+  const source = record(payload);
+  const widgets = record(source?.widgets);
+  if (!source || !widgets || !timestamp(source.generatedAt)) {
+    invalidResponse("dashboard run");
+  }
+  const filters = record(source.filters) ?? {};
+  const fail = () => invalidResponse("dashboard organization scope");
+  const organization = source.organizationScope === undefined ? undefined
+    : parseDashboardOrganizationScope(source.organizationScope, selection ?? {}, fail);
+  const hasScopeSelection = selection?.companyId || selection?.companyIds || selection?.branchIds || selection?.teamIds || selection?.ownerUserIds;
+  if (requireScope || hasScopeSelection) {
+    if (!organization || filters.companyId !== (organization.companyId ?? undefined)
+      || (organization.branchId && filters.branchId !== organization.branchId)
+      || !matchesOrganizationIds(filters.companyIds, organization.companyIds) || !matchesOrganizationIds(filters.branchIds, organization.branchIds)
+      || !boundedArray(source.scope, 500)) return fail();
+    const expected = new Set(organization.selectedBranches.map(branch => branch.id));
+    if ((hasScopeSelection && !expected.size) || source.scope.length !== expected.size || source.scope.some(value => {
+      const entry = record(value);
+      return !entry || !isUUIDv7(entry.branchId) || !["own", "team", "all"].includes(String(entry.scope)) || !expected.delete(entry.branchId);
+    })) return fail();
+  } else if (filters.companyId !== undefined || filters.companyIds !== undefined || filters.branchIds !== undefined) return fail();
+  const populationScope = parsePopulationScope(source.populationScope, filters, selection,
+    organization?.selectedBranches.map(branch => branch.id));
+  return {
     generatedAt: source.generatedAt,
-    filters: record(source.filters) ?? {},
+    filters,
+    ...(organization ? { organizationScope: { companies: organization.companies, branches: organization.branches } } : {}),
+    ...(populationScope ? { populationScope } : {}),
     widgets: Object.fromEntries(
       Object.entries(widgets).map(([widgetId, result]) => [widgetId, parseWidgetResult(result)]),
     ),
-    unavailablePlacementCount: Array.isArray(source.unavailablePlacements)
-      ? source.unavailablePlacements.length
-      : 0,
   };
+}
+
+function parsePopulationScope(value: unknown, filters: Record<string, unknown>, selection: DashboardPopulationSelection | undefined,
+  branchIds: string[] | undefined): DashboardPopulationScope | undefined {
+  const fail = () => invalidResponse("dashboard population scope");
+  const teams = canonicalOrganizationIds(selection?.teamIds, fail);
+  const owners = canonicalOrganizationIds(selection?.ownerUserIds, fail);
+  if (!matchesOrganizationIds(filters.teamIds, teams) || !matchesOrganizationIds(filters.ownerUserIds, owners)) return fail();
+  if (value === undefined && !teams && !owners) return undefined;
+  const scope = record(value);
+  if (!scope || !branchIds || (scope.state !== "READY" && scope.state !== "SOURCE_NOT_READY" && scope.state !== "TOO_BROAD")
+    || !matchesOrganizationIds(scope.teamIds, teams ?? []) || !matchesOrganizationIds(scope.ownerUserIds, owners ?? [])) return fail();
+
+  const branches = new Set(branchIds);
+  const options = (entries: unknown): DashboardPopulationOption[] => {
+    if (!boundedArray(entries, 500) || (scope.state !== "READY" && entries.length > 0)) return fail();
+    const ids = new Set<string>();
+    return entries.map(entry => {
+      const option = record(entry);
+      if (!option || !isUUIDv7(option.id) || ids.has(option.id.toLowerCase()) || !nonEmptyString(option.name)
+        || !boundedArray(option.branchIds, 500) || !option.branchIds.length || new Set(option.branchIds).size !== option.branchIds.length
+        || !option.branchIds.every((id): id is string => isUUIDv7(id) && branches.has(id))) return fail();
+      ids.add(option.id.toLowerCase());
+      return { id: option.id, name: option.name, branchIds: option.branchIds };
+    });
+  };
+  return { state: scope.state, teams: options(scope.teams), owners: options(scope.owners) };
 }
 
 export function parseWidgetResult(payload: unknown): WidgetResult {
@@ -208,15 +261,33 @@ export function parseWidgetResult(payload: unknown): WidgetResult {
     invalidResponse("widget result");
   }
   const error = record(source.error);
-  return {
+  const period = record(meta.effectivePeriod);
+  const range = civilDateRange(period);
+  if (meta.effectivePeriod !== undefined && (!range || !nonEmptyString(period?.timeZone))) invalidResponse("widget effective period");
+  if (source.state !== undefined && !(WIDGET_STATES as readonly unknown[]).includes(source.state)) invalidResponse("widget state");
+  if (meta.partialAccess !== undefined && typeof meta.partialAccess !== "boolean") invalidResponse("widget source coverage");
+  if (meta.ignoredFilters !== undefined && !stringArray(meta.ignoredFilters, 32)) invalidResponse("widget ignored filters");
+  const governedTarget = source.governedTarget === undefined ? undefined : parseGovernedTargetEvidence(source.governedTarget, meta.generatedAt);
+  if (governedTarget) {
+    const pace = governedTarget.measure === "DAILY_PACE";
+    const trajectory = governedTarget.measure === "TRAJECTORY";
+    const exactValue = trajectory ? null : pace ? governedTarget.workingPace?.requiredPerWorkday : governedTarget.amounts?.actualValue;
+    const ready = trajectory ? !!governedTarget.trajectory : exactValue != null;
+    const target = !pace && !trajectory && ready ? Number(governedTarget.amounts!.targetValue) : undefined;
+    if (source.shape !== (trajectory ? "TIME_SERIES" : "SCALAR") || source.state !== (ready ? "READY" : "UNAVAILABLE") || meta.unit !== "MONEY"
+      || meta.currency !== governedTarget.currencyCode || meta.timeBasis !== (pace || trajectory ? "SNAPSHOT" : "EVENT") || source.series.length || error
+      || source.value !== (exactValue == null ? null : Number(exactValue)) || source.target !== target) invalidResponse("widget governed target result");
+  }
+  const result: WidgetResult = {
     widgetId: source.widgetId,
-    ...(source.state === "RETIRED" ? { state: "RETIRED" as const } : {}),
+    ...(source.state === undefined ? {} : { state: source.state as WidgetState }),
     // A widget that failed before its metric resolved falls back to `ROWS`.
     shape: isDataShape(source.shape) ? source.shape : "ROWS",
     value: finiteNumber(source.value) ? source.value : null,
     previousValue: finiteNumber(source.previousValue) ? source.previousValue : null,
     target: finiteNumber(source.target) ? source.target : null,
-    series: source.series.map(parseSeries),
+    ...(governedTarget ? { governedTarget } : {}),
+    series: source.series.map(parseWidgetSeries),
     rows: boundedArray(source.rows, 1000)
       ? source.rows.flatMap((row) => (record(row) ? [record(row) as Record<string, unknown>] : []))
       : [],
@@ -226,108 +297,49 @@ export function parseWidgetResult(payload: unknown): WidgetResult {
     generatedAt: timestamp(meta.generatedAt) ? meta.generatedAt : new Date().toISOString(),
     warnings: stringArray(meta.warnings, 32) ? meta.warnings : [],
     errorCode: error && nonEmptyString(error.code) ? error.code : null,
+    comparison: parseScalarComparison(source.comparison),
+    details: record(source.details) ?? undefined,
+    otherCurrencies: parseCurrencyValues(meta.otherCurrencies),
+    breakdown: parseCurrencyValues(meta.breakdown),
+    partialAccess: meta.partialAccess === true,
+    ignoredFilters: meta.ignoredFilters as string[] | undefined,
+    timeBasis: optionalString(meta.timeBasis) ?? undefined,
+    ...(range && nonEmptyString(period?.timeZone) ? { effectivePeriod: { ...range, timeZone: period.timeZone } } : {}),
   };
-}
-
-function parseSeries(payload: unknown): WidgetSeries {
-  const source = record(payload);
-  if (!source || !nonEmptyString(source.key) || !boundedArray(source.points, 2000)) {
-    invalidResponse("widget series");
+  const classification = result.series.some(series => series.key === LEAD_INQUIRY_CLASSIFICATION)
+    || result.details?.inquiryClassification !== undefined;
+  if (classification && (result.state === "READY" || result.state === "EMPTY") && !readInquiryClassification(result)) {
+    invalidResponse("widget inquiry classification");
   }
-  return {
-    key: source.key,
-    label: nonEmptyString(source.label) ? source.label : source.key,
-    unit: isMetricUnit(source.unit) ? source.unit : null,
-    axis: source.axis === "RIGHT" ? "RIGHT" : "LEFT",
-    currency: optionalString(source.currency),
-    points: source.points.map(parsePoint),
-    isComparison: source.key.endsWith(":PREVIOUS_PERIOD") || source.key.endsWith(":PREVIOUS_YEAR"),
-  };
-}
-
-function parsePoint(payload: unknown): WidgetPoint {
-  const source = record(payload);
-  if (!source || !nonEmptyString(source.key)) invalidResponse("widget point");
-  return {
-    key: source.key,
-    label: nonEmptyString(source.label) ? source.label : source.key,
-    value: finiteNumber(source.value) ? source.value : 0,
-    secondaryValue: finiteNumber(source.secondaryValue) ? source.secondaryValue : null,
-    start: optionalString(source.start),
-    end: optionalString(source.end),
-    meta: record(source.meta) ?? {},
-  };
-}
-
-export function parseDrilldownResponse(payload: unknown): DrilldownPage {
-  const source = record(payload);
-  const pageInfo = record(source?.pageInfo);
-  if (
-    !source ||
-    !pageInfo ||
-    !nonEmptyString(source.widgetId) ||
-    !boundedArray(source.records, 100)
-  ) {
-    invalidResponse("drill-down");
+  if (isLifecycleWidget(result) && (result.state === "READY" || result.state === "EMPTY")
+    && (!isLifecycleTimeZone(result.effectivePeriod?.timeZone) || !readLeadLifecycle(result))) {
+    invalidResponse("widget lead lifecycle");
   }
-  return {
-    widgetId: source.widgetId,
-    widgetRevision: finiteNumber(source.widgetRevision) ? source.widgetRevision : 0,
-    records: source.records.flatMap((entry) => {
-      const row = record(entry);
-      if (!row || !nonEmptyString(row.id)) return [];
-      const fields: DrilldownRecord["fields"] = {};
-      for (const field of DRILLDOWN_FIELDS) {
-        const value = row[field];
-        if (
-          value === null ||
-          typeof value === "string" ||
-          typeof value === "number" ||
-          typeof value === "boolean"
-        ) {
-          fields[field] = value;
-        }
-      }
-      return [{ id: row.id, fields }];
-    }),
-    hasMore: pageInfo.hasMore === true,
-    nextCursor: optionalString(pageInfo.nextCursor),
-  };
+  return result;
 }
 
-/**
- * The currencies a run reported, gathered from every widget's
- * `CURRENCIES:EGP,USD` warning plus its resolved `meta.currency`.
- *
- * This is the **only** honest source for a currency filter on this screen: the
- * portal has no reachable currency catalogue from `/crm`, and
- * `CURRENCY_FILTER_REQUIRED` blanks a widget until one is chosen.
- */
+// The currencies a run reported, gathered from every widget's
 export function currenciesInRun(run: DashboardRunResult | null): string[] {
   if (!run) return [];
   const codes = new Set<string>();
+  const add = (code: string | null) => { if (code && /^[A-Z]{3}$/u.test(code)) codes.add(code); };
   for (const widget of Object.values(run.widgets)) {
-    if (widget.currency) codes.add(widget.currency);
-    for (const warning of widget.warnings) {
-      if (!warning.startsWith(WIDGET_WARNING_CURRENCIES_PREFIX)) continue;
-      for (const code of warning.slice(WIDGET_WARNING_CURRENCIES_PREFIX.length).split(",")) {
-        const trimmed = code.trim();
-        if (/^[A-Z]{3}$/u.test(trimmed)) codes.add(trimmed);
-      }
-    }
+    add(widget.currency);
+    widget.series.forEach((series) => add(series.currency));
+    widget.otherCurrencies?.forEach((item) => add(item.currencyCode));
+    widget.breakdown?.forEach((item) => add(item.currencyCode));
   }
   return [...codes].sort();
 }
 
-/** Warnings minus the machine-readable `CURRENCIES:` carrier. */
 export function displayWarnings(warnings: readonly string[]): string[] {
-  return warnings.filter((warning) => !warning.startsWith(WIDGET_WARNING_CURRENCIES_PREFIX));
+  return [...warnings];
 }
 
 export function failedWidgetIds(run: DashboardRunResult | null): string[] {
   if (!run) return [];
   return Object.values(run.widgets)
-    .filter((widget) => widget.errorCode !== null)
+    .filter((widget) => widget.errorCode !== null && widget.state !== "UNAVAILABLE")
     .map((widget) => widget.widgetId)
     .slice(0, DASHBOARD_WIDGET_LIMIT);
 }

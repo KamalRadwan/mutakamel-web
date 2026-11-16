@@ -44,6 +44,15 @@ describe("routeTitleKey", () => {
     expect(routeTitleKey("/not-a-real-screen")).toBeNull();
   });
 
+  it("distinguishes the default dashboard, libraries and report explorer", () => {
+    expect(routeTitleKey("/crm/dashboard")).toBe("presetDashboards");
+    expect(routeTitleKey("/crm/dashboards")).toBe("crmDashboardBuilder");
+    expect(routeTitleKey("/crm/dashboards/0198c4a2-7f31-7c2e-9b40-1d5f8e2a6c11")).toBe("crmDashboardBuilder");
+    expect(routeTitleKey("/crm/dashboards/reports")).toBe("crmReports");
+    expect(routeTitleKey("/crm/widgets")).toBe("crmWidgetLibrary");
+    expect(routeTitleKey("/crm/widgets/ownership-transfers")).toBe("crmWidgetOwnership");
+  });
+
   it("does not let the root entry claim every path", () => {
     // "/" is a nav href; a naive startsWith would make it match everything and
     // every unknown route would inherit the workspace title.

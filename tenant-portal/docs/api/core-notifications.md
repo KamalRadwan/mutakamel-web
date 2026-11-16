@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-10-18**
+Last source verification: **2026-11-04**
 
 Owning app: **core-app** (delivery effects performed by `worker-app`)
 
@@ -11,6 +11,49 @@ Canonical prefix: `/api/tenant/core/v1/notifications`
 Upstream: `/tenant/notifications`
 
 Portal status: **partial** — inbox, in-app preferences, and realtime are live.
+
+### Activity reminders and shell alerts (2026-11-04)
+
+New `core.activity.reminder` notifications include scalar metadata:
+`activitySubject`, `activityType`, `dueAt`, `reminderOffsetMinutes`, nullable
+`location` and nullable `descriptionPreview` (up to 240 characters).
+The shell, inbox and detail render translated activity types and viewer-local
+dates, subject, offset, location and description preview. Older reminders keep
+their available metadata; no historical event content is invented.
+
+Clicking a shell notification follows its validated action, or the notification
+detail when no action exists. Activity entities open
+`/core/activities?activityId=<UUIDv7>` including previously read reminders;
+the workspace reads that activity through its existing permission-scoped detail
+API and opens its existing modal independently of calendar/list filters.
+Unread rows are marked read when opened. Failures and 403/404 remain visible.
+
+With unread items, the closed bell control shakes for 1.2 seconds every ten
+seconds. The requested bell cue is explicitly enabled independently of OS
+decorative-motion suppression; the dot/count and other reduced-motion policies
+are unchanged. A short two-note sound plays only for
+new, non-silent realtime notifications after browser audio has been unlocked
+by user interaction. Initial REST history, repeated delivery events, old replay
+events and mark-read/count changes do not sound. The bell's sound control stores
+a local browser mute preference, independent of server delivery preferences.
+
+New, non-silent notifications also display a localized notification toast with
+the same title and details as the inbox, an accessible X dismiss control, and
+a fixed 30-second lifetime, including while hovered. Muting sound does not hide
+the toast. Replayed/history events do not show another toast, and auth-generation
+cleanup removes outstanding notification toasts and their expiry timers.
+The toast explicitly uses the portal's `font-sans` stack, overriding Sonner's
+system fallback fonts so Arabic glyphs use the same font as the rest of the UI.
+Closing the toast is a local dismissal; it does not mark the inbox item read.
+
+Live acceptance on 2026-11-04 verified the final activity due at `20:56:00Z`
+with a two-minute reminder: browser arrival and the two-note chime occurred
+at `20:54:19.174Z`; the unread count advanced automatically and the link opened
+the correct existing activity modal. Notification creation time is identical
+in REST and realtime; recipient creation time remains the cursor clock.
+The ten-second shake interval, reduced-motion suppression, read-state stopping,
+Arabic/English, both themes and a 390px viewport were checked in the running
+production portal. Reloading the historical inbox did not play a sound.
 
 The shell bell and notification REST reconciliation require
 `notifications.notification.read` in the current session permission projection.
@@ -34,10 +77,7 @@ Source inspected:
 | GET | `/api/tenant/core/v1/notifications/config` | `notifications.notification.read` | 200 |
 | POST | `/api/tenant/core/v1/notifications/:id/read` | `notifications.notification.read` | **204** |
 | POST | `/api/tenant/core/v1/notifications/read-all` | `notifications.notification.read` | 200 |
-| POST | `/api/tenant/core/v1/notifications/mark-all-read` | `notifications.notification.read` | 200 |
 | POST | `/api/tenant/core/v1/notifications/:id/acknowledge` | `notifications.notification.read` | **204** |
-| POST | `/api/tenant/core/v1/notifications/:id/ack` | `notifications.notification.read` | **204** |
-| POST | `/api/tenant/core/v1/notifications/:id/dismiss` | `notifications.notification.read` | **204** |
 | DELETE | `/api/tenant/core/v1/notifications/:id` | `notifications.notification.read` | **204** |
 | GET | `/api/tenant/core/v1/notifications/preferences` | `notifications.preference.read` | 200 |
 | PUT | `/api/tenant/core/v1/notifications/preferences` | `notifications.preference.manage` | 200 |
@@ -51,7 +91,7 @@ Source inspected:
 
 | Permission | Covers |
 | --- | --- |
-| `notifications.notification.read` | Reading, marking read, acknowledging, dismissing, deleting |
+| `notifications.notification.read` | Reading, marking read, acknowledging, deleting |
 | `notifications.preference.read` | Reading in-app preferences |
 | `notifications.preference.manage` | Writing in-app preferences |
 
@@ -59,26 +99,15 @@ A user can hold `notification.read` without `preference.read`. Gate the
 preferences screen separately from the dropdown.
 
 Note that `notification.read` also authorises **destructive** actions
-(`dismiss`, `DELETE /:id`) — there is no separate delete permission. Confirm
+(`DELETE /:id`) — there is no separate delete permission. Confirm
 before deleting; the permission will not stop it.
-
-## Duplicate route families
-
-Two pairs do the same job. Pick one and use it consistently:
-
-| Pair | Use |
-| --- | --- |
-| `POST /read-all` · `POST /mark-all-read` | **`/read-all`** — it is what the portal already calls |
-| `POST /:id/acknowledge` · `POST /:id/ack` | **`/:id/acknowledge`** — `/ack` is the abbreviation alias |
-
-Do not mix them in one client.
 
 ## GET /:id
 
 Verified **2026-10-17**: detail loading makes one recipient-scoped lookup, even
 for notifications older than the first 250 inbox records or absent from the
 realtime cache. Core uses the current tenant database and authenticated user;
-unknown IDs, another recipient's IDs and dismissed notifications all return
+unknown IDs, another recipient's IDs and deleted notifications all return
 `404 NOTIFICATION_NOT_FOUND` without notification content. No new permission,
 schema or database privilege is needed.
 
@@ -115,15 +144,12 @@ Server-declared notification configuration for in-app and realtime delivery.
 Returns **`204` with no body.** Do not expect the updated notification back —
 update optimistically and reconcile from the next resync.
 
-## dismiss vs delete
+## Removing a notification
 
-| Action | Effect |
-| --- | --- |
-| `POST /:id/dismiss` | Removes it from the user's active list; recoverable server-side |
-| `DELETE /:id` | Deletes it |
-
-Neither is currently surfaced in the portal. If you add them, `DELETE` needs a
-confirm; `dismiss` does not.
+`DELETE /:id` is the only removal route. There is no dismiss, `/ack` or
+`/mark-all-read` route: acknowledge is `POST /:id/acknowledge` and mark-all is
+`POST /read-all`. The portal does not surface delete today; if you add it,
+confirm first, because `notification.read` is the only permission it needs.
 
 ## Preferences
 
@@ -308,6 +334,7 @@ an older response cannot replace a newer lookup or successful command reload.
 | Realtime insert/update/count | live |
 | Topbar dropdown | live — markup replaced in phase 3 |
 | `/config` | live for in-app and realtime flags |
-| Acknowledge / dismiss / delete | not used |
+| Acknowledge (`/:id/acknowledge`) | live |
+| Delete (`DELETE /:id`) | not used |
 | In-app preferences | live |
 | Push/email preferences and device tokens | unavailable until delivery exists |

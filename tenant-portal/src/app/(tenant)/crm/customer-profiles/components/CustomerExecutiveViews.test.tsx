@@ -20,6 +20,7 @@ import { CustomerExecutiveTableView } from "./CustomerExecutiveTableView";
 import { CustomerProfileBulkActionsBar } from "./CustomerProfileBulkActionsBar";
 import { CustomerProfileStatusFunnelBar } from "./CustomerProfileStatusFunnelBar";
 import { CustomerQuickEditModal } from "./CustomerQuickEditModal";
+import { CustomerGridCardBody } from "./customer-grid/CustomerGridCardBody";
 import { readOwnerOptions } from "../../leads/[id]/hooks/readLeadOwnerOptions";
 
 vi.mock("../../leads/[id]/hooks/readLeadOwnerOptions", () => ({
@@ -270,6 +271,43 @@ const statusTotalsMap = new Map<CustomerProfileStatus, number>([
 ]);
 
 describe("CustomerProfiles Executive Suite Components", () => {
+  it.each(["javascript:alert(1)", "httpx:foo"])("renders the customer card website %s as plain text", (companyWebsite) => {
+    render(<CustomerGridCardBody item={{ ...sampleCorporate, companyWebsite }} canEdit={false} />);
+    expect(screen.getByText(companyWebsite).closest("a")).toBeNull();
+  });
+
+  it("normalizes bare customer card websites to HTTPS", () => {
+    render(<CustomerGridCardBody item={{ ...sampleCorporate, companyWebsite: "example.com" }} canEdit={false} />);
+    expect(screen.getByRole("link", { name: "example.com" })).toHaveAttribute("href", "https://example.com/");
+  });
+
+  it.each(["javascript:alert(1)", "httpx:foo"])("renders the customer quick-edit website %s without an anchor", async (companyWebsite) => {
+    const item = { ...sampleCorporate, companyWebsite };
+    mockCustomerDetail(item);
+    render(<CustomerQuickEditModal {...quickEditProps(item)} />);
+    expect((await screen.findByText(companyWebsite)).closest("a")).toBeNull();
+  });
+
+  it.each(["en", "ar"] as const)("retains unsafe customer website input with a field error in %s", async (lang) => {
+    locale.lang = lang;
+    const copy = ({ en, ar })[lang];
+    mockCustomerDetail(sampleCorporate);
+    vi.mocked(runIdempotentWrite).mockClear();
+    const props = quickEditProps();
+    render(<CustomerQuickEditModal {...props} />);
+    fireEvent.click(await screen.findByRole("button", { name: new RegExp(copy.crmCustomerProfiles.ui.quickEdit.edit_company_details) }));
+    const website = screen.getByLabelText<HTMLInputElement>("Company Website");
+    fireEvent.change(website, { target: { value: "javascript:alert(1)" } });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(copy.crmCustomerProfiles.ui.quickEdit.save_company) }));
+    expect(await screen.findByText(copy.crmShared.fieldUrl)).toBeTruthy();
+    expect(website).toHaveAttribute("aria-invalid", "true");
+    expect(website).toHaveAttribute("aria-describedby", "corp-website-error");
+    expect(website).toHaveValue("javascript:alert(1)");
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+    expect(props.onSaved).not.toHaveBeenCalled();
+    fireEvent.change(website, { target: { value: "example.com" } });
+    expect(screen.queryByText(copy.crmShared.fieldUrl)).toBeNull();
+  });
 
   it("renders CustomerProfileStatusFunnelBar 4 statuses and triggers onSelect", () => {
     const onSelect = vi.fn();
@@ -602,6 +640,23 @@ describe("CustomerProfiles Executive Suite Components", () => {
   });
 
   describe("quick-edit detail safety", () => {
+    it.each(["Dr", null])("seeds an individual's honorific from its own detail (%j), ignoring contacts", async (honorificTitle) => {
+      const payload = {
+        ...customerDetailPayload(sampleIndividual),
+        honorificTitle,
+        contacts: [{ ...sampleCorporate.primaryContact!, honorificTitle: "Ms" }],
+      };
+      vi.mocked(axiosClient.get).mockImplementation(async (path) =>
+        path === customerProfilePath(sampleIndividual.id)
+          ? customerResponse(payload)
+          : new Promise<AxiosResponse<unknown>>(() => {}),
+      );
+      render(<CustomerQuickEditModal {...quickEditProps(sampleIndividual)} />);
+      fireEvent.click(await screen.findByRole("button", { name: /Edit Personal Info/i }));
+      const honorific = screen.getByLabelText<HTMLSelectElement>("Honorific Title");
+      expect(honorific.value).toBe(honorificTitle ?? "");
+    });
+
     it("offers only Close while detail is pending, including for keyboard saves", () => {
       vi.mocked(axiosClient.get).mockImplementation(() => new Promise(() => {}));
       vi.mocked(runIdempotentWrite).mockClear();

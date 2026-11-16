@@ -6,7 +6,7 @@ import {
   parseTemplateListItem,
   templatePath,
 } from "./templates-contract";
-import { parsePreviewJob, parseValidationRun } from "./template-lifecycle-contract";
+import { parseEmailPreview, parsePreviewJob, parseValidationRun } from "./template-lifecycle-contract";
 import { parseTemplateAsset } from "./template-assets-contract";
 import { parseResolvedAssignment } from "./template-assignments-contract";
 
@@ -41,6 +41,12 @@ const listRow = {
   updatedAt: "2026-08-30T09:00:00.000Z",
 };
 
+const detailRow = {
+  ...listRow, description: null, dataSourceKey: "TRADE_QUOTATION_PRINT_V1", scope: { type: "TENANT" },
+  systemProtected: false, revision: 12, etag: '"12"',
+  currentDraft: { draftId, revision: 7, contentChecksum: "a".repeat(64), validationState: "PASSED", etag: '"7"' },
+};
+
 describe("Template platform contract", () => {
   it("uses canonical Gateway literals", () => {
     expect(TEMPLATES_PATH).toBe("/api/tenant/core/v1/templates");
@@ -69,26 +75,21 @@ describe("Template platform contract", () => {
   });
 
   it("keeps both revisions and both ETags a publish has to pin", () => {
-    const detail = parseTemplateDetail({
-      ...listRow,
-      description: null,
-      dataSourceKey: "TRADE_QUOTATION_PRINT_V1",
-      scope: { type: "TENANT" },
-      systemProtected: false,
-      revision: 12,
-      etag: '"12"',
-      currentDraft: {
-        draftId,
-        revision: 7,
-        contentChecksum: "a".repeat(64),
-        validationState: "PASSED",
-        etag: '"7"',
-      },
-    });
+    const detail = parseTemplateDetail(detailRow);
     expect(detail.definitionRevision).toBe(12);
     expect(detail.etag).toBe('"12"');
     expect(detail.currentDraft.revision).toBe(7);
     expect(detail.currentDraft.etag).toBe('"7"');
+  });
+
+  it("admits only an explicit enabled Core asset write capability", () => {
+    const enabled = { state: "ENABLED", reason: null };
+    expect(parseTemplateDetail({ ...detailRow, capabilities: { manageAssets: enabled } }).manageAssets).toEqual(enabled);
+    for (const manageAssets of [undefined, true, { state: "HIDDEN", reason: null },
+      { state: "DISABLED", reason: "ACCESS_POLICY_READ_ONLY" }, { state: "ENABLED" }, { ...enabled, scope: "TENANT" }]) {
+      expect(parseTemplateDetail({ ...detailRow, capabilities: { manageAssets } }).manageAssets).toBeUndefined();
+    }
+    expect(parseTemplateDetail(detailRow).manageAssets).toBeUndefined();
   });
 
   it("degrades an unrecognised validation state instead of failing the list", () => {
@@ -114,6 +115,24 @@ describe("Template platform contract", () => {
     // A run only applies to the exact revision it names — the publish screen
     // compares this against the live draft rather than trusting "passed".
     expect(run.draftRevision).toBe(7);
+  });
+
+  it("retains the exact saved draft pin for email previews and rejects other targets", () => {
+    const preview = {
+      kind: "EMAIL",
+      renderTarget: "EMAIL",
+      templateId,
+      source: { kind: "DRAFT", draftId, draftRevision: 7 },
+      templateContentChecksum: "b".repeat(64),
+      subject: "Preview subject",
+      preheader: null,
+      html: "<p>Preview body</p>",
+      text: "Preview body",
+    };
+
+    expect(parseEmailPreview(preview)).toMatchObject({ templateId, draftId, draftRevision: 7 });
+    expect(() => parseEmailPreview({ ...preview, renderTarget: "HTML" })).toThrow();
+    expect(() => parseEmailPreview({ ...preview, source: { kind: "DRAFT", draftRevision: 7 } })).toThrow();
   });
 
   it("reads a completed PDF job whose artifact is still available", () => {
@@ -199,13 +218,16 @@ describe("Template platform contract", () => {
         matchedScope: { type: "TENANT" },
         localeMatch: "EXACT",
         priority: 500,
-        version: { templateVersionId: versionId, versionNumber: 3 },
+        version: {
+          definitionId: templateId, versionId, versionNumber: 3, documentType: "QUOTATION", outputChannel: "PRINT",
+          locale: "ar-EG", dataSourceKey: "TRADE_QUOTATION_PRINT_V1",
+        },
       },
       eligibleCandidateCount: 1,
       orderedSelectorEpochs: [],
       receiptChecksum: "0".repeat(64),
     });
-    expect(chosen.chosen?.versionNumber).toBe(3);
+    expect(chosen.chosen).toMatchObject({ version: { definitionId: templateId, id: versionId, number: 3 } });
 
     const none = parseResolvedAssignment({
       evaluatedAt: "2026-08-30T09:00:00.000Z",

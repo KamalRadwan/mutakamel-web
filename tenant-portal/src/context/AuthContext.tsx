@@ -26,6 +26,7 @@ import {
   subscribePermissionDenials,
   synchronizeTenantTabSession,
   TenantApiClientError,
+  type TenantSessionMetadata,
   unwrapCoreData,
   withTenantAuthLock,
 } from "@/lib/api/axiosClient";
@@ -65,12 +66,15 @@ export interface TenantUserProfile {
   email: string;
   firstName: string;
   lastName: string;
+  /** Core `/auth/me`: the linked person Party has an image to download. */
+  hasAvatar?: boolean;
   isTenantOwner: boolean;
   status: string;
   accessibleBranches: string[];
   accessibleCompanies: string[];
   accessibleBranchCompanies: AccessibleBranchCompany[];
   permissions: string[];
+  featureEntitlements: Record<string, boolean>;
   permissionScopes: Record<string, PermissionScope>;
   teamMemberships: TenantTeamMembership[];
   accessScope: {
@@ -97,7 +101,75 @@ type TenantLoginOptions = {
   rememberMe?: boolean;
 } | { challengeId: string; code: string; rememberMe?: boolean };
 
-interface TenantAuthContextValue {
+export interface TenantProfileCommit {
+  user: TenantUserProfile;
+  sessionRevision: string | null;
+  sequence: number;
+}
+
+export function tenantProfileSessionRevision(session: TenantSessionMetadata | null) {
+  return session ? JSON.stringify([session.sessionId, session.authorizationVersion, session.profileVersion]) : null;
+}
+
+function readTenantProfileOwnerKey(): string | null {
+  if (!hasTenantSessionCookieHint()) return null;
+  const session = getStoredTenantSessionMeta();
+  const event = readLatestTenantAuthEvent();
+  if (!session || event?.kind !== "session-updated" || !event.timing ||
+    event.sessionId !== session.sessionId || event.eventId !== session.authEventId ||
+    event.issuedAt !== session.savedAt || event.timing.sessionExpiresIn !== session.sessionExpiresIn ||
+    Date.now() >= session.savedAt + session.sessionExpiresIn * 1000 ||
+    event.timing.authorizationVersion !== session.authorizationVersion ||
+    event.timing.profileVersion !== session.profileVersion) return null;
+  return JSON.stringify([event.eventId, tenantProfileSessionRevision(session)]);
+}
+
+function createTenantProfileStore() {
+  let current: TenantProfileCommit | null = null;
+  let sequence = 0;
+  let verifiedOwner: string | null = null;
+  const listeners = new Set<() => void>();
+  const readinessListeners = new Set<() => void>();
+  const readReady = () => verifiedOwner !== null && verifiedOwner === readTenantProfileOwnerKey() ? current : null;
+  const holdReadiness = () => {
+    if (verifiedOwner === null) return;
+    verifiedOwner = null;
+    readinessListeners.forEach(listener => listener());
+  };
+  return {
+    read: () => current,
+    readReady,
+    subscribeReadiness: (listener: () => void) => {
+      readinessListeners.add(listener);
+      return () => { readinessListeners.delete(listener); };
+    },
+    holdReadiness,
+    reconcileReadiness: () => {
+      if (verifiedOwner !== null && readReady() === null) holdReadiness();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    commit: (user: TenantUserProfile | null, sessionRevision: string | null, ownerKey: string | null = null) => {
+      if (!user && !current) return;
+      current = user ? { user, sessionRevision, sequence: ++sequence } : null;
+      verifiedOwner = user && sessionRevision ? ownerKey : null;
+      listeners.forEach(listener => listener());
+      readinessListeners.forEach(listener => listener());
+    },
+  };
+}
+
+export interface TenantTemplateProfileReadiness {
+  /** The verified profile for the currently paired owner event, or null while held. */
+  readReadyProfileCommit: () => TenantProfileCommit | null;
+  subscribeProfileReadiness: (listener: () => void) => () => void;
+  /** Starts owner recovery. Consumers keep waiting for readReadyProfileCommit. */
+  recoverTemplateProfile: () => Promise<void>;
+}
+
+interface TenantAuthContextValue extends TenantTemplateProfileReadiness {
   user: TenantUserProfile | null;
   authState: TenantAuthState;
   /**
@@ -124,6 +196,8 @@ interface TenantAuthContextValue {
   login: (options: TenantLoginOptions) => Promise<MfaStep | void>;
   logout: () => Promise<void>;
   retryBootstrap: () => Promise<void>;
+  readProfileCommit: () => TenantProfileCommit | null;
+  subscribeProfileCommit: (listener: () => void) => () => void;
 }
 
 const TenantAuthContext = createContext<TenantAuthContextValue | undefined>(
@@ -139,7 +213,15 @@ const STALE_PERMISSION_CODES = new Set([
 ]);
 
 export function TenantAuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<TenantUserProfile | null>(null);
+  const [user, setRenderedUser] = useState<TenantUserProfile | null>(null);
+  const [profileStore] = useState(createTenantProfileStore);
+  const readinessActive = useRef(true);
+  const templateRecovery = useRef<Promise<void> | null>(null);
+  const setUser = useCallback((profile: TenantUserProfile | null, sessionRevision: string | null = null,
+    ownerKey: string | null = null) => {
+    setRenderedUser(profile);
+    profileStore.commit(profile, sessionRevision, readinessActive.current ? ownerKey : null);
+  }, [profileStore]);
   const [authState, setAuthState] = useState<TenantAuthState>("BOOTSTRAPPING");
   const [endedReason, setEndedReason] = useState<string | null>(null);
   const [realtimeAuthGeneration, setRealtimeAuthGeneration] = useState<string | null>(null);
@@ -148,14 +230,17 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const invalidatePendingAuthWork = useCallback(() => {
-    authOperationGeneration.current += 1;
-    bootstrapAbort.current?.abort();
-    bootstrapAbort.current = null;
-    return authOperationGeneration.current;
-  }, []);
+    const generation = ++authOperationGeneration.current;
+    const pending = bootstrapAbort.current;
+    profileStore.holdReadiness();
+    pending?.abort();
+    if (bootstrapAbort.current === pending) bootstrapAbort.current = null;
+    return generation;
+  }, [profileStore]);
 
   const bootstrap = useCallback(async (markPending = true) => {
     const generation = invalidatePendingAuthWork();
+    if (generation !== authOperationGeneration.current) return;
     const controller = new AbortController();
     bootstrapAbort.current = controller;
     if (markPending) {
@@ -198,6 +283,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
           return;
         }
       }
+      const revision = tenantProfileSessionRevision(getStoredTenantSessionMeta());
+      const ownerKey = readTenantProfileOwnerKey();
       const response = await axiosClient.get(
         "/api/tenant/core/v1/auth/me",
         { cache: "no-store", signal: controller.signal },
@@ -206,7 +293,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       const profile = readTenantUserProfile(response.data);
-      setUser(profile);
+      setUser(profile, tenantProfileSessionRevision(getStoredTenantSessionMeta()) === revision ? revision : null,
+        readTenantProfileOwnerKey() === ownerKey ? ownerKey : null);
       setEndedReason(null);
       setRealtimeAuthGeneration(readRealtimeAuthGeneration(profile.id));
       setAuthState("AUTHENTICATED");
@@ -239,18 +327,59 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     } finally {
       if (bootstrapAbort.current === controller) bootstrapAbort.current = null;
     }
-  }, [invalidatePendingAuthWork]);
+  }, [invalidatePendingAuthWork, setUser]);
+
+  const recoverTemplateProfile = useCallback((): Promise<void> => {
+    if (!readinessActive.current) return Promise.resolve();
+    if (templateRecovery.current) return templateRecovery.current;
+    const generation = authOperationGeneration.current + 1;
+    const recovery = Promise.resolve().then(async () => {
+      if (templateRecovery.current !== recovery || generation !== authOperationGeneration.current) return;
+      const session = getStoredTenantSessionMeta();
+      const event = readLatestTenantAuthEvent();
+      if (session && hasTenantSessionCookieHint()) {
+        if (event === null) {
+          await coordinateTenantSessionRefresh(session.sessionId, null);
+          // A published event normally starts bootstrap. If the coordinator
+          // reused an event without notifying this tab, read the profile here.
+          if (templateRecovery.current === recovery && generation === authOperationGeneration.current &&
+            getStoredTenantSessionMeta()?.sessionId === session.sessionId && readTenantProfileOwnerKey() !== null) {
+            await bootstrap(true);
+          }
+          return;
+        }
+        if (event.kind === "session-updated" && event.timing && event.eventId !== session.authEventId &&
+          event.issuedAt >= session.savedAt && Date.now() < event.issuedAt + event.timing.sessionExpiresIn * 1000 &&
+          (event.sessionId !== session.sessionId || (event.timing.authorizationVersion >= session.authorizationVersion &&
+            event.timing.profileVersion >= session.profileVersion))) {
+          synchronizeTenantTabSession(event);
+        }
+      }
+      await bootstrap(true);
+    });
+    templateRecovery.current = recovery;
+    invalidatePendingAuthWork();
+    const finish = () => {
+      if (templateRecovery.current === recovery) templateRecovery.current = null;
+    };
+    void recovery.then(finish, finish);
+    return recovery;
+  }, [bootstrap, invalidatePendingAuthWork]);
 
   useEffect(() => {
     let cancelled = false;
+    readinessActive.current = true;
     queueMicrotask(() => {
       if (!cancelled) void bootstrap(false);
     });
     return () => {
       cancelled = true;
+      readinessActive.current = false;
+      templateRecovery.current = null;
+      profileStore.holdReadiness();
       bootstrapAbort.current?.abort();
     };
-  }, [bootstrap]);
+  }, [bootstrap, profileStore]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -320,7 +449,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         setAuthState("BOOTSTRAPPING");
       }
       void bootstrap(!sessionChanged);
-    }), [bootstrap, invalidatePendingAuthWork]);
+    }), [bootstrap, invalidatePendingAuthWork, setUser]);
 
   useEffect(() =>
     subscribeToTenantAuthLifecycle(({ state, reason }) => {
@@ -337,12 +466,14 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         setAuthState("ENDED");
         return;
       }
+      // The coordinator can adopt timing silently before publishing this signal.
+      if (state === "AUTHENTICATED") profileStore.reconcileReadiness();
       setAuthState((current) =>
         current === "BOOTSTRAPPING" && state !== "DEGRADED"
           ? current
           : state,
       );
-    }), [invalidatePendingAuthWork]);
+    }), [invalidatePendingAuthWork, profileStore, setUser]);
 
   useEffect(() => {
     // Public and bootstrapping screens can still have stale tab metadata. Do
@@ -387,7 +518,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     setRealtimeAuthGeneration(null);
     setAuthState("BOOTSTRAPPING");
     try {
-      const profile = await withTenantAuthLock(async (signal) => {
+      const outcome = await withTenantAuthLock(async (signal) => {
         if (generation !== authOperationGeneration.current) {
           throw sessionChangedError();
         }
@@ -423,6 +554,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         sessionCommitted = true;
 
         try {
+          const revision = tenantProfileSessionRevision(getStoredTenantSessionMeta());
+          const ownerKey = readTenantProfileOwnerKey();
           const meResponse = await axiosClient.get(
             "/api/tenant/core/v1/auth/me",
             { skipAuthRefresh: true, cache: "no-store", signal },
@@ -434,7 +567,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
           ) {
             throw sessionChangedError();
           }
-          return profile;
+          return { profile, sessionRevision: tenantProfileSessionRevision(getStoredTenantSessionMeta()) === revision ? revision : null,
+            ownerKey: !signal.aborted && readTenantProfileOwnerKey() === ownerKey ? ownerKey : null };
         } catch (error) {
           if (!shouldRetainCommittedTenantSession(error)) {
             const sessionEnded = isDefinitiveAuthFailure(error) ||
@@ -449,12 +583,14 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       if (generation !== authOperationGeneration.current) {
         throw sessionChangedError();
       }
-      if ("mfaRequired" in profile) {
+      if ("mfaRequired" in outcome) {
         setUser(null);
         setAuthState("UNAUTHENTICATED");
-        return profile;
+        return outcome;
       }
-      setUser(profile);
+      const { profile, sessionRevision, ownerKey } = outcome;
+      setUser(profile, tenantProfileSessionRevision(getStoredTenantSessionMeta()) === sessionRevision ? sessionRevision : null,
+        readTenantProfileOwnerKey() === ownerKey ? ownerKey : null);
       setEndedReason(null);
       setRealtimeAuthGeneration(readRealtimeAuthGeneration(profile.id));
       setAuthState("AUTHENTICATED");
@@ -479,7 +615,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
       setAuthState(disposition === "end" ? "ENDED" : "UNAUTHENTICATED");
       throw error;
     }
-  }, [invalidatePendingAuthWork, router]);
+  }, [invalidatePendingAuthWork, router, setUser]);
 
   const logout = useCallback(async () => {
     const generation = invalidatePendingAuthWork();
@@ -551,7 +687,7 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     setRealtimeAuthGeneration(null);
     setAuthState("UNAUTHENTICATED");
     router.replace("/login");
-  }, [invalidatePendingAuthWork, router, user]);
+  }, [invalidatePendingAuthWork, router, setUser, user]);
 
   const value = useMemo<TenantAuthContextValue>(() => ({
     user,
@@ -563,7 +699,12 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     retryBootstrap: () => bootstrap(true),
-  }), [authState, bootstrap, endedReason, login, logout, realtimeAuthGeneration, user]);
+    readProfileCommit: profileStore.read,
+    subscribeProfileCommit: profileStore.subscribe,
+    readReadyProfileCommit: profileStore.readReady,
+    subscribeProfileReadiness: profileStore.subscribeReadiness,
+    recoverTemplateProfile,
+  }), [authState, bootstrap, endedReason, login, logout, profileStore, realtimeAuthGeneration, recoverTemplateProfile, user]);
 
   return (
     <TenantAuthContext.Provider value={value}>
@@ -604,11 +745,13 @@ function readTenantUserProfile(payload: unknown): TenantUserProfile {
     typeof candidate.email !== "string" ||
     typeof candidate.firstName !== "string" ||
     typeof candidate.lastName !== "string" ||
+    (candidate.hasAvatar !== undefined && typeof candidate.hasAvatar !== "boolean") ||
     typeof candidate.isTenantOwner !== "boolean" ||
     typeof candidate.status !== "string" ||
     !stringArray(candidate.accessibleBranches) ||
     !stringArray(candidate.accessibleCompanies) ||
     !stringArray(candidate.permissions) ||
+    !isFeatureEntitlements(candidate.featureEntitlements) ||
     !isPermissionScopes(candidate.permissionScopes, candidate.permissions) ||
     !Array.isArray(candidate.teamMemberships) ||
     !candidate.teamMemberships.every(isTenantTeamMembership)
@@ -627,6 +770,13 @@ function readTenantUserProfile(payload: unknown): TenantUserProfile {
     throw new Error("INVALID_AUTH_PROFILE");
   }
   return candidate as unknown as TenantUserProfile;
+}
+
+function isFeatureEntitlements(value: unknown): value is Record<string, boolean> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entitlements = value as Record<string, unknown>;
+  return typeof entitlements["crm.outbound_email"] === "boolean"
+    && Object.values(entitlements).every((entitled) => typeof entitled === "boolean");
 }
 
 function isAccessScope(value: unknown): value is TenantUserProfile["accessScope"] {

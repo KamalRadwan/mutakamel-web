@@ -10,6 +10,7 @@ import {
   DegradedBanner,
   DetailSection,
   ErrorState,
+  IdentifierText,
   Money,
   PageHeader,
   Skeleton,
@@ -21,23 +22,18 @@ import { formatNumber } from "@/lib/format/number";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { BillingBadge } from "../../components/BillingBadge";
 import { useBillingTableLabels } from "../../billing/hooks/useBillingTableLabels";
-import type { SubscriptionView } from "../subscription-read";
+import { canChangePlan, type SubscriptionView } from "../subscription-read";
 import { OwnerGate } from "../../components/OwnerGate";
 import { AcceptedPricingDetails } from "./AcceptedPricingDetails";
 import { SubscriptionAddonSelections } from "./SubscriptionAddonSelections";
 import { useSubscription } from "../hooks/useSubscription";
-
-/**
- * `assertPlanChangeLifecycle` in `subscription-items.service.ts` — the only two
- * statuses in which a plan change is accepted. The other three each have their
- * own conflict code, so the control is withdrawn rather than offered and then
- * refused.
- */
-const PLAN_CHANGEABLE_STATUSES = ["TRIAL", "ACTIVE"];
+import { useCommercialLabels } from "../hooks/useCommercialLabels";
+import { commercialErrorMessage } from "../commercial-error-messages";
 
 export function SubscriptionWorkspace() {
   const { t, lang } = useI18n();
   const subscription = useSubscription();
+  const commercialLabels = useCommercialLabels(subscription.view);
   const labels = useBillingTableLabels(
     t.coreBilling.itemsLoadFailed,
     t.coreBilling.itemsEmpty,
@@ -45,8 +41,6 @@ export function SubscriptionWorkspace() {
 
   const header = subscription.view?.subscription ?? null;
   const status = header?.status ?? null;
-  const canChangePlan = status !== null && PLAN_CHANGEABLE_STATUSES.includes(status)
-    && header?.currentCollectionInvoiceId === null;
 
   const columns: ColumnDef<SubscriptionView["baseItems"][number]>[] = [
     {
@@ -118,12 +112,17 @@ export function SubscriptionWorkspace() {
       {subscription.isLoading ? (
         <Skeleton className="h-56 w-full" />
       ) : subscription.subscriptionError || !header ? (
+        <div role="alert">
         <ErrorState
           title={t.coreBilling.subscriptionLoadFailed}
-          description={subscription.subscriptionError?.correlationId ?? t.applicationAccess.unavailable}
+          description={commercialErrorMessage(t.commercialPurchase, subscription.subscriptionError)}
           onRetry={() => void subscription.reload()}
           retryLabel={t.common.retry}
         />
+        {subscription.subscriptionError?.correlationId && <p className="text-xs text-muted-foreground">
+          {t.commercialPurchase.supportReference}: <IdentifierText>{subscription.subscriptionError.correlationId}</IdentifierText>
+        </p>}
+        </div>
       ) : (
         <>
           <DetailSection
@@ -184,9 +183,9 @@ export function SubscriptionWorkspace() {
             rowKey={(item) => item.id}
             labels={labels}
           />
-          {subscription.view && <SubscriptionAddonSelections view={subscription.view} />}
+          {subscription.view && <SubscriptionAddonSelections view={subscription.view} labels={commercialLabels} />}
 
-          {!canChangePlan && <p className="text-xs text-muted-foreground">{t.coreBilling.planChangeUnavailable}</p>}
+          {!canChangePlan(subscription.view) && <p className="text-xs text-muted-foreground">{t.coreBilling.planChangeUnavailable}</p>}
           <p className="text-xs text-muted-foreground">{t.subscriptionOffers.notice}</p>
         </>
       )}

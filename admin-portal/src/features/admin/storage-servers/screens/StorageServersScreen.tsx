@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { CheckCircle2, Clock3, HardDrive, Plus, RefreshCw } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import {
   PageHeader,
   StatGrid,
@@ -156,7 +157,7 @@ export function StorageServersScreen() {
         <div ref={errorSummaryRef} tabIndex={-1} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <DegradedBanner>
             <p className="font-medium">{copy.loadErrorTitle}</p>
-            <p>{view.error.message}</p>
+            <p>{getLocalizedApiErrorMessage(view.error, lang)}</p>
             {(view.error.errorCode || view.error.correlationId) && (
               <div className="flex flex-wrap gap-1.5">
                 {view.error.errorCode && <CodeRef value={view.error.errorCode} />}

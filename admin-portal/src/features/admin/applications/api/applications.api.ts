@@ -23,6 +23,7 @@ import {
   FeatureView,
   CreateFeatureDto,
   UpdateFeatureDto,
+  UpdateCoreBaseFeaturePolicyDto,
   TierFeatureGrantView,
   SetTierFeaturesDto,
   PriceTierView,
@@ -35,11 +36,33 @@ import {
   BillingCycle,
 } from "../types";
 
+import { readCoreBaseFeaturePolicy } from "../lib/core-base-feature-policy";
+
 const BASE_URL = "/api/admin/core/v1/applications";
 const TIER_BASE_URL = "/api/admin/core/v1/tiers";
 const FEATURE_BASE_URL = "/api/admin/core/v1/features";
 const AUDIT_BASE_URL = "/api/admin/core/v1/catalog/audit";
 const CURRENCY_BASE_URL = "/api/admin/core/v1/billing/currency-rates";
+
+const ratePattern = /^\d{1,12}(?:\.\d{1,12})?$/;
+
+function readCurrencyRate(value: unknown): CurrencyRateView {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Invalid currency rate response");
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row.currencyCode !== "string" || !/^[A-Z]{3}$/.test(row.currencyCode)
+    || typeof row.currencyUnitsPerUsd !== "string" || !ratePattern.test(row.currencyUnitsPerUsd)
+    || typeof row.isActive !== "boolean") {
+    throw new Error("Invalid currency rate response");
+  }
+  return { currencyCode: row.currencyCode, currencyUnitsPerUsd: row.currencyUnitsPerUsd, isActive: row.isActive };
+}
+
+function readCurrencyRates(value: unknown): CurrencyRateView[] {
+  if (!Array.isArray(value)) throw new Error("Invalid currency rate response");
+  return value.map(readCurrencyRate);
+}
 
 function toQueryString(query?: object): string {
   if (!query) return "";
@@ -267,6 +290,21 @@ export const applicationsApi = {
     return extractCoreData(response);
   },
 
+  updateCoreBaseFeaturePolicy: async (featureId: string, data: UpdateCoreBaseFeaturePolicyDto, idempotencyKey: string) => {
+    const { expectedBaseGrantRevision, included } = data.basePolicy;
+    const response = await axiosClient.patch<SuccessResponse<unknown>>(
+      `${FEATURE_BASE_URL}/${encodeURIComponent(featureId)}`,
+      { basePolicy: { expectedBaseGrantRevision, included } },
+      { headers: { "x-idempotency-key": idempotencyKey } },
+    );
+    const receipt = readCoreBaseFeaturePolicy(extractCoreData(response));
+    if (!receipt || receipt.id !== featureId || receipt.baseIncluded !== included
+      || (receipt.baseGrantRevision !== expectedBaseGrantRevision && receipt.baseGrantRevision !== expectedBaseGrantRevision + 1)) {
+      throw new Error("Invalid Core base feature policy receipt");
+    }
+    return receipt;
+  },
+
   deleteFeature: async (featureId: string, idempotencyKey: string) => {
     await axiosClient.delete(`${FEATURE_BASE_URL}/${encodeURIComponent(featureId)}`, {
       headers: { "x-idempotency-key": idempotencyKey }
@@ -304,7 +342,7 @@ export const applicationsApi = {
   replacePriceLadder: async (tierId: string, data: SetPriceTiersDto, idempotencyKey: string) => {
     const response = await axiosClient.patch<SuccessResponse<PriceTierView[]>>(
       `${TIER_BASE_URL}/${encodeURIComponent(tierId)}/price-tiers`,
-      data,
+      { ...data, reason: data.reason.trim() },
       { headers: { "x-idempotency-key": idempotencyKey } }
     );
     return extractCoreData(response);
@@ -328,25 +366,25 @@ export const applicationsApi = {
 
   // --- 3 Managed Currency Rates Routes ---
   listCurrencyRates: async () => {
-    const response = await axiosClient.get<SuccessResponse<CurrencyRateView[]>>(CURRENCY_BASE_URL);
-    return extractCoreData(response);
+    const response = await axiosClient.get<SuccessResponse<unknown>>(CURRENCY_BASE_URL);
+    return readCurrencyRates(extractCoreData(response));
   },
 
   upsertCurrencyRate: async (currencyCode: string, data: UpsertCurrencyRateDto, idempotencyKey: string) => {
-    const response = await axiosClient.patch<SuccessResponse<CurrencyRateView>>(
+    const response = await axiosClient.patch<SuccessResponse<unknown>>(
       `${CURRENCY_BASE_URL}/${encodeURIComponent(currencyCode.trim().toUpperCase())}`,
       data,
       { headers: { "x-idempotency-key": idempotencyKey } }
     );
-    return extractCoreData(response);
+    return readCurrencyRate(extractCoreData(response));
   },
 
   batchUpsertCurrencyRates: async (data: SetCurrencyRatesDto, idempotencyKey: string) => {
-    const response = await axiosClient.patch<SuccessResponse<CurrencyRateView[]>>(
+    const response = await axiosClient.patch<SuccessResponse<unknown>>(
       CURRENCY_BASE_URL,
       data,
       { headers: { "x-idempotency-key": idempotencyKey } }
     );
-    return extractCoreData(response);
+    return readCurrencyRates(extractCoreData(response));
   }
 };

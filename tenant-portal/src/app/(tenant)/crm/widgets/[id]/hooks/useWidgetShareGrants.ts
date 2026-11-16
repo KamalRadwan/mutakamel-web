@@ -1,176 +1,104 @@
 "use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import {
-  WIDGET_SHARE_TARGETS_PATH,
-  widgetPath,
-} from "../../../dashboards/widget-contract";
-import {
-  buildShareRequest,
-  parseShareTargetsResponse,
-  parseSharesResponse,
-  resourceSharePath,
-  resourceSharesPath,
-  shareTargetsQuery,
-  type ShareAccessLevel,
-  type ShareRecord,
-  type ShareSubjectType,
-  type ShareTarget,
-} from "../../../dashboards/share-contract";
-
-const READ_CONFIG = { cache: "no-store", maxResponseBytes: 512 * 1024 } as const;
-const WRITE_CONFIG = {
-  cache: "no-store",
-  maxResponseBytes: 128 * 1024,
-  nonReplayable: true,
-} as const;
-
-/**
- * Widget shares.
- *
- * Same four routes as a dashboard's, on a different controller and behind a
- * different permission: `crm.widgets.share`, which is a static key, and — like
- * the dashboard's — ownership on top, because `assertOwner` demands `OWNER`.
- */
+import { WIDGET_SHARE_TARGETS_PATH, widgetPath } from "../../../dashboards/widget-contract";
+import { buildShareRequest, parseShareTargetsResponse, parseSharesResponse, resourceSharePath, resourceSharesPath, shareTargetsQuery, type ShareRecord, type ShareTarget, type ShareAccessLevel, type ShareSubjectType } from "../../../dashboards/share-contract";
+import { useWidgetSafety, type WidgetWriteTicket } from "../../hooks/useWidgetSafety";
+import { WIDGET_READ, WIDGET_WRITE, assertWidgetStatus, uncertainWidgetWrite } from "../../hooks/widget-requests";
+interface ShareOutcome { ok: boolean; error: NormalizedApiError | null; uncertain?: boolean; refreshed?: boolean; stale?: boolean; }
 export function useWidgetShareGrants(widgetId: string, enabled: boolean) {
-  const [shares, setShares] = useState<ShareRecord[]>([]);
-  const [targets, setTargets] = useState<ShareTarget[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<NormalizedApiError | null>(null);
-
-  const resourcePath = widgetPath(widgetId);
-  // Defect D9, identical to the dashboard panel's: switching widgets could
-  // leave the previous widget's grants on screen under the new one. One epoch
-  // per source, and a superseded response is discarded rather than committed.
-  const sharesEpochRef = useRef(0);
-  const sharesRequestRef = useRef<AbortController | null>(null);
-  const targetsEpochRef = useRef(0);
-  const targetsRequestRef = useRef<AbortController | null>(null);
-
-  useEffect(
-    () => () => {
-      sharesRequestRef.current?.abort();
-      targetsRequestRef.current?.abort();
-    },
-    [],
-  );
-
-  const load = useCallback(async (): Promise<void> => {
-    const epoch = sharesEpochRef.current + 1;
-    sharesEpochRef.current = epoch;
-    sharesRequestRef.current?.abort();
-    if (!enabled) {
-      sharesRequestRef.current = null;
-      return;
-    }
-    const controller = new AbortController();
-    sharesRequestRef.current = controller;
-    setIsLoading(true);
-    setError(null);
+  const safety = useWidgetSafety("widget-shares:" + widgetId);
+  const { scope, startRead, currentRead, reconciled } = safety;
+  const path = widgetPath(widgetId);
+  const [snapshot, setSnapshot] = useState<{ scope: string; rows: ShareRecord[] } | null>(null);
+  const [readState, setRead] = useState<{ scope: string; busy?: boolean; error?: NormalizedApiError } | null>(null);
+  const [targetState, setTargets] = useState<{ scope: string; query: string; rows: ShareTarget[]; next: number | null; error?: NormalizedApiError; busy?: boolean } | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [denied, setDenied] = useState<string | null>(null);
+  const targetsSequence = useRef(0);
+  const targetsRequest = useRef<AbortController | null>(null);
+  const load = useCallback(async (signal?: AbortSignal, write?: WidgetWriteTicket) => {
+    const ticket = enabled ? startRead(write) : null;
+    if (!ticket) return false;
+    setRead({ scope, busy: true });
     try {
-      const response = await axiosClient.get<unknown>(resourceSharesPath(resourcePath), {
-        ...READ_CONFIG,
-        signal: controller.signal,
-      });
-      const parsed = parseSharesResponse(response.data);
-      if (epoch !== sharesEpochRef.current) return;
-      setShares(parsed);
-    } catch (caught) {
-      if (isAbortError(caught) || epoch !== sharesEpochRef.current) return;
-      setError(normalizeApiError(caught));
-    } finally {
-      if (epoch === sharesEpochRef.current) {
-        sharesRequestRef.current = null;
-        setIsLoading(false);
-      }
-    }
-  }, [enabled, resourcePath]);
-
-  // Deferred out of the effect body: a synchronous setState there cascades a
-  // render, which `react-hooks/set-state-in-effect` refuses. Same shape as
-  // every other loader in this app.
+      const response = await axiosClient.get<unknown>(resourceSharesPath(path), { ...WIDGET_READ, signal });
+      if (signal?.aborted || !currentRead(ticket)) return false;
+      assertWidgetStatus(response, 200);
+      const rows = parseSharesResponse(response.data);
+      setSnapshot({ scope, rows }); setRead({ scope }); reconciled(ticket); return true;
+    } catch (caught) { if (!signal?.aborted && currentRead(ticket)) setRead({ scope, error: normalizeApiError(caught) }); return false; }
+  }, [scope, path, enabled, startRead, currentRead, reconciled]);
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) void load();
-    });
-    return () => {
-      cancelled = true;
-    };
+    const controller = new AbortController();
+    const sequence = targetsSequence;
+    queueMicrotask(() => { if (!controller.signal.aborted) void load(controller.signal); });
+    return () => { controller.abort(); targetsRequest.current?.abort(); sequence.current++; };
   }, [load]);
-
-  return {
-    shares,
-    targets,
-    isLoading,
-    isSubmitting,
-    error,
-    searchTargets: async (search: string): Promise<void> => {
-      const epoch = targetsEpochRef.current + 1;
-      targetsEpochRef.current = epoch;
-      targetsRequestRef.current?.abort();
-      if (!enabled) {
-        targetsRequestRef.current = null;
-        return;
-      }
-      const controller = new AbortController();
-      targetsRequestRef.current = controller;
-      try {
-        const response = await axiosClient.get<unknown>(
-          `${WIDGET_SHARE_TARGETS_PATH}${shareTargetsQuery(search, 0)}`,
-          { ...READ_CONFIG, signal: controller.signal },
-        );
-        const parsed = parseShareTargetsResponse(response.data).items;
-        if (epoch !== targetsEpochRef.current) return;
-        setTargets(parsed);
-      } catch (caught) {
-        if (isAbortError(caught) || epoch !== targetsEpochRef.current) return;
-        setTargets([]);
-      } finally {
-        if (epoch === targetsEpochRef.current) targetsRequestRef.current = null;
-      }
-    },
-    share: async (input: {
-      subjectType: ShareSubjectType;
-      subjectId: string;
-      accessLevel: ShareAccessLevel;
-      expiresAt: string;
-    }): Promise<NormalizedApiError | null> => {
-      setIsSubmitting(true);
-      try {
-        await axiosClient.post<unknown>(
-          resourceSharesPath(resourcePath),
-          buildShareRequest(input),
-          WRITE_CONFIG,
-        );
-        await load();
-        return null;
-      } catch (caught) {
-        return caught instanceof Error && caught.message.startsWith("CRM_")
-          ? { status: 0, code: caught.message }
-          : normalizeApiError(caught);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    revoke: async (shareId: string): Promise<NormalizedApiError | null> => {
-      setIsSubmitting(true);
-      try {
-        await axiosClient.delete<unknown>(resourceSharePath(resourcePath, shareId), WRITE_CONFIG);
-        await load();
-        return null;
-      } catch (caught) {
-        return normalizeApiError(caught);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
+  const searchTargets = async (query: string, offset = 0) => {
+    if (!enabled || !safety.isCurrent()) return;
+    const seq = ++targetsSequence.current;
+    targetsRequest.current?.abort();
+    const controller = new AbortController(); targetsRequest.current = controller;
+    const search = query.trim().slice(0, 80);
+    const existing = offset && targetState?.scope === scope && targetState.query === search ? targetState.rows : [];
+    setTargets({ scope, query: search, rows: existing, next: null, busy: true });
+    try {
+      const response = await axiosClient.get<unknown>(WIDGET_SHARE_TARGETS_PATH + shareTargetsQuery(search, offset), { ...WIDGET_READ, signal: controller.signal });
+      if (controller.signal.aborted || seq !== targetsSequence.current || !safety.isCurrent()) return;
+      assertWidgetStatus(response, 200);
+      const page = parseShareTargetsResponse(response.data);
+      const merged = [...new Map([...existing, ...page.items].map((target) => [target.type + ":" + target.id, target])).values()];
+      setTargets({ scope, query: search, rows: merged, next: page.nextOffset });
+    } catch (caught) {
+      if (!controller.signal.aborted && seq === targetsSequence.current && safety.isCurrent()) setTargets({ scope, query: search, rows: existing, next: offset || null, error: normalizeApiError(caught) });
+    }
   };
+  const mutate = async (input: { subjectType: ShareSubjectType; subjectId: string; accessLevel: ShareAccessLevel; expiresAt: string } | { revoke: string }): Promise<ShareOutcome> => {
+    const no = { ok: false, error: null };
+    if (!enabled || denied === scope || snapshot?.scope !== scope || readState?.error || readState?.busy) return no;
+    if ("revoke" in input && !snapshot.rows.some((row) => row.id === input.revoke)) return no;
+    let body: Record<string, unknown> | null = null;
+    try { if (!("revoke" in input)) body = buildShareRequest(input); }
+    catch (caught) { return { ok: false, error: { status: 422, code: caught instanceof Error ? caught.message : "CRM_SHARE_TARGET_INVALID" } }; }
+    const ticket = safety.beginWrite(true);
+    if (!ticket) return no;
+    setPending(scope);
+    try {
+      const response = "revoke" in input
+        ? await axiosClient.delete<unknown>(resourceSharePath(path, input.revoke), WIDGET_WRITE)
+        : await axiosClient.post<unknown>(resourceSharesPath(path), body, WIDGET_WRITE);
+      if (!safety.currentWrite(ticket)) throw new Error("Widget share scope changed.");
+      if ("revoke" in input) assertWidgetStatus(response, 204);
+      else {
+        assertWidgetStatus(response, 201);
+        const receipt = parseSharesResponse([response.data])[0];
+        if (!receipt || receipt.subjectId !== input.subjectId || receipt.subjectType !== input.subjectType || receipt.accessLevel !== input.accessLevel
+          || (input.expiresAt ? Date.parse(receipt.expiresAt ?? "") !== Date.parse(input.expiresAt) : receipt.expiresAt !== null)) throw new Error("Widget share receipt does not match.");
+      }
+      const refreshed = await load(undefined, ticket);
+      if (!refreshed) safety.fence(ticket);
+      return { ok: true, error: null, refreshed };
+    } catch (caught) {
+      const error = normalizeApiError(caught);
+      if (error.status === 403) setDenied(scope);
+      const uncertain = uncertainWidgetWrite(error);
+      if (uncertain) { safety.fence(ticket); await load(undefined, ticket); }
+      return { ok: false, error, uncertain, stale: !safety.currentWrite(ticket) };
+    } finally { const active = safety.currentWrite(ticket); safety.finish(ticket); if (active) setPending(null); }
+  };
+  const currentTargets = enabled && targetState?.scope === scope ? targetState : null;
+  const error = enabled && readState?.scope === scope ? readState.error ?? null : null;
+  return { scope, shares: enabled && snapshot?.scope === scope && error?.status !== 403 ? snapshot.rows : [],
+    targets: currentTargets?.rows ?? [], targetsError: currentTargets?.error ?? null, targetsLoading: currentTargets?.busy ?? false,
+    targetsHasMore: currentTargets?.next != null, targetsQuery: currentTargets?.query ?? "",
+    targetsMore: () => currentTargets?.next != null ? searchTargets(currentTargets.query, currentTargets.next) : Promise.resolve(),
+    isLoading: enabled && (snapshot?.scope !== scope && !error || readState?.scope === scope && readState.busy === true),
+    isSubmitting: pending === scope, error, searchTargets, reload: () => load(),
+    needsReview: enabled && safety.unresolved, reviewReady: enabled && safety.reviewedRead, review: safety.review,
+    blocked: !enabled || safety.busy || safety.blocked || denied === scope || !!error,
+    share: (input: { subjectType: ShareSubjectType; subjectId: string; accessLevel: ShareAccessLevel; expiresAt: string }) => mutate(input),
+    revoke: (id: string) => mutate({ revoke: id }) };
 }
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
-}

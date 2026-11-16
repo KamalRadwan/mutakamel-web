@@ -82,6 +82,7 @@ function state(): TradeLineDraftState {
     isLoadingItems: false,
     runningTotal: null,
     invalidLineIndex: null,
+    lineErrors: [{}, { item: "ITEM_REQUIRED", uom: "UOM_REQUIRED" }],
     purpose: "SALES",
     searchItems: vi.fn(),
     addLine: vi.fn(),
@@ -91,6 +92,10 @@ function state(): TradeLineDraftState {
     setQuantity: vi.fn(),
     commitQuantity: vi.fn(),
     reset: vi.fn(),
+    appendItems: vi.fn(),
+    ensureItemUoms: vi.fn(async () => []),
+    retryLookups: vi.fn(),
+    restore: vi.fn(),
   };
 }
 
@@ -143,6 +148,44 @@ describe("TradeLineEditor", () => {
     fireEvent.focus(removeButtons[0]);
     expect(await screen.findByRole("tooltip")).toHaveTextContent(
       en.tradeDocuments.lineEditor.removeLine,
+    );
+  });
+
+  it("opens the governed price breakdown popover when a line has a resolved server price", async () => {
+    const priced = state();
+    priced.lines[0] = {
+      ...priced.lines[0]!,
+      quantity: "2",
+      unitPrice: "90.00",
+      priceBreakdown: {
+        unitPrice: "90.00",
+        baselineUnitPrice: "100.00",
+        currencyCode: "EGP",
+        priceBookId: "0192f3a0-0000-7000-8000-000000000099",
+        priceBookVersion: 2,
+        minimumAllowedPrice: "80.00",
+        matchedPromotions: [{ code: "VIP_10", discountAmount: "10.00" }],
+      },
+    };
+    render(
+      <TooltipProvider delayDuration={0}>
+        <TradeLineEditor state={priced} currencyCode="EGP" disabled={false} />
+      </TooltipProvider>,
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: en.tradePricing.linePriceBreakdownTitle,
+    });
+    fireEvent.click(trigger);
+
+    expect(await screen.findByText(en.tradePricing.linePriceBreakdownTitle)).toBeVisible();
+    expect(screen.getByText("VIP_10")).toBeVisible();
+    expect(screen.getByText(en.tradePricing.floorGuardSafe)).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: en.tradePricing.lineOpenSimulator }),
+    ).toHaveAttribute(
+      "href",
+      expect.stringContaining("/trade/pricing?purpose=SALES&currencyCode=EGP"),
     );
   });
 });

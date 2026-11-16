@@ -11,6 +11,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - **Fixed Port**: Run this application only on port `5001`. Do not select an
   alternate port for development or testing.
+- **The running portal is a production build — rebuild after every change**:
+  Docker serves `next build` output behind `portal-edge` on
+  `http://localhost:5001`. Source edits are NOT live until you run
+  `node scripts/rebuild-portal.mjs admin` from `frontend/` (or
+  `pnpm run portal:rebuild` here). Every task that changes this app ends with
+  that rebuild after the unit checks pass and before you report done; quote its
+  final `ready … (HTTP <status>)` line. A failed rebuild is a failed task (the
+  old container keeps serving). No Docker in your sandbox (Codex): write
+  `PENDING: node scripts/rebuild-portal.mjs admin` in your result. Do not start
+  `npm run dev` on 5001 yourself; live reload is the opt-in `--dev` variant.
+  Runbook: `../docs/operations/portal-runtime.md`.
 - **Documentation First**: Read `docs/README.md` and
   `docs/frontend-integration-guide.md` before implementing a server-backed
   screen. For dashboard work, also read `docs/api/dashboard.md`; for
@@ -92,10 +103,34 @@ This version has breaking changes — APIs, conventions, and file structure may 
   routes. SIP passwords may exist only in active component memory and must
   never be written to browser storage, logs, analytics, or UI fixtures.
 - **File Scope**: Modify files only when the user has authorized changes.
-- **Claude Code MCP servers**: Claude Code sessions (not Codex or Antigravity)
-  have user-scope `playwright` and `chrome-devtools` to look at the running
-  portal on `5001` (screenshot changed screens in RTL/LTR and light/dark;
-  console and network errors), `context7` for current Next.js 16, Tailwind v4
-  and Radix docs, and `eslint` for single-file lint. Look only at an app that
-  is already running; never start one for a screenshot. Runbook:
+- **Shared browser MCP**: Claude Code, Codex and Antigravity use the shared
+  `playwright` service at `http://127.0.0.1:8931/mcp` to inspect the running
+  portal on `5001`. Capture the real UI before design, measure computed
+  design-system styles, and screenshot changed screens in RTL/LTR and
+  light/dark. [Browser runbook](../../backend/docs/operations/playwright-mcp.md).
+  Claude-only `chrome-devtools` covers console/network/performance;
+  `context7` covers current framework docs and `eslint` single-file lint.
+  Look only at an app that
+  is already running; never start one for a screenshot. The read-only
+  `postgres` server is a shared container used by every agent; never start
+  another postgres-mcp container. Runbook:
   `../../backend/docs/operations/claude-mcp-servers.md`.
+
+For explicitly authorized Mersany tenant development browser sign-in, read the
+[local development access memo](C:/mutakamel.ai/.local/mersany-dev-access.md).
+The user authorized saving and reusing that development login in this one
+local memo outside all Git repositories. Do not duplicate its values in
+tracked Markdown, application/config files, scripts, logs or shared artifacts;
+keep browser cookies and authenticated storage state out of the memo too.
+
+<!-- mutakamel-agent-tooling -->
+Use the [repo tool and skill inventory](../docs/agent-tooling.md) on demand for the current task.
+<!-- /mutakamel-agent-tooling -->
+
+## Production server
+
+The Mutakamel production server is `12.0.0.88`. Connect from Windows PowerShell with the following command.
+
+```powershell
+ssh -i "$env:USERPROFILE\.ssh\pbs_ed25519" root@12.0.0.88
+```

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore } from "react";
+import { useNotificationAlerts } from "./useNotificationAlerts";
 import {
   markAllTenantNotificationsRead,
   markTenantNotificationRead,
@@ -19,6 +20,7 @@ export function useNotificationsDropdown() {
     tenantNotificationRuntime.getSnapshot,
     tenantNotificationRuntime.getSnapshot,
   );
+  const alerts = useNotificationAlerts(snapshot.generation);
 
   async function retry() {
     const current = tenantNotificationRuntime.getSnapshot();
@@ -61,9 +63,10 @@ export function useNotificationsDropdown() {
   }
 
   async function handleMarkRead(item: TenantNotification) {
+    setOpen(false);
     if (item.readAt !== null) return;
     await mutate(() => markTenantNotificationRead(item.id));
   }
 
-  return { open, pending, failed, snapshot, handleOpenChange, retry, handleMarkAllRead, handleMarkRead };
+  return { open, pending, failed, snapshot, handleOpenChange, retry, handleMarkAllRead, handleMarkRead, ...alerts };
 }

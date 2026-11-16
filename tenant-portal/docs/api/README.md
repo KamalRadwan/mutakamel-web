@@ -7,6 +7,14 @@ Last source verification: **2026-08-27**
 Inventory and Application/Addon read additions refreshed **2026-09-08** from
 the generated Gateway source inventory and the separately dated domain pages.
 
+Subscription flow source review **2026-10-29**: [Core billing](core-billing.md#subscription--10-routes)
+lists all ten subscription controller routes with owner, tenant-wide adoption
+and retained-purpose authority. [Definition adoption](definition-adoption.md)
+and [canonical delivery](catalogue-canonical-delivery.md) document the narrow
+first-PREPARE rejection exception; restored or uncertain intents retain their
+original request/key. Preview UI displays expiry timestamps, without a live
+countdown. Executable documentation checks remain pending lead verification.
+
 Trade Category source and Item assignment integration were verified **2026-09-27**;
 see [Trade Categories](./trade-categories.md) for its eleven routes and delivery evidence.
 

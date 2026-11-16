@@ -24,6 +24,24 @@ function reply(data: unknown) {
 beforeEach(() => vi.resetAllMocks());
 
 describe("all CRM record attachments", () => {
+  it.each([40, 10000])("bounds a %i-page listing to forty requests", async (totalPages) => {
+    vi.mocked(axiosClient.get).mockImplementation(async () => {
+      const number = vi.mocked(axiosClient.get).mock.calls.length;
+      return reply({ ...page(number),
+        items: [{ ...rows[0], id: `01900100-0000-7000-8000-${String(number).padStart(12, "0")}` }],
+        total: totalPages * 50, totalPages, hasNext: number < totalPages,
+      });
+    });
+    const result = readAllCrmAttachments(source);
+    if (totalPages === 40) await expect(result).resolves.toHaveLength(40);
+    else await expect(result).rejects.toThrow("Invalid attachment pagination.");
+    expect(axiosClient.get).toHaveBeenCalledTimes(40);
+  });
+  it("preserves a normal single-page read", async () => {
+    vi.mocked(axiosClient.get).mockResolvedValue(reply({ ...page(1), items: [rows[0]], total: 1, totalPages: 1, hasNext: false }));
+    await expect(readAllCrmAttachments(source)).resolves.toEqual([rows[0]]);
+    expect(axiosClient.get).toHaveBeenCalledOnce();
+  });
   it("loads more than fifty with branch and source scope on every page", async () => {
     vi.mocked(axiosClient.get).mockResolvedValueOnce(reply(page(1))).mockResolvedValueOnce(reply(page(2)));
     await expect(readAllCrmAttachments(source)).resolves.toHaveLength(51);

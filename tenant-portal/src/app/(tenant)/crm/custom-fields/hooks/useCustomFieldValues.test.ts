@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useCustomFieldValues } from "./useCustomFieldValues";
+import { TenantApiClientError } from "@/lib/api/axiosClient";
 
 const { get, post, scope } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -64,6 +65,29 @@ afterEach(() => {
 });
 
 describe("custom-field values, owner races", () => {
+  it("reconciles an uncertain write once without replaying it", async () => {
+    scope.mockReturnValue(READY);
+    post.mockRejectedValue(new TenantApiClientError("Unavailable", { status: 503, statusText: "Unavailable", headers: new Headers(), data: {} }));
+    get.mockResolvedValue(valuesFor(OWNER_A, FIELD_A, "Confirmed value"));
+    const { result } = renderHook(() => useCustomFieldValues(BRANCH));
+    let outcome: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => { outcome = await result.current.save({ id: FIELD_A } as Parameters<typeof result.current.save>[0], "LEAD", OWNER_A, "New value"); });
+    expect(post).toHaveBeenCalledOnce();
+    expect(outcome).toMatchObject({ ok: false, uncertain: true, refreshFailed: false });
+    expect(result.current.values[0].value).toBe("Confirmed value");
+  });
+
+  it("does not call a confirmed write failed merely because its refresh failed", async () => {
+    scope.mockReturnValue(READY);
+    post.mockResolvedValue({ data: { id: FIELD_A, fieldDefinitionId: FIELD_A, ownerType: "LEAD", ownerId: OWNER_A, value: "Saved" } });
+    get.mockRejectedValue(new Error("Offline"));
+    const { result } = renderHook(() => useCustomFieldValues(BRANCH));
+    let outcome: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => { outcome = await result.current.save({ id: FIELD_A } as Parameters<typeof result.current.save>[0], "LEAD", OWNER_A, "Saved"); });
+    expect(post).toHaveBeenCalledOnce();
+    expect(outcome).toMatchObject({ ok: false, confirmed: true, refreshFailed: true });
+    expect(outcome?.uncertain).toBeUndefined();
+  });
   // Defect D5. Select record A, then record B before A answers. A used to land
   // last and replace what B had put on screen — and because `save` writes under
   // the ownerId the caller passes, the next Save wrote A's values onto B.

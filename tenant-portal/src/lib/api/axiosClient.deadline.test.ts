@@ -25,7 +25,7 @@ afterEach(() => {
 describe("ordinary request deadline", () => {
   it.each(["ar", "en"] as const)("bounds stalled headers and translates recovery in %s", async (lang) => {
     window.localStorage.setItem("tenant_lang", lang);
-    const fetchMock = vi.fn((_url: string, _init?: RequestInit) => new Promise<Response>(() => {}));
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
     vi.stubGlobal("fetch", fetchMock);
     const pending = axiosClient.get(PATH, { timeoutMs: 25 }).catch((error: unknown) => error);
     await vi.advanceTimersByTimeAsync(25);
@@ -44,7 +44,7 @@ describe("ordinary request deadline", () => {
     window.localStorage.setItem("tenant_lang", "en");
     const response = new Response("{}");
     vi.spyOn(response, "text").mockImplementation(() => new Promise<string>(() => {}));
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => response);
+    const fetchMock = vi.fn<typeof fetch>(async () => response);
     vi.stubGlobal("fetch", fetchMock);
     const pending = axiosClient.put(PATH, { timezone: "UTC" }, { timeoutMs: 40 })
       .catch((error: unknown) => error);
@@ -62,7 +62,7 @@ describe("ordinary request deadline", () => {
   });
 
   it("retains the write attempt for an explicit same-key recovery", async () => {
-    const fetchMock = vi.fn((_url: string, _init?: RequestInit) => new Promise<Response>(() => {}));
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
     vi.stubGlobal("fetch", fetchMock);
     const options = {
       attempt: { idempotencyKey: KEY },

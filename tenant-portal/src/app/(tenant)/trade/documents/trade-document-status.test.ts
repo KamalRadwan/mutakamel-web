@@ -55,6 +55,21 @@ describe("the Trade status vocabulary", () => {
     expect(resolveTradeStatus("TradeSalesOrderStatus", "CLOSED").known).toBe(true);
   });
 
+  it("renders the quotation list's expired status with a localized outcome", () => {
+    expect(resolveTradeStatus("TradeQuotationStatus", "EXPIRED")).toEqual({ known: true, role: "caution" });
+  });
+
+  it("renders the service-written converted quotation and expired revision outcomes", () => {
+    // documents.service.ts convertQuotation writes CONVERTED to the header;
+    // quotation-expiry.service.ts also writes EXPIRED to the sent revision.
+    expect(resolveTradeStatus("TradeQuotationStatus", "CONVERTED")).toEqual({ known: true, role: "positive" });
+    expect(en.statusValues["TradeQuotationStatus.CONVERTED"]).toBe("Converted");
+    expect(ar.statusValues["TradeQuotationStatus.CONVERTED"]).toBe("محوّل");
+    expect(resolveTradeStatus("TradeQuotationRevisionStatus", "EXPIRED")).toEqual({ known: true, role: "caution" });
+    expect(en.statusValues["TradeQuotationRevisionStatus.EXPIRED"]).toBe("Expired");
+    expect(ar.statusValues["TradeQuotationRevisionStatus.EXPIRED"]).toBe("منتهية الصلاحية");
+  });
+
   it("carries SIGNED, which the check constraint allows and no route writes", () => {
     expect(resolveTradeStatus("TradeContractStatus", "SIGNED").known).toBe(true);
   });

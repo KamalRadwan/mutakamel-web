@@ -80,6 +80,20 @@ const lead = {
 };
 
 describe("lead detail contract", () => {
+  it("reads the individual's top-level job title separately from relationship titles", () => {
+    const parsed = parseLeadDetailResponse({ ...lead, leadProfileType: "INDIVIDUAL", jobTitle: "Consultant" });
+    expect(parsed.jobTitle).toBe("Consultant");
+    expect(parsed.contacts[0].jobTitle).toBe("Procurement");
+  });
+
+  it.each([undefined, null, "", 42])("normalizes an absent or non-text job title (%j) to null", (jobTitle) => {
+    expect(parseLeadDetailResponse({ ...lead, jobTitle }).jobTitle).toBeNull();
+  });
+
+  it("accepts a detail response from before job titles were released", () => {
+    expect(parseLeadDetailResponse(lead).jobTitle).toBeNull();
+  });
+
   it("reads the party-backed read model", () => {
     const parsed = parseLeadDetailResponse(lead);
     expect(parsed.displayName).toBe("Acme Trading");

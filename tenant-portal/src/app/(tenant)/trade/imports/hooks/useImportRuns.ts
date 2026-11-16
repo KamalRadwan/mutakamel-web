@@ -101,10 +101,11 @@ export function useImportRuns() {
   );
 
   const uploadSource = useCallback(
-    async (file: File): Promise<void> => {
-      if (!canExecute || pending) return;
+    async (file: File): Promise<boolean> => {
+      if (!canExecute || pending) return false;
       setPending("upload");
       setFormError(null);
+      setSourceId("");
       try {
         const response = await tradePost(IMPORT_SOURCES_PATH, buildImportSourceBody(file), {
           headers: scope.headers,
@@ -117,13 +118,18 @@ export function useImportRuns() {
             ? t.tradeCommon.replayedDescription
             : t.tradeAutomation.sourceUploaded,
         );
+        return true;
       } catch (error) {
-        fail(error);
+        setSourceId("");
+        const normalized = normalizeApiError(error);
+        setFormError(importMessage(normalized, t) ?? importFormMessage(error, t));
+        if (normalized.status !== 403) toast.outcomeFromApi(normalized);
+        return false;
       } finally {
         setPending(null);
       }
     },
-    [canExecute, pending, scope.headers, toast, t, fail],
+    [canExecute, pending, scope.headers, toast, t],
   );
 
   const startPreview = useCallback(async (): Promise<void> => {

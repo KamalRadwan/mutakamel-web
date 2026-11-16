@@ -1,20 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { generateUUIDv7 } from "@/lib/uuid";
-import { useToast } from "@/design-system";
+import { buildDeliveryRequest, buildOpeningBalanceRequest, buildReceiptRequest, buildReleaseRequest, buildReservationRequest, buildReversalRequest } from "../movement-request-builders";
+import { useCallback, useMemo, useState } from "react";
+import { formatDecimalString, formatNumber } from "@/lib/format/number";
+import { record } from "../../../trade-advanced-validation";
+import { splitSerialInput } from "../serial-input";
+import { useMovementCommandRunner } from "./useMovementCommandRunner";
+import { useMovementNodes } from "./useMovementNodes";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTradeBranchSelection } from "../../../trade-advanced-scope";
-import { normalizeApiError } from "@/lib/api/errors";
-import { isTradeReplay, tradeGet, tradeIfMatch, tradePost } from "../../../trade-api";
-import { parseTradeArray } from "../../../trade-advanced-validation";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import {
   INVENTORY_ADJUST_PERMISSION,
   INVENTORY_DELIVER_PERMISSION,
   INVENTORY_DELIVERIES_PATH,
-  INVENTORY_NODES_PATH,
   INVENTORY_OPENING_BALANCES_PATH,
   INVENTORY_OPENING_BALANCE_PERMISSION,
   INVENTORY_READ_PERMISSION,
@@ -23,17 +24,8 @@ import {
   INVENTORY_RESERVATIONS_PATH,
   INVENTORY_RESERVE_PERMISSION,
   invalidResponse,
-  parseInventoryNode,
-  type InventoryNode,
 } from "../../inventory-contract";
-import { inventoryFormMessage, inventoryMessage } from "../../inventory-messages";
 import {
-  buildDeliveryRequest,
-  buildOpeningBalanceRequest,
-  buildReceiptRequest,
-  buildReleaseRequest,
-  buildReservationRequest,
-  buildReversalRequest,
   deliveryActionPath,
   parseMovementId,
   parseMovementLines,
@@ -42,55 +34,31 @@ import {
   receiptActionPath,
   reservationReleasePath,
   type MovementFormValues,
-  type MovementKind,
   type OpeningBalanceFormValues,
   type ReservationFormValues,
   type ReversalLineValues,
   type SessionMovementEntry,
 } from "../movements-contract";
 
-const MOVEMENT_RESPONSE_LIMIT_BYTES = 120_000;
-
-/** What the last create returned, per family — the only handle on a movement. */
-type CreatedIds = Partial<Record<MovementKind, string>>;
-
-function extractVersion(data: unknown, fallback = 1): number {
+function extractVersion(data: unknown): number {
   if (typeof data === "object" && data !== null && "version" in data) {
     const v = (data as { version?: unknown }).version;
-    if (typeof v === "number" && Number.isInteger(v) && v >= 1) return v;
+    if (typeof v === "number" && Number.isSafeInteger(v) && v >= 1) return v;
   }
-  return fallback;
+  return invalidResponse();
 }
 
-/**
- * Every movement is a BRANCH-scoped write with no read route to follow it.
- *
- * The screen keeps the ids the server returned in session state because there
- * is no way to look them up again: `GET /inventory/receipts/:id` and its
- * siblings do not exist (Q37). A reload loses them, and the screen says so.
- */
 export function useInventoryMovements() {
   const { t, lang } = useI18n();
-  const toast = useToast();
-  const { user } = useTenantAuth();
+  const { user, realtimeAuthGeneration } = useTenantAuth();
+  const authKey = useAuthScopeKey(user);
   const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
 
-  const [created, setCreated] = useState<CreatedIds>({});
-  const [sessionLedger, setSessionLedger] = useState<SessionMovementEntry[]>([]);
-  const [nodesResult, setNodesResult] = useState<{
-    request: object;
-    nodes: InventoryNode[];
-    error: string | null;
-  } | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const inFlight = useRef(false);
-  const unresolved = useRef<{
-    fingerprint: string;
-    body: unknown;
-    headers: Record<string, string>;
-  } | null>(null);
+  const scopeKey = JSON.stringify([authKey, realtimeAuthGeneration, scope.headers]);
+  const scopeOwner = useMemo(() => ({ scopeKey }), [scopeKey]);
+  const [sessionLedger, setSessionLedger] = useState<(SessionMovementEntry & { scopeOwner: object })[]>([]);
+  const { pending, formError, setFormError, hasUnresolvedWrite, retryUnresolved, run, post } = useMovementCommandRunner(scope.headers, scopeKey);
 
   const can = useCallback(
     (permission: string) =>
@@ -98,132 +66,35 @@ export function useInventoryMovements() {
     [scope.permissions, scope.isTenantOwner],
   );
 
-  const canReadNodes = can(INVENTORY_READ_PERMISSION);
-  const nodesRequest = useMemo(
-    () => ({ headers: scope.headers, isResolved: scope.isResolved, branchId, canReadNodes, t }),
-    [scope.headers, scope.isResolved, branchId, canReadNodes, t],
-  );
-  // Hide the previous request's result during render, before the next effect runs.
-  const currentNodesResult = nodesResult?.request === nodesRequest ? nodesResult : null;
-  const knownNodes = currentNodesResult?.nodes ?? [];
-  const nodesError = currentNodesResult?.error ?? null;
-
-  useEffect(() => {
-    if (!nodesRequest.isResolved || !nodesRequest.canReadNodes) return;
-    const controller = new AbortController();
-    void tradeGet(INVENTORY_NODES_PATH, {
-      signal: controller.signal,
-      headers: nodesRequest.headers,
-      maxResponseBytes: MOVEMENT_RESPONSE_LIMIT_BYTES,
-    })
-      .then((res) => {
-        if (controller.signal.aborted) return;
-        setNodesResult({
-          request: nodesRequest,
-          nodes: parseTradeArray(res.data, parseInventoryNode, invalidResponse),
-          error: null,
-        });
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return;
-        setNodesResult({
-          request: nodesRequest,
-          nodes: [],
-          error: inventoryMessage(normalizeApiError(error), nodesRequest.t) ?? inventoryFormMessage(error, nodesRequest.t),
-        });
-      });
-    return () => controller.abort();
-  }, [nodesRequest]);
-
-  const run = useCallback(
-    async (
-      operation: string,
-      call: () => Promise<{ headers: Headers; data: unknown }>,
-      onSuccess?: (data: unknown) => void,
-    ): Promise<boolean> => {
-      if (inFlight.current) return false;
-      inFlight.current = true;
-      setPending(operation);
-      setFormError(null);
-      try {
-        const response = await call();
-        onSuccess?.(response.data);
-        unresolved.current = null;
-        toast.success(
-          t.tradeCommon.savedTitle,
-          isTradeReplay(response.headers)
-            ? t.tradeCommon.replayedDescription
-            : t.tradeInventory.movementAccepted,
-        );
-        return true;
-      } catch (error) {
-        if (error instanceof Error && error.message === "INVENTORY_UNRESOLVED_WRITE") {
-          setFormError(t.tradeInventory.unresolvedWrite);
-          return false;
-        }
-        const normalized = normalizeApiError(error);
-        // A client rejection resolves the write, including an unchanged retry.
-        // Keep its identity only while transport/server failures or invalid
-        // success payloads leave the outcome unknown.
-        if (normalized.status >= 400 && normalized.status < 500) {
-          unresolved.current = null;
-        }
-        if (normalized.status === 403) return false;
-        if (toast.outcomeFromApi(normalized)) return false;
-        setFormError(inventoryMessage(normalized, t) ?? inventoryFormMessage(error, t));
-        return false;
-      } finally {
-        inFlight.current = false;
-        setPending(null);
-      }
-    },
-    [toast, t],
-  );
+  const { knownNodes, nodesError } = useMovementNodes(scope.headers, scopeKey, scope.isResolved && can(INVENTORY_READ_PERMISSION));
 
   const appendLedger = useCallback((entry: SessionMovementEntry) => {
-    setSessionLedger((prev) => [entry, ...prev.filter((item) => item.id !== entry.id)]);
-  }, []);
+    setSessionLedger((prev) => [{ ...entry, scopeKey, scopeOwner }, ...prev.filter((item) => item.id !== entry.id && item.scopeOwner === scopeOwner)]);
+  }, [scopeKey, scopeOwner]);
 
   const updateLedgerStatus = useCallback(
-    (id: string, status: SessionMovementEntry["status"], nextVersion?: number) => {
-      setSessionLedger((prev) =>
-        prev.map((item) =>
-          item.id === id
+    (id: string, status: SessionMovementEntry["status"], nextVersion: number, data?: unknown) => {
+      const lines = record(data)?.lines ? parseMovementLines(data) : undefined;
+      setSessionLedger((prev) => {
+        const target = prev.find(item => item.id === id && item.scopeOwner === scopeOwner);
+        // Posting consumes and versions these reservations; no reservation GET exists.
+        const consumed = status === "POSTED" && target?.kind === "delivery" ? target.reservationIds ?? [] : [];
+        return prev.map((item) =>
+          item.id === id && item.scopeOwner === scopeOwner
             ? {
                 ...item,
                 status,
-                version: nextVersion ?? item.version + 1,
+                version: nextVersion,
+                ...(lines ? { lines } : {}),
               }
-            : item,
-        ),
-      );
+            : item.scopeOwner === scopeOwner && item.kind === "reservation" && consumed.includes(item.id)
+              ? { ...item, stale: true } : item,
+        );
+      });
     },
-    [],
+    [scopeOwner],
   );
 
-  const post = (path: string, body: unknown, ifMatch?: number) => {
-    // Business keys are generated by builders; compare the remaining payload
-    // so an unchanged retry can reuse the original body and HTTP identity.
-    const fingerprint = JSON.stringify([path, scope.headers, ifMatch, body], (key, value: unknown) =>
-      key === "operationKey" || key === "intentKey" ? undefined : value,
-    );
-    if (unresolved.current && unresolved.current.fingerprint !== fingerprint) {
-      throw new Error("INVENTORY_UNRESOLVED_WRITE");
-    }
-    unresolved.current ??= {
-      fingerprint,
-      body,
-      headers: {
-        ...scope.headers,
-        ...(ifMatch === undefined ? {} : { "If-Match": tradeIfMatch(ifMatch) }),
-        "x-idempotency-key": generateUUIDv7(),
-      },
-    };
-    return tradePost(path as Parameters<typeof tradePost>[0], unresolved.current.body, {
-      headers: unresolved.current.headers,
-      maxResponseBytes: MOVEMENT_RESPONSE_LIMIT_BYTES,
-    });
-  };
 
   return {
     t,
@@ -232,10 +103,14 @@ export function useInventoryMovements() {
     branchIds,
     branchId,
     selectBranch,
-    created,
-    sessionLedger,
+    sessionLedger: sessionLedger.filter(entry => entry.scopeOwner === scopeOwner),
     knownNodes,
+    headers: scope.headers, scopeKey,
+    canReadSales: can("trade.sales_orders.read"),
+    canReadPurchases: can("trade.purchase_orders.read"),
     pending,
+    hasUnresolvedWrite,
+    retryUnresolved,
     formError: formError ?? nodesError,
     clearError: () => setFormError(null),
     canOpeningBalance: can(INVENTORY_OPENING_BALANCE_PERMISSION),
@@ -251,16 +126,18 @@ export function useInventoryMovements() {
         "openingBalance",
         () => post(INVENTORY_OPENING_BALANCES_PATH, buildOpeningBalanceRequest(values)),
         (data) => {
-          const id =
-            typeof data === "object" && data !== null && "id" in data && typeof (data as { id?: unknown }).id === "string"
-              ? (data as { id: string }).id
-              : `ob-${Date.now()}`;
+          const result = record(data);
+          const ledger = record(result?.ledger);
+          if (!ledger) invalidResponse();
+          const id = parseMovementId(ledger);
           appendLedger({
             id,
             kind: "openingBalance",
+            businessEffectiveAt: new Date(values.businessEffectiveAt.trim()).toISOString(),
             nodeId: values.nodeId.trim(),
-            summary: `Item ${values.itemId.trim().slice(0, 8)} · Qty ${values.quantity.trim()}`,
-            version: extractVersion(data, 1),
+            summary: `${formatDecimalString(values.quantity, lang, { maximumFractionDigits: 8 })} ${values.display?.unitLabel ?? t.tradeInventory.quantity}`,
+            display: values.display,
+            version: extractVersion(ledger),
             status: "POSTED",
             recordedAt: new Date().toISOString(),
           });
@@ -274,12 +151,14 @@ export function useInventoryMovements() {
         (data) => {
           const reservation = parseReservation(data);
           const { id, version, status } = reservation;
-          setCreated((current) => ({ ...current, reservation: id }));
           appendLedger({
             id,
             kind: "reservation",
             nodeId: values.nodeId.trim(),
-            summary: `Doc ${values.sourceDocumentId.trim().slice(0, 8)} · Qty ${values.quantity.trim()}`,
+            summary: values.display?.itemLabel ?? t.tradeInventory.reservationTab,
+            display: values.display, requestedQuantity: values.quantity,
+            sourceDocumentId: values.sourceDocumentId, sourceLineId: values.sourceLineId,
+            serialKeys: splitSerialInput(values.serialKeys ?? ""),
             version,
             status,
             reservation,
@@ -294,12 +173,14 @@ export function useInventoryMovements() {
         () => post(reservationReleasePath(id), buildReleaseRequest(quantity, reasonCode, serialKeys), version),
         (data) => {
           const reservation = parseReservation(data, id.trim());
-          const previous = sessionLedger.find((entry) => entry.id === reservation.id);
+          const previous = sessionLedger.find((entry) => entry.id === reservation.id && entry.scopeOwner === scopeOwner);
           appendLedger({
             id: reservation.id,
             kind: "reservation",
             nodeId: reservation.fulfillmentNodeId,
             summary: previous?.summary ?? t.tradeInventory.reservationTab,
+            display: previous?.display, sourceDocumentId: previous?.sourceDocumentId,
+            sourceLineId: previous?.sourceLineId, serialKeys: previous?.serialKeys,
             version: reservation.version,
             status: reservation.status,
             reservation,
@@ -315,14 +196,16 @@ export function useInventoryMovements() {
         (data) => {
           const id = parseMovementId(data);
           const lines = parseMovementLines(data);
-          setCreated((current) => ({ ...current, receipt: id }));
+          if (parseMovementStatus(data) !== "DRAFT") invalidResponse();
           appendLedger({
             id,
             kind: "receipt",
+            businessEffectiveAt: new Date(values.businessEffectiveAt.trim()).toISOString(),
             lines,
             nodeId: values.nodeId.trim(),
-            summary: `PO ${values.sourceDocumentId.trim().slice(0, 8)} · ${values.lines.length} line(s)`,
-            version: extractVersion(data, 1),
+            summary: `${formatNumber(values.lines.length, lang)} ${t.tradeInventory.lines}`,
+            display: values.display, sourceDocumentId: values.sourceDocumentId,
+            version: extractVersion(data),
             status: "DRAFT",
             recordedAt: new Date().toISOString(),
           });
@@ -334,7 +217,10 @@ export function useInventoryMovements() {
         "receiptPost",
         () => post(receiptActionPath(id, "post"), undefined, version),
         (data) => {
-          updateLedgerStatus(id.trim(), "POSTED", extractVersion(data, version + 1));
+          const status = parseMovementStatus(data);
+          if (parseMovementId(data) !== id.trim() || status !== "POSTED") invalidResponse();
+          parseMovementLines(data);
+          updateLedgerStatus(id.trim(), status, extractVersion(data), data);
         },
       ),
 
@@ -348,7 +234,9 @@ export function useInventoryMovements() {
             version,
           ),
         (data) => {
-          updateLedgerStatus(id.trim(), parseMovementStatus(data), extractVersion(data, version + 1));
+          if (parseMovementId(data) !== id.trim() || !["PARTIALLY_REVERSED", "REVERSED"].includes(parseMovementStatus(data))) invalidResponse();
+          parseMovementLines(data);
+          updateLedgerStatus(id.trim(), parseMovementStatus(data), extractVersion(data), data);
         },
       ),
 
@@ -359,14 +247,17 @@ export function useInventoryMovements() {
         (data) => {
           const id = parseMovementId(data);
           const lines = parseMovementLines(data);
-          setCreated((current) => ({ ...current, delivery: id }));
+          if (parseMovementStatus(data) !== "DRAFT") invalidResponse();
           appendLedger({
             id,
             kind: "delivery",
+            businessEffectiveAt: new Date(values.businessEffectiveAt.trim()).toISOString(),
+            reservationIds: values.lines.flatMap(line => line.reservationId ? [line.reservationId.trim()] : []),
             lines,
             nodeId: values.nodeId.trim(),
-            summary: `SO ${values.sourceDocumentId.trim().slice(0, 8)} · ${values.lines.length} line(s)`,
-            version: extractVersion(data, 1),
+            summary: `${formatNumber(values.lines.length, lang)} ${t.tradeInventory.lines}`,
+            display: values.display, sourceDocumentId: values.sourceDocumentId,
+            version: extractVersion(data),
             status: "DRAFT",
             recordedAt: new Date().toISOString(),
           });
@@ -378,7 +269,10 @@ export function useInventoryMovements() {
         "deliveryPost",
         () => post(deliveryActionPath(id, "post"), undefined, version),
         (data) => {
-          updateLedgerStatus(id.trim(), "POSTED", extractVersion(data, version + 1));
+          const status = parseMovementStatus(data);
+          if (parseMovementId(data) !== id.trim() || status !== "POSTED") invalidResponse();
+          parseMovementLines(data);
+          updateLedgerStatus(id.trim(), status, extractVersion(data), data);
         },
       ),
 
@@ -392,7 +286,9 @@ export function useInventoryMovements() {
             version,
           ),
         (data) => {
-          updateLedgerStatus(id.trim(), parseMovementStatus(data), extractVersion(data, version + 1));
+          if (parseMovementId(data) !== id.trim() || !["PARTIALLY_REVERSED", "REVERSED"].includes(parseMovementStatus(data))) invalidResponse();
+          parseMovementLines(data);
+          updateLedgerStatus(id.trim(), parseMovementStatus(data), extractVersion(data), data);
         },
       ),
   };

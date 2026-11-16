@@ -1,237 +1,116 @@
-// The widget form's state, and the `querySpec` it builds.
-//
-// Every rule enforced here is read from `GET /dashboards/catalog`, never
-// hardcoded: which visualizations exist, how many series each takes, which
-// data shapes it accepts, which dimensions a metric supports, and whether a
-// target is required. `DashboardCatalogService.validateWidget` re-checks all
-// of it and answers 422 — this only stops the user reaching that.
+import type { DashboardCatalog, VisualizationCapability } from "../dashboards/dashboard-catalog-contract";
+import type { ComparisonDatasetBasis, ComparisonDatasetSelection, ComparisonType, CrmVisualization, TimeGrain, WidgetQuerySpec } from "../dashboards/widget-contract";
+import { normalizeWidgetDisplaySpec } from "../dashboards/widget-contract";
+import type { GovernedTargetBinding } from "../dashboards/won-target-evidence";
+export { validateWidgetForm } from "./widget-form-validation";
 
-import type {
-  DashboardCatalog,
-  MetricDefinition,
-  VisualizationCapability,
-} from "../dashboards/dashboard-catalog-contract";
-import type { CrmVisualization, TimeGrain, WidgetQuerySpec } from "../dashboards/widget-contract";
-
+export interface WidgetSeriesDraft { metricKey: string; axis: "" | "LEFT" | "RIGHT"; label: string; color: string; }
 export interface WidgetFormState {
   name: string;
   visualizationType: CrmVisualization | "";
-  metricKey: string;
+  series: WidgetSeriesDraft[];
   dimensionKey: string;
-  grain: TimeGrain;
-  comparison: "NONE" | "PREVIOUS_PERIOD" | "PREVIOUS_YEAR" | "TARGET";
+  grain: TimeGrain | "";
+  /** INHERIT is editor-only: it omits comparison on the wire. */
+  comparison: "INHERIT" | ComparisonType;
+  datasetBasis?: ComparisonDatasetBasis;
+  datasets?: ComparisonDatasetSelection[];
   target: string;
+  governedTarget?: GovernedTargetBinding;
+  filters: Record<string, unknown>;
+  displaySpec: Record<string, unknown>;
 }
-
-export const EMPTY_WIDGET_FORM: WidgetFormState = {
-  name: "",
-  visualizationType: "",
-  metricKey: "",
-  dimensionKey: "none",
-  grain: "DAY",
-  comparison: "NONE",
-  target: "",
-};
-
-/**
- * The visualizations this form can build.
- *
- * `minSeries > 1` — `MULTI_KPI` and `COMBO` — are excluded: a one-metric form
- * cannot satisfy them, and offering a control whose every submission is a
- * `422 CRM_WIDGET_SERIES_INVALID` is worse than not offering it. Recorded as
- * Q104.
- */
-export function buildableVisualizations(
-  catalog: DashboardCatalog | null,
-): VisualizationCapability[] {
-  return (catalog?.visualizations ?? []).filter((visualization) => visualization.minSeries <= 1);
+export interface WidgetAuthoringInput { name: string; visualizationType: CrmVisualization; querySpec: WidgetQuerySpec; displaySpec?: Record<string, unknown>; }
+export const EMPTY_SERIES: WidgetSeriesDraft = { metricKey: "", axis: "", label: "", color: "" };
+export const EMPTY_WIDGET_FORM: WidgetFormState = { name: "", visualizationType: "", series: [{ ...EMPTY_SERIES }], dimensionKey: "none", grain: "DAY", comparison: "INHERIT", target: "", filters: {}, displaySpec: {} };
+export const NUMBER_FORMATS = ["auto", "compact", "full", "duration-auto", "duration-minutes", "duration-hours", "duration-days"] as const;
+export const LEGEND_POSITIONS = ["top", "bottom", "start", "end", "none"] as const;
+export const FILTER_KEYS = ["datePreset", "compare", "dateFrom", "dateTo", "branchId", "ownerUserId", "pipelineId", "currencyCode", "staleDays", "closingWindowDays", "limit"] as const;
+export const findVisualization = (catalog: DashboardCatalog | null, key: string) => catalog?.visualizations.find((v) => v.key === key);
+export const findMetric = (catalog: DashboardCatalog | null, key: string) => catalog?.metrics.find((m) => m.key === key);
+export const buildableVisualizations = (catalog: DashboardCatalog | null) => catalog?.visualizations ?? [];
+export function datasetComparisonFor(form: WidgetFormState, catalog: DashboardCatalog | null) {
+  const capability = form.series.length === 1 ? findMetric(catalog, form.series[0].metricKey)?.datasetComparison : undefined;
+  return form.visualizationType && capability?.visualizations.includes(form.visualizationType) ? capability : undefined;
 }
-
-/** Metrics whose shape the chosen visualization accepts. */
-export function metricsFor(
-  catalog: DashboardCatalog | null,
-  visualization: VisualizationCapability | undefined,
-): MetricDefinition[] {
-  if (!catalog || !visualization) return [];
-  return catalog.metrics.filter((metric) => visualization.shapes.includes(metric.shape));
-}
-
-export function findVisualization(
-  catalog: DashboardCatalog | null,
-  key: string,
-): VisualizationCapability | undefined {
-  return catalog?.visualizations.find((visualization) => visualization.key === key);
-}
-
-export function findMetric(
-  catalog: DashboardCatalog | null,
-  key: string,
-): MetricDefinition | undefined {
-  return catalog?.metrics.find((metric) => metric.key === key);
-}
-
-export function grainsFor(catalog: DashboardCatalog | null, dimensionKey: string): string[] {
-  return catalog?.dimensions.find((dimension) => dimension.key === dimensionKey)?.grains ?? [];
-}
-
-export type WidgetFormError =
-  | "NAME_REQUIRED"
-  | "VISUALIZATION_REQUIRED"
-  | "METRIC_REQUIRED"
-  | "DIMENSION_REQUIRED"
-  | "TARGET_REQUIRED"
-  | "TARGET_INVALID"
-  | "COMPARISON_UNSUPPORTED";
-
-export function validateWidgetForm(
-  form: WidgetFormState,
-  catalog: DashboardCatalog | null,
-): WidgetFormError | null {
-  if (form.name.trim().length === 0) return "NAME_REQUIRED";
+export function supportsGovernedTarget(form: WidgetFormState, catalog: DashboardCatalog | null) {
+  if (form.series.length !== 1) return false;
+  const metric = findMetric(catalog, form.series[0].metricKey);
   const visualization = findVisualization(catalog, form.visualizationType);
-  if (!visualization) return "VISUALIZATION_REQUIRED";
-  const metric = findMetric(catalog, form.metricKey);
-  if (!metric) return "METRIC_REQUIRED";
-  if (!metric.dimensions.includes(form.dimensionKey)) return "DIMENSION_REQUIRED";
-
-  if (visualization.requiresTarget && form.comparison !== "TARGET") return "TARGET_REQUIRED";
-  if (form.comparison === "TARGET") {
-    const target = Number(form.target);
-    // `@Min(0.000001)` plus a service check that the target is finite and > 0.
-    if (!Number.isFinite(target) || target <= 0) return "TARGET_INVALID";
-  }
-  if (
-    (form.comparison === "PREVIOUS_PERIOD" || form.comparison === "PREVIOUS_YEAR") &&
-    (!visualization.supportsPeriodComparison || !metric.supportsPeriodComparison)
-  ) {
-    return "COMPARISON_UNSUPPORTED";
-  }
-  return null;
+  return !!visualization && !!metric?.comparisonTypes?.includes("GOVERNED_TARGET")
+    && (visualization.requiresTarget || (metric.requiredComparison === "GOVERNED_TARGET" && !!metric.visualizations?.includes(visualization.key)));
+}
+export const grainsFor = (catalog: DashboardCatalog | null, key: string) => catalog?.dimensions.find((d) => d.key === key)?.grains ?? [];
+export function metricsFor(catalog: DashboardCatalog | null, visualization: VisualizationCapability | undefined) {
+  if (!visualization) return [];
+  // DashboardCatalogService.validateWidget restricts typed ROWS to their own renderer.
+  const rowKinds: Partial<Record<CrmVisualization, "ALERT" | "RANKED" | "SCORECARD">> = {
+    ALERT_LIST: "ALERT", LEADERBOARD: "RANKED", SCORECARD: "SCORECARD",
+  };
+  const rowKind = rowKinds[visualization.key];
+  return (catalog?.metrics ?? []).filter((metric) => visualization.shapes.includes(metric.shape)
+    && (!metric.visualizations || metric.visualizations.includes(visualization.key))
+    && (metric.shape !== "ROWS" || metric.rowKind === rowKind));
+}
+export function commonDimensions(form: WidgetFormState, catalog: DashboardCatalog | null) {
+  const metrics = form.series.map((series) => findMetric(catalog, series.metricKey));
+  return metrics.length && metrics.every(Boolean) ? metrics[0]!.dimensions.filter((key) => metrics.every((metric) => metric!.dimensions.includes(key))) : [];
+}
+/** The current renderer cannot plot mixed units or a second value axis. */
+export function presentationVisualization(form: WidgetFormState, catalog: DashboardCatalog | null): CrmVisualization | "" {
+  const units = new Set(form.series.map((series) => findMetric(catalog, series.metricKey)?.unit).filter(Boolean));
+  const dualAxis = ["LINE", "LINE_AREA", "COLUMN", "COMBO"].includes(form.visualizationType);
+  return units.size > 1 && !dualAxis ? "TABLE" : form.visualizationType;
 }
 
-/**
- * The `querySpec` body.
- *
- * `engine` is left unset, which the server reads as `LEGACY_V1`. `SEMANTIC_V1`
- * is deliberately not offered: it accepts a strict subset of metrics and adds
- * `source`, `semanticFilters`, `topN` and `maxPoints`, and sending any of
- * those without the engine is a `422 CRM_WIDGET_ENGINE_INVALID`. Recorded as
- * Q105.
- */
 export function buildQuerySpec(form: WidgetFormState): WidgetQuerySpec {
-  const dimension =
-    form.dimensionKey === "time"
-      ? { key: form.dimensionKey, grain: form.grain }
-      : { key: form.dimensionKey };
-  const spec: WidgetQuerySpec = {
-    series: [{ metricKey: form.metricKey }],
-    dimension,
+  const filters = Object.fromEntries(Object.entries(form.filters).filter(([, value]) => value !== "" && value !== undefined).map(([key, value]) =>
+    [key, ["staleDays", "closingWindowDays", "limit"].includes(key) ? Number(value) : value]));
+  return {
+    series: form.series.map((series) => ({ metricKey: series.metricKey,
+      ...(series.axis ? { axis: series.axis } : {}), ...(series.label ? { label: series.label.trim() } : {}), ...(series.color ? { color: series.color } : {}) })),
+    dimension: form.dimensionKey === "time" ? { key: "time", grain: form.grain as TimeGrain } : { key: form.dimensionKey },
+    ...(Object.keys(filters).length ? { filters } : {}),
+    ...(form.comparison === "DATASETS" ? { comparison: { type: "DATASETS", basis: form.datasetBasis, datasets: form.datasets } }
+      : form.comparison === "TARGET" ? { comparison: { type: "TARGET", target: Number(form.target) } }
+      : form.comparison === "GOVERNED_TARGET" ? { comparison: { type: "GOVERNED_TARGET", governedTarget: form.governedTarget } }
+      : form.comparison === "INHERIT" ? {} : { comparison: { type: form.comparison } }),
   };
-  if (form.comparison === "TARGET") {
-    spec.comparison = { type: "TARGET", target: Number(form.target) };
-  } else if (form.comparison !== "NONE") {
-    spec.comparison = { type: form.comparison };
-  }
-  return spec;
 }
-
-/**
- * The parts of a stored `querySpec` this one-metric form cannot represent.
- *
- * D23: `buildQuerySpec` emits a *fresh* object. Anything the form does not
- * model is absent from what it builds, and `PATCH /widgets/:id` replaces
- * `querySpec` wholesale rather than merging it — so sending a rebuilt spec
- * deletes whatever is listed here. See
- * `docs/api/crm-dashboards.md#patch-widgetsid-replaces-queryspec-wholesale--it-never-merges`.
- */
-export type WidgetSpecLimitation =
-  | "MULTI_SERIES"
-  | "SERIES_STYLING"
-  | "FILTERS"
-  | "SEMANTIC_ENGINE"
-  | "RESULT_LIMITS";
-
-export function widgetSpecLimitations(spec: WidgetQuerySpec): WidgetSpecLimitation[] {
-  const limitations: WidgetSpecLimitation[] = [];
-  if (spec.series.length > 1) limitations.push("MULTI_SERIES");
-  // `axis`, `label` and `color` are per-series presentation the form has no
-  // control for, so a rebuilt series carries none of them.
-  if (spec.series.some((entry) => entry.axis || entry.label || entry.color)) {
-    limitations.push("SERIES_STYLING");
-  }
-  if (spec.filters && Object.keys(spec.filters).length > 0) limitations.push("FILTERS");
-  if (
-    spec.engine === "SEMANTIC_V1" ||
-    spec.semanticVersion !== undefined ||
-    spec.source !== undefined ||
-    spec.semanticFilters !== undefined
-  ) {
-    limitations.push("SEMANTIC_ENGINE");
-  }
-  if (spec.topN !== undefined || spec.maxPoints !== undefined) limitations.push("RESULT_LIMITS");
-  return limitations;
+export function widgetInput(form: WidgetFormState): WidgetAuthoringInput {
+  return { name: form.name.trim(), visualizationType: form.visualizationType as CrmVisualization, querySpec: buildQuerySpec(form), displaySpec: normalizeWidgetDisplaySpec(form.displaySpec) };
 }
-
-/** Whether the editor may open this widget at all. */
-export function isSpecEditable(spec: WidgetQuerySpec): boolean {
-  return widgetSpecLimitations(spec).length === 0;
+export type StoredWidget = { name: string; visualizationType: CrmVisualization | null; querySpec: WidgetQuerySpec; displaySpec?: Record<string, unknown> };
+export function widgetToForm(widget: StoredWidget): WidgetFormState {
+  return { name: widget.name, visualizationType: widget.visualizationType ?? "",
+    series: widget.querySpec.series.length ? widget.querySpec.series.map((series) => ({ metricKey: series.metricKey, axis: series.axis ?? "", label: series.label ?? "", color: series.color ?? "" })) : [{ ...EMPTY_SERIES }],
+    dimensionKey: widget.querySpec.dimension?.key ?? "none", grain: widget.querySpec.dimension?.grain ?? "DAY",
+    comparison: widget.querySpec.comparison?.type ?? "INHERIT", target: widget.querySpec.comparison?.target?.toString() ?? "",
+    datasetBasis: widget.querySpec.comparison?.basis,
+    governedTarget: widget.querySpec.comparison?.governedTarget,
+    datasets: widget.querySpec.comparison?.datasets?.map((dataset) => ({ ...dataset })),
+    filters: { ...widget.querySpec.filters }, displaySpec: { ...widget.displaySpec, ...(widget.displaySpec?.options ? { options: { ...(widget.displaySpec.options as Record<string, unknown>) } } : {}) } };
 }
-
-/**
- * The `PATCH /widgets/:id` body the form owns, minus its revision.
- *
- * **`querySpec` is omitted unless the user edited the query.** The server reads
- * an absent key as "leave the stored spec alone" — `dto.querySpec ??
- * current.querySpec` in `dashboard-widgets.service.ts` — and that is the only
- * way to rename a widget without rewriting its spec. Omitting is also safer
- * than echoing the stored spec back, because crm-app runs
- * `forbidNonWhitelisted` and would answer 400 for any stored key its DTO does
- * not model.
- *
- * This is the second of two independent guards on D23. `isSpecEditable` stops
- * an unrepresentable widget reaching the form; this stops a rename touching the
- * spec even if it did.
- */
-export function buildWidgetUpdate(
-  form: WidgetFormState,
-  stored: { name: string; visualizationType: CrmVisualization; querySpec: WidgetQuerySpec },
-): { name: string; visualizationType: CrmVisualization; querySpec?: WidgetQuerySpec } {
+export function buildWidgetUpdate(form: WidgetFormState, stored: StoredWidget) {
   const original = widgetToForm(stored);
-  const queryUnchanged =
-    form.metricKey === original.metricKey &&
-    form.dimensionKey === original.dimensionKey &&
-    form.grain === original.grain &&
-    form.comparison === original.comparison &&
-    form.target === original.target;
-  return {
-    name: form.name,
-    visualizationType: form.visualizationType as CrmVisualization,
-    ...(queryUnchanged ? {} : { querySpec: buildQuerySpec(form) }),
-  };
+  return { name: form.name.trim(), ...(form.visualizationType !== stored.visualizationType ? { visualizationType: form.visualizationType as CrmVisualization } : {}),
+    ...(JSON.stringify(buildQuerySpec(form)) !== JSON.stringify(buildQuerySpec(original)) ? { querySpec: buildQuerySpec(form) } : {}),
+    ...(JSON.stringify(normalizeWidgetDisplaySpec(form.displaySpec)) !== JSON.stringify(normalizeWidgetDisplaySpec(original.displaySpec)) ? { displaySpec: normalizeWidgetDisplaySpec(form.displaySpec) } : {}) };
 }
 
-/** Reads an existing widget back into the form. */
-export function widgetToForm(widget: {
-  name: string;
-  visualizationType: CrmVisualization;
-  querySpec: WidgetQuerySpec;
-}): WidgetFormState {
-  const comparison = widget.querySpec.comparison?.type;
-  return {
-    name: widget.name,
-    visualizationType: widget.visualizationType,
-    metricKey: widget.querySpec.series[0]?.metricKey ?? "",
-    dimensionKey: widget.querySpec.dimension?.key ?? "none",
-    grain: widget.querySpec.dimension?.grain ?? "DAY",
-    comparison:
-      comparison === "TARGET" ||
-      comparison === "PREVIOUS_PERIOD" ||
-      comparison === "PREVIOUS_YEAR"
-        ? comparison
-        : "NONE",
-    target:
-      widget.querySpec.comparison?.target === undefined
-        ? ""
-        : String(widget.querySpec.comparison.target),
-  };
+export type WidgetSpecLimitation = "SEMANTIC_ENGINE" | "RESULT_LIMITS" | "UNKNOWN_FIELDS";
+export function widgetSpecLimitations(spec: WidgetQuerySpec, display: Record<string, unknown> = {}): WidgetSpecLimitation[] {
+  const result: WidgetSpecLimitation[] = [];
+  if ((spec.engine !== undefined && spec.engine !== "LEGACY_V1") || spec.semanticVersion !== undefined || spec.source !== undefined || spec.semanticFilters !== undefined) result.push("SEMANTIC_ENGINE");
+  if (spec.topN !== undefined || spec.maxPoints !== undefined) result.push("RESULT_LIMITS");
+  const queryKeys = ["engine", "series", "dimension", "filters", "comparison", "semanticVersion", "source", "semanticFilters", "topN", "maxPoints"];
+  if (Object.keys(spec).some((key) => !queryKeys.includes(key)) || spec.series.some((series) => Object.keys(series).some((key) => !["metricKey", "axis", "label", "color"].includes(key)))
+    || Object.keys(spec.dimension ?? {}).some((key) => !["key", "grain"].includes(key))
+    || Object.keys(spec.comparison ?? {}).some((key) => !["type", "target", "basis", "datasets", "governedTarget"].includes(key))
+    || (spec.comparison?.datasets !== undefined && (!Array.isArray(spec.comparison.datasets) || spec.comparison.datasets.some((dataset) =>
+      !dataset || typeof dataset !== "object" || Object.keys(dataset).some((key) => !["datePreset", "dateFrom", "dateTo", "branchId"].includes(key)))))
+    || Object.keys(spec.filters ?? {}).some((key) => !(FILTER_KEYS as readonly string[]).includes(key))
+    || Object.keys(display).some((key) => !["title", "subtitle", "color", "targetColor", "numberFormat", "legendPosition", "options"].includes(key))) result.push("UNKNOWN_FIELDS");
+  return result;
 }
+export const isSpecEditable = (spec: WidgetQuerySpec, display?: Record<string, unknown>) => widgetSpecLimitations(spec, display).length === 0;

@@ -33,16 +33,20 @@ export function useNotificationDetail(id: string) {
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [isPending, setIsPending] = useState(false);
   const request = useRef<AbortController | null>(null);
+  const hasSettled = useRef(false);
 
   const load = useCallback(
-    async (): Promise<void> => {
+    async (silent = false): Promise<void> => {
       request.current?.abort();
       const controller = new AbortController();
       request.current = controller;
       const { signal } = controller;
-      setStatus("loading");
-      setError(null);
-      setNotification(null);
+      if (!silent) {
+        hasSettled.current = false;
+        setStatus("loading");
+        setError(null);
+        setNotification(null);
+      }
 
       try {
         const result = await coreGet(notificationPath(id), {
@@ -51,10 +55,14 @@ export function useNotificationDetail(id: string) {
         });
         if (signal.aborted) return;
         setNotification(parseNotification(result.data, id));
+        hasSettled.current = true;
+        setError(null);
         setStatus("found");
       } catch (loadError) {
         if (signal.aborted || isAbortError(loadError)) return;
         const normalized = normalizeApiError(loadError);
+        if (silent && hasSettled.current && normalized.status !== 404) return;
+        hasSettled.current = true;
         setNotification(null);
         setError(normalized.status === 404 ? null : normalized);
         setStatus(normalized.status === 404 ? "notFound" : "failed");
@@ -63,14 +71,16 @@ export function useNotificationDetail(id: string) {
     [id],
   );
 
+  const revalidate = useCallback(() => load(true), [load]);
+
   useEffect(() => {
     let disposed = false;
-    const unsubscribe = tenantNotificationRuntime.subscribeInvalidation(load);
+    const unsubscribe = tenantNotificationRuntime.subscribeInvalidation(revalidate);
     queueMicrotask(() => {
       if (!disposed) void load();
     });
     return () => { disposed = true; unsubscribe(); request.current?.abort(); };
-  }, [load]);
+  }, [load, revalidate]);
 
   const runAction = useCallback(
     async (action: () => Promise<void>, failureTitle: string, thenLeave: boolean): Promise<void> => {

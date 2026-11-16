@@ -23,6 +23,7 @@ interface TerminalMoveDialogProps {
   onConfirm: (reason: string) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  confirmLabel?: string;
 }
 
 // Non-alert Dialog rather than ConfirmActionModal — this confirmation needs
@@ -36,6 +37,7 @@ export function TerminalMoveDialog({
   onConfirm,
   isSubmitting,
   error,
+  confirmLabel,
 }: TerminalMoveDialogProps) {
   const { t } = useI18n();
   const [reason, setReason] = useState("");
@@ -67,12 +69,12 @@ export function TerminalMoveDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Field label={isWon ? t.crmOpportunities.notesOptional : t.crmOpportunities.reasonRequired}>
+        <Field showLabel required={!isWon} label={isWon ? t.crmOpportunities.notesOptional : t.crmOpportunities.reasonRequired}>
           <Textarea
             value={reason}
             maxLength={1000}
             onChange={(event) => setReason(event.target.value)}
-            placeholder={isWon ? t.crmOpportunities.notesPlaceholder : t.crmOpportunities.reasonPlaceholder}
+            placeholder=""
             disabled={isSubmitting}
           />
         </Field>
@@ -94,7 +96,7 @@ export function TerminalMoveDialog({
             loading={isSubmitting}
             disabled={!isWon && reason.trim() === ""}
           >
-            {isWon ? t.crmOpportunities.confirmWon : t.crmOpportunities.confirmLost}
+            {confirmLabel ?? (isWon ? t.crmOpportunities.confirmWon : t.crmOpportunities.confirmLost)}
           </Button>
         </DialogFooter>
       </DialogContent>

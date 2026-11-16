@@ -52,6 +52,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.user = {
     id, email: "owner@example.test", firstName: "Owner", lastName: "User",
+    featureEntitlements: { "crm.outbound_email": false },
     status: "ACTIVE", isTenantOwner: false, accessibleCompanies: [companyId],
     accessibleBranches: [], teamMemberships: [], permissions: [], permissionScopes: {},
     accessibleBranchCompanies: [],

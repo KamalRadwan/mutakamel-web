@@ -97,6 +97,22 @@ afterEach(() => {
 });
 
 describe("useGlobalSearch", () => {
+  it("keeps an identical profile refresh idle and refetches when permissions change", async () => {
+    const { result, rerender } = renderHook(() => useGlobalSearch("Acme"));
+    await waitFor(() => expect(result.current.isSearching).toBe(false));
+    expect(state.readCorePage).toHaveBeenCalledTimes(1);
+    expect(state.readCrmBody).toHaveBeenCalledTimes(3);
+    state.user = tenantUser({ permissions: [...ALL_PERMISSIONS] });
+    await act(async () => rerender());
+    expect(state.readCorePage).toHaveBeenCalledTimes(1);
+    expect(state.readCrmBody).toHaveBeenCalledTimes(3);
+    state.user = tenantUser({ permissions: ["directory.party.read"] });
+    rerender();
+    await waitFor(() => expect(result.current.isSearching).toBe(false));
+    expect(state.readCorePage).toHaveBeenCalledTimes(2);
+    expect(result.current.visibleSourceIds).toEqual(["parties"]);
+  });
+
   it("asks nothing until a term long enough to be worth a fan-out is submitted", async () => {
     const { result } = renderHook(() => useGlobalSearch(""));
 

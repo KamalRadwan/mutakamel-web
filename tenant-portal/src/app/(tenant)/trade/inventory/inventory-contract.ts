@@ -339,23 +339,3 @@ export function parseBranchIdsPreview(raw: string): {
   return { validIds, invalidEntries };
 }
 
-export function computeStockComposition(availability: InventoryAvailability): {
-  onHand: number;
-  reserved: number;
-  available: number;
-  availablePct: number;
-  reservedPct: number;
-  health: "healthy" | "low" | "depleted";
-} {
-  const onHand = Math.max(0, Number(availability.onHandQuantity) || 0);
-  const reserved = Math.max(0, Number(availability.reservedQuantity) || 0);
-  const available = Number(availability.availableQuantity) || 0;
-  const total = onHand > 0 ? onHand : Math.max(0, reserved + Math.max(0, available));
-  const availablePct =
-    total > 0 ? Math.min(100, Math.max(0, Math.round((Math.max(0, available) / total) * 100))) : 0;
-  const reservedPct = total > 0 ? Math.min(100, Math.max(0, 100 - availablePct)) : 0;
-  const health: "healthy" | "low" | "depleted" =
-    available <= 0 ? "depleted" : availablePct <= 25 ? "low" : "healthy";
-  return { onHand, reserved, available, availablePct, reservedPct, health };
-}
-

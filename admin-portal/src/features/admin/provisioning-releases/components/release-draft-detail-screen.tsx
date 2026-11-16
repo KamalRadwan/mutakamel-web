@@ -1,9 +1,11 @@
 "use client";
 
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, FileKey2, Save } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Button, Card, Checkbox, Field, Input, Textarea } from "@/design-system";
+import { Button, Card, ConfirmActionModal, Field, Input, Textarea } from "@/design-system";
 import { useReleaseDraftDetail } from "../hooks/use-release-draft-detail";
 import { ReleaseDefinitionFields } from "./release-definition-form";
 import {
@@ -181,13 +183,13 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
         </p>
       ) : null}
       {!detail.permissions.canPublishCritical ? (
-        <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail="admin.provisioning.releases.publish + admin.provisioning.critical" copy={copy} />
+        <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail={ADMIN_RBAC_CRITICAL.PROVISIONING_RELEASE_PUBLISH.join(" + ")} copy={copy} />
       ) : (
         <form
           aria-label={copy.publishTitle}
           onSubmit={(event) => {
             event.preventDefault();
-            void detail.publish();
+            detail.requestPublishConfirmation();
           }}
           className="space-y-3"
         >
@@ -208,14 +210,6 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
             )}
           </Field>
           <ReleaseFieldError id="release-signature-error" code={detail.publishErrors.signatureBase64} copy={copy} />
-          <label className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-card/60 p-2.5 text-xs font-semibold text-foreground">
-            <Checkbox
-              checked={detail.publishDraft.confirmed}
-              onCheckedChange={(next) => detail.updatePublishDraft("confirmed", next === true)}
-              className="mt-0.5"
-            />
-            <span>{copy.publishConfirm}</span>
-          </label>
           <ReleaseFieldError id="publish-confirm-error" code={detail.publishErrors.confirmed} copy={copy} />
           <Button type="submit" variant="primary" size="sm" disabled={!detail.canPublish || pending} loading={pending && detail.mutation.name === "PUBLISH"}>
             <FileKey2 className="size-3.5" aria-hidden="true" />
@@ -223,6 +217,22 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
           </Button>
         </form>
       )}
+      <ConfirmActionModal
+        key={`${detail.snapshot?.data.draftId}:${detail.snapshot?.data.revision}`}
+        isOpen={detail.publishConfirmationVersion === detail.snapshot?.data.releaseVersion && detail.canPublish}
+        onClose={detail.closePublishConfirmation}
+        onConfirm={() => { void detail.publish(detail.snapshot?.data.releaseVersion); }}
+        titleEn={RELEASE_COPY.en.publishTitle}
+        titleAr={RELEASE_COPY.ar.publishTitle}
+        descriptionEn={RELEASE_COPY.en.publishConfirm}
+        descriptionAr={RELEASE_COPY.ar.publishConfirm}
+        confirmTextEn={RELEASE_COPY.en.publish}
+        confirmTextAr={RELEASE_COPY.ar.publish}
+        requiredConfirmationText={detail.snapshot?.data.releaseVersion}
+        variant="warning"
+        isLoading={pending}
+        loadingLabel={copy.publishing}
+      />
     </Card>
   );
 }

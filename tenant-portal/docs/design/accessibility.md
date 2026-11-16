@@ -98,6 +98,11 @@ The only focus trap is inside a modal, and `Escape` always exits it.
 
 ### Every control has an accessible name, in the active language
 
+List-page DataTable labels use `t.views.selectAll`, `t.views.selectRow`,
+`t.views.sortAscending`, `t.views.sortDescending` and `t.views.notSorted`
+for selection and sorting controls. Each label describes its control in Arabic
+and English; `t.common.actions` is reserved for actions.
+
 Icon-only buttons need `aria-label` **and** a `Tooltip`. Both come from the
 dictionary. A hardcoded English `aria-label` is invisible to an Arabic
 screen-reader user.

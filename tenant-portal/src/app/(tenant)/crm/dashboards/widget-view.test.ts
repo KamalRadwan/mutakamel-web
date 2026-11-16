@@ -32,6 +32,18 @@ const series = (key: string, label: string, points: Array<[string, number]>, uni
 });
 
 describe("Widget render mode", () => {
+  it("plots declared dual axes and combined geometries while keeping invalid scales at the table boundary", () => {
+    const mixed = result({ shape: "TIME_SERIES", series: [series("count", "Count", [["a", 10]]), { ...series("money", "Money", [["a", 50]], "MONEY"), axis: "RIGHT" }] });
+    expect(widgetRenderMode("COLUMN", mixed)).toBe("BAR");
+    expect(widgetRenderMode("LINE", mixed)).toBe("LINE");
+    for (const visualization of ["COMBO", "LINE_AREA"] as const) expect(widgetRenderMode(visualization, mixed)).toBe("COMPOSED");
+    expect(widgetTableModel(mixed, HEADERS).rows[0].cells).toHaveLength(3);
+    const ordinary = result({ series: [series("crm.count", "Count", [["a", 10]])] });
+    for (const visualization of ["BULLET", "THREE_QUARTER_GAUGE", "DETAILED_SPEEDOMETER", "CALENDAR_HEATMAP"] as const) expect(widgetRenderMode(visualization, ordinary)).toBe("TABLE");
+    expect(widgetRenderMode("PIE", ordinary)).toBe("DONUT");
+    expect(widgetRenderMode("BAR", ordinary)).toBe("BAR");
+    expect(widgetRenderMode("STACKED_BAR_100", ordinary)).toBe("STACKED_BAR");
+  });
   it("renders a scalar visualization as a value only when the metric produced one", () => {
     expect(
       widgetRenderMode("METRIC_CARD", result({ shape: "SCALAR", value: 42, series: [] })),
@@ -51,7 +63,7 @@ describe("Widget render mode", () => {
     expect(widgetRenderMode("DONUT", oneSeries)).toBe("DONUT");
     expect(widgetRenderMode("FUNNEL", oneSeries)).toBe("FUNNEL");
     expect(widgetRenderMode("LINE", oneSeries)).toBe("LINE");
-    expect(widgetRenderMode("AREA", oneSeries)).toBe("AREA");
+    expect(widgetRenderMode("AREA", { ...oneSeries, shape: "TIME_SERIES" })).toBe("AREA");
 
     // Won vs lost: two DISTINCT outcome roles, so the chart can encode them.
     const wonLost = result({
@@ -81,8 +93,8 @@ describe("Widget render mode", () => {
     expect(widgetRenderMode("LINE_AREA", sameRole)).toBe("TABLE");
   });
 
-  it("tables every visualization the design system cannot draw, rather than approximating", () => {
-    const rows = result({ series: [series("crm.action_center.records", "Records", [["a", 1]])] });
+  it("keeps an incompatible source shape at its exact table boundary", () => {
+    const rows = result({ shape: "ROWS", series: [series("crm.action_center.records", "Records", [["a", 1]])] });
     for (const visualization of ["TREEMAP", "GANTT", "FLOWCHART", "HEATMAP", "SCATTER"] as const) {
       expect(widgetRenderMode(visualization, rows)).toBe("TABLE");
     }
@@ -97,7 +109,7 @@ describe("Widget render mode", () => {
           label: "Deals",
           unit: "MONEY",
           axis: "LEFT",
-          points: [{ key: "o1", label: "Deal 1", value: 50000, secondaryValue: 75, meta: {} }],
+          points: [{ key: "o1", label: "Deal 1", value: 75, secondaryValue: 50000, size: 30, meta: {} }],
         },
       ],
     });
@@ -164,19 +176,38 @@ describe("Widget render mode", () => {
       meta: { unit: "MONEY", currency: "EGP", generatedAt: "2026-08-31T09:00:00.000Z", warnings: [] },
     });
     const model = widgetTableModel(charted, HEADERS);
-    expect(model.columns.map((column) => column.label)).toEqual(["Category", "Won"]);
+    expect(model.columns.map((column) => column.label)).toEqual(["Category", "Won (EGP)"]);
     expect(model.rows[0].cells[1]).toEqual({ kind: "money", value: 500, currency: "EGP" });
   });
 
-  it("tabulates a comparison series that the chart deliberately leaves out", () => {
+  it("tabulates matched comparison values and missing cells beside the current series", () => {
     const compared = result({
-      series: [
-        series("crm.leads.created.trend", "Leads", [["d1", 4]]),
-        series("crm.leads.created.trend:PREVIOUS_PERIOD", "Leads (Previous period)", [["d1", 2]]),
-      ],
+      series: [{ ...series("crm.leads.created.trend", "Leads", []), points: [
+        { key: "d1", label: "Current day", value: null, previousValue: 2, previousKey: "p1" },
+        { key: "d2", label: "Next day", value: 0, previousValue: null, previousKey: null },
+      ] }],
     });
     expect(primarySeries(compared)).toHaveLength(1);
-    expect(widgetTableModel(compared, HEADERS).columns).toHaveLength(3);
+    const table = widgetTableModel(compared, { ...HEADERS, previousValue: "Previous value", previousKey: "Matched period" });
+    expect(table.columns.map((column) => column.label)).toEqual(["Category", "Leads", "Leads · Previous value", "Leads · Matched period"]);
+    expect(table.rows[0].cells).toEqual([{ kind: "text", text: "Current day" }, { kind: "missing" }, { kind: "number", value: 2 }, { kind: "text", text: "p1" }]);
+    expect(table.rows[1].cells.slice(1)).toEqual([{ kind: "number", value: 0 }, { kind: "missing" }, { kind: "missing" }]);
+    expect(widgetRenderMode("LINE", compared)).toBe("LINE");
+    expect(widgetRenderMode("DONUT", compared)).toBe("TABLE");
+  });
+
+  it("keeps XY probability, amount and age in their separate exact table columns", () => {
+    const xy = result({ shape: "XY", series: [{ ...series("crm.opportunities.value_probability", "Deals", [], "MONEY"), currency: "EGP",
+      points: [{ key: "o1", value: 75, secondaryValue: 50000, size: 30 }] }] });
+    expect(widgetTableModel(xy, HEADERS).rows[0].cells.slice(1)).toEqual([
+      { kind: "number", value: 75 }, { kind: "money", value: 50000, currency: "EGP" }, { kind: "number", value: 30 },
+    ]);
+  });
+
+  it.each(["UNAVAILABLE", "RETIRED", "FAILED", "DEADLINE_EXCEEDED"])("does not render stale values for a %s result", (state) => {
+    const unavailable = result({ state, value: 12, series: [series("count", "Count", [["a", 12]])] });
+    expect(widgetRenderMode("METRIC_CARD", unavailable)).toBe("TABLE");
+    expect(widgetTableModel(unavailable, HEADERS).rows).toEqual([]);
   });
 });
 

@@ -7,8 +7,9 @@ import {
   useState,
 } from "react";
 import { useToast } from "@/components/ui/ToastContext";
-import { normalizeApiError } from "@/shared/api/normalized-api-error";
-import { useActionMutation } from "@/shared/hooks/useActionMutation";
+import { useI18n } from "@/i18n/I18nContext";
+import { useApplicationMutation } from "./useApplicationMutation";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import { applicationsApi } from "../api/applications.api";
 import type {
   ApplicationLifecycleCommandDto,
@@ -22,8 +23,9 @@ import type {
 
 export function useApplication(applicationKey: string) {
   const toast = useToast();
-  const { mutate, isMutating } = useActionMutation();
-  const { mutate: mutateDatabaseBinding, isMutating: isBindingDatabaseServers } = useActionMutation();
+  const { t } = useI18n();
+  const { mutate, isMutating } = useApplicationMutation();
+  const { mutate: mutateDatabaseBinding, isMutating: isBindingDatabaseServers } = useApplicationMutation();
   const ownerToken = useMemo(
     () => Symbol(`application:${applicationKey}`),
     [applicationKey],
@@ -98,7 +100,7 @@ export function useApplication(applicationKey: string) {
         applicationKeyRef.current === requestedKey &&
         ownerTokenRef.current === requestedOwnerToken
       ) {
-        setManifestError(normalizeApiError(err).message);
+        setManifestError(localizeApplicationError(err, t));
         setLoadedManifestKey(null);
         setLoadedManifestOwnerToken(null);
       }
@@ -108,7 +110,7 @@ export function useApplication(applicationKey: string) {
         ownerTokenRef.current === requestedOwnerToken
       ) setIsManifestLoading(false);
     }
-  }, [applicationKey, ownerToken]);
+  }, [applicationKey, ownerToken, t]);
 
   const fetchApplication = useCallback(async () => {
     const requestedKey = applicationKey;
@@ -154,15 +156,15 @@ export function useApplication(applicationKey: string) {
       ) {
         return;
       }
-      const normalized = normalizeApiError(err);
+      const message = localizeApplicationError(err, t);
       // A failed refresh leaves the last good snapshot standing rather than
       // replacing the page with an error frame: the toast reports it, and the
       // operator keeps whatever the open dialog was showing them.
       if (!isReload) {
-        setError(normalized.message);
+        setError(message);
         markDisplayed(null, null);
       }
-      toast.error("Error", normalized.message);
+      toast.error(t.applications.errorTitle, message);
     } finally {
       if (
         generation === requestGeneration.current &&
@@ -172,7 +174,7 @@ export function useApplication(applicationKey: string) {
         setIsRefreshing(false);
       }
     }
-  }, [applicationKey, fetchManifests, markDisplayed, ownerToken, toast]);
+  }, [applicationKey, fetchManifests, markDisplayed, ownerToken, toast, t]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -223,7 +225,7 @@ export function useApplication(applicationKey: string) {
     return mutate(
       { operation: "UPDATE", applicationKey, dto },
       (key) => applicationsApi.update(applicationKey, dto, key),
-      mutationOptions("Application updated successfully."),
+      mutationOptions(t.applications.notifications.updated),
     );
   };
 
@@ -232,7 +234,7 @@ export function useApplication(applicationKey: string) {
     return mutate(
       { operation: "UPDATE_DATABASE_POLICY", applicationKey, dto },
       (key) => applicationsApi.updateDatabasePolicy(applicationKey, dto, key),
-      mutationOptions("Database policy updated."),
+      mutationOptions(t.applications.notifications.policyUpdated),
     );
   };
 
@@ -241,7 +243,7 @@ export function useApplication(applicationKey: string) {
     return mutate(
       { operation: "PUBLISH", applicationKey, dto },
       (key) => applicationsApi.publish(applicationKey, dto, key),
-      mutationOptions("Application revision published."),
+      mutationOptions(t.applications.notifications.published),
     );
   };
 
@@ -251,7 +253,7 @@ export function useApplication(applicationKey: string) {
     return mutate(
       { operation: "ACTIVATE", applicationKey, dto },
       (key) => applicationsApi.activate(applicationKey, expectedCatalogueRevision, reason, key),
-      mutationOptions("Application activated."),
+      mutationOptions(t.applications.notifications.activated),
     );
   };
 
@@ -265,7 +267,7 @@ export function useApplication(applicationKey: string) {
     return mutateDatabaseBinding(
       { operation: "BIND_DATABASE_SERVERS", applicationKey, dto },
       (key) => applicationsApi.bindDatabaseServers(applicationKey, dto, key),
-      mutationOptions("Database binding command completed."),
+      mutationOptions(t.applications.notifications.bound),
     );
   };
 
@@ -274,7 +276,7 @@ export function useApplication(applicationKey: string) {
     return mutate(
       { operation: "DEPRECATE", applicationKey, dto },
       (key) => applicationsApi.deprecate(applicationKey, dto, key),
-      mutationOptions("Application deprecated."),
+      mutationOptions(t.applications.notifications.deprecated),
     );
   };
 
@@ -283,7 +285,7 @@ export function useApplication(applicationKey: string) {
     return mutate(
       { operation: "DISABLE", applicationKey, dto },
       (key) => applicationsApi.disable(applicationKey, dto, key),
-      mutationOptions("Application disabled."),
+      mutationOptions(t.applications.notifications.disabled),
     );
   };
 
@@ -297,7 +299,7 @@ export function useApplication(applicationKey: string) {
         return true;
       },
       {
-        onSuccessMessage: "Application deleted.",
+        onSuccessMessage: t.applications.notifications.deleted,
         onErrorReconcile: () => {
           if (
             ownerTokenRef.current !== ownerToken ||

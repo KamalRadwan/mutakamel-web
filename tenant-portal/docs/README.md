@@ -14,6 +14,11 @@ and pick the option most consistent with the surrounding rules.
 
 ## Reading order
 
+For UI work, first use [shared Playwright MCP](../../../backend/docs/operations/playwright-mcp.md)
+to capture and measure the real running screen before designing. All agents
+share the browser service; old context overrides and token tables must be
+reconciled against current components and computed styles.
+
 Do not skim. These are ordered so that each one assumes the previous.
 
 | # | Read | Why |
@@ -60,7 +65,7 @@ docs/
 | **[DESIGN-SYSTEM.md](design/DESIGN-SYSTEM.md)** | **The complete spec — palette, type, sizing, libraries, per-page UI/UX** |
 | [README.md](design/README.md) | The five laws, and the index |
 | [tokens.md](design/tokens.md) | Four color roles, OKLCH ramps, semantic tokens, both themes |
-| [typography.md](design/typography.md) | Font pairing, 7-step scale, 3-weight policy, Arabic lift |
+| [typography.md](design/typography.md) | Font pairing, type scale, weights, Arabic/English size parity |
 | [geometry.md](design/geometry.md) | Radius, spacing, control heights, row density, elevation |
 | [motion.md](design/motion.md) | The animation budget and every permitted keyframe |
 | [primitives.md](design/primitives.md) | Every primitive's exact props and variants |
@@ -131,6 +136,14 @@ cause real damage when broken.
    idempotency keys. Never parse a decimal into a JavaScript number.
 6. **No feature is done** until it is server-backed, bilingual, themed in both
    light and dark, keyboard-operable, and tested.
+
+## Authorization lookup cache identity
+
+`src/hooks/useAuthScopeKey.ts` treats missing branch, company and team-membership
+arrays as empty. It sorts copies of branch/company IDs and encoded membership
+values so a profile refresh that only reorders them keeps the same cache key,
+without mutating the profile. Scope changes still invalidate the key;
+session and language fences remain the responsibility of callers.
 
 ## Verification
 

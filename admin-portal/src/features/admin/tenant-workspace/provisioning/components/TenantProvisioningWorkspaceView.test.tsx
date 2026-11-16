@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The view reads its language from the model; only the shared confirmation
 // dialog reads the I18n context.
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ lang: "en" }) }));
+const i18n = vi.hoisted(() => ({ lang: "en" as "en" | "ar" }));
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => i18n }));
 
 import { TenantProvisioningWorkspaceView } from "./TenantProvisioningWorkspaceView";
 import type {
@@ -102,6 +103,68 @@ function failedGenerationSteps(): Record<string, unknown>[] {
 }
 
 describe("TenantProvisioningWorkspaceView", () => {
+  beforeEach(() => { i18n.lang = "en"; });
+
+  it.each(["en", "ar"] as const)("confirms the selected update versions before applying once in %s", async (lang) => {
+    i18n.lang = lang;
+    const model = makeModel({ lang, section: "updates" });
+    const update = readTenantAvailableUpdate(availableUpdate());
+    model.provisioning.updates.data.items = [
+      { ...update, componentKey: "core.foundation", availableRelease: { ...update.availableRelease, releaseVersion: "2.0.0" } },
+      { ...update, componentKey: "crm", availableRelease: { ...update.availableRelease, releaseVersion: "3.0.0" } },
+      { ...update, componentKey: "trade" },
+    ];
+    model.selectedUpdateKeys = ["core.foundation", "crm"];
+    let finish!: () => void;
+    const apply = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    model.applySelectedUpdates = apply;
+    const { rerender } = render(<TenantProvisioningWorkspaceView model={model} />);
+    const trigger = screen.getByRole("button", { name: lang === "en" ? "Apply selected (2)" : "تطبيق المحدد (2)" });
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+    expect(apply).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent("core.foundation → 2.0.0");
+    expect(dialog).toHaveTextContent("crm → 3.0.0");
+    expect(dialog).not.toHaveTextContent("trade");
+    expect(dialog).toHaveTextContent(lang === "en" ? "It cannot be cancelled once running" : "لا يمكن إلغاؤه بعد بدء التنفيذ");
+
+    // Polling can replace the model while the operator reviews the dialog.
+    const refreshedApply = vi.fn().mockResolvedValue(undefined);
+    rerender(<TenantProvisioningWorkspaceView model={{ ...model, selectedUpdateKeys: ["trade"], applySelectedUpdates: refreshedApply }} />);
+    const confirm = within(dialog).getByRole("button", { name: lang === "en" ? "Apply updates" : "تطبيق التحديثات" });
+    act(() => {
+      fireEvent.click(confirm);
+      fireEvent.click(confirm);
+    });
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(refreshedApply).not.toHaveBeenCalled();
+    expect(dialog).toHaveAttribute("aria-busy", "true");
+    expect(confirm).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: lang === "en" ? "Cancel" : "إلغاء" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: lang === "en" ? "Close" : "إغلاق" })).toBeDisabled();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await act(async () => { finish(); });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("dismisses update confirmation without submitting and keeps selection prerequisites", () => {
+    const model = makeModel({ section: "updates" });
+    model.provisioning.updates.data.items = [readTenantAvailableUpdate(availableUpdate())];
+    const { rerender } = render(<TenantProvisioningWorkspaceView model={model} />);
+    expect(screen.getByRole("button", { name: "Apply selected (0)" })).toBeDisabled();
+    model.selectedUpdateKeys = ["core.foundation"];
+    rerender(<TenantProvisioningWorkspaceView model={model} />);
+    fireEvent.click(screen.getByRole("button", { name: "Apply selected (1)" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(model.applySelectedUpdates).not.toHaveBeenCalled();
+    model.provisioning.permissions.canApplyUpdates = false;
+    rerender(<TenantProvisioningWorkspaceView model={model} />);
+    expect(screen.getByRole("button", { name: "Apply selected (1)" })).toBeDisabled();
+  });
+
   it.each(["en", "ar"] as const)("explains a planned update and release recovery in %s", (lang) => {
     const model = makeModel({ lang, section: "updates" });
     model.provisioning.updates.data.items = [readTenantAvailableUpdate(availableUpdate({ updateAlreadyPlanned: true }))];
@@ -737,6 +800,9 @@ function makeModel(
       false,
     ),
     confirmation,
+    decommissionConfirmation: null,
+    requestDecommission: noop,
+    dismissDecommissionConfirmation: noop,
     requestCancel: noop,
     requestRetry: noop,
     requestRecovery: vi.fn(),

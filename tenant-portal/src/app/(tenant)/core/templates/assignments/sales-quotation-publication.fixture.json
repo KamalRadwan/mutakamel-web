@@ -1,0 +1,74 @@
+[
+  {
+    "caseKey": "STARTER-01/ar-EG",
+    "starterKey": "trade.quotation.classic-hybrid.ar-EG.v2",
+    "templateId": "019f0000-0000-7000-8000-000000000100",
+    "templateVersionId": "019f0000-0000-7000-8000-000000000200",
+    "versionNumber": 1,
+    "publishedAt": "2026-11-13T08:59:00Z",
+    "draftChecksum": "f79ad334bc1e99d37a1de53c63bcf6c63e99f35ee27ef6b3437677d1c6c6f51a",
+    "layoutMode": "HYBRID_DOCUMENT",
+    "name": "Classic Hybrid",
+    "locale": "ar-EG"
+  },
+  {
+    "caseKey": "STARTER-01/en-US",
+    "starterKey": "trade.quotation.classic-hybrid.en-US.v2",
+    "templateId": "019f0000-0000-7000-8000-000000000101",
+    "templateVersionId": "019f0000-0000-7000-8000-000000000201",
+    "versionNumber": 1,
+    "publishedAt": "2026-11-13T08:59:00Z",
+    "draftChecksum": "670d8b028ec6ddc5b002f77d6d2096ffbd75fdcfa8adaeaa40218eb9ca1a0ea2",
+    "layoutMode": "HYBRID_DOCUMENT",
+    "name": "Classic Hybrid",
+    "locale": "en-US"
+  },
+  {
+    "caseKey": "STARTER-02/ar-EG",
+    "starterKey": "trade.quotation.editorial-flow.ar-EG.v1",
+    "templateId": "019f0000-0000-7000-8000-000000000102",
+    "templateVersionId": "019f0000-0000-7000-8000-000000000202",
+    "versionNumber": 1,
+    "publishedAt": "2026-11-13T08:59:00Z",
+    "draftChecksum": "e18972b493090151459fe50bba0b8d04515958bc0d02355697da6ef830732733",
+    "layoutMode": "FLOW_DOCUMENT",
+    "name": "Editorial Flow",
+    "locale": "ar-EG"
+  },
+  {
+    "caseKey": "STARTER-02/en-US",
+    "starterKey": "trade.quotation.editorial-flow.en-US.v1",
+    "templateId": "019f0000-0000-7000-8000-000000000103",
+    "templateVersionId": "019f0000-0000-7000-8000-000000000203",
+    "versionNumber": 1,
+    "publishedAt": "2026-11-13T08:59:00Z",
+    "draftChecksum": "73a61212834eb43eeb055ed95ac5907ea96f82233e9b2ceb6d5416da236b38cd",
+    "layoutMode": "FLOW_DOCUMENT",
+    "name": "Editorial Flow",
+    "locale": "en-US"
+  },
+  {
+    "caseKey": "STARTER-03/ar-EG",
+    "starterKey": "trade.quotation.color-fixed.ar-EG.v1",
+    "templateId": "019f0000-0000-7000-8000-000000000104",
+    "templateVersionId": "019f0000-0000-7000-8000-000000000204",
+    "versionNumber": 1,
+    "publishedAt": "2026-11-13T08:59:00Z",
+    "draftChecksum": "c2da63d9df5ad3a5424bf4e3dbb3467eff0dae749f572ca2d5a9fdd9b97083a4",
+    "layoutMode": "FIXED_CANVAS",
+    "name": "Color Fixed",
+    "locale": "ar-EG"
+  },
+  {
+    "caseKey": "STARTER-03/en-US",
+    "starterKey": "trade.quotation.color-fixed.en-US.v1",
+    "templateId": "019f0000-0000-7000-8000-000000000105",
+    "templateVersionId": "019f0000-0000-7000-8000-000000000205",
+    "versionNumber": 1,
+    "publishedAt": "2026-11-13T08:59:00Z",
+    "draftChecksum": "96d39ab5bb26c3a4ad2bcddca3c5d2f66ef98f59f5cdbef32c3b9b9c013cd34f",
+    "layoutMode": "FIXED_CANVAS",
+    "name": "Color Fixed",
+    "locale": "en-US"
+  }
+]

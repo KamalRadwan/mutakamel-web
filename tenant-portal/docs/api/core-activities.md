@@ -1,6 +1,8 @@
 # Core activities: reminder settings
 
-Verified against Core/Worker source on 2026-10-19. Runtime checks pending lead verification.
+Status: **verified against source; runtime checks pending lead verification**
+
+Last source verification: **2026-11-04**
 
 The existing `POST /api/tenant/core/v1/activities` and
 `PATCH /api/tenant/core/v1/activities/:id` accept optional
@@ -23,3 +25,10 @@ in-app preferences and active-user policy apply. Changing due time, offset or
 assignee re-arms the reminder; text edits preserve sent evidence. Fleet backlogs
 or unavailable databases can delay delivery. This uses Core activities, including
 lead TODOs; there are no CRM reminder routes or tables in the portal flow.
+
+The workspace accepts a portal-only `activityId` UUIDv7 query parameter for
+notification deep links. It loads the activity with the existing
+`GET /api/tenant/core/v1/activities/:id` and opens the shared detail modal;
+calendar filters do not have to contain the activity. Closing removes only
+`activityId`, retaining the workspace filters. Invalid IDs make no read request;
+missing read access, forbidden and missing activities retain their boundaries.

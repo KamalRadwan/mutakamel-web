@@ -1,5 +1,32 @@
 # Trade — Foundation
 
+Scope name presentation source-reviewed **2026-11-03** across Trade, CRM and
+Core: company/branch/channel controls use compact interface typography and
+name-only labels. Shared Trade selectors and CRM organization fields search
+their complete loaded choices when more than three options exist. Channel
+listing fields select existing channels rather than accepting pasted UUIDs;
+inventory-node branch assignments use named multi-selection. Related branch
+and channel summaries use names or an unavailable-name label. UUIDs, scope
+headers, request bodies, permissions and concurrency contracts are preserved.
+
+Catalogue workspace presentation source-reviewed **2026-11-03**: Channels,
+UOMs and Commercial Accounts own one inline scope selector; the layout omits
+its duplicate scope bar. Their four summary metrics use the compact shared
+`SummaryStrip`. Channels and Commercial Accounts use full-width compact tables
+and card grids, with quick inspection opened explicitly from rows or view
+actions. The persistent side inspectors and repeated create buttons are removed.
+Commercial Account card view retains server pagination, and credit amounts
+continue through `Money` as exact decimal strings. Type/role/status filtering,
+read-only controls, loading/error states and create/edit workflows are retained.
+
+Item scope selectors source-reviewed **2026-11-03**: the Items list and detail
+workspaces own their inline company/branch/channel controls; the Trade layout
+suppresses its extra scope bar on those routes. Company and branch labels come
+from authorized Core organization reads, filtered to the actor's accessible
+IDs. Missing names use translated ordinal labels. Their triggers and options
+use `font-sans`, weight 400 and the bilingual `text-caption` token, without
+displaying IDs. The selected UUIDs remain the scope values used for requests.
+
 Channel pagination source verification: **2026-10-26**. `GET /channels` now
 accepts `page` (default 1) and `limit` (default 25, maximum 100), and returns
 `{ items, total, page, limit }`. The screen and scope selector collect every
@@ -366,7 +393,7 @@ A version that parses but does not match the row is **409
 The one exception is `parseExpectedVersionOrCreate`, used on exactly one route
 in the whole app: `POST /configuration/company-default-price-books/…/upsert`.
 It additionally accepts **`"0"`**, meaning "I expect no mapping to exist yet".
-See [Configuration](#configuration--9-routes).
+See [Configuration](#configuration--10-routes).
 
 **Where the ETag comes from.** `TradeResponseInterceptor` sets
 `ETag: "<n>"` whenever the unwrapped payload has a numeric `version` property.
@@ -425,7 +452,7 @@ Exception on this page:
 
 No Trade route on this page is cursor-paged. The only cursor in the whole app
 is on `GET /quotations/customer-options` — see
-[trade-documents.md](trade-documents.md#the-one-cursor-in-trade).
+[trade-documents.md](trade-documents.md#quotation-customer-cursor).
 
 ### Capabilities — Trade has none
 
@@ -740,6 +767,14 @@ sites in `catalog.service.ts`. Three distinct failures, one code.
 
 ## Commercial accounts — 10 routes
 
+Credit utilisation display updated **2026-10-31**: the portal computes
+`floor(exposure * 100 / effectiveLimit)` using exact fixed-decimal BigInt units,
+clamped to 0–100. Exposure `99.996` against limit `100` displays 99%; only
+exposure at or above a positive limit displays 100%. Missing, zero or negative
+limits omit the bar; a missing exposure retains the zero-exposure display.
+Quick-test amount labels format their decimal string constants directly with
+the portal's explicit locale, preserving the exact string passed to evaluation.
+
 Assignment compatibility rechecked **2026-10-17** (CXTRADE-OPS-117): the account
 form suggests up to four active books from the first role-filtered page of 25
 in the selected Company (`PURCHASE` for suppliers, `SALES` for customers).
@@ -778,7 +813,7 @@ exact path in any case.
 
 | DTO | Fields |
 | --- | --- |
-| `CreateCommercialAccountDto` | `partyId` **required**, `accountRole` **required**, `paymentTermsId?`, `creditLimit?` (decimal string), `creditCurrencyCode?` (`^[A-Z]{3}$`), `priceBookId?`, `creditPolicyVersionId?`, `terms?` (**defaults to `{}`**) |
+| `CreateCommercialAccountDto` | `partyId` **required**, `accountRole` **required**, `creditLimit?` (decimal string), `creditCurrencyCode?` (`^[A-Z]{3}$`), `priceBookId?`, `creditPolicyVersionId?`, `terms?` (**defaults to `{}`**) |
 | `UpdateCommercialAccountDto` | the same, minus `partyId` and `accountRole`; `terms?` has **no default**, so omitting it leaves the stored value |
 | `CreateAccountBranchRuleDto` | `branchId` **required**, `narrowingRules` (object, **required**) |
 | `UpdateAccountBranchRuleDto` | `narrowingRules` **required**, `status?` |
@@ -788,6 +823,12 @@ exact path in any case.
 | `CommercialAccountLookupQueryDto` | `search?` (≤ 80), `limit` (≤ 100, default 50) — **no `page`** |
 
 `CommercialAccountRole`: **`CUSTOMER`** · **`SUPPLIER`**.
+
+Payment-term assignment verified **2026-10-29**: deferred to Accounting until
+a payment-terms master exists. Create and update reject `paymentTermsId`
+with 400 (including null). The portal does not send, display or search this
+field; lookups contain only credit policies. The nullable database column is
+retained without changes.
 
 **Account status has no enum.** `block` writes the literal `"BLOCKED"` and
 `unblock` writes `"ACTIVE"`; `documents.service.ts` reads only those two
@@ -806,7 +847,7 @@ contract.
 | `TRADE.ACCOUNT.NOT_FOUND` | 404 | |
 | `TRADE.ACCOUNT.ALREADY_EXISTS` | 409 | one account per party per role |
 | `TRADE.ACCOUNT.PARTY_ROLE_INVALID` | 422 | the party does not hold that commercial role |
-| `TRADE.ACCOUNT.TERM_INVALID` | 422 | `paymentTermsId` unusable |
+| `TRADE.ACCOUNT.TERM_INVALID` | 422 | assigned Price Book is missing, inactive or outside the Company |
 | `TRADE.ACCOUNT.PRICE_BOOK_INCOMPATIBLE` | 422 | Assigned book must have purpose PURCHASE for SUPPLIER or SALES for CUSTOMER; create and update validate before saving |
 | `TRADE.ACCOUNT.CREDIT_LIMIT_INVALID` | 422 | limit without a currency, or vice versa |
 | `TRADE.ACCOUNT.BRANCH_RULE_ALREADY_EXISTS` | 409 | `POST` where a rule exists |
@@ -820,10 +861,10 @@ contract.
 
 ---
 
-## Configuration — 9 routes
+## Configuration — 10 routes
 
-Nine routes share the `/configuration` prefix but split across two modules,
-two features and two permission families. Read the table before assuming.
+Ten routes share the `/configuration` prefix and split across two modules,
+two features and three permission families (`trade.configuration.*`, `trade.pricing.read`, `trade.policy.publish`). Read the table before assuming.
 
 | Method | Canonical path | Permission | Scope target | Feature |
 | --- | --- | --- | --- | --- |
@@ -833,16 +874,17 @@ two features and two permission families. Read the table before assuming.
 | POST | `/api/tenant/trade/v1/configuration/versions/:id/test` | `trade.configuration.manage` | `OPERATING_CONTEXT` | `trade.policy_studio` |
 | POST | `/api/tenant/trade/v1/configuration/versions/:id/publish` | **`trade.policy.publish`** | `OPERATING_CONTEXT` | `trade.policy_studio` |
 | POST | `/api/tenant/trade/v1/configuration/resolve` | `trade.configuration.read` | `OPERATING_CONTEXT` | any MVP feature |
+| GET | `/api/tenant/trade/v1/configuration/company-default-price-books` | `trade.pricing.read` | `COMPANY` | **`trade.pricing`** |
 | GET | `/api/tenant/trade/v1/configuration/company-default-price-books/:purpose/:currencyCode` | `trade.configuration.read` | `COMPANY` | **`trade.pricing`** |
 | POST | `/api/tenant/trade/v1/configuration/company-default-price-books/:purpose/:currencyCode/upsert` | `trade.configuration.manage` | `COMPANY` | **`trade.pricing`** |
 | DELETE | `/api/tenant/trade/v1/configuration/company-default-price-books/:purpose/:currencyCode` | `trade.configuration.manage` | `COMPANY` | **`trade.pricing`** |
 
-**Judgement call.** The three `company-default-price-books` routes live on
+**Judgement call.** The four `company-default-price-books` routes live on
 `PricingController`, are gated on `trade.pricing`, and MASTER-PLAN names them
 in task **12.12**, not Phase 10. They are documented here because they are
-under the `/configuration` prefix and 10.19 counts nine routes for it —
+under the `/configuration` prefix —
 a reader looking up a `/configuration` path will look here.
-[trade-advanced.md](trade-advanced.md#price-books--7-routes) cross-links back.
+[trade-advanced.md](trade-advanced.md#price-books--16-routes) cross-links back.
 This also resolves a plan inconsistency: 10.19's own list ("definitions,
 versions, test, publish, resolve") enumerates only six of the nine.
 
@@ -968,7 +1010,7 @@ because the page was silent or wrong about it.
 | Route | What it actually returns |
 | --- | --- |
 | `POST /commercial-accounts/:id/evaluate-credit` | the saved **`TradeDecisionReceiptEntity`**, not the decision. The decision is under `result`: `{ outcome, reasonCode, commercialAccountId, accountVersion, branchRuleId, branchRuleVersion, effectiveLimit, exposureAmount, proposedAmount, remainingAmount, currencyCode, orderingHold, sourceVersion, asOf }`, with every money field a decimal string or `null`. The receipt also carries a numeric `version`, so the response has an `ETag` that means nothing to the caller |
-| `GET /commercial-accounts/lookups` | **not a list of accounts.** `{ paymentTerms: [{ id, source }], creditPolicies: [{ id, versionNumber, status, effectiveFrom, effectiveTo, contentHash, definitionId, code, scopeTarget, companyId, branchId }], limitations: { paymentTerms: "REFERENCED_IDS_ONLY_NO_SCOPED_PAYMENT_TERMS_MASTER_ENTITY" } }` — a reference lookup for the two id fields on the account form |
+| `GET /commercial-accounts/lookups` | **not a list of accounts.** `{ creditPolicies: [{ id, versionNumber, status, effectiveFrom, effectiveTo, contentHash, definitionId, code, scopeTarget, companyId, branchId }] }` — published credit-policy references; payment terms are deferred to Accounting |
 | `GET /items/:id` | the item, spread with `companyProfile` and `branchProfile` **alongside** it, each `null` when the operating context does not reach one |
 | `GET /items` | each row is the item entity; `eligibility` is added **only** when a company header is sent, and its `branchProfile*` members are `null` unless a branch is sent too |
 | `GET /channels/:id` | the channel spread with `branches: TradeChannelBranchEntity[]` |

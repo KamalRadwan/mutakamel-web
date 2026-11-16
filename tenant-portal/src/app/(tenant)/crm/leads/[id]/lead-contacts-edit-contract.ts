@@ -8,6 +8,7 @@ export interface LeadContactsForm {
   firstName: string;
   lastName: string;
   honorificTitle: string;
+  jobTitle: string;
   email: string;
   phones: string[];
 }
@@ -24,6 +25,7 @@ export function toLeadContactsForm(lead: LeadDetail): LeadContactsForm {
     firstName: lead.firstName ?? "",
     lastName: lead.lastName ?? "",
     honorificTitle: lead.honorificTitle ?? "",
+    jobTitle: lead.jobTitle ?? "",
     email: lead.email ?? "",
     phones: lead.phones.length > 0 ? [...lead.phones] : lead.primaryMobile ? [lead.primaryMobile] : [""],
   };
@@ -55,6 +57,7 @@ export function validateLeadContactsForm(
     bag.maxLength("firstName", form.firstName, limits.name);
     bag.maxLength("lastName", form.lastName, limits.name);
     bag.maxLength("honorificTitle", form.honorificTitle, limits.honorificTitle);
+    bag.maxLength("jobTitle", form.jobTitle, limits.jobTitle);
     bag.email("email", form.email, limits.email);
     bag.phones("phones", form.phones);
     if (filledPhones(form.phones).length > limits.phones) bag.set("phones", messages.invalid);
@@ -92,7 +95,7 @@ export function buildLeadContactsRequest(
     const next = form[field].trim();
     if (next !== baseline[field].trim()) request[field] = next;
   }
-  for (const field of ["honorificTitle", "email"] as const) {
+  for (const field of ["honorificTitle", "jobTitle", "email"] as const) {
     const next = form[field].trim();
     if (next !== baseline[field].trim()) request[field] = next || null;
   }

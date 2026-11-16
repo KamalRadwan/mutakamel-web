@@ -52,7 +52,16 @@ export function useLeadContactsEdit(
     setForm((current) => current ? update(current) : null);
     clearError();
   };
-  const setField = (field: LeadContactPersonField, value: string) => change((current) => ({ ...current, [field]: value }));
+  const setField = (field: LeadContactPersonField, value: string) => change((current) => {
+    const next = { ...current, [field]: value };
+    if ((field === "firstName" || field === "lastName") && next.firstName.trim() && next.lastName.trim()) {
+      const previousName = [current.firstName.trim(), current.lastName.trim()].filter(Boolean).join(" ");
+      if (!current.displayName.trim() || current.displayName === previousName) {
+        next.displayName = [next.firstName.trim(), next.lastName.trim()].join(" ");
+      }
+    }
+    return next;
+  });
   const setPhone = (index: number, value: string) => change((current) => ({ ...current, phones: current.phones.map((phone, i) => i === index ? value : phone) }));
   const addPhone = () => change((current) => current.phones.length < LEAD_CONTACT_EDIT_LIMITS.phones ? { ...current, phones: [...current.phones, ""] } : current);
   const removePhone = (index: number) => change((current) => ({ ...current, phones: current.phones.length === 1 ? [""] : current.phones.filter((_, i) => i !== index) }));

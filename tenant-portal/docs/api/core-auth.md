@@ -242,6 +242,7 @@ The identity and permission bootstrap. Response shape as validated by
   email: string;
   firstName: string;
   lastName: string;
+  hasAvatar?: boolean;             // linked person Party image exists; gates the avatar GET
   isTenantOwner: boolean;
   status: string;
   accessibleBranches: string[];    // drives TenantBranchSelect
@@ -255,6 +256,7 @@ The identity and permission bootstrap. Response shape as validated by
     teamMembershipsTotal: number;
   };
   permissions: string[];           // drives route admission
+    featureEntitlements: { "crm.outbound_email": boolean }; // advisory email admission
   permissionScopes: Record<string, {
     tenantWide: boolean;
     companyIds: string[];
@@ -268,6 +270,15 @@ The identity and permission bootstrap. Response shape as validated by
 requires one of them as `branchId`. `permissions` drives **route** admission;
 **action** admission uses the CRM capabilities endpoints instead — see
 [README.md](README.md#capabilities-endpoints).
+
+Email entitlement projection (source updated **2026-10-29**, AUDIT28C-CORE-2):
+`featureEntitlements["crm.outbound_email"]` is available to every authenticated
+staff user, without owner-only billing access. Core resolves it through the same
+revision-fenced policy and current application-publication checks as its route
+guard. Missing or non-boolean projections invalidate the profile; unavailable
+policy returns `503 ACCESS_POLICY_UNAVAILABLE`, not a false entitlement. The
+boolean describes read admission; write restrictions during dunning/read-only
+periods still come from the backend. Deploy Core before the portal rebuild.
 
 Core action scopes (source verified **2026-10-17**, FE-CORE-PERM-001) use
 `permissionScopes` from the same active grants as Core's permission guard.
@@ -381,8 +392,8 @@ rotation and validation.
 
 | Status | Meaning |
 | --- | --- |
-| 401 | Invalid credentials, or expired/replaced session |
-| 403 | Authenticated but not permitted, or tenant suspended |
+| 401 | Login: `INVALID_CREDENTIALS` for wrong passwords and every non-ACTIVE account, including a correct password for a suspended or deactivated user. Protected flows: expired/replaced session. Source reviewed 2026-10-31 (AUDIT29X-AUTH-5). |
+| 403 | Authenticated but not permitted, or tenant suspended. `ACCOUNT_NOT_ACTIVE` is not a login outcome; the portal must not infer account status from login failures. `SUBSCRIPTION_PAST_DUE` and owner billing access are unchanged. |
 | 404 | Unknown session id on revoke |
 | 429 | Core login budget: `AUTH_LOGIN_THROTTLED`; `Retry-After` gives seconds and `details.retryAfterSeconds` is an array containing the same seconds string. Back off; do not retry in a loop. Gateway IP limits may instead return `GW.RATE.LIMIT_EXCEEDED`. |
 | 503 | Login-budget Redis unavailable or returning malformed replies, or public-route limiter Redis unavailable on login, forgot-password, reset-password or accept-invite. Core uses its translated service-unavailable error shape for both limiters; Gateway uses `GW.RATE.UNAVAILABLE`. Treat as temporarily unavailable. |

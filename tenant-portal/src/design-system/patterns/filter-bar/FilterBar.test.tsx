@@ -286,3 +286,19 @@ describe("FilterBar", () => {
     expect(screen.getByRole("button", { name: "Remove Status: Open" })).toBeInTheDocument();
   });
 });
+
+
+describe("inline list filters",()=>{
+  it("names a multi-select filter even when shared picker labels include a placeholder",()=>{
+    const labels = {...multiSelectLabels, placeholder:"Choose…"};
+    renderBar({placement:"inline",filters:[{kind:"multiSelect",id:"branch",label:"Branch",options:[],labels}]});
+    expect(screen.getByRole("button",{name:"Branch"})).toHaveTextContent("Branch");
+  });
+  it("keeps the status control and search visible with the results",()=>{
+    renderBar({placement:"inline",filters:filters.slice(0,1),trailing:<span>List ordering</span>});
+    expect(screen.getByRole("combobox",{name:"Status"})).toBeVisible();
+    expect(screen.getByRole("textbox",{name:"Search"})).toBeVisible();
+    expect(screen.queryByRole("button",{name:/Filters/})).not.toBeInTheDocument();
+    expect(screen.getByText("List ordering")).toBeVisible();
+  });
+});

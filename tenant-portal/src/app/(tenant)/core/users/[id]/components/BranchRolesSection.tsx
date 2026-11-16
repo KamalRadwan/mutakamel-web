@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   AtomicReplacementConfirm,
@@ -8,17 +7,19 @@ import {
   Combobox,
   ConfirmActionModal,
   DataTable,
+  Field,
+  FormModal,
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useLanguage } from "@/i18n/useLanguage";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
-import type {
-  BranchRoleAssignment,
-} from "../../../contracts/role-assignment-contract";
+import type { BranchRoleAssignment } from "../../../contracts/role-assignment-contract";
 import type { useRoleGrantOptions } from "../../../hooks/useRoleGrantOptions";
+import { useBranchRoleForm } from "../hooks/useBranchRoleForm";
 import type { useUserRoleGrants } from "../hooks/useUserRoleGrants";
+import { BranchRoleReplaceModal } from "./BranchRoleReplaceModal";
 import { listTableLabels } from "./list-table-labels";
 
 interface BranchRolesSectionProps {
@@ -26,37 +27,27 @@ interface BranchRolesSectionProps {
   grantOptions: ReturnType<typeof useRoleGrantOptions>;
   roleLabel: (id: string) => string;
   branchLabel: (id: string | null | undefined) => string;
+  writeError?: string;
+  optionsErrorText?: string;
 }
 
 /**
- * `tenant_user_branch_roles` — a role scoped to one branch.
- *
- * Three write paths, and they are genuinely different operations rather than
- * one with options: `POST` adds a single grant, `DELETE` removes one, and `PUT`
- * replaces the whole set. The replacement gets the diff confirmation because
- * the request body says nothing about what it takes away.
+ * `tenant_user_branch_roles` — summary table on `/core/users/[id]` with centered
+ * modals for granting one `(branch, role)` pair (`POST`) or replacing the whole
+ * collection (`PUT`, preceded by `AtomicReplacementConfirm`).
  */
 export function BranchRolesSection({
   panel,
   grantOptions,
   roleLabel,
   branchLabel,
+  writeError,
+  optionsErrorText,
 }: BranchRolesSectionProps) {
   const { t } = useI18n();
   const lang = useLanguage();
   const copy = t.coreIdentity;
-  const [selectedPair, setSelectedPair] = useState("");
-  const [selectedBranchId, selectedRoleId] = selectedPair.split(":");
-  const selected = grantOptions.choices.find((row) => `${row.branchId}:${row.roleId}` === selectedPair);
-  const editingDisabled = panel.isSubmitting || panel.isBranchLoading || !!panel.branchError || !grantOptions.isReady;
-  const draft = panel.branchDraft;
-
-  const pickerLabels = {
-    placeholder: copy.picker.placeholder,
-    searchPlaceholder: copy.picker.searchPlaceholder,
-    loadingLabel: copy.picker.loading,
-    emptyLabel: copy.picker.empty,
-  };
+  const form = useBranchRoleForm({ panel, grantOptions });
 
   const describe = (grant: { branchId: string; roleId: string }) => ({
     label: roleLabel(grant.roleId),
@@ -64,8 +55,16 @@ export function BranchRolesSection({
   });
 
   const columns: ColumnDef<BranchRoleAssignment>[] = [
-    { id: "role", header: copy.roles.singular, cell: (row) => roleLabel(row.roleId) },
-    { id: "branch", header: copy.levels.branches.singular, cell: (row) => branchLabel(row.branchId) },
+    {
+      id: "role",
+      header: copy.roles.singular,
+      cell: (row) => roleLabel(row.roleId),
+    },
+    {
+      id: "branch",
+      header: copy.levels.branches.singular,
+      cell: (row) => branchLabel(row.branchId),
+    },
     {
       id: "actions",
       header: t.common.actions,
@@ -75,7 +74,7 @@ export function BranchRolesSection({
           variant="ghost"
           size="sm"
           onClick={() => panel.requestRemoval(row)}
-          disabled={editingDisabled}
+          disabled={form.editingDisabled}
           aria-label={`${t.common.delete}: ${roleLabel(row.roleId)}`}
         >
           <Trash2 className="size-4 text-destructive" aria-hidden="true" />
@@ -84,23 +83,75 @@ export function BranchRolesSection({
     },
   ];
 
-  function addRow() {
-    if (!selected || editingDisabled) return;
-    const { roleId: newRoleId, branchId: newBranchId } = selected;
-    if (draft === null) {
-      void panel.addBranchRole({ branchId: newBranchId, roleId: newRoleId });
-    } else if (
-      !draft.some((grant) => grant.branchId === newBranchId && grant.roleId === newRoleId)
-    ) {
-      panel.setBranchDraft([...draft, { branchId: newBranchId, roleId: newRoleId }]);
-    }
-    setSelectedPair("");
-  }
+  const pairCombobox = (
+    <Combobox textSize="compact"
+      id="branch-role-pair"
+      placeholder={copy.picker.placeholder}
+      searchPlaceholder={copy.picker.searchPlaceholder}
+      loadingLabel={copy.picker.loading}
+      emptyLabel={copy.picker.empty}
+      value={form.selectedPair || undefined}
+      selectedLabel={
+        form.selectedPair
+          ? `${roleLabel(form.selectedRoleId)} — ${branchLabel(form.selectedBranchId)}`
+          : undefined
+      }
+      onValueChange={(next) => form.setSelectedPair(next ?? "")}
+      options={grantOptions.isReady ? grantOptions.options : []}
+      onSearch={grantOptions.search}
+      loading={grantOptions.isLoading}
+      disabled={panel.isSubmitting}
+      errorContent={grantOptions.error ? optionsErrorText ?? copy.grants.optionsLoadFailed : undefined}
+      footer={
+        grantOptions.hasMore && grantOptions.isReady ? (
+          <Button variant="ghost" size="sm" onClick={grantOptions.loadMore}>
+            {copy.grants.moreOptions}
+          </Button>
+        ) : undefined
+      }
+    />
+  );
 
   return (
-    <section className="flex flex-col gap-2">
-      <h3 className="text-xs font-medium text-foreground">{copy.grants.branchRolesTitle}</h3>
-      <p className="text-2xs text-muted-foreground">{copy.grants.branchRolesDescription}</p>
+    <section className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <h3 className="text-xs font-medium text-foreground">
+            {copy.grants.branchRolesTitle}
+          </h3>
+          <p className="text-2xs text-muted-foreground">
+            {copy.grants.branchRolesDescription}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={form.editingDisabled}
+            onClick={form.openAdd}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            {copy.grants.addBranchRole}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={form.startReplace}
+            disabled={form.editingDisabled || panel.branchRoles.length === 0}
+          >
+            {copy.memberships.replaceAll}
+          </Button>
+        </div>
+      </div>
+
+      {grantOptions.error ? (
+        <p role="alert" className="flex items-center gap-2 text-xs text-destructive">
+          <span>{optionsErrorText ?? copy.grants.optionsLoadFailed}</span>
+          <Button variant="ghost" size="sm" onClick={grantOptions.retry}>
+            {t.common.retry}
+          </Button>
+        </p>
+      ) : null}
 
       <DataTable
         columns={columns}
@@ -109,99 +160,58 @@ export function BranchRolesSection({
         error={panel.branchError}
         onRetry={panel.reload}
         rowKey={(row) => row.id}
-        labels={listTableLabels(t, copy.grants.branchLoadFailed, copy.grants.branchEmpty)}
+        labels={listTableLabels(
+          t,
+          copy.grants.branchLoadFailed,
+          copy.grants.branchEmpty,
+        )}
       />
 
-      {grantOptions.error ? (
-        <p role="alert" className="text-xs text-destructive">
-          {copy.grants.optionsLoadFailed}
-          <Button variant="ghost" size="sm" onClick={grantOptions.retry}>{t.common.retry}</Button>
-        </p>
+      {form.isAddOpen ? (
+        <FormModal
+          open={form.isAddOpen}
+          onOpenChange={(open) => {
+            if (!open) form.closeAdd();
+          }}
+          size="card"
+          title={copy.grants.branchRolesTitle}
+          description={copy.grants.branchRolesDescription}
+          isDirty={form.selectedPair.length > 0}
+          isSubmitting={panel.isSubmitting}
+          submitDisabled={!form.selected || form.editingDisabled}
+          onSubmit={() => void form.submitSingleAdd()}
+          error={writeError}
+          labels={{
+            submit: copy.grants.addBranchRole,
+            cancel: t.common.cancel,
+            close: copy.actions.close,
+            discardTitle: t.common.discardTitle,
+            discardDescription: t.common.discardDescription,
+            discardConfirm: t.common.discardConfirm,
+            discardCancel: t.common.cancel,
+            sections: t.common.general,
+            sectionInvalid: copy.errors.UNKNOWN,
+          }}
+        >
+          <Field label={copy.grants.assignablePair} showLabel required>
+            {pairCombobox}
+          </Field>
+        </FormModal>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-48 flex-1">
-          <label htmlFor="branch-role-pair" className="text-2xs text-muted-foreground">{copy.grants.assignablePair}</label>
-          <Combobox
-            id="branch-role-pair"
-            {...pickerLabels}
-            value={selectedPair || undefined}
-            selectedLabel={selectedPair ? `${roleLabel(selectedRoleId ?? "")} — ${branchLabel(selectedBranchId)}` : undefined}
-            onValueChange={(next) => setSelectedPair(next ?? "")}
-            options={grantOptions.isReady ? grantOptions.options : []}
-            onSearch={grantOptions.search}
-            loading={grantOptions.isLoading}
-            disabled={panel.isSubmitting}
-            errorContent={grantOptions.error ? copy.grants.optionsLoadFailed : undefined}
-            footer={grantOptions.hasMore && grantOptions.isReady ? (
-              <Button variant="ghost" size="sm" onClick={grantOptions.loadMore}>{copy.grants.moreOptions}</Button>
-            ) : undefined}
-          />
-        </div>
-        <Button size="sm"
-          variant="outline"
-          disabled={!selected || editingDisabled}
-          onClick={addRow}
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          {copy.grants.addBranchRole}
-        </Button>
-        {draft === null ? (
-          <Button size="sm"
-            variant="ghost"
-            onClick={panel.startBranchReplace}
-            disabled={editingDisabled || panel.branchRoles.length === 0}
-          >
-            {copy.memberships.replaceAll}
-          </Button>
-        ) : null}
-      </div>
-
-      {draft !== null ? (
-        <div className="flex flex-col gap-2 rounded-sm border border-border bg-muted p-3">
-          <p className="text-2xs text-muted-foreground">{copy.grants.replaceHint}</p>
-          <ul className="flex flex-col gap-1">
-            {draft.map((grant) => {
-              const key = `${grant.branchId}:${grant.roleId}`;
-              const described = describe(grant);
-              return (
-                <li key={key} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-foreground">
-                    {described.label} — {described.hint}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    disabled={editingDisabled}
-                    onClick={() =>
-                      panel.setBranchDraft(
-                        draft.filter(
-                          (entry) => `${entry.branchId}:${entry.roleId}` !== key,
-                        ),
-                      )
-                    }
-                    aria-label={`${t.common.delete}: ${described.label}`}
-                  >
-                    <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={panel.reviewBranch}
-              disabled={editingDisabled}
-            >
-              {copy.grants.review}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={panel.cancelBranchReplace}>
-              {t.common.cancel}
-            </Button>
-          </div>
-        </div>
+      {form.draft !== null && !panel.isReviewingBranch ? (
+        <BranchRoleReplaceModal
+          panel={panel}
+          draft={form.draft}
+          isDirty={form.isDraftDirty}
+          editingDisabled={form.editingDisabled}
+          canAddSelected={Boolean(form.selected)}
+          pairCombobox={pairCombobox}
+          onAddRow={form.addDraftRow}
+          onClose={form.closeReplace}
+          describe={describe}
+          writeError={writeError}
+        />
       ) : null}
 
       <ConfirmActionModal
@@ -213,9 +223,11 @@ export function BranchRolesSection({
         description={formatTemplate(copy.grants.removeBranchRoleMessage, {
           name: panel.pendingRemoval ? roleLabel(panel.pendingRemoval.roleId) : "",
         })}
-        confirmLabel={t.common.delete}
+        confirmLabel={copy.actions.delete}
         cancelLabel={t.common.cancel}
-        onConfirm={() => { if (!editingDisabled) void panel.removeBranchRole(); }}
+        onConfirm={() => {
+          if (!form.editingDisabled) void panel.removeBranchRole();
+        }}
         loading={panel.isSubmitting}
       />
 
@@ -225,7 +237,9 @@ export function BranchRolesSection({
           if (!open) panel.closeBranchReview();
         }}
         diff={panel.branchDiff(describe)}
-        onConfirm={() => { if (!editingDisabled) void panel.commitBranchRoles(); }}
+        onConfirm={() => {
+          if (!form.editingDisabled) void panel.commitBranchRoles();
+        }}
         loading={panel.isSubmitting}
         formatCount={(count) => formatNumber(count, lang)}
         labels={{

@@ -33,7 +33,6 @@ describe("CRM settings read errors", () => {
     get.mockResolvedValueOnce({ status: 200, statusText: "OK", headers: new Headers(), data: {
       id: "01900100-0000-7000-8000-000000000001",
       requireQualifiedStageForConversion: false,
-      defaultLeadStageId: null,
       defaultPipelineId: "01900100-0000-7000-8000-000000000002",
       outboundEmailContentRetentionDays: 730,
       outboundEmailRetentionPolicyRevision: 1,

@@ -4,7 +4,7 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
-Updated: **2026-10-26** — [CRM Leads v3 fonts, weight policy & named type steps](specs/crm-leads-v3.md).
+Updated: **2026-11-04** — shared Arabic/English sizes and line-heights; supersedes the Arabic lift in [CRM Leads v3](specs/crm-leads-v3.md).
 
 Source of truth once implemented: `src/app/fonts.ts`, `src/app/globals.css`.
 
@@ -192,32 +192,30 @@ only through `text-micro` (count chips and initials only), `text-badge`, and
 `text-caption` in their designated roles. Where `text-2xs` appears, it remains
 for Latin uppercase micro-labels only.
 
-## Arabic gets a lift
+## Arabic and English share the same size
 
-Every small and mid step — both the named CRM Leads v3 steps and `xs` / `sm` /
-`base` — gains `+1px` under `html[lang="ar"]`, with line-heights raised in
-lockstep and negative letter-spacing zeroed so Cairo's dots and joined forms
-never clip or split:
+Every type step uses the same font size and line-height in both languages.
+Switching language must not enlarge the interface. The shared base and named
+CRM Leads v3 steps above apply unchanged; Settings badges and tags also keep
+the same height in both directions. Density remains a separate user preference.
+
+Only negative letter-spacing is zeroed for Arabic so Cairo's joined forms
+remain connected:
 
 ```css
 html[lang="ar"] {
-  --text-micro: 0.6875rem;              /* 11px / 15px */
-  --text-badge: 0.75rem;                /* 12px / 17px */
-  --text-caption: 0.8125rem;            /* 13px / 20px */
-  --text-label: 0.84375rem;             /* 13.5px / 20px */
-  --text-tab: 0.90625rem;               /* 14.5px / 22px, tracking 0em */
-  --text-card-title: 0.9375rem;         /* 15px / 22px, tracking 0em */
-  --text-column-title: 0.96875rem;      /* 15.5px / 23px, tracking 0em */
-  --text-xs: 0.875rem;                  /* 14px / 20px */
-  --text-sm: 0.9375rem;                 /* 15px / 22px */
-  --text-base: 1rem;                    /* 16px / 26px */
+  --text-tab--letter-spacing: 0em;
+  --text-card-title--letter-spacing: 0em;
+  --text-column-title--letter-spacing: 0em;
+  --text-sm--letter-spacing: 0em;
+  --text-base--letter-spacing: 0em;
+  --text-lg--letter-spacing: 0em;
+  --text-xl--letter-spacing: 0em;
+  --text-2xl--letter-spacing: 0em;
 }
 ```
 
-`text-2xs` is deliberately **not** lifted — it is Latin-only by convention,
-there being no uppercase in Arabic. Because the lift is driven by `html[lang]`,
-it follows the language toggle automatically; no component branches on language
-for sizing, ever.
+No component branches on language for sizing.
 
 ## Numerals
 

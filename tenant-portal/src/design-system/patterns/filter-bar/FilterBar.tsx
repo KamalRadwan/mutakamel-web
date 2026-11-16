@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { useLanguage } from "@/i18n/useLanguage";
 import { formatDecimalString } from "@/lib/format/number";
@@ -15,12 +15,15 @@ import { Input } from "../../primitives/Input";
 import { Popover, PopoverContent, PopoverTrigger } from "../../primitives/Popover";
 import { INTL_LOCALE } from "@/lib/format/locale";
 import { FilterControl } from "./FilterControl";
-import { PageActions } from "../../shell/PageActions";
+import { FilterControlsHost } from "./FilterControlsHost";
 import { describeFilters, type FilterChipDescriptor, type FilterDef, type FilterValues } from "./filter-types";
 
 export * from "./filter-types";
 
 export interface FilterBarProps {
+  /** Lists may keep controls with their results; existing shell consumers retain their placement. */
+  placement?: "action-bar" | "inline";
+  trailing?: ReactNode;
   filters: FilterDef[];
   values: FilterValues;
   onChange: (next: FilterValues) => void;
@@ -28,6 +31,8 @@ export interface FilterBarProps {
   searchValue: string;
   onSearchChange: (query: string) => void;
   searchPlaceholder?: string;
+  searchWidth?: "default" | "wide";
+  searchTextSize?: "default" | "compact";
   /** Omit search when the list endpoint does not support it. */
   hideSearch?: boolean;
   filtersLabel?: string;
@@ -59,6 +64,8 @@ const RANGE_SEPARATOR = " – ";
 // workspace hook owns writing to it. Search debounces here so the URL isn't
 // touched on every keystroke — docs/design/patterns.md#filterbar.
 export function FilterBar({
+  placement = "action-bar",
+  trailing,
   filters,
   values,
   onChange,
@@ -66,6 +73,8 @@ export function FilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder,
+  searchWidth = "default",
+  searchTextSize = "default",
   hideSearch = false,
   filtersLabel,
   clearAllLabel,
@@ -115,6 +124,8 @@ export function FilterBar({
 
   const visibleChips = chips.slice(0, maxVisibleChips);
   const overflowChips = chips.slice(maxVisibleChips);
+  const inlineFilters = placement === "inline" ? filters : [];
+  const popupFilters = placement === "inline" ? [] : filters;
 
   function applyChipRemoval(chip: FilterChipDescriptor) {
     onChange({ ...values, [chip.filterId]: chip.nextValue });
@@ -158,12 +169,14 @@ export function FilterBar({
           question of the data, the body is where the answer's current
           conditions are listed and removed. Chips also wrap onto a second line
           by design, which a 48px bar has nowhere to put. */}
-      <PageActions slot="search">
+      <FilterControlsHost placement={placement}>
         {!hideSearch && (
           <div
             className={cn(
               "flex h-(--size-toolbar-control) min-w-60 max-w-[460px] flex-1 items-center gap-2 rounded-lg border border-line-control bg-surface-subtle px-2.5",
+              placement === "inline" && "w-full max-w-none basis-full sm:max-w-lg sm:basis-auto",
               "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
+              searchWidth === "wide" && "w-80 min-w-80 max-w-lg 2xl:w-96",
             )}
           >
             <Search
@@ -175,7 +188,8 @@ export function FilterBar({
               value={localSearch}
               onChange={(event) => handleSearchInput(event.target.value)}
               placeholder={searchPlaceholder}
-              className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              aria-label={searchPlaceholder}
+              className={cn("h-full min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0", searchTextSize === "compact" && "sm:text-caption")}
             />
           </div>
         )}
@@ -186,7 +200,8 @@ export function FilterBar({
             when it owned a full row of its own, unworkable in a bar it shares
             with the screen's actions and its view switcher. The popover also
             gives the filters a 288px column instead of a squeezed row. */}
-        {filters.length > 0 && (
+        {inlineFilters.map(renderFilterControl)}
+        {popupFilters.length > 0 && (
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="cursor-pointer">
@@ -200,11 +215,12 @@ export function FilterBar({
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="flex w-72 flex-col gap-2">
-              {filters.map(renderFilterControl)}
+              {popupFilters.map(renderFilterControl)}
             </PopoverContent>
           </Popover>
         )}
-      </PageActions>
+        {placement === "inline" && trailing && <div className="ms-auto">{trailing}</div>}
+      </FilterControlsHost>
 
       {chips.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">

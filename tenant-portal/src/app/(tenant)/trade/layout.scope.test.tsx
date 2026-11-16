@@ -15,9 +15,18 @@ const COMPANY = "0192f3a0-0000-7000-8000-000000000001";
 const OTHER_COMPANY = "0192f3a0-0000-7000-8000-000000000002";
 const BRANCH = "0192f3a0-0000-7000-8000-000000000003";
 const OTHER_BRANCH = "0192f3a0-0000-7000-8000-000000000004";
+const COMPANY_NAME = "Mersany Trading";
+const OTHER_COMPANY_NAME = "Delta Trading";
+const BRANCH_NAME = "Cairo branch";
+const OTHER_BRANCH_NAME = "Alexandria branch";
 const { i18n } = vi.hoisted(() => ({ i18n: vi.fn() }));
 
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: i18n }));
+vi.mock("@/i18n/server", () => ({ loadServerLanguage: vi.fn() }));
+vi.mock("@/hooks/useTenantBranchLabels", () => ({
+  useTenantCompanyLabels: () => new Map([[COMPANY, COMPANY_NAME], [OTHER_COMPANY, OTHER_COMPANY_NAME]]),
+  useTenantBranchLabels: () => new Map([[BRANCH, BRANCH_NAME], [OTHER_BRANCH, OTHER_BRANCH_NAME]]),
+}));
 vi.mock("@/context/AuthContext", () => ({
   useTenantAuth: () => ({ user: {
     accessibleCompanies: [
@@ -29,7 +38,10 @@ vi.mock("@/context/AuthContext", () => ({
       "0192f3a0-0000-7000-8000-000000000004",
     ],
     permissions: [],
-    teamMemberships: [],
+    teamMemberships: [
+      { companyId: "0192f3a0-0000-7000-8000-000000000001", branchId: "0192f3a0-0000-7000-8000-000000000003" },
+      { companyId: "0192f3a0-0000-7000-8000-000000000001", branchId: "0192f3a0-0000-7000-8000-000000000004" },
+    ],
   } }),
 }));
 vi.mock("./trade-api", async (importOriginal) => ({
@@ -71,10 +83,10 @@ describe("Trade layout shared scope", () => {
     const company = screen.getByRole("combobox", { name: t.trade.scopeCompany });
     expect(company).toBeVisible();
     fireEvent.keyDown(company, { key: "ArrowDown" });
-    fireEvent.click(await screen.findByRole("option", { name: COMPANY }));
+    fireEvent.click(await screen.findByRole("option", { name: COMPANY_NAME }));
     const branch = screen.getByRole("combobox", { name: t.trade.scopeBranch });
     fireEvent.keyDown(branch, { key: "ArrowDown" });
-    fireEvent.click(await screen.findByRole("option", { name: BRANCH }));
+    fireEvent.click(await screen.findByRole("option", { name: BRANCH_NAME }));
     const headers = {
       "x-mutakamel-company-id": COMPANY,
       "x-mutakamel-branch-id": BRANCH,
@@ -87,12 +99,12 @@ describe("Trade layout shared scope", () => {
     }));
 
     fireEvent.click(screen.getByRole("button", { name: "Change advanced branch" }));
-    expect(branch).toHaveTextContent(OTHER_BRANCH);
+    expect(branch).toHaveTextContent(OTHER_BRANCH_NAME);
     expect(screen.getByTestId("document")).toHaveTextContent(OTHER_BRANCH);
     expect(screen.getByTestId("advanced")).toHaveTextContent(OTHER_BRANCH);
 
     fireEvent.keyDown(company, { key: "ArrowDown" });
-    fireEvent.click(await screen.findByRole("option", { name: OTHER_COMPANY }));
+    fireEvent.click(await screen.findByRole("option", { name: OTHER_COMPANY_NAME }));
     await waitFor(() => expect(screen.getByText(t.tradeDocuments.scopeRequiredTitle)).toBeVisible());
     expect(screen.getByTestId("document")).toHaveTextContent("{}");
     expect(screen.getByTestId("advanced")).not.toHaveTextContent(OTHER_BRANCH);

@@ -30,7 +30,7 @@ import {
   CONTROL_TOWER_RESOLVE_PERMISSION,
   CONTROL_TOWER_RETRY_PERMISSION,
   RETRYABLE_RETRY_CLASSES,
-  buildResolveExceptionRequest,
+  type buildResolveExceptionRequest,
   buildRetryExceptionRequest,
   controlTowerActionPath,
   controlTowerExceptionPath,
@@ -39,6 +39,7 @@ import {
   parseControlTowerExceptionDetail,
   type ControlTowerExceptionDetail,
 } from "../control-tower-contract";
+import { ResolveExceptionDialog } from "./components/ResolveExceptionDialog";
 
 const DETAIL_RESPONSE_LIMIT_BYTES = 400_000;
 
@@ -106,18 +107,17 @@ export default function ControlTowerExceptionPage({
     return () => controller.abort();
   }, [load]);
 
-  const act = async (action: "retry" | "resolve", reason: string): Promise<void> => {
+  const act = async (
+    action: "retry" | "resolve",
+    request: ReturnType<typeof buildRetryExceptionRequest> | ReturnType<typeof buildResolveExceptionRequest>,
+  ): Promise<void> => {
     if (!exception || pending) return;
     setPending(action);
     setActionError(null);
     try {
       await tradePost(
         controlTowerActionPath(exception.id, action),
-        action === "retry"
-          ? buildRetryExceptionRequest(reason)
-          : // Evidence is required on resolve. It is sent as an empty object
-            // when the operator has none: the DTO forbids omitting the key.
-            buildResolveExceptionRequest("SOURCE_CORRECTED", reason, "{}"),
+        action === "retry" ? buildRetryExceptionRequest(request.reason ?? "") : request,
         {
           headers: { ...scope.headers, "If-Match": tradeIfMatch(exception.version) },
           maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
@@ -175,7 +175,10 @@ export default function ControlTowerExceptionPage({
                   variant="outline"
                   disabled={pending !== null}
                   loading={pending === "resolve"}
-                  onClick={() => setDialog("resolve")}
+                  onClick={() => {
+                    setActionError(null);
+                    setDialog("resolve");
+                  }}
                 >
                   <CheckCircle2 className="size-4" aria-hidden="true" />
                   {t.tradeControlTower.resolve}
@@ -253,19 +256,14 @@ export default function ControlTowerExceptionPage({
       ) : null}
 
       <ReasonDialog
-        open={dialog !== null}
+        open={dialog === "retry"}
         onOpenChange={(open) => {
           if (!open && pending === null) setDialog(null);
         }}
-        title={dialog === "resolve" ? t.tradeControlTower.resolve : t.tradeControlTower.retry}
-        description={
-          dialog === "resolve"
-            ? t.tradeControlTower.resolveDescription
-            : t.tradeControlTower.retryDescription
-        }
-        reasonRequired={dialog === "resolve"}
+        title={t.tradeControlTower.retry}
+        description={t.tradeControlTower.retryDescription}
         maxLength={240}
-        onConfirm={(reason) => void act(dialog ?? "retry", reason)}
+        onConfirm={(reason) => void act("retry", { reason })}
         loading={pending !== null}
         labels={{
           reason: t.tradeGovernance.reason,
@@ -274,6 +272,14 @@ export default function ControlTowerExceptionPage({
           cancel: t.common.cancel,
         }}
       />
+      {dialog === "resolve" ? (
+        <ResolveExceptionDialog
+          onClose={() => setDialog(null)}
+          onConfirm={(request) => void act("resolve", request)}
+          loading={pending !== null}
+          error={actionError ?? undefined}
+        />
+      ) : null}
     </div>
   );
 

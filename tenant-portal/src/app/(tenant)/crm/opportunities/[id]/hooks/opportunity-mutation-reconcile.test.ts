@@ -7,6 +7,9 @@ import type { OpportunityDetail } from "../../opportunity-contract";
 import type { OpportunityPipeline } from "../../hooks/pipeline-types";
 import { useOpportunityEdit } from "./useOpportunityEdit";
 import { usePipelineTransfer } from "./usePipelineTransfer";
+import { en } from "@/i18n/dictionaries/en";
+
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
 
 const { api } = vi.hoisted(() => ({
   api: { get: vi.fn(), patch: vi.fn(), put: vi.fn() },
@@ -130,7 +133,7 @@ describe("Opportunity detail mutation reconciliation", () => {
     act(() => result.current.setCustomField("reference", "corrected"));
     expect(result.current.isDirty).toBe(true);
     await act(async () => { await result.current.submit(); });
-    expect(api.patch.mock.calls[0]?.[1]).toEqual({ customFields: { reference: "corrected" } });
+    expect(api.patch.mock.calls[0]?.[1]).toEqual({ customFields: { reference: "corrected" }, expectedUpdatedAt: item.updatedAt });
     expect(reconcile).toHaveBeenCalledOnce();
     expect(result.current.open).toBe(false);
 

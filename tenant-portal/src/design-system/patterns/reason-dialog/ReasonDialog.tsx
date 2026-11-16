@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../../lib/cn";
 import { Button } from "../../primitives/Button";
 import {
@@ -25,6 +25,7 @@ export interface ReasonDialogLabels {
 export interface ReasonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   title: string;
   description?: string;
   /** Optional icon badge rendered beside the dialog title. */
@@ -38,6 +39,7 @@ export interface ReasonDialogProps {
   showLabel?: boolean;
   /** When true the confirm stays disabled until a non-blank reason is typed. */
   reasonRequired?: boolean;
+  confirmDisabled?: boolean;
   /** Mirrors the backend column bound — pass the real one, do not accept the default blindly. */
   maxLength?: number;
   /** Styles confirm as destructive. The caller decides; the pattern does not guess from the title. */
@@ -52,6 +54,8 @@ export interface ReasonDialogProps {
   loading?: boolean;
   /** A rejection that is not field-level — rendered in-body, never as a toast. */
   error?: string;
+  focusReasonOnError?: boolean;
+  keepFocusWhileLoading?: boolean;
   labels: ReasonDialogLabels;
 }
 
@@ -60,6 +64,7 @@ const DEFAULT_MAX_LENGTH = 1000;
 export function ReasonDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   title,
   description,
   headerIcon,
@@ -68,6 +73,7 @@ export function ReasonDialog({
   templates,
   showLabel = false,
   reasonRequired = false,
+  confirmDisabled = false,
   maxLength = DEFAULT_MAX_LENGTH,
   destructive = false,
   footerLeading,
@@ -76,6 +82,8 @@ export function ReasonDialog({
   onConfirm,
   loading,
   error,
+  focusReasonOnError,
+  keepFocusWhileLoading,
   labels,
 }: ReasonDialogProps) {
   function dismiss() {
@@ -89,6 +97,7 @@ export function ReasonDialog({
         className="p-4 sm:p-5"
         showCloseButton={!loading}
         aria-busy={loading || undefined}
+        onCloseAutoFocus={onCloseAutoFocus}
         onEscapeKeyDown={(event) => (loading ? event.preventDefault() : undefined)}
         onPointerDownOutside={(event) => (loading ? event.preventDefault() : undefined)}
       >
@@ -101,6 +110,7 @@ export function ReasonDialog({
           templates={templates}
           showLabel={showLabel}
           reasonRequired={reasonRequired}
+          confirmDisabled={confirmDisabled}
           maxLength={maxLength}
           destructive={destructive}
           footerLeading={footerLeading}
@@ -110,6 +120,8 @@ export function ReasonDialog({
           onDismiss={dismiss}
           loading={loading}
           error={error}
+          focusReasonOnError={focusReasonOnError}
+          keepFocusWhileLoading={keepFocusWhileLoading}
           labels={labels}
         />
       </DialogContent>
@@ -134,6 +146,7 @@ function ReasonDialogBody({
   templates,
   showLabel,
   reasonRequired,
+  confirmDisabled,
   maxLength,
   destructive,
   footerLeading,
@@ -143,9 +156,38 @@ function ReasonDialogBody({
   onDismiss,
   loading,
   error,
+  focusReasonOnError,
+  keepFocusWhileLoading,
   labels,
 }: ReasonDialogBodyProps) {
   const [reason, setReason] = useState("");
+  const reasonField = useRef<HTMLTextAreaElement | null>(null);
+  const pendingFocus = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const keepPendingFocus = loading && keepFocusWhileLoading;
+    const returnReasonFocus = !loading && focusReasonOnError && error;
+    const previousPendingFocus = pendingFocus.current;
+    if (!loading) pendingFocus.current = null;
+    const target = reasonField.current;
+    if ((!keepPendingFocus && !returnReasonFocus) || !target?.isConnected) return;
+    const document = target.ownerDocument;
+    if (!document.hasFocus()) return;
+    const dialog = target.closest<HTMLElement>('[role="dialog"]');
+    const dialogs = document.querySelectorAll('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
+    if (!dialog || dialogs[dialogs.length - 1] !== dialog) return;
+    const active = document.activeElement;
+    const idle = !active?.isConnected || active === document.body || active === document.documentElement ||
+      active.hasAttribute("data-radix-focus-guard");
+    const needsFocus = idle || (dialog.contains(active) && active.matches(":disabled"));
+    if (keepPendingFocus) {
+      if (!needsFocus) return;
+      // Radix traps Tab with no enabled controls when the dialog itself has focus.
+      dialog.focus();
+      if (document.activeElement === dialog) pendingFocus.current = dialog;
+    } else if (needsFocus || active === previousPendingFocus) {
+      target.focus();
+    }
+  }, [error, focusReasonOnError, keepFocusWhileLoading, loading]);
   const blank = reason.trim() === "";
 
   return (
@@ -196,6 +238,7 @@ function ReasonDialogBody({
 
       <Field label={labels.reason} hint={labels.reasonHint} required={reasonRequired} showLabel={showLabel}>
         <Textarea
+          ref={reasonField}
           value={reason}
           maxLength={maxLength}
           onChange={(event) => setReason(event.target.value)}
@@ -229,7 +272,7 @@ function ReasonDialogBody({
             className={confirmClassName}
             onClick={() => onConfirm(reason)}
             loading={loading}
-            disabled={reasonRequired && blank}
+            disabled={confirmDisabled || (reasonRequired && blank)}
           >
             {confirmIcon}
             {labels.confirm}

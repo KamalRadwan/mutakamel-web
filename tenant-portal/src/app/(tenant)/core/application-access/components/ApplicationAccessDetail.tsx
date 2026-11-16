@@ -1,5 +1,7 @@
 "use client";
 
+import { TenantOrganizationName } from "@/components/tenant/TenantOrganizationName";
+
 import Link from "next/link";
 
 import { Button, DetailSection, ErrorState, IdentifierText, PageHeader, PermissionGate, Skeleton } from "@/design-system";
@@ -33,8 +35,8 @@ export function ApplicationAccessDetail({ request }: { request: ApplicationAcces
           <DetailSection title={copy.scope} emptyValueLabel={t.detail.notRecorded} fields={[
             { label: copy.application, value: <IdentifierText>{view.target.applicationKey}</IdentifierText> },
             { label: copy.addon, value: view.target.addonKey && <IdentifierText>{view.target.addonKey}</IdentifierText> },
-            { label: copy.company, value: <IdentifierText>{view.scope.companyId}</IdentifierText> },
-            { label: copy.branch, value: view.scope.branchId && <IdentifierText>{view.scope.branchId}</IdentifierText> },
+            { label: copy.company, value: <TenantOrganizationName kind="company" id={view.scope.companyId} /> },
+            { label: copy.branch, value: view.scope.branchId && <TenantOrganizationName kind="branch" id={view.scope.branchId} /> },
           ]} />
           <DetailSection title={copy.binding} description={copy.notOperational} fields={[
             { label: copy.state, value: copy.status[resource.kind === "CONFIGURATION" ? resource.bindingState : resource.state] },

@@ -59,6 +59,10 @@ export interface CustomerProfileDetail {
   profileType: CustomerProfileType;
   status: CustomerProfileStatus;
   displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  honorificTitle: string | null;
+  jobTitle: string | null;
   companyName: string | null;
   companyEmail: string | null;
   companyPhone: string | null;
@@ -179,6 +183,10 @@ export function parseCustomerProfileDetailResponse(
     profileType: profile.profileType,
     status: normalizedStatus,
     displayName: profile.displayName,
+    firstName: nullableText(profile.firstName),
+    lastName: nullableText(profile.lastName),
+    honorificTitle: nullableText(profile.honorificTitle),
+    jobTitle: nullableText(profile.jobTitle),
     companyName: nullableText(profile.companyName),
     companyEmail: nullableText(profile.companyEmail),
     companyPhone: nullableText(profile.companyPhone),

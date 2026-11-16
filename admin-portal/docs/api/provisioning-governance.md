@@ -37,6 +37,18 @@ keys remain outside the browser and platform.
 
 ### Release drafts and releases
 
+Frontend confirmation source reviewed **2026-10-31** (AUDIT29X-APW-3):
+publish and retire open the shared `ConfirmActionModal`. Its final action is
+disabled until the operator types the displayed release version exactly,
+including case and whitespace. Opening or cancelling the dialog sends no
+command. Signature/reason validation keeps the existing error-code mapping,
+including `CONFIRMATION_REQUIRED`; permission, signing, current-release and
+checksum fences still apply. Every attempt requires a fresh confirmation,
+while an unchanged retry retains its original idempotency key. English and
+Arabic descriptions explain the action and required version. Specs cover the
+source behavior; tests, typecheck/lint, runtime theme/RTL checks and the admin
+production rebuild remain pending lead verification.
+
 | Method and path | Permissions |
 | --- | --- |
 | `GET /api/admin/core/v1/provisioning/release-drafts` | `admin.provisioning.releases.read` |

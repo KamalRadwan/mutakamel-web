@@ -1,6 +1,7 @@
 "use client";
+import { DashboardRecoveryNotice, type DashboardRecoveryProps } from "../../components/DashboardRecoveryNotice";
 
-import { useState } from "react";
+import { useDashboardWidgetSelection } from "../hooks/useDashboardWidgetSelection";
 import {
   Button,
   Field,
@@ -28,6 +29,9 @@ interface AddWidgetDrawerProps {
   atCapacity: boolean;
   error?: string;
   onSubmit: (widgetId: string) => void;
+  blocked?: boolean;
+  recovery?: DashboardRecoveryProps;
+  onRetryWidgets?: () => void;
 }
 
 export function AddWidgetDrawer({
@@ -43,13 +47,15 @@ export function AddWidgetDrawer({
   atCapacity,
   error,
   onSubmit,
+  blocked = false,
+  recovery,
+  onRetryWidgets,
 }: AddWidgetDrawerProps) {
   const { t } = useI18n();
-  const [widgetId, setWidgetId] = useState<string>("");
+  const form = useDashboardWidgetSelection(widgets, placedWidgetIds, blocked, widgetsUnavailable, atCapacity, onSubmit);
+  const { widgetId, setWidgetId, options } = form;
 
-  // A widget already on the dashboard is a `409
-  // CRM_DASHBOARD_WIDGET_ALREADY_ADDED`, so it is not offered at all.
-  const options = widgets.filter((widget) => !placedWidgetIds.has(widget.id));
+
 
   return (
     <FormDrawer
@@ -59,10 +65,8 @@ export function AddWidgetDrawer({
       description={t.crmDashboards.addWidgetDescription}
       isDirty={widgetId.length > 0}
       isSubmitting={isSubmitting}
-      submitDisabled={widgetId.length === 0 || atCapacity}
-      onSubmit={() => {
-        if (widgetId.length > 0) onSubmit(widgetId);
-      }}
+      submitDisabled={!form.allowed}
+      onSubmit={form.submit}
       error={error}
       labels={{
         submit: t.crmDashboards.addWidgetSubmit,
@@ -73,6 +77,7 @@ export function AddWidgetDrawer({
         discardCancel: t.common.cancel,
       }}
     >
+    {recovery && <DashboardRecoveryNotice {...recovery} />}
       {atCapacity ? (
         <p role="note" className="text-xs text-muted-foreground">
           {formatTemplate(t.crmDashboards.widgetLimitReached, { limit: 20 })}
@@ -80,16 +85,15 @@ export function AddWidgetDrawer({
       ) : null}
 
       {widgetsUnavailable ? (
-        <p role="note" className="text-xs text-muted-foreground">
-          {t.crmDashboards.widgetsUnavailable}
-        </p>
+        <div className="flex flex-col items-start gap-2"><p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.widgetsUnavailable}</p>
+          {onRetryWidgets && <Button variant="outline" onClick={onRetryWidgets}>{t.common.retry}</Button>}</div>
       ) : options.length === 0 ? (
         <p role="note" className="text-xs text-muted-foreground">
           {t.crmDashboards.noWidgetsToAdd}
         </p>
       ) : (
-        <Field label={t.crmDashboards.widget} required>
-          <Select value={widgetId} onValueChange={setWidgetId} disabled={atCapacity}>
+        <Field showLabel label={t.crmDashboards.widget} required>
+          <Select value={widgetId} onValueChange={setWidgetId} disabled={blocked || isSubmitting || atCapacity}>
             <SelectTrigger size="sm">
               <SelectValue placeholder={t.crmDashboards.selectWidget} />
             </SelectTrigger>
@@ -116,3 +120,6 @@ export function AddWidgetDrawer({
     </FormDrawer>
   );
 }
+
+
+

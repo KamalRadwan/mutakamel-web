@@ -27,7 +27,7 @@ const dashboard: DashboardDetail = {
 };
 
 vi.mock("@/context/AuthContext", () => ({
-  useTenantAuth: () => ({ user: { permissions: state.permissions, accessibleBranches: [] } }),
+  useTenantAuth: () => ({ user: { id: dashboard.ownerUserId, permissions: state.permissions, accessibleBranches: [] } }),
 }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ t: DICT_BY_LANG[state.lang], lang: state.lang }),
@@ -38,14 +38,14 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   return { ...actual, axiosClient: { ...actual.axiosClient, get: state.get } };
 });
 vi.mock("@/design-system", async (importOriginal) => {
-  const { hasPermission } = await importOriginal<typeof import("@/design-system")>();
+  const { cn, hasPermission } = await importOriginal<typeof import("@/design-system")>();
   const Slot = ({ children }: { children?: ReactNode }) => <>{children}</>;
   return {
-    hasPermission,
+    Badge: Slot, cn, hasPermission,
     Button: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) =>
       createElement("button", { onClick }, children),
-    DetailHeader: ({ secondaryActions }: { secondaryActions: ReactNode }) => <>{secondaryActions}</>,
-    EmptyState: () => null, ConflictDialog: () => null, DegradedBanner: () => null,
+    DetailHeader: ({ secondaryActions, primaryAction }: { secondaryActions: ReactNode; primaryAction?: { label: string; onClick: () => void } }) => <>{primaryAction && <button onClick={primaryAction.onClick}>{primaryAction.label}</button>}{secondaryActions}</>,
+    EmptyState: () => null, ConfirmActionModal: () => null, ConflictDialog: () => null, DegradedBanner: () => null,
     ErrorState: () => null, NotFoundState: () => null, PermissionGate: Slot, Skeleton: () => null,
     Select: Slot, SelectContent: Slot, SelectItem: Slot, SelectTrigger: Slot, SelectValue: () => null,
     useToast: () => ({}),
@@ -71,17 +71,74 @@ vi.mock("./AddWidgetDrawer", () => ({ AddWidgetDrawer: () => null }));
 vi.mock("./DashboardEditDrawer", () => ({ DashboardEditDrawer: () => null }));
 vi.mock("./ShareDrawer", () => ({ ShareDrawer: () => null }));
 vi.mock("./DrilldownSheet", () => ({ DrilldownSheet: () => null }));
-vi.mock("./WidgetTile", () => ({ WidgetTile: () => null }));
+vi.mock("./WidgetTile", () => ({ WidgetTile: ({ widget, onArchive, onVersion }: {
+  widget: { name: string }; onArchive?: (anchor: HTMLButtonElement) => boolean;
+  onVersion?: (name: string, anchor: HTMLButtonElement) => boolean;
+}) => <>
+  {onArchive && <button onClick={(event) => onArchive(event.currentTarget)}>{`Archive ${widget.name}`}</button>}
+  {onVersion && <button onClick={(event) => onVersion(widget.name, event.currentTarget)}>{`Version of ${widget.name}`}</button>}
+</> }));
+vi.mock("../../../widgets/components/WidgetGovernanceDialog", () => ({ WidgetGovernanceDialog: () => null }));
+vi.mock("./PlacementVersionDialog", () => ({ PlacementVersionDialog: () => null }));
 
 beforeEach(() => {
   state.permissions = ["crm.dashboards.read.own"];
   dashboard.accessLevel = "OWNER";
+  dashboard.placements = [];
   state.lang = "en";
   state.get.mockResolvedValue({ data: [] });
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("dashboard workspace action permissions", () => {
+  it("allows a dashboard editor to review a shared widget placement without standalone widget permissions", async () => {
+    const widgetId = "01900300-0000-7000-8000-000000000025";
+    const placementId = "01900300-0000-7000-8000-000000000026";
+    dashboard.placements = [{
+      id: placementId, dashboardId: dashboard.id, widgetId, x: 0, y: 0, width: 4, height: 2, sortOrder: 0,
+      widget: { id: widgetId, ownerUserId: widgetId, ownerName: null, name: "Shared",
+        visualizationType: "METRIC_CARD", querySpec: { series: [{ metricKey: "crm.leads.created.count" }] },
+        displaySpec: {}, schemaVersion: 1, revision: 1, createdAt: dashboard.createdAt, updatedAt: dashboard.updatedAt,
+        accessLevel: "VIEW", isShared: true },
+    }];
+    state.permissions = ["crm.dashboards.read", "crm.dashboards.update"];
+    dashboard.accessLevel = "VIEW";
+    const { rerender } = render(<DashboardWorkspace dashboardId={dashboard.id} />);
+    expect(screen.queryByRole("button", { name: "Version of Shared" })).not.toBeInTheDocument();
+    dashboard.accessLevel = "EDIT";
+    rerender(<DashboardWorkspace dashboardId={dashboard.id} />);
+    fireEvent.click(screen.getByRole("button", { name: "Version of Shared" }));
+    await waitFor(() => expect(state.get).toHaveBeenCalledWith(
+      `/api/tenant/crm/v1/dashboards/${dashboard.id}/placements/${placementId}/version-policy`, expect.anything(),
+    ));
+    expect(screen.queryByRole("button", { name: "Archive Shared" })).not.toBeInTheDocument();
+  });
+
+  it("opens governance only for an owned widget and reads its definition ID instead of its placement ID", async () => {
+    const widgetId = "01900300-0000-7000-8000-000000000010";
+    const placementId = "01900300-0000-7000-8000-000000000011";
+    const foreignWidgetId = "01900300-0000-7000-8000-000000000012";
+    const ownedWidget = { id: widgetId, ownerUserId: dashboard.ownerUserId, ownerName: null, name: "Owned",
+      visualizationType: "METRIC_CARD" as const, querySpec: { series: [{ metricKey: "crm.leads.created.count" }] },
+      displaySpec: {}, schemaVersion: 1, revision: 1, createdAt: dashboard.createdAt, updatedAt: dashboard.updatedAt,
+      accessLevel: "VIEW" as const, isShared: false };
+    dashboard.placements = [
+      { id: placementId, dashboardId: dashboard.id, widgetId, x: 0, y: 0, width: 4, height: 2, sortOrder: 0, widget: ownedWidget },
+      { id: "01900300-0000-7000-8000-000000000013", dashboardId: dashboard.id, widgetId: foreignWidgetId,
+        x: 4, y: 0, width: 4, height: 2, sortOrder: 1, widget: { ...ownedWidget, id: foreignWidgetId,
+          ownerUserId: "01900300-0000-7000-8000-000000000014", name: "Shared" } },
+    ];
+    const { rerender } = render(<DashboardWorkspace dashboardId={dashboard.id} />);
+    expect(screen.queryByRole("button", { name: "Archive Owned" })).not.toBeInTheDocument();
+    state.permissions = [...state.permissions, "crm.widgets.read", "crm.widgets.delete"];
+    rerender(<DashboardWorkspace dashboardId={dashboard.id} />);
+    expect(screen.queryByRole("button", { name: "Archive Shared" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Archive Owned" }));
+    await waitFor(() => expect(state.get).toHaveBeenCalledWith(
+      `/api/tenant/crm/v1/widgets/${widgetId}`, expect.anything(),
+    ));
+  });
+
   it.each(["en", "ar"] as const)("keeps a read-only owner read-only in %s without loading shares", async (lang) => {
     state.lang = lang;
     const t = DICT_BY_LANG[lang];
@@ -133,3 +190,5 @@ describe("dashboard workspace action permissions", () => {
     }
   });
 });
+
+

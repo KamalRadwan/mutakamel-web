@@ -30,6 +30,21 @@ describe("Core permission targets", () => {
     expect(can(user, "roles.role.create", { tenantWide: true })).toBe(false);
   });
 
+  it("permits an explicit profile branch without granting company authority", () => {
+    const user = {
+      ...subject({ tenantWide: false, companyIds: [], branchIds: ["branch-a"] }),
+      accessibleBranchCompanies: [{ companyId: "company-a", branchId: "branch-a" }],
+    };
+    expect(can(user, KEY, { companyId: "company-a", branchId: "branch-a" })).toBe(true);
+    expect(can(user, KEY, { branchId: "branch-a" })).toBe(true);
+    expect(can(user, KEY, { companyId: "company-a" })).toBe(false);
+    expect(can(user, KEY, { companyId: "company-b", branchId: "branch-a" })).toBe(false);
+    expect(can(user, KEY, { branchId: "branch-b" })).toBe(false);
+    expect(can(user, KEY, { tenantWide: true })).toBe(false);
+    expect(can({ ...user, accessibleBranchCompanies: [] }, KEY,
+      { companyId: "company-a", branchId: "branch-a" })).toBe(false);
+  });
+
   it("fails closed without a matching live projection", () => {
     expect(can(null, KEY)).toBe(false);
     expect(can({ permissions: [KEY] }, KEY, { tenantWide: true })).toBe(false);

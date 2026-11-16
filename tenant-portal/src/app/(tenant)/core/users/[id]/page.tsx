@@ -5,5 +5,5 @@ import { UserDetailWorkspace } from "./components/user-detail-workspace";
 
 export default function TenantUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  return <UserDetailWorkspace id={id} />;
+  return <UserDetailWorkspace key={id} id={id} />;
 }

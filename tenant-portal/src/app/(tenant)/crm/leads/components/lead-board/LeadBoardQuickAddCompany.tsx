@@ -85,7 +85,7 @@ export function LeadBoardQuickAddCompany({ form }: { form: Form }) {
         required
         error={errors.existingCompanyPartyId}
       >
-        <Combobox
+        <Combobox textSize="compact"
           size="sm"
           options={companyComboboxOptions}
           value={existingCompanyPartyId}

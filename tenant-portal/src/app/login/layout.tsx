@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { ar } from "@/i18n/dictionaries/ar";
+import { loadServerLanguage } from "@/i18n/server";
 import { TenantPortalRuntime } from "@/components/auth/TenantPortalRuntime";
 
-
-// Segment-level title. It flows through the root layout's
-// `title.template`, so the brand stays the suffix. Arabic for the same
-// reason the root default is — see src/app/layout.tsx.
-export const metadata: Metadata = { title: ar.metadata.login };
+export async function generateMetadata(): Promise<Metadata> {
+  const { dictionary: t } = await loadServerLanguage();
+  return { title: t.metadata.login };
+}
 
 export default function LoginLayout({ children }: { children: React.ReactNode }) {
   return <TenantPortalRuntime>{children}</TenantPortalRuntime>;

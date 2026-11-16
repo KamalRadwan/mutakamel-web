@@ -94,7 +94,7 @@ function DatabaseServersContent() {
   const { lang } = useI18n();
   const copy = dict(lang);
   const canCreate = adminCanAll(user, ["admin.database_servers.create"]);
-  const canDelete = adminCanAll(user, ["admin.database_servers.delete", "admin.database_servers.critical"]);
+  const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DELETE);
   const canDestroy = adminCanAll(user, ADMIN_RBAC_CRITICAL.DB_SERVERS_DESTROY);
 
   const columns: ColumnDef<DatabaseServerView>[] = [

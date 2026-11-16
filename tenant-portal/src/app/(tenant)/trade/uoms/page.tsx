@@ -12,7 +12,6 @@ import {
   LayoutGrid,
   Layers,
   Pencil,
-  Plus,
   RefreshCw,
   RotateCcw,
   Ruler,
@@ -32,8 +31,7 @@ import {
   IdentifierText,
   PageHeader,
   PermissionGate,
-  StatCard,
-  StatGrid,
+  SummaryStrip,
   SWATCH_SURFACE_PALETTES,
   Tooltip,
   TooltipContent,
@@ -331,7 +329,7 @@ export default function TradeUomsPage() {
 
   return (
     <PermissionGate require={TRADE_PERMISSIONS.itemsRead}>
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-2.5">
         <PageHeader
           className="sr-only"
           title={t.trade.uomsTitle}
@@ -357,7 +355,6 @@ export default function TradeUomsPage() {
           }
         />
 
-        <TradeScopeBar hideWhenSingleScope />
 
         {/* Retire Blocked Reference Protection Banner (`409 TRADE.CATALOG.UOM_RETIRE_REFERENCED`) */}
         {uoms.retireBlocked ? (
@@ -416,36 +413,13 @@ export default function TradeUomsPage() {
 
           <>
             {/* 1. 4-Card KPI Summary Strip */}
-            <StatGrid>
-              <StatCard
-                label={t.trade.uomKpiTotalTitle}
-                value={kpiMetrics.totalCount}
-                description={t.trade.uomKpiTotalHint}
-                icon={Ruler}
-                tone="neutral"
-              />
-              <StatCard
-                label={t.trade.uomKpiActiveTitle}
-                value={kpiMetrics.activeCount}
-                description={t.trade.uomKpiActiveHint}
-                icon={CheckCircle2}
-                tone="brand"
-              />
-              <StatCard
-                label={t.trade.uomKpiBilingualTitle}
-                value={kpiMetrics.bilingualCount}
-                description={t.trade.uomKpiBilingualHint}
-                icon={Globe}
-                tone="brand"
-              />
-              <StatCard
-                label={t.trade.uomKpiCategoriesTitle}
-                value={kpiMetrics.familyCount}
-                description={t.trade.uomKpiCategoriesHint}
-                icon={Layers}
-                tone="warn"
-              />
-            </StatGrid>
+            <SummaryStrip items={[
+              { label: t.trade.uomKpiTotalTitle, value: kpiMetrics.totalCount, description: t.trade.uomKpiTotalHint, icon: Ruler, hue: "indigo" },
+              { label: t.trade.uomKpiActiveTitle, value: kpiMetrics.activeCount, description: t.trade.uomKpiActiveHint, icon: CheckCircle2, hue: "green" },
+              { label: t.trade.uomKpiBilingualTitle, value: kpiMetrics.bilingualCount, description: t.trade.uomKpiBilingualHint, icon: Globe, hue: "blue" },
+              { label: t.trade.uomKpiCategoriesTitle, value: kpiMetrics.familyCount, description: t.trade.uomKpiCategoriesHint, icon: Layers, hue: "amber" },
+            ]} />
+            <TradeScopeBar hideWhenSingleScope />
 
             {/* 2. View Switcher & Quick Action Bar */}
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card p-2.5 shadow-2xs">
@@ -453,7 +427,7 @@ export default function TradeUomsPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={viewMode === "table" ? "primary" : "ghost"}
+                  variant={viewMode === "table" ? "secondary" : "ghost"} aria-pressed={viewMode === "table"}
                   onClick={() => handleSwitchViewMode("table")}
                   className="gap-1.5"
                 >
@@ -463,7 +437,7 @@ export default function TradeUomsPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={viewMode === "cards" ? "primary" : "ghost"}
+                  variant={viewMode === "cards" ? "secondary" : "ghost"} aria-pressed={viewMode === "cards"}
                   onClick={() => handleSwitchViewMode("cards")}
                   className="gap-1.5"
                 >
@@ -473,7 +447,7 @@ export default function TradeUomsPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={viewMode === "operating" ? "primary" : "ghost"}
+                  variant={viewMode === "operating" ? "secondary" : "ghost"} aria-pressed={viewMode === "operating"}
                   onClick={() => handleSwitchViewMode("operating")}
                   className="gap-1.5"
                 >
@@ -500,15 +474,7 @@ export default function TradeUomsPage() {
                       <BookOpen className="size-4" aria-hidden="true" />
                       {t.trade.uomBrowseLibrary}
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="primary"
-                      onClick={() => uoms.openCreate("custom")}
-                    >
-                      <Plus className="size-4" aria-hidden="true" />
-                      {t.trade.uomCreate}
-                    </Button>
+
                   </>
                 ) : null}
               </div>
@@ -674,7 +640,7 @@ export default function TradeUomsPage() {
                       <Button
                         type="button"
                         size="xs"
-                        variant={categoryFilter === "ALL" ? "primary" : "outline"}
+                        variant={categoryFilter === "ALL" ? "secondary" : "outline"}
                         onClick={() => setCategoryFilter("ALL")}
                         className="rounded-full"
                       >
@@ -746,7 +712,7 @@ export default function TradeUomsPage() {
                     </div>
                   </div>
 
-                  <FilterBar
+                  <FilterBar placement="inline" searchTextSize="compact"
                     filters={[
                       {
                         id: "status",
@@ -945,11 +911,11 @@ export default function TradeUomsPage() {
                       retry: t.common.retry,
                       errorTitle: t.trade.uomLoadFailed,
                       emptyTitle: t.trade.uomEmpty,
-                      selectAll: t.common.actions,
-                      selectRow: t.common.actions,
-                      sortAscending: t.common.actions,
-                      sortDescending: t.common.actions,
-                      notSorted: t.common.actions,
+                      selectAll: t.views.selectAll,
+                      selectRow: t.views.selectRow,
+                      sortAscending: t.views.sortAscending,
+                      sortDescending: t.views.sortDescending,
+                      notSorted: t.views.notSorted,
                       pagination: {
                         previous: t.common.previousPage,
                         next: t.common.nextPage,

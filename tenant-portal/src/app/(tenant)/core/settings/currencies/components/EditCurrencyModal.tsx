@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { FormDrawer } from "@/design-system";
+import { FormModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { toCurrencyForm, type Currency, type CurrencyFormValues } from "../currency-contract";
+import {
+  toCurrencyForm,
+  type Currency,
+  type CurrencyFormValues,
+} from "../currency-contract";
+import { useCurrencyForm } from "../hooks/useCurrencyForm";
 import { CurrencyFormFields } from "./CurrencyFormFields";
 
 interface EditCurrencyModalProps {
@@ -12,6 +16,9 @@ interface EditCurrencyModalProps {
   onSubmit: (values: CurrencyFormValues) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  errorCode?: string | null;
+  baseCurrencyCode?: string | null;
+  activateOnSubmit?: boolean;
 }
 
 /**
@@ -25,24 +32,42 @@ export function EditCurrencyModal({
   onSubmit,
   isSubmitting,
   error,
+  errorCode,
+  baseCurrencyCode,
+  activateOnSubmit = false,
 }: EditCurrencyModalProps) {
   const { t } = useI18n();
-  const initial = toCurrencyForm(currency);
-  const [values, setValues] = useState<CurrencyFormValues>(initial);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(initial);
+  const rateRequiredOnEdit =
+    !currency.isDefault &&
+    (activateOnSubmit || currency.status === "ACTIVE" || currency.exchangeRate !== null);
+
+  const form = useCurrencyForm({
+    open: true,
+    mode: "edit",
+    initialValues: toCurrencyForm(currency),
+    codeReadOnly: true,
+    rateLocked: currency.isDefault,
+    rateRequiredOnEdit,
+    isSubmitting,
+    error,
+    errorCode,
+    onClose,
+    onSubmit,
+  });
 
   return (
-    <FormDrawer
+    <FormModal
       open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
+      onOpenChange={form.handleOpenChange}
+      onOpenAutoFocus={form.handleOpenAutoFocus}
+      size="card"
+      density="compact"
+      bodyClassName="px-4 py-3.5"
       title={t.coreSettings.currencyEditTitle}
-      description={currency.code}
-      isDirty={isDirty}
-      isSubmitting={isSubmitting}
-      onSubmit={() => void onSubmit(values)}
-      error={error ?? undefined}
+      isDirty={form.isDirty && !form.busy}
+      isSubmitting={form.busy}
+      onSubmit={() => void form.handleSubmit()}
+      error={form.generalError}
       labels={{
         submit: t.coreSettings.save,
         cancel: t.common.cancel,
@@ -50,16 +75,27 @@ export function EditCurrencyModal({
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
+        sections: t.crmShared.formSectionsNav,
+        sectionInvalid: t.crmShared.formSectionInvalid,
+        close: t.common.close,
       }}
     >
       <CurrencyFormFields
-        values={values}
-        onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
-        isSubmitting={isSubmitting}
+        values={form.values}
+        onChange={form.handleChange}
+        isSubmitting={form.busy}
         codeReadOnly
         rateLocked={currency.isDefault}
+        rateRequiredOnEdit={rateRequiredOnEdit}
         showDefaultToggle={false}
+        baseCurrencyCode={baseCurrencyCode}
+        errors={form.fieldErrors}
+        errorSummary={form.errorSummary}
+        anchorIds={form.anchorIds}
+        fieldRefs={form.fieldRefs}
+        onBlurField={form.handleBlur}
+        onFocusField={form.focusField}
       />
-    </FormDrawer>
+    </FormModal>
   );
 }

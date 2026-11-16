@@ -135,6 +135,69 @@ describe("lead contact card actions", () => {
 afterEach(cleanup);
 
 describe("useLeadContactModal", () => {
+  it.each([
+    { displayName: "Preferred name", firstName: "Dina", lastName: "Ali" },
+    { displayName: "Display name only", firstName: null, lastName: null },
+  ])("preserves $displayName on honorific and identity name edits", async (names) => {
+    vi.mocked(readCoreData).mockResolvedValueOnce({ ...person, ...names });
+    const { result } = setup();
+    await act(async () => result.current.openContact(contact));
+    act(() => result.current.setField("honorificTitle", "Dr"));
+    expect(result.current.form?.displayName).toBe(names.displayName);
+    act(() => result.current.setField("firstName", "Mona"));
+    act(() => result.current.setField("lastName", "Hassan"));
+    expect(result.current.form?.displayName).toBe(names.displayName);
+  });
+  it("derives new-contact names only from complete trimmed parts and preserves custom names", () => {
+    const { result } = setup();
+    act(() => result.current.startAddingContact());
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, firstName: " Mona " })));
+    expect(result.current.newContact.displayName).toBe("");
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, lastName: " Hassan " })));
+    expect(result.current.newContact.displayName).toBe("Mona Hassan");
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, firstName: " Dina " })));
+    expect(result.current.newContact.displayName).toBe("Dina Hassan");
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, lastName: "" })));
+    expect(result.current.newContact.displayName).toBe("Dina Hassan");
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, displayName: "Preferred name" })));
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, honorificTitle: "Dr" })));
+    expect(result.current.newContact.displayName).toBe("Preferred name");
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, lastName: "Ali" })));
+    expect(result.current.newContact.displayName).toBe("Preferred name");
+  });
+  it("keeps a new display-only contact intact on an honorific edit", () => {
+    const { result } = setup();
+    act(() => result.current.startAddingContact());
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, displayName: "Mona" })));
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, honorificTitle: "Dr" })));
+    expect(result.current.newContact.displayName).toBe("Mona");
+  });
+  it("preserves an existing display name on incomplete identity edits and derives an empty name only on a name edit", async () => {
+    const { result } = setup();
+    await act(async () => result.current.openContact(contact));
+    act(() => result.current.setField("lastName", ""));
+    expect(result.current.form?.displayName).toBe("Dina Ali");
+    act(() => result.current.setField("displayName", ""));
+    act(() => result.current.setField("honorificTitle", "Dr"));
+    expect(result.current.form?.displayName).toBe("");
+    act(() => result.current.setField("lastName", " Hassan "));
+    expect(result.current.form?.displayName).toBe("Dina Hassan");
+  });
+  it("derives the hidden display name for identity edits and saves it without the honorific", async () => {
+    const { result } = setup();
+    await act(async () => result.current.openContact(contact));
+    act(() => result.current.setField("firstName", " Mona "));
+    expect(result.current.form?.displayName).toBe("Mona Ali");
+    act(() => result.current.setField("lastName", " Hassan "));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+    act(() => result.current.setField("honorificTitle", "Dr"));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+    await act(async () => result.current.save());
+    expect(writeCoreData).toHaveBeenCalledWith("patch", `/api/tenant/core/v1/directory/parties/${partyId}`, {
+      displayName: "Mona Hassan", firstName: "Mona", lastName: "Hassan", honorificTitle: "Dr",
+    }, expect.any(Object));
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+  });
   it("loads only when opened and cancels or skips unchanged data without writes", async () => {
     const { result } = setup();
     expect(readCoreData).not.toHaveBeenCalled();

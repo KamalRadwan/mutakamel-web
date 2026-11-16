@@ -29,6 +29,7 @@ import {
 import { uuidCrypto } from "@/lib/uuid";
 import { can } from "@/lib/auth/permission-scope";
 import { normalizeApiError } from "@/lib/api/errors";
+import { clearTenantLeadRealtime, publishTenantLeadRealtime } from "./tenant-lead-realtime";
 
 export interface TenantRealtimeCoordinator extends RealtimeApplicationConnection {
   getSnapshot(): ConnectionSnapshot;
@@ -112,6 +113,7 @@ export function TenantRealtimeBinding({
     if (generation === null) {
       (suppliedCoordinator ?? runtime.peek())?.clearGeneration();
       publishConnectionSnapshot(null);
+      clearTenantLeadRealtime();
       tenantNotificationRuntime.clear();
       return;
     }
@@ -148,6 +150,7 @@ export function TenantRealtimeBinding({
     const publishConnection = () => {
       const snapshot = coordinator.getSnapshot();
       if (!active || snapshot.generation !== generation) return;
+      if (snapshot.phase !== "connected") clearTenantLeadRealtime(generation);
       const newlyBlocked = snapshot.phase === "blocked" &&
         (connectionSnapshot?.generation !== generation || connectionSnapshot?.phase !== "blocked");
       publishConnectionSnapshot(snapshot);
@@ -221,6 +224,8 @@ export function TenantRealtimeBinding({
     };
     applicationUnsubscribers.push(
       applicationClient.subscribe("session.ready.v1", (event) => {
+        if (!active || coordinator.getSnapshot().generation !== generation) return;
+        publishTenantLeadRealtime({ generation, kind: "ready" });
         dispatchShellEvent(TENANT_REALTIME_SHELL_EVENTS.sessionReady, event);
         if (!notificationsAuthorized) return;
         if (
@@ -306,6 +311,10 @@ export function TenantRealtimeBinding({
         },
       ),
       applicationClient.subscribe("realtime.sync.required.v1", (event) => {
+        if (!active || coordinator.getSnapshot().generation !== generation) return;
+        if (event.payload.scope === "CRM_LEADS" || event.payload.scope === "ALL") {
+          publishTenantLeadRealtime({ generation, kind: "resync" });
+        }
         if (!notificationsAuthorized && event.payload.scope === "NOTIFICATIONS") return;
         dispatchShellEvent(
           TENANT_REALTIME_SHELL_EVENTS.resyncRequired,
@@ -325,6 +334,14 @@ export function TenantRealtimeBinding({
           TENANT_REALTIME_SHELL_EVENTS.serverDraining,
           event,
         );
+      }),
+      applicationClient.subscribe("crm.leads.changed.v1", (event) => {
+        if (!active || coordinator.getSnapshot().generation !== generation) return;
+        publishTenantLeadRealtime({ generation, kind: "changed", payload: event.payload });
+      }),
+      applicationClient.subscribe("crm.leads.scope-resync.v1", () => {
+        if (!active || coordinator.getSnapshot().generation !== generation) return;
+        publishTenantLeadRealtime({ generation, kind: "resync" });
       }),
     );
     // REST hydration must also work when realtime is off or never handshakes.
@@ -369,6 +386,7 @@ export function TenantRealtimeBinding({
 
     return () => {
       active = false;
+      clearTenantLeadRealtime(generation);
       clearTimeout(retryTimer);
       queuedResyncCursor = undefined;
       window.removeEventListener("online", onOnline);

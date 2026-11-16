@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
 
 const useApplicationCatalogueMock = vi.hoisted(() => vi.fn());
 const replaceGrants = vi.hoisted(() => vi.fn());
@@ -10,7 +11,7 @@ vi.mock("../hooks/useApplicationCatalogue", () => ({
   useApplicationCatalogue: useApplicationCatalogueMock,
 }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", dir: "ltr" }),
+  useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
 }));
 vi.mock("./CatalogueResourceDialog", () => ({ CatalogueResourceDialog: () => null }));
 

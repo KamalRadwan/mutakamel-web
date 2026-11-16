@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Button, EmptyState, Field, IdentifierText, PageHeader, PermissionGate, Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/design-system";
+import { Button, EmptyState, Field, PageHeader, PermissionGate, Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import { DEFINITION_ADOPTION_PERMISSION } from "../../subscription/definition-adoption-command";
+import { canAdoptDefinitions } from "../../subscription/definition-adoption-command";
 import { useApplicationAccessScopes } from "../hooks/useApplicationAccessScopes";
 
 export function ApplicationAccessScopes() {
-  const { t, allowed, companies, branches, open, pending } = useApplicationAccessScopes();
+  const { t, allowed, companies, branches, companyOptions, branchOptions, open, pending } = useApplicationAccessScopes();
   const { user, isAuthenticated } = useTenantAuth();
-  const canAdopt = isAuthenticated && !!user && (user.isTenantOwner || user.permissions.includes(DEFINITION_ADOPTION_PERMISSION));
+  const canAdopt = isAuthenticated && canAdoptDefinitions(user);
   const copy = t.applicationAccess;
   return <div className="flex min-w-0 flex-col gap-4">
     {canAdopt && <div><Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionDefinitionAdoption}>{t.commercialAdoption.open}</Link></Button></div>}
@@ -21,13 +21,13 @@ export function ApplicationAccessScopes() {
         <div className="max-w-xl">
           <Field label={copy.chooseScope} hint={copy.exactScopeNotice}>
             <Select value="" onValueChange={open} disabled={pending}>
-              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
+              <SelectTrigger textSize="compact" size="sm"><SelectValue /></SelectTrigger>
+              <SelectContent textSize="compact">
                 {companies.length > 0 && <SelectGroup><SelectLabel>{copy.company}</SelectLabel>
-                  {companies.map((id) => <SelectItem key={id} value={`companies:${id}`}><IdentifierText>{id}</IdentifierText></SelectItem>)}
+                  {companyOptions.map(({ value, label }) => <SelectItem key={value} value={`companies:${value}`}><bdi>{label}</bdi></SelectItem>)}
                 </SelectGroup>}
                 {branches.length > 0 && <SelectGroup><SelectLabel>{copy.branch}</SelectLabel>
-                  {branches.map((id) => <SelectItem key={id} value={`branches:${id}`}><IdentifierText>{id}</IdentifierText></SelectItem>)}
+                  {branchOptions.map(({ value, label }) => <SelectItem key={value} value={`branches:${value}`}><bdi>{label}</bdi></SelectItem>)}
                 </SelectGroup>}
               </SelectContent>
             </Select>

@@ -1,11 +1,13 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   Button,
   ConfirmActionModal,
   DataTable,
   DetailSection,
+  Field,
+  FormModal,
   IdentifierText,
   Input,
   type ColumnDef,
@@ -30,15 +32,15 @@ export function ModuleSeatsPanel({
   const { t } = useI18n();
   const copy = t.coreIdentity;
   const describeError = useCoreErrorText();
-  const panel = useUserModules(userId, true);
+  const panel = useUserModules(userId, true, canManage);
 
   const columns: ColumnDef<UserModuleAssignment>[] = [
     {
       id: "moduleKey",
       header: copy.modules.moduleKey,
-      // The module key is protocol, not copy — there is no localized module
-      // catalogue on this route, so it renders as the value the server holds.
-      cell: (assignment) => <IdentifierText className="text-xs">{assignment.moduleKey}</IdentifierText>,
+      cell: (assignment) => (
+        <IdentifierText className="text-xs">{assignment.moduleKey}</IdentifierText>
+      ),
     },
     ...(canManage
       ? [
@@ -64,22 +66,33 @@ export function ModuleSeatsPanel({
   const writeText = describeError(panel.writeError);
 
   return (
-    <DetailSection title={copy.modules.title} description={copy.modules.description} columns={1}>
+    <DetailSection
+      title={copy.modules.title}
+      description={copy.modules.description}
+      columns={1}
+    >
       <div className="flex flex-col gap-3">
-        {panel.isSeatLimitReached ? (
-          <p
-            role="status"
-            className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300"
-          >
-            {copy.modules.seatLimit}
-          </p>
-        ) : writeText ? (
+        {writeText && !panel.isAssignOpen ? (
           <p
             role="alert"
-            className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+            className="rounded-sm border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
           >
             {writeText}
           </p>
+        ) : null}
+
+        {canManage ? (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={panel.isSubmitting}
+              onClick={panel.openAssign}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              {copy.modules.assign}
+            </Button>
+          </div>
         ) : null}
 
         <DataTable
@@ -89,34 +102,69 @@ export function ModuleSeatsPanel({
           error={panel.loadError}
           onRetry={panel.reload}
           rowKey={(assignment) => assignment.id}
-          labels={listTableLabels(t, copy.modules.loadFailed, copy.modules.empty)}
+          labels={listTableLabels(
+            t,
+            copy.modules.loadFailed,
+            copy.modules.empty,
+          )}
         />
+      </div>
 
-        {canManage ? (
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-56 flex-1">
-              <Input size="sm"
+      {canManage && panel.isAssignOpen ? (
+        <FormModal
+          open={panel.isAssignOpen}
+          onOpenChange={(open) => {
+            if (!open) panel.closeAssign();
+          }}
+          size="card"
+          title={copy.modules.title}
+          description={copy.modules.description}
+          isDirty={panel.moduleKey.trim().length > 0}
+          isSubmitting={panel.isSubmitting}
+          submitDisabled={!panel.isModuleKeyValid}
+          onSubmit={() => void panel.assign()}
+          error={panel.isSeatLimitReached ? undefined : writeText}
+          labels={{
+            submit: copy.modules.assign,
+            cancel: t.common.cancel,
+            close: copy.actions.close,
+            discardTitle: t.common.discardTitle,
+            discardDescription: t.common.discardDescription,
+            discardConfirm: t.common.discardConfirm,
+            discardCancel: t.common.cancel,
+            sections: t.common.general,
+            sectionInvalid: copy.errors.UNKNOWN,
+          }}
+        >
+          <div className="flex flex-col gap-3">
+            {panel.isSeatLimitReached ? (
+              <p
+                role="status"
+                className="rounded-sm border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground"
+              >
+                {copy.modules.seatLimit}
+              </p>
+            ) : null}
+            <Field
+              label={copy.modules.moduleKey}
+              hint={copy.modules.keyHint}
+              showLabel
+              required
+            >
+              <Input
+                size="sm"
                 dir="ltr"
                 value={panel.moduleKey}
                 onChange={(event) => panel.setModuleKey(event.target.value)}
                 maxLength={MODULE_KEY_MAX_LENGTH}
                 placeholder={copy.modules.keyPlaceholder}
-                aria-label={copy.modules.moduleKey}
                 disabled={panel.isSubmitting}
+                required
               />
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!panel.isModuleKeyValid || panel.isSubmitting}
-              onClick={() => void panel.assign()}
-            >
-              {copy.modules.assign}
-            </Button>
+            </Field>
           </div>
-        ) : null}
-        <p className="text-2xs text-muted-foreground">{copy.modules.keyHint}</p>
-      </div>
+        </FormModal>
+      ) : null}
 
       <ConfirmActionModal
         open={panel.pendingRemoval !== null}
@@ -127,7 +175,7 @@ export function ModuleSeatsPanel({
         description={formatTemplate(copy.modules.removeMessage, {
           name: panel.pendingRemoval?.moduleKey ?? "",
         })}
-        confirmLabel={t.common.delete}
+        confirmLabel={copy.actions.delete}
         cancelLabel={t.common.cancel}
         onConfirm={() => void panel.unassign()}
         loading={panel.isSubmitting}

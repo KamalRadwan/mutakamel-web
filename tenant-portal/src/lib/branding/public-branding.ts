@@ -16,8 +16,6 @@ export const PUBLIC_BRANDING_ICON_PATH = "/api/tenant/core/v1/branding/public/ic
 
 /** `varchar(120)` on every text column of `BrandingEntity`. */
 export const BRANDING_TEXT_MAX_LENGTH = 120;
-/** `login_html` is `text`, capped by `@MaxLength(20000)` on the DTO. */
-const BRANDING_LOGIN_HTML_MAX_LENGTH = 20_000;
 
 const PUBLIC_BRANDING_RESPONSE_LIMIT_BYTES = 64_000;
 
@@ -27,7 +25,6 @@ export interface PublicBranding {
   primaryColor: string | null;
   secondaryColor: string | null;
   fontFamily: string | null;
-  loginHtml: string | null;
   logoUrl: string | null;
   iconUrl: string | null;
 }
@@ -48,7 +45,7 @@ function nullableText(source: Record<string, unknown>, key: string, maxLength: n
 }
 
 /**
- * The two asset fields are compared against the exact paths Core emits rather
+ * The two asset fields are compared against the paths and key hashes Core emits rather
  * than accepted as free-form strings. They are server-generated constants, and
  * treating them as opaque would let a compromised upstream point an `<img>`
  * anywhere.
@@ -60,8 +57,13 @@ function assetPath(
 ): string | null {
   const value = source[key];
   if (value === undefined || value === null) return null;
-  if (value !== expected) throw new Error("Invalid Core public branding response.");
-  return expected;
+  if (
+    typeof value !== "string" ||
+    (value !== expected &&
+      !(value.length === expected.length + 19 &&
+        value.startsWith(`${expected}?v=`) && /^[0-9a-f]{16}$/.test(value.slice(expected.length + 3))))
+  ) throw new Error("Invalid Core public branding response.");
+  return value;
 }
 
 export function parsePublicBranding(payload: unknown): PublicBranding {
@@ -73,7 +75,6 @@ export function parsePublicBranding(payload: unknown): PublicBranding {
     primaryColor: nullableText(branding, "primaryColor", 9),
     secondaryColor: nullableText(branding, "secondaryColor", 9),
     fontFamily: nullableText(branding, "fontFamily", BRANDING_TEXT_MAX_LENGTH),
-    loginHtml: nullableText(branding, "loginHtml", BRANDING_LOGIN_HTML_MAX_LENGTH),
     logoUrl: assetPath(branding, "logoUrl", PUBLIC_BRANDING_LOGO_PATH),
     iconUrl: assetPath(branding, "iconUrl", PUBLIC_BRANDING_ICON_PATH),
   };

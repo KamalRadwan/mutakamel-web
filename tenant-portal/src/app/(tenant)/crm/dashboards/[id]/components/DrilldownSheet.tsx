@@ -5,6 +5,8 @@ import {
   DateTime,
   ErrorState,
   Money,
+  NotFoundState,
+  PermissionGate,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -16,6 +18,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import type { NormalizedApiError } from "@/lib/api/errors";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { DRILLDOWN_FIELDS, type DrilldownRecord } from "../../dashboard-run-contract";
 import type { DrilldownState } from "../hooks/useWidgetDrilldown";
 
@@ -27,11 +30,28 @@ interface DrilldownSheetProps {
   error: NormalizedApiError | null;
   onLoadMore: () => void;
   onClose: () => void;
+  onRetry?: () => void;
+  onReloadDashboard?: () => void;
 }
 
 /** The two fields that are an instant, and the two that are money. */
 const INSTANT_FIELDS = new Set(["occurredAt", "createdAt", "updatedAt", "dueAt", "closedAt", "convertedAt"]);
 const MONEY_FIELD = "amount";
+
+function DrilldownValue({ field, value, record }: { field: string; value: string | number | boolean | null | undefined; record: DrilldownRecord }) {
+  const { t, lang } = useI18n();
+  if (typeof value === "string" && INSTANT_FIELDS.has(field)) return <DateTime value={value} />;
+  if (field === MONEY_FIELD && typeof value === "number") return <Money value={String(value)} currency={typeof record.fields.currencyCode === "string" ? record.fields.currencyCode : undefined} />;
+  if (typeof value === "number") return formatNumber(value, lang);
+  if (typeof value === "boolean") return value ? t.crmDashboards.drilldownYes : t.crmDashboards.drilldownNo;
+  if (typeof value === "string" && field === "status") {
+    const prefix = record.fields.entityType === "LEAD" ? "LeadStatus" : "OpportunityStatus";
+    return t.statusValues[`${prefix}.${value}`] ?? t.crmDashboardReports.statusValues[value] ?? t.crmDashboards.drilldownUnknownStatus;
+  }
+  if (typeof value === "string" && field === "entityType") return t.crmDashboardReports.statusValues[value] ?? t.crmDashboards.unknownEntityType;
+  if (typeof value === "string" && field === "activityType") return t.statusValues[`ActivityType.${value}`] ?? t.crmDashboards.unknownActivityType;
+  return String(value ?? "");
+}
 
 /**
  * The records behind one plotted point.
@@ -49,8 +69,10 @@ export function DrilldownSheet({
   error,
   onLoadMore,
   onClose,
+  onRetry,
+  onReloadDashboard,
 }: DrilldownSheetProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   return (
     <Sheet
@@ -73,12 +95,25 @@ export function DrilldownSheet({
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-          {error ? (
+          {error?.status === 403 ? (
+            <div>
+              <PermissionGate require="crm.dashboards.read" scoped denied>{null}</PermissionGate>
+              <p role="status" className="text-center text-xs text-muted-foreground">{t.crmDashboards.drilldownAccessDenied}</p>
+            </div>
+          ) : error?.status === 404 ? (
+            <NotFoundState title={t.crmDashboards.drilldownNotFound} description={t.crmDashboards.drilldownNotFound}
+              backHref={TENANT_ROUTES.crmDashboards} backLabel={t.crmDashboards.backToList} />
+          ) : error?.code === "CRM_WIDGET_REVISION_CONFLICT" ? (
+            <ErrorState title={t.crmDashboards.drilldownChanged} description={t.crmDashboards.drilldownChanged}
+              onRetry={onReloadDashboard} retryLabel={t.crmDashboards.drilldownReload} />
+          ) : error ? (
             <ErrorState
               title={t.crmDashboards.drilldownFailed}
               description={
                 t.crmDashboards.errors[error.code ?? ""] ?? t.crmDashboards.actionFailed
               }
+              onRetry={onRetry}
+              retryLabel={t.common.retry}
             />
           ) : null}
 
@@ -110,22 +145,7 @@ export function DrilldownSheet({
                           {t.crmDashboards.drilldownFields[field]}
                         </dt>
                         <dd className="truncate text-xs text-foreground">
-                          {typeof value === "string" && INSTANT_FIELDS.has(field) ? (
-                            <DateTime value={value} />
-                          ) : field === MONEY_FIELD && typeof value === "number" ? (
-                            <Money
-                              value={String(value)}
-                              currency={
-                                typeof record.fields.currencyCode === "string"
-                                  ? record.fields.currencyCode
-                                  : undefined
-                              }
-                            />
-                          ) : typeof value === "number" ? (
-                            formatNumber(value, lang)
-                          ) : (
-                            String(value)
-                          )}
+                          <DrilldownValue field={field} value={value} record={record} />
                         </dd>
                       </div>
                     );
@@ -135,7 +155,7 @@ export function DrilldownSheet({
             ))}
           </ul>
 
-          {hasMore ? (
+          {hasMore && !error ? (
             <Button size="sm" variant="outline" onClick={onLoadMore} disabled={isLoading}>
               {t.timeline.loadMore}
             </Button>

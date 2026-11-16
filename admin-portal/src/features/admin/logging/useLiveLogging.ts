@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll } from "@/lib/auth/rbac";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import {
   LIVE_HEARTBEAT_STALE_MS,
   appendLiveRow,
@@ -31,10 +31,7 @@ const INITIAL_DRAFT: LiveLoggingDraft = {
 export function useLiveLogging() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const ownerId = user?.id ?? null;
-  const canLive = adminCanAll(user, [
-    "admin.logging.read",
-    "admin.logging.critical",
-  ]);
+  const canLive = adminCanAll(user, ADMIN_RBAC_CRITICAL.LOGGING_LIVE);
   const [draft, setDraft] = useState<LiveLoggingDraft>(INITIAL_DRAFT);
   const [validationErrors, setValidationErrors] =
     useState<LoggingValidationErrors>({});

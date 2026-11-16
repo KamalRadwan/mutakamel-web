@@ -4,6 +4,7 @@ import { useCommercialChangeSessionKey, useCommercialChangeWorkspace, type Comme
 import { CommercialOperationEvidence, CommercialPreviewEvidence, CommercialReceiptEvidence } from "./CommercialChangeEvidence";
 import { commercialWorkspaceCopy } from "./commercial-workspace-copy";
 import { commercialChangeCopy } from "./commercial-change-copy";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 
 export function CommercialChangeWorkspace(props: CommercialChangeWorkspaceProps) {
   const sessionKey = useCommercialChangeSessionKey(props.source);
@@ -21,7 +22,7 @@ function CommercialChangeSession(props: CommercialChangeWorkspaceProps) {
     <Card className="space-y-3 p-3 sm:p-3.5">
       <div><h3 className="text-xs font-semibold">{copy.title}</h3><p className="mt-0.5 text-xs text-muted-foreground">{copy.intro}</p></div>
       {state.error && <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-md bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <p>{state.errorMessage}</p><p className="break-all font-mono text-xs"><bdi>{state.error.errorCode} {state.error.correlationId}</bdi></p>
+        <p>{getLocalizedApiErrorMessage(state.error, props.lang)}</p><p className="break-all font-mono text-xs"><bdi>{state.error.errorCode} {state.error.correlationId}</bdi></p>
       </div>}
       {!state.canPrepare && <p className="text-xs text-muted-foreground">{copy.forbidden}</p>}
       {!state.lifecycleAllowsChange && <p role="status" className="text-xs text-muted-foreground">{copy.lifecycleUnavailable}</p>}
@@ -46,7 +47,10 @@ function CommercialChangeSession(props: CommercialChangeWorkspaceProps) {
         {state.canReadCatalogue && <div className="space-y-2.5 rounded-md bg-muted p-2.5">
           {state.canReadApplications && <><Button size="sm" type="button" variant="outline" disabled={locked || catalogue.loading || !catalogue.moreApplications} onClick={() => void catalogue.loadApplications()}>{catalogue.applications.length ? copy.more : copy.addApplication}</Button>
             <div className="flex flex-wrap gap-2">{catalogue.applications.map(item => <Button size="sm" key={item.id} type="button" variant="outline" disabled={locked || catalogue.loading} onClick={() => state.chooseApplication(item)}><bdi>{item.name}</bdi></Button>)}</div></>}
-          {catalogue.error && <p role="alert" className="text-xs text-destructive-subtle-foreground">{catalogue.error.message}</p>}
+          {catalogue.error && <div role="alert" className="text-xs text-destructive-subtle-foreground">
+            <p>{getLocalizedApiErrorMessage(catalogue.error, props.lang)}</p>
+            <p className="break-all font-mono text-xs"><bdi>{catalogue.error.errorCode} {catalogue.error.correlationId}</bdi></p>
+          </div>}
           {catalogue.selected && <><p className="text-xs font-medium"><bdi>{catalogue.selected.key}</bdi></p>
             <Field label={copy.tier} hideLabel>{field => <Select value={state.selectedTier} onValueChange={state.setSelectedTier} disabled={locked || catalogue.loading}>
               <SelectTrigger {...field} size="sm"><SelectValue placeholder={copy.choose} /></SelectTrigger><SelectContent>{catalogue.tiers.map(tier => <SelectItem key={tier.id} value={tier.id}>{tier.name}</SelectItem>)}</SelectContent></Select>}</Field>

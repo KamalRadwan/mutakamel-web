@@ -1,215 +1,259 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useCan, useToast } from "@/design-system";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useCan } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
 import { useI18n } from "@/i18n/I18nContext";
-import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { coreDelete, coreGet, corePatch, corePost } from "../../../core-api";
+import type { NormalizedApiError } from "@/lib/api/errors";
 import type { ActiveStatus } from "../../../core-validation";
 import {
-  CURRENCIES_PATH,
-  CURRENCY_CODE_INVALID_CODE,
-  CURRENCY_CODE_TAKEN_CODE,
-  CURRENCY_DEFAULT_DELETE_CODE,
-  CURRENCY_INACTIVE_DEFAULT_CODE,
-  CURRENCY_IN_USE_CODE,
   CURRENCY_PAGE_SIZE,
-  CURRENCY_RATE_REQUIRED_CODE,
-  buildCreateCurrencyRequest,
-  buildUpdateCurrencyRequest,
-  currenciesListPath,
-  currencyPath,
-  parseCurrenciesResponse,
-  setDefaultCurrencyPath,
-  type Currency,
-  type CurrencyFormValues,
+  CURRENCY_PAGE_SIZE_OPTIONS,
   CURRENCY_SORT_FIELDS,
+  currenciesListQuery,
+  fetchCurrenciesPage,
+  resolveCurrencyListFilter,
+  type Currency,
+  type CurrencyListFilter,
   type CurrencySortField,
 } from "../currency-contract";
-
-const LIST_RESPONSE_LIMIT_BYTES = 400_000;
-const ROW_RESPONSE_LIMIT_BYTES = 20_000;
+import { normalizeCurrencyQueryError } from "./currency-errors";
+import { useBaseCurrency } from "./useBaseCurrency";
+import { useCurrencyMutations } from "./useCurrencyMutations";
 
 export function useCurrencies() {
   const { t, lang } = useI18n();
-  const toast = useToast();
-  const canManage = useCan("currencies.currency.manage", { tenantWide: true });
+  const { user, realtimeAuthGeneration } = useTenantAuth();
+  const accessMode = useAccessMode();
+  const authScopeKey = useAuthScopeKey(user);
+
+  const canRead = useCan("currencies.currency.read");
+  const hasManageGrant = useCan("currencies.currency.manage", { tenantWide: true });
+  const canManage = accessMode.canMutate && hasManageGrant;
+
+  const manageScope = user?.permissionScopes?.["currencies.currency.manage"];
+  const manageScopeKey = manageScope
+    ? `${manageScope.tenantWide}:${[...manageScope.companyIds].sort().join(",")}:${[...manageScope.branchIds].sort().join(",")}`
+    : "none";
+  const authFenceKey = `${realtimeAuthGeneration ?? "no-gen"}:${authScopeKey}:${canRead ? "r1" : "r0"}:${manageScopeKey}:${accessMode.mode ?? "unresolved"}`;
+  const canReadCurrencies = canRead && accessMode.canRead;
 
   const [items, setItems] = useState<Currency[]>([]);
-  const [total, setTotal] = useState(0);
+  const [pageInfo, setPageInfo] = useState({ page: 1, limit: CURRENCY_PAGE_SIZE, total: 0 });
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<ActiveStatus | undefined>(undefined);
-  const [search, setSearch] = useState("");
+  const [pageSize, setPageSizeState] = useState<number>(CURRENCY_PAGE_SIZE);
+  const [listFilter, setListFilterState] = useState<CurrencyListFilter | undefined>(undefined);
+  const [search, setSearchState] = useState("");
   const [sort, setSortState] = useState<{ id: CurrencySortField; direction: "asc" | "desc" }>({
     id: "code",
     direction: "asc",
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Currency | null>(null);
-  const [deactivating, setDeactivating] = useState<Currency | null>(null);
 
-  const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      setIsLoading(true);
-      setQueryError(null);
-      try {
-        const result = await coreGet(
-          currenciesListPath(
-            page,
-            statusFilter,
-            search.trim(),
-            sort.id,
-            sort.direction === "asc" ? "ASC" : "DESC",
-          ),
-          {
-            signal,
-            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-          },
-        );
-        const parsed = parseCurrenciesResponse(result.data);
-        if (signal?.aborted) return;
-        const lastPage = Math.max(1, Math.ceil(parsed.total / CURRENCY_PAGE_SIZE));
-        // Mutations can remove the final row on a filtered page. Changing the
-        // page triggers a fresh read with the same filters, search and sort.
-        if (page > lastPage) {
-          setPage(lastPage);
-          return;
-        }
-        setItems(parsed.items);
-        setTotal(parsed.total);
-        setHasLoaded(true);
-      } catch (error) {
-        if (isAbortError(error)) return;
-        setQueryError(normalizeApiError(error));
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
-      }
-    },
-    [page, statusFilter, search, sort],
-  );
+  const { status: statusFilter, isDefault: defaultFilter } = resolveCurrencyListFilter(listFilter);
+  const sortField = sort.id;
+  const sortDir = sort.direction === "asc" ? "ASC" : "DESC";
+  const currentQuery = currenciesListQuery({
+    page,
+    limit: pageSize,
+    status: statusFilter,
+    isDefault: defaultFilter,
+    search,
+    sortBy: sortField,
+    sortDir,
+  });
+  const scopedQueryKey = `${authFenceKey}:${currentQuery}`;
+
+  const [trackedAuthKey, setTrackedAuthKey] = useState(authFenceKey);
+  const [trackedQueryKey, setTrackedQueryKey] = useState(scopedQueryKey);
+  const [isLoading, setIsLoading] = useState(canReadCurrencies);
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
+  const [queryErrorState, setQueryErrorState] = useState<{
+    key: string;
+    error: NormalizedApiError;
+  } | null>(null);
+
+  if (trackedAuthKey !== authFenceKey) {
+    const resetQuery = currenciesListQuery({
+      page: 1,
+      limit: pageSize,
+      status: statusFilter,
+      isDefault: defaultFilter,
+      search,
+      sortBy: sort.id,
+      sortDir,
+    });
+    setTrackedAuthKey(authFenceKey);
+    setTrackedQueryKey(`${authFenceKey}:${resetQuery}`);
+    setItems([]);
+    setPageInfo({ page: 1, limit: pageSize, total: 0 });
+    if (page !== 1) setPage(1);
+    setLoadedQuery(null);
+    setQueryErrorState(null);
+    setIsLoading(canReadCurrencies);
+  } else if (trackedQueryKey !== scopedQueryKey) {
+    setTrackedQueryKey(scopedQueryKey);
+    setQueryErrorState(null);
+    setIsLoading(canReadCurrencies);
+  }
+
+  const mountedRef = useRef(true);
+  const activeLoadRef = useRef<AbortController | null>(null);
+  const latestLoadIdRef = useRef(0);
+  const latestAuthFenceRef = useRef(authFenceKey);
+  const itemsRef = useRef<Currency[]>([]);
+  const loadedQueryRef = useRef<string | null>(null);
+  const dismissModalsRef = useRef<() => void>(() => {});
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    latestAuthFenceRef.current = authFenceKey;
+    itemsRef.current = [];
+    loadedQueryRef.current = null;
+  }, [authFenceKey]);
+
+  const queryError = queryErrorState?.key === scopedQueryKey ? queryErrorState.error : null;
+  const isQueryForbidden = queryError?.status === 403;
+
+  const { baseCurrency, baseStatus, isBaseLoading, reloadBaseCurrency } = useBaseCurrency({
+    authFenceKey,
+    enabled: canReadCurrencies && !isQueryForbidden,
+  });
+
+  const load = useCallback(async (): Promise<void> => {
+    activeLoadRef.current?.abort();
+    if (!mountedRef.current) return;
+    if (!canReadCurrencies) {
+      activeLoadRef.current = null;
+      latestLoadIdRef.current += 1;
+      itemsRef.current = [];
+      loadedQueryRef.current = null;
+      dismissModalsRef.current();
+      setItems([]);
+      setLoadedQuery(null);
+      setPageInfo({ page: 1, limit: pageSize, total: 0 });
+      setQueryErrorState(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const startedFence = authFenceKey;
+    const startedScopedKey = scopedQueryKey;
     const controller = new AbortController();
+    activeLoadRef.current = controller;
+    const requestId = ++latestLoadIdRef.current;
+    const isCurrent = () =>
+      mountedRef.current &&
+      !controller.signal.aborted &&
+      activeLoadRef.current === controller &&
+      latestLoadIdRef.current === requestId &&
+      latestAuthFenceRef.current === startedFence;
+
+    let recoveringPage = false;
+    setIsLoading(true);
+    setQueryErrorState(null);
+    try {
+      const parsed = await fetchCurrenciesPage({
+        page,
+        limit: pageSize,
+        status: statusFilter,
+        isDefault: defaultFilter,
+        search,
+        sortBy: sortField,
+        sortDir,
+        signal: controller.signal,
+      });
+      if (!isCurrent()) return;
+      const lastPage = Math.max(1, parsed.totalPages);
+      // Mutations can remove the final row on a filtered page. Changing the
+      // page triggers a fresh read with the same filters, search and sort.
+      if (page > lastPage) {
+        recoveringPage = true;
+        setPage(lastPage);
+        return;
+      }
+      itemsRef.current = parsed.items;
+      loadedQueryRef.current = startedScopedKey;
+      setItems(parsed.items);
+      setPageInfo({ page: parsed.page, limit: parsed.limit, total: parsed.total });
+      setLoadedQuery(startedScopedKey);
+    } catch (error) {
+      if (!isCurrent() || isAbortError(error)) return;
+      const normalized = normalizeCurrencyQueryError(error);
+      const retainLoadedRows =
+        normalized.status !== 403 &&
+        loadedQueryRef.current === startedScopedKey &&
+        itemsRef.current.length > 0;
+      if (!retainLoadedRows) {
+        itemsRef.current = [];
+        loadedQueryRef.current = null;
+        setItems([]);
+        setLoadedQuery(null);
+        setPageInfo({
+          page: normalized.status === 403 ? 1 : page,
+          limit: pageSize,
+          total: 0,
+        });
+      }
+      if (normalized.status === 403) {
+        dismissModalsRef.current();
+      }
+      setQueryErrorState({ key: startedScopedKey, error: normalized });
+    } finally {
+      if (isCurrent() && !recoveringPage) setIsLoading(false);
+    }
+  }, [
+    authFenceKey,
+    canReadCurrencies,
+    defaultFilter,
+    page,
+    pageSize,
+    scopedQueryKey,
+    search,
+    setIsLoading,
+    setLoadedQuery,
+    setQueryErrorState,
+    sortDir,
+    sortField,
+    statusFilter,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!cancelled) void load();
     });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      latestLoadIdRef.current += 1;
+      activeLoadRef.current?.abort();
+      activeLoadRef.current = null;
+    };
   }, [load]);
 
-  const runWrite = useCallback(
-    async (operation: () => Promise<void>, failureTitle: string): Promise<boolean> => {
-      try {
-        await operation();
-        return true;
-      } catch (error) {
-        const normalized = normalizeApiError(error);
-        // The transport already toasts a 403 — a second would double-fire.
-        if (normalized.status === 403) return false;
-        if (toast.outcomeFromApi(normalized)) return false;
-        const specific = currencyMessage(normalized.code, t);
-        if (specific) {
-          toast.error(failureTitle, specific);
-          return false;
-        }
-        toast.errorFromApi(failureTitle, normalized);
-        return false;
-      }
-    },
-    [toast, t],
-  );
+  const reload = useCallback(async (): Promise<void> => {
+    await Promise.allSettled([load(), reloadBaseCurrency()]);
+  }, [load, reloadBaseCurrency]);
 
-  const create = useCallback(
-    async (values: CurrencyFormValues): Promise<boolean> => {
-      if (!canManage || isSubmitting) return false;
-      setIsSubmitting(true);
-      setFormError(null);
-      try {
-        const request = buildCreateCurrencyRequest(values);
-        const saved = await runWrite(async () => {
-          await corePost(CURRENCIES_PATH, request, { maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES });
-        }, t.coreSettings.currencyCreateFailed);
-        if (!saved) return false;
-        setCreateOpen(false);
-        toast.success(t.coreSettings.savedTitle, t.coreSettings.currencyCreated);
-        await load();
-        return true;
-      } catch (error) {
-        setFormError(formMessage(error, t));
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [canManage, isSubmitting, runWrite, toast, t, load],
-  );
+  const { dismissAllModals, ...mutations } = useCurrencyMutations({
+    t,
+    authFenceKey,
+    canManage,
+    isForbidden: isQueryForbidden,
+    onRefreshList: load,
+    onRefreshAll: reload,
+  });
 
-  const update = useCallback(
-    async (values: CurrencyFormValues): Promise<boolean> => {
-      if (!canManage || !editing || isSubmitting) return false;
-      setIsSubmitting(true);
-      setFormError(null);
-      try {
-        const request = buildUpdateCurrencyRequest(editing, values);
-        if (Object.keys(request).length === 0) {
-          setEditing(null);
-          return true;
-        }
-        const saved = await runWrite(async () => {
-          await corePatch(currencyPath(editing.id), request, {
-            maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES,
-          });
-        }, t.coreSettings.currencyUpdateFailed);
-        if (!saved) return false;
-        setEditing(null);
-        toast.success(t.coreSettings.savedTitle, t.coreSettings.currencyUpdated);
-        await load();
-        return true;
-      } catch (error) {
-        setFormError(formMessage(error, t));
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [canManage, editing, isSubmitting, runWrite, toast, t, load],
-  );
-
-  const setDefault = useCallback(
-    async (currency: Currency): Promise<void> => {
-      if (!canManage || pendingId) return;
-      setPendingId(currency.id);
-      const promoted = await runWrite(async () => {
-        await corePost(setDefaultCurrencyPath(currency.id), undefined, {
-          maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES,
-        });
-      }, t.coreSettings.currencySetDefaultFailed);
-      setPendingId(null);
-      // Promotion and demotion happen in ONE server transaction. Clearing the
-      // old default optimistically would render a tenant with zero defaults —
-      // a state the server's partial-unique index makes impossible.
-      if (promoted) toast.success(t.coreSettings.savedTitle, t.coreSettings.currencyDefaultSet);
-      await load();
-    },
-    [canManage, pendingId, runWrite, toast, t, load],
-  );
-
-  const deactivate = useCallback(async (): Promise<void> => {
-    if (!canManage || !deactivating || pendingId) return;
-    setPendingId(deactivating.id);
-    const done = await runWrite(async () => {
-      await coreDelete(currencyPath(deactivating.id), { maxResponseBytes: 10_000 });
-    }, t.coreSettings.currencyDeactivateFailed);
-    setPendingId(null);
-    setDeactivating(null);
-    if (done) toast.success(t.coreSettings.savedTitle, t.coreSettings.currencyDeactivated);
-    await load();
-  }, [canManage, deactivating, pendingId, runWrite, toast, t, load]);
+  useEffect(() => {
+    dismissModalsRef.current = dismissAllModals;
+  }, [dismissAllModals]);
 
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
     const field = CURRENCY_SORT_FIELDS.find((allowed) => allowed === next.id);
@@ -218,100 +262,74 @@ export function useCurrencies() {
     setPage(1);
   }, []);
 
+  const setListFilter = useCallback((next: CurrencyListFilter | undefined) => {
+    setPage(1);
+    setListFilterState(next);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setPage(1);
+    setListFilterState(undefined);
+    setSearchState("");
+  }, []);
+
+  const setPageSize = useCallback(
+    (nextSize: number) => {
+      if (!CURRENCY_PAGE_SIZE_OPTIONS.some((allowed) => allowed === nextSize)) return;
+      if (nextSize === pageSize) return;
+      setPage(1);
+      setPageSizeState(nextSize);
+    },
+    [pageSize],
+  );
+
+  const isCurrentQueryLoaded = loadedQuery === scopedQueryKey;
+  const visibleItems = isCurrentQueryLoaded ? items : [];
+  const visiblePageInfo = isCurrentQueryLoaded
+    ? pageInfo
+    : { page, limit: pageSize, total: 0 };
+  const hasRetainedRows = isCurrentQueryLoaded && items.length > 0;
+
   return {
     t,
     lang,
     sort,
     setSort,
+    canRead,
     canManage,
     items,
-    pageInfo: { page, limit: CURRENCY_PAGE_SIZE, total },
+    visibleItems,
+    pageInfo,
+    visiblePageInfo,
+    pageSize,
+    listFilter,
     statusFilter,
+    defaultFilter,
     search,
-    isLoading: isLoading && !hasLoaded,
+    hasActiveFilters: listFilter !== undefined || search.trim().length > 0,
+    hasRetainedRows,
+    isQueryForbidden,
+    isLoading: isLoading && !isCurrentQueryLoaded,
     isRefreshing: isLoading,
-    isSubmitting,
-    pendingId,
     queryError,
-    formError,
-    createOpen,
-    editing,
-    deactivating,
+    baseCurrency,
+    baseStatus,
+    isBaseLoading,
+    reloadBaseCurrency,
     setPage,
-    setStatusFilter: (next: ActiveStatus | undefined) => {
-      setPage(1);
-      setStatusFilter(next);
-    },
+    setPageSize,
+    setListFilter,
+    setStatusFilter: (next: ActiveStatus | undefined) => setListFilter(next),
+    setDefaultFilter: (next: boolean | undefined) =>
+      setListFilter(next === undefined ? undefined : next ? "DEFAULT" : "NON_DEFAULT"),
     setSearch: (next: string) => {
       setPage(1);
-      setSearch(next);
+      setSearchState(next);
     },
-    openCreate: () => {
-      setFormError(null);
-      setCreateOpen(true);
-    },
-    closeCreate: () => {
-      if (isSubmitting) return;
-      setFormError(null);
-      setCreateOpen(false);
-    },
-    openEdit: (currency: Currency) => {
-      setFormError(null);
-      setEditing(currency);
-    },
-    closeEdit: () => {
-      if (isSubmitting) return;
-      setFormError(null);
-      setEditing(null);
-    },
-    openDeactivate: (currency: Currency) => setDeactivating(currency),
-    closeDeactivate: () => {
-      if (pendingId) return;
-      setDeactivating(null);
-    },
-    create,
-    update,
-    setDefault,
-    deactivate,
-    reload: () => load(),
+    clearFilters,
+    reload,
+    ...mutations,
   };
-}
-
-type Dictionary = ReturnType<typeof useI18n>["t"];
-
-/** One message per documented rejection — never a shared "operation failed". */
-function currencyMessage(code: string | undefined, t: Dictionary): string | undefined {
-  switch (code) {
-    case "CURRENCY_DECIMAL_PLACES_IMMUTABLE":
-      return t.coreSettings.currencyDecimalPlacesImmutable;
-    case "CURRENCY_REBASE_OUT_OF_RANGE":
-      return t.coreSettings.currencyRebaseOutOfRange;
-    case "CURRENCY_NOT_FOUND":
-      return t.coreSettings.currencyNotFound;
-    case CURRENCY_CODE_TAKEN_CODE:
-      return t.coreSettings.currencyCodeTaken;
-    case CURRENCY_CODE_INVALID_CODE:
-      return t.coreSettings.currencyCodeInvalid;
-    case CURRENCY_RATE_REQUIRED_CODE:
-      return t.coreSettings.currencyRateRequired;
-    case CURRENCY_DEFAULT_DELETE_CODE:
-      return t.coreSettings.currencyDefaultProtected;
-    case CURRENCY_IN_USE_CODE:
-      return t.coreSettings.currencyInUse;
-    case CURRENCY_INACTIVE_DEFAULT_CODE:
-      return t.coreSettings.currencyInactiveDefault;
-    default:
-      return undefined;
-  }
-}
-
-function formMessage(error: unknown, t: Dictionary): string {
-  const reason = error instanceof Error ? error.message : "";
-  if (reason === "CURRENCY_FORM_CODE") return t.coreSettings.currencyFormCode;
-  if (reason === "CURRENCY_FORM_NAME") return t.coreSettings.currencyFormName;
-  if (reason === "CURRENCY_FORM_RATE") return t.coreSettings.currencyFormRate;
-  if (reason === "CURRENCY_FORM_DECIMALS") return t.coreSettings.currencyFormDecimals;
-  return t.coreSettings.currencyCreateFailed;
 }
 
 function isAbortError(error: unknown): boolean {

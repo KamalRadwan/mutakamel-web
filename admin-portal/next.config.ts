@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -11,6 +12,12 @@ const devApiTarget =
   process.env.DEV_API_TARGET || "http://localhost:9000";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  // Production images run the self-contained server (`node server.js`). The
+  // app imports source-based workspace packages from ../packages, so tracing
+  // starts at the frontend workspace root (`next build` runs in this folder).
+  output: "standalone",
+  outputFileTracingRoot: path.resolve(process.cwd(), ".."),
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'],
   },

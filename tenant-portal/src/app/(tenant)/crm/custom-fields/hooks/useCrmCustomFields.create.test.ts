@@ -16,6 +16,20 @@ vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { permis
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe("picklist creation", () => {
+  it("blocks creation at the real 100-definition limit", async () => {
+    get.mockResolvedValue({ data: Array.from({ length: 100 }, (_, index) => ({
+      id: `0191e9a8-7f51-7b32-8d72-${index.toString(16).padStart(12, "0")}`, ownerType: "LEAD", fieldKey: `field_${index}`,
+      nameAr: "الحقل", nameEn: "Field", type: "TEXT", options: [], isActive: true, isSearchable: false, sortOrder: index + 1,
+    })) });
+    const { result } = renderHook(() => useCrmCustomFields());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.openCreate());
+    expect(result.current.isCreateOpen).toBe(false);
+    await act(async () => { await result.current.handleCreate({ ownerType: "LEAD", fieldKey: "new_field", nameAr: "جديد", nameEn: "New", type: "TEXT", isSearchable: false }); });
+    expect(result.current.atCapacity).toBe(true);
+    expect(result.current.createError).toBe(en.crmCustomFields.limitReached);
+    expect(post).not.toHaveBeenCalled();
+  });
   it.each(["SELECT", "MULTI_SELECT"] as const)("POSTs %s options and renders the confirmed definition", async (type) => {
     const option = { key: "web", nameAr: "الموقع", nameEn: "Website", sortOrder: 1, isActive: true };
     get.mockResolvedValue({ data: [] });

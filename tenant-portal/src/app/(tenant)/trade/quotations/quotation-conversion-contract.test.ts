@@ -13,19 +13,22 @@ function source(): QuotationDetail {
     contactPartyId: null, currencyCode: "EGP", businessDate: "2026-10-17",
     lifecycleStatus: "ACCEPTED", approvalStatus: "NOT_REQUIRED",
     fulfillmentStatus: "UNPLANNED", billingStatus: "NOT_BILLED",
-    grandTotal: "200", documentNumber: "Q-1", draftReference: null,
+    grandTotal: "190", documentNumber: "Q-1", draftReference: null,
     partySnapshot: {}, createdBy: null,
     createdAt: "2026-10-17T00:00:00.000Z", updatedAt: "2026-10-17T00:00:00.000Z",
     currentRevisionId: REVISION, acceptedRevisionId: REVISION,
     crmCustomerProfileId: null, customerEligibilitySource: "ACTIVE_COMMERCIAL_ACCOUNT",
     revisions: [{
       id: REVISION, revisionNumber: 1, status: "ACCEPTED", validUntil: "2026-12-31",
-      grandTotal: "200", termsSnapshot: { paymentTermCode: "NET_30", incotermCode: "EXW", custom: { days: 30 } },
+      grandTotal: "190", subtotal: "200", discountTotal: "10", pricingMode: "DISCOUNT",
+      discountSnapshot: { pricing: { mode: "DISCOUNT", scope: "LINE", reason: "Approved source discount" },
+        totals: { subtotal: "200", discountTotal: "10", grandTotal: "190", baseSubtotal: "200", promotionSavings: "0" } },
+      termsSnapshot: { paymentTermCode: "NET_30", incotermCode: "EXW", custom: { days: 30 } },
       sentAt: null, acceptedAt: null, rejectedAt: null, priceLockExpiresAt: null,
     }],
     currentLines: [{
       id: ID, clientLineId: LINE, printLineNumber: 1, descriptionSnapshot: "Accepted goods",
-      quantity: "2", uomId: ID, unitPrice: "100", lineTotal: "200",
+      quantity: "2", uomId: ID, unitPrice: "100", lineTotal: "190", discountTotal: "10", discountSnapshot: {},
     }],
   });
 }
@@ -89,8 +92,9 @@ describe("quotation conversion request and financial evidence (CXPORTAL-TRADE-10
 
   it("matches and totals multiple lines by clientLineId, independent of input order", () => {
     const quotation = source();
-    quotation.currentLines.push({ ...quotation.currentLines[0], id: OTHER_LINE, clientLineId: OTHER_LINE, quantity: "1", lineTotal: "100" });
-    quotation.revisions[0].grandTotal = "300";
+    quotation.currentLines.push({ ...quotation.currentLines[0], id: OTHER_LINE, clientLineId: OTHER_LINE, quantity: "1", lineTotal: "100", discountTotal: "0" });
+    quotation.revisions[0].subtotal = "300";
+    quotation.revisions[0].grandTotal = "290";
     const second = evidence({ clientLineId: OTHER_LINE, discountTotal: "0", chargeTotal: "0", category: "EXEMPT", ratePercent: "0" });
     const request = buildConvertQuotationToSalesOrder(quotation, [second, evidence()]);
     expect(request.lines.map((line) => line.clientLineId)).toEqual([LINE, OTHER_LINE]);
@@ -108,7 +112,8 @@ describe("quotation conversion request and financial evidence (CXPORTAL-TRADE-10
 
   it("rounds percentage tax half-up at eight decimals without floating-point amounts", () => {
     const quotation = source();
-    Object.assign(quotation.currentLines[0], { quantity: "3", unitPrice: "0.33333333", lineTotal: "0.99999999" });
+    Object.assign(quotation.currentLines[0], { quantity: "3", unitPrice: "0.33333333", lineTotal: "0.99999999", discountTotal: "0" });
+    quotation.revisions[0].subtotal = "0.99999999"; quotation.revisions[0].discountTotal = "0";
     quotation.revisions[0].grandTotal = "0.99999999";
     const request = buildConvertQuotationToSalesOrder(quotation, [evidence({ discountTotal: "0", chargeTotal: "0", ratePercent: "12.3456" })]);
     expect(request.lines[0].financial.taxTotal).toBe("0.123456");
@@ -117,7 +122,8 @@ describe("quotation conversion request and financial evidence (CXPORTAL-TRADE-10
 
   it("preserves monetary values beyond Number's safe integer range", () => {
     const quotation = source();
-    Object.assign(quotation.currentLines[0], { quantity: "1", unitPrice: "9007199254740993.01", lineTotal: "9007199254740993.01" });
+    Object.assign(quotation.currentLines[0], { quantity: "1", unitPrice: "9007199254740993.01", lineTotal: "9007199254740993.01", discountTotal: "0" });
+    quotation.revisions[0].subtotal = "9007199254740993.01"; quotation.revisions[0].discountTotal = "0";
     quotation.revisions[0].grandTotal = "9007199254740993.01";
     const request = buildConvertQuotationToSalesOrder(quotation, [evidence({ discountTotal: "0", chargeTotal: "0", category: "EXEMPT", ratePercent: "0" })]);
     expect(request.totals.grandTotal).toBe("9007199254740993.01");
@@ -129,6 +135,9 @@ describe("quotation conversion request and financial evidence (CXPORTAL-TRADE-10
     expect(request.terms).toEqual(quotation.revisions[0].termsSnapshot);
     quotation.revisions[0].termsSnapshot = {};
     expect(() => buildConvertQuotationToSalesOrder(quotation, [evidence()])).toThrow("QUOTATION_CONVERSION_SOURCE");
+  });
+  it.each(["0", "9", "20"])("refuses replacing the saved quotation discount with %s", (discountTotal) => {
+    expect(() => buildConvertQuotationToSalesOrder(source(), [evidence({ discountTotal })])).toThrow("QUOTATION_CONVERSION_EVIDENCE");
   });
 
   it.each([

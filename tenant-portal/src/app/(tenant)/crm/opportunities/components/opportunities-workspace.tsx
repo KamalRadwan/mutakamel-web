@@ -22,6 +22,7 @@ import {
 } from "@/design-system";
 import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
 import { useAccessMode } from "@/hooks/useAccessMode";
+import { useTenantBranchLabels } from "@/hooks/useTenantBranchLabels";
 import { useTenantAuth } from "@/context/AuthContext";
 import { canCreateActivities } from "@/components/activities/activity-presentation";
 import { ActivityModal } from "@/components/activities/ActivityModal";
@@ -32,6 +33,7 @@ import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-wri
 import { localizedName } from "@/lib/format/localized";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { CrmScopeGate } from "../../shared/components/CrmScopeGate";
 import { CreateOpportunityModal } from "./CreateOpportunityModal";
 import {
@@ -75,6 +77,7 @@ import {
 
 export function OpportunitiesWorkspace() {
   const { t, lang } = useI18n();
+  const crmErrorText = useCrmErrorText();
   const { canMutate } = useAccessMode();
   const { user } = useTenantAuth();
   const canOpenActivities = canMutate && canCreateActivities(user);
@@ -307,6 +310,8 @@ export function OpportunitiesWorkspace() {
       amountInvalid: t.crmShared.refusals.CRM_AMOUNT_SCALE_INVALID,
       outOfRange: t.crmOpportunityDetail.create.outOfRange,
       currencyLength: t.crmOpportunityDetail.create.currencyLength,
+      dateInvalid: t.crmOpportunityDetail.form.dateInvalid,
+      selectionInvalid: t.crmOpportunityDetail.form.selectionInvalid,
     }),
     [fieldMessages, t],
   );
@@ -321,6 +326,7 @@ export function OpportunitiesWorkspace() {
       void fetchPipelines();
     },
   );
+  const branchLabels = useTenantBranchLabels(create.open);
 
   const selectedPipeline =
     pipelines.find(({ id }) => id === selectedPipelineId) ?? null;
@@ -613,8 +619,22 @@ export function OpportunitiesWorkspace() {
     view === "board" ? boardItems : list.items;
 
   const listErrorText = list.error
-    ? list.error.message || t.crmOpportunities.loadFailed
+    ? t.crmOpportunities.loadFailed
     : null;
+
+  const createView = canMutate && capabilities?.create ? <CreateOpportunityModal
+    create={create}
+    createCapability={capabilities.create}
+    updateCapability={capabilities.update ?? null}
+    pipelines={pipelines}
+    branchId={branchId}
+    branchLabel={branchId ? branchLabels.get(branchId) ?? t.common.branch : undefined}
+    customFields={customFields}
+  /> : null;
+
+  if (create.open && create.view === "full" && createView) {
+    return <div className="flex h-full min-h-0 flex-col overflow-y-auto p-1">{createView}</div>;
+  }
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
@@ -768,6 +788,7 @@ export function OpportunitiesWorkspace() {
                     initialStageId ?? null,
                     draft,
                     selectedPipelineId,
+                    "full",
                   )
                 }
                 onDelete={(item) => {
@@ -973,14 +994,7 @@ export function OpportunitiesWorkspace() {
         error={terminalMove ? error : null}
       />
 
-      {canMutate && capabilities?.create && <CreateOpportunityModal
-        create={create}
-        createCapability={capabilities?.create ?? null}
-        updateCapability={capabilities?.update ?? null}
-        pipelines={pipelines}
-        branchId={branchId}
-        customFields={customFields}
-      />}
+      {createView}
 
       <ConfirmActionModal
         open={canMutate && bulkDeleteIds !== null}
@@ -1000,7 +1014,7 @@ export function OpportunitiesWorkspace() {
         onClose={() => setSelectedForDelete(null)}
         onConfirm={() => void handleDelete()}
         isDeleting={isDeleting}
-        error={deleteError}
+        error={deleteError ? crmErrorText({ ...deleteError, message: undefined }) ?? t.crmOpportunities.deleteFailed : null}
       />
 
       <ActivityModal

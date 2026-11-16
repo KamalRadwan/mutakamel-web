@@ -16,10 +16,12 @@ import {
   TooltipTrigger,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { auditNotificationText } from "@/lib/audit/notification-text";
+import { notificationHref, notificationText } from "@/lib/notifications/notification-presentation";
+import { INTL_LOCALE } from "@/lib/format/locale";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { wireLabel } from "@/lib/format/wire-label";
 import { KNOWN_NOTIFICATION_PRIORITY, type InboxNotification } from "../notification-contract";
+import { useCoreErrorText } from "../../hooks/useCoreErrorText";
 
 interface NotificationListProps {
   items: InboxNotification[];
@@ -49,6 +51,7 @@ export function NotificationList({
   onDismiss,
 }: NotificationListProps) {
   const { t, lang } = useI18n();
+  const describeError = useCoreErrorText();
 
   if (isLoading) {
     return (
@@ -64,7 +67,7 @@ export function NotificationList({
     return (
       <ErrorState
         title={t.coreNotifications.loadFailed}
-        description={error.message}
+        description={describeError(error)}
         onRetry={onRetry}
         retryLabel={t.common.retry}
       />
@@ -83,10 +86,10 @@ export function NotificationList({
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
-                  href={`/core/notifications/${item.id}`}
+                  href={notificationHref(item)}
                   className="text-sm font-medium text-foreground hover:underline"
                 >
-                  {auditNotificationText(item, t.audit.recordMessages).title}
+                  {notificationText(item, t.audit.recordMessages, t.coreNotifications, t.activities.types, INTL_LOCALE[lang]).title}
                 </Link>
                 {item.readAt === null ? (
                   <Badge tone="brand">{t.coreNotifications.unread}</Badge>
@@ -96,7 +99,7 @@ export function NotificationList({
                 ) : null}
                 <PriorityBadge priority={item.priority} />
               </div>
-              <p className="line-clamp-2 text-xs text-muted-foreground">{auditNotificationText(item, t.audit.recordMessages).body}</p>
+              <p className="whitespace-pre-line text-xs text-muted-foreground">{notificationText(item, t.audit.recordMessages, t.coreNotifications, t.activities.types, INTL_LOCALE[lang]).body}</p>
               <p className="text-2xs text-muted-foreground">
                 <DateTime value={item.createdAt} precision="datetime" language={lang} />
               </p>

@@ -7,6 +7,7 @@ import {
   type UpdateLeadRequest,
 } from "../lead-write-contract";
 import { CrmErrorBag, type CrmFieldMessages } from "../../shared/crm-form-validation";
+import { safeWebsiteHref } from "../../shared/safe-website-href";
 
 export const COMPANY_FIELDS = [
   "companyName", "taxNumber", "commercialRegistrationNumber", "companyEmail", "companyWebsite",
@@ -65,6 +66,9 @@ export function validateCompanyForm(
   addressClearMessage: string,
 ) {
   const bag = new CrmErrorBag(messages);
+  if (form.companyWebsite.trim() && !safeWebsiteHref(form.companyWebsite)) {
+    bag.set("companyWebsite", messages.url);
+  }
   for (const field of COMPANY_FIELDS) {
     if (form[field].trim() === baseline[field].trim()) continue;
     if (field === "companyName") bag.required(field, form[field]);

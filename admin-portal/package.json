@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 5001",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start -p 5001",
+    "portal:rebuild": "node ../scripts/rebuild-portal.mjs admin",
     "lint": "eslint",
     "test": "vitest run",
     "docs:routes": "node scripts/docs/generate-admin-route-inventory.mjs",

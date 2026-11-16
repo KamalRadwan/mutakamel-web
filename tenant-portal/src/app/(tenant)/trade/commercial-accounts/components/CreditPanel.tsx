@@ -15,7 +15,8 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDateTime } from "@/lib/format/date";
-import { INTL_LOCALE } from "@/lib/format/locale";
+import { formatDecimalString } from "@/lib/format/number";
+import { fixedDecimalUnits } from "../../documents/fixed-decimal";
 import type { CreditDecision } from "../commercial-account-contract";
 import { ACCOUNT_UI_COPY, ISO_CURRENCY_PRESETS } from "../commercial-account-metadata";
 
@@ -51,17 +52,22 @@ export function CreditPanel({
 
   if (!canViewCredit) return null;
 
-  const limitNum =
+  const limitUnits =
     decision?.effectiveLimit !== null && decision?.effectiveLimit !== undefined
-      ? Number(decision.effectiveLimit)
+      ? fixedDecimalUnits(decision.effectiveLimit)
       : null;
-  const exposureNum =
+  const exposureUnits =
     decision?.exposureAmount !== null && decision?.exposureAmount !== undefined
-      ? Number(decision.exposureAmount)
-      : 0;
+      ? fixedDecimalUnits(decision.exposureAmount)
+      : BigInt(0);
+  // Floor exact units so a below-limit exposure never displays as fully used.
   const utilizationPct =
-    limitNum && limitNum > 0
-      ? Math.min(100, Math.max(0, Math.round((exposureNum / limitNum) * 100)))
+    limitUnits !== null && limitUnits > BigInt(0)
+      ? exposureUnits >= limitUnits
+        ? 100
+        : exposureUnits <= BigInt(0)
+          ? 0
+          : Number((exposureUnits * BigInt(100)) / limitUnits)
       : null;
 
   const greenSwatch = SWATCH_SURFACE_PALETTES.green;
@@ -105,7 +111,7 @@ export function CreditPanel({
                   dir="ltr"
                   className="px-1.5 py-0.5 font-mono tabular-nums text-xs font-semibold"
                 >
-                  {Number(presetAmt).toLocaleString(INTL_LOCALE[lang])}
+                  {formatDecimalString(presetAmt, lang)}
                 </Button>
               ))}
             </div>

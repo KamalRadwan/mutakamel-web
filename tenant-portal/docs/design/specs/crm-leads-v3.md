@@ -48,7 +48,9 @@ specification.
 5. **Small type is allowed only through named steps.**
    - The steps are `text-micro` (10px, count chips only), `text-badge` (11px) and
      `text-caption` (12px). They are used only where Part 3 names them.
-   - The Arabic lift (`html[lang="ar"]`) applies to every step. Like the pre-v3
+   - Superseded 2026-11-04: Arabic and English share all font sizes and
+     line-heights; only Arabic tracking differs. The original Arabic lift
+     (`html[lang="ar"]`) applied to every step. Like the pre-v3
      steps, the type steps are fixed rem values: the `--ui-scale` density multiplier
      scales chrome geometry (`--size-*`), not type.
 6. **Gradients are allowed only as the named `bg-gradient-*` utilities in Part 2.**

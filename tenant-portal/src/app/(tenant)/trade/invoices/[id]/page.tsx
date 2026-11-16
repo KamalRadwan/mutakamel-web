@@ -59,7 +59,7 @@ export default function InvoiceDetailPage({
   );
   const invoice = detail.document;
   const { headers, canWrite } = detail.scope;
-  const pdf = useTradePdfJob(INVOICES_PATH, id, headers);
+  const pdf = useTradePdfJob(INVOICES_PATH, id, headers, invoice?.version.toString());
   const [editOpen, setEditOpen] = React.useState(false);
 
   const reload = useCallback(async () => {

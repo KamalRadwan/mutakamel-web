@@ -72,10 +72,10 @@ export interface TradeDocumentHeader {
 /**
  * `TradeFinalizedPrintDocumentEntity` — purchase quotations, invoices and
  * contracts. A different table shape from the header above: `documentNumber`
- * is assigned at creation and non-null, there is no approval or fulfilment
+ * is nullable for purchase-quotation drafts, there is no approval or fulfilment
  * axis, and `totalsSnapshot` is the authored evidence rather than a column.
  */
-export interface TradeFinalizedDocument {
+export interface TradeFinalizedDocument<DocumentNumber extends string | null = string> {
   id: string;
   version: number;
   companyId: string;
@@ -83,7 +83,7 @@ export interface TradeFinalizedDocument {
   partyId: string;
   currencyCode: string;
   businessDate: string;
-  documentNumber: string;
+  documentNumber: DocumentNumber;
   reference: string | null;
   lifecycleStatus: string;
   notes: string | null;
@@ -229,7 +229,15 @@ export function parseTradeDocumentHeader(payload: unknown): TradeDocumentHeader 
   };
 }
 
-export function parseTradeFinalizedDocument(payload: unknown): TradeFinalizedDocument {
+export function parseTradeFinalizedDocument(payload: unknown): TradeFinalizedDocument;
+export function parseTradeFinalizedDocument(
+  payload: unknown,
+  options: { allowUnnumberedDraft: true },
+): TradeFinalizedDocument<string | null>;
+export function parseTradeFinalizedDocument(
+  payload: unknown,
+  options?: { allowUnnumberedDraft: true },
+): TradeFinalizedDocument<string | null> {
   const document = record(payload);
   if (
     !document ||
@@ -240,7 +248,9 @@ export function parseTradeFinalizedDocument(payload: unknown): TradeFinalizedDoc
     !isUUIDv7(document.partyId) ||
     !isCurrencyCode(document.currencyCode) ||
     !isTradeDate(document.businessDate) ||
-    !isBoundedString(document.documentNumber, 80) ||
+    !(isBoundedString(document.documentNumber, 80) ||
+      (options?.allowUnnumberedDraft && document.lifecycleStatus === "DRAFT" &&
+        document.documentNumber === null)) ||
     !isTradeStatus(document.lifecycleStatus) ||
     !isTradeTimestamp(document.createdAt) ||
     !isTradeTimestamp(document.updatedAt)
@@ -317,12 +327,13 @@ export function partyDisplayName(snapshot: Record<string, unknown>): string | nu
   return null;
 }
 
-/** `page` and `limit` are the only list parameters `DocumentListQueryDto` reads. */
+/** Filters accepted by the Trade commercial document list DTO. */
 export function tradeListPath(
   base: string,
   page: number,
   status?: string,
   partyId?: string,
+  filters?: { search?: string; currencyCode?: string },
 ): TradePath {
   const query = new URLSearchParams({
     page: String(page),
@@ -330,6 +341,8 @@ export function tradeListPath(
   });
   if (status) query.set("status", status);
   if (partyId) query.set("partyId", partyId);
+  if (filters?.search) query.set("search", filters.search);
+  if (filters?.currencyCode) query.set("currencyCode", filters.currencyCode);
   return `${base}?${query.toString()}` as TradePath;
 }
 

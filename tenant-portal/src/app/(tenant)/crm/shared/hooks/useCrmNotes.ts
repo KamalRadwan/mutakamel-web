@@ -66,6 +66,7 @@ type SettleWrite = (
 export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) {
   const [notes, setNotes] = useState<CrmNote[]>([]);
   const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
   const [writeError, setWriteError] = useState<NormalizedApiError | null>(null);
@@ -79,19 +80,33 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
     useState<AppliedUnreadable | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const requestEpochRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
+  const pageRef = useRef(0);
+  const loadingRef = useRef(false);
 
   const ready = isUUIDv7(branchId) && isUUIDv7(sourceId);
 
   const load = useCallback(
-    async (signal?: AbortSignal) => {
+    async (requestedPage = 1) => {
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      const { signal } = controller;
       const epoch = requestEpochRef.current + 1;
       requestEpochRef.current = epoch;
-      if (!isUUIDv7(branchId) || !isUUIDv7(sourceId)) {
+      if (requestedPage === 1) {
+        pageRef.current = 0;
         setNotes([]);
         setTotal(0);
+        setHasNext(false);
+      }
+      if (!isUUIDv7(branchId) || !isUUIDv7(sourceId)) {
         setLoadError(null);
+        loadingRef.current = false;
+        setIsLoading(false);
         return;
       }
+      loadingRef.current = true;
       setIsLoading(true);
       setLoadError(null);
       try {
@@ -100,7 +115,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
             branchId,
             sourceType,
             sourceId,
-            page: 1,
+            page: requestedPage,
             limit: NOTES_PAGE_SIZE,
           }),
           {
@@ -114,16 +129,23 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
           sourceType,
           sourceId,
         });
-        if (epoch !== requestEpochRef.current) return;
-        setNotes(page.items);
+        if (signal.aborted || epoch !== requestEpochRef.current) return;
+        setNotes((current) => [
+          ...new Map(
+            [...(requestedPage === 1 ? [] : current), ...page.items].map(
+              (note) => [note.id, note] as const,
+            ),
+          ).values(),
+        ]);
+        pageRef.current = requestedPage;
         setTotal(page.total);
+        setHasNext(page.hasNext);
       } catch (caught) {
-        if (isAbortError(caught) || epoch !== requestEpochRef.current) return;
-        setNotes([]);
-        setTotal(0);
+        if (signal.aborted || isAbortError(caught) || epoch !== requestEpochRef.current) return;
         setLoadError(normalizeApiError(caught));
       } finally {
-        if (!signal?.aborted && epoch === requestEpochRef.current) {
+        if (!signal.aborted && epoch === requestEpochRef.current) {
+          loadingRef.current = false;
           setIsLoading(false);
         }
       }
@@ -132,16 +154,27 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    let disposed = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!disposed) void load();
     });
-    return () => controller.abort();
+    return () => {
+      disposed = true;
+      controllerRef.current?.abort();
+      requestEpochRef.current += 1;
+    };
   }, [load, reloadToken]);
 
   const reload = useCallback(() => {
+    controllerRef.current?.abort();
+    requestEpochRef.current += 1;
     setReloadToken((current) => current + 1);
   }, []);
+
+  const loadMore = useCallback(() => {
+    if (!hasNext || loadingRef.current) return;
+    void load(pageRef.current + 1);
+  }, [hasNext, load]);
 
   // A **named** function expression, not an arrow: the ambiguous branch's
   // `replay` calls this same function, and naming it puts it in its own scope
@@ -279,6 +312,8 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   return {
     notes,
     total,
+    hasNext: hasNext && notes.length < total,
+    loadMore,
     ready,
     isLoading,
     loadError,

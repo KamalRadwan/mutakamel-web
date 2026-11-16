@@ -2,8 +2,10 @@
 
 import { Button, DetailSection, Field, Input } from "@/design-system";
 import { useProfileSecurity } from "../hooks/useProfileSecurity";
+import { useCoreErrorText } from "../../hooks/useCoreErrorText";
 
 export function ProfileSecurity() {
+  const describeError = useCoreErrorText();
   const screen = useProfileSecurity();
   const { t } = screen;
   const copy = t.coreIdentity.profile;
@@ -26,14 +28,14 @@ export function ProfileSecurity() {
                 maxLength={screen.maxNameLength} disabled={disabled} required />
             </Field>
           </div>
-          {screen.nameError ? <p role="alert" className="text-sm text-negative-700 dark:text-negative-300">{screen.nameError.message ?? copy.securityFailed}</p> : null}
+          {screen.nameError ? <p role="alert" className="text-sm text-negative-700 dark:text-negative-300">{describeError(screen.nameError)}</p> : null}
           <Button type="submit" variant="outline" className="self-start" loading={screen.pending === "name"}
             disabled={disabled || !screen.isNameValid}>{t.common.save}</Button>
         </form>
       </DetailSection>
       <DetailSection title={copy.changePassword} description={copy.changePasswordDescription}>
         <form method="post" className="flex flex-col gap-4" onSubmit={screen.submitPassword}>
-          <Field label={copy.currentPassword} error={screen.passwordError?.code === "CURRENT_PASSWORD_INVALID" ? screen.passwordError.message ?? copy.securityFailed : undefined} required>
+          <Field label={copy.currentPassword} error={screen.passwordError?.code === "CURRENT_PASSWORD_INVALID" ? describeError(screen.passwordError) : undefined} required>
             <Input type={screen.showPassword ? "text" : "password"} name="currentPassword" autoComplete="current-password"
               value={screen.currentPassword} onChange={(event) => screen.setCurrentPassword(event.target.value)}
               maxLength={screen.maxPasswordLength} disabled={disabled} required />
@@ -53,7 +55,7 @@ export function ProfileSecurity() {
           <Button type="button" variant="ghost" className="self-start" onClick={screen.toggleShowPassword} aria-pressed={screen.showPassword}>
             {screen.showPassword ? t.auth.hidePassword : t.auth.showPassword}
           </Button>
-          {screen.passwordError ? <p role="alert" className="text-sm text-negative-700 dark:text-negative-300">{screen.passwordError.message ?? copy.securityFailed}</p> : null}
+          {screen.passwordError ? <p role="alert" className="text-sm text-negative-700 dark:text-negative-300">{describeError(screen.passwordError)}</p> : null}
           <Button type="submit" variant="outline" className="self-start" loading={screen.pending === "password"}
             disabled={disabled || !screen.currentPassword || !screen.isPasswordValid || !screen.isConfirmed}>{copy.changePassword}</Button>
         </form>

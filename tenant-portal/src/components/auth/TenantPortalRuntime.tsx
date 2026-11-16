@@ -5,6 +5,7 @@ import { TenantRealtimeProvider } from "@/context/TenantRealtimeProvider";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { TenantAuthGuard } from "./TenantAuthGuard";
 import { TenantHostAdmission } from "./TenantHostAdmission";
+import { ToastSessionReset } from "./ToastSessionReset";
 
 export function TenantPortalRuntime({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export function TenantPortalRuntime({ children }: { children: React.ReactNode })
       <I18nProvider>
         <ToastProvider>
           <TenantAuthProvider>
+            <ToastSessionReset />
             <TenantPreferenceHydration />
             <TenantRealtimeProvider>
               <TenantAuthGuard>{children}</TenantAuthGuard>

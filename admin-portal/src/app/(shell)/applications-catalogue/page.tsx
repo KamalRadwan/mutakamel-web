@@ -7,7 +7,7 @@ import { useApplications } from "@/features/admin/applications/hooks/useApplicat
 import { useApplicationRegistration } from "@/features/admin/applications/hooks/useApplicationRegistration";
 import { CreateApplicationModal } from "@/features/admin/applications/components/CreateApplicationModal";
 import { useAuth } from "@/context/AuthContext";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   PageHeader,
@@ -54,8 +54,7 @@ function ApplicationRegistrationOnlyContent() {
   const { createApplication, onboardApplication } = useApplicationRegistration();
   const canOnboard = adminCanAll(user, [
     "admin.applications.create",
-    "admin.applications.update",
-    "admin.applications.critical",
+    ...ADMIN_RBAC_CRITICAL.APPLICATIONS_UPDATE,
   ]);
 
   return (
@@ -124,8 +123,7 @@ function ApplicationsCatalogueContent() {
   const canCreate = adminCanAll(user, ["admin.applications.create"]);
   const canOnboard = adminCanAll(user, [
     "admin.applications.create",
-    "admin.applications.update",
-    "admin.applications.critical",
+    ...ADMIN_RBAC_CRITICAL.APPLICATIONS_UPDATE,
   ]);
   const canReadAudit = adminCanAll(user, ["admin.catalog.read"]);
 

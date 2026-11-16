@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import {
   Button,
   Checkbox,
@@ -41,7 +42,7 @@ export function CatalogueResourceDialog({
   onClose,
   onSubmit,
 }: Props) {
-  const { lang } = useI18n();
+  const { lang, t } = useI18n();
   const copy = resourceDialogCopy(lang);
   const isFeature = kind === "feature";
   const [key, setKey] = useState("");
@@ -104,7 +105,7 @@ export function CatalogueResourceDialog({
       }
       onClose();
     } catch (error) {
-      setSubmissionError(readSubmissionMessage(error, copy.failed));
+      setSubmissionError(localizeApplicationError(error, t));
       queueMicrotask(() => submissionErrorRef.current?.focus());
     }
   };
@@ -212,11 +213,6 @@ function focusFieldError(
   queueMicrotask(() => document.getElementById(id)?.focus());
 }
 
-function readSubmissionMessage(value: unknown, fallback: string) {
-  if (value instanceof Error) return value.message;
-  if (value && typeof value === "object" && "message" in value && typeof value.message === "string") return value.message;
-  return fallback;
-}
 
 function omitFieldError(errors: Record<string, string>, field: string) {
   const next = { ...errors };

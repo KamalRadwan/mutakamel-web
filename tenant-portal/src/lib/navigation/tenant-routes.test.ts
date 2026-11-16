@@ -3,10 +3,10 @@ import {
   TENANT_ROUTES,
   canAccessCoreRoute,
   canAccessCrmRoute,
+  canAccessTradeQuotationCreate,
   getFirstPermittedCrmRoute,
   isSupportedCorePath,
   isSupportedCrmPath,
-  permittedCoreSettingsRoutes,
   canAccessTradeFoundationRoute,
   isSupportedTradePath,
   permittedTradeFoundationRoutes,
@@ -40,6 +40,7 @@ describe("Tenant Portal production route surface", () => {
     expect(isSupportedCrmPath("/crm/customer-profiles/customer-id")).toBe(true);
     expect(isSupportedCrmPath("/crm/customer-profiles/customer-id/general")).toBe(false);
     expect(isSupportedCrmPath("/crm/dashboard")).toBe(true);
+    expect(isSupportedCrmPath("/crm/widgets/ownership-transfers")).toBe(true);
     // Q40: these five screens existed and were redirected to /unavailable
     // because only customer-profiles was admitted here.
     expect(isSupportedCrmPath("/crm/leads/lead-id")).toBe(true);
@@ -153,6 +154,7 @@ describe("Tenant Portal production route surface", () => {
       getFirstPermittedCrmRoute(["activities.read", "crm.leads.read.own"]),
     ).toBe(TENANT_ROUTES.crmActivities);
     expect(getFirstPermittedCrmRoute(["activities.read"])).toBeNull();
+    expect(getFirstPermittedCrmRoute(["crm.widgets.transfer_ownership"])).toBe(TENANT_ROUTES.crmWidgetOwnership);
     // Ordering here decides where a user LANDS, so it is behaviour. The first
     // attempt put these seven ahead of leads, which would have dropped a
     // pipeline manager onto a configuration screen instead of their records.
@@ -184,6 +186,9 @@ describe("Core settings route surface", () => {
     );
     expect(isSupportedCorePath("/core/notifications/an-id/extra")).toBe(false);
     expect(isSupportedCorePath(TENANT_ROUTES.coreSettingsBranding)).toBe(true);
+    expect(isSupportedCorePath(TENANT_ROUTES.coreSettingsUpdates)).toBe(true);
+    expect(canAccessCoreRoute(["workspace.read"], TENANT_ROUTES.coreSettingsUpdates)).toBe(true);
+    expect(canAccessCoreRoute(["workspace.manage"], TENANT_ROUTES.coreSettingsUpdates)).toBe(false);
   });
 
   it("admits the three owner-only billing screens and one invoice detail segment", () => {
@@ -245,6 +250,12 @@ describe("Core settings route surface", () => {
     expect(canAccessCoreRoute(["workspace.email.read"], TENANT_ROUTES.coreSettingsEmail)).toBe(
       true,
     );
+    expect(canAccessCoreRoute(["workspace.email.manage"], TENANT_ROUTES.coreSettingsEmail)).toBe(
+      true,
+    );
+    expect(
+      canAccessCoreRoute(["workspace.email.manage.branch"], TENANT_ROUTES.coreSettingsEmail),
+    ).toBe(false);
     expect(
       canAccessCoreRoute(["notifications.notification.read"], TENANT_ROUTES.coreNotifications),
     ).toBe(true);
@@ -280,6 +291,11 @@ describe("Core settings route surface", () => {
     expect(isSupportedCorePath("/core/templates/0199f2b0-1111-4222-8333-444455556666")).toBe(true);
     // One detail segment, never two — a versions sub-route is not a page.
     expect(isSupportedCorePath("/core/templates/an-id/versions")).toBe(false);
+    const designer = "/core/templates/01890000-0000-7000-8000-000000000001/design";
+    expect(isSupportedCorePath(designer)).toBe(true);
+    expect(isSupportedCorePath(`${designer}/extra`)).toBe(false);
+    expect(isSupportedCorePath("/core/templates/assets/design")).toBe(false);
+    expect(isSupportedCorePath("/core/templates/01890000-0000-4000-8000-000000000001/design")).toBe(false);
     expect(isSupportedCorePath("/core/directory/an-id/addresses")).toBe(false);
     expect(isSupportedCorePath("/core/activities/an-id")).toBe(false);
   });
@@ -306,18 +322,6 @@ describe("Core settings route surface", () => {
     expect(isSupportedCorePath("/core/audit/events/id/extra")).toBe(false);
     expect(canAccessCoreRoute(["templates.create"], TENANT_ROUTES.coreTemplates)).toBe(false);
     expect(canAccessCoreRoute(["audit.read.all"], TENANT_ROUTES.coreAudit)).toBe(false);
-  });
-
-  it("lists only the settings sections the caller may open, and never notifications", () => {
-    expect(permittedCoreSettingsRoutes([])).toEqual([]);
-    expect(permittedCoreSettingsRoutes(["notifications.notification.read"])).toEqual([]);
-    expect(permittedCoreSettingsRoutes(["taxes.tax.read", "numbering.read"])).toEqual([
-      TENANT_ROUTES.coreSettingsTaxes,
-      TENANT_ROUTES.coreSettingsNumbering,
-    ]);
-    expect(permittedCoreSettingsRoutes(["branding.read"])).toEqual([
-      TENANT_ROUTES.coreSettingsBranding,
-    ]);
   });
 
   it("gates each Phase 10 Trade screen on the permission its list route declares", () => {
@@ -372,6 +376,17 @@ describe("Core settings route surface", () => {
       TENANT_ROUTES.tradeChannels,
     ]);
     expect(permittedTradeFoundationRoutes(["trade.credit.view"])).toEqual([]);
+  });
+
+  it("admits the standalone quotation composer route and gates it on trade.quotations.create", () => {
+    expect(TENANT_ROUTES.tradeQuotationCreate).toBe("/trade/quotations/new");
+    expect(isSupportedTradePath(TENANT_ROUTES.tradeQuotationCreate)).toBe(true);
+    expect(isSupportedTradePath("/trade/quotations/0199f2b0-1111-7222-8333-444455556666")).toBe(
+      true,
+    );
+    expect(canAccessTradeQuotationCreate(["trade.quotations.create"])).toBe(true);
+    expect(canAccessTradeQuotationCreate(["trade.quotations.read"])).toBe(false);
+    expect(canAccessTradeQuotationCreate([])).toBe(false);
   });
 
 });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 import { NAV_SECTIONS, type NavAppId, type NavSection } from "./nav-config";
@@ -21,6 +21,7 @@ vi.mock("@/i18n/I18nContext", () => ({
     t: {
       common: { skipToContent: "Skip to content" },
       nav: { appSwitcher: "Switch app", appWorkspace: "Workspace" },
+      crmSettingsNavigation: { sections: "Settings sections" },
       connectivity: {},
     },
   }),
@@ -37,6 +38,10 @@ vi.mock("./GlobalNav", () => ({
   },
 }));
 vi.mock("./NavSheet", () => ({ NavSheet: () => null }));
+vi.mock("./CrmSettingsAside", () => ({
+  CrmSettingsAside: () => <aside aria-label="CRM settings" />,
+  CrmSettingsSheet: () => null,
+}));
 vi.mock("./PageActionBar", () => ({ PageActionBar: () => <div /> }));
 vi.mock("./NavCommandPalette", () => ({ NavCommandPalette: () => null }));
 vi.mock("../patterns/offline-banner/OfflineBanner", () => ({ OfflineBanner: () => null }));
@@ -45,8 +50,8 @@ vi.mock("../patterns/offline-banner/useConnectivity", () => ({
 }));
 
 const EXPECTED: Record<NavAppId, string[]> = {
-  workspace: ["workspace", "coreIdentity", "coreOperations", "coreSettings", "coreBilling", "account"],
-  crm: ["crm", "crmSetup", "crmActivities"],
+  workspace: ["workspace", "coreIdentity", "coreOperations", "coreBilling", "account", "coreSettings"],
+  crm: ["crm", "crmActivities", "crmAnalytics", "crmSetup"],
   trade: [
     "tradeFoundation",
     "tradeDocuments",
@@ -95,14 +100,28 @@ describe("the global nav is scoped to one app", () => {
     expect(renderAt("/crm/leads", "trade")).toEqual(EXPECTED.crm);
   });
 
+  it.each([
+    "/crm/dashboard", "/crm/dashboards", "/crm/dashboards/018f-dashboard",
+    "/crm/dashboards/reports", "/crm/widgets", "/crm/widgets/018f-widget",
+  ])("gives analytics its full content width on %s", (route) => {
+    renderAt(route);
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.getByRole("main")).toHaveTextContent("Body");
+  });
+
+  it("keeps the settings aside on configuration pages", () => {
+    renderAt("/crm/lead-stages");
+    expect(screen.getByRole("complementary", { name: "CRM settings" })).toBeInTheDocument();
+  });
+
   // ---- NEGATIVE CONTROL --------------------------------------------------
   //
   // If the app filtering is removed — from `useNavApps`'s
   // `sections.filter(section => section.app === app.id)`, or from AppShell's
-  // `apps.find(entry => entry.id === app)` — the nav is handed all 15
+  // `apps.find(entry => entry.id === app)` — the nav is handed all sections
   // sections again and every assertion below fails. Verified by deleting each
   // in turn and watching this test go red.
-  it("does NOT show all 15 sections once an app is active", () => {
+  it("does not show another app's sections once an app is active", () => {
     const shown = renderAt("/crm/leads");
 
     expect(shown).not.toEqual(NAV_SECTIONS.map((section) => section.id));

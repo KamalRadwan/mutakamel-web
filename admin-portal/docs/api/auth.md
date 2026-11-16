@@ -1,5 +1,14 @@
 # Admin Authentication API
 
+Login errors (source reviewed 2026-10-31, AUDIT29X-AUTH-5): wrong passwords
+and all non-ACTIVE accounts return the same `401 INVALID_CREDENTIALS`, even
+when a suspended or deactivated user's password is correct. Core counts the
+failure and applies its 600-700 ms response floor; no session, MFA challenge
+or trusted-device cookie is issued. A status change at the locked login
+recheck returns the same 401. `403 ACCOUNT_NOT_ACTIVE` is not a login outcome
+and must not be mapped to an account-status message on the login screen.
+ACTIVE login behavior is unchanged.
+
 ## Optional email MFA — FE-AUTH-001 (source reviewed 2026-10-23)
 
 Core owns all operations below; browser paths use

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./AppShell";
 import { PageActions } from "./PageActions";
@@ -47,6 +47,7 @@ vi.mock("@/context/AuthContext", () => ({
         "crm.opportunities.read",
         "crm.pipelines.read",
         "trade.items.read",
+        "trade.pricing.read",
         // Two setup screens, so that section renders as a MENU. With one it
         // would render as a direct link instead — NavMenu.test.tsx covers that.
         "crm.custom_fields.read",
@@ -76,13 +77,44 @@ afterEach(() => {
 
 function renderShell(children: React.ReactNode, initialApp: "crm" | "trade" = "crm") {
   const { container } = render(<AppShell initialApp={initialApp}>{children}</AppShell>);
-  // The bar is the sibling directly after the <header>, and the only element
-  // between it and <main>.
-  const bar = container.querySelector("header")!.nextElementSibling as HTMLElement;
+  // The Settings column puts its toolbar beside the aside. Locate the real
+  // toolbar rather than relying on the shell's former sibling geometry.
+  const bar = container.querySelector("[data-page-action-bar]") as HTMLElement;
   return { container, bar, main: screen.getByRole("main") };
 }
 
 describe("the page action bar", () => {
+  it.each(["/crm/dashboards", "/crm/widgets/widget-id"])("keeps one analytics primary action with its title on %s", (route) => {
+    pathname = route;
+    const create = vi.fn();
+    const { bar, main } = renderShell(<PageHeader title="Analytics workspace"
+      description="Current authorized records" primaryAction={{ label: "Create report", onClick: create }}
+      secondaryActions={<Button variant="outline">Choose template</Button>} />);
+    expect(within(bar).queryByRole("button", { name: "Create report" })).toBeNull();
+    expect(within(main).getByRole("heading", { name: "Analytics workspace" })).toBeVisible();
+    expect(within(main).getByRole("button", { name: "Choose template" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "Create report" })).toHaveLength(1);
+    fireEvent.click(within(main).getByRole("button", { name: "Create report" }));
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits Governance and Price books from the price-book list's action bar", () => {
+    pathname = "/trade/price-books";
+    const { bar } = renderShell(
+      <PageHeader title="Price books" primaryAction={{ label: "Create price book", onClick: vi.fn() }} />,
+      "trade",
+    );
+    expect(within(bar).queryByText(en.nav.navMenuGovernance)).toBeNull();
+    expect(within(bar).queryByRole("link", { name: en.nav.tradePriceBooks })).toBeNull();
+    expect(within(bar).getByRole("button", { name: "Create price book" })).toBeVisible();
+  });
+
+  it("retains the Price books return link on a book detail route", () => {
+    pathname = "/trade/price-books/book-id";
+    const { bar } = renderShell(<PageHeader title="Sales book" />, "trade");
+    expect(within(bar).getByRole("link", { name: en.nav.tradePriceBooks })).toHaveAttribute("href", "/trade/price-books");
+  });
+
   it("renders a PageHeader's primary action inside the bar, not in the page", () => {
     const { bar, main } = renderShell(
       <PageHeader
@@ -235,6 +267,20 @@ describe("the page action bar", () => {
 });
 
 describe("the global nav", () => {
+  it("places the settings aside beside its own toolbar and keeps portal actions working", () => {
+    pathname = "/crm/lead-stages";
+    const { bar, main } = renderShell(<PageHeader title="Lead Stages" primaryAction={{ label: "Add stage", onClick: vi.fn() }} />);
+    const aside = screen.getByRole("complementary", { name: en.nav.crmSettings });
+    expect(within(aside).getByRole("link", { name: en.nav.leadStages })).toHaveAttribute("aria-current", "page");
+    expect(within(bar).getByRole("button", { name: "Add stage" })).toBeInTheDocument();
+    expect(within(main).queryByRole("button", { name: "Add stage" })).toBeNull();
+  });
+
+  it.each(["/crm/leads", "/crm/dashboards/reports"])("does not show a settings aside on %s", (route) => {
+    pathname = route;
+    renderShell(<PageHeader title="Records" />);
+    expect(screen.queryByRole("complementary", { name: en.nav.crmSettings })).toBeNull();
+  });
   it("renders one menu trigger per permitted section, plus the brand and switcher", () => {
     const { container } = renderShell(<PageHeader title="Leads" />);
     const nav = within(container.querySelector("header")!).getByRole("navigation", {
@@ -247,6 +293,7 @@ describe("the global nav", () => {
       en.nav.leads,
       en.nav.customerProfiles,
       en.nav.opportunities,
+      en.nav.navMenuSettings,
     ]);
     expect(within(nav).getByText(en.nav.navMenuSettings)).toBeInTheDocument();
     expect(within(nav).queryByText(en.nav.navMenuDashboards)).toBeNull();

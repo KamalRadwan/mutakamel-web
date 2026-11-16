@@ -1,24 +1,31 @@
-import { isDecimalString } from "../trade-advanced-validation";
-import { isUUIDv7 } from "@/lib/uuid";
+import { generateUUIDv7 } from "@/lib/uuid";
+import { compareFixedDecimal } from "../documents/fixed-decimal";
+import { isMemberOf, isUuidV7 } from "../trade-advanced-validation";
 import {
+  CURRENCY_CODE_PATTERN,
+  PRICE_BOOK_CODE_MAX_LENGTH,
+  PRICE_BOOK_VERSION_NOTES_MAX_LENGTH,
   PRICE_ENTRIES_MAX,
   PROMOTIONS_MAX,
   PROMOTION_BENEFIT_TYPES,
   PROMOTION_CODE_PATTERN,
-  CURRENCY_CODE_PATTERN,
+  type PriceBookVersionDetail,
   type PromotionBenefitType,
 } from "./pricing-contract";
+import {
+  DECIMAL_16_8_PATTERN,
+  POSITIVE_DECIMAL_16_8_PATTERN,
+} from "./version-draft-validation";
 
-// `CreatePriceBookVersionDto` — the body behind
-// `POST /price-books/:id/versions`. Kept out of the contract file because it is
-// the only part of pricing that is a form model rather than a wire type.
-//
-// The bounds are the DTO's: entries 1–10 000 (**at least one**), promotions
-// 0–500 with a `[]` default, `priority` 0–10 000 defaulting to 100,
-// `minimumQuantity` defaulting to "0" on a promotion and `stackGroup` to
-// "DEFAULT". Everything monetary is a decimal string and stays one.
+export {
+  detectVersionDraftConflicts,
+  type DraftValidationIssue,
+  type VersionDraftConflictReport,
+} from "./version-draft-validation";
+export { applyBulkFormulaToDraftEntries, applyPriceFormulaBigInt } from "./version-formula";
 
 export interface PriceEntryDraft {
+  key?: string;
   itemId: string;
   uomId: string;
   currencyCode: string;
@@ -29,7 +36,8 @@ export interface PriceEntryDraft {
   priority: string;
 }
 
-export interface PromotionDraft {
+export interface PromotionRuleDraft {
+  key?: string;
   code: string;
   name: string;
   benefitType: PromotionBenefitType;
@@ -37,194 +45,101 @@ export interface PromotionDraft {
   priority: string;
   stackGroup: string;
   exclusive: boolean;
-  itemId?: string;
-  uomId?: string;
-  branchId?: string;
-  channelId?: string;
-  partyId?: string;
-  minimumQuantity?: string;
-  maximumQuantity?: string;
-}
-
-export interface VersionDraft {
-  effectiveFrom: string;
-  effectiveTo: string;
-  entries: PriceEntryDraft[];
-  promotions: PromotionDraft[];
-}
-
-export const EMPTY_PRICE_ENTRY_DRAFT: PriceEntryDraft = {
-  itemId: "",
-  uomId: "",
-  currencyCode: "",
-  minimumQuantity: "0",
-  maximumQuantity: "",
-  unitPrice: "",
-  minimumAllowedPrice: "",
-  priority: "100",
-};
-
-export const EMPTY_PROMOTION_DRAFT: PromotionDraft = {
-  code: "",
-  name: "",
-  benefitType: "PERCENTAGE",
-  discountValue: "",
-  priority: "100",
-  stackGroup: "DEFAULT",
-  exclusive: false,
-  itemId: "",
-  uomId: "",
-  branchId: "",
-  channelId: "",
-  partyId: "",
-  minimumQuantity: "",
-  maximumQuantity: "",
-};
-
-export const EMPTY_VERSION_DRAFT: VersionDraft = {
-  effectiveFrom: "",
-  effectiveTo: "",
-  entries: [EMPTY_PRICE_ENTRY_DRAFT],
-  promotions: [],
-};
-
-function isoInstant(value: string): string {
-  const parsed = new Date(value);
-  if (value.trim().length === 0 || Number.isNaN(parsed.getTime())) {
-    throw new Error("PRICING_FORM_DATE");
-  }
-  return parsed.toISOString();
-}
-
-function boundedPriority(value: string): number {
-  const parsed = Number(value.trim());
-  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 10_000) {
-    throw new Error("PRICING_FORM_PRIORITY");
-  }
-  return parsed;
-}
-
-function positiveDecimal(value: string): string {
-  const trimmed = value.trim();
-  if (!isDecimalString(trimmed) || Number(trimmed) <= 0) throw new Error("PRICING_FORM_AMOUNT");
-  return trimmed;
-}
-
-interface PriceEntryBody {
   itemId: string;
   uomId: string;
-  currencyCode: string;
+  branchId: string;
+  channelId: string;
+  partyId: string;
   minimumQuantity: string;
-  unitPrice: string;
-  priority: number;
-  maximumQuantity?: string;
-  minimumAllowedPrice?: string;
+  maximumQuantity: string;
 }
 
-interface PromotionBody {
-  code: string;
-  name: string;
-  benefitType: PromotionBenefitType;
-  discountValue: string;
-  priority: number;
-  stackGroup: string;
-  exclusive: boolean;
-  itemId?: string;
-  uomId?: string;
-  branchId?: string;
-  channelId?: string;
-  partyId?: string;
-  minimumQuantity?: string;
-  maximumQuantity?: string;
+export interface PriceBookVersionDraft {
+  effectiveFrom: string;
+  effectiveTo: string;
+  notes?: string;
+  entries: PriceEntryDraft[];
+  promotions: PromotionRuleDraft[];
 }
 
-export interface VersionDraftConflictReport {
-  hasConflicts: boolean;
-  overlappingTierPairs: Array<{ firstIndex: number; secondIndex: number; itemId: string; uomId: string }>;
-  currencyMismatchIndices: number[];
-  floorAboveUnitIndices: number[];
-  invalidQtyRangeIndices: number[];
-  percentageOver100PromotionIndices: number[];
+export type VersionDraft = PriceBookVersionDraft;
+
+export const EMPTY_PRICE_ENTRY_DRAFT: PriceEntryDraft = {
+  itemId: "", uomId: "", currencyCode: "", minimumQuantity: "1",
+  maximumQuantity: "", unitPrice: "", minimumAllowedPrice: "", priority: "100",
+};
+
+export const EMPTY_PROMOTION_DRAFT: PromotionRuleDraft = {
+  code: "", name: "", benefitType: "PERCENTAGE", discountValue: "",
+  priority: "100", stackGroup: "DEFAULT", exclusive: false,
+  itemId: "", uomId: "", branchId: "", channelId: "", partyId: "",
+  minimumQuantity: "1", maximumQuantity: "",
+};
+
+export function emptyPriceEntryDraft(currencyCode = ""): PriceEntryDraft {
+  return { ...EMPTY_PRICE_ENTRY_DRAFT, key: generateUUIDv7(), currencyCode };
 }
 
-export function detectVersionDraftConflicts(
-  draft: VersionDraft,
-  bookCurrencyCode?: string,
-): VersionDraftConflictReport {
-  const normalizedBookCurrency = bookCurrencyCode?.trim().toUpperCase();
-  const overlappingTierPairs: Array<{ firstIndex: number; secondIndex: number; itemId: string; uomId: string }> = [];
-  const currencyMismatchIndices: number[] = [];
-  const floorAboveUnitIndices: number[] = [];
-  const invalidQtyRangeIndices: number[] = [];
-  const percentageOver100PromotionIndices: number[] = [];
+function toDatetimeLocalValue(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
-  draft.entries.forEach((entry, idx) => {
-    const curr = entry.currencyCode.trim().toUpperCase();
-    if (normalizedBookCurrency && curr.length === 3 && curr !== normalizedBookCurrency) {
-      currencyMismatchIndices.push(idx);
-    }
-    const minQ = Number(entry.minimumQuantity.trim());
-    const maxQ = entry.maximumQuantity.trim().length > 0 ? Number(entry.maximumQuantity.trim()) : Infinity;
-    if (Number.isFinite(minQ) && Number.isFinite(maxQ) && minQ > maxQ) {
-      invalidQtyRangeIndices.push(idx);
-    }
-    const unit = Number(entry.unitPrice.trim());
-    const floor = entry.minimumAllowedPrice.trim().length > 0 ? Number(entry.minimumAllowedPrice.trim()) : null;
-    if (floor !== null && Number.isFinite(unit) && Number.isFinite(floor) && floor > unit) {
-      floorAboveUnitIndices.push(idx);
-    }
-  });
-
-  for (let i = 0; i < draft.entries.length; i++) {
-    for (let j = i + 1; j < draft.entries.length; j++) {
-      const a = draft.entries[i];
-      const b = draft.entries[j];
-      const itemA = a.itemId.trim();
-      const uomA = a.uomId.trim();
-      if (!itemA || !uomA) continue;
-      if (itemA === b.itemId.trim() && uomA === b.uomId.trim()) {
-        const minA = Number(a.minimumQuantity.trim()) || 0;
-        const maxA = a.maximumQuantity.trim().length > 0 ? Number(a.maximumQuantity.trim()) : Infinity;
-        const minB = Number(b.minimumQuantity.trim()) || 0;
-        const maxB = b.maximumQuantity.trim().length > 0 ? Number(b.maximumQuantity.trim()) : Infinity;
-        if (Math.max(minA, minB) <= Math.min(maxA, maxB)) {
-          overlappingTierPairs.push({ firstIndex: i, secondIndex: j, itemId: itemA, uomId: uomA });
-        }
-      }
-    }
-  }
-
-  draft.promotions.forEach((promo, idx) => {
-    if (promo.benefitType === "PERCENTAGE") {
-      const val = Number(promo.discountValue.trim());
-      if (Number.isFinite(val) && val > 100) {
-        percentageOver100PromotionIndices.push(idx);
-      }
-    }
-  });
-
+export function hydrateVersionDraftFromDetail(detail: PriceBookVersionDetail): PriceBookVersionDraft {
+  const currency = detail.book.currencyCode;
   return {
-    hasConflicts:
-      overlappingTierPairs.length > 0 ||
-      currencyMismatchIndices.length > 0 ||
-      floorAboveUnitIndices.length > 0 ||
-      invalidQtyRangeIndices.length > 0 ||
-      percentageOver100PromotionIndices.length > 0,
-    overlappingTierPairs,
-    currencyMismatchIndices,
-    floorAboveUnitIndices,
-    invalidQtyRangeIndices,
-    percentageOver100PromotionIndices,
+    effectiveFrom: toDatetimeLocalValue(detail.version.effectiveFrom),
+    effectiveTo: toDatetimeLocalValue(detail.version.effectiveTo),
+    notes: detail.version.notes ?? "",
+    entries: detail.entries.map((e) => ({
+      key: e.id || generateUUIDv7(),
+      itemId: e.itemId,
+      uomId: e.uomId,
+      currencyCode: e.currencyCode || currency,
+      minimumQuantity: e.minimumQuantity,
+      maximumQuantity: e.maximumQuantity ?? "",
+      unitPrice: e.unitPrice,
+      minimumAllowedPrice: e.minimumAllowedPrice ?? "",
+      priority: String(e.priority),
+    })),
+    promotions: detail.promotions.map((p) => {
+      const sel = p.selector ?? {};
+      const ben = p.benefit ?? {};
+      const bType = p.benefitType === "FIXED_AMOUNT" || ben.type === "FIXED_AMOUNT" ? "FIXED_AMOUNT" : "PERCENTAGE";
+      const dVal = typeof p.discountValue === "string" ? p.discountValue : typeof ben.value === "string" ? ben.value : "0";
+      return {
+        key: p.id || generateUUIDv7(),
+        code: p.code,
+        name: p.name,
+        benefitType: bType,
+        discountValue: dVal,
+        priority: String(p.priority),
+        stackGroup: p.stackGroup || "DEFAULT",
+        exclusive: p.exclusive,
+        itemId: typeof sel.itemId === "string" ? sel.itemId : "",
+        uomId: typeof sel.uomId === "string" ? sel.uomId : "",
+        branchId: typeof sel.branchId === "string" ? sel.branchId : "",
+        channelId: typeof sel.channelId === "string" ? sel.channelId : "",
+        partyId: typeof sel.partyId === "string" ? sel.partyId : "",
+        minimumQuantity: typeof sel.minimumQuantity === "string" ? sel.minimumQuantity : "1",
+        maximumQuantity: typeof sel.maximumQuantity === "string" ? sel.maximumQuantity : "",
+      };
+    }),
   };
 }
 
-export function buildCreateVersionRequest(draft: VersionDraft): {
-  effectiveFrom: string;
-  effectiveTo?: string;
-  entries: PriceEntryBody[];
-  promotions: PromotionBody[];
-} {
-  if (draft.entries.length < 1 || draft.entries.length > PRICE_ENTRIES_MAX) {
+function validateAndSerializeEntriesAndPromos(draft: PriceBookVersionDraft, requireAtLeastOneEntry: boolean) {
+  const effectiveFrom = isoDate(draft.effectiveFrom);
+  const effectiveTo = optionalIsoDate(draft.effectiveTo);
+  if (effectiveTo && new Date(effectiveTo).getTime() <= new Date(effectiveFrom).getTime()) {
+    throw new Error("PRICING_FORM_DATE");
+  }
+  const notesTrimmed = draft.notes?.trim() ?? "";
+  if (notesTrimmed.length > PRICE_BOOK_VERSION_NOTES_MAX_LENGTH) throw new Error("PRICING_FORM_NOTES");
+  if ((requireAtLeastOneEntry && draft.entries.length === 0) || draft.entries.length > PRICE_ENTRIES_MAX) {
     throw new Error("PRICING_FORM_ENTRIES");
   }
   if (draft.promotions.length > PROMOTIONS_MAX) throw new Error("PRICING_FORM_PROMOTIONS");
@@ -233,73 +148,130 @@ export function buildCreateVersionRequest(draft: VersionDraft): {
     const itemId = entry.itemId.trim();
     const uomId = entry.uomId.trim();
     const currencyCode = entry.currencyCode.trim().toUpperCase();
-    if (!isUUIDv7(itemId) || !isUUIDv7(uomId)) throw new Error("PRICING_FORM_ENTRY_ID");
+    if (!isUuidV7(itemId) || !isUuidV7(uomId)) throw new Error("PRICING_FORM_ENTRY_ID");
     if (!CURRENCY_CODE_PATTERN.test(currencyCode)) throw new Error("PRICING_FORM_CURRENCY");
-    if (!isDecimalString(entry.minimumQuantity.trim())) throw new Error("PRICING_FORM_AMOUNT");
-
-    const body: PriceEntryBody = {
-      itemId,
-      uomId,
-      currencyCode,
-      minimumQuantity: entry.minimumQuantity.trim(),
-      unitPrice: positiveDecimal(entry.unitPrice),
-      priority: boundedPriority(entry.priority),
+    const minimumQuantity = nonNegativeDecimal(entry.minimumQuantity, "PRICING_FORM_QUANTITY");
+    const maximumQuantity = optionalPositiveDecimal(entry.maximumQuantity, "PRICING_FORM_QUANTITY");
+    if (maximumQuantity && compareFixedDecimal(maximumQuantity, minimumQuantity) <= 0) {
+      throw new Error("PRICING_FORM_QUANTITY");
+    }
+    const unitPrice = nonNegativeDecimal(entry.unitPrice, "PRICING_FORM_AMOUNT");
+    const minimumAllowedPrice = optionalNonNegativeDecimal(entry.minimumAllowedPrice, "PRICING_FORM_AMOUNT");
+    if (minimumAllowedPrice !== undefined && compareFixedDecimal(minimumAllowedPrice, unitPrice) > 0) {
+      throw new Error("PRICING_FORM_AMOUNT");
+    }
+    return {
+      itemId, uomId, currencyCode, minimumQuantity,
+      ...(maximumQuantity ? { maximumQuantity } : {}),
+      unitPrice,
+      ...(minimumAllowedPrice !== undefined ? { minimumAllowedPrice } : {}),
+      priority: priorityInt(entry.priority),
     };
-    // Both optional fields are nullable on the DTO, but an empty string is not
-    // a decimal — omit rather than send "".
-    if (entry.maximumQuantity.trim().length > 0) {
-      body.maximumQuantity = positiveDecimal(entry.maximumQuantity);
-    }
-    if (entry.minimumAllowedPrice.trim().length > 0) {
-      if (!isDecimalString(entry.minimumAllowedPrice.trim())) throw new Error("PRICING_FORM_AMOUNT");
-      body.minimumAllowedPrice = entry.minimumAllowedPrice.trim();
-    }
-    return body;
   });
 
-  const promotions = draft.promotions.map((promotion) => {
-    const code = promotion.code.trim();
-    const name = promotion.name.trim();
-    if (!PROMOTION_CODE_PATTERN.test(code) || code.length > 80) {
+  const seenPromoCodes = new Set<string>();
+  const promotions = draft.promotions.map((rule) => {
+    const code = rule.code.trim();
+    const name = rule.name.trim();
+    const stackGroup = rule.stackGroup.trim();
+    if (!code || code.length > PRICE_BOOK_CODE_MAX_LENGTH || !PROMOTION_CODE_PATTERN.test(code)) {
       throw new Error("PRICING_FORM_PROMOTION_CODE");
     }
-    if (name.length === 0 || name.length > 160) throw new Error("PRICING_FORM_PROMOTION_NAME");
-    if (!PROMOTION_BENEFIT_TYPES.includes(promotion.benefitType)) {
-      throw new Error("PRICING_FORM_PROMOTION_TYPE");
+    const normCode = code.toUpperCase();
+    if (seenPromoCodes.has(normCode)) throw new Error("PRICING_FORM_PROMOTION_CODE");
+    seenPromoCodes.add(normCode);
+    if (!name || name.length > 160) throw new Error("PRICING_FORM_PROMOTION_NAME");
+    if (!isMemberOf(rule.benefitType, PROMOTION_BENEFIT_TYPES)) throw new Error("PRICING_FORM_PROMOTION_TYPE");
+    const discountValue = positiveDecimal(rule.discountValue, "PRICING_FORM_AMOUNT");
+    if (rule.benefitType === "PERCENTAGE" && compareFixedDecimal(discountValue, "100") > 0) {
+      throw new Error("PRICING_FORM_AMOUNT");
     }
-    const body: PromotionBody = {
-      code,
-      name,
-      benefitType: promotion.benefitType,
-      discountValue: positiveDecimal(promotion.discountValue),
-      priority: boundedPriority(promotion.priority),
-      stackGroup: promotion.stackGroup.trim() || "DEFAULT",
-      exclusive: promotion.exclusive,
+    if (!stackGroup || stackGroup.length > PRICE_BOOK_CODE_MAX_LENGTH || !PROMOTION_CODE_PATTERN.test(stackGroup)) {
+      throw new Error("PRICING_FORM_PROMOTION_CODE");
+    }
+    const minimumQuantity = nonNegativeDecimal(rule.minimumQuantity, "PRICING_FORM_QUANTITY");
+    const maximumQuantity = optionalPositiveDecimal(rule.maximumQuantity, "PRICING_FORM_QUANTITY");
+    if (maximumQuantity && compareFixedDecimal(maximumQuantity, minimumQuantity) <= 0) {
+      throw new Error("PRICING_FORM_QUANTITY");
+    }
+    return {
+      code, name, benefitType: rule.benefitType, discountValue,
+      priority: priorityInt(rule.priority), stackGroup, exclusive: rule.exclusive,
+      ...optionalUuid("itemId", rule.itemId),
+      ...optionalUuid("uomId", rule.uomId),
+      ...optionalUuid("branchId", rule.branchId),
+      ...optionalUuid("channelId", rule.channelId),
+      ...optionalUuid("partyId", rule.partyId),
+      minimumQuantity,
+      ...(maximumQuantity ? { maximumQuantity } : {}),
     };
-    const optionalUuidFields = ["itemId", "uomId", "branchId", "channelId", "partyId"] as const;
-    for (const key of optionalUuidFields) {
-      const rawVal = promotion[key]?.trim();
-      if (rawVal && rawVal.length > 0) {
-        if (!isUUIDv7(rawVal)) throw new Error("PRICING_FORM_ENTRY_ID");
-        body[key] = rawVal;
-      }
-    }
-    if (promotion.minimumQuantity && promotion.minimumQuantity.trim().length > 0) {
-      if (!isDecimalString(promotion.minimumQuantity.trim())) throw new Error("PRICING_FORM_AMOUNT");
-      body.minimumQuantity = promotion.minimumQuantity.trim();
-    }
-    if (promotion.maximumQuantity && promotion.maximumQuantity.trim().length > 0) {
-      body.maximumQuantity = positiveDecimal(promotion.maximumQuantity);
-    }
-    return body;
   });
 
-  const request = {
-    effectiveFrom: isoInstant(draft.effectiveFrom),
+  return { effectiveFrom, effectiveTo, notesTrimmed, entries, promotions };
+}
+
+export function buildCreateVersionRequest(draft: PriceBookVersionDraft) {
+  const { effectiveFrom, effectiveTo, notesTrimmed, entries, promotions } =
+    validateAndSerializeEntriesAndPromos(draft, true);
+  return {
+    effectiveFrom,
+    ...(effectiveTo ? { effectiveTo } : {}),
+    ...(notesTrimmed ? { notes: notesTrimmed } : {}),
+    entries,
+    ...(promotions.length > 0 ? { promotions } : {}),
+  };
+}
+
+
+export function buildUpdatePriceBookVersionRequest(draft: PriceBookVersionDraft) {
+  const { effectiveFrom, effectiveTo, notesTrimmed, entries, promotions } =
+    validateAndSerializeEntriesAndPromos(draft, false);
+  return {
+    effectiveFrom,
+    effectiveTo: effectiveTo ?? null,
+    notes: notesTrimmed || null,
     entries,
     promotions,
   };
-  return draft.effectiveTo.trim().length > 0
-    ? { ...request, effectiveTo: isoInstant(draft.effectiveTo) }
-    : request;
+}
+
+
+function isoDate(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) throw new Error("PRICING_FORM_DATE");
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) throw new Error("PRICING_FORM_DATE");
+  return parsed.toISOString();
+}
+function optionalIsoDate(raw: string): string | undefined {
+  return raw.trim().length === 0 ? undefined : isoDate(raw);
+}
+function nonNegativeDecimal(raw: string, errorCode: string): string {
+  const trimmed = raw.trim();
+  if (!DECIMAL_16_8_PATTERN.test(trimmed)) throw new Error(errorCode);
+  return trimmed;
+}
+function optionalNonNegativeDecimal(raw: string, errorCode: string): string | undefined {
+  return raw.trim().length === 0 ? undefined : nonNegativeDecimal(raw, errorCode);
+}
+function positiveDecimal(raw: string, errorCode: string): string {
+  const trimmed = raw.trim();
+  if (!POSITIVE_DECIMAL_16_8_PATTERN.test(trimmed)) throw new Error(errorCode);
+  return trimmed;
+}
+function optionalPositiveDecimal(raw: string, errorCode: string): string | undefined {
+  return raw.trim().length === 0 ? undefined : positiveDecimal(raw, errorCode);
+}
+function priorityInt(raw: string): number {
+  const trimmed = raw.trim();
+  if (!/^\d+$/u.test(trimmed)) throw new Error("PRICING_FORM_PRIORITY");
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 10_000) throw new Error("PRICING_FORM_PRIORITY");
+  return parsed;
+}
+function optionalUuid<Key extends "itemId" | "uomId" | "branchId" | "channelId" | "partyId">(key: Key, raw: string): Partial<Record<Key, string>> {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return {};
+  if (!isUuidV7(trimmed)) throw new Error("PRICING_FORM_ENTRY_ID");
+  return { [key]: trimmed } as Record<Key, string>;
 }

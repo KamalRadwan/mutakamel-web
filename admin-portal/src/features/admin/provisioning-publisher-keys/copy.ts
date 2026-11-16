@@ -1,3 +1,5 @@
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+
 export interface PublisherKeyCopy {
   back: string;
   title: string;
@@ -99,7 +101,7 @@ export const COPY: Record<"en" | "ar", PublisherKeyCopy> = {
     managePermission:
       "Required permission: admin.provisioning.publisher-keys.manage",
     criticalPermission:
-      "Required permissions: admin.provisioning.publisher-keys.manage + admin.provisioning.critical",
+      `Required permissions: ${ADMIN_RBAC_CRITICAL.PROVISIONING_PUBLISHER_KEYS_MANAGE.join(" + ")}`,
     directory: "Trusted-key directory",
     directoryHelp:
       "Core returns at most 500 records, newest registration first. This endpoint has no search or pagination contract.",
@@ -197,7 +199,7 @@ export const COPY: Record<"en" | "ar", PublisherKeyCopy> = {
     managePermission:
       "الصلاحية المطلوبة: admin.provisioning.publisher-keys.manage",
     criticalPermission:
-      "الصلاحيات المطلوبة: admin.provisioning.publisher-keys.manage + admin.provisioning.critical",
+      `الصلاحيات المطلوبة: ${ADMIN_RBAC_CRITICAL.PROVISIONING_PUBLISHER_KEYS_MANAGE.join(" + ")}`,
     directory: "دليل المفاتيح الموثوقة",
     directoryHelp:
       "يعيد Core بحد أقصى 500 سجل، والأحدث تسجيلًا أولًا. لا يدعم هذا المسار البحث أو ترقيم الصفحات.",

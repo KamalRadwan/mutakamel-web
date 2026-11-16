@@ -1,5 +1,7 @@
 "use client";
 
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+
 import { useState } from "react";
 import { KeyRound, Loader2 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
@@ -44,7 +46,7 @@ const COPY = {
     generating: "Generating key...",
     rotating: "Rotating key...",
     readOnly:
-      "Read-only view. Changes require both admin.settings.update and admin.settings.critical.",
+      `Read-only view. Changes require both ${ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE.join(" and ")}.`,
     enableBlocked: "Generate a key before enabling the runtime.",
     brokerBlocked:
       "Storage runtime broker authentication is not fully configured in Core. Enabling is unavailable until Core reports readiness; an already-enabled runtime can still be disabled.",
@@ -92,7 +94,7 @@ const COPY = {
     generating: "جارٍ إنشاء المفتاح...",
     rotating: "جارٍ تدوير المفتاح...",
     readOnly:
-      "العرض فقط. تتطلب التغييرات صلاحيتي admin.settings.update وadmin.settings.critical معاً.",
+      `العرض فقط. تتطلب التغييرات صلاحيتي ${ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE.join(" و")} معاً.`,
     enableBlocked: "أنشئ المفتاح قبل تفعيل التشغيل.",
     brokerBlocked:
       "تهيئة مصادقة وسيط رسائل تشغيل التخزين غير مكتملة في Core. لن يتاح التفعيل حتى يؤكد Core الجاهزية، مع بقاء إمكانية إيقاف تشغيل مفعّل بالفعل.",

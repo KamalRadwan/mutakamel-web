@@ -110,6 +110,13 @@ export function parseTenantUser(payload: unknown): TenantUser {
   };
 }
 
+/** `TenantUsersService.resendInvite` — core-app/src/tenant/tenant-users/tenant-users.service.ts. */
+export function parseResendInviteResult(payload: unknown): { deliveryStatus: "QUEUED" } {
+  const source = record(payload);
+  if (!source || source.deliveryStatus !== "QUEUED") invalidCoreResponse();
+  return { deliveryStatus: "QUEUED" };
+}
+
 export function userPath(id: string, suffix = ""): CorePath {
   if (!isUUIDv7(id)) invalidCoreResponse();
   return `${USERS_PATH}/${encodeURIComponent(id)}${suffix}`;
@@ -195,6 +202,34 @@ export async function setTenantUserStatus(
 ): Promise<TenantUser> {
   return parseTenantUser(
     await writeCoreData("post", userPath(id, `/${action}`), undefined, {
+      cache: "no-store",
+      maxResponseBytes: CORE_WRITE_RESPONSE_LIMIT_BYTES,
+    }),
+  );
+}
+
+/**
+ * `POST /users/:id/resend-invite` — rotates prior unused invite tokens and
+ * enqueues a fresh invitation email via the outbox without claiming delivery.
+ */
+export async function resendTenantUserInvite(
+  id: string,
+): Promise<{ deliveryStatus: "QUEUED" }> {
+  return parseResendInviteResult(
+    await writeCoreData("post", userPath(id, "/resend-invite"), undefined, {
+      cache: "no-store",
+      maxResponseBytes: CORE_WRITE_RESPONSE_LIMIT_BYTES,
+    }),
+  );
+}
+
+/**
+ * `POST /users/:id/sessions/revoke` — bumps `securityEpoch` and revokes active
+ * sessions while preserving the user's current lifecycle `status`.
+ */
+export async function revokeTenantUserSessions(id: string): Promise<TenantUser> {
+  return parseTenantUser(
+    await writeCoreData("post", userPath(id, "/sessions/revoke"), undefined, {
       cache: "no-store",
       maxResponseBytes: CORE_WRITE_RESPONSE_LIMIT_BYTES,
     }),

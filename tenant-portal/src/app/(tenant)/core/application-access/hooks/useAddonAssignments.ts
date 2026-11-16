@@ -38,7 +38,7 @@ export function useAddonAssignments(userId: string) {
     denied: !allowed || current?.error?.status === 403, reload: () => setRefresh((value) => value + 1), changePage,
     canBrowseUsers: allowed && !!user?.permissions.includes("users.user.read"),
     labels: { retry: t.common.retry, errorTitle: t.addonAssignments.loadFailed, emptyTitle: t.addonAssignments.empty,
-      selectAll: t.common.actions, selectRow: t.common.actions, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
+      selectAll: t.views.selectAll, selectRow: t.views.selectRow, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
       pagination: { previous: t.common.previousPage, next: t.common.nextPage,
         summary: (from: number, to: number, total: number) => formatTemplate(t.common.showingOf, { from: formatNumber(from, lang), to: formatNumber(to, lang), total: formatNumber(total, lang) }) } },
   };

@@ -25,6 +25,8 @@ import {
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
+import { SettingsSaveConfirmation } from "../components/SettingsSaveConfirmation";
+import { useSettingsSaveConfirmation } from "../hooks/useSettingsSaveConfirmation";
 import { useSmtpSettings } from "./hooks/useSmtpSettings";
 import { EmailSuppressionSection } from "./components/EmailSuppressionSection";
 import {
@@ -56,6 +58,12 @@ export default function SmtpSettingsPage() {
       );
     }
   };
+  const confirmation = useSettingsSaveConfirmation(save);
+  const changesTransport = Boolean(smtp.snapshot && smtp.form && (
+    smtp.password.length ||
+    smtp.form.smtpHost !== (smtp.snapshot.data.smtpHost ?? "") ||
+    smtp.form.smtpUsername !== (smtp.snapshot.data.smtpUsername ?? "")
+  ));
   const verify = async () => {
     const succeeded = await smtp.verifyConnection();
     if (succeeded) {
@@ -96,7 +104,7 @@ export default function SmtpSettingsPage() {
                 type="button"
                 variant="primary"
                 size="sm"
-                onClick={() => void save()}
+                onClick={() => changesTransport ? confirmation.request() : void save()}
                 disabled={!smtp.hasUnsavedChanges || pending || smtp.configState !== "READY"}
               >
                 {pending && smtp.mutation.action === "SAVE" ? (
@@ -109,6 +117,12 @@ export default function SmtpSettingsPage() {
             ) : null}
           </div>
         }
+      />
+
+      <SettingsSaveConfirmation
+        confirmation={confirmation}
+        description={(lang === "ar" ? ar : en).settings.confirmation.smtp}
+        lang={lang}
       />
 
       <SettingsResourceBoundary
@@ -298,5 +312,6 @@ function safeMutationMessage(code: string | undefined, lang: "ar" | "en"): strin
   if (safeCode === "SAVE_BEFORE_VERIFY") return copy.saveBeforeVerify;
   if (safeCode === "SMTP_VALIDATION_FAILED") return copy.validationFailed;
   if (safeCode === "NO_SMTP_CHANGES") return copy.noChanges;
+  if (safeCode === "PLATFORM_SMTP_SENDER_DOMAIN_MISMATCH") return copy.senderDomainMismatch;
   return copy.generic(safeCode);
 }

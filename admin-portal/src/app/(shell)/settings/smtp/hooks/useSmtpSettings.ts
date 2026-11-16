@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import {
   normalizeApiError,
@@ -26,10 +26,7 @@ import {
 } from "../smtp-contract";
 import type { SettingsLoadState } from "../../hooks/useSettings";
 
-const SAVE_PERMISSIONS = [
-  "admin.settings.update",
-  "admin.settings.critical",
-] as const;
+const SAVE_PERMISSIONS = ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE;
 
 type SmtpMutation = {
   action: "SAVE" | "VERIFY" | null;

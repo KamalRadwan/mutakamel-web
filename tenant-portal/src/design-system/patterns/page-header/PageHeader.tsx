@@ -6,6 +6,8 @@ import { cn } from "../../lib/cn";
 import { iconSize, mirrorInRtl } from "../../lib/icons";
 import { Button, type ButtonProps } from "../../primitives/Button";
 import { PageActions } from "../../shell/PageActions";
+import { useSettingsPresentation } from "../../shell/settings-presentation";
+import { useAnalyticsPresentation } from "../../shell/analytics-presentation";
 
 export interface Breadcrumb {
   label: string;
@@ -20,7 +22,7 @@ export interface PageHeaderProps {
   primaryAction?: {
     label: string;
     icon?: React.ReactNode;
-    onClick: () => void;
+    onClick: NonNullable<ButtonProps["onClick"]>;
     disabled?: boolean;
     loading?: boolean;
     size?: ButtonProps["size"];
@@ -47,7 +49,9 @@ export interface PageHeaderProps {
  * of** `PageHeader`, never both. That is the whole answer to MASTER-PLAN 1.43:
  * `PageHeader` owns the primary action, in both shapes.
  *
- * **The action cluster renders in the page action bar, not here.** The props
+ * **The default action cluster renders in the page action bar.** Analytics
+ * keeps the same single primary implementation beside its workspace title.
+ * The props
  * are unchanged and every screen goes on declaring its actions exactly where it
  * declared them before; a portal moves the resulting DOM up into the shell's
  * second bar — see `shell/page-action-slots.tsx`. Doing it in this one
@@ -72,10 +76,19 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   const t = useDictionary();
+  const settings = useSettingsPresentation();
+  const analytics = useAnalyticsPresentation() && !settings;
+  const primaryButton = primaryAction ? (
+    <Button variant="primary" size={primaryAction.size ?? (analytics ? "xl" : "sm")}
+      onClick={primaryAction.onClick} disabled={primaryAction.disabled} loading={primaryAction.loading}>
+      {primaryAction.icon}
+      {primaryAction.label}
+    </Button>
+  ) : null;
 
   return (
-    <div className={cn("flex flex-col gap-1 pb-4", className)}>
-      {breadcrumbs && breadcrumbs.length > 0 && (
+    <div data-page-header className={cn(settings ? "contents" : "flex flex-col gap-1 pb-4", analytics && "gap-3 py-4", className)}>
+      {!settings && breadcrumbs && breadcrumbs.length > 0 && (
         <nav aria-label={t.common.breadcrumb} className="flex items-center gap-1 text-xs text-muted-foreground">
           {breadcrumbs.map((crumb, index) => (
             <span key={`${crumb.label}-${index}`} className="flex items-center gap-1">
@@ -93,33 +106,25 @@ export function PageHeader({
           ))}
         </nav>
       )}
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 items-start gap-2">
+      <div className={settings ? "contents" : cn("flex items-start gap-3", analytics && "flex-col gap-4 sm:flex-row sm:justify-between")}>
+        {settings ? <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="sr-only">{title}</h1> : <div className="flex min-w-0 items-start gap-2">
           {leading}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined}
-                className="text-xl font-semibold text-foreground">{title}</h1>
+                className={cn("font-semibold text-foreground", analytics ? "text-2xl tracking-tight sm:text-3xl" : "text-xl")}>{title}</h1>
               {titleAdornment}
             </div>
-            {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+            {description && <p className={cn("mt-1 text-muted-foreground", analytics ? "max-w-3xl text-base" : "text-sm")}>{description}</p>}
           </div>
-        </div>
-        {secondaryActions && <PageActions slot="actions">{secondaryActions}</PageActions>}
-        {primaryAction && (
-          <PageActions slot="primary">
-            <Button
-              variant="primary"
-              size={primaryAction.size ?? "sm"}
-              onClick={primaryAction.onClick}
-              disabled={primaryAction.disabled}
-              loading={primaryAction.loading}
-            >
-              {primaryAction.icon}
-              {primaryAction.label}
-            </Button>
-          </PageActions>
-        )}
+        </div>}
+        {settings && leading && <PageActions slot="actions">{leading}</PageActions>}
+        {analytics ? <div className="flex w-full flex-wrap items-center gap-2 sm:ms-auto sm:w-auto sm:justify-end">
+          {secondaryActions}{primaryButton}
+        </div> : <>
+          {secondaryActions && <PageActions slot="actions">{secondaryActions}</PageActions>}
+          {primaryButton && <PageActions slot="primary">{primaryButton}</PageActions>}
+        </>}
       </div>
     </div>
   );

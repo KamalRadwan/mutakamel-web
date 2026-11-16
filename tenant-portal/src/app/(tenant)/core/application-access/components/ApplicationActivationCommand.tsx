@@ -1,5 +1,7 @@
 "use client";
 
+import { TenantOrganizationName } from "@/components/tenant/TenantOrganizationName";
+
 import { Button, DateTime, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, IdentifierText, Input, PermissionGate } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useApplicationActivationCommand, type ActivationCommandProps } from "../hooks/useApplicationActivationCommand";
@@ -36,7 +38,7 @@ export function ApplicationActivationCommand(props: ActivationCommandProps) {
             <DialogDescription>{state?.command ? t.addonAssignmentCommand.retryNotice : copy.confirmNotice}</DialogDescription></DialogHeader>
           <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
             <div className="min-w-0"><dt className="text-xs text-muted-foreground">{"branchId" in target ? t.applicationAccess.branch : t.applicationAccess.company}</dt>
-              <dd><IdentifierText>{"branchId" in target ? target.branchId : target.companyId}</IdentifierText></dd></div>
+              <dd><TenantOrganizationName kind={"branchId" in target ? "branch" : "company"} id={"branchId" in target ? target.branchId : target.companyId} /></dd></div>
             <div className="min-w-0"><dt className="text-xs text-muted-foreground">{t.applicationAccess.application}</dt><dd><IdentifierText>{target.applicationKey}</IdentifierText></dd></div>
             {"addonKey" in target && <div className="min-w-0"><dt className="text-xs text-muted-foreground">{t.applicationAccess.addon}</dt><dd><IdentifierText>{target.addonKey}</IdentifierText></dd></div>}
             <div className="min-w-0"><dt className="text-xs text-muted-foreground">{copy.requestedState}</dt><dd>{branch ? enabled ? copy.inherit : copy.restrict : enabled ? copy.enable : copy.disable}</dd></div>

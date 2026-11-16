@@ -111,10 +111,21 @@ describe("parseTradeListPage", () => {
 });
 
 describe("paths", () => {
-  it("sends page, limit and the two documented filters, and nothing else", () => {
+  it("omits optional list filters when absent", () => {
     expect(tradeListPath("/api/tenant/trade/v1/quotations", 2, "SENT")).toBe(
       "/api/tenant/trade/v1/quotations?page=2&limit=25&status=SENT",
     );
+  });
+
+  it("encodes quotation search and currency alongside status and party", () => {
+    const path = tradeListPath("/api/tenant/trade/v1/quotations", 1, "EXPIRED", UUID, {
+      search: "Acme & 10%", currencyCode: "EGP",
+    });
+    const url = new URL(path, "https://tenant.example");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      page: "1", limit: "25", status: "EXPIRED", partyId: UUID,
+      search: "Acme & 10%", currencyCode: "EGP",
+    });
   });
 
   it("refuses to build a path around an id that is not a UUID v7", () => {

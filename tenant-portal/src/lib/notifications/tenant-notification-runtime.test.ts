@@ -12,11 +12,13 @@ const generation = "tenant:session:user";
 
 describe("TenantNotificationRuntimeStore", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
   it("invalidates queries on data changes and commands without changing recipient ordering", async () => {
+    vi.useFakeTimers();
     const store = new TenantNotificationRuntimeStore();
     store.bindGeneration(generation);
     const reload = vi.fn(async () => {});
@@ -29,17 +31,25 @@ describe("TenantNotificationRuntimeStore", () => {
     store.setLoadState(generation, "ready");
     expect(reload).toHaveBeenCalledTimes(1);
     expect(store.applyCreated(generation, createdPayload())).toBe("applied");
+    expect(reload).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(400);
     expect(reload).toHaveBeenCalledTimes(2);
     expect(store.applyCreated(generation, createdPayload())).toBe("duplicate");
     expect(reload).toHaveBeenCalledTimes(2);
     expect(store.applyUnreadCount(generation, 7, 1, "2026-10-17T12:00:00.000Z")).toBe("applied");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reload).toHaveBeenCalledTimes(3);
+    store.bindGeneration("other-generation");
+    store.clear();
+    await vi.advanceTimersByTimeAsync(400);
     expect(reload).toHaveBeenCalledTimes(3);
     unsubscribe();
     await store.invalidateQueries();
     expect(reload).toHaveBeenCalledTimes(3);
   });
 
-  it("invalidates historical queries for recipient changes outside the bounded shell cache", () => {
+  it("invalidates historical queries for recipient changes outside the bounded shell cache", async () => {
+    vi.useFakeTimers();
     const store = new TenantNotificationRuntimeStore();
     store.bindGeneration(generation);
     const reload = vi.fn(async () => {});
@@ -50,8 +60,69 @@ describe("TenantNotificationRuntimeStore", () => {
       state: { readAt: "2026-10-17T12:00:00.000Z", acknowledgedAt: null, dismissedAt: null },
       changedAt: "2026-10-17T12:00:00.000Z", recipientStateVersion: 1,
     })).toBe("missing");
+    expect(reload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(400);
     expect(reload).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot()).toBe(before);
+  });
+
+  it("debounces five creation/update commits until 400 ms after the last change", async () => {
+    vi.useFakeTimers();
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const reload = vi.fn(async () => {});
+    store.subscribeInvalidation(reload);
+    const payload = createdPayload();
+    expect(store.applyCreated(generation, payload)).toBe("applied");
+    for (let version = 1; version <= 4; version++) {
+      await vi.advanceTimersByTimeAsync(75);
+      const readAt = `2026-10-17T12:00:0${version}.000Z`;
+      expect(store.applyUpdated(generation, {
+        notificationId: payload.notificationId, recipientId: payload.recipientId,
+        change: "READ", state: { readAt, acknowledgedAt: null, dismissedAt: null },
+        changedAt: readAt, recipientStateVersion: version,
+      })).toBe("applied");
+    }
+    await vi.advanceTimersByTimeAsync(399);
+    expect(reload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs one trailing invalidation when a burst arrives during an in-flight reload", async () => {
+    vi.useFakeTimers();
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    let finish!: () => void;
+    const reload = vi.fn<() => Promise<void>>()
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }))
+      .mockResolvedValue(undefined);
+    store.subscribeInvalidation(reload);
+    const first = store.invalidateQueries();
+    await vi.advanceTimersByTimeAsync(0);
+    for (let revision = 1; revision <= 5; revision++) {
+      store.applyUnreadCount(generation, revision, revision, "2026-10-17T12:00:00.000Z");
+    }
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reload).toHaveBeenCalledTimes(1);
+    finish();
+    await first;
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not invalidate unchanged data or carry a scheduled refresh into a new generation", async () => {
+    vi.useFakeTimers();
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const reload = vi.fn(async () => {});
+    store.subscribeInvalidation(reload);
+    store.applyUnreadCount(generation, 0, 1, "2026-10-17T12:00:00.000Z");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reload).not.toHaveBeenCalled();
+    store.applyCreated(generation, createdPayload());
+    store.bindGeneration("other-generation");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it("shares REST hydration and exposes loading without changing the data revision", async () => {

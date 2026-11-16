@@ -86,6 +86,25 @@ describe("ReasonDialog", () => {
     expect(props.onOpenChange).not.toHaveBeenCalled();
   });
 
+  it("hands focus back to the reason when a pending submission is rejected", () => {
+    const { props, rerender } = renderDialog({ reasonRequired: true, keepFocusWhileLoading: true });
+    const reason = screen.getByRole("textbox");
+    const confirm = screen.getByRole("button", { name: labels.confirm });
+    fireEvent.change(reason, { target: { value: "Restore the saved draft" } });
+    confirm.focus();
+    expect(confirm).toHaveFocus();
+
+    rerender(<ReasonDialog {...props} loading />);
+    expect(reason).toBeDisabled();
+    expect(confirm).toBeDisabled();
+    expect(screen.getByRole("dialog")).toHaveFocus();
+
+    rerender(<ReasonDialog {...props} focusReasonOnError error="Restore could not be verified." />);
+    expect(reason).toHaveFocus();
+    expect(reason).toHaveValue("Restore the saved draft");
+    expect(screen.getByRole("alert")).toHaveTextContent("Restore could not be verified.");
+  });
+
   it("renders a non-field rejection in-body rather than leaving it to a toast", () => {
     renderDialog({ error: "The opportunity already moved to WON." });
     expect(screen.getByRole("alert")).toHaveTextContent("The opportunity already moved to WON.");

@@ -1,15 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { CORE_SETTINGS_NAV_ITEMS, NAV_SECTIONS } from "@/design-system";
+import {
+  CORE_SETTINGS_NAV_ITEMS,
+  NAV_APPS,
+  NAV_SECTIONS,
+  WORKSPACE_NAV_SECTIONS,
+} from "@/design-system";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 
-// MASTER-PLAN 5.15 and 5.16. The sidebar, the settings SubNav and the hub all
-// have to agree about what a given permission set can reach — a screen the
-// sidebar hides but the SubNav still links to only fails on arrival.
 describe("Core settings navigation", () => {
   const coreItems = NAV_SECTIONS.flatMap((section) => section.items).filter(
     (item) =>
-      item.href.startsWith("/core/settings/") || item.href === TENANT_ROUTES.coreNotifications,
+      item.href.startsWith("/core/settings") || item.href === TENANT_ROUTES.coreNotifications,
   );
+
+  it("places Settings last in Workspace desktop and mobile app navigation", () => {
+    expect(WORKSPACE_NAV_SECTIONS.map((section) => section.id)).toEqual([
+      "workspace",
+      "coreIdentity",
+      "coreOperations",
+      "coreBilling",
+      "account",
+      "coreSettings",
+    ]);
+    const workspaceApp = NAV_APPS.find((app) => app.id === "workspace");
+    expect(workspaceApp?.sections.at(-1)?.id).toBe("coreSettings");
+  });
+
+  it("omits the All Settings hub item from every navigation surface", () => {
+    const allItems = NAV_SECTIONS.flatMap((section) => section.items);
+    expect(allItems.some((item) => item.id === "coreSettingsHub")).toBe(false);
+    expect(allItems.some((item) => item.href === TENANT_ROUTES.coreSettings)).toBe(false);
+    expect(
+      CORE_SETTINGS_NAV_ITEMS.some((item) => item.href === TENANT_ROUTES.coreSettings),
+    ).toBe(false);
+  });
 
   it("registers every Core settings route with a permission-bearing predicate", () => {
     expect(coreItems.map((item) => item.href).sort()).toEqual(
@@ -20,6 +44,7 @@ describe("Core settings navigation", () => {
         TENANT_ROUTES.coreSettingsNumbering,
         TENANT_ROUTES.coreSettingsEmail,
         TENANT_ROUTES.coreSettingsBranding,
+        TENANT_ROUTES.coreSettingsUpdates,
         TENANT_ROUTES.coreNotifications,
       ].sort(),
     );
@@ -29,30 +54,35 @@ describe("Core settings navigation", () => {
     }
   });
 
-  it("admits exactly the screens a permission set covers", () => {
+  it("admits exactly the screens a permission and entitlement set covers", () => {
     expect(
       coreItems
         .filter((item) => item.hasAccess(["workspace.read", "notifications.notification.read"]))
         .map((item) => item.href),
-    ).toEqual([TENANT_ROUTES.coreSettingsWorkspace, TENANT_ROUTES.coreNotifications]);
+    ).toEqual([
+      TENANT_ROUTES.coreNotifications,
+      TENANT_ROUTES.coreSettingsWorkspace,
+      TENANT_ROUTES.coreSettingsUpdates,
+    ]);
+
+    const emailItem = CORE_SETTINGS_NAV_ITEMS.find((item) => item.id === "coreEmail");
+    expect(
+      emailItem?.hasAccess(["workspace.email.read"], true, { "crm.outbound_email": false }),
+    ).toBe(false);
+    expect(
+      emailItem?.hasAccess(["workspace.email.read"], false, { "crm.outbound_email": true }),
+    ).toBe(true);
   });
 
-  it("keeps the hub reachable so it can explain an empty section list", () => {
-    const hub = NAV_SECTIONS.flatMap((section) => section.items).find(
-      (item) => item.href === TENANT_ROUTES.coreSettings,
-    );
-    expect(hub?.hasAccess([])).toBe(true);
-  });
-
-  it("exports the SubNav section in the order the sidebar renders it", () => {
+  it("exports the Settings registry in navigation order starting with Workspace", () => {
     expect(CORE_SETTINGS_NAV_ITEMS.map((item) => item.href)).toEqual([
-      TENANT_ROUTES.coreSettings,
       TENANT_ROUTES.coreSettingsWorkspace,
       TENANT_ROUTES.coreSettingsCurrencies,
       TENANT_ROUTES.coreSettingsTaxes,
       TENANT_ROUTES.coreSettingsNumbering,
       TENANT_ROUTES.coreSettingsEmail,
       TENANT_ROUTES.coreSettingsBranding,
+      TENANT_ROUTES.coreSettingsUpdates,
     ]);
   });
 

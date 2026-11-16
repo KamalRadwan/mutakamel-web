@@ -27,8 +27,12 @@ vi.mock("@/i18n/I18nContext", () => ({
 }));
 
 import { TenantFqdnPanel } from "./TenantFqdnPanel";
+import { TenantDestroyStatus } from "./TenantDestroyStatus";
+import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
 import { TenantLifecyclePanel } from "./TenantLifecyclePanel";
 import { TenantProfilePanel } from "./TenantProfilePanel";
+import { tenantWorkspaceCopy } from "./copy";
 
 afterEach(() => {
   i18n.current = { lang: "en", dir: "ltr" };
@@ -113,6 +117,68 @@ function fqdnFixture(
 }
 
 describe("tenant profile and lifecycle panels", () => {
+  it.each(["en", "ar"] as const)(
+    "requires the exact slug for destructive lifecycle actions in %s",
+    async (locale) => {
+      i18n.current = { lang: locale, dir: locale === "ar" ? "rtl" : "ltr" };
+      const text = tenantWorkspaceCopy(locale);
+      const cases = [
+        { status: "ACTIVE", action: "softDelete", label: text.softDelete, operation: null },
+        { status: "DELETED", action: "destroy", label: text.destroy, operation: null },
+        { status: "DELETED", action: "resumeDestruction", label: text.resumeDestroy, operation: tenantDestroyFixture("BLOCKED") },
+        { status: "DELETED", action: "resumeDestruction", label: text.resumeDestroy, operation: haltedTenantDestroyFixture("FINALIZING") },
+      ] as const;
+
+      for (const { status, action, label, operation } of cases) {
+        const command = vi.fn().mockResolvedValue({
+          ...tenantDestroyFixture("FINALIZING"), resumed: true,
+        });
+        const view = render(
+          <TenantLifecyclePanel
+            locale={locale}
+            workspace={workspaceFixture(status, {
+              destroyOperation: operation,
+              [action]: command,
+            })}
+          />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: label }));
+        const dialog = screen.getByRole("alertdialog");
+        const confirm = within(dialog).getByRole("button", {
+          name: action === "resumeDestruction" ? text.resumeDestroy : text.confirm,
+        });
+        const input = within(dialog).getByRole("textbox");
+        expect(confirm).toBeDisabled();
+        for (const value of ["wrong-slug", "ACME", " acme", "acme "]) {
+          fireEvent.change(input, { target: { value } });
+          expect(confirm).toBeDisabled();
+          fireEvent.click(confirm);
+          expect(command).not.toHaveBeenCalled();
+        }
+        fireEvent.change(input, { target: { value: "acme" } });
+        expect(confirm).toBeEnabled();
+        // ConfirmActionModal owns its cancel label; the workspace copy's
+        // "Keep tenant" label belongs to the generic lifecycle dialog.
+        fireEvent.click(within(dialog).getByRole("button", {
+          name: locale === "ar" ? "إلغاء" : "Cancel",
+        }));
+        expect(command).not.toHaveBeenCalled();
+        await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+        fireEvent.click(screen.getByRole("button", { name: label }));
+        const reopened = screen.getByRole("alertdialog");
+        await waitFor(() => expect(within(reopened).getByRole("textbox")).toHaveValue(""));
+        fireEvent.change(within(reopened).getByRole("textbox"), { target: { value: "acme" } });
+        fireEvent.click(within(reopened).getByRole("button", {
+          name: action === "resumeDestruction" ? text.resumeDestroy : text.confirm,
+        }));
+        await waitFor(() => expect(command).toHaveBeenCalledOnce());
+        if (action === "destroy") expect(command).toHaveBeenCalledWith(false);
+        await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+        view.unmount();
+      }
+    },
+  );
+
   it.each([
     ["en", "Storage draining"],
     ["ar", "خادم التخزين قيد الإفراغ"],
@@ -200,6 +266,29 @@ describe("tenant profile and lifecycle panels", () => {
     expect(screen.getByRole("button", { name: action })).toBeInTheDocument();
   });
 
+  it.each([
+    ["ACTIVE", "suspend", "Suspend"],
+    ["SUSPENDED", "activate", "Activate"],
+    ["PROVISIONING_FAILED", "reprovision", "Retry provisioning"],
+    ["PROVISIONING", "cancelProvisioning", "Cancel provisioning"],
+    ["DELETED", "restore", "Restore tenant"],
+  ] as const)("keeps %s %s on generic confirmation", async (status, action, label) => {
+    const command = vi.fn().mockResolvedValue(null);
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture(status, { [action]: command })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const dialog = screen.getByRole("alertdialog", { name: label });
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    const confirm = within(dialog).getByRole("button", { name: "Confirm" });
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(command).toHaveBeenCalledOnce());
+  });
+
   it("requests destruction with retained financial history", async () => {
     const destroy = vi.fn().mockResolvedValue(undefined);
     render(
@@ -215,6 +304,8 @@ describe("tenant profile and lifecycle panels", () => {
       name: "Destroy permanently",
     });
     expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(dialog).toHaveTextContent(tenantWorkspaceCopy("en").destroyHint);
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "acme" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
 
     await vi.waitFor(() => expect(destroy).toHaveBeenCalledWith(false));
@@ -284,6 +375,7 @@ describe("tenant profile and lifecycle panels", () => {
     expect(dialog).toHaveTextContent("goes back to stopping provisioning");
     expect(dialog).toHaveTextContent("the one-hour limit for stopping still counts from the original request");
     expect(dialog).toHaveTextContent("You can abandon the request instead");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "acme" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Resume destruction" }));
 
     await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
@@ -308,6 +400,7 @@ describe("tenant profile and lifecycle panels", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Resume destruction" }));
+    fireEvent.change(within(screen.getByRole("alertdialog")).getByRole("textbox"), { target: { value: "acme" } });
     fireEvent.click(
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Resume destruction" }),
     );
@@ -366,6 +459,7 @@ describe("tenant profile and lifecycle panels", () => {
     const dialog = screen.getByRole("alertdialog", { name: "Resume the destruction of acme?" });
     expect(dialog).toHaveTextContent("continues in the phase where it halted");
     expect(dialog).toHaveTextContent("Fix the reason it halted first");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "acme" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Resume destruction" }));
 
     await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
@@ -393,6 +487,7 @@ describe("tenant profile and lifecycle panels", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Resume destruction" }));
     const dialog = screen.getByRole("alertdialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "acme" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Resume destruction" }));
 
     await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
@@ -646,6 +741,40 @@ describe("tenant profile and lifecycle panels", () => {
 });
 
 describe("TenantFqdnPanel", () => {
+  it.each(["en", "ar"] as const)("localizes field and command errors with diagnostics in %s", (locale) => {
+    i18n.current = { lang: locale, dir: locale === "ar" ? "rtl" : "ltr" };
+    const tenant = tenantFixture();
+    const copy = (locale === "ar" ? ar : en).apiErrorMessages;
+    render(<TenantFqdnPanel locale={locale} tenant={tenant}
+      permissions={{ canRead: true, canValidateFqdn: true, canManageFqdns: true }}
+      fqdn={fqdnFixture(tenant, {
+        preflightError: { isNormalized: true, httpStatus: 400, errorCode: "TENANT_FQDN_REQUIRED", message: "Raw preflight error", correlationId: "preflight-correlation" },
+        mutation: { name: null, error: { isNormalized: true, httpStatus: 409, errorCode: "TENANT_FQDN_STATE_INVALID", message: "Raw command error", correlationId: "fqdn-correlation" } },
+      })} />);
+    expect(screen.getByText(copy.fqdnRequired)).toBeInTheDocument();
+    expect(screen.getByText(/TENANT_FQDN_REQUIRED/)).toHaveTextContent("preflight-correlation");
+    const commandAlert = screen.getByText(copy.fqdnStateInvalid).closest('[role="alert"]');
+    expect(commandAlert).toHaveTextContent("TENANT_FQDN_STATE_INVALID");
+    expect(commandAlert).toHaveTextContent("fqdn-correlation");
+    expect(screen.queryByText(/Raw (preflight|command) error/)).not.toBeInTheDocument();
+  });
+
+  it.each(["en", "ar"] as const)("localizes initial and refresh destroy failures in %s", (locale) => {
+    i18n.current = { lang: locale, dir: locale === "ar" ? "rtl" : "ltr" };
+    const copy = (locale === "ar" ? ar : en).apiErrorMessages;
+    const props = { id: "destroy-errors", locale, polling: false, notAbandonable: false, onRefresh: vi.fn(),
+      loadError: { isNormalized: true as const, httpStatus: 409, errorCode: "HTTP_409", message: "Raw destroy error", correlationId: "destroy-correlation" } };
+    const view = render(<TenantDestroyStatus {...props} operation={null} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.conflict);
+    expect(screen.getByText("HTTP_409")).toBeInTheDocument();
+    expect(screen.getByText("destroy-correlation")).toBeInTheDocument();
+    view.rerender(<TenantDestroyStatus {...props} operation={tenantDestroyFixture("BLOCKED")} />);
+    expect(screen.getByText(copy.conflict)).toBeInTheDocument();
+    expect(screen.getByText("HTTP_409")).toBeInTheDocument();
+    expect(screen.getByText("destroy-correlation")).toBeInTheDocument();
+    expect(screen.queryByText("Raw destroy error")).not.toBeInTheDocument();
+  });
+
   it("explains released domains and withholds the attach form on a deleted tenant", () => {
     const tenant = tenantFixture("DELETED", { fqdns: [] });
     render(

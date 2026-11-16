@@ -27,8 +27,7 @@ const initialForm: CreateStorageServerDto = {
 
 const STORAGE_RUNTIME_UPDATE_PERMISSIONS = [
   "admin.settings.read",
-  "admin.settings.update",
-  "admin.settings.critical",
+  ...ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE,
 ] as const;
 
 interface StorageRuntimeSetupRequired {

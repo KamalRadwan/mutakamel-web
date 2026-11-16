@@ -64,6 +64,7 @@ export function useReleaseDraftDetail(draftId: string) {
   const [validationErrors, setValidationErrors] = useState<ReleaseValidationErrors>({});
   const [publishDraft, setPublishDraft] = useState<PublishDraft>({ ...EMPTY_PUBLISH });
   const [publishErrors, setPublishErrors] = useState<ReleaseValidationErrors>({});
+  const [publishConfirmationVersion, setPublishConfirmationVersion] = useState<string | null>(null);
   const [mutation, setMutation] = useState<ReleaseMutationState>(EMPTY_MUTATION);
   const [validation, setValidation] = useState<CoreSnapshot<ReleaseValidation> | null>(null);
   const [published, setPublished] = useState<CoreSnapshot<ProvisioningRelease> | null>(null);
@@ -76,6 +77,7 @@ export function useReleaseDraftDetail(draftId: string) {
   const hasSnapshot = useRef(false);
   const definitionDirtyRef = useRef(false);
   const intents = useRef(createReleaseIntentStore());
+  const publishPending = useRef(false);
 
   const applyDraft = useCallback((next: CoreSnapshot<ReleaseDraft>, preserveDefinition = false) => {
     hasSnapshot.current = true;
@@ -105,6 +107,7 @@ export function useReleaseDraftDetail(draftId: string) {
       setValidationErrors({});
       setPublishErrors({});
       setPublishDraft({ ...EMPTY_PUBLISH });
+      setPublishConfirmationVersion(null);
     });
     return () => {
       cancelled = true;
@@ -302,7 +305,19 @@ export function useReleaseDraftDetail(draftId: string) {
     snapshot,
   ]);
 
-  const publish = useCallback(async () => {
+  const requestPublishConfirmation = useCallback(() => {
+    const errors = validatePublishDraft({ ...publishDraft, confirmed: true });
+    setPublishErrors(errors);
+    if (!Object.keys(errors).length && snapshot && mutation.phase !== "PENDING") {
+      setPublishConfirmationVersion(snapshot.data.releaseVersion);
+    }
+  }, [mutation.phase, publishDraft, snapshot]);
+
+  const closePublishConfirmation = useCallback(() => {
+    if (!publishPending.current) setPublishConfirmationVersion(null);
+  }, []);
+
+  const publish = useCallback(async (confirmationText = "") => {
     const draft = snapshot?.data;
     if (
       !draft ||
@@ -310,18 +325,23 @@ export function useReleaseDraftDetail(draftId: string) {
       draft.status !== "VALIDATED" ||
       signingEvidence.phase !== "VERIFIED" ||
       definitionDirty ||
+      publishPending.current ||
       mutation.phase === "PENDING" ||
       published !== null
     ) {
       return null;
     }
-    const errors = validatePublishDraft(publishDraft);
+    const errors = validatePublishDraft({
+      ...publishDraft,
+      confirmed: publishConfirmationVersion === draft.releaseVersion && confirmationText === draft.releaseVersion,
+    });
     setPublishErrors(errors);
     if (Object.keys(errors).length) return null;
     const dto = buildPublishReleaseDraftDto(draft, publishDraft);
     const scope = `release-draft:publish:${draft.draftId}`;
     const key = intents.current.get(scope, stableReleaseFingerprint(dto));
     setMutation({ name: "PUBLISH", phase: "PENDING", error: null, correlationId: null });
+    publishPending.current = true;
     try {
       const result = await provisioningReleasesApi.publishDraft(draft.draftId, dto, key);
       intents.current.clear(scope);
@@ -333,12 +353,16 @@ export function useReleaseDraftDetail(draftId: string) {
     } catch (caught) {
       failMutation("PUBLISH", scope, caught);
       return null;
+    } finally {
+      publishPending.current = false;
+      setPublishConfirmationVersion(null);
     }
   }, [
     definitionDirty,
     failMutation,
     mutation.phase,
     permissions.canPublishCritical,
+    publishConfirmationVersion,
     publishDraft,
     published,
     signingEvidence.phase,
@@ -364,6 +388,9 @@ export function useReleaseDraftDetail(draftId: string) {
     validationErrors,
     publishDraft,
     publishErrors,
+    publishConfirmationVersion,
+    requestPublishConfirmation,
+    closePublishConfirmation,
     mutation,
     validation,
     published,

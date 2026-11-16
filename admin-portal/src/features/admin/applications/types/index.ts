@@ -385,7 +385,23 @@ export interface UpdateTierDto {
   isActive?: boolean;
 }
 
+export interface CoreBaseFeaturePolicyReceipt {
+  id: string;
+  moduleId: string;
+  key: "core.template_designer";
+  baseIncluded: boolean;
+  baseGrantRevision: number;
+}
+
+/** Standalone policy command. Never combine with feature metadata. */
+export interface UpdateCoreBaseFeaturePolicyDto {
+  basePolicy: { expectedBaseGrantRevision: number; included: boolean };
+}
+
 export interface FeatureView {
+  /** Absent on an incompatible response: show policy unavailable. */
+  baseIncluded?: boolean;
+  baseGrantRevision?: number;
   id: string;
   moduleId: string;
   key: string;
@@ -438,6 +454,7 @@ export interface SetTierFeaturesDto {
 }
 
 export interface PriceTierView {
+  pricingRevision: string;
   id: string;
   tierId: string;
   billingCycle: BillingCycle;
@@ -455,6 +472,8 @@ export interface PriceTierInput {
 }
 
 export interface SetPriceTiersDto {
+  expectedPricingRevision: string;
+  reason: string;
   billingCycle: BillingCycle;
   brackets: PriceTierInput[];
 }
@@ -468,6 +487,7 @@ export interface CurrencyRateView {
 export interface UpsertCurrencyRateDto {
   currencyUnitsPerUsd: string;
   isActive?: boolean;
+  confirmLargeChange?: boolean;
 }
 
 export interface SetCurrencyRatesDto {

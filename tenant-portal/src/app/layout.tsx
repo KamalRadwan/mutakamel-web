@@ -3,35 +3,33 @@ import { headers } from "next/headers";
 import { uiArabic, uiLatin, uiMono } from "./fonts";
 import "./globals.css";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
-import { ar } from "@/i18n/dictionaries/ar";
+import { I18nProvider } from "@/i18n/I18nContext";
+import { loadServerLanguage, readServerLanguage } from "@/i18n/server";
 import { formatTemplate } from "@/lib/format/template";
 import { DensityProvider, ThemeProvider, TooltipProvider } from "@/design-system";
 import { BrandingProvider } from "@/context/BrandingContext";
 import { InlineBootstrapScript } from "./InlineBootstrapScript";
 
-// The static default and the template every route-level title composes with.
-// Sourced from the Arabic dictionary rather than written here, because the
-// server always renders `lang="ar"` (language lives in localStorage, so no
-// request can resolve it) — hardcoding the copy would put a second, untracked
-// translation surface outside src/i18n. `RouteTitle` refines the title per
-// route on the client, where the language is actually known.
-export const metadata: Metadata = {
-  title: {
-    default: formatTemplate(ar.metadata.title, {
-      portal: ar.common.portalName,
-      app: ar.common.appName,
-    }),
-    template: formatTemplate(ar.metadata.titleTemplate, {
-      page: "%s",
-      portal: ar.common.portalName,
-    }),
-  },
-  description: ar.metadata.description,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { dictionary: t } = await loadServerLanguage();
+  return {
+    title: {
+      default: formatTemplate(t.metadata.title, {
+        portal: t.common.portalName,
+        app: t.common.appName,
+      }),
+      template: formatTemplate(t.metadata.titleTemplate, {
+        page: "%s",
+        portal: t.common.portalName,
+      }),
+    },
+    description: t.metadata.description,
+  };
+}
 
-// All three axes — language, theme, density — must be correct in the first
-// painted frame. None can be resolved on the server without a cookie, so this
-// inline script writes the DOM before React hydrates — see
+// Language and direction come from the tenant_lang cookie on the server.
+// Theme and density still live in localStorage, so this script applies them
+// before hydration — see
 // docs/design/theming.md#no-flash--the-mechanism.
 //
 // Density writes nothing for the default: globals.css already carries
@@ -43,8 +41,6 @@ export const metadata: Metadata = {
 // this string so they cannot drift.
 const BOOTSTRAP = `(function(){try{
   var d=document.documentElement;
-  var l=localStorage.getItem("tenant_lang")==="en"?"en":"ar";
-  d.lang=l; d.dir=l==="ar"?"rtl":"ltr";
   var t=localStorage.getItem("tenant_theme");
   var dark=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
   d.classList.toggle("dark",dark);
@@ -67,9 +63,11 @@ export default async function RootLayout({
   // was set either and an un-nonced inline script is still executed. The two
   // travel together, so there is no state where the bootstrap is silently lost.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const initialLanguage = await readServerLanguage();
+  const directions = { ar: "rtl", en: "ltr" } as const;
 
   return (
-    <html lang="ar" dir="rtl" className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
+    <html lang={initialLanguage} dir={directions[initialLanguage]} className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
       <head>
         <InlineBootstrapScript nonce={nonce} html={BOOTSTRAP} />
       </head>
@@ -77,15 +75,17 @@ export default async function RootLayout({
         suppressHydrationWarning
         className="h-full antialiased"
       >
-        <ThemeProvider>
-          <DensityProvider>
-            <DirectionBridge>
-              <BrandingProvider>
-                <TooltipProvider>{children}</TooltipProvider>
-              </BrandingProvider>
-            </DirectionBridge>
-          </DensityProvider>
-        </ThemeProvider>
+        <I18nProvider initialLanguage={initialLanguage}>
+          <ThemeProvider>
+            <DensityProvider>
+              <DirectionBridge>
+                <BrandingProvider>
+                  <TooltipProvider>{children}</TooltipProvider>
+                </BrandingProvider>
+              </DirectionBridge>
+            </DensityProvider>
+          </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   );

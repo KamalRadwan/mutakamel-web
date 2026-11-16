@@ -7,6 +7,12 @@ import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";
 import { CreateUomConversionModal } from "./CreateUomConversionModal";
 
+const references = {
+  items: [], nodes: [], uoms: [], isLoading: false, error: null, itemError: null, uomError: null, nodeError: null, canCatalog: true, canNodes: true,
+  searchItems: vi.fn(), ensureItem: vi.fn(), ensureUom: vi.fn(), ensureProfiles: vi.fn(), refresh: vi.fn(),
+  itemLabel: () => "Item", profileLabel: () => "Item", nodeLabel: () => "Node", uomLabel: () => "Unit",
+};
+
 let language: "ar" | "en" = "en";
 const dictionaries = { ar, en };
 vi.mock("@/i18n/I18nContext", () => ({
@@ -27,12 +33,23 @@ function renderModal(isSubmitting = false) {
         error={null}
         onClose={vi.fn()}
         onSubmit={vi.fn().mockResolvedValue(true)}
+        references={references}
       />
     </TooltipProvider>,
   );
 }
 
 describe.each(["ar", "en"] as const)("UOM conversion suggestions (%s)", (lang) => {
+  it("uses the active dictionary for preset labels and preserves the selected ratio", () => {
+    language = lang;
+    renderModal();
+    const t = dictionaries[lang].tradeInventory;
+    fireEvent.click(screen.getByRole("button", { name: t.conversionRatioDozen }));
+    expect(screen.getByLabelText(new RegExp(t.factorNumerator, "u"))).toHaveValue("12");
+    expect(screen.getByLabelText(new RegExp(t.factorDenominator, "u"))).toHaveValue("1");
+    expect(screen.getByText(dictionaries[lang].tradeStatus.DRAFT)).toBeInTheDocument();
+  });
+
   it.each([
     ["1", "2.5", "2", "5"],
     ["2", "2.5", "4", "5"],

@@ -1,7 +1,7 @@
 "use client";
 
 import { Tag } from "lucide-react";
-import { TagChip, TagChipOverflow, cn, iconSize } from "@/design-system";
+import { TagChip, TagChipOverflow, cn } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
 import type { CrmTag } from "../../../shared/tag-contract";
 
@@ -19,7 +19,6 @@ export function CustomerProfileTagList({
   if (tags.length === 0) return null;
   const visible = tags.slice(0, maxVisible);
   const hidden = tags.slice(maxVisible);
-  const size = compact ? "xs" : "sm";
 
   return (
     <ul
@@ -32,7 +31,7 @@ export function CustomerProfileTagList({
         className="flex shrink-0 items-center text-muted-foreground"
         aria-hidden="true"
       >
-        <Tag className={iconSize({ size: "sm" })} />
+        <Tag className="size-3" />
       </li>
       {visible.map((tag) => (
         <li key={tag.id} className="flex min-w-0 max-w-full">
@@ -40,7 +39,7 @@ export function CustomerProfileTagList({
             label={tag.name}
             backgroundColor={tag.backgroundColor}
             textColor={tag.textColor}
-            size={size}
+            size="compact"
             className={compact ? "max-w-20" : undefined}
           />
         </li>
@@ -50,7 +49,7 @@ export function CustomerProfileTagList({
           <TagChipOverflow
             label={formatTemplate(moreLabel, { count: hidden.length })}
             hiddenNames={hidden.map((tag) => tag.name)}
-            size={size}
+            size="compact"
           />
         </li>
       )}

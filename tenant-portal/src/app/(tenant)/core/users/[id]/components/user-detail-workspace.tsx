@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, ShieldOff, Trash2, UserCheck } from "lucide-react";
 import {
-  Badge,
   Button,
   ConfirmActionModal,
   DetailHeader,
@@ -13,29 +11,24 @@ import {
   NotFoundState,
   PermissionGate,
   Skeleton,
+  TooltipProvider,
 } from "@/design-system";
 import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import {
-  userDisplayName,
-  type TenantUser,
-  type UpdateUserInput,
-  type UserStatus,
-} from "../../../contracts/user-contract";
+import { userDisplayName } from "../../../contracts/user-contract";
 import { useCoreErrorText } from "../../../hooks/useCoreErrorText";
+import { UserFormDrawer } from "../../components/UserFormDrawer";
+import { toUpdateInput, userToFormValues } from "../../user-payloads";
 import { useTenantUserDetail } from "../hooks/useTenantUserDetail";
-import { UserFormDrawer, type UserFormValues } from "../../components/UserFormDrawer";
+import { useUserPlacementNames } from "../hooks/useUserPlacementNames";
 import { ModuleSeatsPanel } from "./ModuleSeatsPanel";
 import { RoleGrantsPanel } from "./RoleGrantsPanel";
 import { TeamMembershipsPanel } from "./TeamMembershipsPanel";
-
-const STATUS_TONE: Record<UserStatus, "positive" | "caution" | "negative" | "neutral"> = {
-  ACTIVE: "positive",
-  SUSPENDED: "caution",
-  DEACTIVATED: "negative",
-  INVITED: "neutral",
-};
+import {
+  UserDetailSecondaryActions,
+  UserDetailStatusBadges,
+} from "./UserDetailHeaderActions";
 
 export function UserDetailWorkspace({ id }: { id: string }) {
   const screen = useTenantUserDetail(id);
@@ -43,11 +36,15 @@ export function UserDetailWorkspace({ id }: { id: string }) {
   const copy = t.coreIdentity;
   const describeError = useCoreErrorText();
   const actionText = describeError(screen.actionError);
-  const pendingCopy = screen.pendingAction ? copy.users.confirm[screen.pendingAction] : null;
+  const placement = useUserPlacementNames(user);
+  const pendingCopy = screen.pendingAction
+    ? copy.users.confirm[screen.pendingAction]
+    : null;
+  const isDenied = screen.loadError?.status === 403;
 
   if (screen.isMissing || screen.loadError || screen.isLoading || !user) {
     return (
-      <PermissionGate require="users.user.read">
+      <PermissionGate require="users.user.read" denied={isDenied}>
         {screen.isMissing ? (
           <NotFoundState
             title={copy.users.notFoundTitle}
@@ -74,204 +71,190 @@ export function UserDetailWorkspace({ id }: { id: string }) {
   }
 
   return (
-    <PermissionGate require="users.user.read">
-      <div className="flex flex-col gap-4">
-        <DetailHeader
-          title={userDisplayName(user)}
-          subtitle={user.email}
-          backLabel={copy.users.backToList}
-          backHref={TENANT_ROUTES.coreUsers}
-          breadcrumbs={[
-            { label: copy.users.title, href: TENANT_ROUTES.coreUsers },
-            { label: userDisplayName(user) },
-          ]}
-          status={
-            <span className="flex items-center gap-1.5">
-              <Badge tone={STATUS_TONE[user.status]}>{copy.userStatus[user.status]}</Badge>
-              {user.isTenantOwner ? <Badge tone="brand">{copy.users.owner}</Badge> : null}
-              {user.status === "INVITED" ? (
-                <Badge tone="neutral">{copy.users.invitePending}</Badge>
-              ) : null}
-            </span>
-          }
-          secondaryActions={
-            <>
-              {screen.canReadAddonAssignments && <Button size="sm" variant="outline" asChild>
-                <Link href={`${TENANT_ROUTES.coreAddonSeats}/${id}`}>{t.addonAssignments.nav}</Link>
-              </Button>}
-              {screen.canUpdate ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={screen.openEdit}
-                  disabled={screen.isProtectedTarget}
-                  aria-describedby={screen.isProtectedTarget ? "user-management-protection" : undefined}
-                >
-                  <Pencil className="size-4" aria-hidden="true" />
-                  {copy.actions.edit}
-                </Button>
-              ) : null}
-              {screen.canDeactivate && screen.allowedActions.suspend ? (
-                <Button size="sm" variant="outline" onClick={() => screen.requestAction("suspend")}>
-                  <ShieldOff className="size-4" aria-hidden="true" />
-                  {copy.users.suspend}
-                </Button>
-              ) : null}
-              {screen.canDeactivate && screen.allowedActions.activate ? (
-                <Button size="sm" variant="outline" onClick={() => screen.requestAction("activate")}>
-                  <UserCheck className="size-4" aria-hidden="true" />
-                  {copy.users.activate}
-                </Button>
-              ) : null}
-              {screen.canDelete && screen.allowedActions.delete ? (
-                <Button size="sm" variant="outline" onClick={() => screen.requestAction("delete")}>
-                  <Trash2 className="size-4 text-destructive" aria-hidden="true" />
-                  {user.status === "INVITED" ? copy.users.revokeInvite : t.common.delete}
-                </Button>
-              ) : null}
-            </>
-          }
-        />
-
-        {screen.protectedTargetReason ? (
-          <p id="user-management-protection" className="text-xs text-muted-foreground">
-            {screen.protectedTargetReason}
-          </p>
-        ) : null}
-        {screen.isSelfTarget ? (
-          <Button size="sm" variant="outline" className="self-start" asChild>
-            <Link href={TENANT_ROUTES.coreProfile}>{copy.users.editMyName}</Link>
-          </Button>
-        ) : null}
-
-        {screen.isEditOpen ? <UserFormDrawer
-          mode="edit"
-          isOpen={screen.isEditOpen}
-          initial={{
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            companyId: user.companyId,
-            branchId: user.branchId,
-            departmentId: user.departmentId,
-            teamId: user.teamId ?? "",
-            managerId: user.managerId ?? "",
-            employeeCode: user.employeeCode ?? "",
-            jobTitle: user.jobTitle ?? "",
-          }}
-          onClose={screen.closeEdit}
-          onSubmit={(values) => screen.saveEdits(toUpdateInput(values, user))}
-          isSubmitting={screen.isSubmitting}
-          error={screen.isEditOpen ? actionText : undefined}
-        /> : null}
-
-        {actionText ? (
-          <p
-            role="alert"
-            className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
-          >
-            {actionText}
-          </p>
-        ) : null}
-
-        {user.status === "INVITED" ? (
-          // There is no resend-invite route on this controller — the invite mail
-          // is sent once by POST /users. Saying so is the honest surface; a
-          // resend button would be a control with nothing behind it.
-          <p
-            role="status"
-            className="rounded-sm border border-border bg-muted p-2.5 text-xs text-muted-foreground"
-          >
-            {copy.users.inviteLifecycleNote}
-          </p>
-        ) : null}
-
-        <DetailSection
-          title={copy.detail.identity}
-          emptyValueLabel={t.detail.notRecorded}
-          fields={[
-            { label: copy.users.firstName, value: user.firstName },
-            { label: copy.users.lastName, value: user.lastName },
-            { label: copy.users.email, value: <span dir="ltr">{user.email}</span> },
-            { label: copy.users.employeeCode, value: user.employeeCode },
-            { label: copy.users.jobTitle, value: user.jobTitle },
-            { label: copy.fields.status, value: copy.userStatus[user.status] },
-          ]}
-        />
-
-        <DetailSection
-          title={copy.detail.placement}
-          description={copy.detail.placementDescription}
-          emptyValueLabel={t.detail.notRecorded}
-          fields={[
-            { label: copy.levels.companies.parentLabel, value: idValue(user.companyId) },
-            { label: copy.levels.branches.parentLabel, value: idValue(user.branchId) },
-            { label: copy.levels.departments.parentLabel, value: idValue(user.departmentId) },
-            { label: copy.levels.teams.parentLabel, value: idValue(user.teamId) },
-            { label: copy.users.manager, value: idValue(user.managerId) },
-            { label: copy.detail.createdAt, value: formatDateTime(user.createdAt, lang) },
-            { label: copy.detail.updatedAt, value: formatDateTime(user.updatedAt, lang) },
-          ]}
-        />
-
-        <TeamMembershipsPanel
-          userId={user.id}
-          canManage={screen.canManageMemberships}
-          protectedTargetReason={screen.protectedTargetReason}
-          homeTeamId={user.teamId}
-        />
-
-        <ModuleSeatsPanel userId={user.id} canManage={screen.canManageModules} />
-
-        {screen.canAssignRoles ? (
-          <RoleGrantsPanel
-            userId={user.id}
-            canAssignRoles={screen.canAssignRoles}
-            isTenantOwnerActor={screen.isTenantOwnerActor}
-            protectedTargetReason={screen.protectedTargetReason}
+    <PermissionGate require="users.user.read" denied={isDenied}>
+      <TooltipProvider>
+        <div className="flex flex-col gap-4">
+          <DetailHeader
+            title={userDisplayName(user)}
+            subtitle={user.email}
+            backLabel={copy.users.backToList}
+            backHref={TENANT_ROUTES.coreUsers}
+            breadcrumbs={[
+              { label: copy.users.title, href: TENANT_ROUTES.coreUsers },
+              { label: userDisplayName(user) },
+            ]}
+            status={<UserDetailStatusBadges user={user} copy={copy} />}
+            secondaryActions={
+              <UserDetailSecondaryActions
+                id={id}
+                user={user}
+                t={t}
+                canReadAddonAssignments={screen.canReadAddonAssignments}
+                canUpdateInBranch={screen.canUpdateInBranch}
+                isProtectedTarget={screen.isProtectedTarget}
+                allowedActions={screen.allowedActions}
+                onEdit={screen.openEdit}
+                onRequestAction={screen.requestAction}
+              />
+            }
           />
-        ) : null}
 
-        <ConfirmActionModal
-          open={screen.pendingAction !== null}
-          onOpenChange={(open) => {
-            if (!open) screen.cancelAction();
-          }}
-          title={pendingCopy?.title ?? ""}
-          description={formatTemplate(pendingCopy?.description ?? "", {
-            name: userDisplayName(user),
-          })}
-          confirmLabel={pendingCopy?.confirm ?? t.common.confirmDelete}
-          cancelLabel={t.common.cancel}
-          onConfirm={() => void screen.confirmAction()}
-          loading={screen.isSubmitting}
-        />
-      </div>
+          {screen.protectedTargetReason ? (
+            <p id="user-management-protection" className="text-xs text-muted-foreground">
+              {screen.protectedTargetReason}
+            </p>
+          ) : null}
+          {screen.isSelfTarget ? (
+            <Button size="sm" variant="outline" className="self-start" asChild>
+              <Link href={TENANT_ROUTES.coreProfile}>{copy.users.editMyName}</Link>
+            </Button>
+          ) : null}
+
+          {screen.inviteQueued ? (
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground"
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="font-medium">{copy.users.inviteQueued}</span>
+                <span>{copy.users.inviteQueuedDescription}</span>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={screen.dismissInviteQueued}
+              >
+                {t.common.dismiss}
+              </Button>
+            </div>
+          ) : null}
+
+          {screen.isEditOpen ? (
+            <UserFormDrawer
+              mode="edit"
+              isOpen={screen.isEditOpen}
+              initial={userToFormValues(user)}
+              onClose={screen.closeEdit}
+              onSubmit={(values) => screen.saveEdits(toUpdateInput(user, values))}
+              isSubmitting={screen.isSubmitting}
+              error={actionText}
+            />
+          ) : null}
+
+          {actionText && !screen.isEditOpen && screen.pendingAction === null ? (
+            <p
+              role="alert"
+              className="rounded-sm border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
+            >
+              {actionText}
+            </p>
+          ) : null}
+
+          {user.status === "INVITED" ? (
+            <p
+              role="status"
+              className="rounded-sm border border-border bg-muted p-2.5 text-xs text-muted-foreground"
+            >
+              {copy.users.inviteLifecycleNote}
+            </p>
+          ) : null}
+
+          <DetailSection
+            title={copy.detail.identity}
+            emptyValueLabel={t.detail.notRecorded}
+            fields={[
+              { label: copy.users.firstName, value: user.firstName },
+              { label: copy.users.lastName, value: user.lastName },
+              { label: copy.users.email, value: <span dir="ltr">{user.email}</span> },
+              {
+                label: copy.users.employeeCode,
+                value: user.employeeCode ? (
+                  <IdentifierText>{user.employeeCode}</IdentifierText>
+                ) : null,
+              },
+              { label: copy.users.jobTitle, value: user.jobTitle },
+              { label: copy.fields.status, value: copy.userStatus[user.status] },
+            ]}
+          />
+
+          <DetailSection
+            title={copy.detail.placement}
+            description={copy.detail.placementDescription}
+            emptyValueLabel={t.detail.notRecorded}
+            fields={[
+              { label: copy.levels.companies.parentLabel, value: placement.companyLabel },
+              { label: copy.levels.branches.parentLabel, value: placement.branchLabel },
+              {
+                label: copy.levels.departments.parentLabel,
+                value: placement.departmentLabel,
+              },
+              { label: copy.levels.teams.parentLabel, value: placement.teamLabel },
+              {
+                label: copy.users.manager,
+                value:
+                  user.managerId && placement.managerResolved ? (
+                    <Link
+                      href={`${TENANT_ROUTES.coreUsers}/${user.managerId}`}
+                      className="font-medium text-foreground hover:underline"
+                    >
+                      {placement.managerLabel}
+                    </Link>
+                  ) : (
+                    placement.managerLabel
+                  ),
+              },
+              { label: copy.detail.createdAt, value: formatDateTime(user.createdAt, lang) },
+              { label: copy.detail.updatedAt, value: formatDateTime(user.updatedAt, lang) },
+            ]}
+          />
+
+          <TeamMembershipsPanel
+            userId={user.id}
+            canManage={screen.canManageMemberships}
+            protectedTargetReason={screen.protectedTargetReason}
+            homeTeamId={user.teamId}
+          />
+
+          <ModuleSeatsPanel userId={user.id} canManage={screen.canManageModules} />
+
+          {screen.canAssignRoles ? (
+            <RoleGrantsPanel
+              userId={user.id}
+              canAssignRoles={screen.canAssignRoles}
+              isTenantOwnerActor={screen.isTenantOwnerActor}
+              protectedTargetReason={screen.protectedTargetReason}
+            />
+          ) : null}
+
+          <ConfirmActionModal
+            open={screen.pendingAction !== null}
+            onOpenChange={(open) => {
+              if (!open) screen.cancelAction();
+            }}
+            title={pendingCopy?.title ?? ""}
+            description={
+              pendingCopy
+                ? [
+                    formatTemplate(pendingCopy.description, {
+                      name: userDisplayName(user),
+                    }),
+                    actionText,
+                  ]
+                    .filter(Boolean)
+                    .join("\n\n")
+                : ""
+            }
+            confirmLabel={
+              screen.pendingAction === "suspend" && user.status === "INVITED"
+                ? copy.users.revokeInvite
+                : (pendingCopy?.confirm ?? t.common.confirmDelete)
+            }
+            cancelLabel={t.common.cancel}
+            onConfirm={() => void screen.confirmAction()}
+            loading={screen.isSubmitting}
+          />
+        </div>
+      </TooltipProvider>
     </PermissionGate>
   );
-}
-
-/**
- * `UpdateTenantUserDto` — no `email`; changed team/manager IDs use `null` to
- * clear them. Optional text fields use empty strings to clear their values.
- */
-function toUpdateInput(values: UserFormValues, loaded: TenantUser): UpdateUserInput {
-  const teamId = values.teamId || null;
-  const managerId = values.managerId || null;
-  return {
-    firstName: values.firstName,
-    lastName: values.lastName,
-    companyId: values.companyId,
-    branchId: values.branchId,
-    departmentId: values.departmentId,
-    ...(teamId !== loaded.teamId ? { teamId } : {}),
-    ...(managerId !== loaded.managerId ? { managerId } : {}),
-    employeeCode: values.employeeCode,
-    jobTitle: values.jobTitle,
-  };
-}
-
-/** The user routes return placement as ids; no joined name is on the response. */
-function idValue(value: string | null): React.ReactNode {
-  return value ? <IdentifierText className="text-2xs">{value}</IdentifierText> : null;
 }

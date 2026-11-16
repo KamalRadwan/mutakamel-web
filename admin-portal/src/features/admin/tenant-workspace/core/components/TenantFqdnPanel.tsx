@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,7 +67,7 @@ export function TenantFqdnPanel({
 
       {canAttach && (
         <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-          <Field id="tenant-fqdn" label={text.domainFieldLabel} hideLabel error={fqdn.preflightError?.message}>
+          <Field id="tenant-fqdn" label={text.domainFieldLabel} hideLabel error={fqdn.preflightError ? getLocalizedApiErrorMessage(fqdn.preflightError, locale) : undefined}>
             {(field) => (
               <Input
                 {...field}
@@ -102,6 +103,10 @@ export function TenantFqdnPanel({
             </Button>
           )}
         </div>
+      )}
+
+      {fqdn.preflightError && (
+        <p className="font-mono text-xs"><bdi>{fqdn.preflightError.errorCode} {fqdn.preflightError.correlationId}</bdi></p>
       )}
 
       {fqdn.evidence && (
@@ -230,7 +235,7 @@ function InlineError({
   error,
 }: {
   locale: TenantWorkspaceLocale;
-  error: { message: string; correlationId?: string } | null;
+  error: { message: string; errorCode?: string; correlationId?: string } | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -245,7 +250,8 @@ function InlineError({
       tabIndex={-1}
       className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <p>{error.message}</p>
+      <p>{getLocalizedApiErrorMessage(error, locale)}</p>
+      {error.errorCode && <p className="mt-1 font-mono text-xs"><bdi>{error.errorCode}</bdi></p>}
       {error.correlationId && (
         <p className="mt-1 font-mono text-xs">
           {text.correlation}: {error.correlationId}

@@ -16,6 +16,7 @@ export interface PageActionBarProps {
   sections: NavSection[];
   /** Names the bar where the route belongs to no nav entry. */
   appLabelKey: string;
+  leading?: React.ReactNode;
 }
 
 /**
@@ -45,10 +46,11 @@ export interface PageActionBarProps {
  * that disappeared on some screens would shift the page vertically on those
  * routes, moving content under the pointer on navigation.
  */
-export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
+export function PageActionBar({ sections, appLabelKey, leading }: PageActionBarProps) {
   const { t } = useI18n();
   const { register } = usePageActionSlots();
   const location = useNavLocation(sections);
+  const isSettings = location.section?.id === "crmSetup";
 
   // Each ref has to keep ONE identity for the life of the bar. React detaches
   // and re-attaches a callback ref whose function identity changed, so an
@@ -60,6 +62,10 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
   // bar instead of a stub.
   const setPrimary = useCallback(
     (node: HTMLDivElement | null) => register("primary", node),
+    [register],
+  );
+  const setCrumb = useCallback(
+    (node: HTMLDivElement | null) => register("crumb", node),
     [register],
   );
   const setRelated = useCallback(
@@ -84,18 +90,20 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
     : null;
 
   return (
-    <div className="shrink-0 px-5 pt-(--size-actionbar-inset) print:hidden">
+    <div data-page-action-bar className="shrink-0 px-5 pt-(--size-actionbar-inset) print:hidden">
       <div
         className={cn(
-          "flex h-(--size-toolbar) items-center gap-2.5 rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar",
+          "flex min-h-(--size-toolbar) items-center gap-2.5 rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar",
           // A screen's controls are fixed-width (a 240px search box, a segmented
           // switcher) and the bar cannot wrap them onto a second line without
           // becoming two bars. Below `sm` they scroll inside it instead — the
           // shell root is `overflow-hidden`, so without this they would be
           // silently clipped, and the view switcher is the one that would go.
-          "overflow-x-auto",
+          "overflow-x-auto overflow-y-hidden",
+          "[&:has([data-page-location-override])>[data-page-location]]:hidden",
         )}
       >
+        {leading}
         {location.isPrimaryPage && (
           <div ref={setPrimary} className="flex shrink-0 items-center gap-2 empty:hidden" />
         )}
@@ -106,7 +114,7 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
             the list the record came from, which is the trip a user makes far more
             often than any other from here. */}
         {!location.isPrimaryPage && (
-          <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <p data-page-location className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">{sectionLabel}</span>
             {itemLabel && (
               <>
@@ -131,21 +139,24 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
             )}
           </p>
         )}
+        {/* A detail screen names its record here, after the list it came from,
+            so the location reads Section › List › Record in this one bar. */}
+        {!location.isPrimaryPage && (
+          <div ref={setCrumb} className="flex min-w-0 items-center gap-1.5 text-sm empty:hidden" />
+        )}
         {/* The middle. Links to OTHER records live here rather than in the
             trailing cluster: they leave this screen, and the controls beside the
-            view switcher act on it. `mx-auto` centres the group in whatever room
-            the location text and the trailing cluster leave, and `min-w-0` lets
-            it shrink and scroll with the bar rather than pushing either aside. */}
-        <div ref={setRelated} className="mx-auto flex min-w-0 items-center gap-2 empty:hidden" />
-        {/* min-w-0 so a long search box shrinks instead of pushing the view
-            switcher off the inline end. `ms-auto` still holds when the middle is
-            empty, which is every list screen. */}
-        <div className="ms-auto flex min-w-0 items-center gap-2.5">
+            view switcher act on it. Reserve each group's width so its fixed-width
+            controls cannot overlap the next group. The outer bar scrolls when
+            the viewport cannot fit them. */}
+        <div ref={setRelated} className="mx-auto flex shrink-0 items-center gap-2 empty:hidden" />
+        <div className="ms-auto flex shrink-0 items-center gap-2.5">
+          {isSettings && <div ref={setSearch} className="flex shrink-0 items-center gap-2 empty:hidden" />}
           <div ref={setActions} className="flex shrink-0 items-center gap-1.5 empty:hidden" />
           {!location.isPrimaryPage && (
             <div ref={setPrimary} className="flex shrink-0 items-center gap-2 empty:hidden" />
           )}
-          <div ref={setSearch} className="flex min-w-0 items-center gap-2 empty:hidden" />
+          {!isSettings && <div ref={setSearch} className="flex shrink-0 items-center gap-2 empty:hidden" />}
           <div ref={setView} className="flex shrink-0 items-center gap-2 empty:hidden" />
         </div>
       </div>

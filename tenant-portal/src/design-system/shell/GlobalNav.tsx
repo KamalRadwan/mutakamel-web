@@ -13,6 +13,7 @@ import { NavMenu } from "./NavMenu";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
+import { useActiveNavVisibility } from "./useActiveNavVisibility";
 import type { NavApp, NavAppId, NavSection } from "./nav-config";
 
 export interface GlobalNavProps {
@@ -35,8 +36,9 @@ export function GlobalNav({
   sections,
   activeItemId,
 }: GlobalNavProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user } = useTenantAuth();
+  const navRef = useActiveNavVisibility(activeItemId, lang);
 
   return (
     <>
@@ -72,6 +74,7 @@ export function GlobalNav({
           />
         </div>
         <nav
+          ref={navRef}
           aria-label={t.nav.mainNavigation}
           className="scrollbar-none hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto lg:flex"
         >

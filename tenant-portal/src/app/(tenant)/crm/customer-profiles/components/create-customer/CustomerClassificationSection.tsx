@@ -16,6 +16,7 @@ import {
   cn,
   type MultiSelectOption,
 } from "@/design-system";
+import { TenantOrganizationSelect } from "@/components/tenant/TenantOrganizationSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
@@ -234,22 +235,8 @@ export function CustomerClassificationSection({
                   required
                   showLabel
                 >
-                  <Select
-                    value={companyId ?? ""}
-                    disabled={disabled}
-                    onValueChange={(val) => onCompanyChange?.(val)}
-                  >
-                    <SelectTrigger size="sm">
-                      <SelectValue placeholder={t.organization.parentCompany} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companyIds.map((id) => (
-                        <SelectItem key={id} value={id}>
-                          {id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <TenantOrganizationSelect kind="company" ids={companyIds} value={companyId ?? undefined}
+                    onValueChange={(next) => onCompanyChange?.(next)} disabled={disabled} placeholder={t.organization.parentCompany} />
                 </Field>
               </div>
             )}
@@ -265,22 +252,8 @@ export function CustomerClassificationSection({
                   required
                   showLabel
                 >
-                  <Select
-                    value={branchId}
-                    disabled={disabled}
-                    onValueChange={(val) => onBranchChange?.(val)}
-                  >
-                    <SelectTrigger size="sm">
-                      <SelectValue placeholder={t.common.branch} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branchIds.map((id) => (
-                        <SelectItem key={id} value={id}>
-                          {id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <TenantOrganizationSelect kind="branch" ids={branchIds} value={branchId ?? undefined}
+                    onValueChange={(next) => onBranchChange?.(next)} disabled={disabled} placeholder={t.common.branch} />
                 </Field>
               </div>
             )}

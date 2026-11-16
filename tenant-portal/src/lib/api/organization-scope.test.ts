@@ -190,6 +190,9 @@ describe("route inventory coverage", () => {
   ) as { routes?: unknown } | unknown[];
   const routes = (Array.isArray(inventory) ? inventory : (inventory.routes ?? [])) as Array<{
     app: string;
+    routeKey: string;
+    canonicalPath: string;
+    method: string;
     organizationScopeMode?: string;
   }>;
 
@@ -207,12 +210,42 @@ describe("route inventory coverage", () => {
     expect([...declared].sort()).toEqual([...declared].filter((mode) => HANDLED.includes(mode as OrganizationScopeMode)).sort());
   });
 
-  it("still covers 89 scope-carrying routes across all three apps", () => {
+  it("covers the current 228 scope-carrying routes across all three apps", () => {
     const scoped = routes.filter(
       (route) => route.organizationScopeMode && route.organizationScopeMode !== "NONE",
     );
-    expect(scoped).toHaveLength(89);
+    // Exact counts from the current Gateway-derived inventory. Keep the split
+    // explicit so one app's missing policies cannot hide behind another's adds.
+    expect(scoped).toHaveLength(228);
+    expect(Object.fromEntries(["core", "crm", "trade"].map((app) => [
+      app, scoped.filter((route) => route.app === app).length,
+    ]))).toEqual({ core: 41, crm: 5, trade: 182 });
     // L4-3's point: this is not a CRM-only concern.
     expect(new Set(scoped.map((route) => route.app))).toEqual(new Set(["core", "crm", "trade"]));
+  });
+
+  it.each(["get", "set"])("keeps owner-managed branch profiles independent of the active branch selector (%s)", (action) => {
+    expect(routes.find((route) => route.routeKey === `core.tenant.roles.branch-permissions.${action}`))
+      .toMatchObject({ organizationScopeMode: "NONE" });
+  });
+
+  it("requires company and branch scope for purchase-quotation supplier discovery", () => {
+    expect(routes.find((route) => route.routeKey === "trading.purchase-quotations.supplier-options.get"))
+      .toMatchObject({
+        method: "GET",
+        canonicalPath: "/api/tenant/trade/v1/purchase-quotations/supplier-options",
+        organizationScopeMode: "BRANCH_REQUIRED",
+      });
+  });
+  it.each([
+    ["trading.quotations.discount-limits.get", "GET", "/discount-limits"],
+    ["trading.quotations.discount-limits.post", "POST", "/discount-limits"],
+    ["trading.quotations.discount-limits.by-id.patch", "PATCH", "/discount-limits/:id"],
+    ["trading.quotations.discount-policy.get", "GET", "/discount-policy"],
+    ["trading.quotations.pricing-preview.post", "POST", "/pricing-preview"],
+  ])("requires exact company and branch scope for %s", (routeKey, method, suffix) => {
+    expect(routes.find((route) => route.routeKey === routeKey)).toMatchObject({
+      method, canonicalPath: `/api/tenant/trade/v1/quotations${suffix}`, organizationScopeMode: "BRANCH_REQUIRED",
+    });
   });
 });

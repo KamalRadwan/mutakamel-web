@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
 import type { AuthSessionItem } from "./hooks/useAuthenticationManagement";
 import AuthenticationManagementPage from "./page";
 
@@ -20,6 +21,7 @@ const state = vi.hoisted(() => ({
 }));
 
 const t = {
+  views: en.views,
   common: {
     cancel: "Cancel",
     retry: "Retry",

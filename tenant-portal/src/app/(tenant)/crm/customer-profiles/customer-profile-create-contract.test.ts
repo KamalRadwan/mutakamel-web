@@ -177,15 +177,18 @@ describe("validateCreateCustomerProfile", () => {
     ).toEqual({});
   });
 
-  it("rejects a website with no protocol, which @IsUrl requires", () => {
+  it.each(["acme.example", "https://acme.example", "http://acme.example", ""])("accepts the safe optional website %j", (companyWebsite) => {
     expect(
-      validateCreateCustomerProfile(form({ companyWebsite: "acme.example" }), messages)
-        .companyWebsite,
-    ).toBe("Bad URL.");
-    expect(
-      validateCreateCustomerProfile(form({ companyWebsite: "https://acme.example" }), messages)
+      validateCreateCustomerProfile(form({ companyWebsite }), messages)
         .companyWebsite,
     ).toBeUndefined();
+  });
+
+  it.each(["javascript:alert(1)", "data:text/html,x", "vbscript:msgbox(1)", "httpx:foo", "ftp://acme.example"])("rejects the unsafe website %j with a field error", (companyWebsite) => {
+    expect(
+      validateCreateCustomerProfile(form({ companyWebsite }), messages)
+        .companyWebsite,
+    ).toBe("Bad URL.");
   });
 
   it("flags a contact row that carries data but no name", () => {

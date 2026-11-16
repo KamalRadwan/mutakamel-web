@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
+  ChevronRight,
   ArrowUpRight,
   Ban,
   Building2,
@@ -24,11 +24,14 @@ import {
   DetailHeader,
   ErrorState,
   NotFoundState,
+  PageActions,
   Skeleton,
   StatusBadge,
   cardColorBorder,
   cn,
   dossierAvatarClass,
+  iconSize,
+  mirrorInRtl,
   useToast,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
@@ -212,8 +215,6 @@ export function CustomerProfileDetailWorkspace({
     : "";
 
   const activeStatusIndex = CUSTOMER_STATUSES.indexOf(profile.status);
-  const statusDisplayLabel =
-    statusLabels[`CustomerStatus.${profile.status}`] ?? profile.status;
 
   const handleSaveCardPatch = async (patch: CustomerProfileCardPatch) => {
     if (!canEdit || savingCardPatch) return;
@@ -275,41 +276,26 @@ export function CustomerProfileDetailWorkspace({
         backLabel={t.crmCustomerProfiles.back}
       />
 
-      {/* Top Sub-Toolbar: Back to Customers + Breadcrumb + Delete Customer */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-muted-foreground">
-          <Link href={backHref} className="dossier-btn">
-            <ArrowLeft
-              className="size-3.5 rtl:-scale-x-100"
-              aria-hidden="true"
-            />
-            <span>{t.crmCustomerProfiles.back}</span>
-          </Link>
-          <span aria-hidden="true">/</span>
-          <span>CRM</span>
-          <span aria-hidden="true">›</span>
-          <span>{t.crmCustomerProfiles.ui.detail.customerProfiles}</span>
-          <span aria-hidden="true">›</span>
-          <span className="font-semibold text-foreground">
-            {profile.displayName}
-          </span>
-        </div>
-
-        {canDelete && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={actions.requestDelete}
-              className="dossier-btn dossier-btn-cancel"
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-              <span>{t.common.delete}</span>
-            </Button>
-          </div>
-        )}
-      </div>
+      {/* The record's place and actions live in the shell's page bar: the bar
+          already links back to the list, this names the record after it. */}
+      <PageActions slot="crumb">
+        <ChevronRight className={cn(iconSize({ size: "xs" }), mirrorInRtl, "text-muted-foreground")} aria-hidden="true" />
+        <span className="truncate font-semibold text-foreground" title={profile.displayName} aria-current="page">{profile.displayName}</span>
+      </PageActions>
+      {canDelete && (
+        <PageActions slot="actions">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={actions.requestDelete}
+            className="dossier-btn dossier-btn-cancel"
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            <span>{t.common.delete}</span>
+          </Button>
+        </PageActions>
+      )}
 
       {/* Standalone Full-Width Colorful Dossier Hero Header */}
       <div className={cn("dossier-hero", cardColorBorder(currentColor))}>
@@ -336,18 +322,6 @@ export function CustomerProfileDetailWorkspace({
                   {t.crmCustomerProfiles.profileTypes[profile.profileType] ??
                     profile.profileType}
                 </span>
-              </span>
-              <span
-                className={cn(
-                  "dossier-badge",
-                  profile.status === "ACTIVE_CUSTOMER"
-                    ? "dossier-badge-status-conv"
-                    : profile.status === BLACKLISTED_STATUS
-                      ? "dossier-badge-status-disq"
-                      : "dossier-badge-status-open",
-                )}
-              >
-                ● {t.crmCustomerProfiles.ui.detail.status}: {statusDisplayLabel}
               </span>
               {profile.sourceLeadId && (
                 <Link

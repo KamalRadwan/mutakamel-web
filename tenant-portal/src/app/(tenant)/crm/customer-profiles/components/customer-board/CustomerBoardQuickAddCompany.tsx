@@ -35,7 +35,7 @@ export function CustomerBoardQuickAddCompany({ sources, form }: {
         </Field>
       ) : (
         <Field label={t.crmCustomerProfiles.ui.board.existing_company} required error={errors.existingCompanyPartyId}>
-          <Combobox size="sm" options={form.companyComboboxOptions} value={form.existingCompanyPartyId}
+        <Combobox textSize="compact" size="sm" options={form.companyComboboxOptions} value={form.existingCompanyPartyId}
             selectedLabel={form.selectedCompany?.displayName || form.selectedCompanyName || undefined}
             onValueChange={(next) => form.selectCompany(next ?? null)} onSearch={form.setCompanyQuery} debounceMs={0}
             loading={form.companyLookup.isLoadingCompanies} loadingLabel={t.common.loading}

@@ -12,13 +12,8 @@ import {
   parseDashboardsResponse,
   parseNavigationResponse,
 } from "./dashboard-contract";
-import {
-  buildCreateWidgetRequest,
-  buildUpdateWidgetRequest,
-  parseWidgetDetailResponse,
-  parseWidgetUpdateResponse,
-  parseWidgetsResponse,
-} from "./widget-contract";
+import { buildCreateWidgetRequest } from "./widget-contract";
+import { isPlaceableWidget, parseWidgetLibraryDetail, parseWidgetLibraryResponse } from "./widget-library-contract";
 
 const DASHBOARD_ID = "01900300-0000-7000-8000-000000000001";
 const WIDGET_ID = "01900300-0000-7000-8000-0000000000a1";
@@ -38,6 +33,12 @@ const widget = {
   createdAt: "2026-08-01T09:00:00.000Z",
   updatedAt: "2026-08-02T09:00:00.000Z",
   accessLevel: "OWNER",
+  status: "PUBLISHED",
+  versionNumber: 2,
+  governanceRevision: 1,
+  hasDraft: false,
+  draftRevision: null,
+  isShared: false,
 };
 
 const dashboard = {
@@ -84,13 +85,27 @@ const dashboard = {
 };
 
 describe("CRM dashboards API contract", () => {
+  it.each(["PERIOD", "BRANCH"])("reads a saved %s dataset comparison through the widget and dashboard boundaries", (basis) => {
+    const comparison = { type: "DATASETS", basis, datasets: basis === "PERIOD"
+      ? [{ datePreset: "LAST_MONTH" }, { datePreset: "CURRENT_MONTH" }]
+      : [{ branchId: OWNER_ID }, { branchId: DASHBOARD_ID }] };
+    const saved = { ...widget, visualizationType: "COLUMN", querySpec: {
+      series: [{ metricKey: "crm.leads.converted.trend" }], dimension: { key: "time", grain: "MONTH" }, comparison,
+    } };
+    expect(parseWidgetLibraryDetail(saved).querySpec?.comparison).toEqual(comparison);
+    expect(parseWidgetLibraryResponse({ items: [saved], nextCursor: null }).items[0].querySpec?.comparison).toEqual(comparison);
+    const placed = { ...dashboard, placements: [{ ...dashboard.placements[0], widget: saved }] };
+    expect(parseDashboardDetailResponse(placed).placements[0].widget.querySpec.comparison).toEqual(comparison);
+    expect(() => parseWidgetLibraryDetail({ ...saved, querySpec: { ...saved.querySpec, comparison: { ...comparison, datasets: [{}] } } })).toThrow();
+  });
+
   it('reads bounded widget pages and preserves their cursor', () => {
-    const page = parseWidgetsResponse({ items: [widget], nextCursor: WIDGET_ID });
+    const page = parseWidgetLibraryResponse({ items: [widget], nextCursor: WIDGET_ID });
     expect(page.items[0].id).toBe(WIDGET_ID);
     expect(page.nextCursor).toBe(WIDGET_ID);
-    expect(() => parseWidgetsResponse([widget])).toThrow();
-    expect(() => parseWidgetsResponse({ items: [widget], nextCursor: 'invalid' })).toThrow();
-    expect(() => parseWidgetsResponse({ items: Array.from({ length: 101 }, () => widget), nextCursor: null })).toThrow();
+    expect(() => parseWidgetLibraryResponse([widget])).toThrow();
+    expect(() => parseWidgetLibraryResponse({ items: [widget], nextCursor: 'invalid' })).toThrow();
+    expect(() => parseWidgetLibraryResponse({ items: Array.from({ length: 101 }, () => widget), nextCursor: null })).toThrow();
     expect(() => parseDashboardsResponse({ items: [dashboard] })).toThrow();
     expect(() => parseDashboardsResponse({ items: Array.from({ length: 101 }, () => dashboard), nextCursor: null })).toThrow();
   });
@@ -196,7 +211,7 @@ describe("CRM dashboards API contract", () => {
 
 describe("CRM widgets API contract", () => {
   it("reads usage, and keeps `activeShareCount` null when the server omits it", () => {
-    const detail = parseWidgetDetailResponse({
+    const detail = parseWidgetLibraryDetail({
       ...widget,
       usage: {
         placementCount: 4,
@@ -221,19 +236,21 @@ describe("CRM widgets API contract", () => {
     expect(detail.usage?.activeShareCount).toBeNull();
   });
 
-  it("reads the layout adjustments a widget update reports", () => {
-    const result = parseWidgetUpdateResponse({
-      ...widget,
-      dashboardRevisions: { [DASHBOARD_ID]: 8 },
-      layoutAdjustments: [
-        { placementId: PLACEMENT_ID, dashboardId: DASHBOARD_ID, x: 0, y: 6, width: 6, height: 6 },
-      ],
-    });
-    expect(result.dashboardRevisions[DASHBOARD_ID]).toBe(8);
-    expect(result.layoutAdjustments[0].y).toBe(6);
+  it("admits only the published version for placement while retaining draft and archived library items", () => {
+    const draft = { ...widget, id: DASHBOARD_ID, name: "", status: "DRAFT", versionNumber: null, visualizationType: null,
+      querySpec: null, displaySpec: null, schemaVersion: null, hasDraft: true, draftRevision: 2 };
+    const archived = { ...widget, id: PLACEMENT_ID, status: "ARCHIVED" };
+    const published = { ...widget, hasDraft: true, draftRevision: 3 };
+    const page = parseWidgetLibraryResponse({ items: [draft, archived, published], nextCursor: PLACEMENT_ID });
+    expect(page.items[0]).toMatchObject({ name: "", status: "DRAFT", draftRevision: 2 });
+    expect(page.items.filter(isPlaceableWidget)).toEqual([published]);
+    expect(page.nextCursor).toBe(PLACEMENT_ID);
+    expect(() => parseWidgetLibraryDetail({ ...draft, status: "PUBLISHED" })).toThrow();
+    expect(() => parseWidgetLibraryDetail({ ...published, accessLevel: "VIEW", isShared: true })).toThrow();
+    expect(parseWidgetLibraryDetail({ ...widget, accessLevel: "VIEW", isShared: true, hasDraft: null })).toMatchObject({ status: "PUBLISHED" });
   });
 
-  it("omits an empty displaySpec and always sends the widget revision on update", () => {
+  it("omits an empty displaySpec for preview", () => {
     expect(
       buildCreateWidgetRequest({
         name: "New leads",
@@ -244,10 +261,6 @@ describe("CRM widgets API contract", () => {
       name: "New leads",
       visualizationType: "METRIC_CARD",
       querySpec: { series: [{ metricKey: "crm.leads.created.count" }] },
-    });
-    expect(buildUpdateWidgetRequest({ revision: 3, name: "Renamed" })).toEqual({
-      revision: 3,
-      name: "Renamed",
     });
   });
 });

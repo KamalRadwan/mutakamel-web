@@ -18,6 +18,7 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { useCoreOperationsErrorText } from "../../../hooks/useCoreOperationsErrorText";
 import type { useTemplateRecovery } from "../hooks/useTemplateRecovery";
+import type { TemplateRestoreDialogFocus } from "../feedback/useTemplateRestoreDialogFocus";
 
 /**
  * Recovery snapshots.
@@ -29,8 +30,10 @@ import type { useTemplateRecovery } from "../hooks/useTemplateRecovery";
  */
 export function TemplateRecoveryPanel({
   recovery,
+  restoreFocus,
 }: {
   recovery: ReturnType<typeof useTemplateRecovery>;
+  restoreFocus?: TemplateRestoreDialogFocus;
 }) {
   const { t, lang } = useI18n();
   const copy = t.coreOperations.templates;
@@ -70,7 +73,9 @@ export function TemplateRecoveryPanel({
       ) : (
         <ul className="flex flex-col divide-y divide-border">
           {recovery.snapshots.map((snapshot) => {
+            const expiry = recovery.snapshotExpiry(snapshot);
             const unavailable =
+              expiry !== "current" ||
               snapshot.integrityStatus !== "AVAILABLE" ||
               snapshot.objectDeletedAt !== null ||
               snapshot.restoredAt !== null;
@@ -88,7 +93,7 @@ export function TemplateRecoveryPanel({
                   <span className="text-xs text-muted-foreground">
                     {formatTemplate(copy.snapshotExpiry, {
                       created: formatDateTime(snapshot.createdAt, lang),
-                      expires: formatDateTime(snapshot.expiresAt, lang),
+                      expires: expiry === "invalid" ? t.detail.notRecorded : formatDateTime(snapshot.expiresAt, lang),
                     })}
                   </span>
                 </span>
@@ -99,11 +104,17 @@ export function TemplateRecoveryPanel({
                   {snapshot.integrityStatus !== "AVAILABLE" ? (
                     <Badge tone="negative">{copy.snapshotQuarantined}</Badge>
                   ) : null}
+                  {expiry === "expired" ? (
+                    <Badge tone="neutral">{t.quotationPdf.draftRecovery.expired}</Badge>
+                  ) : null}
                   <Button
                     variant="outline"
                     size="xs"
                     disabled={unavailable || !recovery.acknowledgedDiscard}
-                    onClick={() => recovery.openRestore(snapshot)}
+                    onClick={event => {
+                      restoreFocus?.remember(event.currentTarget);
+                      recovery.openRestore(snapshot);
+                    }}
                   >
                     {copy.snapshotRestore}
                   </Button>
@@ -135,6 +146,7 @@ export function TemplateRecoveryPanel({
 
       <ReasonDialog
         open={recovery.restoring !== null}
+        onCloseAutoFocus={restoreFocus?.onCloseAutoFocus}
         onOpenChange={(open) => {
           if (!open) recovery.closeRestore();
         }}
@@ -142,9 +154,12 @@ export function TemplateRecoveryPanel({
         description={copy.snapshotRestoreDescription}
         reasonRequired
         destructive
+        confirmDisabled={recovery.restoringExpiryError !== null}
         onConfirm={(reason) => void recovery.restore(reason)}
         loading={recovery.isSubmitting}
-        error={recovery.formError ?? undefined}
+        error={recovery.restoringExpiryError ?? recovery.formError ?? undefined}
+        focusReasonOnError
+        keepFocusWhileLoading
         labels={{
           reason: copy.restoreReason,
           reasonHint: copy.snapshotReasonHint,

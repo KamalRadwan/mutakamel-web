@@ -311,12 +311,6 @@ export function AccountDetailScreen({ id }: { id: string }) {
                 },
                 { label: t.trade.accountCurrency, value: account.creditCurrencyCode },
                 {
-                  label: t.trade.accountPaymentTerms,
-                  value: account.paymentTermsId ? (
-                    <IdentifierText className="text-xs">{account.paymentTermsId}</IdentifierText>
-                  ) : null,
-                },
-                {
                   label: t.trade.accountPriceBook,
                   value: account.priceBookId ? (
                     <IdentifierText className="text-xs">{account.priceBookId}</IdentifierText>

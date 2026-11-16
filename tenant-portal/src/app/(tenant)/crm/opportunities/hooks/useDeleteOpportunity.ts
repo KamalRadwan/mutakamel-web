@@ -2,16 +2,13 @@
 
 import { useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 
 // DELETE /opportunities/:id — soft delete, 204 No Content. See
 // docs/api/crm-opportunities.md's routes table.
 export function useDeleteOpportunity() {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<NormalizedApiError | null>(null);
 
   async function deleteOpportunity(opportunityId: string): Promise<boolean> {
     setIsDeleting(true);
@@ -25,7 +22,7 @@ export function useDeleteOpportunity() {
       });
       return true;
     } catch (caught) {
-      setError(errorMessage(caught, "Unable to delete the opportunity."));
+      setError(normalizeApiError(caught));
       return false;
     } finally {
       setIsDeleting(false);

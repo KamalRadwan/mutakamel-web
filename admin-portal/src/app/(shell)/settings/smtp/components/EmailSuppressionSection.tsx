@@ -2,12 +2,12 @@
 
 import { Button, Field, Input, ConfirmActionModal } from "@/design-system";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll } from "@/lib/auth/rbac";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { useEmailSuppression } from "../hooks/useEmailSuppression";
 
 export function EmailSuppressionSection() {
   const { user } = useAuth();
-  const allowed = adminCanAll(user, ["admin.settings.update", "admin.settings.critical"]);
+  const allowed = adminCanAll(user, ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE);
   if (!user || !allowed) return null;
   return <EmailSuppressionForm key={user.id} />;
 }

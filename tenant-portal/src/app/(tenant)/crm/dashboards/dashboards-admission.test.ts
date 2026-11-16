@@ -21,6 +21,7 @@ describe("Phase 9 route admission", () => {
     expect(isSupportedCrmPath(TENANT_ROUTES.crmDashboards)).toBe(true);
     expect(isSupportedCrmPath(TENANT_ROUTES.crmDashboardReports)).toBe(true);
     expect(isSupportedCrmPath(TENANT_ROUTES.crmWidgets)).toBe(true);
+    expect(isSupportedCrmPath(TENANT_ROUTES.crmWidgetNew)).toBe(true);
     expect(isSupportedCrmPath(`${TENANT_ROUTES.crmDashboards}/${DASHBOARD_ID}`)).toBe(true);
     expect(isSupportedCrmPath(`${TENANT_ROUTES.crmWidgets}/${DASHBOARD_ID}`)).toBe(true);
   });

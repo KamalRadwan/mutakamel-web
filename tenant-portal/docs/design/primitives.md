@@ -42,7 +42,7 @@ pnpm add @radix-ui/react-alert-dialog @radix-ui/react-avatar \
 | `RadioGroup` | `@radix-ui/react-radio-group` | |
 | `Switch` | `@radix-ui/react-switch` | Thumb travel mirrors under RTL |
 | `Card` | plain | `CardHeader`/`Title`/`Description`/`Content`/`Footer`. **No shadow** |
-| `Badge` | plain CVA | `tone`: `brand`/`positive`/`caution`/`negative`/`neutral`; `size`: `default`/`sm` |
+| `Badge` | plain CVA | `tone`: `brand`/`positive`/`caution`/`negative`/`neutral`; `size`: `default`/`sm`/`compact` |
 | `Separator` | `@radix-ui/react-separator` | |
 | `Skeleton` | plain | The one permitted shimmer |
 | `IdentifierText` | plain `<bdi>` | **The only way to render a machine identifier.** `dir="ltr"` + `wrap-anywhere`. See [typography.md](typography.md#identifiers-wrap-never-overflow) |
@@ -249,11 +249,18 @@ saying where it *is* editable.
 
 ## Badge
 
+CRM Settings refinement, **2026-11-03**: inside the Settings presentation
+context, badges and tag chips use a compact full pill: 16px height in LTR,
+18px in RTL, 11/12px `text-badge`, reduced horizontal padding and no uppercase
+tracking. This reduces their former visual area by about half while preserving
+readability. Semantic tone pairs and user-saved tag colors are preserved.
+The context follows portals; ordinary workspace badges retain the sizes below.
+
 Updated **2026-10-26** ([crm-leads-v3.md](specs/crm-leads-v3.md)).
 
 ```ts
 tone: "brand" | "positive" | "caution" | "negative" | "neutral"
-size?: "default" | "sm" // default "default"
+size?: "default" | "sm" | "compact" // default "default"
 ```
 
 Five tones — the four outcome roles plus neutral (`*-subtle` semantic pairs).
@@ -262,6 +269,7 @@ the thing you are labelling is a category, not a state, and it takes `neutral`.
 
 - `size="default"` (default): `rounded-sm px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide` (`rtl:normal-case rtl:tracking-normal`), preserving every existing caller.
 - `size="sm"`: `h-6` (24px), `rounded-md` (6px), `px-2`, `text-badge` (11px), `font-semibold`, never uppercase.
+- `size="compact"`: `h-4` (16px), `rounded-sm`, `px-1`, `text-badge` and `leading-none`, used by compact CRM tag rows.
 
 ## Avatar
 
@@ -324,10 +332,23 @@ or an `aria-*` attribute handed to it reaches nothing. `SelectTrigger` is the
 only focusable element a select has, and it is what claims an enclosing `Field`
 — see [Field](#the-control-claims-the-field-the-field-does-not-push-at-the-control).
 
-For >20 options with search, that is a `Combobox` — **which does not exist
-yet**. Build it when first genuinely needed (`CountrySelect`'s 250 countries is
-the likely trigger) and add it to this table. Do not fake it with a `Select`
-plus a filter input.
+`SelectTrigger` and `SelectContent` accept `textSize="compact"` for matching
+`font-sans`, 400-weight, bilingual `text-caption` values and menu options.
+For searched remote directories use `Combobox`, forwarding its query to the
+existing endpoint.
+
+### NameSelect
+
+Source-reviewed **2026-11-03**. Company, branch and channel selectors backed by
+a complete loaded list use `NameSelect`: compact text and names only, with
+keyboard search above three options. Search matches labels; UUIDs remain exact
+option values. Descriptions/codes are omitted, the selected name stays visible
+while filtering, and missing names render the translated unavailable label.
+`TenantOrganizationSelect` supplies authorized Core company/branch names for
+the Trade scope controls, CRM create forms and audit branch filter.
+Remote Core filters retain their existing bounded-directory behavior and use
+the same compact text via `nameOnly` filter definitions; unresolved filter
+chips never substitute the UUID.
 
 ## Table
 
@@ -412,7 +433,7 @@ weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6 // "This week", and the grid's first co
 label: string
 backgroundColor?: string | null   // "#RRGGBB"
 textColor?: string | null         // "#RRGGBB" — used only as a pair
-size?: "sm" | "xs"                // card face · dense table cell
+size?: "sm" | "xs" | "compact"    // standard · dense · compact CRM tag rows
 children?: ReactNode              // trailing content, e.g. a remove control
 ```
 
@@ -424,7 +445,18 @@ in `title`. `TagChipOverflow` is the `+N` chip beside it: the visible count is
 a badge states a record's state. Colour rules:
 [tokens.md](tokens.md#tag-colours--a-pair-the-tenant-owns).
 
+CRM list tag rows use `compact`: 16px height, 4px horizontal padding and the
+11px `text-badge` token. This reduces their occupied area by about half from
+the previous 24px tags while retaining readable labels. The matching overflow
+chip uses the same size; status and acquisition-source badges retain `sm`.
+
 ### Combobox
+
+Source-reviewed **2026-11-03**: an unresolved selected value uses a loaded
+option's label or the placeholder, never the raw identifier. Compact mode uses
+the interface font and weight 400 for both trigger and options. `MultiSelect`
+also accepts compact text; unresolved chips retain their values internally and
+show the picker prompt rather than an identifier.
 
 Type-ahead over a **remote** list: the options are whatever the server last
 returned for the query, so filtering never happens in the browser and the

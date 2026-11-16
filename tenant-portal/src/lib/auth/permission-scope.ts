@@ -13,6 +13,7 @@ export interface PermissionTarget {
 interface PermissionSubject {
   permissions: readonly string[];
   permissionScopes?: Record<string, PermissionScope>;
+  accessibleBranchCompanies?: readonly { companyId: string; branchId: string }[];
 }
 
 // core-app/src/common/tenant-access/tenant-permission-resolver.ts
@@ -29,10 +30,19 @@ export function can(
   const scope = user.permissionScopes[key];
   if (!scope) return false;
   if (target.tenantWide || target.companyId === null) return scope.tenantWide;
+  if (!scope.tenantWide && target.branchId !== undefined) {
+    if (!scope.branchIds.includes(target.branchId)) return false;
+    if (target.companyId === undefined) return true;
+    // Branch profiles carry no COMPANY authority. The independent organization
+    // mapping verifies a branch's parent when both target IDs are supplied.
+    if (user.accessibleBranchCompanies) {
+      return user.accessibleBranchCompanies.some(row =>
+        row.branchId === target.branchId && row.companyId === target.companyId);
+    }
+    return scope.companyIds.includes(target.companyId);
+  }
   if (target.companyId !== undefined && !scope.tenantWide &&
     !scope.companyIds.includes(target.companyId)) return false;
-  if (target.branchId !== undefined && !scope.tenantWide &&
-    !scope.branchIds.includes(target.branchId)) return false;
   return scope.tenantWide || scope.companyIds.length > 0 || scope.branchIds.length > 0;
 }
 

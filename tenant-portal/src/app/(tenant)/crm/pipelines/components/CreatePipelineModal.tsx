@@ -1,26 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import {
   Field,
+  Button,
+  DegradedBanner,
   FormModal,
   FormSection,
   Input,
   Switch,
   Textarea,
-  type FormModalSection,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import {
   PIPELINE_CODE_MAX_LENGTH,
-  PIPELINE_CODE_PATTERN,
   PIPELINE_DESCRIPTION_MAX_LENGTH,
   PIPELINE_NAME_MAX_LENGTH,
-  validatePipelineStageSelection,
   type CreatePipelineInput,
   type OpportunityStageDefinition,
 } from "../pipeline-contract";
+import { useCreatePipelineForm } from "../hooks/useCreatePipelineForm";
 import { PipelineStagePickerSection } from "./create-pipeline/PipelineStagePickerSection";
 
 export interface CreatePipelineModalProps {
@@ -29,92 +28,35 @@ export interface CreatePipelineModalProps {
   onSubmit: (input: CreatePipelineInput) => void;
   isSubmitting: boolean;
   error?: string;
+  failureCode?: string;
+  uncertain?: boolean;
+  onReconcile?: () => void;
   /** The reusable stage catalogue. Empty while it loads or if it 403s. */
   stageCatalogue: OpportunityStageDefinition[];
   isLoadingCatalogue: boolean;
+  catalogueError?: boolean;
+  onReloadCatalogue?: () => void;
 }
 
-const EMPTY: CreatePipelineInput = {
-  code: "",
-  nameAr: "",
-  nameEn: "",
-  description: "",
-  isDefault: false,
-  stageIds: [],
-};
-
-/**
- * Creating a pipeline, on the whole viewport.
- *
- * The drawer this replaces had five fields and a sentence explaining that
- * stages had to be added somewhere else afterwards — which left every new
- * pipeline holding the canonical six until someone went and fixed it. The DTO
- * has accepted an ordered `stageIds` all along; what was missing was a surface
- * with room to show what the order means. See docs/design/patterns.md#formmodal.
- *
- * `code` is create-only (`UpdatePipelineDto` has none) and `isDefault` moves
- * through `PUT /:id/default` afterwards, so the edit drawer stays a different
- * form rather than this one in another mode.
- */
+// CreatePipelineDto supports ordered stageIds; keep that choice alongside
+// identity in the modal, with canonical six as the empty-selection default.
 export function CreatePipelineModal({
   open,
   onOpenChange,
   onSubmit,
   isSubmitting,
   error,
+  failureCode,
+  uncertain,
+  onReconcile,
   stageCatalogue,
   isLoadingCatalogue,
+  catalogueError,
+  onReloadCatalogue,
 }: CreatePipelineModalProps) {
   const { t } = useI18n();
-  const [form, setForm] = useState<CreatePipelineInput>(EMPTY);
-  const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
-  const [revealed, setRevealed] = useState(false);
-
-  const code = form.code.trim().toUpperCase();
-  const selected = form.stageIds
-    .map((id) => stageCatalogue.find((stage) => stage.id === id))
-    .filter((stage): stage is OpportunityStageDefinition => stage !== undefined);
-
-  const allErrors = useMemo(() => {
-    const errors: Record<string, string> = {};
-    if (code.length === 0) errors.code = t.crmShared.fieldRequired;
-    else if (!PIPELINE_CODE_PATTERN.test(code)) errors.code = t.crmPipelines.codeInvalid;
-    if (form.nameAr.trim().length === 0) errors.nameAr = t.crmPipelines.nameRequired;
-    if (form.nameEn.trim().length === 0) errors.nameEn = t.crmPipelines.nameRequired;
-    if (form.description.trim().length > PIPELINE_DESCRIPTION_MAX_LENGTH) {
-      errors.description = formatTemplate(t.crmShared.fieldMaxLength, {
-        max: PIPELINE_DESCRIPTION_MAX_LENGTH,
-      });
-    }
-    const problem = validatePipelineStageSelection(selected);
-    if (problem) errors.stages = t.crmPipelines.create.stageProblems[problem];
-    return errors;
-  }, [code, form.description, form.nameAr, form.nameEn, selected, t]);
-
-  const errors = revealed
-    ? allErrors
-    : Object.fromEntries(Object.entries(allErrors).filter(([path]) => touched.has(path)));
-
-  const touch = (path: string) =>
-    setTouched((current) => (current.has(path) ? current : new Set(current).add(path)));
-
-  const setField = <K extends keyof CreatePipelineInput>(
-    key: K,
-    value: CreatePipelineInput[K],
-  ) => setForm((current) => ({ ...current, [key]: value }));
-
-  const reset = () => {
-    setForm(EMPTY);
-    setTouched(new Set());
-    setRevealed(false);
-  };
-
-  const indexEntries: FormModalSection[] = [
-    { id: "identity", label: t.crmPipelines.create.sections.identity, invalid: Boolean(errors.code ?? errors.nameAr ?? errors.nameEn ?? errors.description) },
-    { id: "stages", label: t.crmPipelines.create.sections.stages, invalid: Boolean(errors.stages) },
-  ];
-
-  const errorCount = Object.keys(errors).length;
+  const state = useCreatePipelineForm(stageCatalogue, onSubmit, failureCode);
+  const { form, errors, setField, reset, errorCount } = state;
 
   return (
     <FormModal
@@ -124,15 +66,12 @@ export function CreatePipelineModal({
         onOpenChange(next);
       }}
       title={t.crmPipelines.createTitle}
-      isDirty={JSON.stringify(form) !== JSON.stringify(EMPTY)}
+      size="wide"
+      isDirty={state.isDirty}
       isSubmitting={isSubmitting}
-      onSubmit={() => {
-        setRevealed(true);
-        if (Object.keys(allErrors).length > 0) return;
-        onSubmit({ ...form, code });
-      }}
+      submitDisabled={uncertain}
+      onSubmit={state.submit}
       error={error}
-      sections={indexEntries}
       labels={{
         submit: t.common.create,
         cancel: t.common.cancel,
@@ -153,47 +92,48 @@ export function CreatePipelineModal({
       }
     >
       <FormSection id="identity" title={t.crmPipelines.create.sections.identity}>
-        <Field
+        <Field showLabel
           label={t.crmPipelines.codeLabel}
-          hint={t.crmPipelines.codeHint}
+          hint={t.crmPipelines.review.codeHint}
           error={errors.code}
           required
+          className="md:col-span-2"
         >
           <Input size="sm" placeholder={t.crmPipelines.codeLabel}
             value={form.code}
             maxLength={PIPELINE_CODE_MAX_LENGTH}
             autoComplete="off"
             dir="ltr"
-            className="font-mono"
+            className="max-w-xs font-mono"
             disabled={isSubmitting}
             onChange={(event) => setField("code", event.target.value)}
-            onBlur={() => touch("code")}
           />
         </Field>
 
-        <Field label={t.crmPipelines.nameAr} error={errors.nameAr} required>
+        <Field showLabel label={t.crmPipelines.nameAr} hint={t.crmPipelines.review.nameHint} error={errors.nameAr} required>
           <Input size="sm" placeholder={t.crmPipelines.nameAr}
             value={form.nameAr}
             maxLength={PIPELINE_NAME_MAX_LENGTH}
+            dir="rtl"
             disabled={isSubmitting}
             onChange={(event) => setField("nameAr", event.target.value)}
-            onBlur={() => touch("nameAr")}
           />
         </Field>
 
-        <Field label={t.crmPipelines.nameEn} error={errors.nameEn} required>
+        <Field showLabel label={t.crmPipelines.nameEn} hint={t.crmPipelines.review.nameHint} error={errors.nameEn} required>
           <Input size="sm" placeholder={t.crmPipelines.nameEn}
             value={form.nameEn}
             maxLength={PIPELINE_NAME_MAX_LENGTH}
+            dir="ltr"
             disabled={isSubmitting}
             onChange={(event) => setField("nameEn", event.target.value)}
-            onBlur={() => touch("nameEn")}
           />
         </Field>
 
-        <Field
+        <Field showLabel
           label={t.crmPipelines.description}
           error={errors.description}
+          hint={t.crmPipelines.review.descriptionHint}
           className="md:col-span-2 max-w-prose"
         >
           <Textarea placeholder={t.crmPipelines.description}
@@ -202,7 +142,6 @@ export function CreatePipelineModal({
             maxLength={PIPELINE_DESCRIPTION_MAX_LENGTH}
             disabled={isSubmitting}
             onChange={(event) => setField("description", event.target.value)}
-            onBlur={() => touch("description")}
           />
         </Field>
 
@@ -220,6 +159,12 @@ export function CreatePipelineModal({
         </div>
       </FormSection>
 
+      {uncertain && <div className="space-y-2"><DegradedBanner message={t.crmPipelines.review.uncertainWrite} />
+        {onReconcile && <Button variant="outline" onClick={onReconcile}>{t.crmPipelines.review.checkCurrent}</Button>}
+      </div>}
+      {catalogueError && <div className="space-y-2"><DegradedBanner message={t.crmPipelines.review.createCatalogueUnavailable} />
+        {onReloadCatalogue && <Button variant="outline" onClick={onReloadCatalogue} disabled={isLoadingCatalogue}>{t.common.retry}</Button>}
+      </div>}
       <PipelineStagePickerSection
         catalogue={stageCatalogue}
         selectedIds={form.stageIds}
@@ -227,7 +172,6 @@ export function CreatePipelineModal({
         isLoading={isLoadingCatalogue}
         onChange={(stageIds) => {
           setField("stageIds", stageIds);
-          touch("stages");
         }}
       />
     </FormModal>

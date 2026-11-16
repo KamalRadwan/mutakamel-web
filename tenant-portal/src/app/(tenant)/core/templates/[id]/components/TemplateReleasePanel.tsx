@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CircleAlert, CircleCheck, CircleDashed, Play, Upload } from "lucide-react";
+import { CircleAlert, CircleCheck, CircleDashed, Play, RefreshCw, Upload } from "lucide-react";
 import { Badge, Button, DetailSection, Field, IdentifierText, Input } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
@@ -31,6 +31,7 @@ export function TemplateReleasePanel({
   const { t } = useI18n();
   const copy = t.coreOperations.templates;
   const [changeNote, setChangeNote] = useState("");
+  const ValidationActionIcon = release.validationNeedsReload ? RefreshCw : Play;
 
   const preconditions = [
     {
@@ -75,11 +76,11 @@ export function TemplateReleasePanel({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void release.validate()}
+            onClick={release.validationNeedsReload ? release.reloadValidationDraft : () => void release.validate()}
             loading={release.isValidating}
           >
-            <Play className="size-4" aria-hidden="true" />
-            {copy.validate}
+            <ValidationActionIcon className="size-4" aria-hidden="true" />
+            {release.validationNeedsReload ? copy.conflictReload : copy.validate}
           </Button>
         ) : null
       }
@@ -137,7 +138,7 @@ export function TemplateReleasePanel({
               {copy.publish}
             </Button>
             {!release.canPublish ? (
-              <Badge tone="caution">{copy.publishBlocked}</Badge>
+              <Badge tone="caution" role="status">{release.hasUnsavedTyping ? copy.publishUnsavedTyping : copy.publishBlocked}</Badge>
             ) : null}
           </span>
         </div>

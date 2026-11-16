@@ -43,6 +43,7 @@ export function useControlTower() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (!canRead || signal?.aborted) return;
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -54,27 +55,44 @@ export function useControlTower() {
             maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
           },
         );
+        if (signal?.aborted) return;
         const parsed = parseControlTowerExceptionsResponse(response.data);
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
       } catch (error) {
+        if (signal?.aborted) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
+        setItems([]);
+        setTotal(0);
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, status, severity, category, scope.headers],
+    [canRead, page, status, severity, category, scope.headers],
   );
 
   useEffect(() => {
+    // Queue the scope reset before the load effect so old branch rows cannot
+    // remain visible while the replacement request is pending or fails.
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setItems([]);
+      setTotal(0);
+    });
+    return () => { cancelled = true; };
+  }, [scope.headers]);
+
+  useEffect(() => {
+    if (!canRead) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) void load(controller.signal);
     });
     return () => controller.abort();
-  }, [load]);
+  }, [canRead, load]);
 
   return {
     t,

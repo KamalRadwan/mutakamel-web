@@ -42,7 +42,7 @@ const corporate = {
 
 const individual = {
   ...corporate, leadProfileType: "INDIVIDUAL", displayName: "Mona Hassan", firstName: "Mona", lastName: "Hassan",
-  honorificTitle: "Dr", email: "mona@example.test", phones: ["+20105551234"], primaryMobile: "+20105551234", contacts: [],
+  honorificTitle: "Dr", jobTitle: "Consultant", email: "mona@example.test", phones: ["+20105551234"], primaryMobile: "+20105551234", contacts: [],
 } as LeadDetail;
 
 function renderCard(lead = corporate, canEdit = true) {
@@ -125,8 +125,18 @@ describe("LeadContactsCard", () => {
     expect(modal.getByText(en.crmLeadDetail.contactIdentityPermission)).toBeTruthy();
     expect(modal.getByRole("button", { name: en.crmLeadConvert.contactJobTitle })).toBeTruthy();
     expect(modal.getByLabelText<HTMLSelectElement>(en.crmLeadDetail.honorificTitle).tagName).toBe("SELECT");
-    expect(modal.getByLabelText<HTMLInputElement>(en.crmLeadDetail.fullName).value).toBe("Dina Ali");
-    expect(modal.getByLabelText(en.crmLeadDetail.fullName)).toHaveAttribute("readonly");
+    expect(modal.queryByLabelText(en.crmLeadDetail.fullName)).toBeNull();
+    expect(modal.getByLabelText<HTMLInputElement>(en.crmLeadDetail.firstName).value).toBe("Dina");
+    expect(modal.getByLabelText(en.crmLeadDetail.firstName)).toHaveAttribute("readonly");
+    expect(Array.from(screen.getByRole("dialog").querySelectorAll("dt"), (label) => label.textContent)).toEqual([
+      en.crmLeads.phone, en.crmLeadDetail.honorificTitle, en.crmLeadDetail.firstName,
+      en.crmLeadDetail.lastName, en.crmLeads.email, en.crmLeadConvert.contactJobTitle,
+      en.crmLeadDetail.primaryContact,
+    ]);
+    expect(modal.getByLabelText(en.crmLeadDetail.honorificTitle).closest("dl"))
+      .toHaveClass("sm:grid-cols-6");
+    expect(modal.getByLabelText(en.crmLeadDetail.honorificTitle).closest("dd")?.parentElement)
+      .toHaveClass("sm:col-span-2");
     expect(modal.queryByDisplayValue("Omar Adel")).toBeNull();
     expect(modal.queryByText("company@acme.test")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
@@ -138,8 +148,16 @@ describe("LeadContactsCard", () => {
   it("opens supported individual fields together and restores persisted values on cancel", () => {
     renderCard(individual);
     expect(screen.getByText("Mona Hassan")).toBeTruthy();
+    expect(screen.getByText("Consultant")).toBeTruthy();
     openEditor("Mona Hassan");
-    expect(screen.getByLabelText<HTMLInputElement>(en.crmLeads.name).value).toBe("Mona Hassan");
+    expect(screen.queryByLabelText(en.crmLeads.name)).toBeNull();
+    expect(screen.queryByText(en.crmCustomerProfiles.type)).toBeNull();
+    expect(screen.getByLabelText(en.crmLeadConvert.contactJobTitle)).toHaveValue("Consultant");
+    expect(screen.getByLabelText(en.crmLeadConvert.contactJobTitle)).toHaveAttribute("maxlength", "120");
+    expect(Array.from(screen.getByRole("dialog").querySelectorAll("dt"), (label) => label.textContent)).toEqual([
+      en.crmLeads.phone, en.crmLeadDetail.honorificTitle, en.crmLeadDetail.firstName,
+      en.crmLeadDetail.lastName, en.crmLeads.email, en.crmLeadConvert.contactJobTitle,
+    ]);
     expect(screen.getByLabelText<HTMLInputElement>(en.crmLeadDetail.firstName).value).toBe("Mona");
     expect(screen.getByLabelText<HTMLInputElement>(en.crmLeadDetail.lastName).value).toBe("Hassan");
     expect(screen.getByLabelText<HTMLInputElement>(en.crmLeadDetail.honorificTitle).value).toBe("Dr");
@@ -193,7 +211,10 @@ describe("LeadContactsCard", () => {
   it("adds a contact using fullName while retaining the linked people", async () => {
     renderCard();
     fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.addContact }));
-    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.fullName), { target: { value: "Mona Hassan" } });
+    expect(screen.queryByLabelText(en.crmLeadDetail.fullName)).toBeNull();
+    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.firstName), { target: { value: "Mona" } });
+    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.lastName), { target: { value: "Hassan" } });
+    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.honorificTitle), { target: { value: "Dr" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: en.common.save })); });
     const body = vi.mocked(runIdempotentWrite).mock.calls[0][0].body as { contacts: Record<string, unknown>[] };
     expect(Object.keys(body).sort()).toEqual(["contacts", "expectedUpdatedAt"]);
@@ -209,7 +230,7 @@ describe("LeadContactsCard", () => {
     vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } });
     renderCard();
     fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.addContact }));
-    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.fullName), { target: { value: "Mona" } });
+    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.firstName), { target: { value: "Mona" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: en.common.save })); });
     expect(screen.getByText(en.crmLeadDetail.contactReloadRequired)).toBeTruthy();
     expect(screen.getByRole("button", { name: en.crmLeads.create.addContact })).toBeDisabled();

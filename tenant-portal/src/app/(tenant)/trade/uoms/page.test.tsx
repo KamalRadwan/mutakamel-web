@@ -143,8 +143,11 @@ describe("TradeUomsPage", () => {
 
   it("renders KPI strip, 9-category filter pills, and full-width directory table", () => {
     mockUseUoms.mockReturnValue(buildHookState());
-    renderPage();
+    const { container } = renderPage();
 
+    expect(container.querySelector("dl")?.children).toHaveLength(4);
+    expect(screen.getAllByTestId("trade-scope-bar")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: ar.trade.uomCreate })).toHaveLength(1);
     expect(screen.getByText(ar.trade.uomKpiTotalTitle)).toBeInTheDocument();
     expect(screen.getByText(ar.trade.uomKpiActiveTitle)).toBeInTheDocument();
     expect(screen.queryByText(ar.trade.uomInspectorTitle)).not.toBeInTheDocument();

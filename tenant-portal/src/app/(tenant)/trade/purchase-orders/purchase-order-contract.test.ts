@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   PURCHASE_ORDER_REASON_REQUIRED,
+  PURCHASE_ORDER_PERMISSIONS,
+  canRetryPurchaseOrderDelivery,
   parsePurchaseOrder,
   parsePurchaseOrderDetail,
   purchaseOrderLadder,
@@ -55,6 +57,41 @@ const raw = {
 const everything = () => true;
 
 describe("purchase-order delivery evidence", () => {
+  const failed = parsePurchaseOrderDetail({
+    ...raw, lifecycleStatus: "CONFIRMED",
+    delivery: { status: "FAILED", attemptCount: 1,
+      lastErrorCode: "TRADE.PURCHASE_ORDER.DELIVERY_EMAIL_NOT_FOUND" },
+  });
+
+  it("allows a confirmed failed delivery with the confirmation grant", () => {
+    const canWrite = (permission: string) => permission === PURCHASE_ORDER_PERMISSIONS.confirm;
+    expect(canRetryPurchaseOrderDelivery(failed, canWrite)).toBe(true);
+    expect(canRetryPurchaseOrderDelivery(failed, () => false)).toBe(false);
+    expect(canRetryPurchaseOrderDelivery({ ...failed, delivery: {
+      ...failed.delivery!, lastErrorCode: null,
+    } }, canWrite)).toBe(true);
+  });
+
+  it.each(["DRAFT", "CANCELLED"])("hides retry for %s orders", (lifecycleStatus) => {
+    expect(canRetryPurchaseOrderDelivery({ ...failed, lifecycleStatus }, everything)).toBe(false);
+  });
+
+  it.each(["PDF_REQUESTED", "EMAIL_REQUESTED", "COMPLETED"] as const)(
+    "hides retry for the latest %s delivery", (status) => {
+      expect(canRetryPurchaseOrderDelivery({ ...failed, delivery: {
+        ...failed.delivery!, status,
+      } }, everything)).toBe(false);
+    },
+  );
+
+  it("hides retry without delivery evidence or with an ambiguous provider result", () => {
+    expect(canRetryPurchaseOrderDelivery({ ...failed, delivery: null }, everything)).toBe(false);
+    expect(canRetryPurchaseOrderDelivery({ ...failed, delivery: undefined }, everything)).toBe(false);
+    expect(canRetryPurchaseOrderDelivery({ ...failed, delivery: {
+      ...failed.delivery!, lastErrorCode: "TRADE.PURCHASE_ORDER.DELIVERY_EMAIL_FAILED",
+    } }, everything)).toBe(false);
+  });
+
   it("parses nullable evidence and rejects malformed delivery stages", () => {
     expect(parsePurchaseOrderDetail({ ...raw, delivery: null }).delivery).toBeNull();
     const delivery = { status: "EMAIL_REQUESTED", attemptCount: 2,

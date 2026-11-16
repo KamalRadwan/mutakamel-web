@@ -46,6 +46,7 @@ export interface MultiSelectProps extends ControlSizeProps {
    */
   ariaLabel?: string;
   className?: string;
+  textSize?: "default" | "compact";
   /** Callback when user chooses to create an option for the current search query */
   onCreate?: (query: string) => void;
   /** Template or string for the create option in the list. e.g. "Create tag \"{name}\"" */
@@ -98,6 +99,7 @@ export function MultiSelect({
   onBlur,
   id,
   ariaLabel,
+  textSize = "default",
   size = "sm",
   className,
   onCreate,
@@ -117,7 +119,7 @@ export function MultiSelect({
   const editable = !disabled && !isReadOnly;
 
   const selected = values.map(
-    (value) => options.find((option) => option.value === value) ?? { value, label: value },
+    (value) => options.find((option) => option.value === value) ?? { value, label: placeholder },
   );
   const visible = selected.slice(0, maxVisible);
   const overflow = selected.slice(maxVisible);
@@ -265,7 +267,7 @@ export function MultiSelect({
       );
     }
     return (
-      <Badge key={option.value} tone="neutral" className="max-w-40 gap-0.5 pe-0.5">
+      <Badge key={option.value} tone="neutral" className={cn("max-w-40 gap-0.5 pe-0.5", textSize === "compact" && "font-sans text-caption font-normal normal-case")}>
         <bdi dir="auto" className="truncate">{option.label}</bdi>
         {remove}
       </Badge>
@@ -351,6 +353,7 @@ export function MultiSelect({
               "min-w-24 flex-1 cursor-pointer justify-between gap-1.5 bg-transparent font-normal",
               "h-auto min-h-0 p-0 hover:bg-transparent shadow-none border-none",
               sizeConfig.text,
+              textSize === "compact" && "font-sans font-normal text-caption",
               isReadOnly && "cursor-default",
             )}
           >
@@ -403,6 +406,7 @@ export function MultiSelect({
                 onClick={() => toggleOption(option)}
                 className={cn(
                   "flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm hover:bg-accent",
+                  textSize === "compact" && "font-sans font-normal text-caption",
                   focusRing,
                   option.disabled && "pointer-events-none opacity-50",
                 )}

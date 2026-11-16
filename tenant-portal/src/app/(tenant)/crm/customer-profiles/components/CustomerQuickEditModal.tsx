@@ -54,6 +54,7 @@ import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSo
 import { useCrmCustomFieldValues } from "../../shared/hooks/useCrmCustomFieldValues";
 import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { useCrmRecordCapabilities } from "../../shared/hooks/useCrmRecordCapabilities";
+import { safeWebsiteHref } from "../../shared/safe-website-href";
 import {
   CRM_TAGS_PATH,
   parseCrmTagCatalogue,
@@ -292,6 +293,7 @@ export function CustomerQuickEditModal({
   const [taxNumberDraft, setTaxNumberDraft] = useState("");
   const [crNumberDraft, setCrNumberDraft] = useState("");
   const [websiteDraft, setWebsiteDraft] = useState("");
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [phonesDraft, setPhonesDraft] = useState<string[]>([""]);
 
   // Individual identity draft state
@@ -312,6 +314,7 @@ export function CustomerQuickEditModal({
   // Tie readiness to this row so switching customers cannot reuse the previous detail.
   const fallbackDetail =
     detailLoad?.itemId === itemId && detailLoad?.status === "ready" ? detail : null;
+  const websiteHref = safeWebsiteHref(fallbackDetail?.companyWebsite);
   const effectiveBranchId = fallbackDetail?.branchId || item?.branchId || null;
   const attached = useCrmRecordCapabilities(effectiveBranchId);
   const relatedCounts = useCustomerProfileRelatedCounts(
@@ -448,6 +451,7 @@ export function CustomerQuickEditModal({
   const startIdentityEdit = useCallback(() => {
     if (!fallbackDetail || !editable) return;
     setSectionError(null);
+    setWebsiteError(null);
     setCompanyNameDraft(
       fallbackDetail.companyName || fallbackDetail.displayName || "",
     );
@@ -468,7 +472,11 @@ export function CustomerQuickEditModal({
     setPhonesDraft(existingPhones);
 
     const primaryContact = fallbackDetail.contacts[0];
-    setHonorificDraft(primaryContact?.honorificTitle ?? "");
+    setHonorificDraft(
+      fallbackDetail.profileType === "INDIVIDUAL"
+        ? fallbackDetail.honorificTitle ?? ""
+        : primaryContact?.honorificTitle ?? "",
+    );
     setFirstNameDraft(
       primaryContact?.firstName ??
         fallbackDetail.displayName.split(" ")[0] ??
@@ -540,6 +548,9 @@ export function CustomerQuickEditModal({
         );
         return false;
       }
+      const invalidWebsite = websiteDraft.trim() && !safeWebsiteHref(websiteDraft);
+      setWebsiteError(invalidWebsite ? t.crmShared.fieldUrl : null);
+      if (invalidWebsite) return false;
       body.displayName = companyNameDraft.trim();
       body.companyName = companyNameDraft.trim();
       body.taxNumber = taxNumberDraft.trim();
@@ -631,6 +642,7 @@ export function CustomerQuickEditModal({
     patchCustomerProfile,
     t.crmCustomerProfiles.ui.quickEdit.company_name_is_required,
     t.crmCustomerProfiles.ui.quickEdit.first_name_display_name_is_required,
+    t.crmShared.fieldUrl,
   ]);
 
   // Save Card 2 (Account Details, Ownership & Custom Fields)
@@ -1511,20 +1523,16 @@ export function CustomerQuickEditModal({
                             Company Website
                           </div>
                           <div className="dossier-field-val">
-                            {fallbackDetail.companyWebsite ? (
+                            {websiteHref ? (
                               <a
-                                href={
-                                  fallbackDetail.companyWebsite.startsWith(
-                                    "http",
-                                  )
-                                    ? fallbackDetail.companyWebsite
-                                    : `https://${fallbackDetail.companyWebsite}`
-                                }
+                                href={websiteHref}
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
                                 🌐 {fallbackDetail.companyWebsite} ↗
                               </a>
+                            ) : fallbackDetail.companyWebsite ? (
+                              <span dir="ltr">{fallbackDetail.companyWebsite}</span>
                             ) : (
                               <span className="muted">—</span>
                             )}
@@ -1699,9 +1707,19 @@ export function CustomerQuickEditModal({
                           <input
                             id="corp-website"
                             className="dossier-input"
+                            aria-invalid={Boolean(websiteError)}
+                            aria-describedby={websiteError ? "corp-website-error" : undefined}
                             value={websiteDraft}
-                            onChange={(e) => setWebsiteDraft(e.target.value)}
+                            onChange={(e) => {
+                              setWebsiteDraft(e.target.value);
+                              setWebsiteError(null);
+                            }}
                           />
+                          {websiteError && (
+                            <p id="corp-website-error" className="text-sm text-destructive" role="alert">
+                              {websiteError}
+                            </p>
+                          )}
                         </div>
                       </div>
 

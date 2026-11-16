@@ -4,6 +4,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
+import { useTenantOrganizationOptions } from "@/hooks/useTenantOrganizationOptions";
 import { applicationAccessSchemas } from "../application-access-contract";
 
 export function useApplicationAccessScopes() {
@@ -15,6 +16,8 @@ export function useApplicationAccessScopes() {
     permission === "applications.activation.read" || permission === "applications.activation.manage"));
   const companies = [...new Set(user?.accessibleCompanies ?? [])].filter((id) => applicationAccessSchemas.uuid.safeParse(id).success);
   const branches = [...new Set(user?.accessibleBranches ?? [])].filter((id) => applicationAccessSchemas.uuid.safeParse(id).success);
+  const companyOptions = useTenantOrganizationOptions("company", allowed ? companies : []);
+  const branchOptions = useTenantOrganizationOptions("branch", allowed ? branches : []);
   const open = useCallback((value: string) => {
     if (!allowed) return;
     const [scope, id, extra] = value.split(":");
@@ -22,5 +25,5 @@ export function useApplicationAccessScopes() {
       || (scope === "companies" ? !user?.accessibleCompanies.includes(id) : scope === "branches" ? !user?.accessibleBranches.includes(id) : true)) return;
     startTransition(() => router.push(`/core/application-access/${scope}/${id}`));
   }, [allowed, router, user]);
-  return { t, allowed, companies, branches, open, pending };
+  return { t, allowed, companies, branches, companyOptions, branchOptions, open, pending };
 }

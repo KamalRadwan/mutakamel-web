@@ -31,6 +31,7 @@ only when no pattern fits.
 | `Pagination` | `pagination/` | Page controls |
 | `KpiBadge` | `kpi/` | Compact 24px toggleable KPI filter badge with tone count chip |
 | `StatCard` | `kpi/` | A single metric tile |
+| `SummaryStrip` | `kpi/` | Compact horizontal metric tiles with icons, localized counts and accessible descriptions |
 | `UnavailableState` | `unavailable-state/` | The sealed-route boundary — a capability that is genuinely not built yet |
 | `ConflictDialog` | `conflict-dialog/` | The 409 / 412 / 428 resolution surface |
 | `AmbiguousOutcomePanel` | `ambiguous-outcome/` | A write that may or may not have applied, with its idempotency key |
@@ -41,7 +42,8 @@ only when no pattern fits.
 | `ReadOnlyGate` | `access-mode/` | FULL / READ_ONLY / DUNNING / BLOCKED as an in-body boundary |
 | `DetailHeader` | `detail-header/` | The detail-screen header. **Composes `PageHeader`** |
 | `DetailSection` | `detail-section/` | A labelled field group for read-mostly detail bodies |
-| `Timeline` | `timeline/` | Audit history, stage history, delivery attempts, approval ladders |
+| `HistorySection` · `HistoryTree` · `HistoryDiffList` | `history-tree/` | Canonical 3-level record history, audit diffs, and document revisions |
+| `Timeline` | `timeline/` | Operational delivery attempts, webhook retries, and technical lifecycle streams |
 | `PersonProfileLink` | `person-profile/` | A name opens a reusable contact card: photo, full name, phone, email |
 | `AttachmentList` | `attachment-list/` | Stored attachments plus the upload affordance |
 | `ActivityList` | `activity-list/` | Reusable activity cards: a row can open its activity, and each row's actions are gated per row |
@@ -137,6 +139,9 @@ interface DataTableProps<T> {
   onRetry?: () => void;
   page: PageInfo;                    // server pagination
   onPageChange: (page: number) => void;
+  pageSizeOptions?: readonly number[]; // opt-in server page-size choices
+  onPageSizeChange?: (size: number) => void;
+  hideFirstLast?: boolean;            // default false
   sort?: SortState;
   onSortChange?: (sort: SortState) => void;
   rowKey: (row: T) => string;
@@ -145,6 +150,7 @@ interface DataTableProps<T> {
   emptyState?: React.ReactNode;
   rowReorder?: RowReorderState<T>;    // opt-in row drag + earlier/later
   density?: "default" | "compact";    // per-screen spacing override
+  surface?: "default" | "embedded";  // containing Card owns the frame
 }
 
 interface ColumnDef<T> {
@@ -185,6 +191,14 @@ Owns, so no screen re-implements them:
   header to 32px, the row minimum to 36px and cell padding. It is opt-in so one
   dense operational table does not silently resize every table in the portal.
 - Empty, error and forbidden states rendered in-body
+- **Opt-in rows-per-page and First/Last omission (2026-11-02):** `Pagination`
+  and `DataTable` preserve First/Last boundary buttons and render no page-size
+  selector by default. Callers opt in with `pageSizeOptions`, `onPageSizeChange`
+  and `labels.rowsPerPage` (`labels.pagination.rowsPerPage`, falling back to
+  `t.common.rowsPerPage`), and may set `hideFirstLast` (`false` by default).
+  `/core/settings/currencies` and `/core/settings/taxes` opt into `[20, 50, 100]`
+  and `hideFirstLast`, resetting `page` to `1` on selection while preserving
+  server filters, search and sort.
 - **Empty-page recovery (2026-10-17):** Empty results keep pagination when
   `page` and `onPageChange` are supplied, including a custom empty state, so
   records on earlier pages stay reachable after a mutation. Currency lists
@@ -279,6 +293,8 @@ interface FilterBarProps {
   onSearchChange: (q: string) => void;
   hideSearch?: boolean;                         // default false
   maxVisibleChips?: number;                      // default 6
+  placement?: "action-bar" | "inline";          // default action-bar
+  trailing?: React.ReactNode;                    // e.g. DataTableSort
 }
 ```
 
@@ -309,6 +325,13 @@ interface FilterBarProps {
   is a count rather than the row count that wording originally specified.
 - Filters that map to an enum build their options from
   [../reference/enums.md](../reference/enums.md) with `t.status.*` labels.
+- Organization, Users and Roles use `placement="inline"` inside their results
+  card. All filters remain visible and wrap with the available width.
+  Select filters can supply `allLabel`, a reset option whose internal sentinel
+  is removed before filter state reaches the caller. `DataTableSort` uses the table's declared sortable fields and server
+  sort handler, including `sortField` aliases. Pair the card with
+  `DataTable surface="embedded"` to avoid duplicate frames. Other workspaces
+  retain the default action bar placement.
 - Filter controls open from a "Filters" popover button (with an active count
   badge) beside the search box in `PageActions slot="search"`.
 
@@ -359,6 +382,14 @@ trigger.
 
 ## PageHeader
 
+CRM Settings refinement, **2026-11-03**: the eleven Settings destinations use
+the shell's Settings presentation context. Their page title remains an
+accessible `sr-only` h1; the visible title, description and duplicate breadcrumb
+intro are omitted. Back controls and actions remain in the action bar. The
+context adds no DOM wrapper and reaches dialogs/portals. Other workspaces keep
+their existing page intros. Settings tables use the compact 36px row minimum,
+existing `text-xs` tokens and tighter cell padding; multi-line values can grow.
+
 ```ts
 interface PageHeaderProps {
   title: string;
@@ -387,6 +418,12 @@ Doing it here is what moved 78 screens' actions without editing any of them,
 and it keeps the one-filled-action ceiling structural — the bar can host the
 button but cannot create a `primary` action of its own. The `<h1>` stays on the page. See
 [shell.md](../design/shell.md#it-holds-the-screens-controls).
+
+Organization, Companies, Branches, Departments, Teams, Users and Roles keep
+their `PageHeader` title accessible with `className="sr-only p-0"`. At the
+user's request (2026-11-01), their body descriptions and repeated identity
+subnavigation are removed, and their content starts with zero extra top
+padding. Their actions still render in the shell bar through `PageHeader`.
 
 ## DetailHeader
 
@@ -481,40 +518,55 @@ for step position.
 It never sorts. "Newest first" and "oldest first" are both correct depending on
 whether the reader is auditing or following a process, so the caller decides.
 
-### Entity-history changes
+### Entity-history changes (`HistorySection` & `RecordHistoryTab`)
 
-`EntityHistoryCard` is the shared per-record audit presentation, including the
-History card on `/crm/leads/[id]`. Keep its diff deliberately compact and do not
-redesign it as a nested list of cards:
+Verified **2026-10-29**.
+
+`HistorySection`, `HistoryTree`, and `HistoryDiffList` from `@/design-system`
+(`src/design-system/patterns/history-tree/`), connected to the Audit API through
+`RecordHistoryTab` (`src/components/audit/RecordHistoryTab.tsx`), form the
+**single reusable History template** across Core, CRM, and Trade (standalone
+detail tabs, 31 `RecordHistoryLayout` routes, CRM Quick-Edit modals,
+`AuditEventDetail`, and `QuotationRevisionsPanel`). Never hand-roll a separate
+history card, stage-history list, or diff table in feature code:
 
 ```text
-Stage category: New > Contacted
+| Actor Name - Timestamp
+  | Action Title  [#Reference]
+    | ▸ Details of changes (N changes)
 ```
 
-- Do not render a `Changes` heading or visible `Old value` / `New value` labels.
-- The event header is `<actor> <timestamp>`. Do not show the action key/label
-  (`Stage changed`) and do not repeat the actor on a second line.
-- Each changed field is one plain wrapping line: `<field>: <old> > <new>`.
-- Related changes prefix the field with a direction-isolated subject label:
-  `<company/contact> · <field>: <old> > <new>`. Keep this on the same wrapping
-  line, with no extra card or action headline. Phone arrays display as a
-  comma-separated list, not JSON.
+- **Full `DetailSection` card frame everywhere:** `HistorySection` wraps the
+  tree in `DetailSection` with an `Expand all / Collapse all` header control and
+  an optional `ToggleGroup` category filter bar (`filters`).
+- **Level 1 (`Actor - Timestamp`):** Outcome-toned marker dot (`positive`,
+  `negative`, or `neutral`), actor `Avatar` initials, actor display name, and
+  all-digit day-first timestamp.
+- **Level 2 (`Action Title + #Ref`):** Indented rail (`border-s`) with a
+  contextual action icon + localized domain action headline (`Create Lead`,
+  `Add Quotation`, `Revision 2`, etc.) and an optional `<IdentifierText>`
+  reference badge (`#QT-2026-0018`, linked when an authorized route exists).
+- **Level 3 (`Collapsible Details of changes`):** Collapsed by default behind a
+  direction-aware chevron trigger (`rtl:-scale-x-100`) and change-count badge.
+  Expands to render `HistoryDiffList`.
+- **Canonical `HistoryDiffList` transitions:** Each changed field is one
+  wrapping row (`<field>: <old> > <new>`), with `<company/contact> · <field>:`
+  direction-isolated via `<bdi>` for related parties. Phone arrays display as a
+  comma-separated list, never JSON.
 - If historical evidence is missing, localize `Not recorded` for a missing
   value or `Change details were not recorded.` for an empty event. Never leave
-  the event body blank or manufacture its old values.
+  the expanded details body blank or manufacture old values.
 - The old value is struck through and uses `text-danger-600` in light mode and
   `dark:text-danger-300` in dark mode; the new value uses the normal foreground.
-  These are the existing accessible theme ramps, not a raw red value.
-- Do not render the audit correlation/reference identifier in this card.
+- Do not render the audit correlation identifier in the history card.
 - User references display the resolved name as a `PersonProfileLink`; both old
-  and new names open the corresponding person's card. Resolve through
-  `useUserProfiles` once per unique ID, not independently in every diff value.
+  and new names open the corresponding person's card via `useUserProfiles`.
 - Branch/company/department/team and acquisition source IDs resolve through
-  their authorized detail routes. Supplied `valueLabels` (including the Lead
-  stage catalogue) take precedence. Unresolved UUID values render the localized
-  unavailable marker, never the raw UUID.
-- Keep the comparison itself left-to-right inside an RTL page so old always
-  precedes new; each value still resolves its own text direction.
+  their authorized detail routes. Supplied `valueLabels` (including Lead and
+  Opportunity stage catalogues) take precedence. Unresolved UUID values render
+  the localized unavailable marker, never the raw UUID.
+- Keep the `before > after` comparison left-to-right (`dir="ltr"`) inside an RTL
+  page so old always precedes new; each value resolves its own `dir="auto"`.
 - Read the server's redacted `diff`. For legacy `LEAD_STAGE_CHANGED` rows whose
   diff is absent, only the known stage/status fields in metadata may be used as
   a compatibility fallback. Do not reconstruct arbitrary before/after objects.
@@ -958,6 +1010,12 @@ Other rules the wrappers own so no dashboard re-decides them:
   [theming.md](theming.md#third-party-physical-apis) describes for Radix.
 - **Numbers go through `Intl` with an explicit locale**, never the runtime
   default.
+- Cartesian charts accept `numberFormat` or an explicit `valueFormatter` for
+  consistent axis, tooltip and value-label formatting. `showPoints` enables
+  line/area markers; `showValues` enables numeric labels on Cartesian and
+  donut charts. Both default to false, so existing dense charts keep their
+  current presentation. Donut `valueFormatter` also formats its tooltip and
+  optional labels; the caller still supplies its formatted center value.
 - **`summary` is required, not optional.** An SVG chart is unreadable to a
   screen reader whatever ARIA is bolted onto it, so every chart states its
   numbers in words in a `<figcaption>`. A `Sparkline` carries the trend in its
@@ -1034,6 +1092,12 @@ behaviour from `useFormShell`, so the real `<form>`, the `noValidate` decision,
 the dirty guard on all four dismissal routes and the focus-the-first-invalid-field
 rule are one implementation, not two that drift.
 
+`size="permissions"` is an opt-in centered 1080×760px surface for the approved
+branch permission editor (2026-11-01). It fits within `94dvh` and 16px viewport
+insets, keeps the shared dirty guard and scrollable body, and uses a horizontal
+three-step flow supplied by its caller. This editor passes no `sections` or
+`asideSlot`. Existing card, wide and full consumers keep their geometry.
+
 `size` picks the surface. `full` — the
 default — is `DialogContent size="full"`, the viewport less 20px on every side.
 `card` is `DialogContent size="2xl"`: a centred 672px card, capped at `85dvh`
@@ -1072,7 +1136,10 @@ them, and it passes no `sections`. `FormModalLabels` still requires the two
 index strings — pass the shared `t.crmShared.formSectionsNav` and
 `t.crmShared.formSectionInvalid`, so the wording cannot drift from the
 full-size modals if the form later grows into one. An *edit* surface is outside
-this entirely: the rule is about create, and `EditDrawer` stays a drawer.
+this entirely: the rule is about create. Pipelines settings explicitly uses a
+centred `card` edit modal and `wide` creation modal (2026-11-04); see
+[the Pipelines specification](specs/crm-pipelines-settings.md). Other existing
+`EditDrawer` consumers retain their prescribed surface.
 
 What the extra width buys `full`, beyond room:
 
@@ -1417,6 +1484,17 @@ loading sets the parent's busy state. Pagination is rendered by the consumer
 outside the tree/group roles. Category uses this non-virtual pattern until real
 assistive-technology acceptance permits virtualization. See
 [Trade Categories](../api/trade-categories.md) for cache, reveal and request semantics.
+
+## Dossier forms (2026-11-04)
+
+`DossierFormSurface` presents the same form as a compact dialog or a full page.
+The feature owns the draft, validation and write attempt, so changing presentation
+does not reset values. `DossierFormCard` reuses the existing Dossier tone tokens,
+with 12px bodies and 8px vertical field gaps. Use visible labels and theme-aware
+tonal controls. `DossierFormStars` is a clearable three-star input; choices and
+stars support keyboard navigation in both directions. Mode and submit labels
+arrive as translated props. Full-page consumers also use the shared unsaved
+changes guard for navigation and refresh.
 
 ## Checklist for every pattern
 

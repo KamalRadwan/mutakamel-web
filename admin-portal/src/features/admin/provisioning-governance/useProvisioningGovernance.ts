@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import {
   normalizeApiError,
@@ -42,10 +42,7 @@ export function useProvisioningGovernance() {
   const authorizationOwnerRef = useRef(authorizationOwnerId);
   const canReadCatalogue = adminCan(user, "admin.tenants.read");
   const canReadDiscovery = adminCan(user, "admin.provisioning.discovery.read");
-  const canRunDiscovery = adminCanAll(user, [
-    "admin.provisioning.discovery.run",
-    "admin.provisioning.critical",
-  ]);
+  const canRunDiscovery = adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_DISCOVERY_RUN);
   const canReadFleet = adminCan(user, "admin.provisioning.rollouts.read");
   const canReadPublisherKeys = adminCan(
     user,

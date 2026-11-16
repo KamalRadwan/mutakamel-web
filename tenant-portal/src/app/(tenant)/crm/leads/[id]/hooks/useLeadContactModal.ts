@@ -91,7 +91,16 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
   };
   const setField = <K extends ContactModalField>(field: K, value: ContactModalForm[K]) => {
     if (field !== "jobTitle" && field !== "isPrimary" && !canEditIdentity) return;
-    change((current) => ({ ...current, [field]: value }));
+    change((current) => {
+      const next = { ...current, [field]: value };
+      if ((field === "firstName" || field === "lastName") && next.firstName.trim() && next.lastName.trim()) {
+        const previousName = [current.firstName.trim(), current.lastName.trim()].filter(Boolean).join(" ");
+        if (!current.displayName.trim() || current.displayName === previousName) {
+          next.displayName = [next.firstName.trim(), next.lastName.trim()].join(" ");
+        }
+      }
+      return next;
+    });
   };
   const setPhone = (index: number, value: string) => { if (canEditIdentity) change((current) => ({ ...current, phones: current.phones.map((phone, i) => i === index ? { ...phone, value } : phone) })); };
   const addPhone = () => { if (canEditIdentity) change((current) => current.phones.length < CONTACT_MODAL_LIMITS.methods ? { ...current, phones: [...current.phones, { id: null, methodType: "MOBILE", value: "", isPrimary: false }] } : current); };
@@ -112,7 +121,16 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
   };
   const changeNewContact = (update: (current: NewLeadContactDraft) => NewLeadContactDraft) => {
     if (!canAct || inFlight.current || !addingContact) return;
-    setNewContact(update); setNewContactErrors({}); setActionError(null);
+    setNewContact((current) => {
+      const next = update(current);
+      if ((next.firstName !== current.firstName || next.lastName !== current.lastName) && next.firstName.trim() && next.lastName.trim()) {
+        const previousName = [current.firstName.trim(), current.lastName.trim()].filter(Boolean).join(" ");
+        if (!current.displayName.trim() || current.displayName === previousName) {
+          next.displayName = [next.firstName.trim(), next.lastName.trim()].join(" ");
+        }
+      }
+      return next;
+    }); setNewContactErrors({}); setActionError(null);
   };
   const writeContacts = async (build: (fresh: LeadDetail) => UpdateLeadRequest) => {
     if (!canAct || inFlight.current) return;

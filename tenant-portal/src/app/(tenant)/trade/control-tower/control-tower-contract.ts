@@ -139,10 +139,13 @@ export function buildRetryExceptionRequest(reason: string): { reason?: string } 
  * object is legal, but omitting the key is a 400.
  */
 export function buildResolveExceptionRequest(
-  resolutionCode: ResolutionCode,
+  resolutionCode: string,
   reason: string,
   evidence: string,
 ): { resolutionCode: ResolutionCode; reason: string; evidence: Record<string, unknown> } {
+  if (!isMemberOf(resolutionCode, RESOLUTION_CODES)) {
+    throw new Error("CONTROL_TOWER_FORM_RESOLUTION_CODE");
+  }
   const trimmed = reason.trim();
   if (trimmed.length === 0 || trimmed.length > RESOLUTION_REASON_MAX_LENGTH) {
     throw new Error("CONTROL_TOWER_FORM_REASON");
@@ -275,6 +278,7 @@ export function controlTowerMessage(
 
 export function controlTowerFormMessage(error: unknown, t: Dictionary): string {
   const reason = error instanceof Error ? error.message : "";
+  if (reason === "CONTROL_TOWER_FORM_RESOLUTION_CODE") return t.tradeControlTower.formResolutionCodeInvalid;
   if (reason === "CONTROL_TOWER_FORM_REASON") return t.tradeControlTower.formReasonInvalid;
   if (reason === "CONTROL_TOWER_FORM_EVIDENCE") return t.tradeControlTower.formEvidenceInvalid;
   return t.tradeCommon.actionFailed;

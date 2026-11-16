@@ -1,215 +1,297 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useCan, useToast } from "@/design-system";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { describeApiOutcome, useCan, useToast } from "@/design-system";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantBranding } from "@/context/BrandingContext";
-import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { normalizeApiError } from "@/lib/api/errors";
 import { evaluateBrandColor } from "@/lib/branding/brand-ramp";
 import { PUBLIC_BRANDING_ICON_PATH, PUBLIC_BRANDING_LOGO_PATH } from "@/lib/branding/public-branding";
-import { generateUUIDv7 } from "@/lib/uuid";
+import { useCoreErrorText } from "../../../hooks/useCoreErrorText";
 import {
-  BRANDING_FILE_REQUIRED_CODE,
-  BRANDING_FILE_TOO_LARGE_CODE,
-  BRANDING_FILE_TYPE_UNSUPPORTED_CODE,
+  classifySettingsFailure,
+  isSettingsAbortError,
+  SettingsInvalidResponseError,
+  type SettingsReadFailure,
+} from "../../settings-failure";
+import {
   BRANDING_FORM_TEXT_ERROR,
   BRANDING_MANAGE_PERMISSION,
-  BRANDING_STORAGE_UNAVAILABLE_CODE,
   buildUpdateBrandingRequest,
   EMPTY_BRANDING,
   fetchBrandingSettings,
+  hasBrandingDraftEdits,
+  hasBrandingMetadataChanges,
+  mergeUploadedBranding,
   toBrandingForm,
   updateBrandingSettings,
-  uploadBrandingAsset,
   validateBrandingForm,
-  type BrandingAssetKind,
+  type BrandingDraftState,
   type BrandingFormValues,
   type BrandingSettings,
+  type UpdateBrandingRequest,
 } from "../branding-contract";
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
+import { useBrandingAssets } from "./useBrandingAssets";
+import { useBrandingFormFocus } from "./useBrandingFormFocus";
+import { useBrandingIntentFence } from "./useBrandingIntentFence";
 
 const EMPTY_FORM = toBrandingForm(EMPTY_BRANDING);
 
 export function useBranding() {
   const { t } = useI18n();
   const toast = useToast();
+  const describeCoreError = useCoreErrorText();
   const { updateBranding } = useTenantBranding();
-  const publishBranding = useCallback((saved: BrandingSettings) => {
-    updateBranding({
-      appName: saved.appName,
-      tabTitle: saved.tabTitle,
-      primaryColor: saved.primaryColor,
-      secondaryColor: saved.secondaryColor,
-      fontFamily: saved.fontFamily,
-      logoUrl: saved.hasLogo ? PUBLIC_BRANDING_LOGO_PATH : null,
-      iconUrl: saved.hasIcon ? PUBLIC_BRANDING_ICON_PATH : null,
-    });
-  }, [updateBranding]);
+  const publishBranding = useCallback(
+    (saved: BrandingSettings) => {
+      updateBranding({
+        appName: saved.appName, tabTitle: saved.tabTitle,
+        primaryColor: saved.primaryColor, secondaryColor: saved.secondaryColor,
+        fontFamily: saved.fontFamily,
+        logoUrl: saved.hasLogo ? PUBLIC_BRANDING_LOGO_PATH : null,
+        iconUrl: saved.hasIcon ? PUBLIC_BRANDING_ICON_PATH : null,
+      });
+    },
+    [updateBranding],
+  );
   const canManage = useCan(BRANDING_MANAGE_PERMISSION, { tenantWide: true });
+  const {
+    intentFence, latestIntentFenceRef, mountedRef, activeOperationRef, hasActiveCurrentOperation,
+  } = useBrandingIntentFence(canManage);
+  const {
+    setErrorSummaryNode, setAppNameNode, setTabTitleNode, setPrimaryColorNode,
+    setSecondaryColorNode, focusField, focusErrorSummary,
+  } = useBrandingFormFocus();
 
-  const [branding, setBranding] = useState<BrandingSettings | null>(null);
-  const [values, setValues] = useState<BrandingFormValues>(EMPTY_FORM);
-  const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [trackedFence, setTrackedFence] = useState(intentFence);
+  const [{ branding, baseline, values }, setDraft] = useState<BrandingDraftState>({
+    branding: null,
+    baseline: null,
+    values: EMPTY_FORM,
+  });
+  const [loadFailure, setLoadFailure] = useState<SettingsReadFailure | null>(null);
+  const error = loadFailure?.kind === "api" ? loadFailure.error : null;
+  const hasLoadError = loadFailure !== null;
+  const loadAbortRef = useRef<AbortController | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState<BrandingAssetKind | null>(null);
-  const [uploadError, setUploadError] = useState<Record<BrandingAssetKind, string | null>>({
-    logo: null,
-    icon: null,
-  });
-  /** Bumped after an upload so the 5-minute public asset cache is bypassed. */
-  const [assetVersion, setAssetVersion] = useState(0);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
+  if (trackedFence !== intentFence) {
+    setTrackedFence(intentFence);
+    setDraft({ branding: null, baseline: null, values: EMPTY_FORM });
+    setLoadFailure(null);
     setIsLoading(true);
-    setError(null);
+    setHasLoaded(false);
+    setIsSaving(false);
+    setSubmitAttempted(false);
+    setFormError(null);
+    setIsPreviewOpen(false);
+  }
+
+  const handleAssetSaved = useCallback(
+    (saved: BrandingSettings) => {
+      setDraft((current) => mergeUploadedBranding(current, saved));
+      publishBranding(saved);
+    },
+    [publishBranding],
+  );
+
+  const assets = useBrandingAssets({
+    intentFence, latestIntentFenceRef, mountedRef, activeOperationRef,
+    canManage, isLoading, isSaving, hasLoadError, onAssetSaved: handleAssetSaved,
+  });
+
+  const load = useCallback(async (): Promise<void> => {
+    loadAbortRef.current?.abort();
+    const startedFence = latestIntentFenceRef.current;
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    const isStaleLoad = () =>
+      !mountedRef.current || latestIntentFenceRef.current !== startedFence ||
+      controller.signal.aborted || loadAbortRef.current !== controller;
+
+    setIsLoading(true);
+    setLoadFailure(null);
+    setFormError(null);
+    setSubmitAttempted(false);
     try {
-      const result = await fetchBrandingSettings(signal);
-      if (signal?.aborted) return;
-      setBranding(result);
-      setValues(toBrandingForm(result));
+      const result = await fetchBrandingSettings(controller.signal);
+      if (isStaleLoad()) return;
+      setDraft({ branding: result, baseline: result, values: toBrandingForm(result) });
       setHasLoaded(true);
     } catch (caught) {
-      if (isAbortError(caught)) return;
-      setError(normalizeApiError(caught));
+      if (isSettingsAbortError(caught) || isStaleLoad()) return;
+      setLoadFailure(classifySettingsFailure(caught));
+      setDraft({ branding: null, baseline: null, values: EMPTY_FORM });
       setHasLoaded(true);
     } finally {
-      if (!signal?.aborted) setIsLoading(false);
+      if (!isStaleLoad()) setIsLoading(false);
     }
-  }, []);
+  }, [latestIntentFenceRef, mountedRef]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let disposed = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!disposed) void load();
     });
-    return () => controller.abort();
-  }, [load]);
+    return () => {
+      disposed = true;
+      loadAbortRef.current?.abort();
+    };
+  }, [intentFence, load]);
 
-  /**
-   * The runtime contrast guard (MASTER-PLAN 6.18), computed on what the owner
-   * has typed rather than on what is stored — so the refusal is visible before
-   * the colour is ever saved.
-   *
-   * `scripts/design/contrast.mjs` cannot cover this: it is a build-time Node
-   * pass over the static tokens, and from the moment branding overrides
-   * `--color-brand-*` at runtime it proves nothing about a real tenant.
-   */
   const contrast = useMemo(() => {
     const color = values.primaryColor.trim();
-    if (!color) return null;
-    return evaluateBrandColor(color);
+    return color ? evaluateBrandColor(color) : null;
   }, [values.primaryColor]);
 
   const fieldErrors = useMemo(() => {
     const errors: Partial<Record<keyof BrandingFormValues, string>> = {};
     for (const [field, code] of Object.entries(validateBrandingForm(values))) {
-      errors[field as keyof BrandingFormValues] = code === BRANDING_FORM_TEXT_ERROR
-        ? t.coreBilling.brandingTextTooLong
-        : t.coreBilling.brandingColorInvalid;
+      errors[field as keyof BrandingFormValues] =
+        code === BRANDING_FORM_TEXT_ERROR
+          ? t.coreBilling.brandingTextTooLong
+          : t.coreBilling.brandingColorInvalid;
     }
     return errors;
   }, [values, t]);
 
+  const isDenied = error?.status === 403;
+  const loadErrorDescription = useMemo(
+    () =>
+      loadFailure?.kind === "invalid-response"
+        ? t.coreSettings.invalidResponseDescription
+        : error && !isDenied
+          ? describeCoreError(error)
+          : undefined,
+    [describeCoreError, error, isDenied, loadFailure, t],
+  );
+  const isValid = Object.keys(fieldErrors).length === 0;
+  const isDirty = useMemo(
+    () => baseline !== null && hasBrandingMetadataChanges(values, baseline),
+    [baseline, values],
+  );
+  const hasDraftEdits = useMemo(
+    () => baseline !== null && hasBrandingDraftEdits(values, baseline),
+    [baseline, values],
+  );
+  const isBusy = isSaving || assets.uploading !== null;
+  const canSave = canManage && !isLoading && !isBusy && !hasLoadError && isDirty && isValid;
+  const canDiscard =
+    canManage && !isLoading && !isBusy && !hasLoadError && (hasDraftEdits || formError !== null);
+  const { isDiscardOpen, requestDiscard, confirmDiscard, cancelDiscard } =
+    useUnsavedChangesGuard(canManage && !hasLoadError && isDirty);
+
+  const setValue = useCallback((patch: Partial<BrandingFormValues>) => {
+    setDraft((current) => ({ ...current, values: { ...current.values, ...patch } }));
+    setFormError(null);
+  }, []);
+
+  const resetDraft = useCallback(() => {
+    if (!branding) return;
+    setDraft({ branding, baseline: branding, values: toBrandingForm(branding) });
+    setFormError(null);
+    setSubmitAttempted(false);
+  }, [branding]);
+
+  const discard = useCallback(() => {
+    if (!branding || hasActiveCurrentOperation() || isBusy || isLoading) return;
+    requestDiscard(resetDraft);
+  }, [branding, hasActiveCurrentOperation, isBusy, isLoading, requestDiscard, resetDraft]);
+
+  const handleConfirmDiscard = useCallback(() => {
+    if (hasActiveCurrentOperation() || isBusy) return;
+    confirmDiscard();
+  }, [confirmDiscard, hasActiveCurrentOperation, isBusy]);
+
+  const reload = useCallback(() => {
+    if (hasActiveCurrentOperation() || isBusy || isLoading) return;
+    requestDiscard(() => {
+      void load();
+    });
+  }, [hasActiveCurrentOperation, isBusy, isLoading, load, requestDiscard]);
+
   const save = useCallback(async (): Promise<void> => {
-    if (!canManage || isSaving || !branding || Object.keys(fieldErrors).length > 0) return;
+    const startedFence = latestIntentFenceRef.current;
+    if (!mountedRef.current || startedFence !== intentFence || hasActiveCurrentOperation() || !canSave || !baseline) {
+      return;
+    }
+    const request = buildUpdateBrandingRequest(values, baseline);
+    const editedFields = Object.keys(request) as (keyof UpdateBrandingRequest)[];
+    if (editedFields.length === 0) return;
+
+    const operationToken = Symbol("save");
+    activeOperationRef.current = { token: operationToken, kind: "save", intentFence: startedFence };
+    const isStaleIntent = () => !mountedRef.current || latestIntentFenceRef.current !== startedFence;
+
     setIsSaving(true);
     setFormError(null);
+    setSubmitAttempted(false);
     try {
-      const request = buildUpdateBrandingRequest(values, branding);
+      const fresh = await fetchBrandingSettings();
+      if (isStaleIntent()) return;
+      if (editedFields.some((field) => fresh[field] !== baseline[field])) {
+        setFormError(t.tradeCommon.conflictDescription);
+        toast.error(t.tradeCommon.conflictTitle, t.tradeCommon.conflictDescription);
+        return;
+      }
       const saved = await updateBrandingSettings(request);
-      setBranding(saved);
-      setValues(toBrandingForm(saved));
+      if (isStaleIntent()) return;
+      setDraft({ branding: saved, baseline: saved, values: toBrandingForm(saved) });
       publishBranding(saved);
       toast.success(t.coreBilling.brandingSavedTitle, t.coreBilling.brandingSaved);
     } catch (caught) {
+      if (isStaleIntent()) return;
+      if (caught instanceof SettingsInvalidResponseError) {
+        setFormError(t.coreSettings.invalidResponseDescription);
+        toast.error(t.coreBilling.brandingSaveFailed, t.coreSettings.invalidResponseDescription);
+        return;
+      }
       const normalized = normalizeApiError(caught);
-      if (normalized.status !== 403 && !toast.outcomeFromApi(normalized)) {
+      if (normalized.status === 403) {
+        setFormError(t.coreBilling.brandingReadOnlyNotice);
+        return;
+      }
+      const outcome = describeApiOutcome(normalized, t);
+      if (!toast.outcomeFromApi(normalized)) {
         toast.errorFromApi(t.coreBilling.brandingSaveFailed, normalized);
       }
-      setFormError(t.coreBilling.brandingSaveFailed);
+      setFormError(outcome ? outcome.description : t.coreBilling.brandingSaveFailed);
     } finally {
-      setIsSaving(false);
+      if (activeOperationRef.current?.token === operationToken) activeOperationRef.current = null;
+      if (!isStaleIntent()) setIsSaving(false);
     }
-  }, [canManage, isSaving, branding, fieldErrors, values, toast, t, publishBranding]);
+  }, [
+    activeOperationRef, baseline, canSave, hasActiveCurrentOperation, intentFence,
+    latestIntentFenceRef, mountedRef, publishBranding, t, toast, values,
+  ]);
 
-  /**
-   * Three upload failures, three messages. They are branched on status **and**
-   * code because they are genuinely different problems: no file part (400), the
-   * wrong image format (415), and over the 2 MB cap (413).
-   */
-  const describeUploadError = useCallback(
-    (error: NormalizedApiError): string => {
-      if (error.status === 413 || error.code === BRANDING_FILE_TOO_LARGE_CODE) {
-        return t.coreBilling.brandingFileTooLarge;
-      }
-      if (error.status === 415 || error.code === BRANDING_FILE_TYPE_UNSUPPORTED_CODE) {
-        return t.coreBilling.brandingFileTypeUnsupported;
-      }
-      if (error.code === BRANDING_FILE_REQUIRED_CODE) return t.coreBilling.brandingFileRequired;
-      if (error.code === BRANDING_STORAGE_UNAVAILABLE_CODE) {
-        return t.coreBilling.brandingStorageUnavailable;
-      }
-      return t.coreBilling.brandingUploadFailed;
-    },
-    [t],
-  );
-
-  const upload = useCallback(
-    async (kind: BrandingAssetKind, file: File): Promise<void> => {
-      if (!canManage || uploading) return;
-      setUploading(kind);
-      setUploadError((current) => ({ ...current, [kind]: null }));
-      try {
-        const { branding: saved, replayed } = await uploadBrandingAsset(
-          kind,
-          file,
-          generateUUIDv7(),
-        );
-        setBranding(saved);
-        publishBranding(saved);
-        setAssetVersion((version) => version + 1);
-        toast.success(
-          t.coreBilling.brandingSavedTitle,
-          replayed ? t.coreBilling.brandingUploadReplayed : t.coreBilling.brandingUploaded,
-        );
-      } catch (caught) {
-        const normalized = normalizeApiError(caught);
-        if (normalized.status === 403) return;
-        if (toast.outcomeFromApi(normalized)) return;
-        setUploadError((current) => ({ ...current, [kind]: describeUploadError(normalized) }));
-      } finally {
-        setUploading(null);
-      }
-    },
-    [canManage, uploading, toast, t, describeUploadError, publishBranding],
-  );
+  const attemptSave = useCallback(() => {
+    if (!canManage || isLoading || isBusy || hasLoadError) return;
+    if (!isValid) {
+      setSubmitAttempted(true);
+      focusErrorSummary();
+      return;
+    }
+    void save();
+  }, [canManage, focusErrorSummary, hasLoadError, isBusy, isLoading, isValid, save]);
 
   return {
-    canManage,
-    branding,
-    values,
-    contrast,
-    error,
-    formError,
-    fieldErrors,
-    uploadError,
-    uploading,
-    assetVersion,
-    isLoading: isLoading && !hasLoaded,
-    isRefreshing: isLoading,
-    isSaving,
-    setValue: (patch: Partial<BrandingFormValues>) =>
-      setValues((current) => ({ ...current, ...patch })),
-    rejectUpload: (kind: BrandingAssetKind, message: string) =>
-      setUploadError((current) => ({ ...current, [kind]: message })),
-    save,
-    upload,
-    reload: () => load(),
+    canManage, isDenied, isDirty, isValid, isBusy, canSave, canDiscard, isDiscardOpen,
+    branding, values, contrast, error, hasLoadError, loadErrorDescription,
+    formError, fieldErrors, submitAttempted,
+    setErrorSummaryNode, setAppNameNode, setTabTitleNode, setPrimaryColorNode, setSecondaryColorNode,
+    uploading: assets.uploading, uploadError: assets.uploadError,
+    activeUploadKind: assets.activeUploadKind, assetVersion: assets.assetVersion,
+    isPreviewOpen, isLoading: isLoading && !hasLoaded, isRefreshing: isLoading, isSaving,
+    setValue, focusField, discard, confirmDiscard: handleConfirmDiscard, cancelDiscard,
+    openUploadModal: assets.openUploadModal, closeUploadModal: assets.closeUploadModal,
+    clearUploadError: assets.clearUploadError, setPreviewOpen: setIsPreviewOpen,
+    save, attemptSave, upload: assets.upload, reload,
   };
 }

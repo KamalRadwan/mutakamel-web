@@ -7,6 +7,8 @@ import { Button, Field as FormField, Input, PageHeader, Switch } from "@/design-
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
+import { SettingsSaveConfirmation } from "../components/SettingsSaveConfirmation";
+import { useSettingsSaveConfirmation } from "../hooks/useSettingsSaveConfirmation";
 import { useFatalAlertSettings } from "./hooks/useFatalAlertSettings";
 import type {
   FatalAlertFormState,
@@ -36,6 +38,8 @@ export default function FatalAlertSettingsPage() {
       );
     }
   };
+  const confirmation = useSettingsSaveConfirmation(save);
+  const disabling = state.snapshot?.data.enabled && state.form?.enabled === false;
 
   return (
     <div className="space-y-3">
@@ -47,7 +51,7 @@ export default function FatalAlertSettingsPage() {
               type="button"
               variant="primary"
               size="sm"
-              onClick={() => void save()}
+              onClick={() => disabling ? confirmation.request() : void save()}
               disabled={!state.hasUnsavedChanges || pending || state.loadState !== "READY"}
             >
               {pending ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save className="size-3.5" aria-hidden="true" />}
@@ -55,6 +59,12 @@ export default function FatalAlertSettingsPage() {
             </Button>
           ) : undefined
         }
+      />
+
+      <SettingsSaveConfirmation
+        confirmation={confirmation}
+        description={(lang === "ar" ? ar : en).settings.confirmation.fatalAlertsOff}
+        lang={lang}
       />
 
       <SettingsResourceBoundary

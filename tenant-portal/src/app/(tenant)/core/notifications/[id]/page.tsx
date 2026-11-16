@@ -19,12 +19,15 @@ import {
   Skeleton,
 } from "@/design-system";
 import { wireLabel } from "@/lib/format/wire-label";
-import { auditNotificationText } from "@/lib/audit/notification-text";
+import { notificationHref, notificationText } from "@/lib/notifications/notification-presentation";
+import { INTL_LOCALE } from "@/lib/format/locale";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { PriorityBadge } from "../components/NotificationList";
 import { useNotificationDetail } from "./hooks/useNotificationDetail";
+import { useCoreErrorText } from "../../hooks/useCoreErrorText";
 
 export default function NotificationDetailPage() {
+  const describeError = useCoreErrorText();
   const params = useParams<{ id: string }>();
   const id = typeof params.id === "string" ? params.id : "";
   const { t, lang, notification, status, error, isPending, markRead, acknowledge, dismiss, reload } =
@@ -34,7 +37,7 @@ export default function NotificationDetailPage() {
     <PermissionGate require="notifications.notification.read">
       <div className="flex flex-col gap-4">
         <PageHeader
-          title={notification ? auditNotificationText(notification, t.audit.recordMessages).title : t.coreNotifications.detailTitle}
+          title={notification ? notificationText(notification, t.audit.recordMessages, t.coreNotifications, t.activities.types, INTL_LOCALE[lang]).title : t.coreNotifications.detailTitle}
           leading={
             <Button variant="ghost" size="sm" asChild aria-label={t.common.back}>
               <Link href={TENANT_ROUTES.coreNotifications}>
@@ -85,7 +88,7 @@ export default function NotificationDetailPage() {
         {status === "failed" ? (
           <ErrorState
             title={t.coreNotifications.loadFailed}
-            description={error?.message}
+            description={describeError(error)}
             onRetry={() => void reload()}
             retryLabel={t.common.retry}
           />
@@ -98,12 +101,12 @@ export default function NotificationDetailPage() {
                 <CardTitle>{t.coreNotifications.detailBody}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap text-sm text-foreground">{auditNotificationText(notification, t.audit.recordMessages).body}</p>
-                {notification.actionUrl ? (
+                <p className="whitespace-pre-wrap text-sm text-foreground">{notificationText(notification, t.audit.recordMessages, t.coreNotifications, t.activities.types, INTL_LOCALE[lang]).body}</p>
+                {notification.actionUrl || notification.entityType === "activity" ? (
                   <Button size="sm" variant="link" asChild className="mt-3">
                     {/* Validated same-origin at the boundary; an unsafe route
                         never survives the schema, so it never becomes an href. */}
-                    <Link href={notification.actionUrl}>
+                    <Link href={notificationHref(notification)}>
                       {t.coreNotifications.detailOpenTarget}
                     </Link>
                   </Button>

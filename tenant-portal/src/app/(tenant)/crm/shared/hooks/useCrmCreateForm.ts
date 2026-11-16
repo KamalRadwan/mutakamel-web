@@ -34,6 +34,8 @@ export interface CrmCreateForm<TForm> {
   /** Reveals every error. Called from submit so a never-blurred field still speaks. */
   revealAll: () => void;
   reset: () => void;
+  /** Install resolved defaults as a pristine form without creating a dirty draft. */
+  initialize: (form: TForm) => void;
 }
 
 function defaultFingerprint<TForm>(form: TForm): string {
@@ -89,13 +91,14 @@ export function useCrmCreateForm<TForm>({
 
   const revealAll = useCallback(() => setRevealed(true), []);
 
-  const reset = useCallback(() => {
-    const pristine = createInitial();
+  const initialize = useCallback((pristine: TForm) => {
     setInitial(pristine);
     setForm(pristine);
     setTouched(new Set());
     setRevealed(false);
-  }, [createInitial]);
+  }, []);
 
-  return { form, errors, allErrors, isDirty, setForm, setField, touch, revealAll, reset };
+  const reset = useCallback(() => initialize(createInitial()), [createInitial, initialize]);
+
+  return { form, errors, allErrors, isDirty, setForm, setField, touch, revealAll, reset, initialize };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -82,8 +82,13 @@ export function useDashboards() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
+  const loadController = useRef<AbortController | null>(null);
   const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
+    async (): Promise<void> => {
+      loadController.current?.abort();
+      const controller = new AbortController();
+      loadController.current = controller;
+      const { signal } = controller;
       setIsLoading(true);
       setQueryError(null);
       // Four sources, each degrading on its own: the paged list, the compact
@@ -112,6 +117,8 @@ export function useDashboards() {
             maxResponseBytes: CATALOG_RESPONSE_LIMIT_BYTES,
           }),
         ]);
+
+      if (signal.aborted) return;
 
       if (navigationResult.status === "fulfilled") {
         try {
@@ -156,17 +163,20 @@ export function useDashboards() {
         setCatalogUnavailable(true);
       }
 
-      if (!signal?.aborted) setIsLoading(false);
+      setIsLoading(false);
     },
     [offset, scope.headers],
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!cancelled) void load();
     });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      loadController.current?.abort();
+    };
   }, [load]);
 
   const fail = useCallback(

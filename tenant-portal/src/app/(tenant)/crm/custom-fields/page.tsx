@@ -1,282 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { FormInput, Pencil, RefreshCw, ShieldCheck } from "lucide-react";
-import {
-  Badge,
-  Button,
-  DataTable,
-  FilterBar,
-  PageHeader,
-  PermissionGate,
-  SubNav,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  NAV_SECTIONS,
-  useToast,
-  type ColumnDef,
-} from "@/design-system";
-import { formatTemplate } from "@/lib/format/template";
+import { Globe, Plus, RefreshCw, Search } from "lucide-react";
+import { Badge, Button, ConfirmActionModal, DegradedBanner, ErrorState, Input, PageActions, PageHeader, PermissionGate, Skeleton,
+  Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system";
+import { formatNumber } from "@/lib/format/number";
+import { useI18n } from "@/i18n/I18nContext";
 import { CreateCrmCustomFieldsModal } from "./components/CreateCrmCustomFieldsModal";
 import { CustomFieldRequirementsDrawer } from "./components/CustomFieldRequirementsDrawer";
 import { CustomFieldEditDrawer } from "./components/CustomFieldEditDrawer";
 import { CustomFieldValuesPanel } from "./components/CustomFieldValuesPanel";
-import type { CustomFieldItem } from "./custom-field-contract";
-import { useCrmCustomFields } from "./hooks/useCrmCustomFields";
-import { useCustomFieldRequirements } from "./hooks/useCustomFieldRequirements";
-
-const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
+import { CustomFieldDefinitions } from "./components/CustomFieldDefinitions";
+import { useCustomFieldsPage, useCustomFieldsSessionKey } from "./hooks/useCustomFieldsPage";
 
 export default function CrmCustomFieldsPage() {
-  const {
-    t,
-    editor,
-    items,
-    searchQuery,
-    setSearchQuery,
-    isLoading,
-    isCreating,
-    error,
-    createError,
-    canManage,
-    isCreateOpen,
-    openCreate,
-    closeCreate,
-    handleCreate,
-    reload,
-  } = useCrmCustomFields();
-  const toast = useToast();
-  const requirements = useCustomFieldRequirements();
-  const [requirementsField, setRequirementsField] =
-    useState<CustomFieldItem | null>(null);
-  const [requirementsError, setRequirementsError] = useState<string | null>(null);
+  const sessionKey = useCustomFieldsSessionKey();
+  return <CustomFieldsWorkspace key={sessionKey} />;
+}
 
-  const canCreate = canManage && !isLoading && !error;
-
-  const columns: ColumnDef<CustomFieldItem>[] = [
-    {
-      id: "name",
-      header: t.crmLeadStages.arabicName,
-      cell: (item) => (
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
-            <FormInput className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
-          </span>
-          <div>
-            <p dir="rtl" className="font-medium text-foreground">
-              {item.nameAr}
-            </p>
-            <code className="font-mono text-2xs text-muted-foreground">{item.fieldKey}</code>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "nameEn",
-      header: t.crmLeadStages.englishName,
-      cell: (item) => <span dir="ltr">{item.nameEn}</span>,
-    },
-    {
-      id: "owner",
-      header: t.crmCustomFields.owner,
-      cell: (item) => <Badge tone="neutral">{t.crmCustomFields.ownerTypes[item.ownerType] ?? item.ownerType}</Badge>,
-    },
-    {
-      id: "fieldType",
-      header: t.crmCustomFields.fieldType,
-      cell: (item) => <Badge tone="neutral">{t.crmCustomFields.fieldTypes[item.type] ?? item.type}</Badge>,
-    },
-    {
-      id: "properties",
-      header: t.crmCustomFields.properties,
-      cell: (item) => (
-        <div className="flex flex-wrap gap-1.5">
-          <Badge tone={item.isActive ? "positive" : "neutral"}>{item.isActive ? t.common.active : t.common.inactive}</Badge>
-          {item.isSearchable && <Badge tone="caution">{t.crmCustomFields.searchable}</Badge>}
-          {item.optionsCount > 0 && <Badge tone="neutral">{t.crmCustomFields.optionsCount(item.optionsCount)}</Badge>}
-        </div>
-      ),
-    },
-    {
-      id: "requirements",
-      header: t.crmCustomFields.requirements,
-      cell: (item) => {
-        const required = item.requirements
-          .filter((requirement) => requirement.isRequired)
-          .map((requirement) => requirement.operation);
-        if (required.length === 0) {
-          return <span className="text-xs text-muted-foreground">{t.crmCustomFields.optional}</span>;
-        }
-        return (
-          <div className="flex flex-wrap gap-1.5">
-            {required.map((operation) => (
-              <Badge key={operation} tone="caution">
-                {t.crmCustomFields.requirementOperations[operation] ?? operation}
-              </Badge>
-            ))}
-          </div>
-        );
-      },
-    },
-  ];
-
-  if (canManage) {
-    columns.push({
-      id: "actions",
-      header: t.common.actions,
-      align: "end",
-      sticky: "end",
-      cell: (item) => (
-        <div className="flex items-center justify-end gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" disabled={editor.isSaving} onClick={() => editor.select(item)}
-                aria-label={`${t.crmCustomFields.editTitle}: ${item.fieldKey}`}>
-                <Pencil className="size-4" aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t.crmCustomFields.editTitle}</TooltipContent>
-          </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`${t.crmCustomFields.requirementsTitle}: ${item.fieldKey}`}
-              onClick={() => {
-                setRequirementsError(null);
-                setRequirementsField(item);
-              }}
-            >
-              <ShieldCheck className="size-4" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t.crmCustomFields.requirementsTitle}</TooltipContent>
-        </Tooltip>
-        </div>
-      ),
-    });
-  }
-
-  // A CRM route is reachable by direct URL even when the sidebar hides it, so
-  // the 403 is reachable in-body and gets the mandated surface rather than a
-  // load error — AGENTS.md, docs/design/states.md. Permission string and
-  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
+function CustomFieldsWorkspace() {
+  const screen = useCustomFieldsPage();
+  const { lang } = useI18n();
+  const { t } = screen;
+  const guard = screen.recordValues.guard;
   return (
-    <PermissionGate require="crm.custom_fields.read" denied={error?.status === 403}>
-      <div className="flex flex-col gap-4">
-        <PageHeader
-          className="sr-only"
-          title={t.crm.cRMFormCustomFieldsCustom}
-          description={t.crmCustomFields.managementSubtitle}
-          primaryAction={canCreate ? { label: t.crm.addACustomField, onClick: openCreate } : undefined}
-          secondaryActions={
-            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
-              {t.crmCustomFields.reload}
-            </Button>
-          }
-        />
-
-        <SubNav items={CRM_SETUP_ITEMS} />
-
-        {editor.error && !editor.selected ? <p role="alert" className="text-xs text-destructive">{editor.error}</p> : null}
-
-        {createError && !isCreateOpen ? (
-          <div role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
-            {createError}
+    <PermissionGate require="crm.custom_fields.read" denied={screen.error?.status === 403}>
+      <div className="flex min-w-0 flex-col gap-3" aria-busy={screen.isLoading || screen.busy || undefined}>
+        <PageHeader title={t.nav.customFields} description={t.crmCustomFields.managementSubtitle}
+          primaryAction={screen.tab === "definitions" && screen.canManage ? {
+            label: t.crmCustomFields.addTitle, icon: <Plus className="size-4" aria-hidden="true" />,
+            onClick: screen.openCreate, disabled: !screen.canCreate } : undefined}
+          secondaryActions={<Button size="sm" variant="outline" onClick={screen.reloadPage}
+            loading={screen.isLoading || screen.recordValues.values.isLoading} disabled={screen.busy}>
+            <RefreshCw className="size-4" aria-hidden="true" />{t.crmCustomFields.reload}</Button>} />
+        {screen.tab === "definitions" && <PageActions slot="search">
+          <div className="relative w-full min-w-40 max-w-72">
+            <Search className="pointer-events-none absolute inset-y-0 start-2.5 my-auto size-4 text-muted-foreground" aria-hidden="true" />
+            <Input ref={(element) => screen.dialogFocus.setFallbackElement(element)} size="sm" className="ps-8" value={screen.searchQuery} onChange={(event) => screen.setSearchQuery(event.target.value)}
+              aria-label={t.crmCustomFields.search} placeholder={t.crmCustomFields.search} />
           </div>
-        ) : null}
-
-        <FilterBar
-          filters={[]}
-          values={{}}
-          onChange={() => undefined}
-          onReset={() => undefined}
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder={t.crmCustomFields.search}
-        />
-
-        {/* No pagination: this endpoint returns the whole list and declares no
-            page/limit query at all (verified in its controller). The fake
-            single-page object this replaced rendered working-looking controls
-            over data that could never advance —
-            docs/design/states.md#pagination-is-real-or-absent. */}
-        <DataTable
-          columns={columns}
-          rows={items}
-          isLoading={isLoading}
-          error={error}
-          onRetry={() => void reload()}
-          rowKey={(item) => item.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: t.crmCustomFields.loadFailed,
-            emptyTitle: t.crmCustomFields.empty,
-            selectAll: t.common.actions,
-            selectRow: t.common.actions,
-            sortAscending: t.common.actions,
-            sortDescending: t.common.actions,
-            notSorted: t.common.actions,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
-
-        {/* Values are per record, so this panel asks for one rather than
-            pretending the catalogue screen already knows which. */}
-        <CustomFieldValuesPanel definitions={items} canManage={canManage} />
-
-        <CreateCrmCustomFieldsModal
-          key={isCreateOpen ? "create-open" : "create-closed"}
-          isOpen={isCreateOpen}
-          isSubmitting={isCreating}
-          error={createError}
-          onClose={closeCreate}
-          onSubmit={handleCreate}
-        />
-
-        <CustomFieldEditDrawer key={`edit-${editor.selected?.id ?? "closed"}`} editor={editor} />
-
-        <CustomFieldRequirementsDrawer
-          key={`requirements-${requirementsField?.id ?? "closed"}`}
-          field={requirementsField}
-          initialFlags={
-            requirementsField ? requirements.readFlags(requirementsField) : null
-          }
-          isSubmitting={requirements.isSubmitting}
-          error={requirementsError}
-          onClose={() => {
-            setRequirementsError(null);
-            setRequirementsField(null);
-          }}
-          onSubmit={(flags) => {
-            const target = requirementsField;
-            if (!target) return;
-            void requirements.save(target, flags).then((result) => {
-              if (result.ok) {
-                setRequirementsField(null);
-                toast.success(t.crmCustomFields.requirementsSaved);
-                void reload();
-                return;
-              }
-              if (result.error) {
-                if (!toast.outcomeFromApi(result.error)) {
-                  setRequirementsError(t.crmCustomFields.requirementsFailed);
-                }
-                // A partial run leaves some operations written and some not,
-                // so the list is refetched either way rather than assuming
-                // the drawer's flags are what the server now holds.
-                void reload();
-              }
-            });
-          }}
-        />
+        </PageActions>}
+        {!screen.canManage ? <DegradedBanner message={t.crmCustomFields.readOnly} /> : null}
+        {screen.atCapacity && screen.tab === "definitions" ? <DegradedBanner message={t.crmCustomFields.limitReached} /> : null}
+        {screen.hasLoaded && screen.error ? <DegradedBanner message={t.crmCustomFields.refreshKept} /> : null}
+        {screen.editor.error && !screen.editor.selected ? <DegradedBanner message={screen.editor.error} /> : null}
+        {screen.createError && !screen.isCreateOpen ? <DegradedBanner message={screen.createError} /> : null}
+        <Tabs value={screen.tab} onValueChange={screen.selectTab}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border">
+            <TabsList aria-label={t.nav.customFields}>
+              <TabsTrigger value="definitions" disabled={screen.busy} className="gap-2">
+                {t.crmCustomFields.definitionsTab}
+                {screen.hasLoaded && <Badge tone="neutral">{formatNumber(screen.definitions.length, lang)}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="values" disabled={screen.busy}>{t.crmCustomFields.recordValuesTab}</TabsTrigger>
+            </TabsList>
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Globe className="size-3.5" aria-hidden="true" />{t.crmCustomFields.sharedAcrossBranches}
+            </span>
+          </div>
+          <TabsContent value="definitions"><CustomFieldDefinitions screen={screen} /></TabsContent>
+          <TabsContent value="values">
+            {screen.isLoading && !screen.hasLoaded ? <Skeleton className="h-48 w-full" /> :
+              screen.error && !screen.hasLoaded ? <ErrorState title={t.crmCustomFields.loadFailed}
+                onRetry={() => void screen.reload()} retryLabel={t.common.retry} /> : <CustomFieldValuesPanel state={screen.recordValues} />}
+          </TabsContent>
+        </Tabs>
+        <CreateCrmCustomFieldsModal key={screen.isCreateOpen ? "create-open" : "create-closed"} isOpen={screen.isCreateOpen}
+          isSubmitting={screen.isCreating} error={screen.createError} keyError={screen.createKeyError}
+          onClose={screen.closeCreate} onSubmit={screen.create} />
+        <CustomFieldEditDrawer key={`edit-${screen.editor.selected?.id ?? "closed"}`} editor={screen.editor} />
+        <CustomFieldRequirementsDrawer requirements={screen.requirements} />
+        <ConfirmActionModal open={guard.isDiscardOpen} onOpenChange={(open) => { if (!open) guard.cancelDiscard(); }}
+          title={t.common.discardTitle} description={t.common.discardDescription}
+          confirmLabel={t.common.discardConfirm} cancelLabel={t.common.cancel} onConfirm={guard.confirmDiscard} />
       </div>
     </PermissionGate>
   );

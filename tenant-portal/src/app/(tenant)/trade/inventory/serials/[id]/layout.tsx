@@ -1,1 +1,4 @@
-export { RecordHistoryLayout as default } from "@/components/audit/RecordHistoryLayout";
+import type { ReactNode } from "react";
+
+// The existing record/history tabs are inside the centered lifecycle dossier.
+export default function SerialDetailLayout({ children }: { children: ReactNode }) { return children; }

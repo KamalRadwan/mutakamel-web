@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import {
-  ArrowLeft,
+  ChevronRight,
   Building2,
   Check,
   ExternalLink,
@@ -25,11 +25,14 @@ import {
   DetailHeader,
   ErrorState,
   NotFoundState,
+  PageActions,
   Skeleton,
   StatusBadge,
   cardColorBorder,
   cn,
   dossierAvatarClass,
+  iconSize,
+  mirrorInRtl,
   useToast,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
@@ -199,6 +202,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
   }
 
   const currentStage = detail.stages.find(({ id }) => id === lead.stageId) ?? null;
+  const showStageBar = !detail.stagesDegraded && detail.stages.length > 0;
   const currentStageIndex = detail.stages.findIndex(({ id }) => id === lead.stageId);
   const pendingStage = detail.stages.find(({ id }) => id === pendingStageId) ?? null;
   const sourceLabel = localizedValue(
@@ -215,9 +219,6 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
     .filter(Boolean)
     .join(", ");
   const formattedCreatedAt = formatDate(lead.createdAt, lang);
-  const currentStageName = currentStage
-    ? localizedValue(currentStage.nameAr, currentStage.nameEn, lang)
-    : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -227,6 +228,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
         title={lead.displayName}
         subtitle={[
           t.crmCustomerProfiles.profileTypes[lead.leadProfileType],
+          currentStage ? localizedValue(currentStage.nameAr, currentStage.nameEn, lang) : "",
           sourceLabel,
         ]
           .filter((part) => part.length > 0)
@@ -236,35 +238,26 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
         backHref="/crm/leads"
       />
 
-      {/* Top Sub-Toolbar: Back to Leads + Breadcrumb + Delete Lead */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-muted-foreground">
-          <Link href="/crm/leads" className="dossier-btn">
-            <ArrowLeft className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
-            <span>{t.crmLeadDetail.backToLeads}</span>
-          </Link>
-          <span aria-hidden="true">/</span>
-          <span>CRM</span>
-          <span aria-hidden="true">›</span>
-          <span>{t.crmLeads.title}</span>
-          <span aria-hidden="true">›</span>
-          <span className="font-semibold text-foreground">{lead.displayName}</span>
-        </div>
-        {canDelete && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              className="dossier-btn dossier-btn-cancel"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              <Trash2 className="size-3.5" aria-hidden="true" />
-              <span>{t.common.delete}</span>
-            </Button>
-          </div>
-        )}
-      </div>
+      {/* The record's place and actions live in the shell's page bar: the bar
+          already links back to the list, this names the record after it. */}
+      <PageActions slot="crumb">
+        <ChevronRight className={cn(iconSize({ size: "xs" }), mirrorInRtl, "text-muted-foreground")} aria-hidden="true" />
+        <span className="truncate font-semibold text-foreground" title={lead.displayName} aria-current="page">{lead.displayName}</span>
+      </PageActions>
+      {canDelete && (
+        <PageActions slot="actions">
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="dossier-btn dossier-btn-cancel"
+            onClick={() => setConfirmDeleteOpen(true)}
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            <span>{t.common.delete}</span>
+          </Button>
+        </PageActions>
+      )}
 
       {/* Standalone Full-Width Colorful Dossier Hero Header */}
       <div
@@ -297,21 +290,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                   {t.crmCustomerProfiles.profileTypes[lead.leadProfileType]}
                 </span>
               </span>
-              <span
-                className={cn(
-                  "dossier-badge",
-                  isConverted
-                    ? "dossier-badge-status-conv"
-                    : "dossier-badge-status-open",
-                )}
-              >
-                ● {t.common.status}: {t.statusValues[`LeadStatus.${lead.status}`]}
-              </span>
-              {currentStageName && (
-                <span className="dossier-badge dossier-badge-stage">
-                  {t.crmLeads.stage}: {currentStageName}
-                </span>
-              )}
+              {!showStageBar && <StatusBadge value={lead.status} kind="LeadStatus" />}
               {stageAge && (
                 <span className="dossier-badge dossier-badge-age">
                   ⏱ {formatTemplate(t.crmLeads.card.stageAge, { age: stageAge })}
@@ -489,7 +468,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
       )}
 
       {/* Colorful 8-Stage Connected Pipeline Track */}
-      {!detail.stagesDegraded && detail.stages.length > 0 && (
+      {showStageBar && (
         <div className="dossier-stage-bar">
           <div className="dossier-stage-track">
             {detail.stages.map((entry, idx) => {
@@ -519,6 +498,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                   variant="ghost"
                   size="xs"
                   aria-disabled={stageDisabled}
+                  aria-current={isCurrent ? "step" : undefined}
                   aria-label={stageDisabled ? `${stageName}. ${stageDisabledReason}` : stageName}
                   onClick={() => {
                     if (!stageDisabled) setPendingStageId(entry.id);

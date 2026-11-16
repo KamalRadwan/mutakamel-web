@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import {
   normalizeApiError,
@@ -18,10 +18,7 @@ import {
 } from "../storage-runtime-contract";
 
 const ENDPOINT = "/api/admin/core/v1/system-settings/storage-runtime";
-const UPDATE_PERMISSIONS = [
-  "admin.settings.update",
-  "admin.settings.critical",
-] as const;
+const UPDATE_PERMISSIONS = ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE;
 
 export type StorageRuntimeMutationAction =
   | "ENABLE"

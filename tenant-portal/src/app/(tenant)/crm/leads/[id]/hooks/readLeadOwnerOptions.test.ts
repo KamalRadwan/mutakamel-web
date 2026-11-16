@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axiosClient } from "@/lib/api/axiosClient";
-import { readAssignableLeadOwners } from "./readLeadOwnerOptions";
+import { readCorePage } from "@/lib/api/envelope";
+import { readAssignableLeadOwners, readOwnerOptions } from "./readLeadOwnerOptions";
 
 vi.mock("@/lib/api/axiosClient", () => ({ axiosClient: { get: vi.fn() } }));
+vi.mock("@/lib/api/envelope", () => ({ readCorePage: vi.fn() }));
 const branchId = "01900100-0000-7000-8000-000000000001";
 const headers = {
   "x-mutakamel-company-id": "01900100-0000-7000-8000-000000000004",
@@ -14,6 +16,28 @@ const response = (data: unknown) => ({ data }) as Awaited<ReturnType<typeof axio
 afterEach(() => vi.resetAllMocks());
 
 describe("CRM lead owner candidates", () => {
+  it.each([1, 40, 10000])("bounds a %i-page CRM owner listing", async (totalPages) => {
+    vi.mocked(axiosClient.get).mockImplementation(async () => {
+      const number = vi.mocked(axiosClient.get).mock.calls.length;
+      const item = { ...owner, id: `01900100-0000-7000-8000-${String(number).padStart(12, "0")}` };
+      return response({ items: [item], nextCursor: number < totalPages ? item.id : null });
+    });
+    const result = readAssignableLeadOwners(branchId, "update", new AbortController().signal, headers);
+    if (totalPages <= 40) await expect(result).resolves.toHaveLength(totalPages);
+    else await expect(result).rejects.toThrow("Invalid assignable owners pagination.");
+    expect(axiosClient.get).toHaveBeenCalledTimes(Math.min(totalPages, 40));
+  });
+  it.each([1, 40, 10000])("bounds a %i-page Core user listing", async (totalPages) => {
+    vi.mocked(readCorePage).mockImplementation(async () => {
+      const number = vi.mocked(readCorePage).mock.calls.length;
+      return { data: [{ id: `01900100-0000-7000-8000-${String(number).padStart(12, "0")}`, firstName: "Dina", lastName: "Ali" }],
+        meta: { page: number, hasNext: number < totalPages } };
+    });
+    const result = readOwnerOptions(branchId, new AbortController().signal);
+    if (totalPages <= 40) await expect(result).resolves.toHaveLength(totalPages);
+    else await expect(result).rejects.toThrow("Invalid user list pagination.");
+    expect(readCorePage).toHaveBeenCalledTimes(Math.min(totalPages, 40));
+  });
   it.each(["create", "update"] as const)("follows every cursor with the same branch and %s action", async (action) => {
     vi.mocked(axiosClient.get).mockResolvedValueOnce(response({ items: [owner], nextCursor: owner.id }))
       .mockResolvedValueOnce(response({ items: [teammate], nextCursor: null }));

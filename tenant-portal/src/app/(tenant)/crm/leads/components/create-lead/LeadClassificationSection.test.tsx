@@ -22,6 +22,10 @@ const COMPANY_A = "01900100-0000-7000-8000-0000000000a1";
 const COMPANY_B = "01900100-0000-7000-8000-0000000000a2";
 const BRANCH_A = "01900100-0000-7000-8000-0000000000b1";
 const BRANCH_B = "01900100-0000-7000-8000-0000000000b2";
+vi.mock("@/hooks/useTenantBranchLabels", () => ({
+  useTenantCompanyLabels: () => new Map([[COMPANY_A, "Mersany"], [COMPANY_B, "Delta Trading"]]),
+  useTenantBranchLabels: () => new Map([[BRANCH_A, "Cairo"], [BRANCH_B, "Alexandria"]]),
+}));
 
 function renderSection(overrides: Partial<LeadClassificationSectionProps> = {}) {
   const element = (props: Partial<LeadClassificationSectionProps>) => (
@@ -73,8 +77,9 @@ it("keeps empty, selected and reset pickers controlled throughout the form lifet
     const view = renderSection(empty);
     view.rerenderSection({ ...empty, companyId: COMPANY_B, branchId: BRANCH_B,
       acquisitionSourceId: "01900100-0000-7000-8000-0000000000c1" });
-    expect(screen.getByRole("combobox", { name: en.organization.parentCompany })).toHaveTextContent(COMPANY_B);
-    expect(screen.getByRole("combobox", { name: en.common.branch })).toHaveTextContent(BRANCH_B);
+    expect(screen.getByRole("combobox", { name: en.organization.parentCompany })).toHaveTextContent("Delta Trading");
+    expect(screen.getByRole("combobox", { name: en.common.branch })).toHaveTextContent("Alexandria");
+    expect(screen.getByRole("combobox", { name: en.common.branch })).not.toHaveTextContent(BRANCH_B);
     expect(screen.getByRole("combobox", { name: en.crmLeads.source })).toHaveTextContent("Website");
     view.rerenderSection(empty);
     for (const name of [en.organization.parentCompany, en.common.branch, en.crmLeads.source]) {
@@ -111,9 +116,10 @@ describe("the company and branch pickers", () => {
     expect(screen.getByText(en.common.branch)).toBeTruthy();
   });
 
-  it("shows the branch id, because /auth/me carries no branch names", () => {
+  it("shows the resolved branch name without its identifier", () => {
     renderSection({ branchIds: [BRANCH_A, BRANCH_B] });
-    expect(screen.getByText(BRANCH_A)).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: en.common.branch })).toHaveTextContent("Cairo");
+    expect(screen.queryByText(BRANCH_A)).not.toBeInTheDocument();
   });
 });
 

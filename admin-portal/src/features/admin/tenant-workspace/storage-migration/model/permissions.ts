@@ -1,10 +1,7 @@
-import { adminCan, type AdminAuthorizationContext } from "@/lib/auth/rbac";
+import { adminCan, ADMIN_RBAC_CRITICAL, type AdminAuthorizationContext } from "@/lib/auth/rbac";
 
 export const STORAGE_MIGRATION_READ_PERMISSION = "admin.storage_migrations.read";
-export const STORAGE_MIGRATION_EXECUTE_PERMISSION =
-  "admin.storage_migrations.execute";
-export const STORAGE_MIGRATION_CRITICAL_PERMISSION =
-  "admin.storage_migrations.critical";
+export const [STORAGE_MIGRATION_EXECUTE_PERMISSION, STORAGE_MIGRATION_CRITICAL_PERMISSION] = ADMIN_RBAC_CRITICAL.STORAGE_MIGRATIONS_EXECUTE;
 /** Backup artifacts and restore runs are Worker reads under their own gate. */
 export const BACKUP_EVIDENCE_READ_PERMISSION = "admin.backups.read";
 

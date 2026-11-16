@@ -1,8 +1,12 @@
 import { z } from "zod";
+import { can } from "@/lib/auth/permission-scope";
 import { commercialUuid, commercialUuid7, invalidCommercialRead } from "./commercial-command-fields";
 import { parseCommercialPreparationRequest, type CommercialChange, type CommercialPreparationRequest } from "./commercial-command-request";
 
 export const DEFINITION_ADOPTION_PERMISSION = "applications.addon_definitions.adopt";
+export function canAdoptDefinitions(user: (NonNullable<Parameters<typeof can>[0]> & { isTenantOwner: boolean }) | null | undefined): boolean {
+  return !!user && (user.isTenantOwner || can(user, DEFINITION_ADOPTION_PERMISSION, { tenantWide: true }));
+}
 type AdoptionChange = Extract<CommercialChange, { operation: "ADOPT_DEFINITION" }>;
 export type DefinitionAdoptionRequest = Omit<CommercialPreparationRequest, "changes"> & { changes: AdoptionChange[] };
 const source = z.object({ selectionKey: commercialUuid7, addonSelectionId: commercialUuid, fromDefinitionVersionId: commercialUuid }).strict();

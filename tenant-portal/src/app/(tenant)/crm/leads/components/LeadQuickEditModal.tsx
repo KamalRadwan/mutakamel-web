@@ -52,6 +52,7 @@ import { RecordAttachmentsSection } from "../../shared/components/RecordAttachme
 import { RecordNotesSection } from "../../shared/components/RecordNotesSection";
 import { crmCapabilityAllowsOwner } from "../../shared/crm-capabilities";
 import { CrmErrorBag } from "../../shared/crm-form-validation";
+import { safeWebsiteHref } from "../../shared/safe-website-href";
 import { CRM_RATING_STARS } from "../../shared/crm-rating-contract";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmCustomFieldValues } from "../../shared/hooks/useCrmCustomFieldValues";
@@ -287,6 +288,7 @@ export function LeadQuickEditModal({
   const [taxNumberDraft, setTaxNumberDraft] = useState("");
   const [crNumberDraft, setCrNumberDraft] = useState("");
   const [websiteDraft, setWebsiteDraft] = useState("");
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [phonesDraft, setPhonesDraft] = useState<string[]>([""]);
 
   // Individual identity draft state
@@ -387,6 +389,7 @@ export function LeadQuickEditModal({
   );
 
   const fallbackDetail = currentDetail;
+  const websiteHref = safeWebsiteHref(fallbackDetail?.companyWebsite);
 
   const references = useLeadDetailsReferences(
     fallbackDetail ?? {
@@ -401,6 +404,7 @@ export function LeadQuickEditModal({
       firstName: null,
       lastName: null,
       honorificTitle: null,
+      jobTitle: null,
       companyName: null,
       primaryMobile: null,
       email: null,
@@ -448,6 +452,7 @@ export function LeadQuickEditModal({
     if (!fallbackDetail || !editable) return;
     setSectionError(null);
     setCompanyEmailError(null);
+    setWebsiteError(null);
     const isCorp = fallbackDetail.leadProfileType === "CORPORATE";
     setCompanyNameDraft(fallbackDetail.companyName || fallbackDetail.displayName || "");
     setCompanyEmailDraft(fallbackDetail.companyEmail || fallbackDetail.email || "");
@@ -519,7 +524,9 @@ export function LeadQuickEditModal({
       emailErrors.email("companyEmail", companyEmailDraft);
       const emailError = emailErrors.errors.companyEmail;
       setCompanyEmailError(emailError ?? null);
-      if (emailError) return false;
+      const invalidWebsite = websiteDraft.trim() && !safeWebsiteHref(websiteDraft);
+      setWebsiteError(invalidWebsite ? t.crmShared.fieldUrl : null);
+      if (emailError || invalidWebsite) return false;
       if (companyNameDraft.trim() !== (fallbackDetail.companyName ?? "")) {
         Object.assign(patch, buildLeadCompanyFieldRequest("companyName", companyNameDraft));
       }
@@ -1593,18 +1600,16 @@ export function LeadQuickEditModal({
                           <div className="dossier-field-box">
                             <div className="dossier-field-label">Company Website</div>
                             <div className="dossier-field-val">
-                              {fallbackDetail.companyWebsite ? (
+                              {websiteHref ? (
                                 <a
-                                  href={
-                                    fallbackDetail.companyWebsite.startsWith("http")
-                                      ? fallbackDetail.companyWebsite
-                                      : `https://${fallbackDetail.companyWebsite}`
-                                  }
+                                  href={websiteHref}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
                                   🌐 {fallbackDetail.companyWebsite} ↗
                                 </a>
+                              ) : fallbackDetail.companyWebsite ? (
+                                <span dir="ltr">{fallbackDetail.companyWebsite}</span>
                               ) : (
                                 <span className="muted">—</span>
                               )}
@@ -1769,9 +1774,19 @@ export function LeadQuickEditModal({
                             <input
                               id="corp-website"
                               className="dossier-input"
+                              aria-invalid={Boolean(websiteError)}
+                              aria-describedby={websiteError ? "corp-website-error" : undefined}
                               value={websiteDraft}
-                              onChange={(e) => setWebsiteDraft(e.target.value)}
+                              onChange={(e) => {
+                                setWebsiteDraft(e.target.value);
+                                setWebsiteError(null);
+                              }}
                             />
+                            {websiteError && (
+                              <p id="corp-website-error" className="text-sm text-destructive" role="alert">
+                                {websiteError}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -3022,6 +3037,14 @@ export function LeadQuickEditModal({
                       density="compact"
                       entityType="Lead"
                       entityId={fallbackDetail.id}
+                      valueLabels={{
+                        stageId: Object.fromEntries(
+                          stages.map((stage) => [
+                            stage.id,
+                            localizedValue(stage.nameAr, stage.nameEn, lang),
+                          ]),
+                        ),
+                      }}
                       relatedPartyIds={[
                         fallbackDetail.partyId,
                         ...fallbackDetail.contacts.map((c) => c.partyId),

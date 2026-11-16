@@ -1,7 +1,6 @@
 import type { TradePath } from "@/lib/api/envelope";
-import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
-import { buildSerialSelection } from "./serial-input";
-import { INVENTORY_CODE_PATTERN, isDecimalString, isMemberOf, record } from "../../trade-advanced-validation";
+import { isUUIDv7 } from "@/lib/uuid";
+import { isDecimalString, isMemberOf, record } from "../../trade-advanced-validation";
 import {
   INVENTORY_DELIVERIES_PATH,
   INVENTORY_RECEIPTS_PATH,
@@ -27,6 +26,14 @@ export const MOVEMENT_LINES_MAX = 500;
 
 export type MovementKind = "openingBalance" | "reservation" | "receipt" | "delivery";
 
+interface MovementDisplayContext {
+  sourceLabel?: string;
+  nodeLabel?: string;
+  itemLabel?: string;
+  unitLabel?: string;
+  lineLabels?: string[];
+}
+
 export function reservationReleasePath(id: string): TradePath {
   if (!isUUIDv7(id)) throw new Error("INVENTORY_FORM_UOM");
   return `${INVENTORY_RESERVATIONS_PATH}/${encodeURIComponent(id)}/release` as TradePath;
@@ -43,6 +50,7 @@ export function deliveryActionPath(id: string, action: "post" | "reverse"): Trad
 }
 
 export interface OpeningBalanceFormValues {
+  display?: MovementDisplayContext;
   nodeId: string;
   itemId: string;
   uomId: string;
@@ -67,6 +75,7 @@ export const EMPTY_OPENING_BALANCE_FORM: OpeningBalanceFormValues = {
 };
 
 export interface ReservationFormValues {
+  display?: MovementDisplayContext;
   nodeId: string;
   itemId: string;
   uomId: string;
@@ -113,6 +122,7 @@ export const EMPTY_MOVEMENT_LINE: MovementLineValues = {
 };
 
 export interface MovementFormValues {
+  display?: MovementDisplayContext;
   nodeId: string;
   /** `purchaseOrderId` on a receipt, `salesOrderId` on a delivery. */
   sourceDocumentId: string;
@@ -130,6 +140,7 @@ export const EMPTY_MOVEMENT_FORM: MovementFormValues = {
 };
 
 export interface SessionMovementEntry {
+  scopeKey?: string;
   id: string;
   kind: MovementKind;
   status: "DRAFT" | "POSTED" | "PARTIALLY_REVERSED" | "REVERSED" | ReservationStatus;
@@ -139,18 +150,49 @@ export interface SessionMovementEntry {
   recordedAt: string;
   reservation?: ReservationSnapshot;
   lines?: MovementLineSnapshot[];
+  display?: MovementDisplayContext;
+  requestedQuantity?: string;
+  sourceDocumentId?: string;
+  sourceLineId?: string;
+  serialKeys?: string[];
+  /** Client session metadata: a related write invalidated this returned handle. */
+  stale?: boolean;
+  reservationIds?: string[];
+  businessEffectiveAt?: string;
 }
 
 export interface MovementLineSnapshot {
   id: string;
   quantity: string;
   serialKeys: string[];
+  reversedQuantity?: string;
+  uomId?: string;
+  normalizedUomId?: string;
+  normalizedQuantity?: string;
+  normalizedReversedQuantity?: string;
+  descriptionSnapshot?: string | null;
+  lotKey?: string;
+  expiryDate?: string;
+  reservationId?: string | null;
 }
 
 export interface ReversalLineValues {
   lineId: string;
   quantity: string;
   serialKeys: string;
+}
+
+/** Exact display calculation over the immutable original and returned reversed quantities. */
+export function movementRemainingQuantity(quantity: string, reversedQuantity: string): string {
+  const scaled = (value: string) => {
+    if (!/^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/.test(value)) invalidResponse();
+    const [whole, fraction = ""] = value.split(".");
+    return BigInt(`${whole}${fraction.padEnd(8, "0")}`);
+  };
+  const remaining = scaled(quantity) - scaled(reversedQuantity);
+  if (remaining < BigInt(0)) invalidResponse();
+  const digits = remaining.toString().padStart(9, "0");
+  return `${digits.slice(0, -8)}.${digits.slice(-8)}`;
 }
 
 export function parseMovementLines(payload: unknown): MovementLineSnapshot[] {
@@ -164,7 +206,28 @@ export function parseMovementLines(payload: unknown): MovementLineSnapshot[] {
     if (!Array.isArray(keys) || keys.some((key: unknown) => typeof key !== "string" ||
       !key || key.length > 120 || key !== key.trim() || key === "none") ||
       new Set(keys).size !== keys.length) invalidResponse();
-    return { id: line.id, quantity: line.quantity, serialKeys: keys as string[] };
+    if (line.reversedQuantity !== undefined && !isDecimalString(line.reversedQuantity)) invalidResponse();
+    for (const key of ["uomId", "normalizedUomId"] as const) {
+      if (line[key] !== undefined && !isUUIDv7(line[key])) invalidResponse();
+    }
+    if (line.normalizedQuantity !== undefined && !isDecimalString(line.normalizedQuantity)) invalidResponse();
+    if (line.normalizedReversedQuantity !== undefined && !isDecimalString(line.normalizedReversedQuantity)) invalidResponse();
+    if (line.descriptionSnapshot != null && (typeof line.descriptionSnapshot !== "string" || !line.descriptionSnapshot.trim())) invalidResponse();
+    if (line.reservationId != null && !isUUIDv7(line.reservationId)) invalidResponse();
+    if (tracking.lotKey !== undefined && (typeof tracking.lotKey !== "string" || !tracking.lotKey.trim() || tracking.lotKey.length > 120)) invalidResponse();
+    if (tracking.expiryDate !== undefined && (typeof tracking.expiryDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(tracking.expiryDate) || Number.isNaN(Date.parse(tracking.expiryDate)) ||
+      new Date(tracking.expiryDate).toISOString().slice(0, 10) !== tracking.expiryDate)) invalidResponse();
+    return { id: line.id, quantity: line.quantity, serialKeys: keys as string[],
+      ...(line.reversedQuantity !== undefined ? { reversedQuantity: line.reversedQuantity as string } : {}),
+      ...(line.uomId !== undefined ? { uomId: line.uomId as string } : {}),
+      ...(line.normalizedUomId !== undefined ? { normalizedUomId: line.normalizedUomId as string } : {}),
+      ...(line.normalizedQuantity !== undefined ? { normalizedQuantity: line.normalizedQuantity as string } : {}),
+      ...(line.normalizedReversedQuantity !== undefined ? { normalizedReversedQuantity: line.normalizedReversedQuantity as string } : {}),
+      ...(line.descriptionSnapshot !== undefined ? { descriptionSnapshot: line.descriptionSnapshot as string | null } : {}),
+      ...(tracking.lotKey !== undefined ? { lotKey: tracking.lotKey as string } : {}),
+      ...(tracking.expiryDate !== undefined ? { expiryDate: tracking.expiryDate as string } : {}),
+      ...(line.reservationId !== undefined ? { reservationId: line.reservationId as string | null } : {}) };
   });
 }
 
@@ -190,6 +253,9 @@ export interface ReservationSnapshot {
   releasedQuantity: string;
   consumedQuantity: string;
   remainingQuantity: string;
+  requestedQuantity?: string;
+  backorderedQuantity?: string;
+  outcome?: "FULL" | "PARTIAL" | "BACKORDER";
 }
 
 /** The entity response has no remainingQuantity; match reservationRemaining exactly. */
@@ -221,187 +287,9 @@ export function parseReservation(payload: unknown, expectedId?: string): Reserva
   return {
     id: row.id, fulfillmentNodeId: row.fulfillmentNodeId, status: row.status, version: row.version,
     quantity, releasedQuantity, consumedQuantity, remainingQuantity,
-  };
-}
-
-export const RELEASE_REASON_PRESETS = [
-  "CUSTOMER_CANCELLED",
-  "CUSTOMER_QTY_REDUCTION",
-  "ORDER_EXPIRED",
-  "ALLOCATION_REBALANCE",
-] as const;
-
-export const REVERSAL_REASON_PRESETS = [
-  "DAMAGED_SHIPMENT_RETURN",
-  "WRONG_ITEM_DISPATCHED",
-  "DATA_ENTRY_CORRECTION",
-  "QUALITY_HOLD_REJECTED",
-] as const;
-
-function requireUuid(value: string, reason: string): string {
-  const trimmed = value.trim();
-  if (!isUUIDv7(trimmed)) throw new Error(reason);
-  return trimmed;
-}
-
-/** `POSITIVE_DECIMAL` on every movement quantity — zero and negatives are 400s. */
-function requirePositiveDecimal(value: string): string {
-  const trimmed = value.trim();
-  if (!isDecimalString(trimmed) || Number(trimmed) <= 0) {
-    throw new Error("INVENTORY_FORM_QUANTITY");
-  }
-  return trimmed;
-}
-
-function requireVersion(value: string): number {
-  const parsed = Number(value.trim());
-  if (!Number.isSafeInteger(parsed) || parsed < 1) throw new Error("INVENTORY_FORM_LINES");
-  return parsed;
-}
-
-/** `@IsISO8601({ strict: true })` — a `datetime-local` value is not one. */
-function requireIsoInstant(value: string): string {
-  const trimmed = value.trim();
-  const parsed = new Date(trimmed);
-  if (trimmed.length === 0 || Number.isNaN(parsed.getTime())) throw new Error("INVENTORY_FORM_DATE");
-  return parsed.toISOString();
-}
-
-function buildOptionalTracking(
-  quantity: string,
-  lotKey?: string,
-  serialKeys?: string,
-  expiresAt?: string,
-): Record<string, unknown> | undefined {
-  const lot = lotKey?.trim() ?? "";
-  const serials = buildSerialSelection(serialKeys ?? "", quantity);
-  const exp = expiresAt?.trim() || undefined;
-  if (exp && (!/^\d{4}-\d{2}-\d{2}$/.test(exp) ||
-    Number.isNaN(Date.parse(exp)) || new Date(exp).toISOString().slice(0, 10) !== exp)) {
-    throw new Error("INVENTORY_FORM_DATE");
-  }
-  if (lot.length > 120) {
-    throw new Error("INVENTORY_FORM_TRACKING");
-  }
-  if (!lot && !serials && !exp) return undefined;
-  const tracking: Record<string, unknown> = {};
-  if (lot) tracking.lotKey = lot;
-  if (serials) tracking.serialKeys = serials;
-  if (exp) tracking.expiryDate = exp;
-  return tracking;
-}
-
-export function buildOpeningBalanceRequest(values: OpeningBalanceFormValues) {
-  const tracking = buildOptionalTracking(values.quantity, values.lotKey, values.serialKeys, values.expiresAt);
-  return {
-    nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
-    itemId: requireUuid(values.itemId, "INVENTORY_FORM_ITEM"),
-    uomId: requireUuid(values.uomId, "INVENTORY_FORM_UOM"),
-    quantity: requirePositiveDecimal(values.quantity),
-    itemProfileVersion: requireVersion(values.itemProfileVersion),
-    businessEffectiveAt: requireIsoInstant(values.businessEffectiveAt),
-    operationKey: generateUUIDv7(),
-    ...(tracking ? { tracking } : {}),
-  };
-}
-
-export function buildReservationRequest(values: ReservationFormValues) {
-  const tracking = buildOptionalTracking(values.quantity, values.lotKey, values.serialKeys);
-  const expiresAt = values.expiresAt?.trim()
-    ? requireIsoInstant(values.expiresAt)
-    : undefined;
-  return {
-    nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
-    itemId: requireUuid(values.itemId, "INVENTORY_FORM_ITEM"),
-    uomId: requireUuid(values.uomId, "INVENTORY_FORM_UOM"),
-    quantity: requirePositiveDecimal(values.quantity),
-    sourceDocumentId: requireUuid(values.sourceDocumentId, "INVENTORY_FORM_LINES"),
-    sourceLineId: requireUuid(values.sourceLineId, "INVENTORY_FORM_LINES"),
-    sourceDocumentVersion: requireVersion(values.sourceDocumentVersion),
-    sourceLineVersion: requireVersion(values.sourceLineVersion),
-    intentKey: generateUUIDv7(),
-    ...(expiresAt ? { expiresAt } : {}),
-    ...(tracking ? { tracking } : {}),
-  };
-}
-
-/** Omitted quantity uses the selected serial count, or all remaining stock without a selection. */
-export function buildReleaseRequest(quantity: string, reasonCode: string, serialKeys = "") {
-  const request: { quantity?: string; reasonCode?: string; serialKeys?: string[] } = {};
-  const trimmedQuantity = quantity.trim();
-  if (trimmedQuantity.length > 0) request.quantity = requirePositiveDecimal(trimmedQuantity);
-  const selection = buildSerialSelection(serialKeys, request.quantity);
-  if (selection) request.serialKeys = selection;
-  const trimmedReason = reasonCode.trim().toUpperCase();
-  if (trimmedReason.length > 0) {
-    if (!INVENTORY_CODE_PATTERN.test(trimmedReason)) throw new Error("INVENTORY_FORM_REASON");
-    request.reasonCode = trimmedReason;
-  }
-  return request;
-}
-
-function buildLines(
-  values: MovementFormValues,
-  lineIdKey: "purchaseOrderLineId" | "salesOrderLineId",
-) {
-  if (values.lines.length < 1 || values.lines.length > MOVEMENT_LINES_MAX) {
-    throw new Error("INVENTORY_FORM_LINES");
-  }
-  return values.lines.map((line) => {
-    const tracking = buildOptionalTracking(line.quantity, line.lotKey, line.serialKeys, line.expiresAt);
-    const reservationId =
-      lineIdKey === "salesOrderLineId" && line.reservationId?.trim()
-        ? requireUuid(line.reservationId, "INVENTORY_FORM_LINES")
-        : undefined;
-    return {
-      [lineIdKey]: requireUuid(line.sourceLineId, "INVENTORY_FORM_LINES"),
-      sourceLineVersion: requireVersion(line.sourceLineVersion),
-      uomId: requireUuid(line.uomId, "INVENTORY_FORM_UOM"),
-      quantity: requirePositiveDecimal(line.quantity),
-      ...(reservationId ? { reservationId } : {}),
-      ...(tracking ? { tracking } : {}),
-    };
-  });
-}
-
-export function buildReceiptRequest(values: MovementFormValues) {
-  return {
-    nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
-    purchaseOrderId: requireUuid(values.sourceDocumentId, "INVENTORY_FORM_LINES"),
-    operationKey: generateUUIDv7(),
-    sourceDocumentVersion: requireVersion(values.sourceDocumentVersion),
-    businessEffectiveAt: requireIsoInstant(values.businessEffectiveAt),
-    lines: buildLines(values, "purchaseOrderLineId"),
-  };
-}
-
-export function buildDeliveryRequest(values: MovementFormValues) {
-  return {
-    nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
-    salesOrderId: requireUuid(values.sourceDocumentId, "INVENTORY_FORM_LINES"),
-    operationKey: generateUUIDv7(),
-    sourceDocumentVersion: requireVersion(values.sourceDocumentVersion),
-    businessEffectiveAt: requireIsoInstant(values.businessEffectiveAt),
-    lines: buildLines(values, "salesOrderLineId"),
-  };
-}
-
-/** `ReverseMovementDto` — both fields required; `lines` omitted reverses in full. */
-export function buildReversalRequest(reasonCode: string, businessEffectiveAt: string, lines: ReversalLineValues[] = []) {
-  const reason = reasonCode.trim().toUpperCase();
-  if (!INVENTORY_CODE_PATTERN.test(reason)) throw new Error("INVENTORY_FORM_REASON");
-  if (lines.length > MOVEMENT_LINES_MAX || new Set(lines.map((line) => line.lineId.trim())).size !== lines.length) {
-    throw new Error("INVENTORY_FORM_LINES");
-  }
-  return {
-    reasonCode: reason,
-    businessEffectiveAt: requireIsoInstant(businessEffectiveAt),
-    ...(lines.length ? { lines: lines.map((line) => {
-      const quantity = requirePositiveDecimal(line.quantity);
-      const serialKeys = buildSerialSelection(line.serialKeys, quantity);
-      return { lineId: requireUuid(line.lineId, "INVENTORY_FORM_LINES"), quantity,
-        ...(serialKeys ? { serialKeys } : {}) };
-    }) } : {}),
+    ...(row.requestedQuantity !== undefined ? { requestedQuantity: parseQuantity(row.requestedQuantity) } : {}),
+    ...(row.backorderedQuantity !== undefined ? { backorderedQuantity: parseQuantity(row.backorderedQuantity) } : {}),
+    ...(isMemberOf(row.outcome, ["FULL", "PARTIAL", "BACKORDER"] as const) ? { outcome: row.outcome } : {}),
   };
 }
 

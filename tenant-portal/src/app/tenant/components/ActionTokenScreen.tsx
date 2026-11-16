@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useCoreErrorText } from "@/app/(tenant)/core/hooks/useCoreErrorText";
 import { Eye, EyeOff } from "lucide-react";
 import {
   Button,
@@ -17,6 +18,7 @@ import {
 } from "../hooks/useActionTokenPassword";
 
 export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
+  const describeError = useCoreErrorText();
   const screen = useActionTokenPassword(flow);
   const { t } = screen;
   const copy = t.coreIdentity.actionToken;
@@ -147,7 +149,7 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
                   role="alert"
                   className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
                 >
-                  {screen.error.message ?? copy.genericFailure}
+                  {describeError(screen.error)}
                 </p>
               ) : null}
 

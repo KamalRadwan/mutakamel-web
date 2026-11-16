@@ -16,6 +16,7 @@ import { useTradeDocumentList } from "../documents/hooks/useTradeDocumentList";
 import { useTradeTableLabels } from "../documents/hooks/useTradeTableLabels";
 import { partyDisplayName } from "../documents/trade-document-contract";
 import { PurchaseQuotationDrawer } from "./components/PurchaseQuotationDrawer";
+import { PurchaseQuotationSupplierStatus } from "./components/PurchaseQuotationSupplierStatus";
 import { usePurchaseQuotationForm } from "./hooks/usePurchaseQuotationForm";
 import {
   PURCHASE_QUOTATIONS_PATH,
@@ -33,7 +34,7 @@ export default function PurchaseQuotationsPage() {
   const canCreate = list.scope.canWrite(PURCHASE_QUOTATION_PERMISSIONS.create);
   const form = usePurchaseQuotationForm(
     list.scope.headers,
-    list.scope.canWrite(PURCHASE_QUOTATION_PERMISSIONS.accounts),
+    canCreate,
     null,
     list.reload,
   );
@@ -51,7 +52,7 @@ export default function PurchaseQuotationsPage() {
           href={`${TENANT_ROUTES.tradePurchaseQuotations}/${row.id}`}
           className="text-foreground underline-offset-2 hover:underline"
         >
-          {row.documentNumber}
+          {row.documentNumber ?? t.statusValues["TradePurchaseQuotationStatus.DRAFT"]}
         </Link>
       ),
     },
@@ -83,12 +84,12 @@ export default function PurchaseQuotationsPage() {
           title={t.tradeDocuments.purchaseQuotations.title}
           description={t.tradeDocuments.purchaseQuotations.subtitle}
           primaryAction={
-            canCreate
+            canCreate && form.canUseSupplierPicker
               ? { label: t.tradeDocuments.purchaseQuotations.create, onClick: form.open }
               : undefined
           }
           secondaryActions={
-            <Button size="sm" variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
+            <Button size="sm" variant="outline" onClick={() => { form.searchSuppliers(""); void list.reload(); }} disabled={list.isRefreshing}>
               <RefreshCw
                 className={list.isRefreshing ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"
@@ -99,6 +100,7 @@ export default function PurchaseQuotationsPage() {
         />
 
         <TradeWriteOutcome write={form.write} />
+        {!form.isOpen ? <PurchaseQuotationSupplierStatus state={form} /> : null}
 
         {list.scope.isResolved ? (
           <>

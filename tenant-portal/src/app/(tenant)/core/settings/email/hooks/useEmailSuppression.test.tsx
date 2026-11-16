@@ -5,7 +5,14 @@ import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { useEmailSuppression } from "./useEmailSuppression";
 
-const mocks = vi.hoisted(() => ({ post: vi.fn(), locale: "en", keySequence: 0 }));
+const mocks = vi.hoisted(() => ({ post: vi.fn(), locale: "en", keySequence: 0, canManage: true }));
+vi.mock("@/design-system", async () => {
+  const actual = await vi.importActual<typeof import("@/design-system")>("@/design-system");
+  return {
+    ...actual,
+    useCan: () => mocks.canManage,
+  };
+});
 vi.mock("@/lib/api/axiosClient", () => ({ axiosClient: { post: mocks.post } }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: mocks.locale === "ar" ? ar : en }) }));
 vi.mock("@/lib/uuid", () => ({
@@ -17,7 +24,7 @@ vi.mock("@/lib/api/errors", () => ({
 
 const response = (data: unknown) => ({ data: { success: true, data } });
 const suppressed = { suppressed: true, reasonCode: "COMPLAINT", firstOccurredAt: "2026-10-23T10:00:00Z", lastOccurredAt: "2026-10-23T11:00:00Z" };
-beforeEach(() => { mocks.post.mockReset(); mocks.locale = "en"; mocks.keySequence = 0; });
+beforeEach(() => { mocks.post.mockReset(); mocks.locale = "en"; mocks.keySequence = 0; mocks.canManage = true; });
 afterEach(cleanup);
 
 describe("email suppression commands", () => {

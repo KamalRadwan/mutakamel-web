@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, FormModal, Input, TagColorPicker } from "@/design-system";
+import { DegradedBanner, Field, FormModal, Input, TagColorPicker } from "@/design-system";
+import { formatNumber } from "@/lib/format/number";
 import { useI18n } from "@/i18n/I18nContext";
 import type { CrmTagCatalogueItem } from "../../shared/tag-contract";
 import { useCrmTagForm } from "../hooks/useCrmTagForm";
@@ -12,6 +13,7 @@ interface CrmTagFormModalProps {
   onClose: () => void;
   onSaved: (tag: CrmTagCatalogueItem) => void;
   onReloadNeeded: (message: string) => void;
+  canWrite: boolean;
 }
 
 /**
@@ -19,16 +21,16 @@ interface CrmTagFormModalProps {
  * the same shell the Create Lead flow uses for its inline tag create. Mounted
  * only while open.
  */
-export function CrmTagFormModal({ target, existingTags, onClose, onSaved, onReloadNeeded }: CrmTagFormModalProps) {
-  const { t } = useI18n();
-  const form = useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded });
+export function CrmTagFormModal({ target, existingTags, onClose, onSaved, onReloadNeeded, canWrite }: CrmTagFormModalProps) {
+  const { t, lang } = useI18n();
+  const form = useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded, canWrite });
 
   return (
     <FormModal
       open
       size="card"
       onOpenChange={(open) => {
-        if (!open && !form.isSubmitting) onClose();
+        if (!open && !form.isPending()) onClose();
       }}
       title={form.isEdit ? t.crmTags.editTitle : t.crmTags.addTitle}
       isDirty={form.isDirty}
@@ -49,10 +51,10 @@ export function CrmTagFormModal({ target, existingTags, onClose, onSaved, onRelo
       }}
     >
       <div className="flex flex-col gap-4 py-2">
-        <Field
+        <Field showLabel
           label={t.crmTags.nameLabel}
           error={form.nameError ?? undefined}
-          hint={`${form.charCount}/${form.maxChars}`}
+          hint={`${formatNumber(form.charCount, lang)}/${formatNumber(form.maxChars, lang)}`}
           required
         >
           <Input
@@ -62,17 +64,18 @@ export function CrmTagFormModal({ target, existingTags, onClose, onSaved, onRelo
             onChange={(event) => form.handleNameChange(event.target.value)}
             onBlur={form.handleNameBlur}
             placeholder={t.crmTags.namePlaceholder}
-            maxLength={form.maxChars}
-            disabled={form.isSubmitting}
+            disabled={form.isSubmitting || !canWrite}
             autoFocus
           />
         </Field>
         <TagColorPicker
           value={form.color}
           onChange={form.handleColorChange}
+          onValidityChange={form.handleColorValidityChange}
           previewLabel={form.name}
-          disabled={form.isSubmitting}
+          disabled={form.isSubmitting || !canWrite}
         />
+        {form.isEdit && <DegradedBanner message={t.crmTags.editAppliesEverywhere} />}
       </div>
     </FormModal>
   );

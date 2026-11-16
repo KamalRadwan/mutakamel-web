@@ -156,23 +156,24 @@ export function useTenantBillingWorkspace(
     error: null,
   });
 
+  const userId = user?.id;
   const syncWalletRecovery = useCallback(() => {
-    if (!user?.id) throw conflict("WALLET_RECOVERY_UNAVAILABLE");
+    if (!userId) throw conflict("WALLET_RECOVERY_UNAVAILABLE");
     try {
-      const command = readWalletConfirmation(user.id, tenantId);
-      setWalletRecovery({ actorId: user.id, tenantId, command, unavailable: false });
+      const command = readWalletConfirmation(userId, tenantId);
+      setWalletRecovery({ actorId: userId, tenantId, command, unavailable: false });
       return command;
     } catch {
       setWalletRecovery((current) => ({
-        actorId: user.id,
+        actorId: userId,
         tenantId,
-        command: current?.actorId === user.id && current.tenantId === tenantId
+        command: current?.actorId === userId && current.tenantId === tenantId
           ? current.command : null,
         unavailable: true,
       }));
       throw conflict("WALLET_RECOVERY_UNAVAILABLE");
     }
-  }, [tenantId, user?.id]);
+  }, [tenantId, userId]);
 
   useEffect(() => {
     if (isAuthLoading || !user?.id) return;
@@ -535,9 +536,17 @@ export function useTenantBillingWorkspace(
       const clearedAt = walletPreviewGeneration.current;
       const fingerprint = stableFingerprint(dto);
       const key = intentKeys.current.get("wallet:preview", fingerprint);
-      const result = await runMutation("preview-wallet-adjustment", "wallet:preview", () =>
-        tenantBillingApi.previewWalletAdjustment(tenantId, dto, key),
-      );
+      const result = await runMutation("preview-wallet-adjustment", "wallet:preview", async () => {
+        const preview = await tenantBillingApi.previewWalletAdjustment(tenantId, dto, key);
+        if (
+          preview.direction !== dto.direction ||
+          normalizeSourceAmount(preview.sourceAmount) !== normalizeSourceAmount(dto.sourceAmount) ||
+          preview.sourceCurrencyCode !== dto.sourceCurrencyCode
+        ) {
+          throw conflict("WALLET_PREVIEW_MISMATCH");
+        }
+        return preview;
+      });
       if (clearedAt !== walletPreviewGeneration.current) return null;
       if (result) setWalletPreview(result);
       return result;
@@ -648,11 +657,16 @@ export function useTenantBillingWorkspace(
         setMutation({ name: null, error: conflict("PAYMENT_REFUND_NOT_ALLOWED") });
         return null;
       }
-      const fingerprint = stableFingerprint({ paymentId, note: note?.trim() || null });
+      const normalizedNote = note?.trim() ?? "";
+      if (normalizedNote.length < 10 || normalizedNote.length > 500) {
+        setMutation({ name: null, error: conflict("PAYMENT_REFUND_NOTE_INVALID") });
+        return null;
+      }
+      const fingerprint = stableFingerprint({ paymentId, note: normalizedNote });
       const key = intentKeys.current.get(`payment:refund:${paymentId}`, fingerprint);
       const intentScope = `payment:refund:${paymentId}`;
       const result = await runMutation("refund-payment", intentScope, () =>
-        tenantBillingApi.refundPayment(paymentId, note, key),
+        tenantBillingApi.refundPayment(paymentId, normalizedNote, key),
       );
       if (result) await refresh();
       return result;
@@ -986,6 +1000,11 @@ function conflict(
     errorCode,
     message,
   };
+}
+
+// Ignore canonical decimal padding without converting financial values to floats.
+function normalizeSourceAmount(value: string): string {
+  return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
 function isFutureInstant(value: string): boolean {

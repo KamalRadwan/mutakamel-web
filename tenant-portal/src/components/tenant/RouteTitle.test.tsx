@@ -45,13 +45,13 @@ describe("RouteTitle", () => {
     expect(document.title).not.toBe(leads);
   });
 
-  it("follows the language toggle", () => {
+  it("follows the language toggle", async () => {
     mount("/crm/leads");
     expect(document.title).toContain(ar.nav.leads);
 
     // The toggle writes to the language store, which is a useSyncExternalStore
     // subscription — act() flushes the re-render it schedules.
-    act(() => setLanguage("en"));
+    await act(() => setLanguage("en"));
     expect(document.title).toContain(en.nav.leads);
     expect(document.title).toContain(en.common.portalName);
   });

@@ -19,6 +19,36 @@ tables still include names such as `modules`, `module_tiers`, and `module_id`.
 Those names are storage and current-wire legacy details. There is no supported
 `/api/admin/core/v1/modules` alias and frontend code must not recreate one.
 
+## Core Template Designer base policy (source verified 2026-11-11)
+
+The Core feature list includes `baseIncluded: boolean` and
+`baseGrantRevision: integer` (1..2147483647). The Admin Features tab exposes a
+separate default-availability panel only for `core.template_designer` owned by
+the current `core` Application. Missing or malformed policy evidence is
+unavailable and requires refresh; it never means excluded. Commercial
+`isActive` remains feature metadata and does not change the base grant.
+
+`PATCH /api/admin/core/v1/features/:id` accepts a standalone body
+`{basePolicy:{expectedBaseGrantRevision:number,included:boolean}}`, with no
+metadata fields. The route is WRITE_SENSITIVE, idempotent, and requires BOTH
+`admin.catalog.manage` and `admin.catalog.critical`. The shared client provides
+cookie authentication and CSRF; one UUIDv7 idempotency key identifies the exact
+reviewed intent. The response is a separate policy receipt containing only
+`id`, `moduleId`, `key`, `baseIncluded`, and `baseGrantRevision`; it is not a
+`FeatureView`. The portal validates identity, inclusion, and revision before
+accepting it and refetches authoritative policy after every write outcome.
+
+The confirmation names the global scope for eligible tenants and separates it
+from a tenant or tier change. The server authoritatively enforces Core's
+SYSTEM/NON_BILLABLE/INTERNAL identity and publication/active prerequisites.
+`CORE_BASE_FEATURE_REVISION_STALE` and `CORE_BASE_FEATURE_NOT_ELIGIBLE` remain
+persistent in-dialog rejections. Missing/malformed receipts and ambiguous or
+in-flight outcomes retain the original exact command; a refresh at the same
+revision does not prove an in-flight write failed. Only an exact retry is
+available until newer authoritative evidence resolves the intent. A 403 is a
+permission failure, never an empty policy. The UI is source-integrated;
+authenticated runtime verification follows the required Admin rebuild.
+
 ## Ownership and browser rules
 
 | Concern | Contract |
@@ -585,6 +615,7 @@ interface SetPriceTiersDto {
 interface UpsertCurrencyRateDto {
   currencyUnitsPerUsd: string; // positive; <=12 whole and <=12 decimal digits
   isActive?: boolean;
+  confirmLargeChange?: boolean; // explicit approval when changing a rate by >50%
 }
 
 interface SetCurrencyRatesDto {
@@ -2169,6 +2200,40 @@ rate revision, even if the submitted values are unchanged.
 
 ## Error catalogue for frontend handling
 
+Currency-rate error presentation source reviewed **2026-10-31**: only local
+`CurrencyRateValidationError` messages (including batch-line validation) render
+their translated text verbatim. HTTP 422 `CURRENCY_RATE_CHANGE_TOO_LARGE` maps
+to the Arabic/English `settings.currencyRates.validation.rateChangeTooLarge`
+message asking the operator to review and confirm the change. Other load, single-save, and batch-save
+failures use the active language's operation fallback; banners and toasts retain
+the normalized correlation ID when available. Transport and server messages are
+never rendered on this surface.
+
+Currency-rate approval source reviewed **2026-10-31**: single add/edit and batch
+save first open the same before/after confirmation modal without sending a write.
+Cancelling retains the draft. Only explicit confirmation sends
+`confirmLargeChange: true` on the single DTO or each batch entry; status toggles
+also send approval after their confirmation. The API helper forwards the flag
+unchanged. `SetCurrencyRatesDto` entries inherit it from `UpsertCurrencyRateDto`.
+Typecheck, lint, unit specs, and the admin production rebuild remain lead gates.
+
+Currency-rate response readers source reviewed **2026-10-31**: list and batch
+responses require an array; every list, batch, and single-upsert row requires
+an uppercase three-letter `currencyCode`, a `currencyUnitsPerUsd` string
+matching `/^\d{1,12}(?:\.\d{1,12})?$/`, and boolean `isActive`.
+A malformed response rejects before updating table state and uses the localized
+load/save failure described above. Existing rows remain unchanged.
+
+Catalogue error presentation updated **2026-10-29**: Application dialogs,
+database bind failures (including per-server FAILED receipts), and catalogue
+notifications use shared Arabic/English copy for revision, publication,
+lifecycle, deletion, database-binding and tier conflicts. Known codes explain
+the next operator action; unknown codes retain the server message. Raw machine
+codes and available correlation IDs remain visible with LTR bidi isolation in
+both locales. Mutation localization preserves status, retry/idempotency and
+request-outcome metadata. Automated checks and the admin production rebuild
+remain lead verification gates.
+
 Application errors:
 
 - `APPLICATION_NOT_FOUND`
@@ -2250,6 +2315,14 @@ visible action with this unused legacy permission.
 
 ## Current frontend implementation and remaining gates
 
+Database bind batch behavior source verified **2026-10-29**: Core accepts at
+most five servers per bind command. The portal mirrors this limit for initial
+selection, Select all, and retry-failed. Manual selections above five disable
+confirmation and show Arabic/English guidance to bind in batches of five.
+Submission also enforces the limit, including uncertain-outcome retries,
+without changing the original intent. Automated checks and the admin rebuild
+remain lead verification gates.
+
 Implemented in active frontend source:
 
 - the Application list wires create, all documented filters including
@@ -2272,6 +2345,21 @@ Implemented in active frontend source:
 - Application detail exposes metadata and database-policy revision-fenced
   editing, reasoned lifecycle commands, DRAFT-only deletion, and manifest
   evidence with independent retry state;
+- Delete confirmation source updated **2026-10-30**: the operator must type
+  the exact Application name and enter a reason of at least eight trimmed
+  characters (maximum 256). The delete command carries that reason and the
+  current catalogue revision. Pending deletion blocks duplicate submission and
+  dismissal; failure is caught, displays localized feedback, and preserves the
+  input for retry. Only success navigates back to the catalogue. Automated
+  checks and the admin production rebuild remain lead verification gates;
+- Lifecycle confirmation source updated **2026-10-29**: Disable is offered only
+  for ACTIVE and DEPRECATED Applications and uses destructive styling. Its
+  Arabic/English dialog warns that disabling is irreversible, removes access
+  for every tenant, clears credentials and starts decommissioning. Confirmation
+  requires the exact Application key and a reason of at least eight trimmed
+  characters. Pending confirmation blocks duplicate submits and dismissal.
+  Activate and Deprecate retain their non-empty reason requirement. Automated
+  checks and the admin production rebuild remain lead verification gates;
 - list, detail, and mutation receipts consume the canonical
   `databaseDeployment` profile; detail renders Core's real `serverSummary`
   fleet counts and percentage rather than a local Database Server-list

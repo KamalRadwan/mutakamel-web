@@ -20,7 +20,8 @@ const ROLE_TO_TONE: Record<string, NonNullable<BadgeProps["tone"]>> = {
 
 // Resolves the wire value through docs/design/tokens.md's exhaustive
 // enum -> role table, renders Badge with the translated label, and adds the
-// pulsing dot when the role is "ink + motion" (pending). Always renders a
+// pulsing dot for pending roles. CRM lifecycle/category progress uses the
+// active brand tone so it cannot be mistaken for disabled metadata. Always renders a
 // text label — color is reinforcement, never the only signal. An unmapped
 // value renders neutral with the raw value in monospace, so a backend
 // addition is visible rather than silently swallowed.
@@ -28,6 +29,7 @@ export function StatusBadge({ value, kind, className }: StatusBadgeProps) {
   const { t } = useI18n();
   const role = resolveStatusRole(kind, value);
   const label = t.statusValues[`${kind}.${value}`];
+  const activeProgress = role === "pending" && (kind === "LeadStageFlag" || kind === "OpportunityStageFlag" || kind === "StageCategory");
 
   if (!role) {
     return (
@@ -38,9 +40,9 @@ export function StatusBadge({ value, kind, className }: StatusBadgeProps) {
   }
 
   return (
-    <Badge tone={ROLE_TO_TONE[role]} className={className}>
+    <Badge tone={activeProgress ? "brand" : ROLE_TO_TONE[role]} className={className}>
       {role === "pending" && (
-        <span className="dot-pending size-1.5 shrink-0 rounded-full bg-ink-400" aria-hidden="true" />
+        <span className={`dot-pending size-1.5 shrink-0 rounded-full ${activeProgress ? "bg-current" : "bg-ink-400"}`} aria-hidden="true" />
       )}
       {label ?? value}
     </Badge>

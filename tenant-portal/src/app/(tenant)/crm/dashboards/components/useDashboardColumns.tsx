@@ -40,7 +40,7 @@ export function useDashboardColumns({
       header: t.crmDashboards.name,
       cell: (dashboard) => (
         <div className="min-w-0">
-          <p className="truncate font-medium text-foreground">{dashboard.name}</p>
+          <p className="truncate font-normal text-foreground">{dashboard.name}</p>
           {dashboard.description ? (
             <p className="truncate text-2xs text-muted-foreground">{dashboard.description}</p>
           ) : null}

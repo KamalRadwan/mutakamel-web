@@ -1,265 +1,74 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { isIdempotentReplay } from "@/lib/api/outcomes";
-import {
-  buildUpdatePipelineRequest,
-  moveStageOrder,
-  parsePipelineResponse,
-  pipelinePath,
-  pipelineResetPath,
-  pipelineStagePath,
-  pipelineStagesPath,
-  pipelineStagesReorderPath,
-  type Pipeline,
-  type UpdatePipelineInput,
-} from "../pipeline-contract";
-import type { PipelineWriteResult } from "./usePipelines";
+import { parsePipelineResponse, pipelineConfigurationPath, pipelinePath, type Pipeline } from "../pipeline-contract";
 import { useOpportunityStageCatalogue } from "../../shared/hooks/useOpportunityStageCatalogue";
-
-const READ_CONFIG = { cache: "no-store", maxResponseBytes: 512 * 1024 } as const;
-const WRITE_CONFIG = {
-  cache: "no-store",
-  maxResponseBytes: 256 * 1024,
-  nonReplayable: true,
-} as const;
-
-const OK: PipelineWriteResult = { ok: true, replayed: false, error: null };
+import { usePipelineSafety, type PipelineWriteTicket } from "./usePipelineSafety";
+import { usePipelineDetailWrites, type PipelineSnapshot } from "./usePipelineDetailWrites";
+import { PIPELINE_READ_CONFIG, assertReceiptStatus, assertPipelineConfiguration } from "./pipeline-write-support";
 
 export function usePipelineDetail(pipelineId: string) {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const canManage = user?.permissions.includes("crm.pipelines.manage") ?? false;
-  const [pipeline, setPipeline] = useState<Pipeline | null>(null);
+  const safety = usePipelineSafety(`pipeline:${pipelineId}`);
+  const { scope, startRead, currentRead, reconciled } = safety;
+  const [snapshot, setSnapshot] = useState<PipelineSnapshot | null>(null);
+  const confirmed = useRef<PipelineSnapshot | null>(null);
+  const readFailed = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
-  // The catalogue is a SECOND source on this screen. Its failure degrades the
-  // attach control only; the pipeline itself still renders — states.md's
-  // partial-failure rule.
-  const { items: catalogue, queryError: catalogueError, reload: loadCatalogue } =
-    useOpportunityStageCatalogue(canManage);
-  const [pendingStageId, setPendingStageId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const load = useCallback(
-    async (signal?: AbortSignal): Promise<boolean> => {
-      setIsLoading(true);
-      setQueryError(null);
-      try {
-        const response = await axiosClient.get<unknown>(
-          pipelinePath(pipelineId),
-          { ...READ_CONFIG, signal },
-        );
-        setPipeline(parsePipelineResponse(response.data));
-        return true;
-      } catch (error) {
-        if (isAbortError(error)) return false;
-        setPipeline(null);
-        setQueryError(normalizeApiError(error));
-        return false;
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
-      }
-    },
-    [pipelineId],
-  );
-
+  const catalogue = useOpportunityStageCatalogue(canManage);
+  const accept = (value: Pipeline) => { confirmed.current = { scope, value }; setSnapshot(confirmed.current); };
+  const load = useCallback(async (signal?: AbortSignal, write?: PipelineWriteTicket): Promise<boolean> => {
+    const ticket = startRead(write);
+    if (!ticket) return false;
+    setIsLoading(true);
+    setQueryError(null);
+    try {
+      const response = await axiosClient.get<unknown>(canManage ? pipelineConfigurationPath(pipelineId) : pipelinePath(pipelineId), { ...PIPELINE_READ_CONFIG, signal });
+      if (signal?.aborted || !currentRead(ticket)) return false;
+      assertReceiptStatus(response, 200);
+      const value = parsePipelineResponse(response.data);
+      if (value.id !== pipelineId) throw new Error("Pipeline read belongs to another configuration.");
+      if (canManage) assertPipelineConfiguration(value);
+      confirmed.current = { scope, value };
+      readFailed.current = false;
+      setSnapshot(confirmed.current);
+      if (canManage) reconciled(ticket);
+      return true;
+    } catch (caught) {
+      if (signal?.aborted || !currentRead(ticket)) return false;
+      const error = normalizeApiError(caught);
+      readFailed.current = true;
+      if (error.status === 403 || error.status === 404) { confirmed.current = null; setSnapshot(null); }
+      setQueryError(error);
+      return false;
+    } finally { if (!signal?.aborted && currentRead(ticket)) setIsLoading(false); }
+  }, [scope, pipelineId, canManage, startRead, currentRead, reconciled]);
   useEffect(() => {
+    if (safety.busy) return;
     const controller = new AbortController();
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      // The shared catalogue loads independently so its failure cannot blank the pipeline.
-      void load(controller.signal);
-    });
+    queueMicrotask(() => { if (!controller.signal.aborted) void load(controller.signal); });
     return () => controller.abort();
-  }, [load]);
-
-  const save = async (
-    input: UpdatePipelineInput,
-  ): Promise<PipelineWriteResult> => {
-    if (!canManage) return forbidden();
-    let body: Record<string, unknown>;
-    try {
-      body = buildUpdatePipelineRequest(input);
-    } catch (error) {
-      return { ok: false, replayed: false, error: localError(error) };
-    }
-    setIsSaving(true);
-    try {
-      const response = await axiosClient.patch<unknown>(
-        pipelinePath(pipelineId),
-        body,
-        WRITE_CONFIG,
-      );
-      setPipeline(parsePipelineResponse(response.data));
-      return { ...OK, replayed: isIdempotentReplay(response.headers) };
-    } catch (error) {
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  /** `POST /:id/reset` — restores the canonical stage set. Destructive. */
-  const reset = async (): Promise<PipelineWriteResult> => {
-    if (!canManage) return forbidden();
-    setIsSaving(true);
-    try {
-      const response = await axiosClient.post<unknown>(
-        pipelineResetPath(pipelineId),
-        undefined,
-        WRITE_CONFIG,
-      );
-      setPipeline(parsePipelineResponse(response.data));
-      return { ...OK, replayed: isIdempotentReplay(response.headers) };
-    } catch (error) {
-      await load();
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  /** `POST /:id/stages` — attaches a catalogue stage at the final rank. */
-  const attachStage = async (
-    opportunityStageId: string,
-  ): Promise<PipelineWriteResult> => {
-    if (!canManage) return forbidden();
-    setPendingStageId(opportunityStageId);
-    try {
-      const response = await axiosClient.post<unknown>(
-        pipelineStagesPath(pipelineId),
-        { opportunityStageId },
-        WRITE_CONFIG,
-      );
-      // 201 returns the membership row, not the pipeline — reload for the
-      // recomputed ranks rather than splicing a shape this screen never
-      // renders on its own.
-      await load();
-      return { ...OK, replayed: isIdempotentReplay(response.headers) };
-    } catch (error) {
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
-    } finally {
-      setPendingStageId(null);
-    }
-  };
-
-  /** `DELETE /:id/stages/:pipelineStageId` — 204. */
-  const detachStage = async (
-    pipelineStageId: string,
-  ): Promise<PipelineWriteResult> => {
-    if (!canManage) return forbidden();
-    setPendingStageId(pipelineStageId);
-    try {
-      const response = await axiosClient.delete<unknown>(
-        pipelineStagePath(pipelineId, pipelineStageId),
-        WRITE_CONFIG,
-      );
-      await load();
-      return { ...OK, replayed: isIdempotentReplay(response.headers) };
-    } catch (error) {
-      await load();
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
-    } finally {
-      setPendingStageId(null);
-    }
-  };
-
-  /**
-   * `PATCH /:id/stages/reorder` — the body is the COMPLETE ordered id list
-   * (`ReorderPipelineStagesDto.orderedIds`), never a single position delta.
-   * Verified in pipelines.controller.ts; a per-stage rank PATCH does not exist
-   * and would race.
-   */
-  const moveStage = async (
-    pipelineStageId: string,
-    direction: -1 | 1,
-  ): Promise<PipelineWriteResult | null> => {
-    if (!canManage) return forbidden();
-    const current = pipeline;
-    if (!current) return null;
-    const orderedIds = moveStageOrder(
-      current.stages,
-      pipelineStageId,
-      direction,
-    );
-    if (!orderedIds) return null;
-    setPendingStageId(pipelineStageId);
-    // Optimistic: re-rank locally so the row visibly moves before the round
-    // trip, and restore the server's answer either way.
-    setPipeline({
-      ...current,
-      stages: orderedIds.map((id, index) => {
-        const stage = current.stages.find((entry) => entry.id === id);
-        return { ...(stage as (typeof current.stages)[number]), rank: index + 1 };
-      }),
-    });
-    try {
-      const response = await axiosClient.patch<unknown>(
-        pipelineStagesReorderPath(pipelineId),
-        { orderedIds },
-        WRITE_CONFIG,
-      );
-      await load();
-      return { ...OK, replayed: isIdempotentReplay(response.headers) };
-    } catch (error) {
-      setPipeline(current);
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
-    } finally {
-      setPendingStageId(null);
-    }
-  };
-
-  const attachedStageIds = new Set(
-    (pipeline?.stages ?? []).map((stage) => stage.opportunityStageId),
-  );
-
+  }, [load, safety.busy]);
+  const writes = usePipelineDetailWrites({ pipelineId, canManage, safety, confirmed, readFailed, load, accept });
+  const pipeline = snapshot?.scope === scope ? snapshot.value : null;
+  const attached = new Set(pipeline?.stages.map((stage) => stage.opportunityStageId));
   return {
-    t,
-    lang,
-    pipeline,
-    isLoading,
-    isSaving,
-    pendingStageId,
-    queryError,
+    t, lang, pipeline, isLoading, queryError, canManage,
     notFound: queryError?.status === 404,
-    catalogueError,
-    canManage,
-    // Only active, not-yet-attached definitions can be attached; the service
-    // rejects the rest with PIPELINE_STAGE_ALREADY_ASSIGNED or an inactive
-    // stage error.
-    attachableStages: (catalogueError ? [] : catalogue).filter(
-      (stage) => stage.isActive && !attachedStageIds.has(stage.id),
-    ),
-    save,
-    reset,
-    attachStage,
-    detachStage,
-    moveStage,
-    reload: () => load(),
-    reloadCatalogue: () => loadCatalogue(),
+    catalogueError: catalogue.queryError,
+    attachableStages: (catalogue.queryError ? [] : catalogue.items).filter((stage) => stage.isActive && !attached.has(stage.id)),
+    ...writes,
+    needsReconciliation: safety.needsReconciliation,
+    requiresCatalogue: safety.requiresCatalogue,
+    writeBlocked: safety.busy || safety.needsReconciliation,
+    isPending: safety.isPending,
+    reload: () => load(), reloadCatalogue: () => catalogue.reload(),
   };
-}
-
-function forbidden(): PipelineWriteResult {
-  return {
-    ok: false,
-    replayed: false,
-    error: { status: 403, code: "FORBIDDEN" },
-  };
-}
-
-function localError(error: unknown): NormalizedApiError {
-  return {
-    status: 0,
-    code: error instanceof Error ? error.message : "INVALID_INPUT",
-  };
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
 }

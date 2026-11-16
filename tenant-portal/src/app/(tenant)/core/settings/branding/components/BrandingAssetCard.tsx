@@ -1,15 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, FileUpload, type UploadFile } from "@/design-system";
+import { ImageIcon } from "lucide-react";
+import { Button, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatNumber } from "@/lib/format/number";
-import {
-  BRANDING_ASSET_MAX_BYTES,
-  BRANDING_ASSET_MIME_TYPES,
-  BRANDING_ASSET_PUBLIC_PATH,
-  type BrandingAssetKind,
-} from "../branding-contract";
+import { BRANDING_ASSET_PUBLIC_PATH, type BrandingAssetKind } from "../branding-contract";
+import { formatBrandingAssetLimits } from "../branding-image-validation";
 
 export interface BrandingAssetCardProps {
   kind: BrandingAssetKind;
@@ -18,19 +13,16 @@ export interface BrandingAssetCardProps {
   assetVersion: number;
   isUploading: boolean;
   error: string | null;
+  canManage: boolean;
   disabled: boolean;
-  onUpload: (file: File) => void;
-  onReject: (message: string) => void;
+  onOpenUpload: () => void;
 }
 
-const BYTES_PER_MEGABYTE = 1024 * 1024;
-
 /**
- * One branding asset: what is stored now, and the control that replaces it.
+ * Compact branding asset tile.
  *
- * The image is read back from the **public binary route**, not from a storage
- * key — the public payload carries no keys at all, and the bytes stream through
- * Core so no Storage credential ever reaches the browser.
+ * Stored bytes stream from Core's same-origin public binary route so storage
+ * keys and credentials never reach the browser.
  */
 export function BrandingAssetCard({
   kind,
@@ -39,77 +31,64 @@ export function BrandingAssetCard({
   assetVersion,
   isUploading,
   error,
+  canManage,
   disabled,
-  onUpload,
-  onReject,
+  onOpenUpload,
 }: BrandingAssetCardProps) {
   const { t, lang } = useI18n();
-  const [pending, setPending] = useState<UploadFile | null>(null);
-
-  const formatBytes = (bytes: number) =>
-    `${formatNumber(Math.round((bytes / BYTES_PER_MEGABYTE) * 10) / 10, lang, {
-      maximumFractionDigits: 1,
-    })} ${t.coreBilling.megabytes}`;
-
-  const files: UploadFile[] = pending
-    ? [
-        {
-          ...pending,
-          status: isUploading ? "uploading" : error ? "failed" : pending.status,
-          error: error ?? undefined,
-        },
-      ]
-    : [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {hasAsset ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a same-origin Core route that streams tenant-owned bytes; next/image would add an optimizer hop for an image already capped at 2 MB.
-          <img
-            src={`${BRANDING_ASSET_PUBLIC_PATH[kind]}?v=${assetVersion}`}
-            alt={title}
-            className="h-16 w-auto max-w-full rounded-sm border border-border bg-card object-contain p-1"
-          />
-        ) : (
-          <p className="text-xs text-muted-foreground">{t.coreBilling.brandingNoAsset}</p>
+    <div className="flex flex-col justify-between gap-2.5 rounded-md border border-border bg-surface-subtle p-3">
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-sm border border-border bg-card p-1.5",
+            kind === "logo" ? "h-14 w-20" : "size-14",
+          )}
+        >
+          {hasAsset ? (
+            // eslint-disable-next-line @next/next/no-img-element -- same-origin Core binary route capped server-side.
+            <img
+              src={`${BRANDING_ASSET_PUBLIC_PATH[kind]}?v=${assetVersion}`}
+              alt={title}
+              className="max-h-full max-w-full object-contain"
+            />
+          ) : (
+            <ImageIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="text-xs text-muted-foreground">
+            {formatBrandingAssetLimits(kind, t, lang)}
+          </p>
+          {!hasAsset && (
+            <p className="text-xs text-muted-foreground">{t.coreBilling.brandingNoAsset}</p>
+          )}
+        </div>
+
+        {canManage && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={isUploading}
+            disabled={disabled || isUploading}
+            onClick={onOpenUpload}
+          >
+            {hasAsset
+              ? t.coreSettings.brandingUi.replaceAsset
+              : t.coreSettings.brandingUi.uploadAsset}
+          </Button>
         )}
+      </div>
 
-        <FileUpload
-          files={files}
-          accept={BRANDING_ASSET_MIME_TYPES}
-          maxSizeBytes={BRANDING_ASSET_MAX_BYTES}
-          maxFiles={1}
-          disabled={disabled || isUploading}
-          formatBytes={formatBytes}
-          onFilesAdded={(added) => {
-            const file = added[0];
-            if (!file) return;
-            setPending({ id: `${kind}-${file.name}`, file, status: "ready" });
-            onUpload(file);
-          }}
-          onRemove={() => setPending(null)}
-          onReject={(messages) => {
-            setPending(null);
-            if (messages[0]) onReject(messages[0]);
-          }}
-          labels={{
-            instruction: t.coreBilling.uploadInstruction,
-            browse: t.coreBilling.uploadBrowse,
-            constraint: t.coreBilling.uploadConstraint,
-            remove: t.coreBilling.uploadRemove,
-            uploading: t.coreBilling.uploadInProgress,
-            tooLarge: t.coreBilling.uploadTooLarge,
-            wrongType: t.coreBilling.uploadWrongType,
-            tooMany: t.coreBilling.uploadTooMany,
-          }}
-        />
-
-        {error && !pending && <p className="text-xs text-destructive">{error}</p>}
-      </CardContent>
-    </Card>
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

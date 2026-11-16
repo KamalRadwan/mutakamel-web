@@ -13,6 +13,7 @@ import { useLeadBoard } from "./useLeadBoard";
 import { useLeadList, type LeadsView } from "./useLeadList";
 import { useLeadMutations } from "./useLeadMutations";
 import { useLeadStagesAndCapabilities } from "./useLeadStagesAndCapabilities";
+import { useLeadRealtimeInvalidation } from "./useLeadRealtimeInvalidation";
 
 export type { LeadItem, LeadStage } from "../lead-list-contract";
 export { DEFAULT_LEADS_SORT, type LeadsView } from "./useLeadList";
@@ -24,7 +25,7 @@ export { DEFAULT_LEADS_SORT, type LeadsView } from "./useLeadList";
  */
 export function useLeads() {
   const errorText = useCrmErrorText();
-  const { user } = useTenantAuth();
+  const { user, realtimeAuthGeneration } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
   // The page synchronizes the view before the debounced read fires; "card"
   // keeps the hook usable on its own.
@@ -43,10 +44,11 @@ export function useLeads() {
   }, []);
   const support = useLeadStagesAndCapabilities(branchId);
   const stages = refreshedStages ?? support.stages;
-  const list = useLeadList({ branchId, actorId: user?.id, activeView, onLoadStart: clearError });
+  const list = useLeadList({ branchId, actorId: user?.id, activeView, onLoadStart: clearError, generation: realtimeAuthGeneration });
   const { capabilities } = support;
-  const refreshStages = useCallback(async () => {
-    const currentStages = parseLeadStagesResponse(await readLeadStageCatalogue());
+  const refreshStages = useCallback(async (signal?: AbortSignal) => {
+    const currentStages = parseLeadStagesResponse(await readLeadStageCatalogue(signal));
+    if (signal?.aborted) return currentStages;
     setRefreshedStages(currentStages);
     return currentStages;
   }, []);
@@ -62,13 +64,19 @@ export function useLeads() {
   const { reload: reloadBoard } = board;
 
   const reconcile = useCallback(
-    async (page?: number) => {
-      const [reloaded, boardReloaded] = await Promise.all([reload(page), reloadBoard()]);
+    async (page?: number, signal?: AbortSignal) => {
+      const [reloaded, boardReloaded] = await Promise.all([reload(page, signal), reloadBoard(signal)]);
+      if (signal?.aborted) return false;
       setDataRevision((current) => current + 1);
       return activeView === "board" ? boardReloaded : reloaded;
     },
     [activeView, reload, reloadBoard],
   );
+  useLeadRealtimeInvalidation({
+    generation: realtimeAuthGeneration,
+    branchId,
+    reconcile: (signal) => reconcile(undefined, signal),
+  });
   const report = useCallback(
     (caught: unknown, fallback: string, leadId?: string) => {
       const message = errorText(normalizeApiError(caught)) ?? fallback;

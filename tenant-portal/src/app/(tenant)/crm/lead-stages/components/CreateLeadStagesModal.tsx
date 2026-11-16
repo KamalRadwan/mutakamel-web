@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import {
   Checkbox,
   Field,
@@ -11,7 +10,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  useBlurValidation,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -20,63 +18,20 @@ import {
   type CreateLeadStageFormData,
   type LeadStageCategory,
 } from "../lead-stage-contract";
+import { useCreateLeadStageForm } from "../hooks/useLeadStageForm";
 
 interface CreateModalProps {
   isOpen: boolean;
   isSubmitting: boolean;
+  submitBlocked?: boolean;
   error: string | null;
   onClose: () => void;
   onSubmit: (data: CreateLeadStageFormData) => Promise<boolean>;
 }
 
-const initialForm: CreateLeadStageFormData = {
-  nameAr: "",
-  nameEn: "",
-  flag: "CONTACTED",
-  category: "IN_PROGRESS",
-  isDefault: false,
-};
-
-export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, onSubmit }: CreateModalProps) {
+export function CreateLeadStagesModal({ isOpen, isSubmitting, submitBlocked, error, onClose, onSubmit }: CreateModalProps) {
   const { t } = useI18n();
-  const [form, setForm] = useState<CreateLeadStageFormData>(initialForm);
-  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
-
-  // The same two rules buildCreateLeadStageRequest enforces before it will
-  // build a body — stated once here so the user sees them before submitting
-  // rather than as a thrown "Invalid lead stage form."
-  const validateName = useCallback(
-    (value: string): string | undefined => {
-      const trimmed = value.trim();
-      if (!trimmed) return t.crmLeadStages.nameRequired;
-      if (trimmed.length > 80) return t.crmLeadStages.nameTooLong;
-      return undefined;
-    },
-    [t],
-  );
-
-  const arabicName = useBlurValidation(form.nameAr, validateName);
-  const englishName = useBlurValidation(form.nameEn, validateName);
-
-  const close = () => {
-    setForm(initialForm);
-    arabicName.reset();
-    englishName.reset();
-    onClose();
-  };
-
-  const handleSubmit = async () => {
-    // Reveal before checking: a never-blurred empty field has no error text
-    // yet, and FormModal's focus rule needs one to aim at.
-    arabicName.reveal();
-    englishName.reveal();
-    if (!arabicName.isValid || !englishName.isValid) return;
-    if (await onSubmit(form)) {
-      setForm(initialForm);
-      arabicName.reset();
-      englishName.reset();
-    }
-  };
+  const { form, setForm, arabicName, englishName, isDirty, close, submit } = useCreateLeadStageForm(onSubmit, onClose);
 
   return (
     <FormModal
@@ -89,7 +44,8 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
       density="compact"
       isDirty={isDirty}
       isSubmitting={isSubmitting}
-      onSubmit={() => void handleSubmit()}
+      submitDisabled={submitBlocked}
+      onSubmit={() => void submit()}
       error={error ?? undefined}
       labels={{
         submit: isSubmitting ? t.crmLeadStages.creating : t.common.create,
@@ -104,7 +60,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
       }}
     >
       <div className="flex flex-col gap-4">
-        <Field label={t.crmLeadStages.arabicName} required error={arabicName.error}>
+        <Field showLabel label={t.crmLeadStages.arabicName} required hint={t.crmLeadStages.nameLimit} error={arabicName.error}>
           <Input size="sm" placeholder={t.crmLeadStages.arabicName}
             dir="rtl"
             value={form.nameAr}
@@ -115,7 +71,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
             {...arabicName.fieldProps}
           />
         </Field>
-        <Field label={t.crmLeadStages.englishName} required error={englishName.error}>
+        <Field showLabel label={t.crmLeadStages.englishName} required hint={t.crmLeadStages.nameLimit} error={englishName.error}>
           <Input size="sm" placeholder={t.crmLeadStages.englishName}
             dir="ltr"
             value={form.nameEn}
@@ -126,7 +82,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
             {...englishName.fieldProps}
           />
         </Field>
-        <Field label={t.crmLeadStages.flag}>
+        <Field showLabel label={t.crmLeadStages.flag}>
           <Select
             value={form.flag}
             onValueChange={(value) => {
@@ -146,7 +102,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
             </SelectContent>
           </Select>
         </Field>
-        <Field label={t.crmLeadStages.category}>
+        <Field showLabel label={t.crmLeadStages.category}>
           <Select
             value={form.category}
             onValueChange={(value) => setForm((current) => ({ ...current, category: value as LeadStageCategory }))}

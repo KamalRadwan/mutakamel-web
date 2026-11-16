@@ -4,11 +4,36 @@ import { useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { safeSessionStorage } from "@/lib/safeStorage";
 
+const STORAGE_KEY = "tenant_scroll";
+const MAX_ENTRIES = 50;
+const PERSIST_DELAY_MS = 150;
+
+function readOffsets() {
+  const offsets = new Map<string, [number, number]>();
+  const raw = safeSessionStorage.getItem(STORAGE_KEY);
+  if (raw === null) return offsets;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return offsets;
+    for (const [key, value] of Object.entries(parsed)) {
+      if (
+        Array.isArray(value) && value.length === 2 &&
+        typeof value[0] === "number" && Number.isFinite(value[0]) &&
+        typeof value[1] === "number" && Number.isFinite(value[1])
+      ) {
+        offsets.set(key, [value[0], value[1]]);
+      }
+    }
+  } catch {
+    // Malformed session data must not prevent mounting a scroll container.
+  }
+  return offsets;
+}
+
 function restore(element: HTMLElement, storageKey: string) {
-  const raw = safeSessionStorage.getItem(storageKey);
-  if (raw === null) return;
-  const [x, y] = raw.split(",").map(Number);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const offset = readOffsets().get(storageKey);
+  if (!offset) return;
+  const [x, y] = offset;
   // Stored raw: under RTL scrollLeft is browser-dependent in sign, and a raw
   // value round-trips correctly inside the browser that wrote it.
   element.scrollLeft = x;
@@ -28,7 +53,7 @@ function restore(element: HTMLElement, storageKey: string) {
 // a throwing or absent sessionStorage.
 export function useScrollRestoration(viewName: string) {
   const pathname = usePathname();
-  const storageKey = `tenant_scroll_${pathname}:${viewName}`;
+  const storageKey = `${pathname}:${viewName}`;
 
   // A callback ref with a React 19 cleanup, not an effect over a ref object:
   // the container is mounted conditionally (loading, error and empty each
@@ -38,16 +63,31 @@ export function useScrollRestoration(viewName: string) {
     (element: HTMLDivElement | null) => {
       if (!element) return;
       restore(element, storageKey);
+      let timer: ReturnType<typeof setTimeout> | undefined;
 
       function persist() {
         if (!element) return;
-        safeSessionStorage.setItem(storageKey, `${element.scrollLeft},${element.scrollTop}`);
+        // Merge at flush time so other mounted views keep their latest offsets.
+        const offsets = readOffsets();
+        offsets.delete(storageKey);
+        offsets.set(storageKey, [element.scrollLeft, element.scrollTop]);
+        const entries = [...offsets].slice(-MAX_ENTRIES);
+        safeSessionStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(entries)));
       }
 
-      element.addEventListener("scroll", persist, { passive: true });
+      function schedulePersist() {
+        if (timer !== undefined) return;
+        timer = setTimeout(() => {
+          timer = undefined;
+          persist();
+        }, PERSIST_DELAY_MS);
+      }
+
+      element.addEventListener("scroll", schedulePersist, { passive: true });
       return () => {
+        element.removeEventListener("scroll", schedulePersist);
+        clearTimeout(timer);
         persist();
-        element.removeEventListener("scroll", persist);
       };
     },
     [storageKey],

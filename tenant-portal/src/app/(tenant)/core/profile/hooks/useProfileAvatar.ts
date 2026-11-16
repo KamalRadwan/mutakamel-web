@@ -18,7 +18,7 @@ export function useProfileAvatar() {
   const { t } = useI18n();
   const copy = t.coreIdentity.profile;
   const toast = useToast();
-  const src = useProfileAvatarImage(user?.id);
+  const src = useProfileAvatarImage(user?.id, user?.hasAvatar);
   const busy = useRef(false);
   const [pending, setPending] = useState<"upload" | "remove" | null>(null);
   const [error, setError] = useState<string | null>(null);

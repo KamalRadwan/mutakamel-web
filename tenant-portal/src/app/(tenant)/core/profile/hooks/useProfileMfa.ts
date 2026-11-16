@@ -40,9 +40,10 @@ export function useProfileMfa() {
   }, []);
 
   useEffect(() => {
+    const generation = loadGeneration;
     let cancelled = false;
     queueMicrotask(() => { if (!cancelled) void reload(); });
-    return () => { cancelled = true; loadGeneration.current++; };
+    return () => { cancelled = true; generation.current++; };
   }, [reload]);
 
   const submit = async (event: FormEvent) => {

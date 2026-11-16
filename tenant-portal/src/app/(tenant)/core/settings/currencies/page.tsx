@@ -1,283 +1,247 @@
 "use client";
 
-import { Pencil, RefreshCw, Star, XCircle } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import {
-  Badge,
   Button,
-  DataTable,
-  FilterBar,
+  DegradedBanner,
   PageHeader,
   PermissionGate,
-  SubNav,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  CORE_SETTINGS_NAV_ITEMS,
-  type ColumnDef,
-  type FilterValues,
+  TooltipProvider,
 } from "@/design-system";
-import { formatDecimalString } from "@/lib/format/number";
-import { formatTemplate } from "@/lib/format/template";
-import type { ActiveStatus } from "../../core-validation";
-import type { Currency } from "./currency-contract";
 import { CreateCurrencyModal } from "./components/CreateCurrencyModal";
+import { CurrenciesListCard } from "./components/CurrenciesListCard";
+import { CurrencyBlockerModal } from "./components/CurrencyBlockerModal";
+import { buildCurrencyColumns } from "./components/CurrencyTableColumns";
 import { DeactivateCurrencyConfirmModal } from "./components/DeactivateCurrencyConfirmModal";
 import { EditCurrencyModal } from "./components/EditCurrencyModal";
+import { SetDefaultCurrencyConfirmModal } from "./components/SetDefaultCurrencyConfirmModal";
+import { CURRENCY_PAGE_SIZE_OPTIONS } from "./currency-contract";
+import { describeCurrencyQueryError } from "./hooks/currency-errors";
 import { useCurrencies } from "./hooks/useCurrencies";
 
 export default function CurrenciesPage() {
   const {
     t,
     lang,
+    canRead,
     canManage,
-    items,
-    pageInfo,
-    statusFilter,
+    visibleItems,
+    visiblePageInfo,
+    listFilter,
     search,
+    hasActiveFilters,
+    hasRetainedRows,
+    isQueryForbidden,
     isLoading,
     isRefreshing,
     isSubmitting,
     pendingId,
     queryError,
+    baseCurrency,
+    baseStatus,
+    isBaseLoading,
+    reloadBaseCurrency,
     formError,
+    formErrorCode,
     createOpen,
     editing,
+    isReactivatingInEdit,
+    settingDefault,
     deactivating,
+    blocker,
     setPage,
-    setStatusFilter,
+    setPageSize,
+    setListFilter,
     setSearch,
+    clearFilters,
     openCreate,
     closeCreate,
     openEdit,
     closeEdit,
+    openSetDefault,
+    closeSetDefault,
     openDeactivate,
     closeDeactivate,
+    closeBlocker,
     create,
     update,
-    setDefault,
+    confirmSetDefault,
     deactivate,
+    reactivate,
     reload,
     sort,
     setSort,
   } = useCurrencies();
 
-  const filterValues: FilterValues = statusFilter
-    ? { status: { kind: "select", value: statusFilter } }
-    : {};
+  const loadFailure =
+    queryError && !isQueryForbidden ? describeCurrencyQueryError(queryError, t) : null;
+  const baseCurrencyCode = baseCurrency?.code ?? null;
 
-  const columns: ColumnDef<Currency>[] = [
-    {
-      id: "code",
-      sortable: true,
-      header: t.coreSettings.currencyCode,
-      cell: (currency) => (
-        <span className="flex items-center gap-2">
-          <span className="font-medium text-foreground">{currency.code}</span>
-          {currency.isDefault ? <Badge tone="brand">{t.coreSettings.currencyDefault}</Badge> : null}
-        </span>
-      ),
-    },
-    { id: "name", sortable: true, header: t.coreSettings.currencyName, cell: (currency) => currency.name },
-    {
-      id: "symbol",
-      header: t.coreSettings.currencySymbol,
-      cell: (currency) => currency.symbol ?? "—",
-    },
-    {
-      id: "rate",
-      sortable: true,
-      header: t.coreSettings.currencyExchangeRate,
-      numeric: true,
-      // `numeric(18,8)` arrives as an exact string and is formatted, never parsed.
-      cell: (currency) =>
-        currency.exchangeRate === null
-          ? "—"
-          : formatDecimalString(currency.exchangeRate, lang, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 8,
-            }),
-    },
-    {
-      id: "status",
-      header: t.common.status,
-      cell: (currency) => (
-        <Badge tone={currency.status === "ACTIVE" ? "positive" : "neutral"}>
-          {currency.status === "ACTIVE" ? t.common.active : t.common.inactive}
-        </Badge>
-      ),
-    },
-    ...(canManage
-      ? [
-          {
-            id: "actions",
-            header: t.common.actions,
-            align: "end" as const,
-            sticky: "end" as const,
-            cell: (currency: Currency) => (
-              <span className="flex items-center justify-end gap-1">
-                <RowAction
-                  label={t.coreSettings.currencyEditTitle}
-                  disabled={pendingId !== null}
-                  onClick={() => openEdit(currency)}
-                >
-                  <Pencil className="size-4" aria-hidden="true" />
-                </RowAction>
-                {!currency.isDefault && currency.status === "ACTIVE" ? (
-                  <RowAction
-                    label={t.coreSettings.currencySetDefault}
-                    disabled={pendingId !== null}
-                    loading={pendingId === currency.id}
-                    onClick={() => void setDefault(currency)}
-                  >
-                    <Star className="size-4" aria-hidden="true" />
-                  </RowAction>
-                ) : null}
-                {!currency.isDefault && currency.status === "ACTIVE" ? (
-                  <RowAction
-                    label={t.coreSettings.deactivate}
-                    disabled={pendingId !== null}
-                    onClick={() => openDeactivate(currency)}
-                  >
-                    <XCircle className="size-4 text-destructive" aria-hidden="true" />
-                  </RowAction>
-                ) : null}
-              </span>
-            ),
-          },
-        ]
-      : []),
-  ];
+  const columns = buildCurrencyColumns({
+    t,
+    lang,
+    canManage,
+    pendingId,
+    baseCurrencyCode,
+    onEdit: openEdit,
+    onSetDefault: openSetDefault,
+    onDeactivate: openDeactivate,
+    onReactivate: (currency) => void reactivate(currency),
+  });
+
+  const queryFailure = !isLoading && !hasRetainedRows ? loadFailure : null;
+  const refreshFailure = !isLoading && hasRetainedRows ? loadFailure : null;
 
   return (
-    <PermissionGate require="currencies.currency.read">
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
-          title={t.coreSettings.currenciesTitle}
-          description={t.coreSettings.currenciesSubtitle}
-          primaryAction={
-            canManage ? { label: t.coreSettings.currencyCreate, onClick: openCreate } : undefined
-          }
-          secondaryActions={
-            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
-              <RefreshCw
-                className={isRefreshing ? "size-4 animate-spin" : "size-4"}
-                aria-hidden="true"
+    <PermissionGate
+      require="currencies.currency.read"
+      denied={!canRead || (!isLoading && isQueryForbidden)}
+    >
+      <TooltipProvider>
+        <div className="flex flex-col gap-3">
+          <PageHeader
+            className="sr-only"
+            title={t.coreSettings.currenciesTitle}
+            primaryAction={
+              canManage
+                ? {
+                    label: t.coreSettings.currencyCreate,
+                    icon: <Plus className="size-4" aria-hidden="true" />,
+                    onClick: openCreate,
+                    disabled: isSubmitting || pendingId !== null,
+                  }
+                : undefined
+            }
+            secondaryActions={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void reload()}
+                disabled={isRefreshing}
+              >
+                <RefreshCw
+                  className={isRefreshing ? "size-4 animate-spin" : "size-4"}
+                  aria-hidden="true"
+                />
+                {t.coreSettings.reload}
+              </Button>
+            }
+          />
+
+          {baseStatus === "unknown" && !isLoading && !queryFailure && !isQueryForbidden ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DegradedBanner
+                message={t.coreSettings.currencyBaseLoadFailed}
+                className="flex-1"
               />
-              {t.coreSettings.reload}
-            </Button>
-          }
-        />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void reloadBaseCurrency()}
+                disabled={isBaseLoading}
+              >
+                {t.coreSettings.currencyBaseRetry}
+              </Button>
+            </div>
+          ) : null}
 
-        <SubNav items={CORE_SETTINGS_NAV_ITEMS} />
+          {refreshFailure ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DegradedBanner
+                message={
+                  refreshFailure.description
+                    ? `${refreshFailure.title} — ${refreshFailure.description}`
+                    : refreshFailure.title
+                }
+                className="flex-1"
+              />
+              {refreshFailure.retryable ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void reload()}
+                  disabled={isRefreshing}
+                >
+                  {t.common.retry}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
 
-        <FilterBar
-          filters={[
-            {
-              id: "status",
-              kind: "select",
-              label: t.common.status,
-              placeholder: t.coreSettings.statusAny,
-              options: [
-                { value: "ACTIVE", label: t.common.active },
-                { value: "INACTIVE", label: t.common.inactive },
-              ],
-            },
-          ]}
-          values={filterValues}
-          onChange={(next) => {
-            const value = next.status;
-            setStatusFilter(
-              value?.kind === "select" && value.value ? (value.value as ActiveStatus) : undefined,
-            );
-          }}
-          onReset={() => setStatusFilter(undefined)}
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t.coreSettings.currencySearch}
-          clearAllLabel={t.coreSettings.clearFilters}
-          filtersLabel={t.common.filter}
-        />
+          <CurrenciesListCard
+            t={t}
+            columns={columns}
+            items={visibleItems}
+            pageInfo={visiblePageInfo}
+            sort={sort}
+            listFilter={listFilter}
+            search={search}
+            hasActiveFilters={hasActiveFilters}
+            canManage={canManage}
+            isLoading={isLoading}
+            queryFailure={queryFailure}
+            onPageChange={setPage}
+            pageSizeOptions={CURRENCY_PAGE_SIZE_OPTIONS}
+            onPageSizeChange={setPageSize}
+            onSortChange={setSort}
+            onListFilterChange={setListFilter}
+            onSearchChange={setSearch}
+            onClearFilters={clearFilters}
+            onOpenCreate={openCreate}
+            onRetry={() => void reload()}
+          />
 
-        <DataTable
-          columns={columns}
-          rows={items}
-          isLoading={isLoading}
-          error={queryError}
-          onRetry={() => void reload()}
-          page={pageInfo}
-          onPageChange={setPage}
-          sort={sort}
-          onSortChange={setSort}
-          rowKey={(currency) => currency.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: t.coreSettings.currencyLoadFailed,
-            emptyTitle: t.coreSettings.currencyEmpty,
-            selectAll: t.common.actions,
-            selectRow: t.common.actions,
-            sortAscending: t.common.actions,
-            sortDescending: t.common.actions,
-            notSorted: t.common.actions,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
-
-        <CreateCurrencyModal
-          key={createOpen ? "create-open" : "create-closed"}
-          isOpen={createOpen}
-          onClose={closeCreate}
-          onSubmit={create}
-          isSubmitting={isSubmitting}
-          error={formError}
-        />
-
-        {editing ? (
-          <EditCurrencyModal
-            key={editing.id}
-            currency={editing}
-            onClose={closeEdit}
-            onSubmit={update}
+          <CreateCurrencyModal
+            key={createOpen ? "create-open" : "create-closed"}
+            isOpen={createOpen}
+            onClose={closeCreate}
+            onSubmit={create}
             isSubmitting={isSubmitting}
             error={formError}
+            errorCode={formErrorCode}
+            baseStatus={baseStatus}
+            baseCurrencyCode={baseCurrencyCode}
           />
-        ) : null}
 
-        <DeactivateCurrencyConfirmModal
-          currency={deactivating}
-          onClose={closeDeactivate}
-          onConfirm={() => void deactivate()}
-          isSubmitting={pendingId !== null}
-        />
-      </div>
+          {editing ? (
+            <EditCurrencyModal
+              key={`edit-${editing.id}-${isReactivatingInEdit ? "activate" : "edit"}`}
+              currency={editing}
+              onClose={closeEdit}
+              onSubmit={update}
+              isSubmitting={isSubmitting}
+              error={formError}
+              errorCode={formErrorCode}
+              baseCurrencyCode={baseCurrencyCode}
+              activateOnSubmit={isReactivatingInEdit}
+            />
+          ) : null}
+
+          <SetDefaultCurrencyConfirmModal
+            currency={settingDefault}
+            baseCurrency={baseCurrency}
+            baseStatus={baseStatus}
+            onClose={closeSetDefault}
+            onConfirm={() => void confirmSetDefault()}
+            isSubmitting={
+              pendingId !== null && settingDefault !== null && pendingId === settingDefault.id
+            }
+          />
+
+          <DeactivateCurrencyConfirmModal
+            currency={deactivating}
+            onClose={closeDeactivate}
+            onConfirm={() => void deactivate()}
+            isSubmitting={
+              pendingId !== null && deactivating !== null && pendingId === deactivating.id
+            }
+          />
+
+          <CurrencyBlockerModal blocker={blocker} onClose={closeBlocker} />
+        </div>
+      </TooltipProvider>
     </PermissionGate>
-  );
-}
-
-function RowAction({
-  label,
-  disabled,
-  loading,
-  onClick,
-  children,
-}: {
-  label: string;
-  disabled: boolean;
-  loading?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={label} disabled={disabled} loading={loading} onClick={onClick}>
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
   );
 }

@@ -19,7 +19,8 @@ const permissions = ["admin.tenant_users.read", "admin.tenant_users.reset_passwo
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: { permissions }, isLoading: false }),
 }));
-vi.mock("@/lib/auth/rbac", () => ({
+vi.mock("@/lib/auth/rbac", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/auth/rbac")>(),
   adminCanAll: (_user: unknown, required: readonly string[]) =>
     required.every((permission) => permissions.includes(permission)),
 }));

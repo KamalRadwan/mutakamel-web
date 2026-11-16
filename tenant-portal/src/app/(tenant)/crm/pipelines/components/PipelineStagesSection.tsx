@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronDown, ChevronUp, Lock, Plus, Trash2 } from "lucide-react";
 import {
   Badge,
@@ -22,6 +21,7 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
+import { usePipelineStageSelection } from "../hooks/usePipelineStageSelection";
 import {
   moveStageOrder,
   type OpportunityStageDefinition,
@@ -34,9 +34,10 @@ interface PipelineStagesSectionProps {
   catalogueUnavailable: boolean;
   canManage: boolean;
   pendingStageId: string | null;
-  onAttach: (opportunityStageId: string) => void;
+  onAttach: (opportunityStageId: string) => void | Promise<boolean | void>;
   onDetach: (pipelineStageId: string) => void;
   onMove: (pipelineStageId: string, direction: -1 | 1) => void;
+  onReloadCatalogue?: () => void;
 }
 
 /**
@@ -57,9 +58,11 @@ export function PipelineStagesSection({
   onAttach,
   onDetach,
   onMove,
+  onReloadCatalogue,
 }: PipelineStagesSectionProps) {
   const { t, lang } = useI18n();
-  const [selectedStageId, setSelectedStageId] = useState<string>("");
+  const selection = usePipelineStageSelection(onAttach);
+  const { selectedStageId, setSelectedStageId } = selection;
 
   return (
     <DetailSection
@@ -69,7 +72,9 @@ export function PipelineStagesSection({
     >
       <div className="flex flex-col gap-3">
         {canManage && catalogueUnavailable ? (
-          <DegradedBanner message={t.crmPipelines.catalogueUnavailable} />
+          <div className="space-y-2"><DegradedBanner message={t.crmPipelines.catalogueUnavailable} />
+            {onReloadCatalogue && <Button variant="outline" onClick={onReloadCatalogue}>{t.common.retry}</Button>}
+          </div>
         ) : null}
 
         {stages.length === 0 ? (
@@ -92,10 +97,8 @@ export function PipelineStagesSection({
                   {localizedName(stage, lang)}
                 </span>
                 <StatusBadge kind="OpportunityStageFlag" value={stage.flag} />
-                <Badge tone="neutral">
-                  {t.statusValues[`StageCategory.${stage.category}`] ??
-                    stage.category}
-                </Badge>
+                {["NEW", "WON", "LOST"].includes(stage.flag) && <Badge tone="neutral">{t.crmPipelines.review.requiredStage}</Badge>}
+                <StatusBadge kind="StageCategory" value={stage.category} />
                 {stage.isSystem ? (
                   <Badge tone="neutral">
                     <Lock className="size-3" aria-hidden="true" />
@@ -161,7 +164,7 @@ export function PipelineStagesSection({
               <Select
                 value={selectedStageId || undefined}
                 onValueChange={setSelectedStageId}
-                disabled={attachableStages.length === 0}
+                disabled={attachableStages.length === 0 || pendingStageId !== null || catalogueUnavailable}
               >
                 <SelectTrigger size="sm" aria-label={t.crmPipelines.attachStage}>
                   <SelectValue
@@ -183,12 +186,8 @@ export function PipelineStagesSection({
             </div>
             <Button size="sm"
               variant="outline"
-              disabled={!selectedStageId || pendingStageId !== null}
-              onClick={() => {
-                if (!selectedStageId) return;
-                onAttach(selectedStageId);
-                setSelectedStageId("");
-              }}
+              disabled={!selectedStageId || pendingStageId !== null || catalogueUnavailable}
+              onClick={() => void selection.attach()}
             >
               <Plus className="size-4" aria-hidden="true" />
               {t.crmPipelines.attachStage}

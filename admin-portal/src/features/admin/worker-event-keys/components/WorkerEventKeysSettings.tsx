@@ -3,7 +3,7 @@
 import { KeyRound, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { Badge, Button, ConfirmActionModal, PageHeader } from "@/design-system";
 import { WORKER_KEY_COPY } from "../copy";
 
@@ -13,7 +13,7 @@ export function WorkerEventKeysSettings() {
   const { user, isLoading } = useAuth();
   const { lang } = useI18n();
   const canRead = adminCan(user, "admin.provisioning.publisher-keys.read");
-  const canManage = adminCanAll(user, ["admin.provisioning.publisher-keys.manage", "admin.provisioning.critical"]);
+  const canManage = adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_PUBLISHER_KEYS_MANAGE);
   if (isLoading) return <p role="status">{WORKER_KEY_COPY[lang].loading}</p>;
   return <WorkerEventKeysContent key={`${user?.id}:${canRead}:${canManage}`} canRead={canRead} canManage={canManage} />;
 }

@@ -60,14 +60,36 @@ describe("useNavLocation", () => {
     expect(locate("/crm/leads/018f-not-a-real-id").isPrimaryPage).toBe(false);
   });
 
-  // THE case the length comparison exists for. `/core/settings` and
-  // `/core/settings/currencies` are both nav items and both prefix this route;
-  // a first-match scan returns whichever the map happens to list first, and the
-  // map lists the hub first — so every settings screen would read "All
-  // settings". Delete `item.href.length <= bestLength` and this goes red.
+  // Nested routes exist under a shared parent (`/core/directory` and
+  // `/core/directory/settings`, `/crm/dashboards` and `/crm/dashboards/reports`).
+  // A first-match scan would return whichever the map happens to list first;
+  // longest-prefix wins instead.
   it("prefers the most specific entry when two nav items both prefix the route", () => {
-    expect(locate("/core/settings/currencies").itemId).toBe("coreCurrencies");
-    expect(locate("/core/settings").itemId).toBe("coreSettingsHub");
+    expect(locate("/core/directory/settings").itemId).toBe("coreDirectorySettings");
+    expect(locate("/core/directory").itemId).toBe("coreDirectory");
+    expect(locate("/crm/dashboards/reports").itemId).toBe("crmDashboardReports");
+    expect(locate("/crm/dashboards").itemId).toBe("crmDashboards");
+  });
+
+  it("resolves every Core settings child route to coreSettings while leaving /core/settings unowned", () => {
+    const bareSettings = locate("/core/settings");
+    expect(bareSettings.section).toBeNull();
+    expect(bareSettings.itemId).toBeNull();
+    expect(bareSettings.itemLabelKey).toBeNull();
+
+    for (const [route, itemId] of [
+      ["/core/settings/workspace", "coreWorkspaceSettings"],
+      ["/core/settings/currencies", "coreCurrencies"],
+      ["/core/settings/taxes", "coreTaxes"],
+      ["/core/settings/numbering", "coreNumbering"],
+      ["/core/settings/email", "coreEmail"],
+      ["/core/settings/branding", "coreBranding"],
+      ["/core/settings/updates", "coreComponentUpdates"],
+    ] as const) {
+      const location = locate(route);
+      expect(location.section?.id).toBe("coreSettings");
+      expect(location.itemId).toBe(itemId);
+    }
   });
 
   // A prefix is only a match at a path boundary. Without the `/` check

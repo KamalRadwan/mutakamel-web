@@ -1,179 +1,301 @@
 "use client";
 
-import { Clock8, PlugZap, RefreshCw, ShieldCheck } from "lucide-react";
 import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  ErrorState,
-  PageHeader,
-  PermissionGate,
-  Skeleton,
-  SubNav,
-  CORE_SETTINGS_NAV_ITEMS,
+  AlertCircle, Clock8, Lock, Pencil, RefreshCw, RotateCcw, Save, ShieldCheck,
+} from "lucide-react";
+import {
+  Badge, Button, Card, ConfirmActionModal, EmptyState, ErrorState, PageHeader,
+  PermissionGate, Skeleton,
 } from "@/design-system";
 import { useEmailConfig } from "../hooks/useEmailConfig";
 import { EmailConflictDialog } from "./EmailConflictDialog";
 import { EmailDnsPanel } from "./EmailDnsPanel";
-import { EmailProviderFields } from "./EmailProviderFields";
-import { EmailSenderFields } from "./EmailSenderFields";
+import { EmailLimitsModal } from "./EmailLimitsModal";
+import { EmailProviderModal } from "./EmailProviderModal";
+import { EmailSenderModal } from "./EmailSenderModal";
+import { EmailSmtpModal } from "./EmailSmtpModal";
+import { EmailSmtpProbeModal } from "./EmailSmtpProbeModal";
+import { EmailSummaryRows } from "./EmailSummaryRows";
 
-export function EmailConfigWorkspace() {
-  const {
-    t,
-    canManage,
-    config,
-    draft,
-    isLoading,
-    pending,
-    isNotReady,
-    loadError,
-    formError,
-    conflict,
-    updateDraft,
-    dismissConflict,
-    resolveConflict,
-    save,
-    verify,
-    verifyConnection,
-    reload,
-  } = useEmailConfig();
-  const isBusy = pending !== null;
-  const isReadOnly = !canManage;
+interface EmailConfigWorkspaceProps {
+  hasExternalOverlay?: boolean;
+}
 
+export function EmailConfigWorkspace({ hasExternalOverlay = false }: EmailConfigWorkspaceProps) {
   return (
     <PermissionGate require="workspace.email.read">
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
+      <EmailConfigContent hasExternalOverlay={hasExternalOverlay} />
+    </PermissionGate>
+  );
+}
+
+function EmailConfigContent({ hasExternalOverlay }: Required<EmailConfigWorkspaceProps>) {
+  const {
+    t, canManage, config, draft, activeModal, isLoading, pending,
+    probeOutcome, isDirty, isDiscardOpen,
+    isNotReady, isAccessBlocked, isForbidden,
+    hasLoadError, loadErrorMessage, fieldErrors, formError,
+    conflict, conflictReview, isConflictLoading,
+    openModal, closeModal, updateDraft,
+    discardDraft, confirmDiscard, cancelDiscard,
+    dismissConflict, resolveConflict,
+    adoptConflictLatest, discardConflictDraft,
+    setDeliveryStatus, save,
+    verify, verifyConnection, reload,
+  } = useEmailConfig();
+
+  const isBusy = pending !== null || isLoading || isConflictLoading;
+  const isReadOnly = !canManage;
+  const hasOpenOverlay =
+    hasExternalOverlay || activeModal !== null || conflict !== null || isDiscardOpen;
+
+  return (
+    <PermissionGate require="workspace.email.read" denied={isForbidden}>
+      <div className="flex w-full flex-col gap-3">
+        <PageHeader
+          className="sr-only"
           title={t.coreSettings.emailTitle}
-          description={t.coreSettings.emailSubtitle}
           primaryAction={
-            canManage && draft
-              ? {
-                  label: t.coreSettings.save,
-                  onClick: () => void save(),
-                  disabled: isBusy,
-                  loading: pending === "save",
-                }
+            canManage && config && draft && !hasOpenOverlay
+              ? isDirty
+                ? {
+                    label: t.coreSettings.save,
+                    icon: <Save className="size-3.5" aria-hidden="true" />,
+                    onClick: () => void save(),
+                    disabled: isBusy,
+                    loading: pending === "save",
+                  }
+                : {
+                    label: t.coreSettings.emailEditSettings,
+                    icon: <Pencil className="size-3.5" aria-hidden="true" />,
+                    onClick: () => openModal("sender"),
+                    disabled: isBusy,
+                  }
               : undefined
           }
           secondaryActions={
-            <span className="flex flex-wrap items-center gap-2">
-              {canManage && config ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {isReadOnly && config ? (
+                <Badge tone="neutral" size="sm">
+                  <Lock className="size-3.5" aria-hidden="true" />
+                  {t.common.readOnly}
+                </Badge>
+              ) : null}
+
+              {canManage && config && isDirty ? (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void verify()}
-                    disabled={isBusy}
-                    loading={pending === "verify"}
-                  >
-                    <ShieldCheck className="size-4" aria-hidden="true" />
-                    {t.coreSettings.emailVerify}
+                  <Badge tone="caution" size="sm">
+                    {t.coreSettings.emailUnsavedDraftBadge}
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={() => openModal("sender")} disabled={isBusy}>
+                    {t.coreSettings.emailEditSettings}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void verifyConnection()}
-                    disabled={isBusy || config.providerDriver !== "smtp"}
-                    loading={pending === "probe"}
-                  >
-                    <PlugZap className="size-4" aria-hidden="true" />
-                    {t.coreSettings.emailVerifyConnection}
+                  <Button variant="ghost" size="sm" onClick={discardDraft} disabled={isBusy}>
+                    <RotateCcw className="size-3.5" aria-hidden="true" />
+                    {t.coreSettings.workspaceUi.discard}
                   </Button>
                 </>
               ) : null}
-              <Button variant="outline" size="sm" onClick={() => void reload()} disabled={isLoading}>
-                <RefreshCw className={isLoading ? "size-4 animate-spin" : "size-4"} aria-hidden="true" />
+
+              <Button variant="outline" size="sm" onClick={reload} disabled={isBusy}>
+                <RefreshCw className={isLoading ? "size-3.5 animate-spin" : "size-3.5"} aria-hidden="true" />
                 {t.coreSettings.reload}
               </Button>
-            </span>
+            </div>
           }
         />
 
-        <SubNav items={CORE_SETTINGS_NAV_ITEMS} />
+        {isLoading && !config ? <EmailConfigSkeleton /> : null}
 
-        {isLoading && !config ? (
-          <Card>
-            <CardContent className="flex flex-col gap-3">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {isNotReady ? (
+        {!isLoading && isNotReady ? (
           <EmptyState
             icon={Clock8}
             title={t.coreSettings.emailNotReadyTitle}
             description={t.coreSettings.emailNotReadyDescription}
-            action={{ label: t.coreSettings.reload, onClick: () => void reload() }}
+            action={{ label: t.coreSettings.reload, onClick: reload }}
           />
         ) : null}
 
-        {loadError ? (
+        {!isLoading && isAccessBlocked ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title={t.coreSettings.emailTitle}
+            description={t.coreSettings.emailAccessBlocked}
+          />
+        ) : null}
+
+        {!isLoading && hasLoadError ? (
           <ErrorState
             title={t.coreSettings.emailLoadFailed}
-            description={loadError.message}
-            onRetry={() => void reload()}
+            description={loadErrorMessage}
+            onRetry={reload}
             retryLabel={t.common.retry}
           />
         ) : null}
 
-        {formError ? (
-          <p role="alert" className="rounded-sm border border-destructive px-3 py-2 text-xs text-destructive">
-            {formError}
+        {formError && activeModal === null && conflict === null ? (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground wrap-anywhere"
+          >
+            <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <bdi>{formError}</bdi>
+          </div>
+        ) : null}
+
+        {canManage && config && isDirty && activeModal === null ? (
+          <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            {t.coreSettings.emailSaveBeforeVerifyHint}
           </p>
         ) : null}
 
         {config && draft ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t.coreSettings.emailSenderTitle}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EmailSenderFields
-                  values={draft}
-                  onChange={updateDraft}
-                  disabled={isBusy}
-                  readOnly={isReadOnly}
-                />
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t.coreSettings.emailProviderTitle}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <EmailProviderFields
-                    config={config}
-                    values={draft}
-                    onChange={updateDraft}
-                    disabled={isBusy}
-                    readOnly={isReadOnly}
-                  />
-                </CardContent>
-              </Card>
-
-              <EmailDnsPanel config={config} />
-            </div>
-          </div>
+          <>
+            <EmailSummaryRows
+              config={config}
+              draft={draft}
+              canManage={canManage}
+              isDirty={isDirty}
+              disabled={isBusy}
+              pending={pending}
+              onOpenModal={openModal}
+              onVerify={() => void verify()}
+              onSetDeliveryStatus={(nextStatus) => void setDeliveryStatus(nextStatus)}
+              limitsAction={
+                canManage ? (
+                  <Button variant="outline" size="sm" onClick={() => openModal("limits")} disabled={isBusy}>
+                    {t.coreSettings.emailEditLimitsAction}
+                  </Button>
+                ) : null
+              }
+            />
+            <EmailSenderModal
+              open={activeModal === "sender"}
+              config={config}
+              values={draft}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isDirty={isDirty}
+              isBusy={isBusy}
+              isSubmitting={pending === "save"}
+              readOnly={isReadOnly}
+              onChange={updateDraft}
+              onOpenSmtpSettings={() => openModal("smtp")}
+              onSave={() => void save()}
+              onClose={closeModal}
+            />
+            <EmailProviderModal
+              open={activeModal === "provider"}
+              config={config}
+              values={draft}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isDirty={isDirty}
+              isBusy={isBusy}
+              isSubmitting={pending === "save"}
+              readOnly={isReadOnly}
+              onChange={updateDraft}
+              onOpenSmtpSettings={() => openModal("smtp")}
+              onSave={() => void save()}
+              onClose={closeModal}
+            />
+            <EmailSmtpModal
+              open={activeModal === "smtp"}
+              config={config}
+              values={draft}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isDirty={isDirty}
+              isBusy={isBusy}
+              pending={pending}
+              readOnly={isReadOnly}
+              onChange={updateDraft}
+              onVerifyConnection={() => void verifyConnection()}
+              onSave={() => void save()}
+              onClose={closeModal}
+            />
+            <EmailSmtpProbeModal
+              open={activeModal === "probe"}
+              pending={pending}
+              probeOutcome={probeOutcome}
+              formError={formError}
+              onRetry={() => void verifyConnection()}
+              onBackToSmtp={() => openModal("smtp")}
+              onClose={closeModal}
+            />
+            <EmailLimitsModal
+              open={activeModal === "limits"}
+              config={config}
+              values={draft}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isDirty={isDirty}
+              isBusy={isBusy}
+              isSubmitting={pending === "save"}
+              readOnly={isReadOnly}
+              onChange={updateDraft}
+              onSave={() => void save()}
+              onClose={closeModal}
+            />
+            <EmailDnsPanel
+              open={activeModal === "dns"}
+              config={config}
+              values={draft}
+              fieldErrors={fieldErrors}
+              formError={formError}
+              isDirty={isDirty}
+              isBusy={isBusy}
+              pending={pending}
+              readOnly={isReadOnly}
+              onChange={updateDraft}
+              onSave={() => void save()}
+              onVerify={() => void verify()}
+              onClose={closeModal}
+            />
+          </>
         ) : null}
+
+        <ConfirmActionModal
+          open={isDiscardOpen}
+          onOpenChange={(open) => { if (!open) cancelDiscard(); }}
+          title={t.common.discardTitle}
+          description={t.common.discardDescription}
+          confirmLabel={t.common.discardConfirm}
+          cancelLabel={t.common.cancel}
+          onConfirm={confirmDiscard}
+        />
 
         <EmailConflictDialog
           kind={conflict}
-          onReload={() => void resolveConflict()}
+          review={conflictReview}
+          draftStatus={draft?.status ?? null}
+          error={formError}
+          loading={isConflictLoading}
+          onResolve={() => void resolveConflict()}
+          onAdoptLatest={adoptConflictLatest}
+          onDiscardToLatest={discardConflictDraft}
           onCancel={dismissConflict}
-          loading={isLoading}
         />
       </div>
     </PermissionGate>
+  );
+}
+
+function EmailConfigSkeleton() {
+  return (
+    <Card className="divide-y divide-border overflow-hidden">
+      {[0, 1, 2, 3, 4].map((index) => (
+        <div
+          key={index}
+          className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex flex-col gap-1.5">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3.5 w-64" />
+          </div>
+          <Skeleton className="h-8 w-20" />
+        </div>
+      ))}
+    </Card>
   );
 }

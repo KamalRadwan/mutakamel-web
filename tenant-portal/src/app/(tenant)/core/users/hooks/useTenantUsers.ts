@@ -1,236 +1,158 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRealtimeResync, type PageInfo, type SortState } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
-import { useRealtimeResync } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { can } from "@/lib/auth/permission-scope";
+import type { CorePageMeta } from "../../contracts/core-page";
 import {
-  deleteTenantUser,
   fetchTenantUsers,
-  inviteTenantUser,
-  setTenantUserStatus,
-  USER_LIMIT_REACHED_CODE,
-  type InviteUserInput,
+  TENANT_USER_SORT_FIELDS,
   type TenantUser,
   type TenantUserFilters,
   type UserStatus,
-  TENANT_USER_SORT_FIELDS,
-  type TenantUserSortField,
 } from "../../contracts/user-contract";
+import {
+  allowedUserActions,
+  canInviteWithPlacement,
+  canOpenUserInvite,
+} from "../user-permissions";
+import { useUserListMutations } from "./useUserListMutations";
 
-export type UserRowAction = "suspend" | "activate" | "delete";
-
-/**
- * Which lifecycle actions the backend will actually accept for one row.
- *
- * Copied from `TenantUsersService`, not guessed: `activate` refuses anything
- * that is not SUSPENDED with `INVALID_STATUS_TRANSITION`; `assertNotSelf` and
- * `assertNotOwner` run before every one of the three. Offering a control that
- * is guaranteed to 403 is worse than not offering it — the reason is surfaced
- * as a tooltip instead.
- */
-export function allowedUserActions(
-  user: TenantUser,
-  actingUserId: string | null,
-): Record<UserRowAction, boolean> {
-  const isProtected = user.isTenantOwner || user.id === actingUserId;
-  return {
-    suspend: !isProtected && user.status !== "SUSPENDED" && user.status !== "DEACTIVATED",
-    activate: !isProtected && user.status === "SUSPENDED",
-    delete: !isProtected,
-  };
-}
+const INITIAL_META: CorePageMeta = {
+  page: 1,
+  limit: 25,
+  total: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrev: false,
+};
 
 export function useTenantUsers() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const { user: actor } = useTenantAuth();
-  const permissions = actor?.permissions ?? [];
-  const canInvite = permissions.includes("users.user.invite");
-  const canDeactivate = permissions.includes("users.user.deactivate");
-  const canDelete = permissions.includes("users.user.delete");
+  const canRead = can(actor, "users.user.read");
+  const canInvite = canOpenUserInvite(actor);
+  const canInvitePlacement = canInviteWithPlacement(actor);
+  const canReadBilling = can(actor, "tenant.billing.read");
 
-  const [page, setPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [serverSearch, setServerSearch] = useState("");
-  const [filters, setFilters] = useState<TenantUserFilters>({});
-  const [sort, setSortState] = useState<{ id: TenantUserSortField; direction: "asc" | "desc" }>({
+  const [rows, setRows] = useState<TenantUser[]>([]);
+  const [meta, setMeta] = useState<CorePageMeta>(INITIAL_META);
+  const [isLoading, setIsLoading] = useState(true);
+  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
+  const [searchQuery, setSearchQueryState] = useState("");
+  const [filters, setFiltersState] = useState<TenantUserFilters>({});
+  const [sort, setSortState] = useState<SortState>({
     id: "createdAt",
     direction: "desc",
   });
-  const [rows, setRows] = useState<TenantUser[]>([]);
-  const [pageInfo, setPageInfo] = useState({ page: 1, limit: 25, total: 0 });
-  const [isLoading, setIsLoading] = useState(true);
-  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
+  const [page, setPage] = useState(1);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [mutationError, setMutationError] = useState<NormalizedApiError | null>(null);
-  /** The seat cap has its own screen state; it is an outcome, not a failure. */
-  const [isSeatLimitReached, setIsSeatLimitReached] = useState(false);
-  const [pendingAction, setPendingAction] = useState<
-    { user: TenantUser; action: UserRowAction } | null
-  >(null);
+  const reload = useCallback(() => setReloadToken((token) => token + 1), []);
+  useRealtimeResync(reload);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setPage(1);
-      setServerSearch(searchQuery.trim());
-    }, 300);
-    return () => window.clearTimeout(timeout);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    // Deferred past the effect body on purpose: a synchronous setState there
-    // cascades an extra render (react-hooks/set-state-in-effect), and the abort
-    // check means a torn-down screen never writes at all.
     const controller = new AbortController();
+    let recoveringPage = false;
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
+      if (!canRead) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
+      const sortBy = TENANT_USER_SORT_FIELDS.find((field) => field === sort.id);
+      const sortDir = sort.direction === "asc" ? "ASC" : "DESC";
       fetchTenantUsers({
         page,
-        search: serverSearch,
+        search: searchQuery,
         filters,
-        sortBy: sort.id,
-        sortDir: sort.direction === "asc" ? "ASC" : "DESC",
+        sortBy,
+        sortDir,
         signal: controller.signal,
       })
         .then((result) => {
           if (controller.signal.aborted) return;
-          setRows(result.items);
-          setPageInfo({ page: result.page, limit: result.limit, total: result.total });
+          const validMaxPage = Math.max(1, result.totalPages);
+          if (page > validMaxPage) {
+            recoveringPage = true;
+            setPage(validMaxPage);
+            return;
+          }
+          const { items, ...pageMeta } = result;
+          setRows(items);
+          setMeta(pageMeta);
         })
-        .catch((error: unknown) => {
+        .catch((cause: unknown) => {
           if (controller.signal.aborted) return;
           setRows([]);
-          setQueryError(normalizeApiError(error));
+          setQueryError(normalizeApiError(cause));
         })
         .finally(() => {
-          if (!controller.signal.aborted) setIsLoading(false);
+          if (!controller.signal.aborted && !recoveringPage) {
+            setIsLoading(false);
+          }
         });
     });
     return () => controller.abort();
-  }, [filters, page, serverSearch, reloadToken, sort]);
+  }, [canRead, filters, page, reloadToken, searchQuery, sort]);
 
-  const reload = useCallback(() => setReloadToken((token) => token + 1), []);
-
-  // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
-  // an ALL-scoped resync, a realtime reconnect, and a return from offline.
-  useRealtimeResync(reload);
-
-  const handleInvite = useCallback(
-    async (input: InviteUserInput): Promise<boolean> => {
-      setIsSubmitting(true);
-      setMutationError(null);
-      try {
-        await inviteTenantUser(input);
-        setIsInviteOpen(false);
-        setIsSeatLimitReached(false);
-        reload();
-        return true;
-      } catch (error) {
-        const normalized = normalizeApiError(error);
-        if (normalized.status === 403 && normalized.code === USER_LIMIT_REACHED_CODE) {
-          setIsSeatLimitReached(true);
-          setIsInviteOpen(false);
-        }
-        setMutationError(normalized);
-        return false;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [reload],
-  );
-
-  const confirmPendingAction = useCallback(async () => {
-    if (!pendingAction) return;
-    const { user, action } = pendingAction;
-    setIsSubmitting(true);
-    setMutationError(null);
-    try {
-      if (action === "delete") await deleteTenantUser(user.id);
-      else await setTenantUserStatus(user.id, action);
-      setPendingAction(null);
-      reload();
-    } catch (error) {
-      setPendingAction(null);
-      setMutationError(normalizeApiError(error));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [pendingAction, reload]);
-
-  const setFilter = useCallback((patch: Partial<TenantUserFilters>) => {
-    setPage(1);
-    setFilters((current) => {
-      const next = { ...current, ...patch };
-      return Object.fromEntries(
-        Object.entries(next).filter(([, value]) => Boolean(value)),
-      ) as TenantUserFilters;
-    });
-  }, []);
-
-  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
-    const field = TENANT_USER_SORT_FIELDS.find((allowed) => allowed === next.id);
-    if (!field) return;
-    setSortState({ id: field, direction: next.direction });
+  const setSearchQuery = useCallback((value: string) => {
+    setSearchQueryState(value);
     setPage(1);
   }, []);
 
-  return useMemo(
-    () => ({
-      t,
-      lang,
-      sort,
-      setSort,
-      actingUserId: actor?.id ?? null,
-      canInvite,
-      canDeactivate,
-      canDelete,
-      rows,
-      pageInfo,
-      page,
-      setPage,
-      isLoading,
-      queryError,
-      searchQuery,
-      setSearchQuery,
-      filters,
-      setFilter,
-      resetFilters: () => {
-        setPage(1);
-        setFilters({});
-      },
-      reload,
-      isInviteOpen,
-      openInvite: () => {
-        if (!canInvite) return;
-        setMutationError(null);
-        setIsInviteOpen(true);
-      },
-      closeInvite: () => setIsInviteOpen(false),
-      isSubmitting,
-      mutationError,
-      isSeatLimitReached,
-      dismissSeatLimit: () => setIsSeatLimitReached(false),
-      pendingAction,
-      requestAction: (user: TenantUser, action: UserRowAction) =>
-        setPendingAction({ user, action }),
-      cancelAction: () => setPendingAction(null),
-      confirmPendingAction,
-      handleInvite,
-      statusFilter: filters.status,
-      setStatusFilter: (status: UserStatus | undefined) => setFilter({ status }),
-    }),
-    [
-      actor?.id, canDeactivate, canDelete, canInvite, confirmPendingAction, filters,
-      handleInvite, isInviteOpen, isLoading, isSeatLimitReached, isSubmitting, lang,
-      mutationError, page, pageInfo, pendingAction, queryError, reload, rows,
-      searchQuery, setFilter, setSort, sort, t,
-    ],
+  const setFilters = useCallback((next: TenantUserFilters) => {
+    setFiltersState(next);
+    setPage(1);
+  }, []);
+
+  const setStatusFilter = useCallback((value: UserStatus | undefined) => {
+    setFiltersState((current) => ({ ...current, status: value }));
+    setPage(1);
+  }, []);
+
+  const setSort = useCallback((next: SortState) => {
+    setSortState(next);
+    setPage(1);
+  }, []);
+
+  const mutations = useUserListMutations({ actor, rows, setRows, reload });
+
+  const resolveActions = useCallback(
+    (target: TenantUser) => allowedUserActions(target, actor),
+    [actor],
   );
+
+  const pageInfo = useMemo<PageInfo>(
+    () => ({ page: meta.page, limit: meta.limit, total: meta.total }),
+    [meta.limit, meta.page, meta.total],
+  );
+
+  return {
+    t,
+    rows,
+    pageInfo,
+    isLoading,
+    queryError,
+    searchQuery,
+    setSearchQuery,
+    filters,
+    setFilters,
+    statusFilter: filters.status,
+    setStatusFilter,
+    sort,
+    setSort,
+    setPage,
+    reload,
+    canInvite,
+    canInvitePlacement,
+    canReadBilling,
+    resolveActions,
+    ...mutations,
+  };
 }

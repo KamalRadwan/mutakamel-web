@@ -35,6 +35,9 @@ export const safeStorage = {
   }
 };
 
+export const SALES_DRAFT_TYPING_PREFIX = "sales-quotation:draft-typing:";
+export const SALES_PUBLISH_RECOVERY_PREFIX = "sales-quotation:publish-recovery:";
+
 export const safeSessionStorage = {
   getItem: (key: string): string | null => {
     try {

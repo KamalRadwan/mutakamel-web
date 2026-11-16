@@ -155,6 +155,17 @@ export default function PurchaseOrderDetailPage({
               }
               secondaryActions={
                 <>
+                  {screen.canRetryDelivery ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={write.isWriting}
+                      disabled={write.isBlocked}
+                      onClick={() => void screen.retryDelivery()}
+                    >
+                      {td.purchaseOrders.retryDelivery}
+                    </Button>
+                  ) : null}
                   {detail.scope.canWrite(PURCHASE_ORDER_PERMISSIONS.update) &&
                   order.lifecycleStatus === "DRAFT" ? (
                     <Button

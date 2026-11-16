@@ -46,7 +46,7 @@ export function LeadIndividualContactCard({
       {!edit.form ? (
         <LeadContactReadCard
           name={lead.displayName}
-          jobTitle={null}
+          jobTitle={lead.jobTitle}
           email={lead.email}
           country={lead.address?.country ?? undefined}
           phones={

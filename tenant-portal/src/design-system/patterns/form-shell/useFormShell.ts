@@ -99,6 +99,7 @@ export function useFormShell({
   }
 
   function requestClose() {
+    if (isSubmitting) return;
     if (isDirty) {
       setConfirmingDiscard(true);
     } else {
@@ -107,6 +108,7 @@ export function useFormShell({
   }
 
   function confirmDiscard() {
+    if (isSubmitting) return;
     setConfirmingDiscard(false);
     onOpenChange(false);
   }

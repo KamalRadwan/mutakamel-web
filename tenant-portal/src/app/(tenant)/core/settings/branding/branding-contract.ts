@@ -7,6 +7,10 @@ import {
 } from "@/lib/branding/public-branding";
 import { corePost, corePut } from "../../core-api";
 import { CORE_DETAIL_RESPONSE_LIMIT_BYTES, record } from "../../contracts/core-page";
+import { SettingsInvalidResponseError } from "../settings-failure";
+import type { BrandingAssetKind } from "./branding-image-validation";
+
+export type { BrandingAssetKind } from "./branding-image-validation";
 
 // `BrandingController`
 // (../backend/mutakamel-apps/core-app/src/tenant/branding/branding.controller.ts).
@@ -21,17 +25,16 @@ const BRANDING_ICON_PATH = "/api/tenant/core/v1/branding/icon" as const;
 export const BRANDING_READ_PERMISSION = "branding.read";
 export const BRANDING_MANAGE_PERMISSION = "branding.manage";
 
-/** `BRANDING_ASSET_MAX_BYTES` and `BRANDING_ASSET_MIME_TYPES` in the controller. */
-export const BRANDING_ASSET_MAX_BYTES = 2 * 1024 * 1024;
-export const BRANDING_ASSET_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
-
-/** Three separate outcomes, three separate messages — never one "upload failed". */
+/**
+ * Distinct outcomes from `BrandingController` / `BrandingService`
+ * (../backend/mutakamel-apps/core-app/src/tenant/branding/branding.controller.ts).
+ */
 export const BRANDING_FILE_REQUIRED_CODE = "BRANDING_FILE_REQUIRED";
 export const BRANDING_FILE_TYPE_UNSUPPORTED_CODE = "BRANDING_FILE_TYPE_UNSUPPORTED";
 export const BRANDING_FILE_TOO_LARGE_CODE = "BRANDING_FILE_TOO_LARGE";
+export const BRANDING_FILE_INVALID_CODE = "BRANDING_FILE_INVALID";
 export const BRANDING_STORAGE_UNAVAILABLE_CODE = "BRANDING_STORAGE_UNAVAILABLE";
-
-export type BrandingAssetKind = "logo" | "icon";
+export const BRANDING_IDEMPOTENCY_CONFLICT_CODE = "BRANDING_IDEMPOTENCY_CONFLICT";
 
 const BRANDING_ASSET_UPLOAD_PATH: Record<BrandingAssetKind, typeof BRANDING_LOGO_PATH | typeof BRANDING_ICON_PATH> = {
   logo: BRANDING_LOGO_PATH,
@@ -68,7 +71,7 @@ export const EMPTY_BRANDING: BrandingSettings = {
 };
 
 function invalidBrandingResponse(): never {
-  throw new Error("Invalid Core branding response.");
+  throw new SettingsInvalidResponseError("Invalid Core branding response.");
 }
 
 function nullableText(source: Record<string, unknown>, key: string, maxLength: number): string | null {
@@ -82,14 +85,18 @@ function nullableText(source: Record<string, unknown>, key: string, maxLength: n
 function parseBrandingSettings(payload: unknown): BrandingSettings {
   const branding = record(payload);
   if (!branding) invalidBrandingResponse();
+  if (Object.keys(branding).length === 0) return { ...EMPTY_BRANDING };
+  if (typeof branding.hasLogo !== "boolean" || typeof branding.hasIcon !== "boolean") {
+    invalidBrandingResponse();
+  }
   return {
     appName: nullableText(branding, "appName", BRANDING_TEXT_MAX_LENGTH),
     tabTitle: nullableText(branding, "tabTitle", BRANDING_TEXT_MAX_LENGTH),
     primaryColor: nullableText(branding, "primaryColor", 9),
     secondaryColor: nullableText(branding, "secondaryColor", 9),
     fontFamily: nullableText(branding, "fontFamily", BRANDING_TEXT_MAX_LENGTH),
-    hasLogo: nullableText(branding, "logoStorageKey", 512) !== null,
-    hasIcon: nullableText(branding, "iconStorageKey", 512) !== null,
+    hasLogo: branding.hasLogo,
+    hasIcon: branding.hasIcon,
   };
 }
 
@@ -98,8 +105,14 @@ export interface BrandingFormValues {
   tabTitle: string;
   primaryColor: string;
   secondaryColor: string;
-  fontFamily: string;
 }
+
+const BRANDING_FORM_FIELDS = [
+  "appName",
+  "tabTitle",
+  "primaryColor",
+  "secondaryColor",
+] as const;
 
 export function toBrandingForm(branding: BrandingSettings): BrandingFormValues {
   return {
@@ -107,19 +120,61 @@ export function toBrandingForm(branding: BrandingSettings): BrandingFormValues {
     tabTitle: branding.tabTitle ?? "",
     primaryColor: branding.primaryColor ?? "",
     secondaryColor: branding.secondaryColor ?? "",
-    fontFamily: branding.fontFamily ?? "",
   };
+}
+
+export interface BrandingDraftState {
+  branding: BrandingSettings | null;
+  baseline: BrandingSettings | null;
+  values: BrandingFormValues;
+}
+
+/** Uploads save assets immediately; metadata edits keep their conflict baseline. */
+export function mergeUploadedBranding(current: BrandingDraftState, saved: BrandingSettings): BrandingDraftState {
+  const baseline = { ...saved };
+  const values = toBrandingForm(saved);
+  if (current.baseline) {
+    for (const field of BRANDING_FORM_FIELDS) {
+      if (current.values[field] !== (current.baseline[field] ?? "")) {
+        baseline[field] = current.baseline[field];
+        values[field] = current.values[field];
+      }
+    }
+  }
+  return { branding: saved, baseline, values };
+}
+
+export function hasBrandingMetadataChanges(
+  values: BrandingFormValues,
+  current: BrandingSettings,
+): boolean {
+  return BRANDING_FORM_FIELDS.some(
+    (field) => (values[field].trim() || null) !== (current[field] || null),
+  );
+}
+
+export function hasBrandingDraftEdits(
+  values: BrandingFormValues,
+  current: BrandingSettings,
+): boolean {
+  return BRANDING_FORM_FIELDS.some(
+    (field) => values[field] !== (current[field] ?? ""),
+  );
 }
 
 /** `@IsHexColor()` accepts 3, 4, 6 and 8 hex digits behind a `#`. */
 const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+export function isValidBrandingHexColor(value: string): boolean {
+  return HEX_COLOR.test(value.trim());
+}
 
 export const BRANDING_FORM_COLOR_ERROR = "BRANDING_FORM_COLOR";
 export const BRANDING_FORM_TEXT_ERROR = "BRANDING_FORM_TEXT";
 
 export function validateBrandingForm(values: BrandingFormValues) {
   const errors: Partial<Record<keyof BrandingFormValues, string>> = {};
-  for (const field of ["appName", "tabTitle", "fontFamily"] as const) {
+  for (const field of ["appName", "tabTitle"] as const) {
     if (values[field].length > BRANDING_TEXT_MAX_LENGTH) errors[field] = BRANDING_FORM_TEXT_ERROR;
   }
   for (const field of ["primaryColor", "secondaryColor"] as const) {
@@ -134,15 +189,14 @@ export interface UpdateBrandingRequest {
   tabTitle?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  fontFamily?: string | null;
 }
 
 /**
  * Builds the `UpdateBrandingDto` patch.
  *
- * `loginHtml` is deliberately absent: this screen does not edit it, and Core
- * only writes keys the body actually carries, so omitting it preserves whatever
- * is stored. Sending `""` would silently erase a tenant's login page.
+ * Font settings and custom login markup are deliberately omitted: the portal
+ * uses its bundled bilingual fonts and does not render custom login markup.
+ * Core only writes keys the body carries, preserving those stored settings.
  */
 export function buildUpdateBrandingRequest(
   values: BrandingFormValues,
@@ -151,7 +205,7 @@ export function buildUpdateBrandingRequest(
   const error = Object.values(validateBrandingForm(values))[0];
   if (error) throw new Error(error);
   const request: UpdateBrandingRequest = {};
-  for (const field of ["appName", "tabTitle", "fontFamily", "primaryColor", "secondaryColor"] as const) {
+  for (const field of BRANDING_FORM_FIELDS) {
     const value = values[field].trim() || null;
     // Core preserves omitted keys and persists null as an explicit reset.
     if (value !== (current[field] || null)) request[field] = value;
@@ -164,6 +218,7 @@ export async function fetchBrandingSettings(signal?: AbortSignal): Promise<Brand
     await readCoreData(BRANDING_PATH, {
       signal,
       cache: "no-store",
+      suppressForbiddenToast: true,
       maxResponseBytes: CORE_DETAIL_RESPONSE_LIMIT_BYTES,
     }),
   );

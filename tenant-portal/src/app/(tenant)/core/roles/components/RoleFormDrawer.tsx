@@ -1,21 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { Field, FormDrawer, Input, Textarea } from "@/design-system";
-import { useI18n } from "@/i18n/I18nContext";
+import { Info, ShieldCheck } from "lucide-react";
+import { Field, FormModal, Input, Textarea } from "@/design-system";
 import {
   ROLE_DESCRIPTION_MAX_LENGTH,
   ROLE_NAME_MAX_LENGTH,
 } from "../../contracts/role-contract";
+import { useRoleFormModal, type RoleFormValues } from "../hooks/useRoleFormModal";
 
-export interface RoleFormValues {
-  name: string;
-  description: string;
-}
-
-interface RoleFormDrawerProps {
+interface RoleFormModalProps {
+  mode: "create" | "edit";
   isOpen: boolean;
-  /** Seeds the form; identity-stable so the caller remounts with a `key`. */
+  /** Seeds the form; callers pass a stable `key` so each session starts cleanly. */
   initial: RoleFormValues;
   title: string;
   description: string;
@@ -25,12 +21,9 @@ interface RoleFormDrawerProps {
   error?: string;
 }
 
-/**
- * One drawer for `POST /roles` and `PATCH /roles/:id` — both DTOs carry exactly
- * `name` and `description`, and `CreateTenantRoleDto.permissionIds` is left to
- * the permission editor rather than duplicated as a 200-checkbox list here.
- */
-export function RoleFormDrawer({
+/** Centered modal markup for `POST /roles` and `PATCH /roles/:id` without section rails. */
+export function RoleFormModal({
+  mode,
   isOpen,
   initial,
   title,
@@ -39,65 +32,81 @@ export function RoleFormDrawer({
   onSubmit,
   isSubmitting,
   error,
-}: RoleFormDrawerProps) {
-  const { t } = useI18n();
+}: RoleFormModalProps) {
+  const form = useRoleFormModal({
+    mode,
+    initial,
+    isSubmitting,
+    onClose,
+    onSubmit,
+  });
+  const { t } = form;
   const copy = t.coreIdentity.roles;
-  const [values, setValues] = useState<RoleFormValues>(initial);
-
-  async function handleSubmit() {
-    const trimmedDescription = values.description.trim();
-    await onSubmit({
-      name: values.name.trim(),
-      description: trimmedDescription.length > 0 ? trimmedDescription : undefined,
-    });
-  }
+  const branchCopy = t.coreIdentity.roleBranch;
 
   return (
-    <FormDrawer
+    <FormModal
       open={isOpen}
-      onOpenChange={(open) => {
-        if (open) return;
-        setValues(initial);
-        onClose();
-      }}
+      onOpenChange={form.handleOpenChange}
+      size="card"
+      headerIcon={
+        <span className="flex size-10 items-center justify-center rounded-md border border-primary/20 bg-primary/5 text-primary">
+          <ShieldCheck className="size-5" aria-hidden="true" />
+        </span>
+      }
       title={title}
       description={description}
-      isDirty={values.name !== initial.name || values.description !== initial.description}
+      isDirty={form.isDirty}
       isSubmitting={isSubmitting}
-      submitDisabled={values.name.trim().length === 0}
-      onSubmit={() => void handleSubmit()}
+      submitDisabled={form.submitDisabled}
+      onSubmit={form.handleSubmit}
       error={error}
       labels={{
-        submit: t.common.save,
+        submit: mode === "create" ? copy.create : t.common.save,
         cancel: t.common.cancel,
         discardTitle: t.common.discardTitle,
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
+        sections: t.common.general,
+        sectionInvalid: t.coreIdentity.errors.UNKNOWN,
+        close: t.coreIdentity.actions.close,
       }}
     >
       <div className="flex flex-col gap-4">
-        <Field label={copy.name} required>
-          <Input size="sm" placeholder={copy.name}
-            value={values.name}
-            onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
+        <Field
+          label={copy.name}
+          required
+          showLabel
+          error={form.nameError}
+          hint={form.nameHint}
+        >
+          <Input
+            size="sm"
+            placeholder={copy.name}
+            value={form.values.name}
+            onChange={form.handleNameChange}
+            onBlur={form.handleNameBlur}
             maxLength={ROLE_NAME_MAX_LENGTH}
             disabled={isSubmitting}
             required
           />
         </Field>
-        <Field label={copy.description}>
-          <Textarea placeholder={copy.description}
-            value={values.description}
-            onChange={(event) =>
-              setValues((current) => ({ ...current, description: event.target.value }))
-            }
+        <Field label={copy.description} showLabel hint={form.descriptionHint}>
+          <Textarea
+            placeholder={copy.description}
+            value={form.values.description}
+            onChange={form.handleDescriptionChange}
             maxLength={ROLE_DESCRIPTION_MAX_LENGTH}
             disabled={isSubmitting}
-            rows={3}
+            rows={4}
           />
         </Field>
+        <p className="flex items-center gap-2 rounded-md bg-info-subtle px-3 py-2 text-xs text-info-subtle-foreground">
+          <Info className="size-3.5 shrink-0" aria-hidden="true" />
+          <span>{mode === "create" ? branchCopy.createHint : branchCopy.renameHint}</span>
+        </p>
       </div>
-    </FormDrawer>
+    </FormModal>
   );
 }

@@ -60,9 +60,52 @@ describe("commercial-account-metadata", () => {
     expect(validResult.isValid).toBe(true);
   });
 
+  it.each([
+    ["9007199254740993.01", "9007199254740993.00", true],
+    ["9007199254740993.00", "9007199254740993.00", false],
+    ["9007199254740992.99999999", "9007199254740993.00", false],
+    ["9007199254740993.00000001", "9007199254740993.00", true],
+    [" 09007199254740993.000 ", "9007199254740993.0", false],
+  ] as const)("compares branch %s against company %s exactly", (branch, company, exceeds) => {
+    const result = validateNarrowingAgainstCompany(
+      { creditLimit: branch, orderingHold: false, allowedCurrencies: [] },
+      { accountRole: "CUSTOMER", creditLimit: company, terms: {} },
+    );
+    expect(result.exceedsCompanyCreditLimit).toBe(exceeds);
+    expect(result.isValid).toBe(!exceeds);
+  });
+
+  it.each(["abc", "Infinity", "1e3", "0x10", "1.123456789", "1.2.3", "-1"])(
+    "rejects invalid credit limit %s on either side",
+    (invalid) => {
+      for (const [branch, company] of [[invalid, "100"], ["10", invalid]] as const) {
+        const result = validateNarrowingAgainstCompany(
+          { creditLimit: branch, orderingHold: false, allowedCurrencies: [] },
+          { accountRole: "CUSTOMER", creditLimit: company, terms: {} },
+        );
+        expect(result.isValid).toBe(false);
+      }
+    },
+  );
+
+  it("preserves optional limits while rejecting malformed input without a company ceiling", () => {
+    const account = { accountRole: "CUSTOMER", creditLimit: null, terms: {} };
+    for (const branch of ["", "  ", "9007199254740993.01"]) {
+      expect(validateNarrowingAgainstCompany(
+        { creditLimit: branch, orderingHold: false, allowedCurrencies: [] }, account,
+      ).isValid).toBe(true);
+    }
+    expect(validateNarrowingAgainstCompany(
+      { creditLimit: "abc", orderingHold: false, allowedCurrencies: [] }, account,
+    ).isValid).toBe(false);
+    expect(validateNarrowingAgainstCompany(
+      { creditLimit: "", orderingHold: false, allowedCurrencies: [] },
+      { ...account, creditLimit: "100" },
+    ).isValid).toBe(true);
+  });
+
   it("parses commercial account lookups payload safely", () => {
     const lookups = parseCommercialAccountLookups({
-      paymentTerms: [{ id: "01890a5d-ac96-774b-bcce-b302099a8057", source: "existing_commercial_accounts" }],
       creditPolicies: [
         {
           id: "01890a5d-ac96-774b-bcce-b302099a8058",
@@ -75,7 +118,7 @@ describe("commercial-account-metadata", () => {
         },
       ],
     });
-    expect(lookups.paymentTerms.length).toBe(1);
+    expect(lookups).not.toHaveProperty("paymentTerms");
     expect(lookups.creditPolicies[0]?.code).toBe("trade.credit.strict_gate");
   });
 });

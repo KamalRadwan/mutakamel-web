@@ -4,6 +4,8 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useDashboardShares } from "./useDashboardShares";
 
+vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { id: "01900300-0000-7000-8000-000000000001", isTenantOwner: true, permissions: [], accessibleBranches: [], teamMemberships: [] } }) }));
+
 const { get } = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/axiosClient")>();
@@ -43,3 +45,4 @@ describe("dashboard share loading failures", () => {
     expect(result.current.targetSearchError).toBeNull();
   });
 });
+

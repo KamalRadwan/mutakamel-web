@@ -1,3 +1,4 @@
+import { parseTemplateSourceTuple, parseTemplateDocumentIdentity } from "./template-source-metadata";
 import type { CorePath } from "@/lib/api/envelope";
 import {
   invalidCoreResponse,
@@ -40,17 +41,11 @@ export const TEMPLATE_ASSIGNMENTS_PERMISSION = "templates.assignments.manage";
  */
 export const ACCESS_POLICY_BLOCKED_CODE = "ACCESS_POLICY_BLOCKED";
 
-export const TEMPLATE_DOCUMENT_TYPES = ["QUOTATION", "CRM_OUTBOUND_EMAIL"] as const;
-export const TEMPLATE_OUTPUT_CHANNELS = ["PRINT", "EMAIL"] as const;
-export const TEMPLATE_LAYOUT_MODES = ["HYBRID_DOCUMENT", "EMAIL_FLOW"] as const;
+export {
+  TEMPLATE_DOCUMENT_TYPES, TEMPLATE_OUTPUT_CHANNELS, TEMPLATE_LAYOUT_MODES, TEMPLATE_ADAPTER_KEYS,
+} from "./template-source-metadata";
 export const TEMPLATE_DIRECTIONS = ["AUTO", "LTR", "RTL"] as const;
 export const TEMPLATE_LOCALES = ["ar-EG", "en-US"] as const;
-export const TEMPLATE_ADAPTER_KEYS = [
-  "TRADE_QUOTATION_PRINT_V1",
-  "CRM_LEAD_OUTBOUND_EMAIL_V1",
-  "CRM_CUSTOMER_OUTBOUND_EMAIL_V1",
-  "CRM_OPPORTUNITY_OUTBOUND_EMAIL_V1",
-] as const;
 export const TEMPLATE_SCOPE_TYPES = ["TENANT", "COMPANY", "BRANCH"] as const;
 export const TEMPLATE_LIFECYCLE_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 /** `publicValidationState` maps VALID/INVALID to PASSED/FAILED on the wire. */
@@ -68,12 +63,9 @@ export type TemplateSortField =
   | "name"
   | "publishedVersionNumber";
 
-export type TemplateDocumentType = (typeof TEMPLATE_DOCUMENT_TYPES)[number];
-export type TemplateOutputChannel = (typeof TEMPLATE_OUTPUT_CHANNELS)[number];
-export type TemplateLayoutMode = (typeof TEMPLATE_LAYOUT_MODES)[number];
+export type { TemplateDocumentType, TemplateOutputChannel, TemplateLayoutMode, TemplateAdapterKey } from "./template-source-metadata";
 export type TemplateDirection = (typeof TEMPLATE_DIRECTIONS)[number];
 export type TemplateLocale = (typeof TEMPLATE_LOCALES)[number];
-export type TemplateAdapterKey = (typeof TEMPLATE_ADAPTER_KEYS)[number];
 export type TemplateScopeType = (typeof TEMPLATE_SCOPE_TYPES)[number];
 type TemplateValidationState = (typeof TEMPLATE_VALIDATION_STATES)[number];
 
@@ -135,11 +127,19 @@ export interface TemplateCursorPage<T> {
   totalCount: number | null;
 }
 
+export type TemplatePdfPreviewCapability =
+  | { readonly state: "ENABLED" | "HIDDEN"; readonly reason: null }
+  | { readonly state: "DISABLED"; readonly reason: "ARCHIVED" | "ACCESS_POLICY_READ_ONLY" };
+
 export interface TemplateDetail extends TemplateListItem {
   description: string | null;
   dataSourceKey: string;
   scope: TemplateScope;
   systemProtected: boolean;
+  /** Core's PDF create capability. Older or invalid evidence leaves it absent. */
+  previewPdf?: TemplatePdfPreviewCapability;
+  /** Core's definition-scoped asset write grant, when explicitly enabled. */
+  manageAssets?: { readonly state: "ENABLED"; readonly reason: null };
   /** The `If-Match` value for every definition-level write. */
   etag: string;
   currentDraft: {
@@ -182,10 +182,15 @@ function parsePublishedVersion(value: unknown): TemplatePublishedVersion | null 
   if (value === null || value === undefined) return null;
   const version = record(value);
   if (!version) invalidCoreResponse();
+  const hasCoreId = Object.hasOwn(version, "templateVersionId");
+  const hasLegacyId = Object.hasOwn(version, "versionId");
+  if (!hasCoreId && !hasLegacyId) invalidCoreResponse();
+  const versionId = requiredUuidV7(version, hasCoreId ? "templateVersionId" : "versionId");
+  if (hasCoreId && hasLegacyId && requiredUuidV7(version, "versionId") !== versionId) invalidCoreResponse();
   const number = version.versionNumber;
   if (!Number.isSafeInteger(number) || (number as number) < 1) invalidCoreResponse();
   return {
-    versionId: requiredUuidV7(version, "versionId"),
+    versionId,
     versionNumber: number as number,
     publishedAt: requiredTimestamp(version, "publishedAt"),
   };
@@ -200,13 +205,14 @@ function positiveInteger(source: Record<string, unknown>, key: string): number {
 export function parseTemplateListItem(payload: unknown): TemplateListItem {
   const row = record(payload);
   if (!row) invalidCoreResponse();
+  const identity = parseTemplateDocumentIdentity(row);
   return {
     id: requiredUuidV7(row, "templateId"),
     code: requiredText(row, "code", TEMPLATE_CODE_MAX),
     name: requiredText(row, "name", TEMPLATE_NAME_MAX),
-    documentType: requiredText(row, "documentType", 40),
-    outputChannel: requiredText(row, "outputChannel", 16),
-    layoutMode: requiredText(row, "layoutMode", 24),
+    documentType: identity.documentType,
+    outputChannel: identity.outputChannel,
+    layoutMode: identity.layoutMode,
     lifecycleStatus: requiredText(row, "lifecycleStatus", 16),
     locale: requiredText(row, "locale", 35),
     direction: requiredText(row, "direction", 8),
@@ -218,26 +224,45 @@ export function parseTemplateListItem(payload: unknown): TemplateListItem {
   };
 }
 
+function parsePdfPreviewCapability(value: unknown): TemplatePdfPreviewCapability | undefined {
+  const capabilities = record(value);
+  if (!capabilities || !Object.hasOwn(capabilities, "previewPdf")) return undefined;
+  const capability = record(capabilities.previewPdf);
+  if (!capability || Object.keys(capability).length !== 2 ||
+    !Object.hasOwn(capability, "state") || !Object.hasOwn(capability, "reason")) return undefined;
+  const { state, reason } = capability;
+  if ((state === "ENABLED" || state === "HIDDEN") && reason === null) return { state, reason };
+  if (state === "DISABLED" && (reason === "ARCHIVED" || reason === "ACCESS_POLICY_READ_ONLY")) return { state, reason };
+  return undefined;
+}
+
 export function parseTemplateDetail(payload: unknown): TemplateDetail {
   const row = record(payload);
   if (!row) invalidCoreResponse();
   const draft = record(row.currentDraft);
   if (!draft) invalidCoreResponse();
   const revision = positiveInteger(row, "revision");
+  const identity = parseTemplateSourceTuple(row);
+  const previewPdf = parsePdfPreviewCapability(row.capabilities);
+  const assetCapability = record(record(row.capabilities)?.manageAssets);
+  const manageAssets = assetCapability && Object.keys(assetCapability).length === 2 &&
+    assetCapability.state === "ENABLED" && assetCapability.reason === null ? { state: "ENABLED", reason: null } as const : undefined;
   return {
     id: requiredUuidV7(row, "templateId"),
     code: requiredText(row, "code", TEMPLATE_CODE_MAX),
     name: requiredText(row, "name", TEMPLATE_NAME_MAX),
     description: nullableText(row, "description", TEMPLATE_DESCRIPTION_MAX),
-    documentType: requiredText(row, "documentType", 40),
-    outputChannel: requiredText(row, "outputChannel", 16),
-    layoutMode: requiredText(row, "layoutMode", 24),
-    dataSourceKey: requiredText(row, "dataSourceKey", 64),
+    documentType: identity.documentType,
+    outputChannel: identity.outputChannel,
+    layoutMode: identity.layoutMode,
+    dataSourceKey: identity.dataSourceKey,
     lifecycleStatus: requiredText(row, "lifecycleStatus", 16),
     locale: requiredText(row, "locale", 35),
     direction: requiredText(row, "direction", 8),
     scope: optionalScope(row.scope),
     systemProtected: requiredBoolean(row, "systemProtected"),
+    ...(previewPdf ? { previewPdf } : {}),
+    ...(manageAssets ? { manageAssets } : {}),
     definitionRevision: revision,
     definitionEtag: requiredText(row, "etag", 64),
     etag: requiredText(row, "etag", 64),
@@ -263,6 +288,31 @@ export function parseTemplateDetail(payload: unknown): TemplateDetail {
   };
 }
 
+/** Admit the raw list/search wire before removing supported Core wrapping.
+ * SuccessResponseDto, ApiErrorDto and Gateway Problem Details carry distinct
+ * signals; none of the error shapes can establish an authorized cursor page. */
+export function parseTemplateCursorResponse<T>(
+  response: { status: number; data: unknown },
+  parseItem: (value: unknown) => T,
+): TemplateCursorPage<T> {
+  if (response.status !== 200) invalidCoreResponse();
+  const outer = record(response.data);
+  if (!outer) invalidCoreResponse();
+  const wrapped = Object.hasOwn(outer, "data");
+  if (wrapped && Object.hasOwn(outer, "items")) invalidCoreResponse();
+  const page = wrapped ? record(outer.data) : outer;
+  if (!page || Object.hasOwn(page, "data")) invalidCoreResponse();
+  for (const layer of wrapped ? [outer, page] : [outer]) {
+    if ((Object.hasOwn(layer, "success") && layer.success !== true) ||
+      (Object.hasOwn(layer, "statusCode") && layer.statusCode !== response.status) ||
+      (Object.hasOwn(layer, "status") && layer.status !== response.status) ||
+      ["errorCode", "code", "errorCategory", "errors", "details", "type", "title", "detail"].some(key => Object.hasOwn(layer, key))) {
+      invalidCoreResponse();
+    }
+  }
+  return parseTemplateCursorPage(page, parseItem);
+}
+
 export function parseTemplateCursorPage<T>(
   payload: unknown,
   parseItem: (value: unknown) => T,
@@ -280,12 +330,18 @@ export function parseTemplateCursorPage<T>(
     invalidCoreResponse();
   }
   const total = body.totalCount;
+  const limit = positiveInteger(pageInfo, "limit");
+  const hasNextPage = requiredBoolean(pageInfo, "hasNextPage");
+  // CursorQueryDto caps every template catalogue at 100 rows.
+  if (limit > 100 || body.items.length > limit ||
+    (hasNextPage ? typeof nextCursor !== "string" || nextCursor.length === 0 : nextCursor != null) ||
+    (total != null && (!Number.isSafeInteger(total) || (total as number) < 0))) invalidCoreResponse();
   return {
     items: body.items.map(parseItem),
     // Preserved exactly as received — never re-encoded.
     nextCursor: (nextCursor as string | null | undefined) ?? null,
-    hasNextPage: requiredBoolean(pageInfo, "hasNextPage"),
-    limit: positiveInteger(pageInfo, "limit"),
+    hasNextPage,
+    limit,
     totalCount: Number.isSafeInteger(total) ? (total as number) : null,
   };
 }

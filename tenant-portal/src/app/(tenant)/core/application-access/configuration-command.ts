@@ -51,7 +51,6 @@ const intentSchema = z.object({ idempotencyKey: uuid7, target: z.unknown().trans
   .refine((value) => (value.observedResourceId === null) === (value.body.expectedConfigRevision === "0"));
 export type ConfigurationIntent = z.infer<typeof intentSchema>;
 const saved = z.object({ actorId: uuid, intent: intentSchema }).strict();
-const previousSaved = z.object({ actorId: uuid, command: commandSchema }).strict();
 function storageKey(actorId: string, request: ConfigurationTarget) {
   uuid.parse(actorId); const target = configurationTarget(request);
   return `tenant-configuration-intent:${actorId}:${target.kind}:${"companyId" in target ? target.companyId : target.branchId}:${target.applicationKey}:${target.addonKey}`;
@@ -66,13 +65,7 @@ export function readConfigurationIntent(actorId: string, target: ConfigurationTa
       if (current.data.actorId !== actorId || JSON.stringify(current.data.intent.target) !== JSON.stringify(configurationTarget(target))) invalid();
       return current.data.intent;
     }
-    // Migrate only browser-local entries written by the earlier editor. Never
-    // restore their values into React state or send a command during this read.
-    const previous = previousSaved.parse(parsed);
-    if (previous.actorId !== actorId || JSON.stringify(previous.command.target) !== JSON.stringify(configurationTarget(target))) invalid();
-    const intent = describeConfigurationIntent(previous.command);
-    sessionStorage.setItem(key, JSON.stringify(saved.parse({ actorId, intent })));
-    return intent;
+    invalid();
   } catch {
     // An unreadable original still blocks replacement. Scrub a possibly secret
     // payload while retaining an unavailable marker rather than an empty slot.

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { ar } from "@/i18n/dictionaries/ar";
+import { loadServerLanguage } from "@/i18n/server";
 import { TenantPortalRuntime } from "@/components/auth/TenantPortalRuntime";
 
-
-// Segment-level title. It flows through the root layout's
-// `title.template`, so the brand stays the suffix. Arabic for the same
-// reason the root default is — see src/app/layout.tsx.
-export const metadata: Metadata = { title: ar.metadata.fence };
+export async function generateMetadata(): Promise<Metadata> {
+  const { dictionary: t } = await loadServerLanguage();
+  return { title: t.metadata.fence };
+}
 
 // The terminal fences: session expiry, a suspended account, a maintenance
 // window and a blocked entitlement. They render without AppShell — the shell's

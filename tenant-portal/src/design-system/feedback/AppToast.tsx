@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
 import { Button } from "../primitives/Button";
+import { IdentifierText } from "../primitives/IdentifierText";
 
 export type AppToastType = "success" | "error" | "warning" | "info";
 
@@ -12,6 +13,7 @@ export interface AppToastProps {
   type: AppToastType;
   title: string;
   message?: string;
+  reference?: { label: string; value: string };
   action?: { label: string; onClick: () => void };
   onDismiss: () => void;
 }
@@ -32,7 +34,7 @@ const ICON_TONE: Record<AppToastType, string> = {
   info: "text-ink-500 dark:text-ink-400",
 };
 
-export function AppToast({ type, title, message, action, onDismiss }: AppToastProps) {
+export function AppToast({ type, title, message, reference, action, onDismiss }: AppToastProps) {
   const { t } = useI18n();
   const Icon = ICONS[type];
 
@@ -53,17 +55,20 @@ export function AppToast({ type, title, message, action, onDismiss }: AppToastPr
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      className="flex w-full max-w-sm items-start gap-2 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-overlay"
+      className="flex w-full max-w-sm items-start gap-2 rounded-md border border-border bg-popover p-3 font-sans text-popover-foreground shadow-overlay"
     >
       <Icon className={cn("mt-0.5 size-4 shrink-0", ICON_TONE[type])} aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{title}</p>
-        {/* wrap-anywhere, not break-all: the message often ends in a bare
-            36-character correlationId, which otherwise pushes the toast off
-            screen — B11, typography.md#identifiers-wrap-never-overflow. */}
-        {message && (
+        <p className="wrap-anywhere text-sm font-medium"><bdi>{title}</bdi></p>
+        {(message || reference) && (
           <p className="mt-0.5 whitespace-pre-line wrap-anywhere text-xs text-muted-foreground">
-            <bdi>{message}</bdi>
+            <bdi>
+              {message}
+              {reference && <>
+                {message ? " — " : null}{reference.label}{": "}
+                <IdentifierText selectAll>{reference.value}</IdentifierText>
+              </>}
+            </bdi>
           </p>
         )}
         {action ? <Button className="mt-2" variant="outline" size="sm" onClick={() => { action.onClick(); onDismiss(); }}>{action.label}</Button> : null}

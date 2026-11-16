@@ -52,6 +52,22 @@ describe("Combobox", () => {
     expect(screen.getByRole("button", { name: /Aswan branch/ })).toBeInTheDocument();
   });
 
+  it("keeps an entity's supporting text visible when its remote option is absent", () => {
+    const { props, rerender } = renderCombobox({ value: "99", selectedLabel: "Aswan branch", selectedDescription: "Upper Egypt" });
+    expect(screen.getByRole("button", { name: /Aswan branch Upper Egypt/ })).toContainElement(screen.getByText("Upper Egypt"));
+    rerender(<Combobox {...props} value={undefined} />);
+    expect(screen.queryByText("Upper Egypt")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Select a branch/ })).toBeInTheDocument();
+  });
+
+  it("resolves a loaded option name and uses the placeholder for an unresolved value", () => {
+    const { props, rerender } = renderCombobox({ value: "1" });
+    expect(screen.getByRole("button", { name: /Cairo branch/ })).toBeInTheDocument();
+    rerender(<Combobox {...props} value="unknown-identifier" />);
+    expect(screen.getByRole("button", { name: /Select a branch/ })).toBeInTheDocument();
+    expect(screen.queryByText("unknown-identifier")).not.toBeInTheDocument();
+  });
+
   it("puts role=combobox on the search field with a real listbox relationship", () => {
     renderCombobox();
     fireEvent.click(screen.getByRole("button", { name: /Select a branch/ }));

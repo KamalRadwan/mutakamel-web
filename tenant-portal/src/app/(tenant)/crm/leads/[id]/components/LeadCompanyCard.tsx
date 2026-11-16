@@ -10,6 +10,7 @@ import type { LeadCompanyEdit } from "../hooks/useLeadCompanyEdit";
 import { useLeadCompanyModal } from "../hooks/useLeadCompanyModal";
 import { LeadCompanyEditModal } from "./LeadCompanyEditModal";
 import { LeadPhoneActionsRow } from "../../components/LeadPhoneActionsRow";
+import { safeWebsiteHref } from "../../../shared/safe-website-href";
 
 function formatFullLegalAddress(address: LeadDetail["address"]): string | null {
   if (!address) return null;
@@ -43,6 +44,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
     <ReadValue value={value} dir={dir} emptyLabel={t.detail.notRecorded} />
   );
   const fullLegalAddress = formatFullLegalAddress(lead.address);
+  const websiteHref = safeWebsiteHref(lead.companyWebsite);
 
   // When editing, hide the original View Mode card in-place and render the Inline Editor card
   if (modal.form) {
@@ -80,9 +82,9 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
     },
     {
       label: t.crmLeadDetail.companyWebsite,
-      value: lead.companyWebsite ? (
+      value: websiteHref ? (
         <a
-          href={lead.companyWebsite.startsWith("http") ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+          href={websiteHref}
           target="_blank"
           rel="noopener noreferrer"
           dir="ltr"
@@ -91,7 +93,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
           {lead.companyWebsite} ↗
         </a>
       ) : (
-        <EmptyValue label={t.detail.notRecorded} />
+        read(lead.companyWebsite, "ltr")
       ),
     },
     {

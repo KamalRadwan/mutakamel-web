@@ -21,6 +21,7 @@ const profile = (id: string, fullName = "Saly Essam"): UserContactProfile => ({ 
 beforeEach(() => {
   vi.clearAllMocks();
   auth.user = { id: ME, firstName: "Kamal", lastName: "Radwan", email: "kamal@example.com", isTenantOwner: false,
+    featureEntitlements: { "crm.outbound_email": false },
     status: "ACTIVE", permissions: ["users.user.read"], permissionScopes: {
       "users.user.read": { tenantWide: true, companyIds: [], branchIds: [] },
     }, accessibleBranches: [], accessibleCompanies: [], accessibleBranchCompanies: [], teamMemberships: [],

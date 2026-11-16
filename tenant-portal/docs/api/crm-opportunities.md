@@ -2,16 +2,48 @@
 
 Status: **verified**
 
-Last source verification: **2026-10-18**
+Last source verification: **2026-11-04**
+
+Pipeline configuration detail source verification: **2026-10-29** (AUDIT29B-CRM-1).
+
+Settings pipeline/stage read admission and mutation recovery re-verified:
+**2026-11-03**, against the Gateway, controllers, DTOs and pipeline services.
 
 Owning app: **crm-app**
 
 Canonical prefix: `/api/tenant/crm/v1/opportunities`, `/pipelines`,
 `/opportunity-stages`
 
-Portal status: **built** — board, rich card and table views, persistent
-importance and card colour, plus delete. See the full breakdown below. Not
-exercised against a live session: CRM is blocked twice over, by P4 and by Q17.
+Portal status: **built** — board, rich card and table views, Fast create and
+directly editable Full view, persistent importance and card colour, plus delete.
+Authenticated read and baseline UI inspection succeeded on 2026-11-04. The new
+form's runtime screenshot verification is recorded with its implementation plan;
+unit checks alone do not prove successful live writes.
+
+### Opportunity form contract (verified 2026-11-04)
+
+Fast create and Full create share one draft, validation and create attempt.
+Fast create includes tenant-required custom fields; Full create exposes all
+supported create fields, including optional customer contact and contextual
+source lead. Assignment choices use CRM assignable owners. Importance has one
+three-star control and defaults to zero. Amount is nonnegative, capped at
+8796093022207.999, with currency-specific precision and an explicit three-letter
+currency whenever an amount is provided, including zero. Expected close date
+is a real calendar date; probability is an optional integer from 0 to 100.
+
+Saved Full view edits supported PATCH fields directly with the original
+`expectedUpdatedAt` snapshot. Customer, branch and source lead are immutable.
+Explicit nullable clears are preserved; card colour is available after creation.
+Ordinary save, lifecycle commands, tags and related panels use their respective
+contracts. A conflict preserves the draft for review. Uncertain PATCH and stage
+results require an authoritative record read before another write, because those
+Gateway routes are not idempotent replay contracts.
+
+The single Customer business row counts customer-party records within branch
+and read scope: opportunities, quotations, sales orders and invoices. It does not
+claim those documents belong to this opportunity. Loading, zero, failed and
+denied reads remain distinct. Activities, notes, files, stage history and audit
+history retain their own permissions and endpoints.
 
 Source inspected:
 `crm-app/src/crm/opportunities/opportunities.controller.ts`,
@@ -21,6 +53,16 @@ Source inspected:
 `crm-app/src/crm/common/dto/crm-list-query.dto.ts`.
 
 ## Routes
+
+### Localized failure display (verified 2026-10-30)
+
+Opportunity deletion retains a normalized API error and formats it through
+`useCrmErrorText` without server prose: ordinary 500 responses show
+`crmShared.errorGeneric`, and 409 responses show `crmShared.errorConflict`.
+`crmOpportunities.deleteFailed` is the bilingual fallback. List failures show
+only `crmOpportunities.loadFailed`. Acquisition-source edit refusals use the
+same localized formatter; uncertain writes retain their reload-and-review
+messages. Raw backend messages are never rendered by these paths.
 
 | Method | Canonical path | Permission | Branch guard |
 | --- | --- | --- | --- |
@@ -54,7 +96,8 @@ Pipelines and stages:
 | --- | --- | --- |
 | GET | `/api/tenant/crm/v1/pipelines` | `crm.pipelines.read` |
 | GET | `/api/tenant/crm/v1/pipelines/:id` | `crm.pipelines.read` |
-| GET | `/api/tenant/crm/v1/pipelines/configuration` | `crm.pipelines.read` |
+| GET | `/api/tenant/crm/v1/pipelines/configuration` | `crm.pipelines.manage` |
+| GET | `/api/tenant/crm/v1/pipelines/:id/configuration` | `crm.pipelines.manage` |
 | GET | `/api/tenant/crm/v1/opportunity-stages` | `crm.pipelines.manage` |
 | GET | `/api/tenant/crm/v1/opportunity-stages/:id` | `crm.pipelines.manage` |
 | POST | `/api/tenant/crm/v1/opportunity-stages` | `crm.pipelines.manage` |
@@ -69,6 +112,9 @@ is worse than not showing them the screen: `PermissionGate` would never fire,
 and they would meet the refusal one control at a time.
 
 The same applies to `GET /pipelines/configuration`.
+
+| Method | Canonical path | Permission |
+| --- | --- | --- |
 | PUT | `/api/tenant/crm/v1/pipelines/:id/default` | `crm.pipelines.manage` |
 | PATCH | `/api/tenant/crm/v1/pipelines/:id/stages/reorder` | `crm.pipelines.manage` |
 | DELETE | `/api/tenant/crm/v1/pipelines/:id/stages/:pipelineStageId` | `crm.pipelines.manage` |
@@ -78,6 +124,31 @@ The same applies to `GET /pipelines/configuration`.
 | GET | `/api/tenant/crm/v1/pipelines/assignment-options` | `crm.pipelines.manage` |
 
 Complete list: [crm-reference.md](crm-reference.md).
+
+Assignment-option query conversion reverified **2026-11-04**: `limit` is an
+optional HTTP numeric string converted by the owning backend DTO, default 50,
+range 1–100. `search` is trimmed and capped at 80 characters. The portal's normal
+`?limit=50` request returns 200 with eligible `users` and active `teams`; empty
+arrays represent an actual empty catalogue. Invalid limits remain 400. Live UI
+verification saved a user and team together in RESTRICTED mode, reloaded their
+confirmed selections, then saved ALL and confirmed both target arrays cleared.
+The temporary pipeline/team fixtures were deleted after verification.
+
+Pipeline managers load detail through `GET /pipelines/:id/configuration`.
+It returns the raw pipeline projection with stages and assignments, including
+inactive pipelines and restricted pipelines the manager is not assigned to.
+This lets the existing edit modal reactivate an inactive non-default pipeline
+through `PATCH /pipelines/:id` with `isActive: true`. Configuration reads require
+the manage grant (or tenant owner authority); actors without that grant receive 403.
+Missing or deleted ids return 404. Actors holding only the read grant continue to load
+`GET /pipelines/:id`, which retains active-only, assignment-aware visibility.
+
+A manager in a resolved tenant `READ_ONLY` mode can still read configuration
+and the reusable opportunity-stage catalogue. The portal hides mutation actions
+and explains the restriction. In Opportunity Stages, a write-policy 403 leaves
+confirmed readable content available and locks writes; an authoritative GET403
+is the page's permission boundary.
+The detail hook reselects its read endpoint when management permission changes.
 
 `assignments` is how a `RESTRICTED` pipeline
 (`PipelineAccessModeEnum`) grants access to specific users or teams. Stage
@@ -91,11 +162,19 @@ races.
 | `/opportunity-stages` | The tenant-wide **stage catalogue** — the vocabulary |
 | `/pipelines/:id/stages/:pipelineStageId` | One stage's **membership in a pipeline** |
 
-Deleting from the catalogue removes the definition everywhere; deleting a
-pipeline stage removes that stage from that one pipeline. They are not
-interchangeable, and the second is what a pipeline editor calls.
+Deleting from the catalogue soft-deletes an unassigned custom definition;
+system definitions and definitions still used by pipelines cannot be deleted.
+Deleting a pipeline stage removes only its membership in that pipeline. These
+operations are not interchangeable, and the second is what a pipeline editor calls.
 
 Pipeline editor safeguards (verified **2026-10-17**, FE-CRM-PIPE-001):
+Presentation rechecked **2026-11-04**: settings lists Arabic and English names
+in separate columns. Each editable row opens a centred edit modal using the
+authoritative configuration read and existing PATCH contract. Creation uses a
+wide modal with canonical/custom stage selection. View opens the dedicated
+`/crm/pipelines/:id` page for stage/access/reset operations; no inline editor
+is automatically rendered beneath the list.
+
 NEW stays first; earlier/later controls cannot move NEW or swap another stage
 ahead of it. NEW, WON and LOST have no detach control. Other stage detaches
 require confirmation naming the stage; an in-use stage can still be rejected
@@ -106,8 +185,18 @@ becomes the default.
 
 **`POST /pipelines/:id/reset` is destructive** — it returns the pipeline to its
 default stage configuration. Anything that depends on the removed stages is
-affected. Require an explicit typed confirmation, not a plain
-"are you sure".
+affected. The confirmation names these consequences and the canonical shared
+definitions it restores. A server blocker replaces the destructive action with
+recovery guidance instead of offering the same refused operation again.
+
+Pipeline mutations acquire a synchronous session/actor lock before dispatch.
+Unknown transport, malformed receipt, 5xx and in-flight outcomes require a
+validated current read; failed reconciliation retains a fence across modal
+close/reopen. Configuration recovery requires complete assignments matching
+the pipeline access mode. Read-only projections cannot clear that fence. A
+successful explicit reload enables reviewed user action, never an automatic
+second write. Every read is checked against its current actor/resource and
+request generation.
 
 ## The board and card endpoints — use these, not the list
 

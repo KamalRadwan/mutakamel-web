@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { Button } from "../../primitives/Button";
 import { Field } from "../../primitives/Field";
 import { Input } from "../../primitives/Input";
+import { TooltipProvider } from "../../primitives/Tooltip";
 import { FormModal, type FormModalProps } from "./FormModal";
 import { FormSection } from "./FormSection";
 
@@ -51,6 +52,16 @@ function Modal(overrides: Partial<FormModalProps> = {}) {
 }
 
 describe("FormModal is a real form", () => {
+  it("keeps document authoring centered and submits through the same guarded form", () => {
+    const onSubmit = vi.fn();
+    renderModal(<Modal size="document" onSubmit={onSubmit} />);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveClass("max-w-[1120px]", "start-1/2", "-translate-x-1/2");
+    expect(screen.getByRole("heading", { name: "Add lead" })).toHaveClass("text-xl");
+    expect(dialog.querySelector("aside")).toBeNull();
+    screen.getByLabelText("Company name").closest("form")!.requestSubmit();
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
   it("hides and blocks submission for receipt-only states", () => {
     const onSubmit = vi.fn();
     renderModal(<Modal hideSubmit onSubmit={onSubmit} />);
@@ -430,5 +441,47 @@ describe("FormModal stepper variant", () => {
     expect(document.activeElement).toBe(
       screen.getByRole("heading", { name: "Address", level: 3 }),
     );
+  });
+});
+
+describe("FormModal opt-in onOpenAutoFocus and preserved defaults", () => {
+  it("focuses the caller's target editable field on open when opted in, skipping preceding tooltip/read-only controls", () => {
+    function OptInFocusModal() {
+      const editableRef = useRef<HTMLInputElement | null>(null);
+      return (
+        <TooltipProvider>
+          <Modal
+            onOpenAutoFocus={(event) => {
+              if (!editableRef.current) return;
+              event.preventDefault();
+              editableRef.current.focus();
+            }}
+          >
+            <Field label="Locked code" hint="Fixed after creation." hintPlacement="tooltip" readOnly>
+              <Input value="EUR" readOnly />
+            </Field>
+            <Field label="Display name">
+              <Input ref={editableRef} />
+            </Field>
+          </Modal>
+        </TooltipProvider>
+      );
+    }
+
+    renderModal(<OptInFocusModal />);
+    expect(document.activeElement).toBe(screen.getByLabelText("Display name"));
+  });
+
+  it("preserves default open focus, permissions size geometry, and dirty confirmation when onOpenAutoFocus is omitted", () => {
+    const onOpenChange = vi.fn();
+    renderModal(<Modal size="permissions" isDirty onOpenChange={onOpenChange} />);
+
+    const content = screen.getByRole("dialog");
+    expect(content).toHaveClass("h-[760px]", "max-w-[1080px]");
+    expect(document.activeElement).toBe(screen.getByLabelText("Company name"));
+
+    fireEvent.keyDown(content, { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByText("Discard?")).toBeInTheDocument();
   });
 });

@@ -47,11 +47,11 @@ and the brand sits inside the same family instead of fighting it.
 
 | Role | Ramp | Admin's name | Hue | Job |
 | --- | --- | --- | --- | --- |
-| Brand | `brand` | `action` | cobalt, ~254→267 | Primary action, active nav, focus ring, links |
+| Brand | `brand` | `action` | cobalt, ~254→267 | Primary action, active nav, focus ring, links, CRM stage/category progress |
 | Positive | `positive` | `success` | 149–164 (green) | Won, converted, active |
 | Caution | `caution` | `warn` | 92 → 44 (amber) | On hold, degraded, needs attention |
 | Negative | `negative` | `danger` | 30 → 26 (vermilion) | Lost, disqualified, destructive, error |
-| Neutral | `ink` | `ink` / `surface` | 232 → 245 (cold blue) | Text, borders, surfaces, **every in-progress state** |
+| Neutral | `ink` | `ink` / `surface` | 232 → 245 (cold blue) | Text, borders, surfaces, other in-progress states |
 
 Four deliberate choices, all of them admin's and all of them kept:
 
@@ -250,11 +250,13 @@ against a 4.5 bar** — that is the pairing to re-measure before touching
 
 `OpportunityStageFlagEnum` has 9 values, `LeadStageFlagEnum` has 8. No palette
 has 9 colorblind-safe hues. Stage is conveyed by **column position, label, and
-progress**. Only outcome takes a hue:
+progress**. Lifecycle/category progress uses one shared active hue; each stage
+does not receive its own color (updated 2026-11-04):
 
 | Outcome | Role |
 | --- | --- |
-| In progress | `ink` + a pulsing dot |
+| Lead/opportunity stage and category progress | `brand` + a matching pulsing dot |
+| Other in-progress statuses | `ink` + a pulsing dot |
 | Won / converted / active | `positive` |
 | On hold / nurturing | `caution` |
 | Lost / disqualified / blacklisted | `negative` |
@@ -358,6 +360,11 @@ English operator and vice versa. See `src/app/fonts.ts`.
 
 ## Scale — 7 steps
 
+**Updated 2026-11-04:** Arabic and English share every font size and line-height.
+The current token values and named CRM steps are documented in
+[typography.md](typography.md#the-7-step-scale-and-named-v3-steps).
+This supersedes the historical Arabic lift and the older scale table below.
+
 | Token | Latin | Arabic | Line | Use |
 | --- | ---: | ---: | ---: | --- |
 | `text-2xs` | 13px | 13px | 18 | Latin uppercase micro-labels; a **compatibility alias** for `text-xs` |
@@ -376,9 +383,9 @@ accident.
 
 **The 13px floor is not negotiable, even for density.** Density comes from
 tighter spacing and shorter rows, never smaller type — 11px Arabic is
-unreadable, and a screen nobody can read fits zero items. Arabic gains 1px on
-the three smallest steps because Naskh forms need the room for dots and
-diacritics.
+unreadable, and a screen nobody can read fits zero items. As of 2026-11-04,
+language switching preserves type sizes and line-heights; Arabic retains zero
+letter-spacing for joined forms.
 
 ### Inputs are 16px on mobile
 
@@ -621,10 +628,19 @@ pnpm add @radix-ui/react-alert-dialog @radix-ui/react-avatar \
 | --- | --- |
 | A component library (MUI, Chakra, Mantine) | Brings its own design language; you would fight it forever |
 | `styled-components` / `emotion` | A second styling system beside Tailwind |
-| `cmdk` | Command palette not built — 11 routes do not need one |
 | `framer-motion` | The motion budget is small enough for CSS |
 | `@tanstack/react-table` | `DataTable` needs server pagination + sorting, not client-side table logic |
-| `recharts` / `echarts` | No charts in scope. Both currently installed with **zero imports** — removed |
+| `echarts` | The portal uses its installed Recharts runtime and bounded DS SVG patterns; a second broad chart framework has no proven need |
+
+Current chart runtime (source reviewed 2026-11-05): **Recharts 3.10** is installed
+and imported by `patterns/chart`. The DS exports line, area, horizontal/vertical
+bar and composed geometry with independently formatted numeric axes, nullable
+gaps and optional per-series styles. Pie and donut share the part-to-whole
+pattern with an explicit geometry variant. Bounded native patterns also include target gauges, hierarchy, floating waterfall,
+intervals, directed cyclic graphs and matrix heatmaps. Feature adapters retain
+typed source measures and exact accessible tables. Source/type tests remain
+separate from authenticated browser and visual acceptance.
+The command palette is also implemented: the DS `CommandPalette` wraps `cmdk`.
 
 ---
 
@@ -647,7 +663,7 @@ alternative. So the file exists. What it must never contain is styling.
 @theme        { /* ramps, admin's aliases, type scale, radius, the theme flip */ }
 @theme inline { /* font vars, semantic→utility bridges */ }
 :root / .dark { /* semantic token values, control sizes, z-ladder, elevation */ }
-html[lang="ar"] { /* the Arabic type lift */ }
+html[lang="ar"] { /* zero tracking for Arabic joined forms; shared type sizes */ }
 
 .ds-hit-area, .ds-hit-target { /* the pointer-target floor */ }
 .dot-pending                 { /* the one informational animation */ }

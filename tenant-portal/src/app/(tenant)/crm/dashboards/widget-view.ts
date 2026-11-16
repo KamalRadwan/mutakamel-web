@@ -1,17 +1,18 @@
 // How one executed widget is rendered, and the table every widget also gets.
 //
-// crm-app offers 34 visualization types; this design system has line, area,
-// bar, donut and sparkline (docs/design/patterns.md#chart). The rule here is
-// **never approximate**: a treemap, a gantt or a sankey renders as its data
-// table rather than as a chart that is not the chart it claims to be. That
-// table is also the screen-reader equivalent every chart needs
-// (docs/design/accessibility.md), so it is built for all of them.
+// Current visualization enums have native adapters. Invalid, incomplete,
+// unavailable or over-budget geometry keeps its exact accessible data table.
 
 import type { ChartRole, SwatchHue } from "@/design-system";
 import type { Language } from "@/i18n/useLanguage";
 import { formatDecimalString, formatNumber } from "@/lib/format/number";
 import type { CrmMetricUnit, CrmVisualization } from "./widget-contract";
 import type { WidgetResult, WidgetSeries } from "./dashboard-run-contract";
+import { typedTableModel } from "./widget-typed-table";
+import { WIDGET_RENDER_CAPABILITIES } from "./widget-render-capabilities";
+import { seriesTableModel, type WidgetTableHeaders } from "./widget-series-table";
+import { durationDistribution } from "./widget-duration-distribution";
+export type { WidgetTableHeaders } from "./widget-series-table";
 
 export type WidgetRenderMode =
   | "SCALAR"
@@ -19,6 +20,7 @@ export type WidgetRenderMode =
   | "GAUGE"
   | "LINE"
   | "AREA"
+  | "COMPOSED"
   | "BAR"
   | "STACKED_BAR"
   | "DONUT"
@@ -26,6 +28,16 @@ export type WidgetRenderMode =
   | "SCATTER"
   | "HEATMAP"
   | "HISTOGRAM"
+  | "BOX_PLOT"
+  | "WATERFALL"
+  | "TREEMAP"
+  | "LEADERBOARD"
+  | "SCORECARD"
+  | "GANTT"
+  | "FLOWCHART"
+  | "CALENDAR"
+  | "TIMELINE"
+  | "CALENDAR_HEATMAP"
   | "ALERT_LIST"
   | "ACTIVITY_FEED"
   | "TABLE";
@@ -53,14 +65,17 @@ export const COLORFUL_SWATCH_HUES: readonly SwatchHue[] = [
 ];
 
 export type WidgetCell =
-  | { kind: "text"; text: string }
+  | { kind: "missing" }
+  | { kind: "text"; text: string; swatch?: string }
   | { kind: "datetime"; value: string }
-  | { kind: "number"; value: number }
+  | { kind: "number"; value: number; unit?: CrmMetricUnit; signed?: boolean }
+  | { kind: "decimal"; value: string; currency?: string }
   | { kind: "money"; value: number; currency: string | null };
 
 export interface WidgetTableModel {
   columns: Array<{ key: string; label: string; numeric: boolean }>;
-  rows: Array<{ key: string; cells: WidgetCell[] }>;
+  rows: Array<{ key: string; cells: WidgetCell[]; total?: boolean }>;
+  compactMissing?: boolean;
 }
 
 /** Single-value KPI card. */
@@ -92,9 +107,27 @@ const DONUT_VISUALIZATIONS = new Set<CrmVisualization>(["PIE", "DONUT"]);
 const SCATTER_VISUALIZATIONS = new Set<CrmVisualization>(["SCATTER", "BUBBLE"]);
 const HEATMAP_VISUALIZATIONS = new Set<CrmVisualization>(["HEATMAP", "CALENDAR_HEATMAP"]);
 
-/** Series the server appended as a period comparison are not plotted — see below. */
+/** Current execution pairs comparison values on each primary point. */
 export function primarySeries(result: WidgetResult): WidgetSeries[] {
-  return result.series.filter((series) => !series.isComparison);
+  return result.series;
+}
+
+/** canonicalSeries splits one categorical money metric by its actual currency. */
+export function hasSingleMeasureCurrencyFacets(series: readonly WidgetSeries[]): boolean {
+  if (series.length < 2 || series.some((row) => row.unit !== "MONEY" || !row.currency || !row.key.endsWith(`:${row.currency}`))) return false;
+  return new Set(series.map((row) => row.currency)).size === series.length && new Set(series.map((row) => row.key.slice(0, -(row.currency!.length + 1)))).size === 1;
+}
+
+export function hasPointComparison(result: WidgetResult): boolean {
+  return result.series.some((series) => series.points.some((point) => point.previousValue !== undefined));
+}
+
+export function plotsPointComparison(mode: WidgetRenderMode): boolean {
+  return ["LINE", "AREA", "BAR", "STACKED_BAR", "COMPOSED", "HEATMAP"].includes(mode);
+}
+
+export function widgetDataUnavailable(result: WidgetResult): boolean {
+  return result.state !== undefined && ["UNAVAILABLE", "RETIRED", "FAILED", "DEADLINE_EXCEEDED"].includes(result.state);
 }
 
 /**
@@ -107,12 +140,26 @@ export function widgetRenderMode(
   visualizationType: CrmVisualization,
   result: WidgetResult,
 ): WidgetRenderMode {
-  if (result.errorCode !== null) return "TABLE";
+  if (result.errorCode !== null || widgetDataUnavailable(result)) return "TABLE";
+  if (!(WIDGET_RENDER_CAPABILITIES[visualizationType] as readonly string[]).includes(result.shape)) return "TABLE";
+  const plotted = primarySeries(result);
+  if (visualizationType === "MULTI_KPI" && result.shape === "SCALAR" && plotted.length >= 2 && plotted.length <= 4) return "MULTI_KPI";
+  if (visualizationType === "LEADERBOARD" && result.shape === "CATEGORY" && plotted.length >= 1 && plotted.length <= 4) return "LEADERBOARD";
+  const units = new Set(plotted.map((series) => series.unit));
+  const dualAxis = ["LINE", "LINE_AREA", "COLUMN", "COMBO"].includes(visualizationType);
+  if (units.size > 2 || (units.size > 1 && !dualAxis)) return "TABLE";
+  // An axis has one unit. Do not place money and counts on the same scale.
+  if (["LEFT", "RIGHT"].some((axis) => new Set(plotted.filter((series) => series.axis === axis).map((series) => series.unit)).size > 1)) return "TABLE";
   if (SCALAR_VISUALIZATIONS.has(visualizationType) && result.value !== null) return "SCALAR";
   if (GAUGE_VISUALIZATIONS.has(visualizationType) && result.value !== null) return "GAUGE";
 
   if (result.typedResult !== null) {
     const typed = result.typedResult;
+    if (visualizationType === "BOX_PLOT" && durationDistribution(typed)?.totalCount) return "BOX_PLOT";
+    if (visualizationType === "WATERFALL" && typed.shape === "WATERFALL") return "WATERFALL";
+    if (visualizationType === "TREEMAP" && typed.shape === "HIERARCHY") return "TREEMAP";
+    if (visualizationType === "LEADERBOARD" && typed.shape === "ROWS" && typed.rowKind === "RANKED") return "LEADERBOARD";
+    if (visualizationType === "SCORECARD" && typed.shape === "ROWS" && typed.rowKind === "SCORECARD") return "SCORECARD";
     if (
       visualizationType === "HISTOGRAM" &&
       typed.shape === "BINNED_DISTRIBUTION" &&
@@ -135,16 +182,33 @@ export function widgetRenderMode(
       Array.isArray(typed.events) &&
       typed.events.length > 0
     ) {
-      return "ACTIVITY_FEED";
+      return visualizationType === "TIMELINE" ? "TIMELINE" : "ACTIVITY_FEED";
     }
     return "TABLE";
   }
 
   const series = primarySeries(result);
   if (series.length === 0 || series.every((entry) => entry.points.length === 0)) return "TABLE";
+  if (visualizationType === "FLOWCHART" && result.shape === "GRAPH") return "FLOWCHART";
+  if ((visualizationType === "GANTT" || visualizationType === "CALENDAR" || visualizationType === "TIMELINE") && result.shape === "INTERVAL") return visualizationType;
+  if (visualizationType === "CALENDAR_HEATMAP" && result.shape === "TIME_SERIES" && series.length === 1) return "CALENDAR_HEATMAP";
+  if (visualizationType === "HEATMAP" && (result.shape === "CATEGORY" || result.shape === "TIME_SERIES")) return "HEATMAP";
+  // A partial donut/funnel is a different population; do not draw missing
+  // categories as zero or quietly omit them from a percentage denominator.
+  if (["DONUT", "FUNNEL", "STACKED_BAR_100"].includes(visualizationType)
+    && series.some((entry) => entry.points.some((point) => point.value === null))) return "TABLE";
+  if (["PIE", "DONUT", "FUNNEL", "STACKED_BAR_100"].includes(visualizationType)
+    && series.some((entry) => !["COUNT", "MONEY"].includes(entry.unit ?? "") || entry.points.some((point) => point.value === null || point.value < 0))) return "TABLE";
+  if (["SCATTER", "BUBBLE"].includes(visualizationType)
+    && series.some((entry) => entry.points.some((point) => point.value === null || point.secondaryValue === null
+      || (visualizationType === "BUBBLE" && point.size == null)))) return "TABLE";
+  // The current XY producer declares probability/amount/capped-age by this
+  // registered metric. A future generic XY source needs explicit axis metadata.
+  if (["SCATTER", "BUBBLE"].includes(visualizationType)
+    && !series.every((entry) => entry.key === "crm.opportunities.value_probability" || entry.key.startsWith("crm.opportunities.value_probability:"))) return "TABLE";
 
   if (visualizationType === "MULTI_KPI") return "MULTI_KPI";
-  if (visualizationType === "FUNNEL" && series.length === 1) return "FUNNEL";
+  if (visualizationType === "FUNNEL" && (series.length === 1 || hasSingleMeasureCurrencyFacets(series))) return "FUNNEL";
   if (STACKED_BAR_VISUALIZATIONS.has(visualizationType) && series.length <= 8) return "STACKED_BAR";
   if (
     SCATTER_VISUALIZATIONS.has(visualizationType) &&
@@ -165,9 +229,11 @@ export function widgetRenderMode(
     return "HEATMAP";
   }
 
-  if (DONUT_VISUALIZATIONS.has(visualizationType) && series.length === 1) return "DONUT";
+  if (DONUT_VISUALIZATIONS.has(visualizationType) && (series.length === 1 || hasSingleMeasureCurrencyFacets(series))) return "DONUT";
 
   if (series.length > 1 && !canPlotMultiSeries(series)) return "TABLE";
+
+  if (visualizationType === "COMBO" || visualizationType === "LINE_AREA") return "COMPOSED";
 
   if (LINE_VISUALIZATIONS.has(visualizationType)) return "LINE";
   if (AREA_VISUALIZATIONS.has(visualizationType)) return "AREA";
@@ -176,8 +242,6 @@ export function widgetRenderMode(
 }
 
 function canPlotMultiSeries(series: readonly WidgetSeries[]): boolean {
-  const units = new Set(series.map((entry) => entry.unit));
-  if (units.size > 1) return false;
   return series.length <= COLORFUL_SWATCH_FILLS.length;
 }
 
@@ -268,14 +332,16 @@ export function scalarDelta(
   inverse = false,
 ): ScalarDeltaSummary | null {
   if (result.value === null || result.previousValue === null) return null;
+  if (result.comparison?.percentChange === null) return null;
   if (result.previousValue === 0) {
     if (result.value === 0) {
       return { deltaPercent: 0, sign: "flat", tone: "neutral" };
     }
     return null;
   }
-  const deltaPercent =
-    ((result.value - result.previousValue) / Math.abs(result.previousValue)) * 100;
+  const deltaPercent = result.comparison?.percentChange
+    ?? ((result.value - result.previousValue) / Math.abs(result.previousValue)) * 100;
+  if (!Number.isFinite(deltaPercent)) return null;
   if (Math.abs(deltaPercent) < 0.05) {
     return { deltaPercent: 0, sign: "flat", tone: "neutral" };
   }
@@ -298,11 +364,12 @@ export function scalarDelta(
  * because the server has already narrowed it to a double.
  */
 export function formatMetricValue(
-  value: number,
+  value: number | null,
   unit: CrmMetricUnit | null,
   currency: string | null,
   lang: Language,
 ): string {
+  if (value === null) return "—";
   if (unit === "MONEY") {
     return formatDecimalString(
       String(value),
@@ -333,135 +400,46 @@ export function formatMetricValue(
  */
 export function widgetTableModel(
   result: WidgetResult,
-  headers: { label: string; value: string },
+  headers: WidgetTableHeaders,
 ): WidgetTableModel {
-  const typed = typedResultTable(result, headers);
+  const evidence = result.governedTarget;
+  if (evidence?.trajectory && headers.governedTarget?.trajectory) {
+    const labels = headers.governedTarget.trajectory;
+    const { points } = evidence.trajectory;
+    const hasPlan = evidence.workingPace?.state === "READY";
+    const money = (value: string | null): WidgetCell => value === null ? { kind: "missing" }
+      : { kind: "decimal", value, currency: evidence.currencyCode };
+    return { columns: [
+      { key: "date", label: labels.date, numeric: false },
+      { key: "won", label: labels.dailyWon, numeric: true },
+      { key: "observed", label: labels.observed, numeric: true },
+      ...(hasPlan ? [{ key: "plan", label: labels.plan, numeric: true }, { key: "workday", label: labels.workday, numeric: false }] : []),
+    ], rows: points.map(point => ({ key: point.date, cells: [
+      { kind: "text", text: point.date }, money(point.wonValue), money(point.observedCumulative),
+      ...(hasPlan ? [money(point.plannedCumulative), point.isPlannedWorkday ? { kind: "text", text: labels.workday } as const
+        : { kind: "missing" } as const] : []),
+    ] })) };
+  }
+  if (evidence?.amounts && headers.governedTarget) {
+    const { amounts, currencyCode, workingPace } = evidence;
+    const columns = [
+      { key: "actual", label: headers.governedTarget.actual, value: amounts.actualValue, currency: currencyCode },
+      { key: "target", label: headers.governedTarget.target, value: amounts.targetValue, currency: currencyCode },
+      { key: "remaining", label: headers.governedTarget.remaining, value: amounts.remainingValue, currency: currencyCode },
+      { key: "attainment", label: headers.governedTarget.attainment, value: amounts.attainmentPercent },
+      ...(workingPace ? [
+        { key: "requiredPerWorkday", label: headers.governedTarget.dailyPace, value: workingPace.requiredPerWorkday, currency: currencyCode },
+        { key: "remainingWorkdays", label: headers.governedTarget.workdays, value: workingPace.remainingWorkdays },
+        { key: "calendarRevision", label: headers.governedTarget.calendarRevision, value: workingPace.calendarRevision },
+      ] : []),
+    ];
+    return { columns: columns.map(({ key, label }) => ({ key, label, numeric: true })),
+      rows: [{ key: "__governed_target__", cells: columns.map(({ value, currency }) => value === null
+        ? { kind: "missing" } : typeof value === "number" ? { kind: "number", value } : { kind: "decimal", value, currency }) }] };
+  }
+  if (evidence) return { columns: [], rows: [] };
+  if (widgetDataUnavailable(result) || result.errorCode !== null) return { columns: [], rows: [] };
+  const typed = typedTableModel(result, headers);
   if (typed) return typed;
-  const labelHeader = headers.label;
-
-  // Comparison series ARE tabulated: they are a real column of numbers, and
-  // only the chart has no honest way to distinguish them.
-  const series = result.series;
-  if (series.length === 0) return { columns: [], rows: [] };
-
-  const order: string[] = [];
-  const labels = new Map<string, string>();
-  for (const entry of series) {
-    for (const point of entry.points) {
-      if (!labels.has(point.key)) {
-        labels.set(point.key, point.label);
-        order.push(point.key);
-      }
-    }
-  }
-
-  return {
-    columns: [
-      { key: "__label__", label: labelHeader, numeric: false },
-      ...series.map((entry) => ({ key: entry.key, label: entry.label, numeric: true })),
-    ],
-    rows: order.map((pointKey) => ({
-      key: pointKey,
-      cells: [
-        { kind: "text", text: labels.get(pointKey) ?? pointKey },
-        ...series.map((entry): WidgetCell => {
-          const point = entry.points.find((candidate) => candidate.key === pointKey);
-          if (!point) return { kind: "text", text: "" };
-          return entry.unit === "MONEY"
-            ? { kind: "money", value: point.value, currency: entry.currency ?? result.currency }
-            : { kind: "number", value: point.value };
-        }),
-      ],
-    })),
-  };
-}
-
-/**
- * The five P2 shapes carry **no series at all** — `executeWidget` `continue`s
- * past series assembly whenever a metric returns a typed result — so they are
- * tabulated from `result` directly or they are not rendered at all.
- */
-function typedResultTable(
-  result: WidgetResult,
-  headers: { label: string; value: string },
-): WidgetTableModel | null {
-  const typed = result.typedResult;
-  if (!typed) return null;
-  const money = result.unit === "MONEY";
-  const currency = result.currency;
-
-  const rowsOf = (key: string): Array<Record<string, unknown>> =>
-    Array.isArray(typed[key])
-      ? (typed[key] as unknown[]).flatMap((entry) =>
-          entry && typeof entry === "object" ? [entry as Record<string, unknown>] : [],
-        )
-      : [];
-
-  const numeric = (value: unknown): WidgetCell =>
-    money && typeof value === "number"
-      ? { kind: "money", value, currency }
-      : { kind: "number", value: typeof value === "number" ? value : 0 };
-
-  /**
-   * A record count, whatever the metric's unit is.
-   *
-   * `numeric()` decides on `result.unit` alone, which is right for a value and
-   * wrong for a count: a `BINNED_DISTRIBUTION` over a MONEY metric buckets
-   * records **by** an amount, and `bin.count` is how many fell in the bucket —
-   * "12 opportunities", never "EGP 12.00". The bucket's own money boundaries
-   * are already inside `bin.label`, formatted server-side, so they keep their
-   * currency. Audit R5.
-   */
-  const count = (value: unknown): WidgetCell => ({
-    kind: "number",
-    value: typeof value === "number" ? value : 0,
-  });
-
-  const text = (value: unknown): WidgetCell => ({
-    kind: "text",
-    text: typeof value === "string" ? value : "",
-  });
-
-  const instant = (value: unknown): WidgetCell =>
-    typeof value === "string" && Number.isFinite(new Date(value).getTime())
-      ? { kind: "datetime", value }
-      : { kind: "text", text: "" };
-
-  const build = (
-    rows: Array<Record<string, unknown>>,
-    cells: (row: Record<string, unknown>) => WidgetCell[],
-    valueIsNumeric: boolean,
-  ): WidgetTableModel => ({
-    columns: [
-      { key: "__label__", label: headers.label, numeric: false },
-      { key: "__value__", label: headers.value, numeric: valueIsNumeric },
-    ],
-    rows: rows.map((row, index) => ({
-      key: typeof row.id === "string" ? row.id : `row-${index}`,
-      cells: cells(row),
-    })),
-  });
-
-  if (typed.shape === "HIERARCHY") {
-    return build(rowsOf("nodes"), (node) => [text(node.label), numeric(node.value)], true);
-  }
-  if (typed.shape === "BINNED_DISTRIBUTION") {
-    return build(rowsOf("bins"), (bin) => [text(bin.label), count(bin.count)], true);
-  }
-  if (typed.shape === "WATERFALL") {
-    return build(rowsOf("steps"), (step) => [text(step.label), numeric(step.value)], true);
-  }
-  if (typed.shape === "EVENT_STREAM") {
-    return build(rowsOf("events"), (event) => [text(event.title), instant(event.occurredAt)], false);
-  }
-  if (typed.shape === "ROWS") {
-    // ALERT and RANKED rows both carry `title`/`label`; only ALERT carries an
-    // instant, and `severity` is deliberately not shown as a raw wire value.
-    return build(
-      rowsOf("rows"),
-      (row) => [text(row.title ?? row.label), instant(row.occurredAt)],
-      false,
-    );
-  }
-  return null;
+  return seriesTableModel(result, headers);
 }

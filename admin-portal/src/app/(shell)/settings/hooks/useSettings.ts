@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient, getApiRequestOutcome } from "@/lib/api/axiosClient";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import {
   normalizeApiError,
   type NormalizedApiError,
@@ -46,10 +46,7 @@ export interface SettingFieldData extends MergedSystemSetting {
   correlationId?: string;
 }
 
-const SETTINGS_SAVE_PERMISSIONS = [
-  "admin.settings.update",
-  "admin.settings.critical",
-] as const;
+const SETTINGS_SAVE_PERMISSIONS = ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE;
 const MIN_TOP_UP_KEY = "billing.min_topup_usd";
 const MAX_TOP_UP_KEY = "billing.max_topup_usd";
 
@@ -290,10 +287,13 @@ export function useSettings(prefix: string) {
         } else {
           writeIntentsRef.current.delete(key);
         }
-        const message = localSettingsError(lang, normalized.errorCode);
-        failures.push(
-          `${key}: ${message}${normalized.correlationId ? ` · ${normalized.correlationId}` : ""}`,
+        const message = localSettingsError(
+          lang,
+          normalized.errorCode,
+          normalized.httpStatus,
+          normalized.correlationId,
         );
+        failures.push(`${key}: ${message}`);
         setSettings((current) =>
           current.map((setting) =>
             setting.key === key
@@ -356,7 +356,12 @@ export function useSettings(prefix: string) {
         );
       } catch (caught) {
         const normalized = normalizeApiError(caught);
-        const message = localSettingsError(lang, normalized.errorCode);
+        const message = localSettingsError(
+          lang,
+          normalized.errorCode,
+          normalized.httpStatus,
+          normalized.correlationId,
+        );
         setSettings((current) =>
           current.map((setting) =>
             setting.key === key
@@ -499,41 +504,6 @@ function validateSettingValue(
   ) {
     throw new Error(copy.invalidOption);
   }
-
-  if (key === "asterisk.turn_servers_json" || key === "asterisk.ice_servers_json") {
-    if (typeof value !== "string" || value.length > 10_000) {
-      throw new Error(copy.invalidIceServerArray);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      throw new Error(copy.invalidIceServerArray);
-    }
-    if (!Array.isArray(parsed) || !parsed.every(isValidIceServerObject)) {
-      throw new Error(copy.invalidIceServerArray);
-    }
-  }
-
-  if (key === "asterisk.extra_json") {
-    if (typeof value !== "string" || value.length > 10_000) {
-      throw new Error(copy.invalidJsonObject);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      throw new Error(copy.invalidJsonObject);
-    }
-    if (!plainRecord(parsed)) throw new Error(copy.invalidJsonObject);
-  }
-
-  if (
-    key === "asterisk.websocket_url" &&
-    (typeof value !== "string" || (value !== "" && !/^wss?:\/\/\S+$/iu.test(value)))
-  ) {
-    throw new Error(copy.invalidWebsocketUrl);
-  }
 }
 
 function toFieldData(
@@ -647,19 +617,6 @@ function isTopUpKey(key: string): boolean {
   return key === MIN_TOP_UP_KEY || key === MAX_TOP_UP_KEY;
 }
 
-function isValidIceServerObject(value: unknown): boolean {
-  const record = plainRecord(value);
-  if (!record) return false;
-  if (typeof record.urls === "string") return Boolean(record.urls.trim());
-  return (
-    Array.isArray(record.urls) &&
-    record.urls.length > 0 &&
-    record.urls.every(
-      (url) => typeof url === "string" && Boolean(url.trim()),
-    )
-  );
-}
-
 function plainRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -677,7 +634,12 @@ function settingWriteFingerprint(
   });
 }
 
-export function localSettingsError(lang: "ar" | "en", code: string): string {
+export function localSettingsError(
+  lang: "ar" | "en",
+  code: string,
+  httpStatus?: number,
+  correlationId?: string,
+): string {
   const copy = (lang === "ar" ? ar : en).settings.validation;
   if (code === "PENDING_SETTING_WRITE_MUST_BE_RECONCILED") {
     return copy.unresolvedWrite;
@@ -685,5 +647,9 @@ export function localSettingsError(lang: "ar" | "en", code: string): string {
   if (code === "DEPENDENT_TOP_UP_WRITE_SKIPPED") {
     return copy.dependentTopUpSkipped;
   }
-  return copy.saveFailedGeneric(code);
+  const messages: Record<string, string> = copy.serverErrors;
+  if (Object.hasOwn(messages, code)) return messages[code];
+  if (httpStatus === 403) return copy.serverErrors.FORBIDDEN;
+  if (httpStatus === 429) return copy.serverErrors.TOO_MANY_REQUESTS;
+  return copy.saveFailedGeneric(correlationId);
 }

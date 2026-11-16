@@ -2,12 +2,17 @@
 import type { AcceptedPricing } from "@/shared/api/accepted-pricing";
 import type { InitialQuoteView, OriginalInitialSeedReceipt } from "../initial-commercial-readers";
 import type { InitialCommercialCopy } from "./initial-commercial-copy";
+import { useI18n } from "@/i18n/I18nContext";
+import { localeForLanguage } from "@/i18n/locale";
 
 export function InitialCommercialQuote({ quote, expired, copy }: { quote: InitialQuoteView; expired: boolean; copy: InitialCommercialCopy }) {
+  const { lang } = useI18n();
+  const expiresAt = new Date(quote.expiresAt);
+  const expiryLabel = Number.isNaN(expiresAt.getTime()) ? quote.expiresAt : new Intl.DateTimeFormat(localeForLanguage(lang), { dateStyle: "medium", timeStyle: "short" }).format(expiresAt);
   return <section aria-label={copy.quote} className="min-w-0 space-y-3 rounded-md border border-border p-3">
     {expired && <p role="alert" className="text-sm text-warning-subtle-foreground">{copy.expired}</p>}
     <p className="break-all text-xs">{copy.quoteId}: <bdi className="font-mono">{quote.quoteId}</bdi></p>
-    <p className="text-xs">{copy.expires}: <time dateTime={quote.expiresAt}><bdi>{quote.expiresAt}</bdi></time></p>
+    <p className="text-xs">{copy.expires}: <time dateTime={quote.expiresAt}><bdi>{expiryLabel}</bdi></time></p>
     <p className="text-xs">{copy.resolvedTrial}: <bdi>{quote.resolvedTrialDays}</bdi></p>
     <Totals totals={quote.totals} copy={copy} />
     <p className="text-xs text-muted-foreground">{copy.allowance}</p>

@@ -10,6 +10,12 @@ import type { OrgLevel } from "../contracts/organization-contract";
  * duplication file-architecture.md#cleanliness-rules forbids, so the difference
  * lives here as data and the screen reads it.
  */
+interface OrgChildDestination {
+  href: string;
+  readPermission: string;
+  kind: "branches" | "departments" | "teams" | "users";
+}
+
 export interface OrgLevelConfig {
   level: OrgLevel;
   href: string;
@@ -19,6 +25,10 @@ export interface OrgLevelConfig {
   managePermission: string;
   /** The level whose id this level's create DTO requires, if any. */
   parent?: OrgLevel;
+  /** Ordered ancestor chain shown in cascade creation and placement views. */
+  ancestors: readonly OrgLevel[];
+  /** Primary child workspace offered when deletion is blocked by child records. */
+  childDestination: OrgChildDestination;
   /** The optional scalar fields this level's create/update DTOs accept. */
   fields: readonly OrgLevelField[];
 }
@@ -32,12 +42,25 @@ type OrgLevelField =
   | "isHeadquarters"
   | "leadUserId";
 
+export const ORG_LEVEL_ORDER: readonly OrgLevel[] = [
+  "companies",
+  "branches",
+  "departments",
+  "teams",
+];
+
 export const ORG_LEVEL_CONFIG: Record<OrgLevel, OrgLevelConfig> = {
   companies: {
     level: "companies",
     href: TENANT_ROUTES.coreCompanies,
     readPermission: "org.company.read",
     managePermission: "org.company.manage",
+    ancestors: [],
+    childDestination: {
+      href: TENANT_ROUTES.coreBranches,
+      readPermission: "org.branch.read",
+      kind: "branches",
+    },
     fields: ["legalName", "taxNumber", "currencyCode"],
   },
   branches: {
@@ -46,6 +69,12 @@ export const ORG_LEVEL_CONFIG: Record<OrgLevel, OrgLevelConfig> = {
     readPermission: "org.branch.read",
     managePermission: "org.branch.manage",
     parent: "companies",
+    ancestors: ["companies"],
+    childDestination: {
+      href: TENANT_ROUTES.coreDepartments,
+      readPermission: "org.department.read",
+      kind: "departments",
+    },
     fields: ["address", "phone", "isHeadquarters"],
   },
   departments: {
@@ -54,6 +83,12 @@ export const ORG_LEVEL_CONFIG: Record<OrgLevel, OrgLevelConfig> = {
     readPermission: "org.department.read",
     managePermission: "org.department.manage",
     parent: "branches",
+    ancestors: ["companies", "branches"],
+    childDestination: {
+      href: TENANT_ROUTES.coreTeams,
+      readPermission: "org.team.read",
+      kind: "teams",
+    },
     fields: [],
   },
   teams: {
@@ -62,6 +97,12 @@ export const ORG_LEVEL_CONFIG: Record<OrgLevel, OrgLevelConfig> = {
     readPermission: "org.team.read",
     managePermission: "org.team.manage",
     parent: "departments",
+    ancestors: ["companies", "branches", "departments"],
+    childDestination: {
+      href: TENANT_ROUTES.coreUsers,
+      readPermission: "users.user.read",
+      kind: "users",
+    },
     fields: ["leadUserId"],
   },
 };

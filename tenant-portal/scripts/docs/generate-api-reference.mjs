@@ -43,6 +43,7 @@ const APPS = {
       "crm-customer-profiles.md",
       "crm-opportunities.md",
       "crm-catalogues.md",
+      "crm-dashboards.md",
     ],
   },
   trade: {

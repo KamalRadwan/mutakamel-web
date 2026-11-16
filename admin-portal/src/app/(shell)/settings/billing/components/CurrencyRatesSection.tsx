@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCurrencyRates } from "../hooks/useCurrencyRates";
+import { CurrencyRateValidationError } from "../hooks/currency-rate-validation-error";
 import { useI18n } from "@/i18n/I18nContext";
 import { Coins, Plus, Edit2, Loader2, RefreshCw, CheckCircle2, XCircle, DollarSign } from "lucide-react";
 import {
@@ -17,6 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  ConfirmActionModal,
   type ColumnDef,
 } from "@/design-system";
 import type { CurrencyRateView } from "../hooks/useCurrencyRates";
@@ -43,7 +45,10 @@ export function CurrencyRatesSection() {
     fetchRates,
     upsertRate,
     toggleRateStatus,
-    batchUpsertRates,
+    confirmation,
+    requestBatchConfirmation,
+    closeConfirmation,
+    confirmRateChange,
   } = useCurrencyRates();
   const { t } = useI18n();
   const copy = t.settings.currencyRates;
@@ -73,25 +78,16 @@ export function CurrencyRatesSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await upsertRate(formCurrencyCode, formUnitsPerUsd, formIsActive);
-    if (success) {
-      setFormCurrencyCode("");
-      setFormUnitsPerUsd("");
-    }
+    await upsertRate(formCurrencyCode, formUnitsPerUsd, formIsActive);
   };
 
-  const handleBatchSubmit = async (event: React.FormEvent) => {
+  const handleBatchSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     setBatchError(null);
     try {
-      const rates = parseCurrencyRateLines(batchText, copy.validation);
-      if (!rates.length) throw new Error(copy.validation.atLeastOneRate);
-      if (await batchUpsertRates(rates)) {
-        setIsBatchOpen(false);
-        setBatchText("");
-      }
+      requestBatchConfirmation(parseCurrencyRateLines(batchText, copy.validation));
     } catch (submissionError) {
-      setBatchError(submissionError instanceof Error ? submissionError.message : copy.validation.batchInvalid);
+      setBatchError(submissionError instanceof CurrencyRateValidationError ? submissionError.message : copy.validation.batchInvalid);
     }
   };
 
@@ -134,7 +130,7 @@ export function CurrencyRatesSection() {
             align: "end" as const,
             cell: (rate: CurrencyRateView) => (
               <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={() => toggleRateStatus(rate)}>
+                <Button type="button" variant="ghost" size="sm" disabled={isSaving} onClick={() => toggleRateStatus(rate)}>
                   {rate.isActive ? copy.deactivate : copy.activate}
                 </Button>
                 <Button
@@ -142,6 +138,7 @@ export function CurrencyRatesSection() {
                   variant="ghost"
                   size="sm"
                   title={copy.edit}
+                  disabled={isSaving}
                   onClick={() => {
                     setEditingRate(rate);
                     setIsAddModalOpen(true);
@@ -156,8 +153,36 @@ export function CurrencyRatesSection() {
       : []),
   ];
 
+  const confirmationDescription = confirmation && confirmation.kind !== "status"
+    ? [copy.confirmBatchDescription(confirmation.changes.length), ...confirmation.changes.map(({ before, after }) => copy.confirmRateDiff(
+      after.currencyCode,
+      before ? formatCurrencyRate(before.currencyUnitsPerUsd) : copy.newRate,
+      formatCurrencyRate(after.currencyUnitsPerUsd),
+      before ? (before.isActive ? copy.statusActive : copy.statusInactive) : copy.newRate,
+      after.isActive ? copy.statusActive : copy.statusInactive,
+    ))].join("\n")
+    : confirmation ? copy.confirmStatusDescription(confirmation.rate.currencyCode, confirmation.rate.isActive ? copy.deactivate : copy.activate) : "";
+
   return (
     <Card className="overflow-hidden">
+      <ConfirmActionModal
+        isOpen={confirmation !== null}
+        onClose={closeConfirmation}
+        onConfirm={async () => {
+          if (await confirmRateChange() && confirmation?.kind === "batch") {
+            setIsBatchOpen(false);
+            setBatchText("");
+          }
+        }}
+        isLoading={isSaving}
+        variant="warning"
+        titleEn={confirmation?.kind === "status" ? copy.confirmStatusTitle : confirmation?.kind === "single" ? copy.confirmSingleTitle : copy.confirmBatchTitle}
+        titleAr={confirmation?.kind === "status" ? copy.confirmStatusTitle : confirmation?.kind === "single" ? copy.confirmSingleTitle : copy.confirmBatchTitle}
+        descriptionEn={confirmationDescription}
+        descriptionAr={confirmationDescription}
+        confirmTextEn={copy.confirmApply}
+        confirmTextAr={copy.confirmApply}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3 sm:p-3.5">
         <div className="flex items-center gap-2.5">
           <div className="rounded-lg bg-info-subtle p-2 text-info-subtle-foreground">

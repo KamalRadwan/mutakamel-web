@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
+
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
 import type {
   ApplicationDatabaseServerBindReceipt,
   BindApplicationDatabaseServersDto,

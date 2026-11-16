@@ -99,11 +99,11 @@ export function useLeadBoard({
   enabled: boolean;
   branchId: string | null;
   stages: LeadStage[];
-  refreshStages: () => Promise<LeadStage[]>;
+  refreshStages: (signal?: AbortSignal) => Promise<LeadStage[]>;
   search: LeadSearchState;
   sort: { id: "displayName" | "createdAt"; direction: "asc" | "desc" };
 }) {
-  const { user } = useTenantAuth();
+  const { user, realtimeAuthGeneration } = useTenantAuth();
   const [lanes, setLanes] = useState<Record<string, LeadBoardLane>>(EMPTY_LANES);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set());
@@ -157,6 +157,7 @@ export function useLeadBoard({
   );
 
   const reload = useCallback(async (signal?: AbortSignal) => {
+    if (signal?.aborted) return false;
     // A pending filter debounce must not supersede an awaited mutation reload.
     window.clearTimeout(reloadTimerRef.current);
     reloadTimerRef.current = undefined;
@@ -198,16 +199,16 @@ export function useLeadBoard({
         setLanes(parseLeadBoardResponse(response.data, branchId, knownStages.map(({ id }) => id)));
       } catch (caught) {
         if (!(caught instanceof LeadBoardStagesChangedError)) throw caught;
-        const currentStages = await refreshStages();
-        stagesRef.current = currentStages;
+        const currentStages = await refreshStages(signal);
         if (signal?.aborted || epoch !== requestEpochRef.current) return false;
+        stagesRef.current = currentStages;
         const retry = await readBoard(currentStages.length);
         if (signal?.aborted || epoch !== requestEpochRef.current) return false;
         setLanes(parseLeadBoardResponse(retry.data, branchId, currentStages.map(({ id }) => id)));
       }
       return true;
     } catch (caught) {
-      if (isAbortError(caught) || epoch !== requestEpochRef.current) return false;
+      if (signal?.aborted || isAbortError(caught) || epoch !== requestEpochRef.current) return false;
       setLanes(EMPTY_LANES);
       setError(normalizeApiError(caught));
       return false;
@@ -226,9 +227,10 @@ export function useLeadBoard({
     reloadTimerRef.current = timer;
     return () => {
       window.clearTimeout(timer);
+      requestEpochRef.current += 1;
       controller.abort();
     };
-  }, [reload]);
+  }, [reload, realtimeAuthGeneration]);
 
   const loadMoreStage = useCallback(async (stageId: string) => {
     const lane = lanes[stageId];

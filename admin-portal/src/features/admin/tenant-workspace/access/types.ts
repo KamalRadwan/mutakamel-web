@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import type { PageResult as SharedPageResult, SortDirection } from "@/types/common";
 import type { TenantStatus } from "../core/types";
 
@@ -250,23 +251,14 @@ export interface TenantAccessPermissions {
 export const TENANT_ACCESS_PERMISSION_SETS = {
   read: ["admin.tenant_users.read"],
   readRoles: ["admin.tenant_users.assign_roles"],
-  invite: ["admin.tenant_users.invite", "admin.tenant_users.critical"],
+  invite: ADMIN_RBAC_CRITICAL.TENANT_USERS_INVITE,
   update: ["admin.tenant_users.update"],
-  resetPassword: [
-    "admin.tenant_users.reset_password",
-    "admin.tenant_users.critical",
-  ],
-  suspend: ["admin.tenant_users.suspend", "admin.tenant_users.critical"],
-  assignRoles: [
-    "admin.tenant_users.assign_roles",
-    "admin.tenant_users.critical",
-  ],
-  delete: ["admin.tenant_users.delete", "admin.tenant_users.critical"],
-  restore: ["admin.tenant_users.restore", "admin.tenant_users.critical"],
-  transferOwnership: [
-    "admin.tenant_users.transfer_ownership",
-    "admin.tenant_users.critical",
-  ],
+  resetPassword: ADMIN_RBAC_CRITICAL.TENANT_USERS_RESET_PASSWORD,
+  suspend: ADMIN_RBAC_CRITICAL.TENANT_USERS_SUSPEND,
+  assignRoles: ADMIN_RBAC_CRITICAL.TENANT_USERS_ASSIGN_ROLES,
+  delete: ADMIN_RBAC_CRITICAL.TENANT_USERS_DELETE,
+  restore: ADMIN_RBAC_CRITICAL.TENANT_USERS_RESTORE,
+  transferOwnership: ADMIN_RBAC_CRITICAL.TENANT_USERS_TRANSFER_OWNERSHIP,
 } as const;
 
 export function isTenantAccessDatabaseReady(status: TenantStatus): boolean {

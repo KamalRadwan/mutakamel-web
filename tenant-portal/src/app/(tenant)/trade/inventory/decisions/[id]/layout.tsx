@@ -1,1 +1,4 @@
-export { RecordHistoryLayout as default } from "@/components/audit/RecordHistoryLayout";
+import type { ReactNode } from "react";
+
+// Keep record/history navigation in the same centered evidence surface.
+export default function DecisionDetailLayout({ children }: { children: ReactNode }) { return children; }

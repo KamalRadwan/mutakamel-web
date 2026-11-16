@@ -27,6 +27,24 @@ Lifecycle/definition facts are display-only. A retained disabled/revoked Addon i
 
 ## UI and session safety
 
+Definition-adoption admission source update **2026-10-29**: the Application
+access entry and both adoption hooks require the tenant owner or an explicit
+tenant-wide `applications.addon_definitions.adopt` grant. Company/branch-only
+grants and missing scope projections hide the entry and produce the denied
+state without dispatching discovery or commercial commands. Core remains
+authoritative. Ordinary purchase changes still require the tenant owner.
+
+Error presentation source update **2026-10-29**: subscription reads, commercial
+changes and definition adoption use `commercialErrorMessage` for distinct Arabic
+and English sentences for stale preparation/recovery, incompatible targets,
+unavailable prices, occupied capacity, another preparation in progress,
+unavailable commands, incomplete billing, already-applied or expired previews,
+missing wallets, and HTTP 403/429. Unknown failures use a neutral fallback without
+displaying server messages or raw codes. Correlation IDs appear as labelled
+secondary support references rather than replacing the explanation. Existing
+owner/permission gates still handle access denial; messages do not change retry
+or retained-request behavior. Typecheck, lint and runtime verification are pending.
+
 `/core/subscription` joins detail/items only when subscription identity/revision and both collections match. A failure or mismatched concurrent snapshot renders retry/unavailable, never the old base-only degraded fallback. Refresh, session/user changes and loss of ownership retire earlier financial facts immediately; returning to a prior context requires a fresh observation. Pending reads are aborted and late results are ignored. The plan workspace remounts across session generations. Actual403 overrides advisory owner state through `OwnerGate.denied`.
 
 The canonical editor at `/core/subscription/change` replaces the old flat seat-only adapter. It supports Application and Addon ADD, existing seat increases and nondecreasing Application tier rank, including subscriptions with retained Addons. New requests require a coherent TRIAL/ACTIVE view without a collection hold. Published offers supply actual selectors and compatibility; they never supply an accepted purchase total. The flow uses preparation, a complete server quote, explicit apply, saved operation reads and the immutable receipt. See [the exact commands and recovery rules](catalogue-canonical-delivery.md#mounted-ordinary-purchase-editor). Adoption, decrease and removal are not offered. Scope activation/configuration lives in [Application access](application-access.md).

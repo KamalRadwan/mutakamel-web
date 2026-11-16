@@ -1,16 +1,10 @@
 "use client";
 
 import {
-  DegradedBanner,
+  Combobox,
   Field,
   FormDrawer,
-  IdentifierText,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Textarea,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -20,9 +14,8 @@ import {
   TRADE_NOTES_MAX_LENGTH,
   TRADE_REFERENCE_MAX_LENGTH,
 } from "../../documents/trade-document-contract";
-import { tradeDocumentMessage } from "../../documents/trade-document-errors";
 import type { PurchaseQuotationFormState } from "../hooks/usePurchaseQuotationForm";
-import { supplierOptionLabel } from "../purchase-quotation-contract";
+import { PurchaseQuotationSupplierStatus } from "./PurchaseQuotationSupplierStatus";
 
 export interface PurchaseQuotationDrawerProps {
   state: PurchaseQuotationFormState;
@@ -62,40 +55,27 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
     >
       <TradeWriteOutcome write={state.write} />
       <TradeWriteFields write={state.write}>
-      {state.suppliersError ? (
-        <DegradedBanner
-          message={
-            tradeDocumentMessage(state.suppliersError.code, t.tradeDocuments.errors) ??
-            t.tradeDocuments.purchaseQuotations.suppliersUnavailable
-          }
-        />
-      ) : null}
+      <PurchaseQuotationSupplierStatus state={state} isEdit={isEdit} />
 
-      {/* Trade publishes no supplier name anywhere: the commercial-account row
-          carries `party_id` and nothing else, and the lookups route returns
-          payment terms rather than accounts. The id is shown because it is the
-          only identity that exists, not because a name was dropped. */}
       <Field
         label={t.tradeDocuments.purchaseQuotations.supplierLabel}
         hint={t.tradeDocuments.purchaseQuotations.supplierSearch}
         required
       >
-        <Select
-          value={state.values.supplierPartyId}
-          onValueChange={(next) => state.setValue({ supplierPartyId: next })}
-          disabled={state.write.isBlocked || state.isLoadingSuppliers || state.suppliers.length === 0}
-        >
-          <SelectTrigger size="sm">
-            <SelectValue placeholder={t.tradeDocuments.purchaseQuotations.supplierPlaceholder} />
-          </SelectTrigger>
-          <SelectContent>
-            {state.suppliers.map((supplier) => (
-              <SelectItem key={supplier.id} value={supplier.partyId}>
-                <IdentifierText>{supplierOptionLabel(supplier)}</IdentifierText>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Combobox
+          value={state.values.supplierPartyId || undefined}
+          selectedLabel={state.selectedSupplierLabel || t.tradeDocuments.purchaseQuotations.supplierPlaceholder}
+          onValueChange={(next) => state.setValue({ supplierPartyId: next ?? "" })}
+          onSearch={state.searchSuppliers}
+          loading={state.isLoadingSuppliers}
+          disabled={state.write.isBlocked}
+          options={state.suppliers.map((supplier) => ({ value: supplier.partyId, label: supplier.displayName }))}
+          placeholder={t.tradeDocuments.purchaseQuotations.supplierPlaceholder}
+          searchPlaceholder={t.tradeDocuments.purchaseQuotations.supplierSearch}
+          loadingLabel={t.common.loading}
+          emptyLabel={t.tradeDocuments.purchaseQuotations.supplierEmpty}
+          errorContent={state.suppliersError ? <p className="p-2 text-sm">{t.tradeDocuments.purchaseQuotations.suppliersUnavailable}</p> : undefined}
+        />
       </Field>
 
       <Field label={t.tradeDocuments.currency} hint={t.tradeDocuments.currencyHint} required>

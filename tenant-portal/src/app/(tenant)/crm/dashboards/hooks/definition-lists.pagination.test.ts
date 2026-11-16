@@ -6,8 +6,8 @@ import { useDashboards } from './useDashboards';
 import { useWidgets } from '../../widgets/hooks/useWidgets';
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock('@/context/AuthContext', () => ({ useTenantAuth: () => ({ user: { permissions: [] } }) }));
-vi.mock('@/design-system', () => ({ hasPermission: () => false }));
+vi.mock('@/context/AuthContext', () => ({ useTenantAuth: () => ({ user: { id: "01900300-0000-7000-8000-000000000001", permissions: ["crm.widgets.read"] }, realtimeAuthGeneration: 1 }) }));
+vi.mock('@/design-system', () => ({ hasPermission: (_grants: string[], key: string) => key === "crm.widgets.read" }));
 vi.mock('@/lib/api/axiosClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api/axiosClient')>()), axiosClient: { get },
 }));
@@ -24,19 +24,23 @@ const catalog = { grid: {}, visualizations: [], metrics: [], dimensions: [], tem
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe.each([
-  { resource: 'dashboards', useList: useDashboards },
+  { resource: 'dashboards', useList: () => useDashboards(true) },
   { resource: 'widgets', useList: useWidgets },
 ])('$resource cursor list', ({ resource, useList }) => {
   it('loads on demand, retains a failed page for retry, and resets after reload', async () => {
     const path = `/api/tenant/crm/v1/${resource}`;
+    const item = resource === 'widgets' ? {
+      ...definition, ownerName: null, isShared: false, governanceRevision: 1,
+      status: 'PUBLISHED', versionNumber: 1, hasDraft: false, draftRevision: null,
+    } : definition;
     let failPage = true;
     get.mockImplementation(async (url: string) => {
-      if (url.endsWith('/catalog')) return { data: catalog };
-      if (url === path) return { data: { items: [definition], nextCursor: firstId } };
+      if (url.endsWith('/catalog')) return { status: 200, data: catalog };
+      if (url === path) return { status: 200, data: { items: [item], nextCursor: firstId } };
       if (failPage) throw new TenantApiClientError('Failed', {
         status: 500, statusText: 'Internal Server Error', headers: new Headers(), data: {},
       });
-      return { data: { items: [{ ...definition, id: secondId, name: 'Second' }], nextCursor: null } };
+      return { status: 200, data: { items: [{ ...item, id: secondId, name: 'Second' }], nextCursor: null } };
     });
     const { result } = renderHook(() => useList());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -60,3 +64,5 @@ describe.each([
     expect(result.current.hasMore).toBe(true);
   });
 });
+
+

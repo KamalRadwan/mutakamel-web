@@ -517,7 +517,7 @@ function updateForbiddenError(): NormalizedApiError {
 
 function permissionsForbiddenError(): NormalizedApiError {
   return localForbidden(
-    "Both admin.roles.update and admin.roles.critical are required to replace role permissions.",
+    `Both ${ADMIN_RBAC_CRITICAL.ROLES_UPDATE.join(" and ")} are required to replace role permissions.`,
   );
 }
 

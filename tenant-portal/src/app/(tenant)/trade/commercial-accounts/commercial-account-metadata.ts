@@ -1,4 +1,9 @@
 import { SWATCH_SURFACE_PALETTES, type SwatchHue } from "@/design-system";
+import {
+  NON_NEGATIVE_DECIMAL,
+  canonicalizeDecimalInput,
+  compareFixedDecimal,
+} from "../documents/fixed-decimal";
 import type { AccountRole, CommercialAccount } from "./commercial-account-contract";
 
 export interface RolePalette {
@@ -63,7 +68,6 @@ export const ACCOUNT_UI_COPY = {
     lockedForSupplierBadge: "Locked for SUPPLIER",
     supplierCreditLockNotice:
       "Supplier accounts cannot carry a sales credit limit per backend contract (prevents 422 CREDIT_LIMIT_INVALID).",
-    availablePaymentTerms: "Available payment terms:",
     publishedCreditPolicies: "Published credit policies:",
     hideAdvancedTerms: "Hide Advanced Contract View",
     showAdvancedTerms: "Advanced Contract View",
@@ -101,7 +105,6 @@ export const ACCOUNT_UI_COPY = {
     lockedForSupplierBadge: "مقفل للموردين (SUPPLIER)",
     supplierCreditLockNotice:
       "حسابات الموردين (SUPPLIER) لا تقبل سقف ائتمان مبيعات وفق عقد الخدمة (422 CREDIT_LIMIT_INVALID).",
-    availablePaymentTerms: "شروط الدفع المتاحة:",
     publishedCreditPolicies: "سياسات الائتمان المنشورة:",
     hideAdvancedTerms: "إخفاء محرر العقد المتقدم",
     showAdvancedTerms: "عرض محرر العقد المتقدم",
@@ -250,14 +253,18 @@ export function validateNarrowingAgainstCompany(
   const supplierCreditLimitForbidden =
     account.accountRole === "SUPPLIER" && rule.creditLimit.trim().length > 0;
 
-  let exceedsCompanyCreditLimit = false;
-  if (rule.creditLimit.trim() && account.creditLimit) {
-    const branchNum = Number(rule.creditLimit.trim());
-    const companyNum = Number(account.creditLimit);
-    if (!Number.isNaN(branchNum) && !Number.isNaN(companyNum) && branchNum > companyNum) {
-      exceedsCompanyCreditLimit = true;
-    }
-  }
+  const branchLimit = canonicalizeDecimalInput(rule.creditLimit);
+  const companyLimit = account.creditLimit === null
+    ? null
+    : canonicalizeDecimalInput(account.creditLimit);
+  const invalidCreditLimit =
+    (rule.creditLimit.trim().length > 0 && branchLimit === null) ||
+    (account.creditLimit !== null && companyLimit === null) ||
+    (branchLimit !== null && !NON_NEGATIVE_DECIMAL.test(branchLimit)) ||
+    (companyLimit !== null && !NON_NEGATIVE_DECIMAL.test(companyLimit));
+  const exceedsCompanyCreditLimit =
+    branchLimit !== null && companyLimit !== null &&
+    compareFixedDecimal(branchLimit, companyLimit) > 0;
 
   const companyAllowed = Array.isArray(account.terms?.allowedCurrencies)
     ? (account.terms.allowedCurrencies as unknown[])
@@ -275,6 +282,7 @@ export function validateNarrowingAgainstCompany(
     disallowedCurrencies,
     supplierCreditLimitForbidden,
     isValid:
+      !invalidCreditLimit &&
       !exceedsCompanyCreditLimit &&
       disallowedCurrencies.length === 0 &&
       !supplierCreditLimitForbidden,

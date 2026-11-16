@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getMock, postMock } = vi.hoisted(() => ({
+const { getMock, postMock, patchMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   postMock: vi.fn(),
+  patchMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api/axiosClient", () => ({
   axiosClient: {
     get: getMock,
     post: postMock,
+    patch: patchMock,
   },
 }));
 
@@ -21,10 +23,64 @@ import { applicationsApi } from "./applications.api";
 
 const envelope = (data: unknown) => ({ data: { data } });
 
+describe("currency rate response validation", () => {
+  const rate = { currencyCode: "EUR", currencyUnitsPerUsd: "0.930000000000", isActive: true };
+  const invalidRows = [
+    {},
+    { currencyCode: "EUR", currencyUnitsPerUsd: "0.93" },
+    { ...rate, currencyCode: "eur" },
+    { ...rate, currencyUnitsPerUsd: 0.93 },
+    { ...rate, currencyUnitsPerUsd: "1e3" },
+    { ...rate, currencyUnitsPerUsd: "1234567890123" },
+    { ...rate, isActive: "true" },
+    null,
+  ];
+
+  beforeEach(() => { getMock.mockReset(); patchMock.mockReset(); });
+
+  it("reads valid list, single and batch responses without converting decimals", async () => {
+    getMock.mockResolvedValue(envelope([rate]));
+    await expect(applicationsApi.listCurrencyRates()).resolves.toEqual([rate]);
+    patchMock.mockResolvedValueOnce(envelope(rate)).mockResolvedValueOnce(envelope([rate]));
+    await expect(applicationsApi.upsertCurrencyRate("EUR", rate, "key")).resolves.toEqual(rate);
+    await expect(applicationsApi.batchUpsertCurrencyRates({ rates: [rate] }, "key")).resolves.toEqual([rate]);
+  });
+
+  it.each(invalidRows)("rejects malformed rows: %j", async (row) => {
+    getMock.mockResolvedValue(envelope([rate, row]));
+    await expect(applicationsApi.listCurrencyRates()).rejects.toThrow("Invalid currency rate response");
+    patchMock.mockResolvedValueOnce(envelope(row)).mockResolvedValueOnce(envelope([rate, row]));
+    await expect(applicationsApi.upsertCurrencyRate("EUR", rate, "key")).rejects.toThrow("Invalid currency rate response");
+    await expect(applicationsApi.batchUpsertCurrencyRates({ rates: [rate] }, "key")).rejects.toThrow("Invalid currency rate response");
+  });
+
+  it.each([null, {}, "rates", 1])("rejects non-array list and batch bodies: %j", async (body) => {
+    getMock.mockResolvedValue(envelope(body));
+    patchMock.mockResolvedValue(envelope(body));
+    await expect(applicationsApi.listCurrencyRates()).rejects.toThrow("Invalid currency rate response");
+    await expect(applicationsApi.batchUpsertCurrencyRates({ rates: [rate] }, "key")).rejects.toThrow("Invalid currency rate response");
+  });
+});
+
 describe("Application technical provisioning API", () => {
   beforeEach(() => {
     getMock.mockReset();
     postMock.mockReset();
+    patchMock.mockReset();
+  });
+
+  it('sends the last-read price revision and trimmed audit reason with the command key', async () => {
+    const rows = [{ pricingRevision: 'b'.repeat(64), unitPrice: '10.0000' }];
+    patchMock.mockResolvedValue(envelope(rows));
+    const body = {
+      billingCycle: 'MONTHLY' as const,
+      expectedPricingRevision: 'a'.repeat(64),
+      reason: '  Reviewed pricing  ',
+      brackets: [{ minUsers: 1, maxUsers: null, unitPrice: '10.0000' }],
+    };
+    await expect(applicationsApi.replacePriceLadder('tier-1', body, 'command-key')).resolves.toEqual(rows);
+    expect(patchMock).toHaveBeenCalledWith('/api/admin/core/v1/tiers/tier-1/price-tiers',
+      { ...body, reason: 'Reviewed pricing' }, { headers: { 'x-idempotency-key': 'command-key' } });
   });
 
   it("reads the fail-closed technical readiness projection", async () => {

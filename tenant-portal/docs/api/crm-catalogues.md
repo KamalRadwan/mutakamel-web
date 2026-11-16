@@ -144,11 +144,49 @@ uploads it. Treat the icon URL as an opaque, cache-busted path; do not
 construct it by hand. Reordering uses the dedicated `reorder` endpoint, same
 reasoning as lead stages.
 
-The source edit drawer requires `crm.acquisition_sources.manage` and sends
+The source edit modal requires `crm.acquisition_sources.manage` and sends
 `{ nameAr, nameEn, isActive }` to `PATCH /:id`. Both names are trimmed,
 required, and at most 120 characters. Deactivation retains the source and its
 historical references. The raw updated source is runtime-validated before
 updating the list.
+
+The settings workspace presents this catalogue as **Lead Source**. Verified
+**2026-11-03** against the controller, DTO and service: both localized names
+are unique after trimming/case normalization, the complete catalogue is capped
+at 500 non-deleted sources, and settings reads have no branch or pagination
+query. Search is local across both names. Reorder sends every source ID,
+including inactive rows, exactly once; filtered views cannot reorder.
+
+Presentation source-verified **2026-11-04**: Lead Sources, Lead Stages and
+Opportunity Stages display Arabic and English names in separate equal-weight
+columns. Source create/edit use centred compact `FormModal` surfaces. Source
+row actions are Edit, a visible labeled Source icon button, and a menu for Move
+to position and Delete. Edit shows the current icon with Add icon / Change icon;
+switching to the uploader requires saving any name/status changes first. Create
+explains that the source must be saved before its icon can be uploaded.
+Dragging and the keyboard/click position modal share the same full-catalogue
+reorder writer. Duplicate, partial, foreign and unchanged orders never write;
+the validated response must prove the requested dense order before success is
+announced. Reorder failures roll back the local preview and reload; an unknown
+outcome or failed refresh blocks further writes until a validated read succeeds.
+An authenticated-scope change remounts the workspace, and late read/reorder
+results cannot update an unmounted workspace. No revision/ETag or concurrent
+same-set reorder conflict detection is implied by this UI.
+
+Deleting any source referenced by a lead or customer profile, including a
+soft-deleted record, returns `409 CRM_ACQUISITION_SOURCE_IN_USE`. The UI keeps
+the source and offers editing/deactivation instead of repeating Delete. No
+source-replacement or historical-attribution migration command is exposed.
+Create/update/delete are non-replayable; unknown outcomes reload the catalogue
+and require review before another intent. Only validated write responses raise
+confirmed-success feedback.
+
+Source icons are one nonempty PNG, JPEG or ICO file, at most **2 MiB**. Filename
+extension, MIME and contents must agree. Generic OS MIME values are normalized
+only for `.ico`; there is no persisted remove-icon endpoint. Icon replacement
+retains the same idempotency key and selected file when explicitly retrying an
+unknown result. The current icon remains usable after a rejected upload, and a
+failed image read renders a neutral fallback without hiding the source row.
 
 ## Tags
 
@@ -162,8 +200,9 @@ Canonical prefix: `/api/tenant/crm/v1/tags`
 | PATCH | `/api/tenant/crm/v1/tags/:id` | `crm.tags.manage` |
 | DELETE | `/api/tenant/crm/v1/tags/:id` | `crm.tags.manage` |
 
-Verified **2026-09-24** against `tags/tags.controller.ts`,
-`tags/tags.service.ts` and `tags/dto/tag.dto.ts`.
+Verified **2026-11-03** against Gateway tag routes, `tags/tags.controller.ts`,
+`tags/tags.service.ts`, `tags/dto/tag.dto.ts` and
+`tags/repo/record-tags.repository.ts`.
 
 The list is a raw, name-sorted array, not a Core envelope and not paginated.
 Every catalogue response (`GET /tags`, `GET/POST/PATCH /tags/:id`) is one item
@@ -181,7 +220,7 @@ of this shape:
 ```
 
 A tenant can have at most 500 live tags. Names are trimmed, non-empty, at most
-60 characters, and unique among live tags after case/whitespace normalization.
+60 Unicode code points, and unique among live tags after case/whitespace normalization.
 
 **Colour.** `backgroundColor` and `textColor` are a pair: both upper-case
 `#RRGGBB`, or both `null` for an uncoloured tag. The server accepts either case
@@ -191,7 +230,7 @@ on input (`^#[0-9A-Fa-f]{6}$`) and stores the upper-case form.
 | --- | --- | --- |
 | `POST /tags` | `{ name, backgroundColor?, textColor? }` | Send both colours or neither |
 | `PATCH /tags/:id` | any of `{ name?, backgroundColor?, textColor? }` | At least one key. Colours travel together; `backgroundColor: null, textColor: null` clears the colour |
-| `DELETE /tags/:id` | — | `204`. Soft-deletes the tag and detaches it from every record in the same transaction |
+| `DELETE /tags/:id` | — | `204`. Soft-deletes the tag and detaches it from every record in the same transaction; refused when more than 100 live leads use it |
 
 | Status | Code | When |
 | --- | --- | --- |
@@ -199,6 +238,7 @@ on input (`^#[0-9A-Fa-f]{6}$`) and stores the upper-case form.
 | `422` | `CRM_TAG_LIMIT_EXCEEDED` | Creating the 501st live tag |
 | `422` | `CRM_TAG_COLOR_INCOMPLETE` | Only one colour sent, or one `null` and the other not |
 | `422` | `CRM_TAG_UPDATE_EMPTY` | `PATCH` with no field |
+| `422` | `CRM_TAG_DETACH_LIMIT_EXCEEDED` | More than 100 live leads use the tag; no deletion or detachment occurs. `details.count` identifies the current count |
 | `404` | `CRM_TAG_NOT_FOUND` | The tag does not exist or was deleted |
 
 The same `{ id, name, backgroundColor, textColor }` summary is embedded in the
@@ -213,11 +253,14 @@ contract, so the portal sends them with `nonReplayable` and no idempotency key.
 A transport failure or `5xx` is an uncertain outcome: the catalogue is re-read
 before anything else is sent.
 
-The **Tags** screen at `/crm/tags` (Setup nav, gated on `crm.tags.read`;
+The **Tags** screen at `/crm/tags` (Settings aside, gated on `crm.tags.read`;
 create/edit/delete need `crm.tags.manage`) lists the catalogue with each chip,
 creates and edits a tag's name and colour in one centred `FormModal size="card"` with the design
 system's `TagColorPicker` — `PATCH` carries only the changed keys, colours as a
-pair — and deletes through `ConfirmActionModal`.
+pair — and deletes through `ConfirmActionModal`. The detach-limit refusal
+replaces the delete action with an explanation and shows the usage count only
+when returned by the server. A malformed or incomplete visible custom colour
+draft blocks saving, even when an earlier valid pair is still committed.
 
 The Create Lead modal loads this catalogue and sends the selected ids as
 `CreateLeadDto.tagIds` in its single lead-creation request. Up to 50 unique ids
@@ -227,6 +270,8 @@ require scoped `crm.leads.update`; neither path requires `crm.tags.manage`. See
 [CRM — Leads](crm-leads.md#tags-during-creation).
 
 ## Custom fields
+
+Verified **2026-11-03** against Gateway, CustomFieldsController, DTO and service.
 
 Canonical prefix: `/api/tenant/crm/v1/custom-fields`
 
@@ -244,11 +289,19 @@ removed — deleting one would orphan every stored value. Do not build a delete
 control for this screen.
 
 The custom-field edit drawer requires `crm.custom_fields.manage` and sends
-`{ nameAr, nameEn, isActive, isSearchable, options? }` to `PATCH /:id`.
+`{ nameAr, nameEn, isActive, isSearchable, placeholderAr?, placeholderEn?, sortOrder?, options? }` to `PATCH /:id`.
 The editor keeps `fieldKey`, `ownerType` and `type` fixed and omits unchanged
 options when saving other metadata. PATCH does not
 include requirements in its response, so the list retains its confirmed
 requirement flags; requirements continue to use their separate operation.
+
+Creation and editing expose optional Arabic/English placeholders (maximum 180
+characters each), Searchable, and a positive integer display order (server
+default 100). Empty placeholders are omitted on create and sent as empty strings
+when explicitly cleared on edit. The complete tenant catalogue is limited to
+100 definitions, including inactive definitions. The create control is disabled
+at that confirmed limit. Names are required in both languages, up to 120
+characters each; names are not required to be unique.
 
 Creation supports all eleven field types, including `SELECT` and
 `MULTI_SELECT`, through the existing POST. Picklists require 1–100 options:
@@ -276,35 +329,33 @@ written. Definitions and values are separate resources: the definition list
 tells you which inputs to render, `values` supplies and persists what the user
 typed.
 
+Value-owner applicability verified **2026-11-04**: the values
+panel shows only active `CUSTOMER_PROFILE` definitions for customer profiles.
+`LEAD_AND_PARTY` definitions apply to leads in this panel. GET values accepts
+only concrete owners (`LEAD`, `PARTY`, `CUSTOMER_PROFILE`, `OPPORTUNITY`) in
+`ownerType`; `LEAD_AND_PARTY` returns HTTP 400. The DTO rejects `entityType`
+and other aliases as unknown fields. The record picker here supports Leads,
+Customer profiles and Opportunities; no Party name picker is assumed.
+
 `POST /custom-fields/:id/requirements` sets the per-operation requirement flags
-(`CREATE` / `UPDATE` / `CONVERT`) as one call — it is not a `PATCH` of the
-definition.
+(`CREATE` / `UPDATE` / `CONVERT`) **one operation per call** — it is not a
+`PATCH` of the definition. The portal writes changed rules sequentially and
+reloads the confirmed rules after success or failure. A later failure does
+not undo earlier successful operations. Inactive definitions cannot change
+requirements; Opportunity definitions cannot set a `CONVERT` requirement.
 
-### `fieldKey` is unique per `ownerType`, not per tenant
+### `fieldKey` is unique across the tenant catalogue for current writes
 
-**Decided 2026-08-31**, from the CRM audit review's open question 4. The audit
-found the documentation implying tenant-global uniqueness and the implementation
-enforcing per-`ownerType` uniqueness, and asked which was intended.
+**Verified 2026-11-03**: current
+`custom-fields.service.ts` `assertFieldKeyAvailable` queries `{ fieldKey }`
+without an owner filter and rejects every other matching definition with
+`409 CUSTOM_FIELD_KEY_TAKEN`. This supersedes the older per-owner guidance.
+The response validator still accepts existing catalogues whose owner/key
+identities are distinct; it does not claim those existing entries are newly
+creatable under the current write contract.
 
-**The implementation is right; the documentation was wrong.** Verified at
-`custom-fields.service.ts:614`, where the uniqueness identity is built as:
-
-```ts
-const identity = `${row.ownerType}\u0000${row.fieldKey}`;
-```
-
-Scoped uniqueness is also the more useful model, which is why this is not merely
-the cheaper answer: a `priority` field on a Lead and a `priority` field on an
-Opportunity are genuinely different fields, and forcing `lead_priority` /
-`opportunity_priority` makes every tenant re-encode the owner type into the key
-by hand. Global uniqueness would buy nothing user-visible and cost a migration
-with a collision survey attached.
-
-Three consequences the screen must get right:
-
-- **Validate duplicates within the chosen `ownerType` only.** A form that greys
-  out a key because it exists under a different owner type is wrong, and the
-  server will happily accept what the form refused.
+- **Check duplicate keys across all loaded definitions**, regardless of owner
+  type, and still handle the server conflict because the catalogue can change.
 - **`fieldKey` is normalized before it is stored** — trimmed, whitespace to
   underscores, lowercased — then matched against `^[a-z][a-z0-9_]{0,63}$`, else
   `422 CUSTOM_FIELD_KEY_INVALID`. Echo the normalized form back to the user
@@ -314,12 +365,38 @@ Three consequences the screen must get right:
   resolves to more than one definition for that record. It is a distinct outcome
   from `404 CUSTOM_FIELD_NOT_FOUND` and needs its own message.
 
-### Duplicate route family
+Record values use typed controls for all eleven types and a separate explicit
+Save per changed value. Datetime values include seconds and an explicit time
+zone; a timezone-free `datetime-local` string is not a valid wire value.
+Optional blanks clear a value; an Update-required field cannot be cleared.
+Value writes validate their response, refresh values without replay after an
+uncertain outcome, and distinguish a confirmed write followed by a failed read.
+No record-value batch Save endpoint is assumed.
 
-The same six routes are also exposed under `/api/tenant/crm/v1/settings/custom-fields/*`.
-Both families reach the same controller. **Use the `/custom-fields/*` form**
-and treat the `/settings/` form as a compatibility alias; do not mix them in
-one client.
+### Canonical route family
+
+**Verified 2026-11-04** against the Gateway custom-field route contracts and
+`crm-custom-fields.route-contracts.spec.ts`: only the six canonical
+`/api/tenant/crm/v1/custom-fields/*` routes exist. There is no
+`/settings/custom-fields/*` compatibility alias.
+
+### Record update admission
+
+**Verified 2026-11-04**: record-value mutation also needs the selected owner's
+branch capability from `/leads/capabilities`,
+`/customer-profiles/capabilities` or `/opportunities/capabilities`, and the
+owner projection from the matching `GET /:id`. Both requests preserve the
+organization scope headers. Validate owner id/branch and `ownerUserId`, then
+match the `update` action's `ownerUserIds` boundary. A null action denies the
+update; an unresolved or failed read leaves values read only. Converted leads
+remain readable but cannot be changed. The backend remains authoritative for
+record/pipeline access and ownership changes.
+
+The values editor preserves drafts until an explicit discard confirmation
+when changing branch, record type, record, tab or reloading. Boolean fields
+distinguish no value from false; required Update values cannot be cleared.
+Phone validation normalizes an international `00` prefix before counting the
+7–15 digits, matching CRM's canonical phone normalization.
 
 Each field declares a `CrmCustomFieldOwnerTypeEnum` (which entity it attaches
 to), a `CrmCustomFieldTypeEnum` (11 values), and per-operation requirement
@@ -355,7 +432,9 @@ Retention contract source-verified **2026-10-18** (CXCRM-OPS-104) against the
 Gateway settings routes, controller, DTO and compare-and-set service.
 `409 CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE` keeps the entire draft and
 blocks further saves until the user reloads the policy. A successful reload
-updates the confirmed server values and revision without replacing the draft.
+updates the confirmed server values and revision, retains intentionally edited
+draft fields, and refreshes untouched fields so they cannot become accidental
+writebacks. Credential replacement decisions and reentered secrets are retained.
 A failed reload keeps the draft and recovery action. Compare the current server retention days
 with the draft, then explicitly save again or discard the draft. No write is
 retried automatically.
@@ -365,12 +444,44 @@ retried automatically.
 this route — a user holding only it cannot save. Verified against
 `@RequirePermissions` on `crm-settings.controller.ts`.
 
-Tenant-wide CRM configuration. Some sections are read-only in the portal by
-deliberate decision — telephony/Asterisk topology is exposed but must not be
-edited from here, because a wrong value breaks call routing tenant-wide and
-the safe editing surface is elsewhere.
+Presentation and full Asterisk editing verified **2026-11-03** against the
+approved CRM Settings designs and owning DTO/service. The two-column business
+form edits the current-Qualified-stage conversion rule and outbound **email
+content** retention (integer 30–2555 days; seeded 730). Existing messages retain
+their original retention deadline. The default pipeline is read-only and its
+catalogue name may be unavailable without blocking the settings form.
+
+Advanced telephony opens a structured panel for the existing Asterisk DTO:
+WebSocket URL (`ws://`/`wss://`, 512), SIP domain/realm/from-domain/registrar
+(180 each), proxy (512), caller ID (64), contact URI (255), registration expiry
+(nullable integer 60–86400), enabled/session-timers/tracing/invalid-TLS booleans,
+and STUN/TURN/ICE lists. STUN allows 16 strings of 512 characters. TURN and ICE
+each allow 16 servers, 1–8 URLs of 512 characters per server, username 128 and
+write-only credential 256. Public responses expose `hasCredential`, never a
+credential. There is no connection-test or live-health endpoint.
+
+Untouched TURN/ICE lists are omitted from PUT. A user must explicitly enable
+list replacement; each retained server with a saved credential requires reentry
+or an explicit clear choice. Replacing a list with blank credentials clears
+them. Credentials and replacement flags are never fabricated from masked values;
+only DTO fields reach the server. Telephony edits remain in the same draft and
+are saved atomically with business settings. Read-only tenant mode or absence of
+`crm.settings.manage` prevents all writes.
+
+Malformed/unknown mutation results trigger a validated readback while retaining
+the complete draft, then require explicit review before another save. Repeated
+same-tick submission is fenced. Read responses and mutation completion are scoped
+to the active actor/permissions and request generation. Success feedback appears
+only after a validated save response. Page reload/discard/navigation protect dirty
+drafts; missing singleton 503 is an unavailable state, not a create-settings form.
 
 ## Static data catalogue
+
+Settings presentation and read recovery re-verified **2026-11-03** against
+`static-data/static-data.controller.ts`, `static-data.service.ts`, the Gateway
+route contract, and the portal runtime validator. The endpoint is authenticated
+with CRM module access; the portal page additionally requires
+`crm.settings.read`.
 
 Presentation reviewed **2026-10-18** (FE-CRM-CONFIG-005): settings resolve
 default stage and pipeline references through the validated catalogues, using
@@ -385,7 +496,7 @@ Canonical prefix: `/api/tenant/crm/v1/static-data`
 
 | Method | Canonical path | Permission |
 | --- | --- | --- |
-| GET | `/api/tenant/crm/v1/static-data` | `crm.settings.read` |
+| GET | `/api/tenant/crm/v1/static-data` | Authenticated tenant user with CRM module access; page admission: `crm.settings.read` |
 
 **Read-only runtime vocabulary.** There is no CRUD here and none must be
 faked — an earlier version of this portal shipped a local CRUD fallback for
@@ -395,6 +506,22 @@ boundary now prevents.
 Its values mirror the compiled enums in
 [../reference/enums.md](../reference/enums.md). If the two disagree, the
 installed package declaration wins and this documentation is stale.
+
+The response currently contains eleven enum groups plus permissions, record
+types, CRM events, allowed attachments, blocked attachment types and two derived
+rule groups. Group and permission totals are derived from the runtime response.
+The attachment size limit is separate from the five attachment families: it is
+shown as a size in the Entries column, never counted as a sixth family.
+
+The catalogue has no pagination or mutation command. Local search matches
+translated groups/values and technical identifiers. Eye details expose every
+localized value and the four opportunity-stage status mappings; wire values
+remain in a closed technical disclosure. Untranslated permission labels are
+explicitly marked. Counts use the explicit locale with Western Arabic digits.
+A failed initial read renders Retry; failed refreshes retain confirmed rows
+with a stale-data notice. A server 403 removes retained rows and open details
+and renders the permission boundary. New reads cancel and fence older requests,
+and changing the authenticated scope hides the previous scope's catalogue.
 
 ## Frontend notes
 
@@ -430,5 +557,5 @@ Settings load failures render one error surface (or the permission boundary for
 | Acquisition sources | live — list, create, edit names/active status, reorder, icon upload and delete |
 | Tags | live — list, create, edit name/colour, delete |
 | Custom fields | live — all field types creatable, edit names/active/searchable/options, requirements and values |
-| CRM settings | live — safe subset writable |
+| CRM settings | live — business settings and full Asterisk editor, atomic retention revision recovery and explicit secret-list replacement |
 | Static data catalogue | live — read-only, contract-tested |

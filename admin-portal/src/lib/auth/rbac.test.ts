@@ -171,19 +171,17 @@ describe("Bilingual RBAC System", () => {
       ).toBe(false);
     });
 
-    it("10. Worker job and migration controls use their new permission pairs", () => {
+    it("10. Worker migration controls require their critical permission pair", () => {
       const workerAdmin: AdminAuthorizationContext = {
         isSuperAdmin: false,
-        permissions: ["admin.jobs.manage", "admin.jobs.critical", "admin.migrations.manage", "admin.migrations.critical"],
+        permissions: ["admin.migrations.manage", "admin.migrations.critical"],
       };
-      expect(adminCanAll(workerAdmin, ADMIN_RBAC_CRITICAL.JOBS_MANAGE)).toBe(true);
       expect(adminCanAll(workerAdmin, ADMIN_RBAC_CRITICAL.MIGRATIONS_MANAGE)).toBe(true);
 
       const weakWorkerAdmin: AdminAuthorizationContext = {
         isSuperAdmin: false,
-        permissions: ["admin.jobs.manage", "admin.migrations.manage"], // missing critical
+        permissions: ["admin.migrations.manage"], // missing critical
       };
-      expect(adminCanAll(weakWorkerAdmin, ADMIN_RBAC_CRITICAL.JOBS_MANAGE)).toBe(false);
       expect(adminCanAll(weakWorkerAdmin, ADMIN_RBAC_CRITICAL.MIGRATIONS_MANAGE)).toBe(false);
     });
 

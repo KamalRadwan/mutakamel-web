@@ -2,7 +2,11 @@
 
 Source status: **2026-09-09; partial implementation, no authenticated runtime acceptance**.
 
-Last source verification: **2026-09-09**. Verification applies to the explicit mounted contracts below, not deployed/runtime acceptance.
+Last source verification: **2026-10-29** (subscription route authority and PREPARE rejection recovery). Verification applies to source contracts, not deployed/runtime acceptance; older executable packets below remain historical.
+
+Preparation-rejection recovery source review: **2026-10-29** (AUDIT29-TP-1); executable checks pending lead verification.
+
+Subscription authority review **2026-10-29** (AUDIT29-TP-3/6): adoption entry and hooks require the current Owner or a genuine tenant-wide `applications.addon_definitions.adopt` grant via `canAdoptDefinitions(user)`; Company/Branch-scoped grants alone are denied without dispatch. Ordinary financial changes remain Owner-only. The complete ten-route subscription table and purpose-specific Company checks are in [Core billing](core-billing.md#subscription--10-routes). The first-PREPARE rejection exception below applies to both purchase and adoption; it never releases an already uncertain or restored intent.
 
 This page records the current Tenant Portal contract after the single-contract decision. Earlier dated verification records remain historical evidence for their original source snapshots.
 
@@ -42,6 +46,8 @@ The ordinary Tenant purchase editor below now consumes the actual coordinated co
 The purchase codecs in `commercial-command-fields.ts`, `commercial-command-request.ts`, `commercial-operation.ts`, `commercial-preview.ts` and `commercial-apply.ts` follow the actual closed request, 13-field operation receipt, 13-field preview with 22-field change rows, and nine-field apply receipt. They preserve exact retained pricing and bigint arithmetic, source-bound nullable identities, original command/preview references and newly assigned IDs from the actual receipt only. Task 13 passed their earlier codec and mounted read/transport static packets. These results predate the purchase editor below.
 
 ## Purchase retry and receipt semantics
+
+The purchase and definition-adoption editors release a refused first PREPARE only when it began from an empty journal, has no operation ID or earlier uncertain attempt, and receives exactly 400 `COMMERCIAL_CONTRACT_INVALID`, 409 `COMMERCIAL_TARGET_INCOMPATIBLE`, 422 `COMMERCIAL_PRICE_UNAVAILABLE`, 409 `COMMERCIAL_CAPACITY_OCCUPIED`, or 409 `ADDON_PREPARATION_STALE`. Successful session-journal removal returns the editor to idle with the mapped bilingual error; invalid-contract uses the existing safe generic fallback. Storage-removal failure keeps the storage boundary closed to new changes. Restored intents, same-key retries, network failures, all 5xx (including 503 `COMMERCIAL_COMMAND_UNAVAILABLE`), unknown conflicts and mismatched status/code pairs remain uncertain with the same request and key. This exception does not discard later PREVIEW/APPLY/RECOVER commands or introduce a general discard action.
 
 The purchase owner confirms that an exact preview retry returns the original saved preview, including after expiry. A new explicitly requested key may obtain a fresh five-minute quote for the same unresolved preparation after current owner checks; one terminal preparation outcome still permits only one commit. The prepared codec accepts an expired original as historical evidence without granting apply eligibility. An uncertain apply retains its original request and key.
 

@@ -103,7 +103,8 @@ Arbitrary `text-[10px]`/`text-[11px]` sizes remain banned. Small type uses only
 the named v3 steps: `text-micro` (10px, count chips only), `text-badge` (11px),
 `text-caption` (12px), `text-label` (12.5px), `text-tab` (13.5px),
 `text-card-title` (14px) and `text-column-title` (14.5px), where the owner spec
-assigns them. Arabic lift and the density multiplier still apply to every step.
+assigns them. Arabic and English share type sizes and line-heights; density
+remains a separate setting (updated 2026-11-04).
 
 **Lint: error on arbitrary `text-[Npx]`, including fractional pixel values.**
 Named steps pass in both strings and template literals. `text-tab` avoids a utility collision with `--color-nav`.

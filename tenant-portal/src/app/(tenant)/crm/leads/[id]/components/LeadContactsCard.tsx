@@ -149,7 +149,35 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                 <LeadContactFields
                   fields={[
                     {
+                      label: t.crmLeads.phone,
+                      span2: true,
+                      value: (
+                        <div className="dossier-phone-box-edit p-2.5">
+                          <CrmPhoneListField
+                            label={t.crmLeads.phone}
+                            phones={newContact.phones}
+                            path="phones"
+                            errors={newContactErrors}
+                            disabled={actionBusy}
+                            onChange={(idx, val) =>
+                              edit.changeNewContact((prev) => ({
+                                ...prev,
+                                phones: prev.phones.map((p, i) => i === idx ? val : p),
+                              }))
+                            }
+                            onAdd={() => edit.changeNewContact((prev) => ({ ...prev, phones: [...prev.phones, ""] }))}
+                            onRemove={(idx) => edit.changeNewContact((prev) => ({
+                              ...prev,
+                              phones: prev.phones.length === 1 ? [""] : prev.phones.filter((_, i) => i !== idx),
+                            }))}
+                            onBlur={() => {}}
+                          />
+                        </div>
+                      ),
+                    },
+                    {
                       label: t.crmLeadDetail.honorificTitle,
+                      third: true,
                       value: (
                         <Field label={t.crmLeadDetail.honorificTitle} error={newContactErrors.honorificTitle}>
                           <HonorificSelect
@@ -167,32 +195,10 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                       ),
                     },
                     {
-                      label: t.crmLeadDetail.fullName,
-                      value: (
-                        <Field
-                          label={t.crmLeadDetail.fullName}
-                          error={newContactErrors.displayName}
-                        >
-                          <Input
-                            size="sm"
-                            placeholder={t.crmLeadDetail.fullName}
-                            value={newContact.displayName}
-                            disabled={actionBusy}
-                            maxLength={LEAD_CONTACT_EDIT_LIMITS.displayName}
-                            onChange={(e) =>
-                              edit.changeNewContact((prev) => ({
-                                ...prev,
-                                displayName: e.target.value,
-                              }))
-                            }
-                          />
-                        </Field>
-                      ),
-                    },
-                    {
                       label: t.crmLeadDetail.firstName,
+                      third: true,
                       value: (
-                        <Field label={t.crmLeadDetail.firstName} error={newContactErrors.firstName}>
+                        <Field label={t.crmLeadDetail.firstName} error={newContactErrors.firstName ?? newContactErrors.displayName}>
                           <Input
                             size="sm"
                             placeholder={t.crmLeadDetail.firstName}
@@ -211,6 +217,7 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     },
                     {
                       label: t.crmLeadDetail.lastName,
+                      third: true,
                       value: (
                         <Field label={t.crmLeadDetail.lastName} error={newContactErrors.lastName}>
                           <Input
@@ -225,24 +232,6 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                                 lastName: e.target.value,
                               }))
                             }
-                          />
-                        </Field>
-                      ),
-                    },
-                    {
-                      label: t.crmLeadConvert.contactJobTitle,
-                      value: (
-                        <Field label={t.crmLeadConvert.contactJobTitle} error={newContactErrors.jobTitle}>
-                          <CrmJobTitleField
-                            value={newContact.jobTitle}
-                            disabled={actionBusy}
-                            onChange={(value) =>
-                              edit.changeNewContact((prev) => ({
-                                ...prev,
-                                jobTitle: value,
-                              }))
-                            }
-                            onBlur={() => {}}
                           />
                         </Field>
                       ),
@@ -270,42 +259,21 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                       ),
                     },
                     {
-                      label: t.crmLeads.phone,
-                      span2: true,
+                      label: t.crmLeadConvert.contactJobTitle,
                       value: (
-                        <div className="dossier-phone-box-edit p-2.5">
-                          <CrmPhoneListField
-                            label={t.crmLeads.phone}
-                            phones={newContact.phones}
-                            path="phones"
-                            errors={newContactErrors}
+                        <Field label={t.crmLeadConvert.contactJobTitle} error={newContactErrors.jobTitle}>
+                          <CrmJobTitleField
+                            value={newContact.jobTitle}
                             disabled={actionBusy}
-                            onChange={(idx, val) =>
+                            onChange={(value) =>
                               edit.changeNewContact((prev) => ({
                                 ...prev,
-                                phones: prev.phones.map((p, i) =>
-                                  i === idx ? val : p,
-                                ),
-                              }))
-                            }
-                            onAdd={() =>
-                              edit.changeNewContact((prev) => ({
-                                ...prev,
-                                phones: [...prev.phones, ""],
-                              }))
-                            }
-                            onRemove={(idx) =>
-                              edit.changeNewContact((prev) => ({
-                                ...prev,
-                                phones:
-                                  prev.phones.length === 1
-                                    ? [""]
-                                    : prev.phones.filter((_, i) => i !== idx),
+                                jobTitle: value,
                               }))
                             }
                             onBlur={() => {}}
                           />
-                        </div>
+                        </Field>
                       ),
                     },
                     {

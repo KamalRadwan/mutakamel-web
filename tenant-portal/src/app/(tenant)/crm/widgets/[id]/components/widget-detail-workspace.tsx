@@ -1,318 +1,112 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
-import {
-  Badge,
-  Button,
-  ConflictDialog,
-  DegradedBanner,
-  DetailSection,
-  DetailHeader,
-  ErrorState,
-  NotFoundState,
-  Skeleton,
-  useToast,
-} from "@/design-system";
+import { History, Layers3, Pencil, RefreshCw } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Badge, Button, ConflictDialog, DateTime, DegradedBanner, DetailHeader, DetailSection, ErrorState, NotFoundState, PermissionGate, Skeleton } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantAuth } from "@/context/AuthContext";
-import { hasPermission } from "@/design-system";
-import { formatTemplate } from "@/lib/format/template";
-import { wireLabel } from "@/lib/format/wire-label";
+import { localizedName } from "@/lib/format/localized";
+import { formatNumber } from "@/lib/format/number";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import type { NormalizedApiError } from "@/lib/api/errors";
-import { parseWidgetResult, type WidgetResult } from "../../../dashboards/dashboard-run-contract";
-import { WIDGET_CATALOG_PATH, WIDGET_PREVIEW_PATH, buildCreateWidgetRequest } from "../../../dashboards/widget-contract";
-import { axiosClient } from "@/lib/api/axiosClient";
-import { normalizeApiError } from "@/lib/api/errors";
-import { parseCatalogResponse, type DashboardCatalog } from "../../../dashboards/dashboard-catalog-contract";
-import { WidgetFormDrawer } from "../../components/WidgetFormDrawer";
-import { buildWidgetUpdate, widgetSpecLimitations, widgetToForm } from "../../widget-form";
-import { useWidgetDetail } from "../hooks/useWidgetDetail";
-import { useWidgetShareGrants } from "../hooks/useWidgetShareGrants";
+import { WidgetBuilder } from "../../components/WidgetBuilder";
+import { WidgetDeleteDialog } from "../../components/WidgetDeleteDialog";
+import { WidgetGovernanceDialog } from "../../components/WidgetGovernanceDialog";
+import { WidgetUsagePanel } from "../../components/WidgetUsagePanel";
+import { useWidgetWorkspace } from "../hooks/useWidgetWorkspace";
 import { WidgetNotEditableNotice } from "./WidgetNotEditableNotice";
+import { WidgetPublicationReview } from "./WidgetPublicationReview";
+import { WidgetReviewPreview } from "./WidgetReviewPreview";
 import { WidgetSharesSection } from "./WidgetSharesSection";
+import { WidgetVersionsWorkspace } from "./WidgetVersionsWorkspace";
 
 export function WidgetDetailWorkspace({ widgetId }: { widgetId: string }) {
-  const { t } = useI18n();
-  const toast = useToast();
-  const { user } = useTenantAuth();
-  const { widget, isLoading, isSaving, error, update, reload } = useWidgetDetail(widgetId);
-  const isOwner = widget?.accessLevel === "OWNER";
-  const canShare = isOwner && hasPermission(user?.permissions ?? [], "crm.widgets.share");
-  const shares = useWidgetShareGrants(widgetId, canShare);
-
-  const [catalog, setCatalog] = useState<DashboardCatalog | null>(null);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [conflict, setConflict] = useState(false);
-  const [preview, setPreview] = useState<WidgetResult | null>(null);
-  const [previewError, setPreviewError] = useState<NormalizedApiError | null>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-
-  const canEdit =
-    (widget?.accessLevel === "OWNER" || widget?.accessLevel === "EDIT") &&
-    hasPermission(user?.permissions ?? [], "crm.widgets.update");
-  const canPreview = hasPermission(user?.permissions ?? [], "crm.dashboards.read", true);
-
+  const { t, lang } = useI18n();
+  const state = useWidgetWorkspace(widgetId);
+  const { detail, widget, lifecycle, governance } = state;
+  const historyButton = useRef<HTMLButtonElement>(null);
+  const historyOpen = state.versions.open;
+  const wasHistoryOpen = useRef(false);
   useEffect(() => {
-    let cancelled = false;
-    void axiosClient
-      .get<unknown>(WIDGET_CATALOG_PATH, { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 })
-      .then((response) => {
-        if (!cancelled) setCatalog(parseCatalogResponse(response.data));
-      })
-      .catch(() => {
-        // The editor degrades to "catalogue unavailable" rather than failing
-        // the screen — the widget itself is already loaded.
-        if (!cancelled) setCatalog(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  function describe(caught: NormalizedApiError | null): string {
-    return t.crmDashboards.errors[caught?.code ?? ""] ?? t.crmDashboards.actionFailed;
-  }
-
-  if (isLoading && !widget) {
-    return (
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
-  }
-
-  if (error?.status === 403) {
-    // NOT `PermissionGate`. This screen only renders at all because
-    // `page.tsx`'s gate on `crm.widgets.read` already passed, so a second
-    // client-side check here is always satisfied and renders its children —
-    // which were `null`, making a server 403 a blank page. The whole point of
-    // a 403 from the server is that the permission string said yes and branch
-    // or owner scope said no (S6, defect D11), so the state has to be rendered
-    // unconditionally rather than re-derived from permissions.
-    return (
-      <ErrorState title={t.permissionGate.title} description={t.permissionGate.description} />
-    );
-  }
-
-  if (!widget) {
-    return (
-      <NotFoundState
-        title={t.crmWidgets.notFoundTitle}
-        description={t.crmWidgets.notFoundDescription}
-        backLabel={t.crmWidgets.backToList}
-        backHref={TENANT_ROUTES.crmWidgets}
-      />
-    );
-  }
-
-  const usage = widget.usage;
-  // D23. The form defines one metric with no filters and no semantic engine.
-  // A widget carrying more than that cannot be represented in it, and opening
-  // it anyway is what silently collapsed stored specs — so the editor is not
-  // offered at all, and the reason is stated rather than left to be discovered.
-  const specLimitations = widgetSpecLimitations(widget.querySpec);
-  const canOpenEditor = canEdit && specLimitations.length === 0;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <DetailHeader
-        title={widget.name}
-        subtitle={wireLabel(
-          t.crmDashboards.visualizations,
-          widget.visualizationType,
-          t.common.unknownCode,
-          "crmDashboards.visualizations",
-        )}
-        status={<Badge tone="neutral">{t.crmDashboards.accessLevels[widget.accessLevel]}</Badge>}
-        backHref={TENANT_ROUTES.crmWidgets}
-        backLabel={t.crmWidgets.backToList}
-        secondaryActions={
-          canOpenEditor ? (
-            <Button size="sm"
-              variant="outline"
-              onClick={() => {
-                setPreview(null);
-                setPreviewError(null);
-                setIsEditOpen(true);
-              }}
-            >
-              <Pencil className="size-4" aria-hidden="true" />
-              {t.crmWidgets.edit}
-            </Button>
-          ) : undefined
-        }
-      />
-
-      {canEdit && specLimitations.length > 0 ? (
-        <WidgetNotEditableNotice limitations={specLimitations} />
-      ) : null}
-
-      <DetailSection
-        title={t.crmWidgets.definition}
-        fields={[
-          { label: t.crmWidgets.metric, value: widget.querySpec.series.map((s) => s.metricKey).join(", ") },
-          // Both keys have a translation and both used to print the wire value
-          // anyway — "none" and "NONE" reached the screen verbatim, in English,
-          // beside their own Arabic labels.
-          {
-            label: t.crmWidgets.dimension,
-            value: wireLabel(
-              t.crmWidgets.dimensions,
-              widget.querySpec.dimension?.key ?? "none",
-              t.common.unknownCode,
-              "crmWidgets.dimensions",
-            ),
-          },
-          {
-            label: t.crmWidgets.comparison,
-            value: wireLabel(
-              t.crmWidgets.comparisonValues,
-              widget.querySpec.comparison?.type ?? "NONE",
-              t.common.unknownCode,
-              "crmWidgets.comparisonValues",
-            ),
-          },
-          { label: t.crmWidgets.revision, value: String(widget.revision) },
-        ]}
-      />
-
-      {usage ? (
-        <section className="flex flex-col gap-2 rounded-sm border border-border bg-card p-3">
-          <h2 className="text-sm font-medium text-foreground">{t.crmWidgets.usageTitle}</h2>
-          <p className="text-xs text-muted-foreground">
-            {formatTemplate(t.crmWidgets.usageSummary, {
-              placements: usage.placementCount,
-              dashboards: usage.dashboardCount,
-            })}
-          </p>
-          {/* Owner-only, and honest about what the viewer cannot see: the
-              server counts every placement but only returns the ones on
-              dashboards this viewer can reach. */}
-          {usage.hiddenPlacementCount > 0 ? (
-            <DegradedBanner
-              message={formatTemplate(t.crmWidgets.hiddenPlacements, {
-                count: usage.hiddenPlacementCount,
-              })}
-            />
-          ) : null}
-          {usage.placements.length > 0 ? (
-            <ul className="flex flex-col gap-1">
-              {usage.placements.map((placement) => (
-                <li key={placement.placementId} className="text-xs text-foreground">
-                  {placement.dashboardName}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
-
-      {canShare ? (
-        <WidgetSharesSection
-          shares={shares.shares}
-          targets={shares.targets}
-          isLoading={shares.isLoading}
-          isSubmitting={shares.isSubmitting}
-          onSearchTargets={(query) => void shares.searchTargets(query)}
-          onShare={(input) => {
-            void shares.share({ ...input, expiresAt: "" }).then((failure) => {
-              if (!failure) toast.success(t.crmDashboards.shared);
-              else if (!toast.outcomeFromApi(failure)) {
-                toast.errorFromApi(describe(failure), failure);
-              }
-            });
-          }}
-          onRevoke={(shareId) => {
-            void shares.revoke(shareId).then((failure) => {
-              if (!failure) toast.success(t.crmDashboards.shareRevoked);
-              else if (!toast.outcomeFromApi(failure)) {
-                toast.errorFromApi(describe(failure), failure);
-              }
-            });
-          }}
-        />
-      ) : null}
-
-      <WidgetFormDrawer
-        key={isEditOpen ? `edit-${widget.revision}` : "closed"}
-        open={isEditOpen}
-        onOpenChange={setIsEditOpen}
-        title={t.crmWidgets.editTitle}
-        submitLabel={t.common.save}
-        initial={widgetToForm(widget)}
-        catalog={catalog}
-        isSubmitting={isSaving}
-        canPreview={canPreview}
-        preview={preview}
-        previewError={previewError}
-        isPreviewing={isPreviewing}
-        onPreview={(input) => {
-          setIsPreviewing(true);
-          setPreviewError(null);
-          void axiosClient
-            .post<unknown>(WIDGET_PREVIEW_PATH, buildCreateWidgetRequest(input), {
-              cache: "no-store",
-              maxResponseBytes: 2 * 1024 * 1024,
-              skipAutoIdempotency: true,
-            })
-            .then((response) => setPreview(parseWidgetResult(response.data)))
-            .catch((caught) => {
-              setPreview(null);
-              setPreviewError(normalizeApiError(caught));
-            })
-            .finally(() => setIsPreviewing(false));
-        }}
-        onSubmit={(_input, form) => {
-          // Not `_input`: that always carries a rebuilt querySpec, which the
-          // server would store wholesale. `buildWidgetUpdate` sends the spec
-          // only when the user actually changed the query — D23.
-          void update(buildWidgetUpdate(form, widget)).then((result) => {
-            if (result.ok) {
-              setIsEditOpen(false);
-              toast.success(t.crmWidgets.saved);
-              if (result.adjustments.length > 0) {
-                toast.warning(
-                  t.crmWidgets.layoutAdjustedTitle,
-                  formatTemplate(t.crmWidgets.layoutAdjusted, {
-                    count: result.adjustments.length,
-                  }),
-                );
-              }
-              return;
-            }
-            if (result.conflict) {
-              setConflict(true);
-              return;
-            }
-            if (result.error && !toast.outcomeFromApi(result.error)) {
-              toast.errorFromApi(describe(result.error), result.error);
-            }
-          });
-        }}
-      />
-
-      <ConflictDialog
-        open={conflict}
-        onOpenChange={setConflict}
-        title={t.crmWidgets.conflictTitle}
-        description={t.crmWidgets.conflictDescription}
-        onReload={() => {
-          setConflict(false);
-          setIsEditOpen(false);
-          void reload();
-        }}
-        onCancel={() => setConflict(false)}
-        labels={{
-          yourChanges: t.crmDashboards.conflictYours,
-          theirChanges: t.crmDashboards.conflictTheirs,
-          reload: t.crmDashboards.conflictReload,
-          overwrite: t.crmDashboards.conflictOverwrite,
-          cancel: t.common.cancel,
-        }}
-      />
-    </div>
-  );
+    if (wasHistoryOpen.current && !historyOpen) historyButton.current?.focus();
+    wasHistoryOpen.current = historyOpen;
+  }, [historyOpen]);
+  const labels = t.crmWidgets.review;
+  const draft = detail.draftState?.draft;
+  if (detail.isLoading && !widget) return <div className="space-y-3"><Skeleton className="h-10 w-64" /><Skeleton className="h-40 w-full" /></div>;
+  if (detail.error?.status === 403) return <PermissionGate require="crm.widgets.read" denied>{null}</PermissionGate>;
+  if (!widget && detail.error?.status === 404) return <NotFoundState title={t.crmWidgets.notFoundTitle} description={t.crmWidgets.notFoundDescription} backLabel={t.crmWidgets.backToList} backHref={TENANT_ROUTES.crmWidgets} />;
+  if (!widget) return <ErrorState title={t.crmWidgets.loadFailed} description={t.crmDashboards.actionFailed} onRetry={() => void detail.reload()} retryLabel={t.common.retry} />;
+  if (state.versions.open && widget.versionNumber !== null) return <WidgetVersionsWorkspace state={state.versions}
+    name={widget.name} activeVersion={widget.versionNumber} catalog={detail.catalog} reload={detail.reload} />;
+  if (lifecycle.review) return <WidgetPublicationReview
+    name={draft?.name ?? widget.name}
+    history={state.history} draftUpdatedAt={draft?.updatedAt}
+    preview={<WidgetReviewPreview input={state.reviewInput} state={state.reviewPreview} catalog={detail.catalog}
+      canPreview={state.canPreview} publishing={lifecycle.action === "publish"} />}
+    impact={lifecycle.review.impact} unconfirmed={lifecycle.review.unconfirmed} error={state.lifecycleError}
+    pending={lifecycle.action === "publish"} blocked={detail.blocked || detail.isLoading}
+    page={lifecycle.dashboardPage} onPage={lifecycle.setDashboardPage}
+    onBack={lifecycle.closeReview} onConfirm={() => void state.publish()} />;
+  if (state.active) return <>
+    <WidgetBuilder key={`${detail.scope}:${state.active.base.widgetRevision}:${state.active.base.draft?.draftId ?? ""}:${state.active.base.draft?.revision ?? 0}`} title={t.crmWidgets.editTitle}
+      initial={state.active.initial} catalog={detail.catalog} isSubmitting={detail.isSaving}
+      error={state.formError} canPreview={state.canPreview} blocked={detail.blocked || !state.canEdit}
+      needsReview={detail.needsReview} reviewReady={detail.reviewReady} onReload={() => void detail.reload()} onReview={detail.review}
+      onCancel={state.closeEditor} onSaveDraft={(form) => void state.save(form)} />
+    <ConflictDialog open={state.conflict} onOpenChange={(open) => { if (!open) state.cancelConflict(); }}
+      title={t.crmWidgets.conflictTitle} description={t.crmWidgets.conflictDescription} onReload={() => void state.reloadConflict()} onCancel={state.cancelConflict}
+      loading={detail.isLoading} labels={{ yourChanges: t.crmDashboards.conflictYours, theirChanges: t.crmDashboards.conflictTheirs,
+        reload: t.crmDashboards.conflictReload, overwrite: t.crmDashboards.conflictOverwrite, cancel: t.common.cancel }} />
+  </>;
+  const metrics = widget.querySpec?.series.map((series) => {
+    const metric = detail.catalog?.metrics.find((candidate) => candidate.key === series.metricKey);
+    return series.label || (metric ? localizedName(metric, lang) : labels.selectedUnavailable);
+  });
+  return <div className="flex flex-col gap-4">
+    <DetailHeader title={widget.name || t.crmWidgets.lifecycle.untitledDraft} subtitle={widget.visualizationType ? t.crmDashboards.visualizations[widget.visualizationType] : undefined}
+      status={<Badge tone={widget.status === "PUBLISHED" ? "positive" : "neutral"}>{t.crmWidgets.lifecycle.statuses[widget.status]}</Badge>}
+      backHref={TENANT_ROUTES.crmWidgets} backLabel={t.crmWidgets.backToList}
+      primaryAction={draft && lifecycle.canPublish ? { label: t.crmWidgets.lifecycle.reviewPublication,
+        icon: <Layers3 className="size-4" aria-hidden="true" />, onClick: () => void lifecycle.inspect(),
+        disabled: !state.publishReady || detail.blocked || detail.isLoading, loading: lifecycle.action === "inspect" } : undefined}
+      secondaryActions={<><Button variant="outline" disabled={detail.isLoading || detail.isSaving} onClick={() => void detail.reload()}><RefreshCw className="size-4" aria-hidden="true" />{t.connectivity.reload}</Button>
+        {widget.versionNumber !== null && widget.accessLevel !== "VIEW" && <Button variant="outline" ref={historyButton}
+          aria-disabled={detail.isLoading || detail.isSaving} onClick={() => {
+            if (!detail.isLoading && !detail.isSaving) state.versions.openHistory();
+          }}><History className="size-4" aria-hidden="true" />{t.crmWidgets.versionComparison.openHistory}</Button>}
+        {state.canEdit && !state.limitations.length && <Button variant="outline" disabled={detail.blocked || !detail.catalog} onClick={state.openEditor}><Pencil className="size-4" aria-hidden="true" />{t.crmWidgets.edit}</Button>}
+        {state.canEdit && draft && <Button variant="outline" disabled={detail.blocked || detail.isLoading} onClick={() => lifecycle.setDiscardOpen(true)}>{t.crmWidgets.lifecycle.discard}</Button>}
+        {governance.canManage && widget.accessLevel === "OWNER" && <Button variant="outline" disabled={detail.blocked || detail.isLoading}
+          onClick={(event) => governance.open(widget.id, widget.status === "ARCHIVED" ? "RESTORE" : "ARCHIVE", event.currentTarget)}>
+          {widget.status === "ARCHIVED" ? t.crmWidgets.governance.restore : t.crmWidgets.governance.archive}
+        </Button>}</>} />
+    {state.lifecycleError && !lifecycle.discardOpen && <p role="alert" className="rounded-md border border-destructive bg-destructive-subtle p-3 text-sm text-destructive">{state.lifecycleError}</p>}
+    {draft && lifecycle.canPublish && detail.catalog && !state.publishReady && <p role="note" className="text-sm text-muted-foreground">{t.crmWidgets.lifecycle.completeDraftBeforePublish}</p>}
+    {(detail.readOnly || widget.accessLevel === "VIEW" || !state.canEdit) && <p role="note" className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">{labels.viewOnly}</p>}
+    {detail.error && <DegradedBanner message={labels.staleList} />}
+    {detail.draftFailed && <DegradedBanner message={t.crmWidgets.lifecycle.draftUnavailable} />}
+    {draft && widget.status === "ARCHIVED" && <p role="note" className="text-sm text-muted-foreground">{t.crmWidgets.versionComparison.archivedDraft}</p>}
+    {draft && state.limitations.length > 0 && <DetailSection title={t.crmWidgets.lifecycle.statuses.DRAFT} fields={[
+      { label: t.crmWidgets.name, value: draft.name || t.crmWidgets.lifecycle.untitledDraft },
+      { label: t.crmWidgets.revision, value: formatNumber(draft.revision, lang) },
+      { label: t.crmDashboards.updated, value: <DateTime value={draft.updatedAt} /> },
+    ]} />}
+    {!detail.catalog && <DegradedBanner message={labels.catalogUnavailable} />}
+    {state.canEdit && state.limitations.length > 0 && <WidgetNotEditableNotice limitations={state.limitations} />}
+    {detail.needsReview && <div className="space-y-2"><DegradedBanner message={labels.uncertain} /><div className="flex gap-2">
+      <Button variant="outline" onClick={() => void detail.reload()} disabled={detail.isSaving}>{labels.checkCurrent}</Button>
+      <Button variant="outline" onClick={detail.review} disabled={!detail.reviewReady || detail.isSaving}>{labels.reviewed}</Button></div></div>}
+    <DetailSection title={t.crmWidgets.definition} fields={[
+      { label: t.crmWidgets.metric, value: metrics?.join(" · ") },
+      { label: t.crmWidgets.dimension, value: t.crmWidgets.dimensions[widget.querySpec?.dimension?.key ?? "none"] ?? t.common.unknownCode },
+      { label: t.crmWidgets.comparison, value: t.crmWidgets.comparisonValues[widget.querySpec?.comparison?.type ?? "INHERIT"] },
+      { label: t.crmWidgets.revision, value: formatNumber(widget.revision, lang) },
+      { label: t.crmDashboards.updated, value: <DateTime value={widget.updatedAt} /> },
+    ]} />
+    {widget.usage && <WidgetUsagePanel key={`${detail.scope}:${widget.revision}`} widgetId={widget.id} widgetName={widget.name} initialUsage={widget.usage} />}
+    {state.canShare && <WidgetSharesSection key={detail.scope} state={state.shares} />}
+    <WidgetGovernanceDialog state={governance} />
+    {lifecycle.discardOpen && <WidgetDeleteDialog open title={t.crmWidgets.lifecycle.discard}
+      description={t.crmWidgets.lifecycle.discardDescription} confirmLabel={t.crmWidgets.lifecycle.discard}
+      pending={lifecycle.action === "discard"} blocked={detail.blocked || detail.isLoading} error={state.lifecycleError}
+      onClose={() => lifecycle.setDiscardOpen(false)} onConfirm={() => void state.discard()} />}
+  </div>;
 }

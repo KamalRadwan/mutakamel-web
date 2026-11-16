@@ -1,285 +1,71 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { RefreshCw, Sparkles, Star } from "lucide-react";
-import {
-  Button,
-  ConfirmActionModal,
-  DataTable,
-  DegradedBanner,
-  FilterBar,
-  PageHeader,
-  PermissionGate,
-  SubNav,
-  NAV_SECTIONS,
-  useToast,
-} from "@/design-system";
+import { LayoutTemplate, Plus, RefreshCw, Search, Sparkles, Star } from "lucide-react";
+import { useTenantAuth } from "@/context/AuthContext";
+import { Button, DataTable, DegradedBanner, Field, FormDrawer, Input, PageHeader, PermissionGate, hasPermission } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
-import type { NormalizedApiError } from "@/lib/api/errors";
-import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { DashboardDeleteDialog } from "./components/DashboardDeleteDialog";
+import { DashboardBlueprintDrawer } from "./components/DashboardBlueprintDrawer";
 import { DashboardFormDrawer } from "./components/DashboardFormDrawer";
+import { DashboardRecoveryNotice } from "./components/DashboardRecoveryNotice";
 import { useDashboardColumns } from "./components/useDashboardColumns";
-import { useDashboards, type DashboardWriteResult } from "./hooks/useDashboards";
-import type { DashboardSummary } from "./dashboard-contract";
-
-const CRM_ANALYTICS_ITEMS = NAV_SECTIONS.flatMap((section) => section.items).filter((item) =>
-  ["crmDashboardReports", "crmDashboards", "crmWidgets"].includes(item.id),
-);
+import { useDashboardsPage } from "./hooks/useDashboardsPage";
 
 export default function DashboardsPage() {
   const { t } = useI18n();
-  const toast = useToast();
-  const router = useRouter();
-  const {
-    items,
-    catalog,
-    catalogFailed,
-    hasLoaded,
-    isLoading,
-    hasMore,
-    loadMore,
-    isSubmitting,
-    pendingId,
-    queryError,
-    canCreate,
-    canDelete,
-    searchQuery,
-    setSearchQuery,
-    create,
-    ensureTemplate,
-    openDefault,
-    duplicate,
-    remove,
-    setDefault,
-    setFavorite,
-    reload,
-  } = useDashboards();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createError, setCreateError] = useState<string | undefined>(undefined);
-  const [pendingDelete, setPendingDelete] = useState<DashboardSummary | null>(null);
-
-  function describeFailure(error: NormalizedApiError): string {
-    return t.crmDashboards.errors[error.code ?? ""] ?? t.crmDashboards.actionFailed;
-  }
-
-  function report(result: DashboardWriteResult, successTitle: string): boolean {
-    if (result.ok) {
-      if (result.replayed) {
-        toast.info(t.errors.idempotencyReplayedTitle, t.errors.idempotencyReplayedDescription);
-      } else {
-        toast.success(successTitle);
-      }
-      return true;
-    }
-    if (result.error && !toast.outcomeFromApi(result.error)) {
-      toast.errorFromApi(describeFailure(result.error), result.error);
-    }
-    return false;
-  }
-
-  const columns = useDashboardColumns({
-    canCreate,
-    canDelete,
-    pendingId,
-    onSetDefault: (dashboard) => {
-      void setDefault(dashboard.id).then((result) =>
-        report(result, t.crmDashboards.defaultChanged),
-      );
-    },
-    onToggleFavorite: (dashboard) => {
-      void setFavorite(dashboard.id, !dashboard.isFavorite).then((result) =>
-        report(result, t.crmDashboards.favoriteChanged),
-      );
-    },
-    onDuplicate: (dashboard) => {
-      void duplicate(dashboard.id).then((result) => {
-        if (report(result, t.crmDashboards.duplicated) && result.createdId) {
-          router.push(`${TENANT_ROUTES.crmDashboards}/${result.createdId}`);
-        }
-      });
-    },
-    onDelete: setPendingDelete,
-  });
-
-  return (
-    <PermissionGate require="crm.dashboards.read" scoped>
-      <div className="flex flex-col gap-4">
-        <PageHeader
-          className="sr-only"
-          title={t.crmDashboards.title}
-          description={t.crmDashboards.subtitle}
-          primaryAction={
-            canCreate
-              ? {
-                  label: t.crmDashboards.add,
-                  onClick: () => {
-                    setCreateError(undefined);
-                    setIsCreateOpen(true);
-                  },
-                }
-              : undefined
-          }
-          secondaryActions={
-            <>
-              <Button size="sm"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={() => {
-                  void openDefault().then((result) => {
-                    if (result.ok && result.createdId) {
-                      router.push(`${TENANT_ROUTES.crmDashboards}/${result.createdId}`);
-                      return;
-                    }
-                    if (result.error && !toast.outcomeFromApi(result.error)) {
-                      toast.errorFromApi(describeFailure(result.error), result.error);
-                    }
-                  });
-                }}
-              >
-                <Star className="size-4" aria-hidden="true" />
-                {t.crmDashboards.openDefault}
-              </Button>
-              {canCreate ? (
-                <Button size="sm"
-                  variant="outline"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    // PUT, not POST: get-or-create, so pressing it twice does
-                    // not leave two standard dashboards behind.
-                    void ensureTemplate("CRM_DEFAULT").then((result) => {
-                      if (report(result, t.crmDashboards.standardReady) && result.createdId) {
-                        router.push(`${TENANT_ROUTES.crmDashboards}/${result.createdId}`);
-                      }
-                    });
-                  }}
-                >
-                  <Sparkles className="size-4" aria-hidden="true" />
-                  {t.crmDashboards.standardDashboard}
-                </Button>
-              ) : null}
-              <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
-                <RefreshCw
-                  className={isLoading ? "size-4 animate-spin" : "size-4"}
-                  aria-hidden="true"
-                />
-                {t.common.retry}
-              </Button>
-            </>
-          }
-        />
-
-        <SubNav items={CRM_ANALYTICS_ITEMS} />
-
-        {/* Partial failure: the catalogue only feeds the template picker, so
-            losing it degrades one control rather than the screen. */}
-        {catalogFailed ? <DegradedBanner message={t.crmDashboards.catalogueUnavailable} /> : null}
-
-        {canCreate ? null : (
-          <p
-            role="note"
-            className="rounded-sm border border-border bg-muted px-2.5 py-1.5 text-xs text-muted-foreground"
-          >
-            {t.crmDashboards.readOnlyReason}
-          </p>
-        )}
-
-        <FilterBar
-          filters={[]}
-          values={{}}
-          onChange={() => undefined}
-          onReset={() => undefined}
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder={t.crmDashboards.search}
-        />
-
-        <DataTable
-          columns={columns}
-          rows={items}
-          isLoading={isLoading && !hasLoaded}
-          error={queryError}
-          onRetry={() => void reload()}
-          rowKey={(dashboard) => dashboard.id}
-          onRowClick={(dashboard) =>
-            router.push(`${TENANT_ROUTES.crmDashboards}/${dashboard.id}`)
-          }
-          labels={{
-            retry: t.common.retry,
-            errorTitle: t.crmDashboards.loadFailed,
-            emptyTitle: searchQuery.trim()
-              ? t.crmDashboards.emptyFiltered
-              : t.crmDashboards.empty,
-            selectAll: t.views.selectAll,
-            selectRow: t.views.selectItem,
-            sortAscending: t.views.sortAscending,
-            sortDescending: t.views.sortDescending,
-            notSorted: t.views.notSorted,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) =>
-                formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
-
-        {hasMore ? (
-          <Button variant="outline" disabled={isLoading} loading={isLoading} onClick={() => void loadMore()}>
-            {t.crmDashboards.loadMoreDashboards}
-          </Button>
-        ) : null}
-
-        <DashboardFormDrawer
-          key={isCreateOpen ? "open" : "closed"}
-          open={isCreateOpen}
-          onOpenChange={(open) => {
-            if (!open) setCreateError(undefined);
-            setIsCreateOpen(open);
-          }}
-          templates={catalog?.templates ?? []}
-          templatesUnavailable={catalog === null}
-          isSubmitting={isSubmitting}
-          error={createError}
-          onSubmit={(input) => {
-            void create(input).then((result) => {
-              if (result.ok) {
-                setIsCreateOpen(false);
-                setCreateError(undefined);
-                report(result, t.crmDashboards.created);
-                if (result.createdId) {
-                  router.push(`${TENANT_ROUTES.crmDashboards}/${result.createdId}`);
-                }
-                return;
-              }
-              setCreateError(result.error ? describeFailure(result.error) : undefined);
-              if (result.error) toast.outcomeFromApi(result.error);
-            });
-          }}
-        />
-
-        <ConfirmActionModal
-          open={pendingDelete !== null}
-          onOpenChange={(open) => {
-            if (!open) setPendingDelete(null);
-          }}
-          title={t.crmDashboards.deleteTitle}
-          description={formatTemplate(t.crmDashboards.deleteDescription, {
-            name: pendingDelete?.name ?? "",
-          })}
-          confirmLabel={t.common.delete}
-          cancelLabel={t.common.cancel}
-          loading={pendingId !== null}
-          onConfirm={() => {
-            const target = pendingDelete;
-            if (!target) return;
-            void remove(target.id).then((result) => {
-              if (report(result, t.crmDashboards.deleted)) setPendingDelete(null);
-            });
-          }}
-        />
-      </div>
-    </PermissionGate>
-  );
+  const { user } = useTenantAuth();
+  const enabled = Boolean(user?.isTenantOwner) || hasPermission(user?.permissions ?? [], "crm.dashboards.read", true);
+  const state = useDashboardsPage(enabled);
+  const { list } = state;
+  const recovery = { blocked: list.needsReconciliation, ready: list.reviewReady, busy: list.isSubmitting || list.isLoading, onReload: state.reloadRecovery, onAcknowledge: list.acknowledge };
+  const columns = useDashboardColumns({ canCreate: list.canUseTemplates, canDelete: list.canDelete,
+    pendingId: list.isSubmitting || !list.canMutate || list.needsReconciliation ? "pending" : list.pendingId,
+    onSetDefault: state.setDefault, onToggleFavorite: state.setFavorite, onDuplicate: state.openDuplicate, onDelete: state.setPendingDelete });
+  return <PermissionGate require={user?.isTenantOwner ? [] : "crm.dashboards.read"} scoped denied={list.queryError?.status === 403}>
+    <div className="flex w-full flex-col gap-4 px-1 pb-6 sm:px-3">
+      <PageHeader title={t.nav.crmDashboardBuilder} description={t.crmDashboards.subtitle}
+        primaryAction={list.canCreate ? { label: t.crmDashboards.add, onClick: state.openCreate, icon: <Plus className="size-4" aria-hidden="true" />, disabled: list.isSubmitting } : undefined}
+        secondaryActions={<>
+          <Button size="xl" variant="outline" disabled={list.isSubmitting} onClick={() => void state.openDefault()}><Star className="size-4" aria-hidden="true" />{t.crmDashboards.openDefault}</Button>
+          {list.canUseTemplates && <Button size="xl" variant="outline" disabled={list.isSubmitting} onClick={() => void state.standard()}><Sparkles className="size-4" aria-hidden="true" />{t.crmDashboards.standardDashboard}</Button>}
+          {list.mayUseTemplates && <Button size="xl" variant="outline" disabled={list.isSubmitting || state.blueprints.busy}
+            onClick={() => state.blueprints.changeOpen(true)}><LayoutTemplate className="size-4" aria-hidden="true" />{t.crmDashboards.blueprints.browse}</Button>}
+          <Button size="xl" variant="outline" onClick={() => void list.reload()} disabled={list.isLoading || list.isSubmitting}><RefreshCw className="size-4" aria-hidden="true" />{t.connectivity.reload}</Button>
+        </>} />
+      <div className="rounded-lg border border-border bg-card p-4"><div className="relative w-full sm:max-w-lg"><Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <Input className="ps-8" value={list.searchQuery} onChange={(event) => list.setSearchQuery(event.target.value)} placeholder={t.crmDashboards.search} aria-label={t.crmDashboards.search} />
+      </div></div>
+      {list.catalogFailed && <DegradedBanner message={t.crmDashboards.catalogueUnavailable} />}
+      {list.queryError && list.hasLoaded && <DegradedBanner message={t.crmDashboards.review.staleList} />}
+      {!list.canCreate && <p role="note" className="rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground">{t.crmDashboards.readOnlyReason}</p>}
+      <DashboardRecoveryNotice {...recovery} />
+      <DataTable showRowNumbers={false} columns={columns} rows={list.items} isLoading={list.isLoading && !list.hasLoaded} error={list.hasLoaded ? null : list.queryError}
+        onRetry={() => void list.reload()} rowKey={(row) => row.id} onRowClick={(row) => state.navigate(row.id)} labels={{ retry: t.common.retry, errorTitle: t.crmDashboards.loadFailed,
+          emptyTitle: list.searchQuery.trim() ? t.crmDashboards.emptyFiltered : t.crmDashboards.empty,
+          selectAll: t.views.selectAll, selectRow: t.views.selectItem, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
+          pagination: { previous: t.common.previousPage, next: t.common.nextPage, summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }) } }} />
+      {list.searchQuery && !list.items.length && !list.queryError && <Button variant="outline" className="self-start" onClick={() => list.setSearchQuery("")}>{t.crmDashboards.review.clearSearch}</Button>}
+      {list.hasMore && <Button variant="outline" disabled={list.isLoading} loading={list.isLoading} onClick={() => void list.loadMore()}>{t.crmDashboards.loadMoreDashboards}</Button>}
+      <DashboardFormDrawer key={state.isCreateOpen ? "open" : "closed"} open={state.isCreateOpen} onOpenChange={state.setIsCreateOpen} templates={list.canUseTemplates ? list.catalog?.templates ?? [] : []}
+        templatesUnavailable={!list.catalog} canUseTemplates={list.canUseTemplates} recovery={recovery} blocked={list.needsReconciliation} isSubmitting={list.isSubmitting} error={state.createError} failureCode={state.createFailureCode}
+        onSubmit={(input) => void state.create(input)} />
+      <DashboardBlueprintDrawer state={state.blueprints} onRecovery={state.reloadRecovery} />
+      <FormDrawer open={state.pendingDuplicate !== null} onOpenChange={(open) => { if (!open) state.setPendingDuplicate(null); }} title={t.crmDashboards.duplicate}
+        description={t.crmDashboards.review.templatePermission} isDirty={state.duplicateName.length > 0} isSubmitting={list.isSubmitting} submitDisabled={list.needsReconciliation}
+        error={state.duplicateError} onSubmit={() => void state.duplicate()}
+        labels={{ submit: t.crmDashboards.duplicate, cancel: t.common.cancel, discardTitle: t.common.discardTitle, discardDescription: t.common.discardDescription, discardConfirm: t.common.discardConfirm, discardCancel: t.common.cancel }}>
+        <DashboardRecoveryNotice {...recovery} />
+        <Field showLabel label={t.crmDashboards.review.duplicateName} hint={t.crmDashboards.review.nameLimit}><Input value={state.duplicateName} maxLength={120} onChange={(event) => state.setDuplicateName(event.target.value)} /></Field>
+      </FormDrawer>
+      <DashboardDeleteDialog open={state.pendingDelete !== null} onOpenChange={(open) => { if (!open) state.setPendingDelete(null); }} title={t.crmDashboards.deleteTitle}
+        description={`${formatTemplate(t.crmDashboards.deleteDescription, { name: state.pendingDelete?.name ?? "" })} ${t.crmDashboards.review.deleteImpact}`}
+        pending={list.isSubmitting} blocked={list.needsReconciliation || !!state.deleteError}
+        error={state.deleteError} recovery={recovery} onConfirm={() => void state.remove()} />
+    </div>
+  </PermissionGate>;
 }
+
+
+
+

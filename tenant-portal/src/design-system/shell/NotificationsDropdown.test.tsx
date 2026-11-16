@@ -171,6 +171,20 @@ describe("NotificationsDropdown REST recovery", () => {
 });
 
 describe("NotificationsDropdown accessibility", () => {
+  it("animates the whole unread bell independently of decorative-motion suppression, and pauses it when open", async () => {
+    tenantNotificationRuntime.replaceAfterResync(generation, [notification()], 1, 1,
+      "2026-08-14T10:00:00.000Z", null, tenantNotificationRuntime.getSnapshot().revision);
+    tenantNotificationRuntime.setLoadState(generation, "ready");
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(pageResponse([notification()], 1))));
+    render(<NotificationsDropdown />);
+    const bell = screen.getByRole("button", { name: `${en.common.notifications}, 1` });
+    expect(bell.className).toContain("animate-[notification-bell-shake_10s_ease-in-out_infinite]!");
+    expect(bell.querySelector("svg")?.classList.toString()).not.toContain("animate-");
+    fireEvent.click(bell);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(bell.className).not.toContain("animate-[notification-bell-shake");
+  });
+
   it.each(["en", "ar"] as const)("labels the dialog and restores focus after Escape in %s", async (locale) => {
     language = locale;
     dictionary = { en, ar }[locale];

@@ -40,8 +40,9 @@ vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: { id: "admin-1" }, isLoading: false }),
 }));
 
-vi.mock("@/lib/auth/rbac", () => ({
+vi.mock("@/lib/auth/rbac", async (importOriginal) => ({
   ADMIN_RBAC_CRITICAL: {
+    ...(await importOriginal<typeof import("@/lib/auth/rbac")>()).ADMIN_RBAC_CRITICAL,
     STORAGE_SERVERS_CREATE: ["storage-create"],
     STORAGE_SERVERS_UPDATE: ["storage-activate"],
   },

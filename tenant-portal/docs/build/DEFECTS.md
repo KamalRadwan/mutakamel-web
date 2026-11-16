@@ -406,7 +406,7 @@ Outcome: `colorUtilityTotal`, `colorFamiliesInUse`, `roundedXlOrAbove`,
 `fontBoldOrHeavier`, `arbitraryTypeSize` and `handRolledTables` are all **0**
 in feature code. Two counters have a floor above zero, and both have every
 site named in
-[enforcement.md](../design/enforcement.md#the-two-counters-that-cannot-reach-zero-and-why)
+[enforcement.md](../design/enforcement.md#the-two-numeral-counters)
 rather than a footnote: `languageTernaries` 5 and `handRolledButtons` 2.
 
 ---

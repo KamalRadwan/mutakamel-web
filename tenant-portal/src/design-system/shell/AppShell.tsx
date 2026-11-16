@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PanelLeft } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { focusRing } from "../lib/variants";
 import { cn } from "../lib/cn";
@@ -14,6 +15,11 @@ import { PageActionSlotsProvider } from "./page-action-slots";
 import { useActiveApp } from "./useActiveApp";
 import { useNavApps } from "./useNavApps";
 import { useNavLocation } from "./useNavLocation";
+import { useCrmSettingsNavigation } from "./useCrmSettingsNavigation";
+import { CrmSettingsAside, CrmSettingsSheet } from "./CrmSettingsAside";
+import { SettingsPresentationContext } from "./settings-presentation";
+import { AnalyticsPresentationContext } from "./analytics-presentation";
+import { Button } from "../primitives/Button";
 import type { NavAppId } from "./nav-config";
 
 export interface AppShellProps {
@@ -27,25 +33,22 @@ export interface AppShellProps {
 }
 
 /**
- * Two 35px bars stacked above `<main>` — see docs/design/shell.md.
+ * Ocean Navy global navigation above a full-height content column.
  *
  * ```text
- * ┌ GlobalNav 35px ── brand · app · sections ·········· account ┐
- * ├ PageActionBar 35px ── where you are ··· this screen's controls ┤
- * │ main                                                          │
+ * ┌ GlobalNav ── brand · app · destinations · Settings · account ┐
+ * │ Settings aside │ PageActionBar                              │
+ * │ (settings only)│ main                                       │
  * ```
  *
- * This replaced a 240px sidebar beside a 48px topbar. The chrome costs 22px
- * more vertically and gives back the sidebar's whole 240px horizontally, which
- * on the 1366×768 laptop this is built for is the trade that matters: a dense
- * table gains room for several more columns and loses part of one row, and the
- * row comes back because a screen's actions now live in the bar rather than in
- * a header block above the table.
+ * The 240px aside belongs only to CRM Settings. Record pages retain all
+ * available width; the compact Sections sheet replaces the aside below lg.
  *
  * **The height chain is load-bearing.** `h-dvh` here, `shrink-0` on both bars,
  * `flex-1` on `<main>`. Every board and every `h-full` view inside one resolves
  * its height through this and collapses to nothing if `<main>` stops being a
- * flex item with a definite height. It is equally load-bearing that a screen
+ * flex item with a definite height. Both intermediate columns use min-h-0.
+ * It is equally load-bearing that a screen
  * root is `<main>`'s CHILD: a segment layout that wraps it in a real box makes
  * `h-full` resolve against that box's auto height instead, which is why the
  * Core, CRM and Trade segment layouts all render their children directly.
@@ -64,6 +67,7 @@ export function AppShell({ children, initialApp }: AppShellProps) {
   const sections = activeApp?.sections ?? [];
   const appLabelKey = activeApp?.labelKey ?? "appWorkspace";
   const { itemId } = useNavLocation(sections);
+  const settings = useCrmSettingsNavigation(sections);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { status, stopReason } = useConnectivity();
 
@@ -97,7 +101,6 @@ export function AppShell({ children, initialApp }: AppShellProps) {
           sections={sections}
           activeItemId={itemId}
         />
-        <PageActionBar sections={sections} appLabelKey={appLabelKey} />
         <NavSheet
           sections={sections}
           open={mobileNavOpen}
@@ -132,9 +135,30 @@ export function AppShell({ children, initialApp }: AppShellProps) {
             spacing and nothing else — the 16/24px this inherited from the
             sidebar era read as a gap where a page title used to be, and on a
             1366×768 laptop it was 48px of vertical budget spent on nothing. */}
-        <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto p-2.5 outline-none">
-          {children}
-        </main>
+        <div className="flex min-h-0 flex-1">
+          {settings.isSettings && <CrmSettingsAside section={settings.section} activeItemId={itemId} />}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <PageActionBar sections={sections} appLabelKey={appLabelKey}
+              leading={settings.isSettings ? (
+                <Button variant="outline" size="sm" className="lg:hidden"
+                  aria-controls="crm-settings-sections" aria-expanded={settings.open}
+                  onClick={() => settings.onOpenChange(true)}>
+                  <PanelLeft className="size-4" aria-hidden="true" />
+                  {t.crmSettingsNavigation.sections}
+                </Button>
+              ) : undefined}
+            />
+            <main id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-2.5 outline-none">
+              <SettingsPresentationContext.Provider value={settings.isSettings}>
+                <AnalyticsPresentationContext.Provider value={settings.isAnalytics}>
+                  {children}
+                </AnalyticsPresentationContext.Provider>
+              </SettingsPresentationContext.Provider>
+            </main>
+          </div>
+        </div>
+        {settings.isSettings && <CrmSettingsSheet section={settings.section} activeItemId={itemId}
+          open={settings.open} onOpenChange={settings.onOpenChange} />}
       </div>
     </PageActionSlotsProvider>
   );

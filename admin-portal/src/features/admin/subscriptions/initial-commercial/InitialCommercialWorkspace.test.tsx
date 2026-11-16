@@ -12,6 +12,8 @@ import { initialCommercialCopy } from "./initial-commercial-copy";
 import { initialId, initialNow, initialQuoteFixture, initialReceiptFixture, initialTermsFixture } from "./initial-commercial.fixture";
 import type { InitialCommercialContext } from "./hooks/useInitialCommercial";
 import { initialOptionsFixture } from "./initial-create-options.fixture";
+import { ar as arabicDictionary } from "@/i18n/dictionaries/ar";
+import { en as englishDictionary } from "@/i18n/dictionaries/en";
 
 const context: InitialCommercialContext = { purpose: "INITIAL_SEED", targetTenantId: initialId(2), subscriptionId: null, subscriptionRevision: null, intentId: initialId(40) };
 const en = initialCommercialCopy("en");
@@ -36,6 +38,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("Unmounted initial-commercial workspace", () => {
+  it.each(["en", "ar"] as const)("localizes create-options failures and preserves evidence in %s", async (lang) => {
+    locale.lang = lang; locale.dir = lang === "ar" ? "rtl" : "ltr";
+    auth.user.permissions.push("admin.tenants.create");
+    api.options.mockRejectedValue({ isNormalized: true, httpStatus: 409, errorCode: "HTTP_409", message: "Raw options error", correlationId: initialId(99) });
+    await setup();
+    fireEvent.click(screen.getByRole("button", { name: initialCommercialCopy(lang).loadOptions }));
+    const copy = (lang === "ar" ? arabicDictionary : englishDictionary).apiErrorMessages;
+    const alert = (await screen.findByText(copy.conflict)).closest('[role="alert"]');
+    expect(alert).toHaveTextContent("HTTP_409");
+    expect(alert).toHaveTextContent(initialId(99));
+    expect(screen.queryByText("Raw options error")).not.toBeInTheDocument();
+  });
+
   it("loads genuine published addon choices only on request and adds their exact definition", async () => {
     auth.user.permissions.push("admin.tenants.create");
     const terms = initialTermsFixture(); terms.applications[0].addons = [];
@@ -109,6 +124,7 @@ describe("Unmounted initial-commercial workspace", () => {
     let reject!: (reason: unknown) => void;
     api.seed.mockImplementationOnce(() => new Promise((_resolve, refuse) => { reject = refuse; }));
     await setup(); await quote();
+    fireEvent.click(screen.getByRole("checkbox", { name: en.review }));
     fireEvent.click(screen.getByRole("button", { name: en.submit }));
     await waitFor(() => expect(api.seed).toHaveBeenCalledOnce());
     expect(screen.getByText(en.submitting)).toBeDefined();
@@ -144,6 +160,48 @@ describe("Unmounted initial-commercial workspace", () => {
     expect(screen.queryByRole("button", { name: en.submit })).toBeNull();
     expect(api.seed).not.toHaveBeenCalled();
     expect(api.quote.mock.calls[0][0]).not.toHaveProperty("targetTenantId");
+  });
+  it.each(["en", "ar"])("requires acknowledgement of totals, trial days and expiry before seeding in %s", async language => {
+    locale.lang = language; locale.dir = language === "ar" ? "rtl" : "ltr";
+    const copy = initialCommercialCopy(language);
+    await setup();
+    const submit = screen.getByRole("button", { name: copy.submit });
+    expect(submit).toBeDisabled();
+    await quote(copy);
+    const review = screen.getByRole("checkbox", { name: copy.review });
+    expect(review).not.toBeChecked(); expect(submit).toBeDisabled();
+    fireEvent.click(submit); expect(api.seed).not.toHaveBeenCalled();
+    fireEvent.click(review); expect(review).toBeChecked(); expect(submit).not.toBeDisabled();
+    fireEvent.click(review); expect(submit).toBeDisabled();
+    fireEvent.click(review); fireEvent.click(submit);
+    await screen.findByRole("region", { name: copy.original });
+    expect(api.seed).toHaveBeenCalledOnce();
+  });
+  it("clears acknowledgement when a replacement quote arrives", async () => {
+    api.quote.mockResolvedValue(initialQuoteFixture());
+    await setup(); await quote();
+    fireEvent.click(screen.getByRole("checkbox", { name: en.review }));
+    expect(screen.getByRole("button", { name: en.submit })).not.toBeDisabled();
+    await quote();
+    expect(api.quote).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("checkbox", { name: en.review })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: en.submit })).toBeDisabled();
+    expect(api.seed).not.toHaveBeenCalled();
+  });
+  it.each(["base", "addon", "trial", "restore", "removeAddon", "removeApplication"] as const)("clears acknowledgement after a %s draft change", async change => {
+    await setup(); await quote();
+    fireEvent.click(screen.getByRole("checkbox", { name: en.review }));
+    if (change === "base" || change === "addon" || change === "trial") {
+      fireEvent.change(screen.getByRole("spinbutton", { name: change === "base" ? en.baseSeats : change === "addon" ? en.addonSeats : en.trial }), { target: { value: change === "base" ? "4" : "1" } });
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: en[change] }));
+    }
+    expect(screen.getByRole("button", { name: en.submit })).toBeDisabled();
+    // Restore can retain identical terms and the same quote object. Consent
+    // must still be cleared by the draft handler itself.
+    const review = screen.queryByRole("checkbox", { name: en.review });
+    if (review) expect(review).not.toBeChecked();
+    expect(api.seed).not.toHaveBeenCalled();
   });
   it("clears quoted evidence after actor or permission change", async () => {
     const view = await setup(); await quote();

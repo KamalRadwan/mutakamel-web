@@ -1,5 +1,28 @@
 # Trade — Advanced and Analytics
 
+Price-book organization selectors source-verified **2026-11-01**: the list
+workspace loads every page of Core's existing organization company/branch
+directories once per authenticated scope, displays names, and searches locally.
+Options remain intersected with `/auth/me` access IDs. Branch options use the
+stored `companyId`, including for owners without team memberships. The company
+selector requires a concrete company and restores the saved company, falling
+back to the first accessible company. Only branches and channels offer All;
+changing company clears the selected branch. Core's
+`org.company.read` / `org.branch.read` permissions still apply to name lookup.
+No Core directory request depends on the typed search text or selected company.
+The company, branch, and channel controls occupy the second navigation bar's
+middle slot. The list omits its redundant Governance / Price books location
+label, duplicate branch selector, and KPI badges; the unused KPI read is removed.
+Detail routes retain the Price books link back to the list. Channel search also
+filters its already-loaded options locally; All channels clears channel scope.
+Search, filters, and view controls remain mounted before company selection,
+during loading, on read errors, and when results are empty. The setup prompt
+uses pricing-specific wording without exposing API scope details.
+`PricingController.list` remains COMPANY-scoped. All companies was removed by
+the user's **2026-11-01** frontend-only decision. A combined cross-company
+listing would need a backend contract (Q143 in
+[OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q143--price-books-have-no-cross-company-list-contract)).
+
 Action admission reviewed **2026-10-24** (AUD24-FE-TENANT-04): the advanced
 `useTradeScope` filters its permission keys through `permissionScopes` and
 `can()` for the request's selected company/branch, or tenant-wide target.
@@ -34,12 +57,15 @@ build: Q90, Q91 and Q92 below were found then and are corrected inline)
 
 Control Tower evidence permissions re-verified: **2026-10-17** (CLXAPP-134).
 
-Price-book publish eligibility re-verified: **2026-10-18** (CXPORTAL-TRADE-118).
+Price-book publish eligibility source re-verified: **2026-11-01** (CXPORTAL-TRADE-118).
 The version detail exposes `version.createdByUserId` from the stored creator.
 Publish requires the existing `trade.policy.publish` grant (or tenant owner),
-TESTED status, passing latest evidence for the current checksum, and a signed-in
-user different from the creator. Missing identities, loading/errors and pending
-actions disable publishing. The portal lists localized reasons linked to the
+TESTED status, passing latest evidence for the current checksum, and an authenticated
+actor. The maker needs server-projected `soloOwnerGovernanceEligible` and an explicit,
+initially unchecked `soloOwnerAttestation`; otherwise an independent checker must publish.
+A legacy null creator does not add a restriction absent from the server contract.
+Missing actor identity, loading/errors and pending actions disable publishing.
+The portal lists localized reasons linked to the
 button with `aria-describedby`; its handler also refuses ineligible publication.
 Server lifecycle and maker-checker enforcement remain authoritative.
 
@@ -54,8 +80,8 @@ Canonical prefixes: `/api/tenant/trade/v1/inventory`, `.../price-books`,
 
 Upstream: `/api/v1/trade/*`
 
-Portal status: **not built** — this page is the contract for MASTER-PLAN
-Phase 12. No screen calls any of these routes yet.
+Portal status: **live** — verified **2026-11-01** across Phase 12 Trade routes, including unified `/trade/price-books`, `/trade/price-books/[id]`, `/trade/price-book-versions/[id]`, and `/trade/pricing`.
+
 
 **129 routes.** Inventory 26 · Dashboards 20 · Widgets 11 · Webhooks 11 ·
 Policy versions 9 · Workflow versions 9 · Extensions 9 · Imports 7 ·
@@ -142,13 +168,59 @@ only signal is `items.length === limit`.
 
 No route on this page is cursor-paged. The only cursor in Trade is on
 `GET /quotations/customer-options` — see
-[trade-documents.md](trade-documents.md#the-one-cursor-in-trade).
+[trade-documents.md](trade-documents.md#quotation-customer-cursor).
 
 ---
 
 ## Inventory — 26 routes
 
 Feature gate: **`trade.inventory`** on every route.
+
+Screen suite source-reviewed **2026-11-03**. The seven existing workspaces
+(Availability, Fulfilment nodes, Periods, UOM conversions, Movements, Serials
+and Decisions) use the Tenant design-system components and semantic surfaces,
+horizontal inventory navigation and centered task/detail dialogs. Arabic RTL,
+English LTR and both themes use the existing dictionaries and tokens. No mock
+operational data or new backend route is introduced.
+
+Availability is one item/node/unit and optional tracking inquiry, with an exact
+on-hand/reserved/available snapshot, its server timestamp and advisory. History
+is limited to the current session's successful inquiries; it is not a stock
+register or aggregate. A failed refresh retains the previous snapshot with its
+error context. Item detail determines LOT/SERIAL/NONE controls. Named catalogue
+selectors require their own read grants; the unit directory pages through all
+results and historical profile labels resolve through authorized item pages,
+including inactive items. Item detail hydrates tracking and real profile
+versions. Unavailable names remain an explicit reference boundary.
+
+Period and conversion filters send only the documented query fields. Their
+detail dialogs inspect the selected list record; they do not issue a fabricated
+GET-by-id. The period form limits code to40 characters to respect the current
+storage limit, validates actual calendar dates and retains UTC-day semantics.
+UOM creation locks the target to the selected item's base unit and sends positive
+integer rational factors. Node code/type stay immutable on edit, and node
+deactivation requires a review step.
+
+Movement task dialogs cover all nine writes, including separate draft/post,
+reservation release and partial reversal with explicit serial subsets. Order
+selectors hydrate real source and line versions; successful validated responses
+are the only source of session handles. Scope/actor changes discard prior
+handles and fence late responses, including returning to the same scope after
+leaving it. Serials and Decisions remain read-only. Serial details preserve
+nullable custody/unit/reservation references and the bounded lifecycle fields;
+decision details preserve safe selected values, matched rules and policy
+versions without offering approval or override actions. Full portal verification
+passed on2026-11-03, including7538 tests, route checks, the production build,
+bundle budgets and unused-code checks. Authenticated browser review remains
+pending; these automated gates do not certify live transaction behavior.
+
+Inventory copy source reviewed **2026-10-31** (AUDIT29X-TPT-6). Decision,
+serial, UOM conversion and movement screens, including their forms and ratio
+presets, resolve their labels through the Arabic and English `tradeInventory`
+dictionaries. Revision badges and conversion dossier headings are localized;
+revision/version values and ratio operands remain unchanged. Inventory dictionary
+keys and interpolation tokens are covered by a parity spec. Runtime verification
+and the tenant portal rebuild are pending lead verification.
 
 Governance pagination source reviewed **2026-10-26** (AUD26-TRADE-03).
 The four COMPANY-scoped GET lists `/inventory/periods`, `/inventory/uom-conversions`,
@@ -286,6 +358,15 @@ All new guidance and local validation are bilingual. Runtime verification pendin
 
 #### Portal UOM ratio assistance
 
+Quantity simulator reviewed **2026-11-03**. Quantity stays a
+decimal string; the preview multiplies its exact integer magnitude by the
+numerator and divides by the denominator with scaled `BigInt` arithmetic.
+It returns exactly eight decimal places only when the result is representable
+in the inventory numeric(24,8) range. A fractional remainder is rejected rather
+than rounded, including factors and quantities beyond JavaScript's safe integer
+range. Invalid or empty input shows bilingual inline validation and no numeric
+result. This is a local preview; no API request is sent.
+
 Reviewed **2026-10-17** (CXPORTAL-TRADE-115). The create-conversion modal
 normalizes the complete numerator/denominator expression using exact `BigInt`
 arithmetic and reduces it before offering Apply. It displays the original and
@@ -306,8 +387,12 @@ AUD26-FE-TENANT-01; runtime verification pending). An unchanged
 submission reuses both identities. Changed payloads, branches and other operations
 are blocked while a transport failure (status 0), server failure (5xx), or an
 unparseable success response leaves the outcome unknown. Every definitive client
-rejection (4xx, including 409/412/413) releases the fence, even on an unchanged
+rejection (4xx, including 409/412/413, except
+`TRADE.IDEMPOTENCY.IN_FLIGHT`) releases the fence, even on an unchanged
 retry, so corrected inputs or If-Match values use fresh request identities.
+A still-processing key retains its original identity. Retry original operation
+uses the stored body, headers, business key and HTTP key even if displayed form
+values changed; unresolved task dialogs cannot be discarded or switched.
 A page reload loses this recovery state,
 just as it loses the session ledger; resolve an uncertain write before leaving.
 
@@ -377,54 +462,103 @@ indistinguishably.
 
 ---
 
-## Price books — 7 routes
+## Price books — 16 routes
 
-Feature gate: **`trade.pricing`**. All target **`COMPANY`**.
+Feature gate: **`trade.pricing`**. All target **`COMPANY`** (except `POST /pricing/evaluate` which accepts `COMPANY_OR_BRANCH`).
 
-Price-book test reporting re-verified: **2026-10-17** (CXPORTAL-TRADE-117).
+Enterprise Price Books & Promotions verified: **2026-11-01**. Price-book test reporting re-verified: **2026-11-01** (CXPORTAL-TRADE-117). Unified Price Book Detail (`/trade/price-books/[id]`) and Version Workspace (`/trade/price-book-versions/[id]`) consume `GET /price-books/:id` (`linkedAccounts` capped at 100, informational `activeLocksCount`, latest 60 `auditTrail` events, `companyDefaultMapping`), `GET /price-book-versions/:id` (`canViewCost` cost redaction, `soloOwnerGovernanceEligible`, `latestTestEvidence`, latest 40 `auditTrail` events), `GET /pricing/reference-data`, and `GET /price-book-versions/:id/diff/:compareVersionId` (tier `unitPrice`-only diff + `promotionsChanged` count) in `COMPANY` scope. Temporal applicability follows `[effectiveFrom, COALESCE(supersededAt, effectiveTo))` across both `PUBLISHED` and `SCHEDULED` versions.
 The test action returns HTTP 200 for both passed and failed validation. The
 portal validates `passed`, `entryCount`, `promotionCount`, `conflicts` and
 `promotionConflicts` before showing the result. Only `passed: true` announces
 success. A failed report remains visible on the version page after the detail
 refresh, with separate entry and promotion conflict lists containing the exact
 server diagnostics; an empty version also displays the no-entries explanation.
-The report shown here belongs to the test run in the current page session.
+The saved report comes from `latestTestEvidence` and survives a page reload.
+A validated report from a just-completed test is retained while the detail refresh
+catches up. Unsaved edits are marked separately and never treated as tested content.
+Matrix display formats decimal strings with an explicit locale and up to eight
+fractional digits without a floating-point conversion; editor values and requests
+retain the original precision. Cost visibility follows `canViewCost`, and catalog
+costs retain their proven profile currency rather than assuming the book currency.
+Unknown writes keep their original body, revision, and UUIDv7 key for a same-key
+retry within the page session. A confirmed write followed by a failed read exposes
+read recovery, and a confirmed draft deletion returns to its parent book even when
+confirmed through that retry. This does not promise offline persistence or sync.
 
 | Method | Canonical path | Permission |
 | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/price-books` | `trade.pricing.read` |
+| GET | `/api/tenant/trade/v1/price-books/kpis` | `trade.pricing.read` |
+| GET | `/api/tenant/trade/v1/price-books/:id` | `trade.pricing.read` |
 | POST | `/api/tenant/trade/v1/price-books` | `trade.pricing.manage` |
+| PATCH | `/api/tenant/trade/v1/price-books/:id` | `trade.pricing.manage` · `If-Match` |
 | POST | `/api/tenant/trade/v1/price-books/:id/versions` | `trade.pricing.manage` · `If-Match` |
+| POST | `/api/tenant/trade/v1/price-books/:id/versions/clone` | `trade.pricing.manage` · `If-Match` |
 | GET | `/api/tenant/trade/v1/price-book-versions/:id` | `trade.pricing.read` |
+| GET | `/api/tenant/trade/v1/price-book-versions/:id/diff/:compareVersionId` | `trade.pricing.read` |
+| PATCH | `/api/tenant/trade/v1/price-book-versions/:id` | `trade.pricing.manage` · `If-Match` |
+| DELETE | `/api/tenant/trade/v1/price-book-versions/:id` | `trade.pricing.manage` · `If-Match` |
 | POST | `/api/tenant/trade/v1/price-book-versions/:id/test` | `trade.pricing.manage` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/price-book-versions/:id/publish` | **`trade.policy.publish`** · `If-Match` — **200** |
+| POST | `/api/tenant/trade/v1/price-book-versions/:id/retire` | **`trade.policy.publish`** · `If-Match` — **200** |
+| GET | `/api/tenant/trade/v1/pricing/reference-data` | `trade.pricing.read` |
 | POST | `/api/tenant/trade/v1/pricing/evaluate` | `trade.pricing.read` — `COMPANY_OR_BRANCH`, **200** |
 
-> **Publishing a price-book version needs `trade.policy.publish`, not
+> **Publishing or retiring a price-book version needs `trade.policy.publish`, not
 > `trade.pricing.manage`.** The same cross-family grant governs
-> `POST /configuration/versions/:id/publish`. Two of the three publish actions
-> in Trade are behind a Policy Studio permission.
+> `POST /configuration/versions/:id/publish`.
 
-The three `/configuration/company-default-price-books/*` routes belong to this
-family too, but are documented with the rest of the `/configuration` prefix in
-[trade-foundation.md](trade-foundation.md#configuration--9-routes) — they are
+The pricing simulator presentation (verified 2026-11-01) uses named,
+locally searchable scope directories. An explicit All branches selection sends
+company scope even for a user with one accessible branch. A deep-linked channel
+is reconciled with the visible shared scope before automatic evaluation.
+Editing inputs invalidates the displayed decision until reevaluation; pinned
+comparisons retain their original inputs and scope.
+
+The waterfall starts at the matched tier's baseline and subtracts only applied
+promotion amounts using exact decimal arithmetic. Rejected promotions are shown
+as evidence, never deductions. Public simulation decisions are transient: their
+identifier/JSON can be inspected, but they do not link to durable document
+receipts. The response does not prove account/default source attribution or a
+PUBLISHED status (an effective SCHEDULED version is also eligible), so the UI
+describes automatic/explicit selection and the returned version number.
+
+The four `/configuration/company-default-price-books*` routes belong to this
+family too, and are documented with the rest of the `/configuration` prefix in
+[trade-foundation.md](trade-foundation.md#configuration--10-routes) — they are
 MASTER-PLAN task 12.12, and the judgement call is explained there.
 
 ### Request bodies
 
+Price-book creation currency choices (verified 2026-11-01) come from all pages
+of `GET /api/tenant/core/v1/currencies?status=ACTIVE`, requiring
+`currencies.currency.read`. The selector uses the Core currency UUID as its
+option value and displays the configured name and code; search filters the
+loaded directory locally. The configured default is preselected, and an
+unavailable preset, failed read, denied read, or empty directory cannot submit.
+`CreatePriceBookDto` still accepts `currencyCode`, so the selected record's
+code is sent through the existing Trade contract. Persisting a `currencyId`
+instead would require an explicit backend contract and data-model change.
+There are no fixed currency presets or arbitrary code input in this modal.
+
 | DTO | Fields |
 | --- | --- |
-| `PriceBookListQueryDto` | `page`, `limit` (≤ 100, default 25), `purpose?`, `status?` (free string ≤ 32) |
-| `CreatePriceBookDto` | `code` (≤ 80), `purpose`, `currencyCode` (`^[A-Z]{3}$`) |
-| `CreatePriceBookVersionDto` | `effectiveFrom` (ISO 8601 strict), `effectiveTo?`, `entries[]` (**1–10 000**), `promotions[]` (0–500, **defaults to `[]`**) |
+| `PriceBookListQueryDto` | `page`, `limit` (≤ 100, default 25), `purpose?`, `currencyCode?`, `status?`, `q?` (≤ 120), `governanceState?` |
+| `CreatePriceBookDto` | `code` (≤ 80), `purpose`, `currencyCode` (`^[A-Z]{3}$`), `name?`, `localizedNames?`, `description?` |
+| `UpdatePriceBookDto` | `name?`, `localizedNames?`, `description?`, `status?` (`ACTIVE`/`INACTIVE`) |
+| `CreatePriceBookVersionDto` | `effectiveFrom` (ISO 8601 strict), `effectiveTo?`, `notes?`, `entries[]` (**1–10 000**), `promotions[]` (0–500, **defaults to `[]`**) |
+| `ClonePriceBookVersionDto` | `sourceMode` (`CLONE_VERSION`/`SEED_FROM_CATALOG`/`EMPTY_DRAFT`), `sourceVersionId?`, `effectiveFrom`, `effectiveTo?`, `adjustmentMode?`, `adjustmentValue?`, `roundingMode?`, `includePromotions?`, `notes?` |
+| `UpdatePriceBookVersionDto` | `effectiveFrom?`, `effectiveTo?`, `notes?`, `entries?` (0–10 000), `promotions?` (0–500) |
+| `RetirePriceBookVersionDto` | `reason?` (≤ 240) |
+| `PublishPriceBookVersionDto` | `supersedesVersionId?` (UUIDv7), `soloOwnerAttestation?` (boolean), `approvalNotes?` (≤ 240) |
 | `PriceEntryDto` | `itemId`, `uomId`, `currencyCode`, `minimumQuantity` (decimal string), `maximumQuantity?` (positive, nullable), `unitPrice` (decimal string), `minimumAllowedPrice?` (nullable), `priority?` (int 0–10 000, **default 100**) |
 | `PromotionRuleDto` | `code` (≤ 80, `^[A-Za-z0-9][A-Za-z0-9._-]*$`), `name` (≤ 160), `benefitType`, `discountValue` (**positive** decimal string) — plus optional `itemId`, `uomId`, `branchId`, `channelId`, `partyId`, `minimumQuantity` (**default `"0"`**), `maximumQuantity?`, `priority?` (default 100), `stackGroup?` (**default `"DEFAULT"`**), `exclusive?` (default `false`) |
-| `PricingEvaluateDto` | `purpose`, `itemId`, `uomId`, `quantity` (**positive** decimal string), `currencyCode` — all required — plus `priceBookId?` and `partyId?` |
+| `PricingEvaluateDto` | `purpose`, `itemId`, `uomId`, `quantity` (**positive** decimal string), `currencyCode` — all required — plus `priceBookId?`, `partyId?`, `branchId?`, `channelId?`, `pricingAt?` |
 
 `PriceBookPurpose`: **`SALES`** · **`PURCHASE`**.
 `PromotionBenefitType`: **`PERCENTAGE`** · **`FIXED_AMOUNT`**.
 Price-book **version** status is `GovernedVersionStatus`, below. Price-book
-`status` itself is a free string with no enum.
+`status` is `PriceBookStatus` (`ACTIVE` · `INACTIVE`).
 
 Decimal-string fields on this page: `minimumQuantity`, `maximumQuantity`,
 `unitPrice`, `minimumAllowedPrice`, `discountValue`, `quantity`. **Never
@@ -720,6 +854,14 @@ owning document's route, not from an extensions route.
 
 ## Imports — 11 routes
 
+Upload readiness reviewed **2026-10-31** (AUDIT29X-TPT-4): starting a source
+upload clears the previous source ID. The file chip becomes ready only after
+the server response supplies a validated source ID. A rejected upload clears
+the chip and source ID and shows the translated error beside the source field.
+Removing or locally rejecting a file also clears the source ID. Preview stays
+disabled while uploading or without a source ID, preventing reuse of an older
+upload after failure. Explicitly entering an existing source ID remains supported.
+
 Feature gate: `allOf: [trade.automation, trade.catalog]` on all eleven,
 **except** `POST /imports/sources`, which is
 `allOf: [trade.automation]` + `anyOf: [catalog, sales, purchasing, inventory]`.
@@ -888,6 +1030,22 @@ secret, the API cannot supply it.
 ---
 
 ## Control tower — 4 routes
+
+List loading behavior reviewed in source **2026-10-31** (AUDIT29X-TPD-3):
+automatic loads and manual reloads require the current scope's
+`trade.control_tower.read` permission (or tenant ownership). A scope-header
+change clears rows and total before starting the replacement request. A
+non-abort load failure also clears rows and total and exposes the normalized
+query error. Aborted requests cannot restore rows from the previous scope.
+
+Resolution dialog behavior verified in source **2026-10-31** (AUDIT29X-TPT-1):
+the operator must choose `SOURCE_CORRECTED` or `OWNER_RESULT_APPLIED`; neither
+is selected by default. Confirm requires a selection and a non-blank reason.
+The optional evidence textarea is validated by `buildResolveExceptionRequest`
+before the POST: it accepts a JSON object and rejects malformed JSON, arrays,
+null and scalars. Blank evidence becomes `{}` to satisfy the required API key.
+The selected code and parsed evidence are sent with the trimmed reason and
+the existing `If-Match` header. Closing the dialog clears its form for reopening.
 
 > **Not gated on `trade.control_tower_advanced`.** MASTER-PLAN task 12.19 says
 > it is. The controller declares

@@ -17,6 +17,8 @@ import {
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
 import { applicationsApi } from "../api/applications.api";
+import { localizeApplicationError } from "../lib/application-error-copy";
+import { MAX_BULK_APPLICATION_BIND_SERVERS } from "../lib/application-database-bind.constants";
 import type {
   ApplicationDatabaseServerBindReceipt,
   ApplicationDatabaseServerBindResult,
@@ -70,6 +72,7 @@ export function ApplicationDatabaseBindDialog({
   onBind,
 }: Props) {
   const copy = useBindCopy();
+  const { t } = useI18n();
   const [fleet, setFleet] = useState<ApplicationDatabaseServerCandidatesView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -98,17 +101,18 @@ export function ApplicationDatabaseBindDialog({
         setSelected(
           next.servers
             .filter((server) => server.bindable)
+            .slice(0, MAX_BULK_APPLICATION_BIND_SERVERS)
             .map((server) => server.databaseServerId),
         );
       }
     } catch (requestError) {
       if (controller.signal.aborted) return;
       setFleet(null);
-      setLoadError(normalizeApiError(requestError).message);
+      setLoadError(localizeApplicationError(requestError, t));
     } finally {
       if (!controller.signal.aborted) setIsLoading(false);
     }
-  }, [applicationKey]);
+  }, [applicationKey, t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -161,8 +165,11 @@ export function ApplicationDatabaseBindDialog({
     .map((row) => row.databaseServerId);
   const retryIds = hasCurrentFleet
     ? failedIds.filter((databaseServerId) => bindableIds.includes(databaseServerId))
+      .slice(0, MAX_BULK_APPLICATION_BIND_SERVERS)
     : [];
+  const batchHint = copy.batchHint.replace("{{count}}", String(MAX_BULK_APPLICATION_BIND_SERVERS));
   const canSubmit = !isSubmitting && hasCurrentFleet && selected.length > 0 &&
+    selected.length <= MAX_BULK_APPLICATION_BIND_SERVERS &&
     selected.every((databaseServerId) => bindableIds.includes(databaseServerId));
 
   const submitIds = async (databaseServerIds: string[]) => {
@@ -170,6 +177,9 @@ export function ApplicationDatabaseBindDialog({
     if (!fleet?.policyRevision) return;
     if (databaseServerIds.some((databaseServerId) => !bindableIds.includes(databaseServerId))) return;
     if (!databaseServerIds.length) return setError(copy.selectServer);
+    if ((unresolvedIntent?.databaseServerIds ?? databaseServerIds).length > MAX_BULK_APPLICATION_BIND_SERVERS) {
+      return setError(batchHint);
+    }
     // Retrying reuses the same audited reason, so it is re-validated here too.
     if (reason.trim().length < 8) return setError(copy.reasonMinimum);
     submissionPending.current = true;
@@ -194,7 +204,7 @@ export function ApplicationDatabaseBindDialog({
       const original = shouldRotateWriteCommandKey(normalized) ? null : dto;
       unresolvedIntentRef.current = original ? { applicationKey, dto: original } : null;
       setUnresolvedIntent(original);
-      setError(readMessage(submissionError, copy.submitFailed));
+      setError(localizeApplicationError(submissionError, t));
       await load();
     } finally {
       submissionPending.current = false;
@@ -251,9 +261,14 @@ export function ApplicationDatabaseBindDialog({
                       : current.filter((id) => id !== databaseServerId),
                   )
                 }
-                onSelectAll={() => setSelected(bindableIds)}
+                onSelectAll={() => setSelected(bindableIds.slice(0, MAX_BULK_APPLICATION_BIND_SERVERS))}
                 onClear={() => setSelected([])}
               />
+              {bindableIds.length > MAX_BULK_APPLICATION_BIND_SERVERS && (
+                <p id="application-bind-batch-hint" role="status" className="text-xs text-muted-foreground">
+                  {batchHint}
+                </p>
+              )}
               {bindableIds.length > 0 && fleet?.bindable === true && (
                 <Field
                   label={copy.reason}
@@ -311,7 +326,8 @@ export function ApplicationDatabaseBindDialog({
                 {copy.retryFailed}
               </Button>
             )}
-            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={!canSubmit}>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={!canSubmit}
+              aria-describedby={bindableIds.length > MAX_BULK_APPLICATION_BIND_SERVERS ? "application-bind-batch-hint" : undefined}>
               {unresolvedIntent ? copy.retryOriginal : copy.confirm}
             </Button>
           </footer>
@@ -400,6 +416,7 @@ function ServerRow({
   copy: BindCopy;
   onToggle: (databaseServerId: string, checked: boolean) => void;
 }) {
+  const { t } = useI18n();
   const blocked = blockedCopy(server, copy);
   return (
     <li className="rounded-md border border-border p-3">
@@ -426,9 +443,9 @@ function ServerRow({
             {server.credentialRevision !== null && ` · ${copy.revision} ${server.credentialRevision}`}
           </span>
           {server.safeFailureCode && (
-            <code className="mt-1 block break-words font-mono text-xs text-warning-subtle-foreground" dir="ltr">
-              {server.safeFailureCode}
-            </code>
+            <span className="mt-1 block break-words text-xs text-warning-subtle-foreground">
+              {localizeApplicationError({ code: server.safeFailureCode, message: copy.blockedUnknown }, t)}
+            </span>
           )}
           {blocked && (
             <span className="mt-1 block text-xs text-warning-subtle-foreground">{blocked}</span>
@@ -479,6 +496,7 @@ function OutcomeRow({
   result: ApplicationDatabaseServerBindResult;
   copy: BindCopy;
 }) {
+  const { t } = useI18n();
   const failed = result.outcome === "FAILED";
   return (
     <li className="flex items-start gap-2 text-xs">
@@ -492,13 +510,8 @@ function OutcomeRow({
           {result.databaseServerName ?? result.databaseServerId}
         </span>
         <span className="ms-2 text-muted-foreground">{OUTCOME_LABEL[result.outcome](copy)}</span>
-        {failed && result.message && (
-          <span className="mt-0.5 block text-warning-subtle-foreground">{result.message}</span>
-        )}
-        {failed && result.code && (
-          <code className="mt-0.5 block font-mono text-xs text-muted-foreground" dir="ltr">
-            {result.code}
-          </code>
+        {failed && (
+          <span className="mt-0.5 block text-warning-subtle-foreground">{localizeApplicationError(result, t)}</span>
         )}
       </span>
     </li>
@@ -523,17 +536,4 @@ function blockedCopy(
     return copy.blockedBindingBusy;
   }
   return copy.blockedUnknown;
-}
-
-function readMessage(value: unknown, fallback: string): string {
-  if (value instanceof Error) return value.message;
-  if (
-    value &&
-    typeof value === "object" &&
-    "message" in value &&
-    typeof value.message === "string"
-  ) {
-    return value.message;
-  }
-  return fallback;
 }

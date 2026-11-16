@@ -49,3 +49,11 @@ packages/webphone/**
 **/*.p12
 **/*.pfx
 **/*.log
+
+# Specs never run in an image (Vitest runs on the host) and need the host-only
+# test setup for their matcher types, so `next build` must not type-check them.
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__

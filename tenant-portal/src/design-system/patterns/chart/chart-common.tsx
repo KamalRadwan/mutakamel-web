@@ -16,7 +16,13 @@ import { cn } from "../../lib/cn";
  */
 export const CHART_ANIMATION = { isAnimationActive: false } as const;
 
-export const AXIS_TICK = { fill: "var(--color-ink-600)", fontSize: 11 } as const;
+// Recharts supplies a physical anchor. Keep SVG positioning physical while
+// the browser resolves each tick's localized text through the bidi algorithm.
+export const AXIS_TICK = {
+  fill: "var(--chart-axis)",
+  fontSize: 11,
+  style: { direction: "ltr", unicodeBidi: "plaintext" },
+} as const;
 export const GRID_STROKE = "var(--border)";
 
 export interface ChartAxisDirection {
@@ -121,12 +127,13 @@ export interface ChartFrameProps {
   height?: number;
   className?: string;
   children: React.ReactNode;
+  interactive?: boolean;
 }
 
-export function ChartFrame({ label, summary, height = 240, className, children }: ChartFrameProps) {
+export function ChartFrame({ label, summary, height = 240, className, children, interactive = false }: ChartFrameProps) {
   return (
     <figure className={cn("flex w-full flex-col gap-1", className)} style={{ height }}>
-      <div role="img" aria-label={label} className="min-h-0 flex-1">
+      <div role={interactive ? "group" : "img"} aria-label={label} className="min-h-0 flex-1">
         {children}
       </div>
       <figcaption className="sr-only">{summary}</figcaption>

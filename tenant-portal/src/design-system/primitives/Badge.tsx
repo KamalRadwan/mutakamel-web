@@ -3,6 +3,7 @@
 import { forwardRef } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
+import { useSettingsPresentation } from "../shell/settings-presentation";
 
 // Five tones: the four outcome roles plus neutral for categories. There is
 // no "info" tone and no purple/indigo tone — a value that isn't an outcome
@@ -34,6 +35,7 @@ export const badgeVariants = cva("inline-flex w-fit items-center gap-1 font-semi
       default:
         "rounded-sm px-1.5 py-0.5 text-xs uppercase tracking-wide rtl:normal-case rtl:tracking-normal",
       sm: "h-6 rounded-md px-2 text-badge",
+      compact: "h-4 rounded-sm px-1 text-badge leading-none",
     },
   },
   defaultVariants: {
@@ -47,8 +49,11 @@ export interface BadgeProps
     VariantProps<typeof badgeVariants> {}
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, tone, size, ...props }, ref) => (
-    <span ref={ref} className={cn(badgeVariants({ tone, size }), className)} {...props} />
-  ),
+  ({ className, tone, size, ...props }, ref) => {
+    const settings = useSettingsPresentation();
+    return <span ref={ref} className={cn(badgeVariants({ tone, size }), className,
+      settings && "h-4 gap-0.5 rounded-full px-0.75 py-0 text-badge font-medium leading-none normal-case tracking-normal",
+    )} {...props} />;
+  },
 );
 Badge.displayName = "Badge";

@@ -5,8 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TierView } from "../types";
 import { CatalogueResourceDialog } from "./CatalogueResourceDialog";
 
-vi.mock("@/i18n/I18nContext", () => {
-  const value = { lang: "en", dir: "ltr", t: { common: { close: "Close" } } };
+vi.mock("@/i18n/I18nContext", async () => {
+  const { en } = await vi.importActual<typeof import("@/i18n/dictionaries/en")>(
+    "@/i18n/dictionaries/en",
+  );
+  const value = { lang: "en", dir: "ltr", t: en };
   return {
     useI18n: () => value,
     useOptionalI18n: () => value,

@@ -26,6 +26,7 @@ export interface FormDrawerLabels {
 export interface FormDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   title: string;
   description?: string;
   isDirty: boolean;
@@ -54,6 +55,7 @@ export interface FormDrawerProps {
 export function FormDrawer({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   title,
   description,
   isDirty,
@@ -84,6 +86,7 @@ export function FormDrawer({
     <>
       <Sheet open={open} onOpenChange={(next) => (next ? onOpenChange(true) : shell.requestClose())}>
         <SheetContent
+          onCloseAutoFocus={onCloseAutoFocus}
           onEscapeKeyDown={(event) => {
             event.preventDefault();
             shell.requestClose();

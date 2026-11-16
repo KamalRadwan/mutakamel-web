@@ -174,6 +174,26 @@ Returns **`204`** with no body.
 
 ## Frontend notes
 
+- Detail contact form layout (source reviewed **2026-10-28**,
+  FE-INDIVIDUAL-JOBTITLE): existing corporate contacts show a full-width phone
+  row, then Honorific / First name / Last name, then Email / Job title.
+  Identity and communication fields remain read-only; only relationship job
+  title and primary selection are editable. The individual form places phones
+  before Honorific / First name / Last name in equal thirds, then Email / Job
+  title at half width. Its validated detail contract retains the top-level
+  `honorificTitle`, `firstName` and `lastName` fields from the Party-backed
+  backend serializer, preserving multiword name parts when editing. Saves
+  send the trimmed honorific separately as `primaryContact.honorificTitle`;
+  an empty string clears it. The display name is composed from first/last
+  name without honorific. Top-level `jobTitle` is `string | null`; missing,
+  empty or non-text values parse as null during the CRM task B rollout. The
+  individual editor seeds this value, caps input at 120 characters, and saves
+  the trimmed value as `primaryContact.jobTitle` (empty string clears it).
+  The individual read card displays the saved job title. Quick edit seeds an
+  individual's honorific from top-level `honorificTitle`, including null,
+  rather than `contacts[0]`. All fields stack on narrow screens. Rebuild the
+  portal only after CRM task B is live.
+
 - Quick-edit write outcomes (source reviewed **2026-10-17**, FE-CUST-006):
   rejected rating and card-colour writes restore their previous values;
   refused status moves retain the saved status. Failed section and contact

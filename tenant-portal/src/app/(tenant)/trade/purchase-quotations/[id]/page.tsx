@@ -36,6 +36,7 @@ import {
   tradeDocumentActionPath,
 } from "../../documents/trade-document-contract";
 import { PurchaseQuotationDrawer } from "../components/PurchaseQuotationDrawer";
+import { PurchaseQuotationSupplierStatus } from "../components/PurchaseQuotationSupplierStatus";
 import { usePurchaseQuotationForm } from "../hooks/usePurchaseQuotationForm";
 import {
   PURCHASE_QUOTATIONS_PATH,
@@ -61,7 +62,7 @@ export default function PurchaseQuotationDetailPage({
   const quotation = detail.document;
   const { headers, canWrite } = detail.scope;
   const write = useTradeWrite();
-  const pdf = useTradePdfJob(PURCHASE_QUOTATIONS_PATH, id, headers);
+  const pdf = useTradePdfJob(PURCHASE_QUOTATIONS_PATH, id, headers, quotation?.version.toString());
   const [issueOpen, setIssueOpen] = useState(false);
 
   const reload = useCallback(async () => {
@@ -70,7 +71,7 @@ export default function PurchaseQuotationDetailPage({
 
   const form = usePurchaseQuotationForm(
     headers,
-    canWrite(PURCHASE_QUOTATION_PERMISSIONS.accounts),
+    canWrite(PURCHASE_QUOTATION_PERMISSIONS.update),
     quotation,
     reload,
   );
@@ -181,7 +182,7 @@ export default function PurchaseQuotationDetailPage({
         ) : (
           <>
             <DetailHeader
-              title={quotation.documentNumber}
+              title={quotation.documentNumber ?? t.statusValues["TradePurchaseQuotationStatus.DRAFT"]}
               subtitle={partyDisplayName(quotation.partySnapshot) ?? quotation.partyId}
               status={
                 <TradeStatusBadge
@@ -201,7 +202,7 @@ export default function PurchaseQuotationDetailPage({
                   : undefined
               }
               secondaryActions={
-                isDraft && canWrite(PURCHASE_QUOTATION_PERMISSIONS.update) ? (
+                isDraft && canWrite(PURCHASE_QUOTATION_PERMISSIONS.update) && form.canUseSupplierPicker ? (
                   <Button size="sm" variant="outline" onClick={form.open}>
                     {t.tradeDocuments.purchaseQuotations.editTitle}
                   </Button>
@@ -223,7 +224,7 @@ export default function PurchaseQuotationDetailPage({
               title={t.tradeDocuments.identity}
               emptyValueLabel={t.tradeDocuments.notRecorded}
               fields={[
-                { label: t.tradeDocuments.documentNumber, value: quotation.documentNumber },
+                { label: t.tradeDocuments.documentNumber, value: quotation.documentNumber ?? t.statusValues["TradePurchaseQuotationStatus.DRAFT"] },
                 { label: t.tradeDocuments.reference, value: quotation.reference },
                 { label: t.tradeDocuments.currency, value: quotation.currencyCode },
                 { label: t.tradeDocuments.validUntil, value: quotation.validUntil },
@@ -266,6 +267,7 @@ export default function PurchaseQuotationDetailPage({
             />
 
             <PurchaseQuotationDrawer state={form} isEdit />
+            {!form.isOpen ? <PurchaseQuotationSupplierStatus state={form} isEdit /> : null}
 
             <ConfirmActionModal
               open={issueOpen}

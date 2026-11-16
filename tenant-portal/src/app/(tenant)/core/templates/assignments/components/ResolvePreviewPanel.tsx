@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { Compass } from "lucide-react";
 import {
   Button,
   DetailSection,
   Field,
+  IdentifierText,
   Select,
   SelectContent,
   SelectItem,
@@ -14,6 +14,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDateTime } from "@/lib/format/date";
+import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import {
   TEMPLATE_ADAPTER_KEYS,
@@ -21,31 +22,24 @@ import {
   TEMPLATE_LOCALES,
   TEMPLATE_OUTPUT_CHANNELS,
 } from "../../templates-contract";
-import type { ResolvedAssignment } from "../../template-assignments-contract";
+import { isSalesQuotationSelector, type AssignmentSelector, type ResolvedAssignment } from "../../template-assignments-contract";
 
-/**
- * "Which template actually renders for this selector, right now?"
- *
- * Priority and effective windows overlap and the server decides. Asking it
- * directly is the only way an operator can see the answer before a document
- * renders with the wrong template — which is the point at which the mistake
- * would otherwise become visible.
- */
 export function ResolvePreviewPanel({
-  resolved,
+  selector,
+  resolved: result,
   isResolving,
+  onChange,
   onResolve,
 }: {
+  selector: Omit<AssignmentSelector, "scope">;
   resolved: ResolvedAssignment | null;
   isResolving: boolean;
-  onResolve: (selector: Record<string, unknown>) => void;
+  onChange: (patch: Partial<Omit<AssignmentSelector, "scope">>) => void;
+  onResolve: () => void;
 }) {
-  const { t, lang } = useI18n();
+  const { t, lang, dir } = useI18n();
   const copy = t.coreOperations.templates;
-  const [documentType, setDocumentType] = useState<string>(TEMPLATE_DOCUMENT_TYPES[0]);
-  const [outputChannel, setOutputChannel] = useState<string>(TEMPLATE_OUTPUT_CHANNELS[0]);
-  const [adapterKey, setAdapterKey] = useState<string>(TEMPLATE_ADAPTER_KEYS[0]);
-  const [locale, setLocale] = useState<string>(TEMPLATE_LOCALES[0]);
+  const { documentType, outputChannel, adapterKey, locale } = selector;
 
   return (
     <DetailSection
@@ -56,15 +50,7 @@ export function ResolvePreviewPanel({
           variant="outline"
           size="sm"
           loading={isResolving}
-          onClick={() =>
-            onResolve({
-              documentType,
-              outputChannel,
-              adapterKey,
-              locale,
-              scope: { type: "TENANT" },
-            })
-          }
+          onClick={onResolve}
         >
           <Compass className="size-4" aria-hidden="true" />
           {copy.resolveRun}
@@ -72,8 +58,8 @@ export function ResolvePreviewPanel({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={copy.documentType}>
-          <Select value={documentType} onValueChange={setDocumentType} disabled={isResolving}>
+        <Field label={copy.documentType} showLabel>
+          <Select dir={dir} value={documentType} onValueChange={(value) => onChange({ documentType: value })} disabled={isResolving}>
             <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
@@ -87,8 +73,8 @@ export function ResolvePreviewPanel({
           </Select>
         </Field>
 
-        <Field label={copy.outputChannel}>
-          <Select value={outputChannel} onValueChange={setOutputChannel} disabled={isResolving}>
+        <Field label={copy.outputChannel} showLabel>
+          <Select dir={dir} value={outputChannel} onValueChange={(value) => onChange({ outputChannel: value })} disabled={isResolving}>
             <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
@@ -102,8 +88,8 @@ export function ResolvePreviewPanel({
           </Select>
         </Field>
 
-        <Field label={copy.dataSource}>
-          <Select value={adapterKey} onValueChange={setAdapterKey} disabled={isResolving}>
+        <Field label={copy.dataSource} showLabel>
+          <Select dir={dir} value={adapterKey} onValueChange={(value) => onChange({ adapterKey: value })} disabled={isResolving}>
             <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
@@ -117,8 +103,8 @@ export function ResolvePreviewPanel({
           </Select>
         </Field>
 
-        <Field label={copy.locale}>
-          <Select value={locale} onValueChange={setLocale} disabled={isResolving}>
+        <Field label={copy.locale} showLabel>
+          <Select dir={dir} value={locale} onValueChange={(value) => onChange({ locale: value })} disabled={isResolving}>
             <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
@@ -133,22 +119,34 @@ export function ResolvePreviewPanel({
         </Field>
       </div>
 
-      {resolved ? (
-        <div className="flex flex-col gap-1 border-t border-border pt-3 text-sm">
+      {result ? (
+        <div role="status" className="flex flex-col gap-1 border-t border-border pt-3 text-sm">
           <span className="text-foreground">
-            {resolved.chosen
+            {result.chosen
               ? formatTemplate(copy.resolveChosen, {
-                  version: String(resolved.chosen.versionNumber),
-                  priority: String(resolved.chosen.priority),
-                  localeMatch: resolved.chosen.localeMatch,
+                  version: formatNumber(result.chosen.version.number, lang),
+                  priority: formatNumber(result.chosen.priority, lang),
+                  localeMatch: result.chosen.localeMatch === "EXACT"
+                    ? copy.locales[locale as keyof typeof copy.locales]
+                    : copy.assignmentDefaultLocale,
                 })
               : copy.resolveNone}
           </span>
+          {result.chosen ? (
+            <>
+              <span className="text-xs text-muted-foreground">{copy.scopeTypes[result.chosen.matchedScope.type]}</span>
+              {isSalesQuotationSelector(selector) ? (
+                <span className="text-xs text-muted-foreground">
+                  {copy.definitionTitle} <IdentifierText selectAll>{result.chosen.version.definitionId}</IdentifierText>
+                </span>
+              ) : null}
+              <span className="text-xs text-muted-foreground">
+                {copy.assignmentVersionId} <IdentifierText selectAll>{result.chosen.version.id}</IdentifierText>
+              </span>
+            </>
+          ) : null}
           <span className="text-xs text-muted-foreground">
-            {formatTemplate(copy.resolveEvaluatedAt, {
-              at: formatDateTime(resolved.evaluatedAt, lang),
-              count: String(resolved.eligibleCandidateCount),
-            })}
+            {formatDateTime(result.evaluatedAt, lang)}
           </span>
         </div>
       ) : null}

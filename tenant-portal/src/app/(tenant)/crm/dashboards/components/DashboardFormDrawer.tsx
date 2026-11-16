@@ -1,139 +1,35 @@
 "use client";
-
-import { useState } from "react";
-import {
-  Field,
-  FormDrawer,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-} from "@/design-system";
+import { DashboardRecoveryNotice, type DashboardRecoveryProps } from "./DashboardRecoveryNotice";
+import { Field, FormDrawer, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
-import {
-  DASHBOARD_DESCRIPTION_MAX_LENGTH,
-  DASHBOARD_NAME_MAX_LENGTH,
-  type DashboardTemplateKey,
-} from "../dashboard-contract";
+import { DASHBOARD_DESCRIPTION_MAX_LENGTH, DASHBOARD_NAME_MAX_LENGTH } from "../dashboard-contract";
 import type { TemplateDefinition } from "../dashboard-catalog-contract";
 import type { CreateDashboardInput } from "../hooks/useDashboards";
-
-interface DashboardFormDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (input: CreateDashboardInput) => void;
-  templates: TemplateDefinition[];
-  templatesUnavailable: boolean;
-  isSubmitting: boolean;
-  error?: string;
+import { useDashboardCreateForm } from "../hooks/useDashboardCreateForm";
+export function DashboardFormDrawer({ open, onOpenChange, onSubmit, templates, templatesUnavailable, canUseTemplates = true, blocked = false, isSubmitting, error, recovery, failureCode }: {
+  open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (input: CreateDashboardInput) => void;
+  templates: TemplateDefinition[]; templatesUnavailable: boolean; canUseTemplates?: boolean; blocked?: boolean; isSubmitting: boolean; error?: string; recovery?: DashboardRecoveryProps; failureCode?: string;
+}) {
+  const { t, lang } = useI18n(); const form = useDashboardCreateForm(onSubmit, canUseTemplates, blocked);
+  return <FormDrawer open={open} onOpenChange={onOpenChange} title={t.crmDashboards.createTitle} description={t.crmDashboards.createDescription}
+    isDirty={form.dirty} isSubmitting={isSubmitting} submitDisabled={form.disabled} onSubmit={form.submit} error={error}
+    labels={{ submit: t.common.create, cancel: t.common.cancel, discardTitle: t.common.discardTitle, discardDescription: t.common.discardDescription, discardConfirm: t.common.discardConfirm, discardCancel: t.common.cancel }}>
+    {recovery && <DashboardRecoveryNotice {...recovery} />}
+    <Field showLabel label={t.crmDashboards.name} required error={form.nameInvalid ? t.crmDashboards.nameRequired : failureCode === "CRM_DASHBOARD_NAME_CONFLICT" ? error : undefined} hint={t.crmDashboards.review.nameLimit}>
+      <Input value={form.name} maxLength={DASHBOARD_NAME_MAX_LENGTH} autoComplete="off" disabled={isSubmitting} onChange={(event) => form.changeName(event.target.value)} />
+    </Field>
+    <Field showLabel label={t.crmDashboards.description} hint={t.crmDashboards.review.descriptionLimit}><Textarea value={form.description} maxLength={DASHBOARD_DESCRIPTION_MAX_LENGTH} disabled={isSubmitting} onChange={(event) => form.setDescription(event.target.value)} /></Field>
+    {templatesUnavailable && <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.catalogueUnavailable}</p>}
+    {!canUseTemplates && <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.review.templatePermission}</p>}
+    <Field showLabel label={t.crmDashboards.templateLabel} hint={t.crmDashboards.templateHint}><Select value={form.templateKey} onValueChange={form.setTemplateKey} disabled={isSubmitting || blocked}>
+      <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__blank__">{t.crmDashboards.blankTemplate}</SelectItem>
+        {canUseTemplates && !templatesUnavailable && templates.map((template) => <SelectItem key={template.key} value={template.key}>{`${localizedName(template, lang)} · ${formatTemplate(t.crmDashboards.widgetCount, { count: template.widgetCount })}`}</SelectItem>)}
+      </SelectContent></Select></Field>
+    <p className="text-xs text-muted-foreground">{t.crmDashboards.review.limits}</p>
+  </FormDrawer>;
 }
 
-const BLANK_TEMPLATE = "__blank__";
 
-/**
- * Create only.
- *
- * `templateKey` is offered on `POST /dashboards` rather than through
- * `POST /from-template/:key` because the former takes a name, a description
- * **and** a template in one request, and the two paths otherwise produce the
- * same dashboard (`DashboardDefinitionsService.create` calls the same
- * `templates.createFromTemplate`).
- */
-export function DashboardFormDrawer({
-  open,
-  onOpenChange,
-  onSubmit,
-  templates,
-  templatesUnavailable,
-  isSubmitting,
-  error,
-}: DashboardFormDrawerProps) {
-  const { t, lang } = useI18n();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [templateKey, setTemplateKey] = useState<string>(BLANK_TEMPLATE);
-  const [touched, setTouched] = useState(false);
 
-  const nameError =
-    touched && name.trim().length === 0 ? t.crmDashboards.nameRequired : undefined;
-
-  return (
-    <FormDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={t.crmDashboards.createTitle}
-      description={t.crmDashboards.createDescription}
-      isDirty={name.length > 0 || description.length > 0 || templateKey !== BLANK_TEMPLATE}
-      isSubmitting={isSubmitting}
-      submitDisabled={name.trim().length === 0}
-      onSubmit={() => {
-        setTouched(true);
-        if (name.trim().length === 0) return;
-        onSubmit({
-          name,
-          description,
-          templateKey:
-            templateKey === BLANK_TEMPLATE ? null : (templateKey as DashboardTemplateKey),
-        });
-      }}
-      error={error}
-      labels={{
-        submit: t.common.create,
-        cancel: t.common.cancel,
-        discardTitle: t.common.discardTitle,
-        discardDescription: t.common.discardDescription,
-        discardConfirm: t.common.discardConfirm,
-        discardCancel: t.common.cancel,
-      }}
-    >
-      <Field label={t.crmDashboards.name} error={nameError} required>
-        <Input size="sm" placeholder={t.crmDashboards.name}
-          value={name}
-          maxLength={DASHBOARD_NAME_MAX_LENGTH}
-          autoComplete="off"
-          onChange={(event) => {
-            setTouched(true);
-            setName(event.target.value);
-          }}
-        />
-      </Field>
-
-      <Field label={t.crmDashboards.description}>
-        <Textarea placeholder={t.crmDashboards.description}
-          value={description}
-          maxLength={DASHBOARD_DESCRIPTION_MAX_LENGTH}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-      </Field>
-
-      {templatesUnavailable ? (
-        <p role="note" className="text-xs text-muted-foreground">
-          {t.crmDashboards.catalogueUnavailable}
-        </p>
-      ) : (
-        <Field label={t.crmDashboards.templateLabel} hint={t.crmDashboards.templateHint}>
-          <Select value={templateKey} onValueChange={setTemplateKey}>
-            <SelectTrigger size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={BLANK_TEMPLATE}>{t.crmDashboards.blankTemplate}</SelectItem>
-              {templates.map((template) => (
-                <SelectItem key={template.key} value={template.key}>
-                  {`${localizedName(template, lang)} · ${formatTemplate(t.crmDashboards.widgetCount, {
-                    count: template.widgetCount,
-                  })}`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
-    </FormDrawer>
-  );
-}

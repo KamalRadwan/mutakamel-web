@@ -10,7 +10,8 @@ vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) })
 vi.mock("@/context/AuthContext", () => {
   const user = {
     accessibleCompanies: ["019f0000-0000-7000-8000-000000000001"],
-    accessibleBranches: ["019f0000-0000-7000-8000-000000000002"], teamMemberships: [],
+    accessibleBranches: ["019f0000-0000-7000-8000-000000000002"],
+    teamMemberships: [{ companyId: "019f0000-0000-7000-8000-000000000001", branchId: "019f0000-0000-7000-8000-000000000002" }],
   };
   return { useTenantAuth: () => ({ user }) };
 });
@@ -72,10 +73,14 @@ describe("Trade scope channel pagination", () => {
   it("omits channel headers only when requested and preserves company/branch scope", async () => {
     localStorage.setItem("tenant_trade_channel", channel(3).id);
     localStorage.setItem("tenant_trade_branch", channel(2).id);
-    get.mockResolvedValueOnce({
-      data: { items: [channel(3)], total: 1, page: 1, limit: 100 },
+    get.mockImplementation(async (path) => ({
+      data: String(path).endsWith(channel(3).id)
+        ? { ...channel(3), branches: [{ id: channel(8).id, channelId: channel(3).id,
+          companyId: channel(1).companyId, branchId: channel(2).id, isActive: true, version: 1,
+          updatedAt: "2026-10-26T00:00:00.000Z" }] }
+        : { items: [channel(3)], total: 1, page: 1, limit: 100 },
       headers: new Headers(), status: 200,
-    });
+    }));
     const { result } = renderHook(() => ({
       scope: useTradeScope(),
       company: useTradeScopeRequest("COMPANY", { includeChannel: false }),
@@ -105,6 +110,26 @@ describe("Trade scope channel pagination", () => {
     expect(result.current.channels).toEqual([]);
     expect(result.current.isLoadingChannels).toBe(false);
     expect(get).toHaveBeenCalledTimes(20);
+  });
+
+  it("offers only channels with an active mapping to the selected branch", async () => {
+    localStorage.setItem("tenant_trade_branch", channel(2).id);
+    localStorage.setItem("tenant_trade_channel", channel(4).id);
+    get.mockImplementation(async (path) => {
+      const selected = [3, 4, 5].find((value) => String(path).endsWith(channel(value).id));
+      return { data: selected ? { ...channel(selected), branches: [{ id: channel(selected + 10).id,
+        channelId: channel(selected).id, companyId: channel(1).companyId,
+        branchId: selected === 4 ? channel(9).id : channel(2).id, isActive: selected !== 5,
+        version: 1, updatedAt: "2026-10-26T00:00:00.000Z" }] }
+        : { items: [channel(3), channel(4), channel(5)], total: 3, page: 1, limit: 100 },
+      headers: new Headers(), status: 200 };
+    });
+    const { result } = renderHook(() => useTradeScope(), { wrapper: TradeScopeProvider });
+    await waitFor(() => expect(result.current.context.branchId).toBe(channel(2).id));
+    await waitFor(() => expect(result.current.isLoadingChannels).toBe(false));
+    expect(result.current.channels.map((choice) => choice.id)).toEqual([channel(3).id]);
+    expect(result.current.context.channelId).toBeNull();
+    expect(localStorage.getItem("tenant_trade_channel")).toBeNull();
   });
 
   it("restores a saved selection found after the first server page", async () => {

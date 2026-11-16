@@ -36,6 +36,19 @@ export function timestamp(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(new Date(value).getTime());
 }
 
+export function civilDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function civilDateRange(value: unknown) {
+  const range = record(value);
+  return civilDate(range?.from) && civilDate(range?.to) && range.from <= range.to
+    ? { from: range.from, to: range.to }
+    : null;
+}
+
 export function stringArray(value: unknown, max: number): value is string[] {
   return (
     Array.isArray(value) &&

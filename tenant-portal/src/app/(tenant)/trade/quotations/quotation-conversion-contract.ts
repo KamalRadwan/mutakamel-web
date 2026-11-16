@@ -85,6 +85,7 @@ export function buildConvertQuotationToSalesOrder(
     const unitPrice = nonNegative(line.unitPrice);
     if (quantity === "0") invalidEvidence();
     const discountTotal = nonNegative(draft.discountTotal);
+    if (compareFixedDecimal(discountTotal, nonNegative(line.discountTotal)) !== 0) invalidEvidence();
     const chargeTotal = nonNegative(draft.chargeTotal);
     const rate = nonNegative(draft.ratePercent);
     const taxCode = draft.taxCode.trim();
@@ -99,6 +100,9 @@ export function buildConvertQuotationToSalesOrder(
     ) invalidEvidence();
     const subtotal = multiplyFixedDecimal(quantity, unitPrice);
     if (compareFixedDecimal(discountTotal, subtotal) > 0) invalidEvidence();
+    if (compareFixedDecimal(subtractFixedDecimal(subtotal, discountTotal), nonNegative(line.lineTotal)) !== 0) {
+      throw new Error("QUOTATION_CONVERSION_SOURCE");
+    }
     const taxableBase = addFixedDecimal(subtractFixedDecimal(subtotal, discountTotal), chargeTotal);
     // Percent / 100 stays exact at this input precision; multiplication uses Trade's half-up scale.
     const rateFraction = fixedDecimalText(fixedDecimalUnits(rate) / BigInt(100));
@@ -128,7 +132,9 @@ export function buildConvertQuotationToSalesOrder(
     amountPaid: "0",
   });
   if (!result.ok) invalidEvidence();
-  if (compareFixedDecimal(result.value.totals.subtotal, revision.grandTotal) !== 0) {
+  if (compareFixedDecimal(result.value.totals.subtotal, revision.subtotal) !== 0
+    || compareFixedDecimal(result.value.totals.discountTotal, revision.discountTotal) !== 0
+    || compareFixedDecimal(subtractFixedDecimal(revision.subtotal, revision.discountTotal), revision.grandTotal) !== 0) {
     throw new Error("QUOTATION_CONVERSION_SOURCE");
   }
   // Construct every nested object explicitly: no itemId, uomId, quantity or UI state can leak.

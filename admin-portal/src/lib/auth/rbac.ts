@@ -91,6 +91,18 @@ export const ADMIN_RBAC_CRITICAL = {
 
   // Tenant Critical
   TENANTS_DESTROY: ["admin.tenants.destroy", "admin.tenants.critical"] as const,
+  TENANTS_SUSPEND: ["admin.tenants.suspend", "admin.tenants.critical"] as const,
+  TENANTS_REPROVISION: ["admin.tenants.reprovision", "admin.tenants.critical"] as const,
+  TENANTS_DELETE: ["admin.tenants.delete", "admin.tenants.critical"] as const,
+  TENANTS_RESTORE: ["admin.tenants.restore", "admin.tenants.critical"] as const,
+  TENANTS_MANAGE_FQDNS: ["admin.tenants.manage_fqdns", "admin.tenants.critical"] as const,
+  TENANT_USERS_INVITE: ["admin.tenant_users.invite", "admin.tenant_users.critical"] as const,
+  TENANT_USERS_RESET_PASSWORD: ["admin.tenant_users.reset_password", "admin.tenant_users.critical"] as const,
+  TENANT_USERS_SUSPEND: ["admin.tenant_users.suspend", "admin.tenant_users.critical"] as const,
+  TENANT_USERS_ASSIGN_ROLES: ["admin.tenant_users.assign_roles", "admin.tenant_users.critical"] as const,
+  TENANT_USERS_DELETE: ["admin.tenant_users.delete", "admin.tenant_users.critical"] as const,
+  TENANT_USERS_RESTORE: ["admin.tenant_users.restore", "admin.tenant_users.critical"] as const,
+  TENANT_USERS_TRANSFER_OWNERSHIP: ["admin.tenant_users.transfer_ownership", "admin.tenant_users.critical"] as const,
 
   // Applications Critical
   APPLICATIONS_UPDATE: ["admin.applications.update", "admin.applications.critical"] as const,
@@ -131,7 +143,36 @@ export const ADMIN_RBAC_CRITICAL = {
   BACKUP_DB_CREDENTIAL_REGENERATE: ["admin.database_servers.credentials.rotate", "admin.database_servers.critical"] as const,
   BACKUP_DB_CREDENTIAL_RECONCILE: ["admin.database_servers.credentials.rotate", "admin.database_servers.critical"] as const,
 
-  // Worker / Background Jobs Critical
-  JOBS_MANAGE: ["admin.jobs.manage", "admin.jobs.critical"] as const,
+  // Worker migrations
   MIGRATIONS_MANAGE: ["admin.migrations.manage", "admin.migrations.critical"] as const,
+
+  // Settings and commercial actions
+  SETTINGS_UPDATE: ["admin.settings.update", "admin.settings.critical"] as const,
+  CATALOG_MANAGE: ["admin.catalog.manage", "admin.catalog.critical"] as const,
+  CURRENCY_MANAGE: ["admin.billing.currency.manage", "admin.catalog.critical"] as const,
+  INVOICES_ISSUE: ["admin.invoices.update", "admin.invoices.critical"] as const,
+  INVOICES_VOID: ["admin.invoices.void", "admin.invoices.critical"] as const,
+  BILLING_PAYMENT_MANAGE: ["admin.wallet.manage", "admin.billing.critical"] as const,
+  BILLING_RECONCILE: ["admin.billing.reconcile", "admin.billing.critical"] as const,
+  WALLET_MANAGE: ["admin.wallet.manage", "admin.wallet.critical"] as const,
+  SUBSCRIPTIONS_CREATE: ["admin.subscriptions.create", "admin.subscriptions.critical"] as const,
+  SUBSCRIPTIONS_UPDATE: ["admin.subscriptions.update", "admin.subscriptions.critical"] as const,
+  SUBSCRIPTIONS_CANCEL: ["admin.subscriptions.cancel", "admin.subscriptions.critical"] as const,
+
+  // Logging and provisioning
+  LOGGING_UPDATE: ["admin.logging.update", "admin.logging.critical"] as const,
+  LOGGING_LIVE: ["admin.logging.read", "admin.logging.critical"] as const,
+  PROVISIONING_ROLLOUT_CREATE: ["admin.provisioning.rollouts.create", "admin.provisioning.critical"] as const,
+  PROVISIONING_ROLLOUT_MANAGE: ["admin.provisioning.rollouts.manage", "admin.provisioning.critical"] as const,
+  PROVISIONING_ROLLOUT_ATTEST: ["admin.provisioning.rollouts.report", "admin.provisioning.critical"] as const,
+  PROVISIONING_DISCOVERY_RUN: ["admin.provisioning.discovery.run", "admin.provisioning.critical"] as const,
+  PROVISIONING_PUBLISHER_KEYS_MANAGE: ["admin.provisioning.publisher-keys.manage", "admin.provisioning.critical"] as const,
+  PROVISIONING_RELEASE_PUBLISH: ["admin.provisioning.releases.publish", "admin.provisioning.critical"] as const,
+  PROVISIONING_RELEASE_RETIRE: ["admin.provisioning.releases.retire", "admin.provisioning.critical"] as const,
+  PROVISIONING_TENANT_UPDATE: ["admin.tenants.reprovision", "admin.tenants.critical", "admin.provisioning.critical"] as const,
+  PROVISIONING_PREREQUISITES_REQUEST: ["admin.provisioning.prerequisites.request", "admin.provisioning.critical"] as const,
+  PROVISIONING_ADD_APPLICATION: ["admin.provisioning.add-application", "admin.provisioning.critical"] as const,
+  PROVISIONING_REPAIR: ["admin.provisioning.repair", "admin.provisioning.critical"] as const,
+  PROVISIONING_DECOMMISSION: ["admin.provisioning.decommission", "admin.provisioning.critical"] as const,
+  PROVISIONING_CONFLICTS_RESOLVE: ["admin.provisioning.conflicts.resolve", "admin.provisioning.critical"] as const,
 } as const;

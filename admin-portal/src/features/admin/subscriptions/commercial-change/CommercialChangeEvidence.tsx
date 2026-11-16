@@ -1,4 +1,5 @@
 import { Badge, Card } from "@/design-system";
+import { localeForLanguage } from "@/i18n/locale";
 import type { AcceptedPricing } from "@/shared/api/accepted-pricing";
 import type { CommercialApplyReceipt, CommercialOperationReceipt, CommercialPreview } from "./commercial-change-readers";
 import { commercialChangeCopy, type CommercialChangeCopy } from "./commercial-change-copy";
@@ -9,12 +10,14 @@ export function CommercialPreviewEvidence({ value, lang, expired, labels = {} }:
 }) {
   const copy = commercialChangeCopy(lang);
   const financial = value.financial;
+  const expiresAt = new Date(value.expiresAt);
+  const expiryLabel = Number.isNaN(expiresAt.getTime()) ? value.expiresAt : new Intl.DateTimeFormat(localeForLanguage(lang === "ar" ? "ar" : "en"), { dateStyle: "medium", timeStyle: "short" }).format(expiresAt);
   return <Card className="min-w-0 space-y-3 p-3 sm:p-3.5" dir={lang === "ar" ? "rtl" : "ltr"}>
     <h3 className="text-xs font-semibold">{copy.review}</h3>
     <Facts values={[[copy.recurringBefore, `USD ${financial.previousRecurringUsd}`], [copy.recurringAfter, `USD ${financial.nextRecurringUsd}`],
       [copy.fullDelta, `USD ${financial.fullPeriodDeltaUsd}`], [copy.settlement, `${copy[financial.direction]} · USD ${financial.proratedAmountUsd}`],
       [copy.wallet, copy[financial.walletStatus]], [copy.available, `USD ${financial.walletAvailableUsd}`], [copy.shortfall, `USD ${financial.walletShortfallUsd}`]]} />
-    <p className="text-xs text-muted-foreground">{copy.expires}: <time dateTime={value.expiresAt}><bdi>{value.expiresAt}</bdi></time></p>
+    <p className="text-xs text-muted-foreground">{copy.expires}: <time dateTime={value.expiresAt}><bdi>{expiryLabel}</bdi></time></p>
     {expired && <p role="alert" className="rounded-md bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">{copy.expired}</p>}
     {!financial.canApply && <p role="status" className="text-xs text-muted-foreground">{copy.cannotApply}</p>}
     <ol className="space-y-2.5">{value.changes.map(item => <li key={item.selectionKey} className="min-w-0 space-y-2.5 rounded-md border border-border p-2.5 sm:p-3">

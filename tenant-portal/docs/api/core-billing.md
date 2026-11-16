@@ -2,7 +2,8 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-10-29** (subscription authority and preview flow;
+other domains retain their separately dated evidence).
 
 Owning app: **core-app**
 
@@ -28,23 +29,26 @@ Source inspected:
 `core-app/src/admin/subscriptions/dto/subscription-item.dto.ts`,
 `core-app/src/common/swagger/swagger.examples.ts`.
 
-**23 routes.** Billing 8 · Subscription 4 · Branding 7 · Payments 2 · Wallet 2.
+**29 routes.** Billing 8 · Subscription 10 · Branding 7 · Payments 2 · Wallet 2.
 
 ---
 
 ## The two rules that shape every screen here
 
-**1. These routes are owner-only, and they carry no permission strings.**
+**1. Financial access requires the owner; pure definition adoption has separate authority.**
 
-`TenantBillingController` and `SubscriptionSelfServeController` are both
-`@UseGuards(TenantGuard, TenantOwnerGuard)` with **no `@RequirePermissions`**
-anywhere. Access is `tenant_users.is_tenant_owner`, full stop. No role grant
-can substitute for it.
+Billing, wallet, payments and subscription detail/items remain owner-only.
+Subscription commands and history authorize the actual or retained original
+purpose: ordinary purchases require the current owner; pure definition adoption
+admits the owner or a tenant-wide `applications.addon_definitions.adopt` grant,
+with affected-Company checks at the boundaries described below. Company- or
+Branch-scoped grants alone do not admit adoption. Branding has its own public
+and permissioned routes.
 
-So the nav predicate for every billing and subscription screen is
-`user.isTenantOwner`, not a permission lookup — and a non-owner reaching the
-URL gets a **403 `TENANT_OWNER_REQUIRED`** that must render `PermissionGate`,
-never an empty state (task 6.20).
+Keep owner predicates on financial screens and use `canAdoptDefinitions(user)`
+for adoption entry and hooks. Actual server 403 renders `PermissionGate`, never
+an empty state. Adoption must neither expose owner-only money reads nor inherit
+an owner-only UI gate.
 
 **2. Every money value is a decimal string.**
 
@@ -169,29 +173,72 @@ only readback is the paginated `GET /payments` —
 
 ---
 
-## Subscription — 4 routes
+## Subscription — 10 routes
 
-**Canonical read update, 2026-09-09:** [Subscription/Addons](subscription-addons.md)
+**Canonical flow update, 2026-10-29:** [Subscription/Addons](subscription-addons.md)
 supplies detail/items and complete retained parent/Addon prices in the subscription workspace.
 [Published offer enumeration](subscription-offers.md) is also implemented as a read-only owner explorer.
-[The broader target](application-addons-target.md) still defines purchase preparation and recovery;
-Q25's discovery gap is resolved, not its complete purchase workflow. Future pure definition adoption
-has separate scoped authority; it must not give a non-owner monetary access
-or be blocked merely by an owner-only UI predicate.
+[Canonical delivery](catalogue-canonical-delivery.md) documents the mounted purchase
+preparation, quote, apply and recovery flow. [Definition adoption](definition-adoption.md)
+uses price-free discovery and shared purpose-aware command/history routes.
 
 | Method | Canonical path | Access | Notes |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/core/v1/subscription` | owner | Current subscription + lifecycle |
 | GET | `/api/tenant/core/v1/subscription/items` | owner | Modules, tiers, seats, accepted prices |
-| POST | `/api/tenant/core/v1/subscription/plan-change-previews` | owner | **201.** Idempotency-required |
-| POST | `/api/tenant/core/v1/subscription/plan-change-previews/:previewId/apply` | owner | **200.** Idempotency-required |
+| GET | `/api/tenant/core/v1/subscription/definition-adoption-selections` | adoption admission | Price-free selections; optional `after` cursor |
+| GET | `/api/tenant/core/v1/subscription/definition-adoption-selections/:addonSelectionId/targets` | adoption admission | Published candidates; optional `after` cursor; no apply authority |
+| GET | `/api/tenant/core/v1/subscription/operations/:operationId` | retained-purpose authority | Current progress; adoption status exposes no Company/configuration data |
+| GET | `/api/tenant/core/v1/subscription/plan-change-previews/:previewId/receipt` | retained-purpose authority + adoption Company checks | Original immutable receipt; progress read separately |
+| POST | `/api/tenant/core/v1/subscription/preparations` | command-purpose authority | **202.** Retained operation; idempotency-required |
+| POST | `/api/tenant/core/v1/subscription/plan-change-previews` | command-purpose authority + adoption Company checks | **201.** Exact prepared request; idempotency-required |
+| POST | `/api/tenant/core/v1/subscription/plan-change-previews/:previewId/apply` | retained-purpose authority + adoption Company checks | **200.** Empty `{}` body; idempotency-required |
+| POST | `/api/tenant/core/v1/subscription/operations/:operationId/recovery` | retained-purpose authority + adoption recovery Company checks | **202.** Expected revision, action and reason; idempotency-required |
+
+All ten routes use `TenantGuard`. Detail/items additionally use `TenantOwnerGuard`
+and `SubscriptionCommercialReadGuard`. The other eight declare
+`@RequireTenantWidePermissions('applications.addon_definitions.adopt')`: the
+current owner is the administrative exception; non-owners need a genuine TENANT
+grant. Domain guards/services authorize the complete command or retained original
+purpose, so that grant never permits an ordinary financial purchase.
+
+Adoption admission means owner or that tenant-wide grant with current session
+checks. PREPARE independently checks the target, source and required authority.
+Adoption preview, apply and full receipt require current authority over the
+complete affected-Company manifest; dispatching recovery checks every Company
+already discovered. Operation status needs Tenant adoption authority without
+exposing Company data. Authorization is rechecked on replay and history reads;
+saved commands and receipts do not grant current operational access.
 
 ### Add-or-increase only
+
+Accessibility update **2026-10-29** (AUDIT29-TP-5): purchase and definition
+adoption keep a stable page-heading focus destination when preparation, quote,
+apply or starting another change removes its trigger. Confirmed preparation,
+quote and receipt outcomes update a persistent polite status region in Arabic
+and English. An aborted operation or unresolved request is not announced as an
+applied change.
 
 The canonical preparation body is `{expectedSubscriptionRevision,changes,reason?}`.
 The preview body adds the actual `preparationId`; apply sends exactly `{}`.
 Ordered change rows use the actual Application/Addon ADD or CHANGE selectors.
 The removed flat single-item DTO and seat-only browser adapter are not supported.
+
+Presentation update, source reviewed **2026-10-29** (AUDIT29-TP-4): purchase
+review and quotes show `Application · Tier` or `Application · Addon` names.
+The subscription's retained Application/tier names and validated published
+catalogue names are transient display evidence; selected cart offer names remain
+available through preparation and quote. UUIDs and command keys are grouped in
+collapsed, keyboard-operable **Technical identifiers** disclosures (Arabic and
+English). Prices and confirmation eligibility still come from the retained quote.
+Names never enter the command payload or persisted intent journal.
+
+Optional name discovery is owner-only, aborts on session change, and reads at
+most ten catalogue pages of 100 offers. Missing catalogue matches or failed
+discovery use known subscription/discovery keys, then a translated resource
+label, so a restored intent remains readable without exposing UUIDs as names.
+Non-owner definition adoption keeps its existing scoped reads and key fallback;
+it does not call the owner-only catalogue for labels.
 
 **The API has no downgrade path.** A UI that offers "reduce seats" or "remove
 module" and then surfaces a rejection is a worse experience than not offering
@@ -205,8 +252,13 @@ every displayed financial total. Current owner, subscription, readiness and
 wallet checks remain authoritative. See [canonical purchase flow](catalogue-canonical-delivery.md#mounted-ordinary-purchase-editor).
 
 The preview is **durable, owner-bound and price-frozen**, and it expires.
-`apply` revalidates collection, price and wallet before committing, so a stale
-preview fails at apply time — show the countdown on the preview screen.
+The preview screen displays priced-at and expiry timestamps. Local expiry
+tracking disables confirmation when it expires; the display has no live countdown.
+Purchase `apply` revalidates collection, price and wallet before committing, so
+a stale preview can still fail at apply time. Pure definition adoption preserves
+accepted prices and has no wallet settlement. Only the actual
+`SUBSCRIPTION_PLAN_CHANGE_PREVIEW_EXPIRED` apply rejection permits a new preview
+of the same preparation; uncertain apply retains its original key/body.
 
 ### Subscription status has **five** values, not four
 
@@ -235,20 +287,21 @@ Shell update verified **2026-10-17**: successful settings saves and logo/icon
 uploads publish their validated response to the root `BrandingProvider`. The
 existing shell name and contrast-checked color tokens update immediately;
 reset or rejected colors restore system tokens. Local UUIDv7 asset query keys
-bypass the public routes' five-minute cache for the shared logo and tab icon.
+receive `no-cache` from the public routes for the shared logo and tab icon.
 A late initial public-branding read cannot overwrite a successful local write.
 
-Settings form serialization verified **2026-10-17**: saves compare the five editable
+Settings form serialization reviewed **2026-10-30**: saves compare the four editable
 fields with the loaded settings. Unchanged fields are omitted; clearing a stored
-value sends `null`, which Core persists as a reset. `loginHtml` is always omitted.
-App name, tab title and font family inputs are limited to 120 characters and
+value sends `null`, which Core persists as a reset. `fontFamily` and `loginHtml`
+are always omitted, preserving their stored values. The form has no font input:
+the portal uses its bundled bilingual fonts. App name and tab title are limited to 120 characters and
 overlong values fail inline validation before a request; no text is truncated.
 Both colors accept only supported hex values (up to 9 characters), or a reset.
 
 | Method | Canonical path | Access | Notes |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/core/v1/branding/public` | **`@Public()`** | Pre-auth projection |
-| GET | `/api/tenant/core/v1/branding/public/logo` | **`@Public()`** | Binary, `public, max-age=300` |
+| GET | `/api/tenant/core/v1/branding/public/logo` | **`@Public()`** | Binary; matching key hash `v` is immutable for one year, otherwise `no-cache` |
 | GET | `/api/tenant/core/v1/branding/public/icon` | **`@Public()`** | Binary, same headers |
 | GET | `/api/tenant/core/v1/branding` | `branding.read` | Full settings |
 | PUT | `/api/tenant/core/v1/branding` | `branding.manage` | `UpdateBrandingDto` |
@@ -256,6 +309,9 @@ Both colors accept only supported hex values (up to 9 characters), or a reset.
 | POST | `/api/tenant/core/v1/branding/icon` | `branding.manage` | multipart, idempotency-required |
 
 ### The public payload — exactly these fields
+
+The portal projection ignores `loginHtml`; it is neither parsed nor carried in
+the shared branding context. The backend payload still includes it.
 
 ```text
 primaryColor · secondaryColor · fontFamily · appName · tabTitle · loginHtml
@@ -269,11 +325,16 @@ logoUrl · iconUrl
 `BrandingService.getPublic()`, which returns **eight** fields, and against the
 Swagger example in `branding.controller.ts`. They are same-origin **paths** to
 the two public binary routes (`/api/tenant/core/v1/branding/public/logo` and
-`.../icon`), or `null` when no asset is stored or storage is unavailable. The
+`.../icon`), followed by `?v=<hash>`, or `null` when no storage key is set. The
 bytes stream through Core, so no Storage credential ever reaches the browser —
 which is the property the "no storage keys" rule was protecting, and it still
-holds. The portal validates both fields against those two exact constants
-rather than treating them as free-form URLs. See
+holds. Source verified **2026-10-29**: the hash is the first 16 lowercase hex
+characters of SHA-256 of the storage key and changes on key replacement. The
+binary response emits that hash as a quoted `ETag`; only an exactly matching
+`v` receives `public, max-age=31536000, immutable`. Missing, malformed and stale
+versions receive `no-cache`. The portal validates both fields against the exact
+paths, optionally followed by only `?v=<16 lowercase hex>`, rather than treating
+them as free-form URLs. See
 [Q27](../build/OPEN-QUESTIONS.md#q27--publicbrandingview-carries-two-fields-the-contract-page-omits).
 
 The three public routes are the ones the **login screen** needs, because they

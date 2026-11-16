@@ -56,13 +56,15 @@ export function TradeEvidenceBlocked({ title, description }: TradeEvidenceBlocke
  * Retrying reuses the **same** idempotency key, which is the only thing that
  * makes the retry safe — a fresh key would be a second write, not a retry.
  */
-export function TradeWriteOutcome({ write }: { write: TradeWriteState }) {
+export function TradeWriteOutcome({ write, retryBlockedReason }: {
+  write: TradeWriteState; retryBlockedReason?: string;
+}) {
   const { t } = useI18n();
   if (!write.ambiguous) return null;
   return (
     <section role="status" className="space-y-2 rounded-sm border border-caution-200 bg-caution-100 p-3 text-caution-900 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-200">
       <h2 className="flex items-center gap-2 text-sm font-medium"><CircleAlert className="size-4 shrink-0" aria-hidden="true" />{t.tradeDocuments.ambiguousTitle}</h2>
-      <p className={cn("text-xs", proseMeasure)}>{t.tradeDocuments.ambiguousDescription}</p>
+      <p className={cn("text-xs", proseMeasure)}>{retryBlockedReason ?? t.tradeDocuments.ambiguousDescription}</p>
       <dl className="space-y-1 text-xs">
         <div><dt>{t.tradeDocuments.ambiguousOperation}</dt><dd>{write.ambiguous.operation}</dd></div>
         <div><dt>{t.tradeDocuments.ambiguousKey}</dt><dd><IdentifierText>{write.ambiguous.idempotencyKey}</IdentifierText></dd></div>
@@ -70,7 +72,7 @@ export function TradeWriteOutcome({ write }: { write: TradeWriteState }) {
           <div><dt>{t.errors.reference}</dt><dd><IdentifierText>{write.ambiguous.correlationId}</IdentifierText></dd></div>
         ) : null}
       </dl>
-      <Button type="button" variant="outline" size="sm" loading={write.isWriting}
+      <Button type="button" variant="outline" size="sm" loading={write.isWriting} disabled={Boolean(retryBlockedReason)}
         onClick={() => void write.ambiguous?.retry()}>{t.common.retry}</Button>
     </section>
   );

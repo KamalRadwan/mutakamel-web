@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { ar } from "@/i18n/dictionaries/ar";
+import { loadServerLanguage } from "@/i18n/server";
 
-// Segment-level title. It flows through the root layout's
-// `title.template`, so the brand stays the suffix. Arabic for the same
-// reason the root default is — see src/app/layout.tsx.
-export const metadata: Metadata = { title: ar.nav.appWorkspace };
+export async function generateMetadata(): Promise<Metadata> {
+  const { dictionary: t } = await loadServerLanguage();
+  return { title: t.nav.appWorkspace };
+}
 
 export default function CoreLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;

@@ -11,6 +11,7 @@ import {
   parseOpportunityStageDefinitionsResponse,
   parsePipelineResponse,
   parsePipelinesResponse,
+  pipelineConfigurationPath,
   pipelineStagePath,
   pipelineStagesReorderPath,
 } from "./pipeline-contract";
@@ -47,6 +48,13 @@ const pipeline = {
 };
 
 describe("Pipeline API contract", () => {
+  it("builds the configuration detail path with a validated pipeline UUID", () => {
+    expect(pipelineConfigurationPath(PIPELINE_ID)).toBe(
+      `/api/tenant/crm/v1/pipelines/${PIPELINE_ID}/configuration`,
+    );
+    expect(() => pipelineConfigurationPath("invalid/id")).toThrow();
+  });
+
   it("parses the raw CRM payload and orders stages by rank, not by name", () => {
     const parsed = parsePipelineResponse(pipeline);
     expect(parsed.stages.map(({ rank }) => rank)).toEqual([1, 2]);

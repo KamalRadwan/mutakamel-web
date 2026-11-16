@@ -1,64 +1,97 @@
 "use client";
 
-import { Clock8, RefreshCw } from "lucide-react";
+import { History, Lock, RefreshCw, RotateCcw, Save } from "lucide-react";
 import {
+  Badge,
   Button,
   Card,
   CardContent,
-  Combobox,
-  EmptyState,
+  ConfirmActionModal,
   ErrorState,
-  Field,
-  Input,
   PageHeader,
   PermissionGate,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Skeleton,
-  SubNav,
-  Switch,
-  CORE_SETTINGS_NAV_ITEMS,
 } from "@/design-system";
-import {
-  CURRENCY_CODE_LENGTH,
-  TIMEZONE_MAX_LENGTH,
-  WORKSPACE_LANGUAGES,
-} from "./workspace-settings-contract";
+import { INTL_LOCALE } from "@/lib/format/locale";
+import { formatTemplate } from "@/lib/format/template";
+import { useCoreErrorText } from "../../hooks/useCoreErrorText";
+import { WorkspaceCurrencySection } from "./components/WorkspaceCurrencySection";
+import { WorkspaceRegionalSection } from "./components/WorkspaceLeftCards";
+import { WorkspaceConflictDialog, WorkspaceHistoryModal } from "./components/WorkspaceModals";
+import { WorkspaceNotReadyState } from "./components/WorkspaceNotReadyState";
+import { WorkspaceSupportSection } from "./components/WorkspaceRightRail";
 import { useTimezoneOptions } from "./hooks/useTimezoneOptions";
+import { useWorkspaceHistory } from "./hooks/useWorkspaceAuditPreview";
 import { useWorkspaceSettings } from "./hooks/useWorkspaceSettings";
+import { describeWorkspaceLoadFailure } from "./workspace-errors";
 
 export default function WorkspaceSettingsPage() {
+  const describeError = useCoreErrorText();
   const {
     t,
+    lang,
     canManage,
+    canReadCurrencies,
+    settings,
     draft,
     currencyOptions,
+    currenciesTotal,
+    isCurrenciesTruncated,
+    isLoadingCurrencies,
+    currencyLoadFailure,
+    dirtyCount,
+    conflict,
     isLoading,
     isSaving,
+    isDirty,
+    isLoadForbidden,
     isNotReady,
-    loadError,
+    loadFailure,
     fieldError,
     canSave,
+    isDiscardOpen,
+    confirmDiscard,
+    onDiscardOpenChange,
     updateDraft,
+    discardDraft,
     save,
+    dismissConflict,
+    reloadFromConflict,
+    overwriteConflict,
+    retryCurrencyOptions,
     reload,
   } = useWorkspaceSettings();
-  const timezones = useTimezoneOptions(draft?.timezone ?? "");
+
+  const {
+    canReadAudit,
+    isHistoryOpen,
+    openHistory,
+    setHistoryOpen,
+    historyValueLabels,
+  } = useWorkspaceHistory(t, currencyOptions);
+
+  const timezones = useTimezoneOptions(draft?.timezone ?? "", INTL_LOCALE[lang]);
   const isReadOnly = !canManage;
+  const wsUi = t.coreSettings.workspaceUi;
+  const loadFailureCopy = loadFailure
+    ? describeWorkspaceLoadFailure(loadFailure, t, describeError)
+    : null;
 
   return (
-    <PermissionGate require="workspace.read">
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
+    <PermissionGate require="workspace.read" denied={!isLoading && isLoadForbidden}>
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <PageHeader
+          className="sr-only"
           title={t.coreSettings.workspaceTitle}
           description={t.coreSettings.workspaceSubtitle}
           primaryAction={
             canManage && draft
               ? {
-                  label: t.coreSettings.save,
+                  label:
+                    isDirty && dirtyCount > 0
+                      ? formatTemplate(wsUi.saveWithCount, { count: dirtyCount })
+                      : t.coreSettings.save,
+                  icon: <Save className="size-3.5" aria-hidden="true" />,
                   onClick: () => void save(),
                   disabled: !canSave || isSaving,
                   loading: isSaving,
@@ -66,147 +99,130 @@ export default function WorkspaceSettingsPage() {
               : undefined
           }
           secondaryActions={
-            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
-              <RefreshCw className={isLoading ? "size-4 animate-spin" : "size-4"} aria-hidden="true" />
-              {t.coreSettings.reload}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {!canManage && draft ? (
+                <Badge tone="neutral" size="sm">
+                  <Lock className="size-3.5" aria-hidden="true" />
+                  {t.common.readOnly}
+                </Badge>
+              ) : null}
+
+              {canManage && isDirty ? (
+                <Button size="sm" variant="ghost" onClick={discardDraft} disabled={isSaving}>
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
+                  {wsUi.discard}
+                </Button>
+              ) : null}
+
+              {canReadAudit && settings ? (
+                <Button size="sm" variant="outline" onClick={openHistory}>
+                  <History className="size-3.5" aria-hidden="true" />
+                  {t.audit.historyTitle}
+                </Button>
+              ) : null}
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={reload}
+                disabled={isLoading || isSaving}
+              >
+                <RefreshCw
+                  className={isLoading ? "size-3.5 animate-spin" : "size-3.5"}
+                  aria-hidden="true"
+                />
+                {t.coreSettings.reload}
+              </Button>
+            </div>
           }
         />
 
-        <SubNav items={CORE_SETTINGS_NAV_ITEMS} />
-
         {isLoading && !draft ? <WorkspaceSkeleton /> : null}
 
-        {isNotReady ? (
-          <EmptyState
-            icon={Clock8}
-            title={t.coreSettings.workspaceNotReadyTitle}
-            description={t.coreSettings.workspaceNotReadyDescription}
-            action={{ label: t.coreSettings.reload, onClick: () => void reload() }}
-          />
+        {!isLoading && isNotReady ? (
+          <WorkspaceNotReadyState t={t} isLoading={isLoading} onReload={reload} />
         ) : null}
 
-        {loadError ? (
+        {!isLoading && loadFailureCopy ? (
           <ErrorState
-            title={t.coreSettings.workspaceLoadFailed}
-            description={loadError.message}
-            onRetry={() => void reload()}
+            title={loadFailureCopy.title}
+            description={loadFailureCopy.description}
+            onRetry={loadFailureCopy.retryable ? reload : undefined}
             retryLabel={t.common.retry}
           />
         ) : null}
 
         {draft ? (
-          <Card>
-            <CardContent className="flex flex-col gap-3">
-              <Field
-                label={t.coreSettings.workspaceLanguage}
-                hint={t.coreSettings.workspaceLanguageHint}
-                error={fieldError?.field === "defaultLanguage" ? fieldError.message : undefined}
-                readOnly={isReadOnly}
-              >
-                <Select
-                  value={draft.defaultLanguage}
-                  onValueChange={(value) => updateDraft({ defaultLanguage: value })}
-                  disabled={isReadOnly || isSaving}
-                >
-                  <SelectTrigger size="sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WORKSPACE_LANGUAGES.map((language) => (
-                      <SelectItem key={language} value={language}>
-                        {t.coreSettings.languageNames[language]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+          <>
+            <WorkspaceRegionalSection
+              t={t}
+              lang={lang}
+              draft={draft}
+              isReadOnly={isReadOnly}
+              isSaving={isSaving}
+              fieldError={fieldError}
+              timezones={timezones}
+              onUpdateDraft={updateDraft}
+            />
 
-              <Field
-                label={t.coreSettings.workspaceTimezone}
-                hint={t.coreSettings.workspaceTimezoneHint}
-                error={fieldError?.field === "timezone" ? fieldError.message : undefined}
-                readOnly={isReadOnly}
-                required
-              >
-                {timezones.hasZones ? (
-                  <Combobox
-                    value={draft.timezone}
-                    selectedLabel={draft.timezone}
-                    onValueChange={(value) => updateDraft({ timezone: value ?? "" })}
-                    options={timezones.options}
-                    onSearch={timezones.onSearch}
-                    placeholder={t.coreSettings.workspaceTimezonePlaceholder}
-                    searchPlaceholder={t.coreSettings.workspaceTimezoneSearch}
-                    loadingLabel={t.common.loading}
-                    emptyLabel={t.coreSettings.workspaceTimezoneEmpty}
-                    disabled={isReadOnly || isSaving}
-                    readOnly={isReadOnly}
-                  />
-                ) : (
-                  <Input size="sm"
-                    value={draft.timezone}
-                    placeholder={t.coreSettings.workspaceTimezonePlaceholder}
-                    onChange={(event) => updateDraft({ timezone: event.target.value })}
-                    maxLength={TIMEZONE_MAX_LENGTH}
-                    disabled={isSaving}
-                    readOnly={isReadOnly}
-                    dir="ltr"
-                  />
-                )}
-              </Field>
+            <WorkspaceCurrencySection
+              t={t}
+              lang={lang}
+              settings={settings}
+              draft={draft}
+              currencyOptions={currencyOptions}
+              currenciesTotal={currenciesTotal}
+              isCurrenciesTruncated={isCurrenciesTruncated}
+              canReadCurrencies={canReadCurrencies}
+              isLoadingCurrencies={isLoadingCurrencies}
+              currencyLoadFailure={currencyLoadFailure}
+              describeError={describeError}
+              isReadOnly={isReadOnly}
+              isSaving={isSaving}
+              fieldError={fieldError}
+              onRetryCurrencies={() => void retryCurrencyOptions()}
+              onUpdateDraft={updateDraft}
+            />
 
-              <Field
-                label={t.coreSettings.workspaceCurrency}
-                hint={t.coreSettings.workspaceCurrencyHint}
-                error={fieldError?.field === "defaultCurrencyCode" ? fieldError.message : undefined}
-                readOnly={isReadOnly}
-              >
-                {currencyOptions.length > 0 ? (
-                  <Select
-                    value={draft.defaultCurrencyCode}
-                    onValueChange={(value) => updateDraft({ defaultCurrencyCode: value })}
-                    disabled={isReadOnly || isSaving}
-                  >
-                    <SelectTrigger size="sm">
-                      <SelectValue placeholder={t.coreSettings.workspaceCurrencyPlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencyOptions.map((currency) => (
-                        <SelectItem key={currency.code} value={currency.code}>
-                          {`${currency.code} — ${currency.name}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input size="sm"
-                    value={draft.defaultCurrencyCode}
-                    placeholder={t.coreSettings.workspaceCurrencyPlaceholder}
-                    onChange={(event) =>
-                      updateDraft({ defaultCurrencyCode: event.target.value.toUpperCase() })
-                    }
-                    maxLength={CURRENCY_CODE_LENGTH}
-                    disabled={isSaving}
-                    readOnly={isReadOnly}
-                    dir="ltr"
-                  />
-                )}
-              </Field>
+            <WorkspaceSupportSection
+              t={t}
+              draft={draft}
+              isReadOnly={isReadOnly}
+              isSaving={isSaving}
+              onUpdateDraft={updateDraft}
+            />
+          </>
+        ) : null}
 
-              <Field
-                label={t.coreSettings.workspaceAllowSupport}
-                hint={t.coreSettings.workspaceAllowSupportHint}
-                readOnly={isReadOnly}
-              >
-                <Switch
-                  checked={draft.allowSupport}
-                  onCheckedChange={(checked) => updateDraft({ allowSupport: checked })}
-                  disabled={isReadOnly || isSaving}
-                />
-              </Field>
-            </CardContent>
-          </Card>
+        <ConfirmActionModal
+          open={isDiscardOpen}
+          onOpenChange={onDiscardOpenChange}
+          title={t.common.discardTitle}
+          description={t.common.discardDescription}
+          confirmLabel={t.common.discardConfirm}
+          cancelLabel={t.common.cancel}
+          onConfirm={confirmDiscard}
+          loading={isSaving}
+        />
+
+        <WorkspaceConflictDialog
+          t={t}
+          conflict={conflict}
+          currencyOptions={currencyOptions}
+          loading={isSaving}
+          onCancel={dismissConflict}
+          onReload={() => void reloadFromConflict()}
+          onOverwrite={() => void overwriteConflict()}
+        />
+
+        {canReadAudit ? (
+          <WorkspaceHistoryModal
+            t={t}
+            open={isHistoryOpen}
+            onOpenChange={setHistoryOpen}
+            settings={settings}
+            valueLabels={historyValueLabels}
+          />
         ) : null}
       </div>
     </PermissionGate>
@@ -215,12 +231,15 @@ export default function WorkspaceSettingsPage() {
 
 function WorkspaceSkeleton() {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3">
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-        <Skeleton className="h-9 w-full" />
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-4">
+      {[0, 1, 2].map((index) => (
+        <Card key={index}>
+          <CardContent className="flex flex-col gap-3 py-5">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }

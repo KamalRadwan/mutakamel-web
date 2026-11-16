@@ -20,11 +20,11 @@ Source of truth once implemented: `src/app/globals.css`.
 
 | Role | Ramp | Admin's name | Hue | Meaning |
 | --- | --- | --- | --- | --- |
-| Brand | `brand` | `action` | cobalt, ~254 → 267 | Primary actions, active nav, focus rings, links |
+| Brand | `brand` | `action` | cobalt, ~254 → 267 | Primary actions, active nav, focus rings, links, CRM stage/category progress |
 | Positive | `positive` | `success` | 149–164 (green) | Won, converted, active, healthy |
 | Caution | `caution` | `warn` | 92 → 44 (amber) | On hold, nurturing, degraded, needs attention |
 | Negative | `negative` | `danger` | 30 → 26 (vermilion) | Lost, disqualified, blacklisted, destructive, error |
-| Neutral | `ink` | `ink` / `surface` | 232 → 245 (cold blue) | Text, borders, surfaces, and **every in-progress state** |
+| Neutral | `ink` | `ink` / `surface` | 232 → 245 (cold blue) | Text, borders, surfaces, and other in-progress states |
 
 > **The role names are the only thing that did not move.** The values are the
 > admin portal's; `brand` / `positive` / `caution` / `negative` / `ink` stay
@@ -265,7 +265,7 @@ never the only signal.
 | `LeadStageFlagEnum` | `CONVERTED`, `QUALIFIED` | positive |
 | `LeadStageFlagEnum` | `DISQUALIFIED` | negative |
 | `LeadStageFlagEnum` | `ON_HOLD`, `NURTURING` | caution |
-| `LeadStageFlagEnum` | `NEW`, `CONTACTED`, `QUALIFYING` | ink + motion |
+| `LeadStageFlagEnum` | `NEW`, `CONTACTED`, `QUALIFYING` | brand + motion |
 | `OpportunityStatusEnum` | `WON` | positive |
 | `OpportunityStatusEnum` | `LOST` | negative |
 | `OpportunityStatusEnum` | `ON_HOLD` | caution |
@@ -273,14 +273,14 @@ never the only signal.
 | `OpportunityStageFlagEnum` | `WON` | positive |
 | `OpportunityStageFlagEnum` | `LOST` | negative |
 | `OpportunityStageFlagEnum` | `ON_HOLD` | caution |
-| `OpportunityStageFlagEnum` | `NEW`, `DISCOVERY`, `QUALIFICATION`, `PROPOSAL`, `NEGOTIATION`, `CONTRACTING` | ink + motion |
+| `OpportunityStageFlagEnum` | `NEW`, `DISCOVERY`, `QUALIFICATION`, `PROPOSAL`, `NEGOTIATION`, `CONTRACTING` | brand + motion |
 | `CustomerStatusEnum` | `ACTIVE_CUSTOMER` | positive |
 | `CustomerStatusEnum` | `BLACKLISTED` | negative |
 | `CustomerStatusEnum` | `INACTIVE` | caution |
 | `CustomerStatusEnum` | `PROSPECT` | ink + motion |
 | `StageCategoryEnum` | `POSITIVE` | positive |
 | `StageCategoryEnum` | `NEGATIVE` | negative |
-| `StageCategoryEnum` | `OPEN`, `IN_PROGRESS` | ink + motion |
+| `StageCategoryEnum` | `OPEN`, `IN_PROGRESS` | brand + motion |
 | `TenantStatusEnum` | `ACTIVE` | positive |
 | `TenantStatusEnum` | `PROVISIONING_FAILED`, `DELETED` | negative |
 | `TenantStatusEnum` | `SUSPENDED` | caution |
@@ -387,7 +387,13 @@ By contrast, **Activity Types (`ACTIVITY_TYPES`)** and **Target Entity Types (`A
 
 ### "In progress" is ink plus motion
 
-In read-only `StatusBadge` cells, an in-progress state renders as an `ink` tint with a **pulsing dot** and, for a pending row, `border-dashed`. Motion carries the state without spending a hue, and it survives colorblindness in a way a fifth color never would. See [motion.md](motion.md#the-pending-dot).
+**2026-11-04 exception:** `StatusBadge` uses the existing `brand` tone and a
+matching dot for in-progress `LeadStageFlag`, `OpportunityStageFlag` and `StageCategory` values, so
+their lifecycle/category labels do not look disabled. Positive, caution and
+negative outcomes keep their existing roles. This is one shared progress hue,
+not a separate color for every stage.
+
+Other in-progress `StatusBadge` kinds retain an `ink` tint with a **pulsing dot** and, for a pending row, `border-dashed`. Motion reinforces the translated label for either treatment. See [motion.md](motion.md#the-pending-dot).
 
 ## The theme flip
 

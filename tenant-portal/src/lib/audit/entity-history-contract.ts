@@ -11,10 +11,30 @@ const AUDIT_RESPONSE_LIMIT_BYTES = 256 * 1024;
 
 export const AUDIT_HISTORY_PAGE_SIZE = 10;
 
-/**
- * One entry: who, when, and what happened. Everything else the ledger carries
- * is deliberately unread — a card tells a story, it does not dump a row.
- */
+export const HISTORY_SUBJECT_CATEGORIES = [
+  "lead",
+  "contact",
+  "quotation",
+  "salesOrder",
+  "invoice",
+  "activity",
+] as const;
+
+export type HistorySubjectCategory = (typeof HISTORY_SUBJECT_CATEGORIES)[number];
+
+export type HistorySubjectKind =
+  | HistorySubjectCategory
+  | "note"
+  | "attachment"
+  | "record";
+
+const VALID_SUBJECT_KINDS = new Set<string>([
+  ...HISTORY_SUBJECT_CATEGORIES,
+  "note",
+  "attachment",
+  "record",
+]);
+
 /** One field that moved, as `computeDiff` in the audit-log package writes it. */
 interface EntityAuditChange {
   field: string;
@@ -34,6 +54,12 @@ export interface EntityAuditEvent {
   outcome: "SUCCESS" | "FAILURE" | null;
   /** A failure's own reason, which is the half that matters in an incident. */
   reason: string | null;
+  /** Semantic subject category for grouped related history or standalone Trade/CRM rows. */
+  subjectKind?: HistorySubjectKind;
+  /** Target entity identifier when the event refers to a related document or child record. */
+  subjectId?: string | null;
+  /** Human-readable reference identifier (e.g. documentNumber or attachment fileName). */
+  referenceLabel?: string | null;
   /**
    * What actually changed, old value beside new.
    *
@@ -60,6 +86,31 @@ function text(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
+function resolveSubjectKind(row: Record<string, unknown>): HistorySubjectKind | undefined {
+  const explicit = text(row.subjectKind);
+  if (explicit && VALID_SUBJECT_KINDS.has(explicit)) {
+    return explicit as HistorySubjectKind;
+  }
+  const entityType = text(row.entityType);
+  if (entityType === "TradeQuotationEntity") return "quotation";
+  if (entityType === "TradeSalesOrderEntity") return "salesOrder";
+  if (entityType === "TradeSalesInvoiceEntity") return "invoice";
+  if (entityType === "CrmNote") return "note";
+  if (entityType === "CrmAttachment") return "attachment";
+  if (entityType === "Activity" || entityType === "ActivityEntity") return "activity";
+  if (
+    entityType === "Lead" ||
+    entityType === "LeadEntity" ||
+    entityType === "CustomerProfile" ||
+    entityType === "CustomerProfileEntity" ||
+    entityType === "Opportunity" ||
+    entityType === "OpportunityEntity"
+  ) {
+    return "lead";
+  }
+  return undefined;
+}
+
 /**
  * The `diff` column: `[{ field, before, after }]`, bounded and already
  * redacted by the writer.
@@ -79,9 +130,13 @@ function parseChanges(value: unknown): EntityAuditChange[] {
     const row = record(entry);
     const field = row ? text(row.field) : null;
     if (!row || !field) continue;
-    changes.push({ field, before: row.before, after: row.after,
+    changes.push({
+      field,
+      before: row.before,
+      after: row.after,
       subjectId: text(row.subjectId) ?? undefined,
-      subjectLabel: text(row.subjectLabel) ?? undefined });
+      subjectLabel: text(row.subjectLabel) ?? undefined,
+    });
   }
   return changes;
 }
@@ -113,10 +168,18 @@ function legacyStageChanges(action: string, value: unknown): EntityAuditChange[]
 }
 
 /** The query half, kept out of the path for `CorePath`'s sake. */
-export function entityHistoryQuery(cursor: string | null, limit: number, relatedPartyIds?: readonly string[]): string {
+export function entityHistoryQuery(
+  cursor: string | null,
+  limit: number,
+  relatedPartyIds?: readonly string[],
+  historyCategory?: HistorySubjectCategory,
+): string {
   const query = new URLSearchParams({ limit: String(limit) });
   if (cursor !== null) query.set("cursor", cursor);
-  if (relatedPartyIds?.length) query.set("relatedPartyIds", [...new Set(relatedPartyIds)].sort().join(","));
+  if (relatedPartyIds?.length) {
+    query.set("relatedPartyIds", [...new Set(relatedPartyIds)].sort().join(","));
+    if (historyCategory) query.set("historyCategory", historyCategory);
+  }
   return query.toString();
 }
 
@@ -136,14 +199,15 @@ function entityHistoryPath(entityType: string, entityId: string): CorePath {
  *
  * Core's data envelope holds { items, nextCursor }; no page totals are inferred.
  */
-export function parseEntityHistory(
-  data: unknown,
-): EntityAuditPage {
+export function parseEntityHistory(data: unknown): EntityAuditPage {
   const body = record(data);
   const items = body?.items;
   const nextCursor = body?.nextCursor;
-  if (!Array.isArray(items) || (nextCursor !== null &&
-    (typeof nextCursor !== "string" || !nextCursor || nextCursor.length > 512))) {
+  if (
+    !Array.isArray(items) ||
+    (nextCursor !== null &&
+      (typeof nextCursor !== "string" || !nextCursor || nextCursor.length > 512))
+  ) {
     throw new Error("Invalid audit response.");
   }
   const events: EntityAuditEvent[] = [];
@@ -156,6 +220,9 @@ export function parseEntityHistory(
     if (!id || !action || !occurredAt) continue;
     const outcome = text(row.outcome);
     const parsedChanges = parseChanges(row.diff);
+    const subjectKind = resolveSubjectKind(row);
+    const subjectId = text(row.subjectId) ?? text(row.entityId);
+    const referenceLabel = text(row.referenceLabel) ?? text(row.entityLabel);
     events.push({
       id,
       action,
@@ -163,6 +230,9 @@ export function parseEntityHistory(
       occurredAt,
       outcome: outcome === "SUCCESS" || outcome === "FAILURE" ? outcome : null,
       reason: text(row.reason),
+      ...(subjectKind ? { subjectKind } : {}),
+      ...(subjectId ? { subjectId } : {}),
+      ...(referenceLabel ? { referenceLabel } : {}),
       changes:
         parsedChanges.length > 0
           ? parsedChanges
@@ -179,10 +249,11 @@ export async function fetchEntityHistory(
   limit: number,
   signal?: AbortSignal,
   relatedPartyIds?: readonly string[],
+  historyCategory?: HistorySubjectCategory,
 ): Promise<EntityAuditPage> {
   const { data } = await readCorePage(
     entityHistoryPath(entityType, entityId),
-    entityHistoryQuery(cursor, limit, relatedPartyIds),
+    entityHistoryQuery(cursor, limit, relatedPartyIds, historyCategory),
     { signal, cache: "no-store", maxResponseBytes: AUDIT_RESPONSE_LIMIT_BYTES },
   );
   return parseEntityHistory(data);

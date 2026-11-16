@@ -48,6 +48,7 @@ export interface DataTableLabels {
     first?: string;
     last?: string;
     page?: (n: number) => string;
+    rowsPerPage?: string;
   };
 }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { TenantOrganizationName } from "@/components/tenant/TenantOrganizationName";
+
 import { Button, DateTime, DetailSection, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
   ErrorState, Field, IdentifierText, Input, PermissionGate, Skeleton } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -46,7 +48,7 @@ export function ConfigurationForm(props: ConfigurationFormProps) {
           <DialogHeader><DialogTitle>{copy.review}</DialogTitle><DialogDescription>{state?.phase === "uncertain" ? copy.retryNotice : copy.replaceNotice}</DialogDescription></DialogHeader>
           {command && <DetailSection title={copy.exactTarget} fields={[
             { label: "companyId" in command.target ? t.applicationAccess.company : t.applicationAccess.branch,
-              value: <IdentifierText>{"companyId" in command.target ? command.target.companyId : command.target.branchId}</IdentifierText> },
+              value: <TenantOrganizationName kind={"companyId" in command.target ? "company" : "branch"} id={"companyId" in command.target ? command.target.companyId : command.target.branchId} /> },
             { label: t.applicationAccess.addon, value: <IdentifierText>{command.target.addonKey}</IdentifierText> },
             { label: t.applicationAccess.definition, value: <IdentifierText>{command.body.definitionVersionId}</IdentifierText> },
             { label: copy.schemaKey, value: <IdentifierText>{command.body.schemaRef.key}</IdentifierText> },

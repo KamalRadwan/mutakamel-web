@@ -1,302 +1,170 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { definitionListPath, mergeDefinitionItems } from '../definition-pagination';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { hasPermission } from "@/design-system";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isIdempotentReplay } from "@/lib/api/outcomes";
-import { hasPermission } from "@/design-system";
-import {
-  DASHBOARDS_CATALOG_PATH,
-  DASHBOARDS_DEFAULT_PATH,
-  DASHBOARDS_PATH,
-  buildCreateDashboardRequest,
-  buildNamedRequest,
-  dashboardDefaultPath,
-  dashboardDuplicatePath,
-  dashboardFavoritePath,
-  dashboardFromTemplatePath,
-  dashboardPath,
-  parseDashboardDetailResponse,
-  parseDashboardsResponse,
-  type DashboardSummary,
-  type DashboardTemplateKey,
-} from "../dashboard-contract";
-import {
-  parseCatalogResponse,
-  type DashboardCatalog,
-} from "../dashboard-catalog-contract";
+import { definitionListPath, mergeDefinitionItems } from "../definition-pagination";
+import { DASHBOARDS_CATALOG_PATH, DASHBOARDS_DEFAULT_PATH, DASHBOARDS_PATH, buildCreateDashboardRequest, buildNamedRequest,
+  dashboardDefaultPath, dashboardDuplicatePath, dashboardFavoritePath, dashboardFromTemplatePath, dashboardPath,
+  parseDashboardDetailResponse, parseDashboardsResponse, type DashboardDetail, type DashboardSummary, type DashboardTemplateKey } from "../dashboard-contract";
+import { parseCatalogResponse, type DashboardCatalog } from "../dashboard-catalog-contract";
+import { dashboardWriteDenied, invalidDashboardReceipt, uncertainDashboardWrite, useDashboardSafety } from "./useDashboardSafety";
 
 const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 } as const;
-const WRITE_CONFIG = {
-  cache: "no-store",
-  maxResponseBytes: 512 * 1024,
-  nonReplayable: true,
-} as const;
+const WRITE_CONFIG = { ...READ_CONFIG, nonReplayable: true } as const;
+export interface DashboardWriteResult { ok: boolean; replayed: boolean; createdId: string | null; error: NormalizedApiError | null; refreshFailed?: boolean; ignored?: boolean; }
+export interface CreateDashboardInput { name: string; description: string; templateKey: DashboardTemplateKey | null; }
+const failed = (error: NormalizedApiError): DashboardWriteResult => ({ ok: false, replayed: false, createdId: null, error });
 
-export interface DashboardWriteResult {
-  ok: boolean;
-  replayed: boolean;
-  createdId: string | null;
-  error: NormalizedApiError | null;
-}
-
-export interface CreateDashboardInput {
-  name: string;
-  description: string;
-  templateKey: DashboardTemplateKey | null;
-}
-
-const OK: DashboardWriteResult = { ok: true, replayed: false, createdId: null, error: null };
-
-export function useDashboards() {
+export function useDashboards(enabled: boolean) {
   const { user } = useTenantAuth();
-  const permissions = useMemo(() => user?.permissions ?? [], [user]);
-  // `crm.dashboards.create/update/delete` are STATIC keys in the CRM catalogue
-  // — only `crm.dashboards.read` is seeded with `.own/.team/.all`. Matching
-  // them scoped would admit a permission the tenant can never hold.
-  const canCreate = hasPermission(permissions, "crm.dashboards.create");
-  const canDelete = hasPermission(permissions, "crm.dashboards.delete");
-
+  const safety = useDashboardSafety("catalogue");
+  const { scope, startRead, currentRead, readSettled, readSucceeded, beginWrite, currentWrite, fence, finish } = safety;
+  const permission = (key: string) => Boolean(user?.isTenantOwner) || hasPermission(user?.permissions ?? [], key);
+  const canCreate = safety.canMutate && permission("crm.dashboards.create");
+  const canUseTemplates = canCreate && permission("crm.widgets.create");
+  const canDelete = safety.canMutate && permission("crm.dashboards.delete");
   const [items, setItems] = useState<DashboardSummary[]>([]);
   const [catalog, setCatalog] = useState<DashboardCatalog | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [dataScope, setDataScope] = useState<object | null>(null);
+  const [attemptScope, setAttemptScope] = useState<object | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [catalogFailed, setCatalogFailed] = useState(false);
+  const [catalogError, setCatalogError] = useState<NormalizedApiError | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const request = useRef<AbortController | null>(null);
+  const visible = dataScope === scope && enabled;
+  const visibleItems = useMemo(() => visible ? items : [], [visible, items]);
 
-  const load = useCallback(async (signal?: AbortSignal, cursor?: string): Promise<void> => {
-    setIsLoading(true);
-    setQueryError(null);
-    // allSettled, not all: the catalogue only feeds the template picker, and
-    // losing the whole screen because it failed is states.md's exact
-    // partial-failure mistake.
+  const load = useCallback(async (signal?: AbortSignal, cursor?: string): Promise<boolean> => {
+    const ticket = enabled ? startRead() : null;
+    if (!ticket) return false;
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    signal?.addEventListener("abort", () => controller.abort(), { once: true });
+    const activeSignal = controller.signal;
+    setIsLoading(true); setQueryError(null);
     const [list, catalogue] = await Promise.allSettled([
-      axiosClient.get<unknown>(definitionListPath(DASHBOARDS_PATH, cursor), { ...READ_CONFIG, signal }),
-      axiosClient.get<unknown>(DASHBOARDS_CATALOG_PATH, { ...READ_CONFIG, signal }),
+      axiosClient.get<unknown>(definitionListPath(DASHBOARDS_PATH, cursor), { ...READ_CONFIG, signal: activeSignal }),
+      axiosClient.get<unknown>(DASHBOARDS_CATALOG_PATH, { ...READ_CONFIG, signal: activeSignal }),
     ]);
-    if (signal?.aborted) return;
-
-    if (list.status === "fulfilled") {
-      try {
-        const page = parseDashboardsResponse(list.value.data);
-        setItems((current) => cursor ? mergeDefinitionItems(current, page.items) : page.items);
-        setNextCursor(page.nextCursor);
-        setHasLoaded(true);
-      } catch (error) {
-        setQueryError(normalizeApiError(error));
-      }
-    } else {
-      setQueryError(normalizeApiError(list.reason));
+    if (activeSignal.aborted || !currentRead(ticket)) {
+      if (!activeSignal.aborted && readSettled(ticket)) { setAttemptScope(scope); setIsLoading(false); }
+      return false;
     }
-
-    if (catalogue.status === "fulfilled") {
-      try {
-        setCatalog(parseCatalogResponse(catalogue.value.data));
-        setCatalogFailed(false);
-      } catch {
-        setCatalogFailed(true);
-      }
-    } else {
-      setCatalogFailed(true);
-    }
-    setIsLoading(false);
-  }, []);
-
+    let loaded = false;
+    try {
+      if (list.status === "rejected") throw list.reason;
+      const page = parseDashboardsResponse(list.value.data);
+      setItems((current) => cursor ? mergeDefinitionItems(current, page.items) : page.items);
+      setNextCursor(page.nextCursor); setDataScope(scope); readSucceeded(); loaded = true;
+    } catch (error) { setQueryError(normalizeApiError(error)); }
+    try {
+      if (catalogue.status === "rejected") throw catalogue.reason;
+      setCatalog(parseCatalogResponse(catalogue.value.data)); setCatalogFailed(false); setCatalogError(null);
+    } catch (error) { setCatalog(null); setCatalogFailed(true); setCatalogError(normalizeApiError(error)); }
+    setAttemptScope(scope); setIsLoading(false);
+    return loaded;
+  }, [enabled, scope, startRead, currentRead, readSettled, readSucceeded]);
   useEffect(() => {
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
-    return () => controller.abort();
+    const controller = new AbortController(); const requests = request;
+    queueMicrotask(() => { if (!controller.signal.aborted) void load(controller.signal); });
+    return () => { controller.abort(); requests.current?.abort(); };
   }, [load]);
-
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
-    if (!query) return items;
-    return items.filter(({ name, description }) =>
-      [name, description ?? ""].some((value) => value.toLocaleLowerCase().includes(query)),
-    );
-  }, [items, searchQuery]);
+    return query ? visibleItems.filter(({ name, description }) => [name, description ?? ""].some((v) => v.toLocaleLowerCase().includes(query))) : visibleItems;
+  }, [visibleItems, searchQuery]);
 
-  async function write(
-    call: () => Promise<{ headers: Headers; data: unknown }>,
-    reload = true,
-  ): Promise<DashboardWriteResult> {
+  async function write(allowed: boolean, id: string | null,
+    call: () => Promise<{ status: number; headers: Headers; data: unknown }>,
+    validate: (data: unknown, status: number) => DashboardDetail | null): Promise<DashboardWriteResult> {
+    const ticket = beginWrite(enabled && allowed);
+    if (!ticket) return enabled && allowed && safety.canMutate ? { ok: false, replayed: false, createdId: null, error: null, ignored: true } : failed(dashboardWriteDenied());
+    setPendingId(id); setIsSubmitting(true);
+    let receipt: DashboardDetail | null = null;
+    let replayed = false;
     try {
       const response = await call();
-      if (reload) await load();
-      const created = response.data as { id?: unknown } | null;
-      return {
-        ...OK,
-        replayed: isIdempotentReplay(response.headers),
-        createdId: typeof created?.id === "string" ? created.id : null,
-      };
+      receipt = validate(response.data, response.status);
+      if (!currentWrite(ticket)) return { ok: false, replayed: false, createdId: null, error: null, ignored: true };
+      replayed = response.headers ? isIdempotentReplay(response.headers) : false;
     } catch (error) {
-      return { ok: false, replayed: false, createdId: null, error: normalizeApiError(error) };
+      const normalized = normalizeApiError(error);
+      if (uncertainDashboardWrite(normalized)) fence(ticket);
+      if (!currentWrite(ticket)) return { ok: false, replayed: false, createdId: null, error: null, ignored: true };
+      return failed(normalized);
+    } finally {
+      finish(ticket); setPendingId(null); setIsSubmitting(false);
     }
+    const refreshFailed = !(await load());
+    if (!safety.isScopeCurrent()) return { ok: false, replayed: false, createdId: null, error: null, ignored: true };
+    return { ok: true, replayed, createdId: receipt?.id ?? null, error: null, refreshFailed };
   }
-
-  const create = async (input: CreateDashboardInput): Promise<DashboardWriteResult> => {
-    if (!canCreate) return forbidden();
+  const exact = (id: string, check: (detail: DashboardDetail) => boolean = () => true) => (data: unknown) => {
+    const receipt = parseDashboardDetailResponse(data);
+    if (receipt.id !== id || !check(receipt)) invalidDashboardReceipt();
+    return receipt;
+  };
+  const create = async (input: CreateDashboardInput) => {
     let body: Record<string, unknown>;
-    try {
-      body = buildCreateDashboardRequest(input);
-    } catch (error) {
-      return localFailure(error);
-    }
-    setIsSubmitting(true);
-    try {
-      return await write(() => axiosClient.post<unknown>(DASHBOARDS_PATH, body, WRITE_CONFIG));
-    } finally {
-      setIsSubmitting(false);
-    }
+    try { body = buildCreateDashboardRequest(input); } catch (error) { return failed({ status: 0, code: error instanceof Error ? error.message : "INVALID_INPUT" }); }
+    return write(canCreate && (!input.templateKey || canUseTemplates), null,
+      () => axiosClient.post<unknown>(DASHBOARDS_PATH, body, WRITE_CONFIG), (data) => {
+        const receipt = parseDashboardDetailResponse(data);
+        if (receipt.name !== input.name.trim() || receipt.accessLevel !== "OWNER" || receipt.ownerUserId !== user?.id) invalidDashboardReceipt();
+        return receipt;
+      });
   };
-
-  /**
-   * `PUT /from-template/:key` — get-or-create.
-   *
-   * The POST on the same path creates a **new** instance every time;
-   * `ensureTemplate` returns the actor's existing instance of that template
-   * when one exists and only audits a creation when it actually created one.
-   * That is what "set up the standard dashboard" means, so this is the verb
-   * that button uses.
-   */
-  const ensureTemplate = async (
-    templateKey: DashboardTemplateKey,
-  ): Promise<DashboardWriteResult> => {
-    if (!canCreate) return forbidden();
-    setIsSubmitting(true);
-    try {
-      return await write(() =>
-        axiosClient.put<unknown>(
-          dashboardFromTemplatePath(templateKey),
-          buildNamedRequest(""),
-          WRITE_CONFIG,
-        ),
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  /**
-   * `GET /dashboards/default` reads the existing default; setup is an explicit PUT.
-   */
+  const ensureTemplate = async (templateKey: DashboardTemplateKey) => write(canUseTemplates, null,
+    () => axiosClient.put<unknown>(dashboardFromTemplatePath(templateKey), buildNamedRequest(""), WRITE_CONFIG), (data) => {
+      const receipt = parseDashboardDetailResponse(data);
+      if (receipt.sourceTemplateKey !== templateKey || receipt.accessLevel !== "OWNER" || receipt.ownerUserId !== user?.id) invalidDashboardReceipt();
+      return receipt;
+    });
+  const duplicate = async (id: string, name = "") => write(canUseTemplates && visibleItems.some((item) => item.id === id), id,
+    () => axiosClient.post<unknown>(dashboardDuplicatePath(id), buildNamedRequest(name), WRITE_CONFIG), (data) => {
+      const receipt = parseDashboardDetailResponse(data);
+      if (receipt.id === id || receipt.accessLevel !== "OWNER" || receipt.ownerUserId !== user?.id || (name.trim() && receipt.name !== name.trim())) invalidDashboardReceipt();
+      return receipt;
+    });
+  const remove = async (id: string) => write(canDelete && visibleItems.some((item) => item.id === id && item.accessLevel === "OWNER"), id,
+    () => axiosClient.delete<unknown>(dashboardPath(id), WRITE_CONFIG), (data, status) => {
+      if (status !== 204 || (data !== null && data !== undefined && data !== "")) invalidDashboardReceipt();
+      return null;
+    });
+  const setDefault = async (id: string) => write(visibleItems.some((item) => item.id === id), id,
+    () => axiosClient.put<unknown>(dashboardDefaultPath(id), undefined, WRITE_CONFIG), exact(id, (receipt) => receipt.isDefault));
+  const setFavorite = async (id: string, favorite: boolean) => write(visibleItems.some((item) => item.id === id), id,
+    () => axiosClient.put<unknown>(dashboardFavoritePath(id), { favorite }, WRITE_CONFIG), exact(id, (receipt) => receipt.isFavorite === favorite));
   const openDefault = async (): Promise<DashboardWriteResult> => {
-    setIsSubmitting(true);
+    const ticket = enabled ? startRead() : null;
+    if (!ticket) return enabled ? { ok: false, replayed: false, createdId: null, error: null, ignored: true } : failed(dashboardWriteDenied());
     try {
       const response = await axiosClient.get<unknown>(DASHBOARDS_DEFAULT_PATH, READ_CONFIG);
-      const detail = parseDashboardDetailResponse(response.data);
-      await load();
-      return { ...OK, createdId: detail.id };
-    } catch (error) {
-      return { ok: false, replayed: false, createdId: null, error: normalizeApiError(error) };
-    } finally {
-      setIsSubmitting(false);
-    }
+      const receipt = parseDashboardDetailResponse(response.data);
+      if (!currentRead(ticket)) return { ok: false, replayed: false, createdId: null, error: null, ignored: true };
+      return { ok: true, replayed: false, createdId: receipt.id, error: null };
+    } catch (error) { return currentRead(ticket) ? failed(normalizeApiError(error)) : { ok: false, replayed: false, createdId: null, error: null, ignored: true }; }
   };
-
-  const duplicate = async (id: string): Promise<DashboardWriteResult> => {
-    if (!canCreate) return forbidden();
-    setPendingId(id);
-    try {
-      return await write(() =>
-        axiosClient.post<unknown>(dashboardDuplicatePath(id), {}, WRITE_CONFIG),
-      );
-    } finally {
-      setPendingId(null);
-    }
-  };
-
-  const remove = async (id: string): Promise<DashboardWriteResult> => {
-    if (!canDelete) return forbidden();
-    setPendingId(id);
-    try {
-      // 204 No Content — nothing to read back.
-      return await write(() => axiosClient.delete<unknown>(dashboardPath(id), WRITE_CONFIG));
-    } finally {
-      setPendingId(null);
-    }
-  };
-
-  /**
-   * Default and favourite are **read**-permission writes: both handlers carry
-   * `@RequirePermissions('crm.dashboards.read')`, because they store a
-   * per-user preference rather than editing the dashboard.
-   */
-  const setDefault = async (id: string): Promise<DashboardWriteResult> => {
-    const previous = items;
-    setItems((current) => current.map((item) => ({ ...item, isDefault: item.id === id })));
-    setPendingId(id);
-    try {
-      const result = await write(() =>
-        axiosClient.put<unknown>(dashboardDefaultPath(id), undefined, WRITE_CONFIG),
-      );
-      if (!result.ok) setItems(previous);
-      return result;
-    } finally {
-      setPendingId(null);
-    }
-  };
-
-  const setFavorite = async (id: string, favorite: boolean): Promise<DashboardWriteResult> => {
-    const previous = items;
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, isFavorite: favorite } : item)),
-    );
-    setPendingId(id);
-    try {
-      const result = await write(() =>
-        axiosClient.put<unknown>(dashboardFavoritePath(id), { favorite }, WRITE_CONFIG),
-      );
-      if (!result.ok) setItems(previous);
-      return result;
-    } finally {
-      setPendingId(null);
-    }
-  };
-
-  return {
-    items: filteredItems,
-    catalog,
-    catalogFailed,
-    hasLoaded,
-    isLoading,
-    hasMore: nextCursor !== null,
-    loadMore: () => nextCursor && !isLoading ? load(undefined, nextCursor) : Promise.resolve(),
-    isSubmitting,
-    pendingId,
-    queryError,
-    canCreate,
-    canDelete,
-    searchQuery,
-    setSearchQuery,
-    create,
-    ensureTemplate,
-    openDefault,
-    duplicate,
-    remove,
-    setDefault,
-    setFavorite,
-    reload: () => load(),
-  };
+  return { items: filteredItems, catalog: visible ? catalog : null, catalogFailed: visible && catalogFailed,
+    catalogError: attemptScope === scope ? catalogError : null, hasLoaded: visible, isLoading: enabled && (attemptScope !== scope || isLoading), hasMore: visible && nextCursor !== null,
+    loadMore: () => nextCursor && visible && !isLoading ? load(undefined, nextCursor) : Promise.resolve(false),
+    isSubmitting, pendingId, queryError: attemptScope === scope ? queryError : null,
+    canCreate: canCreate && !safety.blocked, canUseTemplates: canUseTemplates && !safety.blocked,
+    mayUseTemplates: canUseTemplates,
+    canDelete: canDelete && !safety.blocked, canMutate: safety.canMutate && !safety.blocked,
+    needsReconciliation: safety.blocked, reviewReady: safety.reviewReady, acknowledge: safety.acknowledge,
+    searchQuery, setSearchQuery, create, ensureTemplate, openDefault, duplicate, remove, setDefault, setFavorite,
+    reload: () => load() };
 }
 
-function forbidden(): DashboardWriteResult {
-  return { ok: false, replayed: false, createdId: null, error: { status: 403, code: "FORBIDDEN" } };
-}
 
-function localFailure(error: unknown): DashboardWriteResult {
-  return {
-    ok: false,
-    replayed: false,
-    createdId: null,
-    error: { status: 0, code: error instanceof Error ? error.message : "INVALID_INPUT" },
-  };
-}
+
+

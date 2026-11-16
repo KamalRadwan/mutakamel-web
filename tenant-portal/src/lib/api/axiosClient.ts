@@ -10,14 +10,12 @@ import {
   readLatestTenantAuthEvent,
   type TenantAuthEvent,
 } from "../auth/sessionCoordinator";
-import { safeSessionStorage, safeStorage } from "../safeStorage";
+import { SALES_DRAFT_TYPING_PREFIX, SALES_PUBLISH_RECOVERY_PREFIX, safeSessionStorage, safeStorage } from "../safeStorage";
 import { generateUUIDv7 } from "../uuid";
-import { ar } from "../../i18n/dictionaries/ar";
-import { en } from "../../i18n/dictionaries/en";
+import { getActiveDictionary, readLanguage } from "../../i18n/dictionary-store";
 
 // Cookie auth and the readable double-submit CSRF proof require same-origin
 // canonical Gateway paths. Deployment ingress owns /api/*.
-const API_BASE_URL = "";
 const SESSION_META_KEY = "tenant_session_meta";
 const REMEMBER_PREFERENCE_KEY = "tenant_auth_remember";
 const TENANT_CSRF_COOKIE = "__Host-mutakamel-tenant-csrf";
@@ -48,6 +46,8 @@ export interface ApiEnvelope<T = any> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface AxiosResponse<T = any> {
+  readonly provenance?: "http";
+  readonly request?: TenantApiClientError["request"];
   data: T;
   status: number;
   statusText: string;
@@ -55,6 +55,14 @@ export interface AxiosResponse<T = any> {
 }
 
 export interface TenantApiRequestConfig extends RequestInit {
+  /** Synchronous owner check at transport dispatch, auth replay and response admission. */
+  assertCurrent?: () => void;
+  /** Keep a write unresolved when Fetch cannot confirm the original response target. */
+  requireExactResponseTarget?: boolean;
+  /** Successful binary downloads still parse HTTP error bodies as JSON. */
+  responseType?: "json" | "blob";
+  /** Require a complete, unencoded 200 download with this exact media type. */
+  expectedBinaryContentType?: string;
   /** Total deadline, including response body and any auth recovery (1..2^31-1 ms). */
   timeoutMs?: number;
   skipAuthRefresh?: boolean;
@@ -67,6 +75,8 @@ export interface TenantApiRequestConfig extends RequestInit {
   skipAutoIdempotency?: boolean;
   /** Reject the response body before JSON parsing when it exceeds this bound. */
   maxResponseBytes?: number;
+  /** Read a successful blob incrementally and cancel the stream if it exceeds this bound. */
+  maxBinaryResponseBytes?: number;
 }
 
 export type AuthSessionClientType = "WEB" | "IOS" | "ANDROID" | "DESKTOP";
@@ -114,7 +124,19 @@ export class TenantApiClientError extends Error {
     data: Record<string, unknown>;
   };
 
-  constructor(message: string, response: TenantApiClientError["response"]) {
+  constructor(
+    message: string,
+    response: TenantApiClientError["response"],
+    readonly provenance: "http" | "client" | "unknown" = "unknown",
+    readonly request?: {
+      readonly endpoint: string;
+      readonly method: string;
+      readonly origin?: string;
+      readonly finalUrl?: string;
+      readonly redirected?: boolean;
+    },
+    readonly rawData?: Readonly<Record<string, unknown>>,
+  ) {
     super(message);
     this.name = "TenantApiClientError";
     this.response = response;
@@ -122,6 +144,12 @@ export class TenantApiClientError extends Error {
 }
 
 interface PreparedRequest {
+  assertCurrent?: () => void;
+  requireExactResponseTarget: boolean;
+  origin?: string;
+  responseType: "json" | "blob";
+  expectedBinaryContentType?: string;
+  maxBinaryResponseBytes?: number;
   endpoint: string;
   url: string;
   init: RequestInit;
@@ -294,6 +322,19 @@ export function clearLocalTenantAuthState(): void {
   if (typeof window === "undefined") return;
   safeSessionStorage.removeItem(SESSION_META_KEY);
   safeStorage.removeItem(REMEMBER_PREFERENCE_KEY);
+  try {
+    // Clear retained quotation authoring content on sign-out.
+    const handoffKey = "trade:quotation:composer-handoff";
+    for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.sessionStorage.key(index);
+      if (key === handoffKey || key?.startsWith(`${handoffKey}:`) || key?.startsWith(SALES_DRAFT_TYPING_PREFIX) ||
+        key?.startsWith(SALES_PUBLISH_RECOVERY_PREFIX)) {
+        window.sessionStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Storage may be unavailable; auth teardown must still complete.
+  }
   lastUserInteractionAt = 0;
   lastActivityAttemptAt = 0;
   lastActivityTouchAt = 0;
@@ -350,7 +391,7 @@ async function requestTenantSessionRefresh(
   let payload: unknown;
   try {
     response = await fetch(
-      `${API_BASE_URL}/api/tenant/core/v1/auth/refresh`,
+      "/api/tenant/core/v1/auth/refresh",
       {
         method: "POST",
         headers: createRequestHeaders({
@@ -367,7 +408,7 @@ async function requestTenantSessionRefresh(
     clearTimeout(timeout);
     signal?.removeEventListener("abort", abortFromCaller);
   }
-  if (!response.ok) throw normalizeApiError(response, payload);
+  if (!response.ok) throw await normalizeApiError(response, payload);
 
   const auth = readWebAuthSessionResponse(payload);
   if (!auth) throw createLocalApiError(500, "INVALID_REFRESH_RESPONSE");
@@ -528,9 +569,14 @@ export async function customTenantFetch<T = any>(
     );
   } catch (error) {
     if (!timedOut) throw error;
-    const copy = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
     const write = !isSafeMethod(prepared.init.method ?? "GET");
-    const message = write ? copy.errors.writeTimedOut : copy.errors.requestTimedOut;
+    // The provider-seeded copy resolves at once; a standalone caller loads
+    // only its active language. If that download fails, the stable code is
+    // still a truthful message and the timeout must not be masked.
+    const copy = await getActiveDictionary().catch(() => null);
+    const message = copy
+      ? (write ? copy.errors.writeTimedOut : copy.errors.requestTimedOut)
+      : "CLIENT_REQUEST_TIMEOUT";
     const idempotencyKey = new Headers(prepared.init.headers).get("x-idempotency-key");
     // A client deadline cannot prove that the server rolled back a write.
     // Keep its exact key as recovery evidence; never replay on timeout.
@@ -543,7 +589,7 @@ export async function customTenantFetch<T = any>(
         message,
         ...(write && idempotencyKey ? { idempotencyKey } : {}),
       },
-    });
+    }, "client");
   } finally {
     clearTimeout(timer);
     callerSignal?.removeEventListener("abort", cancel);
@@ -560,12 +606,44 @@ async function sendPreparedRequest<T>(
   await touchCoreSessionForCrossAppActivity(request);
   request.init.signal?.throwIfAborted();
   assertRequestFenceIsCurrent(request, eventBeforeRequest);
-  const response = await fetch(request.url, request.init);
-  const payload = await readResponsePayload(response, request.maxResponseBytes);
+  const assertOutcomeCurrent = () => {
+    if (!request.assertCurrent) return;
+    request.init.signal?.throwIfAborted();
+    assertRequestFenceIsCurrent(request, eventBeforeRequest);
+  };
+  const scopedBinary = request.responseType === "blob" && request.requireExactResponseTarget &&
+    request.expectedBinaryContentType !== undefined;
+  const checkTargetBeforeRead = scopedBinary || request.maxBinaryResponseBytes !== undefined;
+  let response: Response;
+  let payload: unknown;
+  try {
+    response = await fetch(request.url, request.init);
+    if (scopedBinary) {
+      try {
+        request.init.signal?.throwIfAborted();
+        assertRequestFenceIsCurrent(request, eventBeforeRequest);
+      } catch (error) {
+        void response.body?.cancel().catch(() => undefined);
+        throw error;
+      }
+    }
+    if (checkTargetBeforeRead) assertExactResponseTarget(request, response, true);
+    payload = await readResponsePayload(response, request);
+  } catch (error) {
+    assertOutcomeCurrent();
+    throw error;
+  }
   request.init.signal?.throwIfAborted();
   assertRequestFenceIsCurrent(request, eventBeforeRequest);
   if (!response.ok) {
-    const error = normalizeApiError(response, payload, request.endpoint);
+    let error: TenantApiClientError;
+    try {
+      error = await normalizeApiError(response, payload, request.endpoint, request.init.method, request.origin);
+    } catch (error) {
+      assertOutcomeCurrent();
+      throw error;
+    }
+    assertOutcomeCurrent();
     const code = getAuthErrorCode(error);
     const disposition = classifyAuthFailure(response.status, code);
 
@@ -601,16 +679,20 @@ async function sendPreparedRequest<T>(
     ) {
       publishTenantAuthLifecycle("STALE");
       try {
+        assertOutcomeCurrent();
         publishTenantAuthLifecycle("REFRESHING");
+        assertOutcomeCurrent();
         await coordinateTenantSessionRefresh(
           request.sessionId ?? undefined,
           eventBeforeRequest,
           request.init.signal ?? undefined,
         );
       } catch (refreshError) {
+        assertOutcomeCurrent();
         throw refreshError;
       }
 
+      assertOutcomeCurrent();
       if (!request.replayAfterRefresh) throw error;
       return sendPreparedRequest<T>(
         request,
@@ -624,8 +706,9 @@ async function sendPreparedRequest<T>(
       !request.publicAuthEndpoint &&
       !isTenantActivityEndpoint(request.endpoint)
     ) {
-      if (!request.suppressForbiddenToast) dispatchForbiddenToast(code);
+      if (!request.suppressForbiddenToast) await dispatchForbiddenToast(code, assertOutcomeCurrent);
       if (typeof window !== "undefined") {
+        assertOutcomeCurrent();
         const headers = new Headers(request.init.headers);
         window.dispatchEvent(new CustomEvent<PermissionDenialEvent>(PERMISSION_DENIED_EVENT, {
           detail: {
@@ -641,12 +724,35 @@ async function sendPreparedRequest<T>(
     throw error;
   }
 
+  if (!checkTargetBeforeRead) assertExactResponseTarget(request, response);
+
   return {
+    ...(request.requireExactResponseTarget ? {
+      provenance: "http" as const,
+      request: { endpoint: request.endpoint, method: request.init.method ?? "GET", origin: request.origin,
+        finalUrl: response.url, redirected: response.redirected },
+    } : {}),
     data: payload as T,
     status: response.status,
     statusText: response.statusText,
     headers: response.headers,
   };
+}
+
+function assertExactResponseTarget(request: PreparedRequest, response: Response, requireObservedUrl = false): void {
+  if (!request.requireExactResponseTarget) return;
+  let sameTarget = response.redirected === false && !!request.origin;
+  if (sameTarget && (response.url || requireObservedUrl)) {
+    try {
+      const target = new URL(response.url);
+      sameTarget = target.origin === request.origin && `${target.pathname}${target.search}` === request.endpoint &&
+        !target.hash && !target.username && !target.password;
+    } catch { sameTarget = false; }
+  }
+  if (!sameTarget) {
+    void response.body?.cancel().catch(() => undefined);
+    throw createLocalApiError(409, "RESPONSE_TARGET_UNCONFIRMED");
+  }
 }
 
 async function touchCoreSessionForCrossAppActivity(
@@ -876,7 +982,7 @@ function createRequestHeaders(init?: HeadersInit): Headers {
   const headers = new Headers(init);
   if (!headers.has("Accept-Language")) {
     // Match useLanguage's stored selection and Arabic default, not the browser locale.
-    headers.set("Accept-Language", safeStorage.getItem("tenant_lang") === "en" ? "en" : "ar");
+    headers.set("Accept-Language", readLanguage());
   }
   return headers;
 }
@@ -889,6 +995,10 @@ function prepareRequest(
 ): PreparedRequest {
   assertRelativeGatewayEndpoint(endpoint);
   const {
+    assertCurrent,
+    requireExactResponseTarget = false,
+    responseType = "json",
+    expectedBinaryContentType,
     timeoutMs: _timeoutMs,
     skipAuthRefresh = false,
     suppressForbiddenToast = false,
@@ -896,6 +1006,7 @@ function prepareRequest(
     replayAfterRefresh: replayAfterRefreshOverride = false,
     skipAutoIdempotency = false,
     maxResponseBytes,
+    maxBinaryResponseBytes,
     ...requestInit
   } = options;
   if (
@@ -906,6 +1017,12 @@ function prepareRequest(
   ) {
     throw createLocalApiError(500, "INVALID_RESPONSE_BYTE_BOUND");
   }
+  // Core's template-render storage bucket and PDF result contract allow 25 MiB.
+  if (maxBinaryResponseBytes !== undefined && (responseType !== "blob" ||
+    !Number.isSafeInteger(maxBinaryResponseBytes) || maxBinaryResponseBytes < 1 ||
+    maxBinaryResponseBytes > 25 * 1024 * 1024)) {
+    throw createLocalApiError(500, "INVALID_RESPONSE_BYTE_BOUND");
+  }
   const headers = createRequestHeaders(requestInit.headers);
   const method = (requestInit.method ?? "GET").toUpperCase();
   const publicAuthEndpoint = isPublicTenantAuthEndpoint(endpoint);
@@ -913,7 +1030,9 @@ function prepareRequest(
     ? null
     : capturedSessionMetadata;
   const hasCallerIdempotencyKey = headers.has("x-idempotency-key");
-  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (!headers.has("Accept")) {
+    headers.set("Accept", responseType === "blob" ? "*/*" : "application/json");
+  }
   if (
     requestInit.body !== undefined &&
     !(requestInit.body instanceof FormData) &&
@@ -942,12 +1061,15 @@ function prepareRequest(
   }
   removeLegacyBrowserTokens();
 
-  const url = endpoint.startsWith("http")
-    ? endpoint
-    : `${API_BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
   return {
+    assertCurrent,
+    requireExactResponseTarget,
+    origin: typeof window === "undefined" ? undefined : window.location.origin,
     endpoint,
-    url,
+    url: endpoint,
+    responseType,
+    expectedBinaryContentType,
+    maxBinaryResponseBytes,
     skipAuthRefresh,
     suppressForbiddenToast,
     replayAfterRefresh:
@@ -999,6 +1121,7 @@ function assertRequestFenceIsCurrent(
   ) {
     throw createLocalApiError(409, "AUTH_SESSION_CHANGED");
   }
+  request.assertCurrent?.();
 }
 
 function assertAuthSnapshotIsCurrent(
@@ -1129,9 +1252,35 @@ function readBrowserCookie(name: string): string | undefined {
 
 async function readResponsePayload(
   response: Response,
-  maxResponseBytes?: number,
+  request?: PreparedRequest,
 ): Promise<unknown> {
-  const text = await response.text();
+  const { maxResponseBytes, maxBinaryResponseBytes } = request ?? {};
+  if (response.ok && request?.responseType === "blob") {
+    const { expectedBinaryContentType } = request;
+    if (expectedBinaryContentType !== undefined) {
+      const { signal } = request.init;
+      const contentType = response.headers.get("content-type")?.trim().toLowerCase();
+      const encoding = response.headers.get("content-encoding");
+      if (signal?.aborted || response.status !== 200 || contentType !== expectedBinaryContentType.toLowerCase() ||
+          (encoding !== null && encoding.toLowerCase() !== "identity")) {
+        void response.body?.cancel().catch(() => undefined);
+        signal?.throwIfAborted();
+        throw createLocalApiError(502, "API_RESPONSE_INVALID_BINARY_DOWNLOAD");
+      }
+    }
+    if (maxBinaryResponseBytes !== undefined) {
+      const bytes = await readBoundedResponseBytes(response, maxBinaryResponseBytes, request.init.signal);
+      return new Blob([bytes], { type: response.headers.get("content-type") ?? "" });
+    }
+    const blob = await response.blob();
+    if (maxResponseBytes !== undefined && blob.size > maxResponseBytes) {
+      throw createLocalApiError(502, "API_RESPONSE_TOO_LARGE");
+    }
+    return blob;
+  }
+  const text = maxBinaryResponseBytes !== undefined && maxResponseBytes !== undefined
+    ? new TextDecoder().decode(await readBoundedResponseBytes(response, maxResponseBytes, request?.init.signal))
+    : await response.text();
   if (
     maxResponseBytes !== undefined &&
     new TextEncoder().encode(text).byteLength > maxResponseBytes
@@ -1146,16 +1295,46 @@ async function readResponsePayload(
   }
 }
 
-function normalizeApiError(
+async function readBoundedResponseBytes(response: Response, limit: number, signal?: AbortSignal | null) {
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array(0);
+  const bytes = new Uint8Array(limit);
+  let offset = 0;
+  const cancel = () => { void reader.cancel().catch(() => undefined); };
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    for (;;) {
+      signal?.throwIfAborted();
+      const chunk = await reader.read();
+      signal?.throwIfAborted();
+      if (chunk.done) return bytes.subarray(0, offset);
+      if (chunk.value.byteLength > limit - offset) throw createLocalApiError(502, "API_RESPONSE_TOO_LARGE");
+      bytes.set(chunk.value, offset);
+      offset += chunk.value.byteLength;
+    }
+  } catch (error) {
+    cancel();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    reader.releaseLock();
+  }
+}
+
+async function normalizeApiError(
   response: Response,
   payload: unknown,
   endpoint?: string,
-): TenantApiClientError {
+  method?: string,
+  origin?: string,
+): Promise<TenantApiClientError> {
   const body = record(payload) ?? {};
   const unavailable = response.status === 503 && endpoint !== undefined &&
     /^\/api\/tenant\/core\/v1\/auth\/(login|forgot-password|reset-password|accept-invite)\/?$/u.test(endpoint);
-  const copy = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
-  const message = unavailable ? copy.auth.temporarilyUnavailable : firstString(
+  // Only the auth-unavailable copy is local; every other message is the
+  // server's. A failed translation download falls back to that server copy.
+  const copy = unavailable ? await getActiveDictionary().catch(() => null) : null;
+  const message = copy ? copy.auth.temporarilyUnavailable : firstString(
     body.message,
     body.title,
     body.detail,
@@ -1176,7 +1355,9 @@ function normalizeApiError(
       correlationId,
       ...(details === undefined ? {} : { details }),
     },
-  });
+  }, "http", endpoint && method ? {
+    endpoint, method, origin, finalUrl: response.url, redirected: response.redirected,
+  } : undefined, Object.freeze({ ...body }));
 }
 
 function createLocalApiError(
@@ -1188,18 +1369,18 @@ function createLocalApiError(
     statusText: "",
     headers: new Headers(),
     data: { message: code, errorCode: code, correlationId: "" },
-  });
+  }, "client");
 }
 
 // The one permitted i18n change inside the transport — see
 // docs/architecture/data-layer.md#permitted-changes (D9 in DEFECTS.md).
-// This module has no React tree to read useI18n() from, so it reads the
-// same tenant_lang key useLanguage() does, directly, and selects between
-// the same two dictionary objects I18nContext.tsx does — the strings
-// themselves still live only in i18n/dictionaries/, not duplicated here.
-function dispatchForbiddenToast(code?: string): void {
+// The provider seeds this getter; standalone callers load only their active
+// language. A failed translation download must not mask the original 403.
+async function dispatchForbiddenToast(code: string | undefined, assertOutcomeCurrent: () => void): Promise<void> {
   if (typeof window === "undefined") return;
-  const t = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
+  const t = await getActiveDictionary().catch(() => null);
+  if (!t) return;
+  assertOutcomeCurrent();
   const errors: Readonly<Record<string, string>> = t.coreIdentity.errors;
   const message = code && Object.prototype.hasOwnProperty.call(errors, code)
     ? errors[code]
@@ -1268,12 +1449,15 @@ function isSafeMethod(method: string): boolean {
 
 function assertRelativeGatewayEndpoint(endpoint: string): void {
   if (
-    !endpoint.startsWith("/") ||
-    /^[a-z][a-z\d+.-]*:/iu.test(endpoint) ||
-    endpoint.startsWith("//") ||
-    endpoint.includes("\\")
+    !endpoint.startsWith("/api/tenant/") ||
+    endpoint.includes("\\") ||
+    Array.from(endpoint).some((character) => {
+      const code = character.charCodeAt(0);
+      return code <= 32 || code === 127;
+    }) ||
+    !new URL(endpoint, "https://tenant.invalid").pathname.startsWith("/api/tenant/")
   ) {
-    throw createLocalApiError(400, "UNTRUSTED_API_ORIGIN");
+    throw createLocalApiError(400, "INVALID_TENANT_ENDPOINT");
   }
 }
 

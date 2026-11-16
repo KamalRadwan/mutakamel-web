@@ -2,6 +2,8 @@
   "name": "mutakamel-frontend-workspace",
   "private": true,
   "scripts": {
+    "portal:rebuild": "node scripts/rebuild-portal.mjs",
+    "portal:status": "node scripts/rebuild-portal.mjs --status",
     "scripts-runnable:check": "node scripts/check-runnable-scripts.mjs",
     "scripts-runnable:test": "node --test scripts/check-runnable-scripts.test.mjs",
     "test": "npm run scripts-runnable:test",

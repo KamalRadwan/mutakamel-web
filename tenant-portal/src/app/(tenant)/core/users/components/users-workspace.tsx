@@ -1,202 +1,238 @@
 "use client";
 
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
-import { useTenantAuth } from "@/context/AuthContext";
+import { Plus, RefreshCw } from "lucide-react";
 import {
   Button,
   Card,
   CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   ConfirmActionModal,
-  CORE_IDENTITY_NAV_ITEMS,
   DataTable,
+  DataTableSort,
   FilterBar,
   PageHeader,
   PermissionGate,
-  SubNav,
+  TooltipProvider,
 } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import {
-  USER_STATUSES,
-  userDisplayName,
-  type UserStatus,
-} from "../../contracts/user-contract";
+import { userDisplayName } from "../../contracts/user-contract";
 import { useCoreErrorText } from "../../hooks/useCoreErrorText";
-import { UserFormDrawer, type UserFormValues } from "./UserFormDrawer";
-import { useUserColumns } from "./useUserColumns";
 import { useTenantUsers } from "../hooks/useTenantUsers";
-
-function readUserStatus(value: string): UserStatus | undefined {
-  return USER_STATUSES.find((status) => status === value);
-}
-
-/** `CreateTenantUserDto` — an empty optional is omitted, not sent as "". */
-function toInviteInput(values: UserFormValues) {
-  return {
-    email: values.email,
-    firstName: values.firstName,
-    lastName: values.lastName,
-    companyId: values.companyId,
-    branchId: values.branchId,
-    departmentId: values.departmentId,
-    ...(values.teamId ? { teamId: values.teamId } : {}),
-    ...(values.managerId ? { managerId: values.managerId } : {}),
-    ...(values.employeeCode ? { employeeCode: values.employeeCode } : {}),
-    ...(values.jobTitle ? { jobTitle: values.jobTitle } : {}),
-  };
-}
+import { useUsersWorkplaceLookups } from "../hooks/useUsersWorkplaceLookups";
+import {
+  EMPTY_USER_FORM,
+  toInviteInput,
+  userToFormValues,
+} from "../user-payloads";
+import { UserFormDrawer } from "./UserFormDrawer";
+import { useUserColumns } from "./useUserColumns";
 
 export function UsersWorkspace() {
   const screen = useTenantUsers();
   const { t } = screen;
-  const copy = t.coreIdentity;
-  const { user: actor } = useTenantAuth();
-  const canReadPlacement = ["org.company.read", "org.branch.read", "org.department.read"]
-    .every((permission) => actor?.permissions.includes(permission));
+  const copy = t.coreIdentity.users;
   const describeError = useCoreErrorText();
   const mutationText = describeError(screen.mutationError);
+  const workplace = useUsersWorkplaceLookups(screen.filters);
 
   const columns = useUserColumns({
-    actingUserId: screen.actingUserId,
-    canDeactivate: screen.canDeactivate,
-    canDelete: screen.canDelete,
+    t,
+    resolveActions: screen.resolveActions,
+    resolvePlacement: workplace.resolvePlacement,
+    onEdit: screen.openEdit,
     onAction: screen.requestAction,
   });
 
   const pendingCopy = screen.pendingAction
-    ? copy.users.confirm[screen.pendingAction.action]
+    ? copy.confirm[screen.pendingAction.action]
     : null;
+  const pendingDescription =
+    pendingCopy && screen.pendingAction
+      ? [
+          formatTemplate(pendingCopy.description, {
+            name: userDisplayName(screen.pendingAction.user),
+          }),
+          mutationText,
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      : "";
+  const isModalOpen =
+    screen.isInviteOpen ||
+    screen.editingUser !== null ||
+    screen.pendingAction !== null;
 
   return (
-    <PermissionGate require="users.user.read">
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
-          title={copy.users.title}
-          description={copy.users.subtitle}
+    <PermissionGate
+      require="users.user.read"
+      denied={screen.queryError?.status === 403}
+    >
+      <div className="flex min-w-0 flex-col gap-3 px-2 pb-4 pt-0 sm:px-5 sm:pb-5">
+        <PageHeader
+          className="sr-only p-0"
+          title={copy.title}
           primaryAction={
             screen.canInvite
-              ? { label: copy.users.invite, onClick: screen.openInvite, disabled: !canReadPlacement }
+              ? {
+                  label: copy.invite,
+                  icon: <Plus className="size-4" aria-hidden="true" />,
+                  onClick: screen.openInvite,
+                  disabled: !screen.canInvitePlacement,
+                }
               : undefined
           }
           secondaryActions={
-            <Button size="sm" variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={screen.reload}
+              disabled={screen.isLoading}
+            >
               <RefreshCw
                 className={`size-4 ${screen.isLoading ? "animate-spin" : ""}`}
                 aria-hidden="true"
               />
-              {t.common.retry}
+              {t.coreIdentity.actions.refresh}
             </Button>
           }
         />
 
-        <SubNav items={CORE_IDENTITY_NAV_ITEMS} />
-
-        {screen.canInvite && !canReadPlacement ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            {copy.users.invitePlacementReadRequired}
+        {screen.canInvite && !screen.canInvitePlacement ? (
+          <p
+            role="status"
+            className="rounded-sm border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground"
+          >
+            {copy.invitePlacementReadRequired}
           </p>
         ) : null}
 
-        {screen.isSeatLimitReached ? (
-          // 403 USER_LIMIT_REACHED is an outcome with a next step, not a
-          // permission problem — @CountsAgainstUsers() on POST /users.
-          <Card>
-            <CardContent className="flex flex-col items-start gap-2 py-5">
-              <p className="text-sm font-medium text-foreground">{copy.users.seatLimitTitle}</p>
-              <p className="max-w-prose text-xs text-muted-foreground">
-                {copy.users.seatLimitDescription}
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={TENANT_ROUTES.coreSettings}>{copy.users.seatLimitAction}</Link>
+        {screen.inviteQueuedUser ? (
+          <div
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground"
+          >
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium">
+                {copy.inviteQueued} —{" "}
+                <span dir="ltr">{screen.inviteQueuedUser.email}</span>
+              </span>
+              <span>{copy.inviteQueuedDescription}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={screen.dismissInviteQueued}
+            >
+              {t.common.dismiss}
+            </Button>
+          </div>
+        ) : null}
+
+        {screen.seatLimitReached ? (
+          <Card className="border-warning/40">
+            <CardHeader>
+              <CardTitle>{copy.seatLimitTitle}</CardTitle>
+              <CardDescription>{copy.seatLimitDescription}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-2">
+              {screen.canReadBilling ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={TENANT_ROUTES.coreBilling}>{copy.seatLimitAction}</Link>
                 </Button>
-                <Button variant="ghost" size="sm" onClick={screen.dismissSeatLimit}>
-                  {t.common.dismiss}
-                </Button>
-              </div>
+              ) : null}
+              <Button size="sm" variant="ghost" onClick={screen.dismissSeatLimit}>
+                {t.common.dismiss}
+              </Button>
             </CardContent>
           </Card>
         ) : null}
 
+        <Card className="min-w-0 overflow-hidden p-0">
         <FilterBar
-          filters={[
-            {
-              id: "status",
-              kind: "select",
-              label: copy.fields.status,
-              options: USER_STATUSES.map((status) => ({
-                value: status,
-                label: copy.userStatus[status],
-              })),
-              placeholder: copy.filters.anyStatus,
-            },
-          ]}
-          values={
-            screen.statusFilter
-              ? { status: { kind: "select", value: screen.statusFilter } }
-              : {}
-          }
-          onChange={(next) => {
-            const value = next.status;
-            screen.setStatusFilter(
-              value?.kind === "select" ? readUserStatus(value.value) : undefined,
-            );
-          }}
-          onReset={screen.resetFilters}
+          placement="inline"
+          className="border-b border-border p-4"
+          trailing={<DataTableSort columns={columns} value={screen.sort} onChange={screen.setSort} labels={{ label: t.coreIdentity.sortBy, ascending: t.views.sortAscending, descending: t.views.sortDescending }} />}
+          filters={workplace.filterDefinitions}
+          values={workplace.filterValues}
+          onChange={(next) => screen.setFilters(workplace.parseFilterValues(next))}
+          onReset={() => screen.setFilters({})}
           searchValue={screen.searchQuery}
           onSearchChange={screen.setSearchQuery}
-          searchPlaceholder={copy.users.searchPlaceholder}
+          searchPlaceholder={copy.searchPlaceholder}
           filtersLabel={t.filters.label}
           clearAllLabel={t.filters.clearAll}
         />
 
-        {mutationText && !screen.isInviteOpen ? (
+        {mutationText && !isModalOpen ? (
           <p
             role="alert"
-            className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+            className="rounded-sm border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
           >
             {mutationText}
           </p>
         ) : null}
 
-        <DataTable
-          columns={columns}
-          rows={screen.rows}
-          isLoading={screen.isLoading}
-          error={screen.queryError}
-          onRetry={screen.reload}
-          page={screen.pageInfo}
-          onPageChange={screen.setPage}
-          sort={screen.sort}
-          onSortChange={screen.setSort}
-          rowKey={(user) => user.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: copy.users.loadFailed,
-            emptyTitle: copy.users.empty,
-            selectAll: t.views.selectAll,
-            selectRow: t.views.selectItem,
-            sortAscending: t.views.sortAscending,
-            sortDescending: t.views.sortDescending,
-            notSorted: t.views.notSorted,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) =>
-                formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
+        <TooltipProvider>
+          <DataTable
+            surface="embedded"
+            columns={columns}
+            rows={screen.rows}
+            isLoading={screen.isLoading}
+            error={screen.queryError}
+            onRetry={screen.reload}
+            page={screen.pageInfo}
+            onPageChange={screen.setPage}
+            sort={screen.sort}
+            onSortChange={screen.setSort}
+            rowKey={(user) => user.id}
+            labels={{
+              retry: t.common.retry,
+              errorTitle: copy.loadFailed,
+              emptyTitle: copy.empty,
+              selectAll: t.views.selectAll,
+              selectRow: t.views.selectItem,
+              sortAscending: t.views.sortAscending,
+              sortDescending: t.views.sortDescending,
+              notSorted: t.views.notSorted,
+              pagination: {
+                previous: t.common.previousPage,
+                next: t.common.nextPage,
+                summary: (from, to, total) =>
+                  formatTemplate(t.common.showingOf, { from, to, total }),
+              },
+            }}
+          />
+        </TooltipProvider>
+        </Card>
 
-        {screen.isInviteOpen && canReadPlacement ? <UserFormDrawer
-          mode="invite"
-          isOpen={screen.isInviteOpen}
-          onClose={screen.closeInvite}
-          onSubmit={(values) => screen.handleInvite(toInviteInput(values))}
-          isSubmitting={screen.isSubmitting}
-          error={screen.isInviteOpen ? mutationText : undefined}
-        /> : null}
+        {screen.isInviteOpen ? (
+          <UserFormDrawer
+            mode="invite"
+            isOpen={screen.isInviteOpen}
+            initial={EMPTY_USER_FORM}
+            onClose={screen.closeInvite}
+            onSubmit={(values) => screen.handleInvite(toInviteInput(values))}
+            isSubmitting={screen.isSubmitting}
+            error={mutationText}
+          />
+        ) : null}
+
+        {screen.editingUser ? (
+          <UserFormDrawer
+            key={screen.editingUser.id}
+            mode="edit"
+            isOpen
+            initial={userToFormValues(screen.editingUser)}
+            onClose={screen.closeEdit}
+            onSubmit={screen.handleUpdate}
+            isSubmitting={screen.isSubmitting}
+            error={mutationText}
+          />
+        ) : null}
 
         <ConfirmActionModal
           open={screen.pendingAction !== null}
@@ -204,12 +240,15 @@ export function UsersWorkspace() {
             if (!open) screen.cancelAction();
           }}
           title={pendingCopy?.title ?? ""}
-          description={formatTemplate(pendingCopy?.description ?? "", {
-            name: screen.pendingAction ? userDisplayName(screen.pendingAction.user) : "",
-          })}
-          confirmLabel={pendingCopy?.confirm ?? t.common.confirmDelete}
+          description={pendingDescription}
+          confirmLabel={
+            screen.pendingAction?.action === "suspend" &&
+            screen.pendingAction.user.status === "INVITED"
+              ? copy.revokeInvite
+              : (pendingCopy?.confirm ?? "")
+          }
           cancelLabel={t.common.cancel}
-          onConfirm={() => void screen.confirmPendingAction()}
+          onConfirm={() => void screen.confirmAction()}
           loading={screen.isSubmitting}
         />
       </div>

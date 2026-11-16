@@ -39,7 +39,7 @@ export function useApplicationAccessList({ scope, scopeId }: ScopeTarget) {
   return { t, reload, changePage, data: current?.data ?? null, error: current?.error ?? null,
     loading: allowed && !current, denied: !allowed || current?.error?.status === 403,
     labels: { retry: t.common.retry, errorTitle: t.applicationAccess.loadFailed, emptyTitle: t.applicationAccess.directoryEmpty,
-      selectAll: t.common.actions, selectRow: t.common.actions, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
+      selectAll: t.views.selectAll, selectRow: t.views.selectRow, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
       pagination: { previous: t.common.previousPage, next: t.common.nextPage,
         summary: (from: number, to: number, total: number) => formatTemplate(t.common.showingOf, { from: formatNumber(from, lang), to: formatNumber(to, lang), total: formatNumber(total, lang) }) } },
   };

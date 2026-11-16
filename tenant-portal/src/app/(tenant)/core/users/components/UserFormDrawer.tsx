@@ -1,273 +1,208 @@
 "use client";
 
-import { useState } from "react";
-import { Combobox, Field, FormDrawer, Input } from "@/design-system";
-import { useI18n } from "@/i18n/I18nContext";
+import { Field, FormModal, Input } from "@/design-system";
+import { UserRound } from "lucide-react";
 import {
   USER_EMAIL_MAX_LENGTH,
   USER_EMPLOYEE_CODE_MAX_LENGTH,
   USER_JOB_TITLE_MAX_LENGTH,
   USER_NAME_MAX_LENGTH,
 } from "../../contracts/user-contract";
-import { useOrgNodeOptions, useTenantUserOptions } from "../../hooks/useCoreOptions";
+import { useUserFormModal } from "../hooks/useUserFormModal";
+import type { UserFormValues } from "../user-payloads";
+import { UserPlacementFields } from "./UserPlacementFields";
+
+export type { UserFormValues } from "../user-payloads";
 
 interface UserFormDrawerProps {
-  isOpen: boolean;
-  /**
-   * Invite sends `CreateTenantUserDto`; edit sends `UpdateTenantUserDto`, which
-   * carries **no `email`** — the address is fixed at invite time.
-   */
   mode: "invite" | "edit";
-  initial?: Partial<UserFormValues>;
+  isOpen: boolean;
+  initial: UserFormValues;
   onClose: () => void;
-  /**
-   * Receives the trimmed form values, not a DTO. Invite and edit send different
-   * bodies — `UpdateTenantUserDto` has no `email` and Core rejects unknown keys
-   * — so each caller maps these to the shape its own route declares.
-   */
   onSubmit: (values: UserFormValues) => Promise<boolean>;
   isSubmitting: boolean;
   error?: string;
 }
 
-export interface UserFormValues {
-  email: string;
-  firstName: string;
-  lastName: string;
-  companyId: string;
-  branchId: string;
-  departmentId: string;
-  teamId: string;
-  managerId: string;
-  employeeCode: string;
-  jobTitle: string;
-}
-
-const EMPTY: UserFormValues = {
-  email: "",
-  firstName: "",
-  lastName: "",
-  companyId: "",
-  branchId: "",
-  departmentId: "",
-  teamId: "",
-  managerId: "",
-  employeeCode: "",
-  jobTitle: "",
-};
-
+/**
+ * Centered modal (`FormModal` `size="wide"`) for `POST /users` (invite) and
+ * `PATCH /users/:id` (edit), without side rails.
+ */
 export function UserFormDrawer({
-  isOpen,
   mode,
+  isOpen,
   initial,
   onClose,
   onSubmit,
   isSubmitting,
   error,
 }: UserFormDrawerProps) {
-  const { t } = useI18n();
-  const copy = t.coreIdentity;
-  const seed: UserFormValues = { ...EMPTY, ...initial };
-  const [form, setForm] = useState<UserFormValues>(seed);
-  const patch = (next: Partial<UserFormValues>) => setForm((current) => ({ ...current, ...next }));
-  const isInvite = mode === "invite";
-
-  // The placement cascade mirrors the DTO: companyId, branchId and departmentId
-  // are all required, and each level filters the next.
-  const companies = useOrgNodeOptions("companies");
-  const branches = useOrgNodeOptions("branches", { parentId: form.companyId || undefined });
-  const departments = useOrgNodeOptions("departments", { parentId: form.branchId || undefined });
-  const teams = useOrgNodeOptions("teams", { parentId: form.departmentId || undefined });
-  const managers = useTenantUserOptions();
-
-  const isDirty = JSON.stringify(form) !== JSON.stringify(seed);
-  const canSubmit =
-    (!isInvite || form.email.trim().length > 0) &&
-    form.firstName.trim().length > 0 &&
-    form.lastName.trim().length > 0 &&
-    form.companyId.length > 0 &&
-    form.branchId.length > 0 &&
-    form.departmentId.length > 0;
-
-  const pickerLabels = {
-    placeholder: copy.picker.placeholder,
-    searchPlaceholder: copy.picker.searchPlaceholder,
-    loadingLabel: copy.picker.loading,
-    emptyLabel: copy.picker.empty,
-  };
-
-  async function handleSubmit() {
-    const saved = await onSubmit({
-      email: form.email.trim().toLowerCase(),
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      companyId: form.companyId,
-      branchId: form.branchId,
-      departmentId: form.departmentId,
-      teamId: form.teamId,
-      managerId: form.managerId,
-      employeeCode: form.employeeCode.trim(),
-      jobTitle: form.jobTitle.trim(),
-    });
-    if (saved) setForm(seed);
-  }
+  const form = useUserFormModal({ mode, isOpen, initial, onClose, onSubmit });
+  const { t, copy, values } = form;
 
   return (
-    <FormDrawer
+    <FormModal
       open={isOpen}
-      onOpenChange={(open) => {
-        if (open) return;
-        setForm(seed);
-        onClose();
-      }}
-      title={isInvite ? copy.users.inviteTitle : copy.users.editTitle}
-      description={isInvite ? copy.users.inviteDescription : copy.users.editDescription}
-      isDirty={isDirty}
+      onOpenChange={form.handleOpenChange}
+      size="wide"
+      headerIcon={<span className="flex size-10 items-center justify-center rounded-md border border-primary/20 bg-primary/5 text-primary"><UserRound className="size-5" aria-hidden="true" /></span>}
+      title={mode === "invite" ? copy.users.inviteTitle : copy.users.editTitle}
+      description={
+        mode === "invite"
+          ? copy.users.inviteDescription
+          : copy.users.editDescription
+      }
+      isDirty={form.isDirty}
       isSubmitting={isSubmitting}
-      submitDisabled={!canSubmit}
-      onSubmit={() => void handleSubmit()}
+      submitDisabled={!form.valid}
+      onSubmit={() => void form.handleSubmit()}
       error={error}
       labels={{
-        submit: isInvite ? copy.users.inviteSubmit : t.common.save,
+        submit: mode === "invite" ? copy.users.inviteSubmit : t.common.save,
         cancel: t.common.cancel,
+        close: copy.actions.close,
         discardTitle: t.common.discardTitle,
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
+        sections: t.common.general,
+        sectionInvalid: copy.errors.UNKNOWN,
       }}
     >
-      <div className="flex flex-col gap-4">
-        {/* `UpdateTenantUserDto` has no `email` key and the pipe runs
-            forbidNonWhitelisted, so sending one on edit is a 400 — the field is
-            read-only rather than absent, so the reader still sees the address. */}
-        <Field
-          label={copy.users.email}
-          hint={isInvite ? copy.users.emailHint : copy.users.emailFixed}
-          readOnly={!isInvite}
-          required={isInvite}
-        >
-          <Input size="sm" placeholder={copy.users.email}
-            type="email"
-            dir="ltr"
-            value={form.email}
-            onChange={(event) => patch({ email: event.target.value })}
-            maxLength={USER_EMAIL_MAX_LENGTH}
-            disabled={isSubmitting}
-            readOnly={!isInvite}
-            required={isInvite}
-          />
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={copy.users.firstName} required>
-            <Input size="sm" placeholder={copy.users.firstName}
-              value={form.firstName}
-              onChange={(event) => patch({ firstName: event.target.value })}
+      <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label={copy.users.firstName}
+            error={form.firstNameValidation.error}
+            showLabel
+            required
+          >
+            <Input
+              size="sm"
+              placeholder={copy.users.firstName}
+              value={values.firstName}
+              onChange={(event) => form.patchValues({ firstName: event.target.value })}
+              onBlur={form.firstNameValidation.fieldProps.onBlur}
               maxLength={USER_NAME_MAX_LENGTH}
               disabled={isSubmitting}
               required
             />
           </Field>
-          <Field label={copy.users.lastName} required>
-            <Input size="sm" placeholder={copy.users.lastName}
-              value={form.lastName}
-              onChange={(event) => patch({ lastName: event.target.value })}
+
+          <Field
+            label={copy.users.lastName}
+            error={form.lastNameValidation.error}
+            showLabel
+            required
+          >
+            <Input
+              size="sm"
+              placeholder={copy.users.lastName}
+              value={values.lastName}
+              onChange={(event) => form.patchValues({ lastName: event.target.value })}
+              onBlur={form.lastNameValidation.fieldProps.onBlur}
               maxLength={USER_NAME_MAX_LENGTH}
               disabled={isSubmitting}
               required
             />
           </Field>
-        </div>
 
-        <Field label={copy.levels.companies.parentLabel} required>
-          <Combobox
-            {...pickerLabels}
-            value={form.companyId || undefined}
-            selectedLabel={companies.labelFor(form.companyId)}
-            onValueChange={(next) =>
-              patch({ companyId: next ?? "", branchId: "", departmentId: "", teamId: "" })
-            }
-            options={companies.options}
-            onSearch={companies.search}
-            loading={companies.isLoading}
-            disabled={isSubmitting}
-          />
-        </Field>
+          <div className="sm:col-span-2">
+            {mode === "invite" ? (
+              <Field
+                label={copy.users.email}
+                hint={copy.users.emailHint}
+                error={form.emailValidation.error}
+                showLabel
+                required
+              >
+                <Input
+                  size="sm"
+                  type="email"
+                  dir="ltr"
+                  placeholder="name@company.com"
+                  value={values.email}
+                  onChange={(event) => form.patchValues({ email: event.target.value })}
+                  onBlur={form.emailValidation.fieldProps.onBlur}
+                  maxLength={USER_EMAIL_MAX_LENGTH}
+                  disabled={isSubmitting}
+                  required
+                />
+              </Field>
+            ) : (
+              <Field
+                label={copy.users.email}
+                hint={copy.users.emailFixed}
+                showLabel
+                readOnly
+              >
+                <Input
+                  size="sm"
+                  type="email"
+                  dir="ltr"
+                  value={values.email}
+                  readOnly
+                />
+              </Field>
+            )}
+          </div>
 
-        <Field label={copy.levels.branches.parentLabel} hint={copy.users.branchHint} required>
-          <Combobox
-            {...pickerLabels}
-            value={form.branchId || undefined}
-            selectedLabel={branches.labelFor(form.branchId)}
-            onValueChange={(next) => patch({ branchId: next ?? "", departmentId: "", teamId: "" })}
-            options={branches.options}
-            onSearch={branches.search}
-            loading={branches.isLoading}
-            disabled={isSubmitting || form.companyId.length === 0}
-          />
-        </Field>
-
-        <Field label={copy.levels.departments.parentLabel} required>
-          <Combobox
-            {...pickerLabels}
-            value={form.departmentId || undefined}
-            selectedLabel={departments.labelFor(form.departmentId)}
-            onValueChange={(next) => patch({ departmentId: next ?? "", teamId: "" })}
-            options={departments.options}
-            onSearch={departments.search}
-            loading={departments.isLoading}
-            disabled={isSubmitting || form.branchId.length === 0}
-          />
-        </Field>
-
-        <Field label={copy.levels.teams.parentLabel}>
-          <Combobox
-            {...pickerLabels}
-            clearLabel={copy.picker.clear}
-            value={form.teamId || undefined}
-            selectedLabel={teams.labelFor(form.teamId)}
-            onValueChange={(next) => patch({ teamId: next ?? "" })}
-            options={teams.options}
-            onSearch={teams.search}
-            loading={teams.isLoading}
-            disabled={isSubmitting || form.departmentId.length === 0}
-          />
-        </Field>
-
-        <Field label={copy.users.manager}>
-          <Combobox
-            {...pickerLabels}
-            clearLabel={copy.picker.clear}
-            value={form.managerId || undefined}
-            selectedLabel={managers.labelFor(form.managerId)}
-            onValueChange={(next) => patch({ managerId: next ?? "" })}
-            options={managers.options}
-            onSearch={managers.search}
-            loading={managers.isLoading}
-            disabled={isSubmitting}
-          />
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={copy.users.employeeCode}>
-            <Input size="sm" placeholder={copy.users.employeeCode}
+          <Field
+            label={copy.users.employeeCode}
+            error={form.employeeCodeValidation.error}
+            showLabel
+          >
+            <Input
+              size="sm"
               dir="ltr"
-              value={form.employeeCode}
-              onChange={(event) => patch({ employeeCode: event.target.value })}
+              placeholder={copy.users.employeeCode}
+              value={values.employeeCode}
+              onChange={(event) =>
+                form.patchValues({ employeeCode: event.target.value })
+              }
+              onBlur={form.employeeCodeValidation.fieldProps.onBlur}
               maxLength={USER_EMPLOYEE_CODE_MAX_LENGTH}
               disabled={isSubmitting}
             />
           </Field>
-          <Field label={copy.users.jobTitle}>
-            <Input size="sm" placeholder={copy.users.jobTitle}
-              value={form.jobTitle}
-              onChange={(event) => patch({ jobTitle: event.target.value })}
+
+          <Field label={copy.users.jobTitle} showLabel>
+            <Input
+              size="sm"
+              placeholder={copy.users.jobTitle}
+              value={values.jobTitle}
+              onChange={(event) => form.patchValues({ jobTitle: event.target.value })}
               maxLength={USER_JOB_TITLE_MAX_LENGTH}
               disabled={isSubmitting}
             />
           </Field>
         </div>
+
+        <h3 className="border-b border-border pb-2 text-sm font-medium text-foreground">{copy.detail.placement}</h3>
+        <UserPlacementFields
+          values={values}
+          cascade={form.cascade}
+          users={form.users}
+          canReadUsers={form.canReadUsers}
+          isSubmitting={isSubmitting}
+          companyError={
+            form.submitAttempted && !values.companyId
+              ? copy.cascade.chooseCompanyFirst
+              : undefined
+          }
+          branchError={
+            form.submitAttempted && !values.branchId
+              ? copy.cascade.chooseBranchFirst
+              : undefined
+          }
+          departmentError={
+            form.submitAttempted && !values.departmentId
+              ? copy.cascade.chooseDepartmentFirst
+              : undefined
+          }
+          onManagerChange={(managerId) => form.patchValues({ managerId })}
+        />
       </div>
-    </FormDrawer>
+    </FormModal>
   );
 }

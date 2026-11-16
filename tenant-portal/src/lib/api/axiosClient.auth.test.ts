@@ -715,7 +715,7 @@ describe("tenant browser session coordination", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     const controller = new AbortController();
-    const request = api.customTenantFetch("/api/trade/v1/orders", {
+    const request = api.customTenantFetch("/api/tenant/trade/v1/orders", {
       signal: controller.signal,
     });
     controller.abort();

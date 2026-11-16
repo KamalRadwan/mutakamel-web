@@ -22,6 +22,42 @@ vi.mock("@/features/admin/subscriptions/commercial-change/commercial-change.api"
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "billing-test-actor", permissions: ["admin.subscriptions.read", "admin.subscriptions.update", "admin.subscriptions.critical"] } }) }));
 import { TenantBillingPanel } from "./TenantBillingPanel";
 
+it.each([
+  ["en", "Wallet", "Credit", "Top-up"],
+  ["ar", "المحفظة", "إضافة", "شحن الرصيد"],
+] as const)("localizes ledger enums in %s and retains wire titles", (lang, tab, direction, reason) => {
+  render(<TenantBillingPanel lang={lang} workspace={workspaceFixture({
+    ledgerState: "ready",
+    ledger: { items: [{
+      id: "ledger-entry", walletId: "wallet", direction: "CREDIT", reason: "TOP_UP",
+      amountUsd: "10.00", sourceAmount: "10.00", sourceCurrencyCode: "USD",
+      currencyUnitsPerUsd: "1", rateRevisionId: null, rateObservedAt: null,
+      balanceAfterUsd: "110.00", actor: { type: "SYSTEM", id: null },
+      referenceType: null, referenceId: null, note: null, createdAt: "2026-10-31T08:00:00.000Z",
+    }], meta: EMPTY_META },
+  })} />);
+  activateTab(tab);
+  expect(screen.getByRole("tab", { name: tab })).toHaveAttribute("data-state", "active");
+  expect(screen.getByTitle("CREDIT")).toHaveTextContent(direction);
+  expect(screen.getByTitle("TOP_UP")).toHaveTextContent(reason);
+});
+
+it.each([
+  ["en", "Payments", "Succeeded", "Invoice settlement", "Paymob"],
+  ["ar", "المدفوعات", "ناجحة", "تسوية فاتورة", "باي موب"],
+] as const)("localizes payment enums in %s and retains wire titles", (lang, tab, status, purpose, provider) => {
+  render(<TenantBillingPanel lang={lang} workspace={workspaceFixture({
+    payments: { items: [{ ...paymentFixture(), status: "SUCCEEDED", purpose: "INVOICE_SETTLEMENT", provider: "PAYMOB" }], meta: EMPTY_META },
+  })} />);
+  activateTab(tab);
+  expect(screen.getByRole("tab", { name: tab })).toHaveAttribute("data-state", "active");
+  expect(screen.getByTitle("SUCCEEDED")).toHaveTextContent(status);
+  expect(screen.getByTitle("INVOICE_SETTLEMENT")).toHaveTextContent(purpose);
+  expect(screen.getByTitle("PAYMOB")).toHaveTextContent(provider);
+});
+import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
+
 // TenantBillingPanel takes `lang` as a prop (its parent, TenantWorkspaceScreen,
 // owns the language state) and never called useI18n() itself — until this
 // panel's tables moved onto the design-system DataTable/Pagination, which do
@@ -306,6 +342,60 @@ function activateTab(name: string) {
 }
 
 describe("TenantBillingPanel safety boundaries", () => {
+  it.each(["en", "ar"] as const)("localizes local conflicts and unknown failures in %s", (lang) => {
+    const copy = (lang === "ar" ? ar : en).apiErrorMessages;
+    const workspace = workspaceFixture({ mutation: { name: null, error: {
+      isNormalized: true, httpStatus: 409, errorCode: "SUBSCRIPTION_CANCEL_NOT_ALLOWED",
+      message: "Unreviewed local English error", correlationId: "billing-correlation",
+    } } });
+    const view = render(<TenantBillingPanel workspace={workspace} lang={lang} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.billingActionConflict);
+    expect(screen.getByRole("alert")).toHaveTextContent("SUBSCRIPTION_CANCEL_NOT_ALLOWED");
+    expect(screen.getByRole("alert")).toHaveTextContent("billing-correlation");
+    expect(screen.queryByText("Unreviewed local English error")).not.toBeInTheDocument();
+    workspace.mutation.error = { ...workspace.mutation.error!, errorCode: "FUTURE_BILLING_ERROR" };
+    view.rerender(<TenantBillingPanel workspace={workspace} lang={lang} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.generic);
+    expect(screen.getByRole("alert")).toHaveTextContent("FUTURE_BILLING_ERROR");
+  });
+
+  it.each([
+    ["en", "Wallet", "Debit", "Manual debit (MANUAL_DEBIT)", "Balance before", "Balance after"],
+    ["ar", "المحفظة", "خصم", "خصم يدوي (MANUAL_DEBIT)", "الرصيد قبل", "الرصيد بعد"],
+  ] as const)("shows the signed debit effect before confirmation in %s", (lang, tab, direction, reason, before, after) => {
+    const workspace = workspaceFixture({
+      permissions: permissionFixture({ canPreviewWalletAdjustment: true, canConfirmWalletAdjustment: true }),
+      walletPreview: {
+        ...walletPreviewFixture(),
+        direction: "DEBIT",
+        reasonCode: "MANUAL_DEBIT",
+        balanceAfterUsd: "75.00",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      },
+    });
+    render(<TenantBillingPanel workspace={workspace} lang={lang} />);
+    activateTab(tab);
+    expect(screen.getByText(direction)).toBeInTheDocument();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.getByText(before).parentElement).toHaveTextContent("USD 100.00");
+    expect(screen.getByText(after).parentElement).toHaveTextContent("USD 75.00");
+  });
+
+  it.each([
+    ["en", "The wallet preview does not match the requested adjustment"],
+    ["ar", "معاينة المحفظة لا تطابق التعديل المطلوب"],
+  ] as const)("explains a rejected preview in %s", (lang, message) => {
+    const workspace = workspaceFixture({
+      mutation: {
+        name: null,
+        error: { isNormalized: true, httpStatus: 409, errorCode: "WALLET_PREVIEW_MISMATCH", message: "generic conflict" },
+      },
+    });
+    render(<TenantBillingPanel workspace={workspace} lang={lang} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByRole("button", { name: /Confirm adjustment|تأكيد التعديل/ })).not.toBeInTheDocument();
+  });
+
   it.each([
     ["en", "Recover original adjustment", "Wallet"],
     ["ar", "استعادة التعديل الأصلي", "المحفظة"],
@@ -596,7 +686,7 @@ describe("TenantBillingPanel safety boundaries", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("requires explicit confirmation before dispatching a refund", () => {
+  it("requires a valid audit note and fresh confirmation before each refund attempt", async () => {
     const refundPayment = vi.fn().mockResolvedValue(null);
     const workspace = workspaceFixture({
       permissions: permissionFixture({ canRefundPayment: true }),
@@ -611,13 +701,88 @@ describe("TenantBillingPanel safety boundaries", () => {
 
     fireEvent.click(
       screen.getByRole("checkbox", {
-        name: "I confirm this critical refund",
+        name: "I confirm this critical refund: USD 30.00",
       }),
     );
+    expect(refund).toBeDisabled();
+    const note = screen.getByLabelText("Refund audit note (10–500 characters)");
+    expect(note).toBeRequired();
+    expect(note).toHaveAttribute("maxLength", "500");
+    fireEvent.change(note, { target: { value: "   short   " } });
+    expect(refund).toBeDisabled();
+    fireEvent.change(note, { target: { value: "x".repeat(501) } });
+    expect(refund).toBeDisabled();
+    fireEvent.change(note, { target: { value: "Provider refund reviewed" } });
     expect(refund).toBeEnabled();
     fireEvent.click(refund);
 
-    expect(refundPayment).toHaveBeenCalledWith(PAYMENT_ID, undefined);
+    expect(refundPayment).toHaveBeenCalledWith(PAYMENT_ID, "Provider refund reviewed");
+    const confirmation = screen.getByRole("checkbox", { name: "I confirm this critical refund: USD 30.00" });
+    await waitFor(() => expect(confirmation).not.toBeChecked());
+    expect(refund).toBeDisabled();
+    fireEvent.click(refund);
+    expect(refundPayment).toHaveBeenCalledTimes(1);
+    fireEvent.click(confirmation);
+    fireEvent.click(refund);
+    await waitFor(() => expect(refundPayment).toHaveBeenCalledTimes(2));
+    expect(confirmation).not.toBeChecked();
+  });
+
+  it.each(["en", "ar"] as const)("localizes invalid refund notes in %s", (lang) => {
+    const workspace = workspaceFixture({
+      mutation: { name: null, error: { isNormalized: true, httpStatus: 409, errorCode: "PAYMENT_REFUND_NOTE_INVALID", message: "Unreviewed message" } },
+    });
+    render(<TenantBillingPanel workspace={workspace} lang={lang} />);
+    expect(screen.getByText(lang === "ar"
+      ? "أدخل ملاحظة تدقيق للاسترداد يتراوح طولها بين 10 و500 حرف."
+      : "Enter a refund audit note between 10 and 500 characters long.")).toBeInTheDocument();
+    expect(screen.getByText("PAYMENT_REFUND_NOTE_INVALID")).toBeInTheDocument();
+    expect(screen.queryByText("Unreviewed message")).not.toBeInTheDocument();
+  });
+
+  it.each(["success", "error"] as const)("clears refund confirmation after %s without clearing another payment", async (outcome) => {
+    let finish!: (value: PaymentStatusView | null) => void;
+    const refundPayment = vi.fn().mockReturnValue(new Promise<PaymentStatusView | null>((resolve) => { finish = resolve; }));
+    const workspace = workspaceFixture({
+      permissions: permissionFixture({ canRefundPayment: true }),
+      payments: { items: [paymentFixture(), { ...paymentFixture(), paymentId: "other-payment", providerCurrencyCode: "EGP", providerAmount: "1500.00" }], meta: EMPTY_META },
+      refundPayment,
+    });
+    openPayments(workspace);
+    const confirmation = screen.getByRole("checkbox", { name: "I confirm this critical refund: USD 30.00" });
+    const otherConfirmation = screen.getByRole("checkbox", { name: "I confirm this critical refund: EGP 1500.00" });
+    fireEvent.change(screen.getAllByLabelText("Refund audit note (10–500 characters)")[0], { target: { value: "Provider refund reviewed" } });
+    fireEvent.click(confirmation);
+    fireEvent.click(otherConfirmation);
+    fireEvent.click(screen.getAllByRole("button", { name: "Refund" })[0]);
+    expect(confirmation).not.toBeChecked();
+    // Even if rechecked while the command is awaiting its result, completion clears it.
+    fireEvent.click(confirmation);
+    finish(outcome === "success" ? paymentFixture("REFUNDED") : null);
+    await waitFor(() => expect(confirmation).not.toBeChecked());
+    expect(otherConfirmation).toBeChecked();
+  });
+
+  it.each(["success", "error"] as const)("clears cancellation confirmation after %s", async (outcome) => {
+    let finish!: (value: unknown) => void;
+    const cancelSubscription = vi.fn().mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const workspace = workspaceFixture({
+      permissions: permissionFixture({ canCancelSubscription: true }),
+      cancelSubscription,
+    });
+    render(<TenantBillingPanel workspace={workspace} lang="en" />);
+    const confirmation = screen.getByRole("checkbox", { name: "I confirm cancellation" });
+    const cancel = screen.getByRole("button", { name: "Cancel subscription" });
+    fireEvent.click(confirmation);
+    fireEvent.click(cancel);
+    expect(cancelSubscription).toHaveBeenCalledWith();
+    expect(confirmation).not.toBeChecked();
+    fireEvent.click(confirmation);
+    finish(outcome === "success" ? { status: "ACTIVE", scheduled: true, changed: true } : null);
+    await waitFor(() => expect(confirmation).not.toBeChecked());
+    expect(cancel).toBeDisabled();
+    fireEvent.click(cancel);
+    expect(cancelSubscription).toHaveBeenCalledTimes(1);
   });
 
   it("disables apply and confirm commands when their reviewed previews have expired", async () => {

@@ -13,6 +13,7 @@ import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import type { ActivityScope } from "../activity-contract";
 import { ActivityModal } from "../ActivityModal";
+import { ActivityDeepLink } from "../ActivityDeepLink";
 import { ActivityOutcomeDialog } from "../ActivityOutcomeDialog";
 import type { ActivityCommandKind } from "../hooks/useActivityCommands";
 import { activityFilterDefs, activityFilterUpdates, activityFilterValues } from "./activity-filter-defs";
@@ -181,6 +182,7 @@ export function ActivitiesWorkspace({ scope }: ActivitiesWorkspaceProps) {
         </div>
 
         {/* One template modal and one outcome dialog for the whole workspace. */}
+        <ActivityDeepLink scope={scope} onChanged={workspace.refresh} />
         <ActivityModal
           request={modal.request}
           scope={scope}

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getAdminAuthHandling } from "@/lib/api/axiosClient";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll, adminCanAny } from "@/lib/auth/rbac";
+import { adminCanAll, adminCanAny, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { clearPersistedCommandAttempt, preparePersistedCommandAttempt, readPersistedCommandAttempt,
   type PersistedCommandAttempt } from "@/shared/api/persisted-command-recovery";
@@ -23,7 +23,7 @@ export function useInitialCommercial(context: InitialCommercialContext, input: u
   const { user } = useAuth();
   const actorId = user?.id ?? "";
   const canQuote = Boolean(actorId) && adminCanAny(user, ["admin.catalog.read", "admin.tenants.create"]);
-  const canSeed = Boolean(actorId) && adminCanAll(user, ["admin.subscriptions.create", "admin.subscriptions.critical"]);
+  const canSeed = Boolean(actorId) && adminCanAll(user, ADMIN_RBAC_CRITICAL.SUBSCRIPTIONS_CREATE);
   const tenantId = context.purpose === "INITIAL_SEED" ? context.targetTenantId : null;
   const parsed = useMemo(() => {
     try {

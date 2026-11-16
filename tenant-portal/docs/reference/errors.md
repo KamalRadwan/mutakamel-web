@@ -6,6 +6,13 @@ Last source verification: **2026-08-27**
 
 ## The catalogue
 
+### UOM quantity preview (2026-10-31)
+
+`tradeInventory.conversionPreviewInvalid` is a bilingual portal-local validation
+message for an invalid or empty simulator quantity. The input is marked invalid
+and linked to its inline error; the output is withheld until valid input is
+restored. It introduces no backend error code or API request.
+
 ### Trade channel list limit (2026-10-26)
 
 `ChannelPageLimitError` is a portal-local loading failure, not a backend HTTP
@@ -113,6 +120,17 @@ never renders the empty-inbox message. This dictionary key is not a backend
 error code.
 
 ## The rule
+
+### Core screen error text (2026-10-30)
+
+Workspace/email load errors, notification inbox/detail/preferences, audit load
+errors, invite/password-reset errors and profile security errors must pass
+through `useCoreErrorText` / `useCoreOperationsErrorText`. For these surfaces,
+`NormalizedApiError.message` is diagnostic only, including status-0 JavaScript
+exception text. The Core formatter supplies localized code/outcome text or
+`coreIdentity.errors.OFFLINE` / `UNKNOWN`, then appends the localized support
+reference and correlation ID. `CURRENT_PASSWORD_INVALID` uses the existing
+`mfa.errors.currentPassword` copy. No server or transport prose is displayed.
 
 **Branch on HTTP status and the stable error code. Never on message text.**
 

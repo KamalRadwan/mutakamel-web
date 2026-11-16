@@ -20,20 +20,23 @@ export interface TradeDocumentListState<T> {
   pageInfo: { page: number; limit: number; total: number };
   status: string;
   partyId: string;
+  search: string;
+  currencyCode: string;
   isLoading: boolean;
   isRefreshing: boolean;
   queryError: NormalizedApiError | null;
   setPage: (page: number) => void;
   setStatus: (status: string) => void;
   setPartyId: (partyId: string) => void;
+  setSearch: (search: string) => void;
+  setCurrencyCode: (currencyCode: string) => void;
   reload: () => Promise<void>;
 }
 
 /**
  * The list half of every commercial-document screen.
  *
- * `DocumentListQueryDto` reads exactly four parameters — `page`, `limit`,
- * `status` and `partyId` — and nothing else.
+ * Quotations apply status, party, search and currency filters before pagination.
  *
  * The response is flat `{ items, total, page, limit }` with no `totalPages`,
  * `hasNext` or `hasPrev`; `DataTable` derives its own pager from the three
@@ -52,6 +55,11 @@ export function useTradeDocumentList<T>(
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [partyId, setPartyId] = useState(() => urlPartyId);
+  const [search, setSearch] = useState("");
+  const [currencyCode, setCurrencyCode] = useState("");
+  const searchFilter = search.trim();
+  // A currency is sent only when all three ISO letters have been entered.
+  const currencyFilter = /^[A-Z]{3}$/.test(currencyCode) ? currencyCode : "";
   const [result, setResult] = useState<{
     key: string;
     items: T[];
@@ -80,7 +88,7 @@ export function useTradeDocumentList<T>(
     setPreviousScopeKey(scopeKey);
     setPage(1);
   }
-  const requestKey = JSON.stringify([scopeKey, page, status, partyId]);
+  const requestKey = JSON.stringify([scopeKey, page, status, partyId, searchFilter, currencyFilter]);
   // Quarantine old rows during render, before the new scope's effect runs.
   const current = isResolved && result?.key === requestKey ? result : null;
 
@@ -113,6 +121,7 @@ export function useTradeDocumentList<T>(
             page,
             status || undefined,
             isUUIDv7(trimmedPartyId) ? trimmedPartyId : undefined,
+            { search: searchFilter || undefined, currencyCode: currencyFilter || undefined },
           ),
           { signal, headers, maxResponseBytes: TRADE_LIST_RESPONSE_BYTES },
         );
@@ -126,7 +135,7 @@ export function useTradeDocumentList<T>(
           isLoading: false, error: normalizeApiError(error) });
       }
     },
-    [basePath, page, status, partyId, isResolved, headers, parseItem, requestKey],
+    [basePath, page, status, partyId, searchFilter, currencyFilter, isResolved, headers, parseItem, requestKey, setResult],
   );
 
   useEffect(() => {
@@ -154,6 +163,8 @@ export function useTradeDocumentList<T>(
     pageInfo: { page, limit: TRADE_DOCUMENT_PAGE_SIZE, total: current?.total ?? 0 },
     status,
     partyId,
+    search,
+    currencyCode,
     isLoading: isResolved && (!current || (current.isLoading && !current.hasLoaded)),
     isRefreshing: isResolved && (!current || current.isLoading),
     queryError: current?.error ?? null,
@@ -165,6 +176,14 @@ export function useTradeDocumentList<T>(
     setPartyId: (next: string) => {
       setPage(1);
       setPartyId(next);
+    },
+    setSearch: (next: string) => {
+      setPage(1);
+      setSearch(next);
+    },
+    setCurrencyCode: (next: string) => {
+      setPage(1);
+      setCurrencyCode(next.trim().toUpperCase());
     },
     reload,
   };

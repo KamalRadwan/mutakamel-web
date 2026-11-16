@@ -1,6 +1,7 @@
 import {
   adminCan,
   adminCanAll,
+  ADMIN_RBAC_CRITICAL,
   type AdminAuthorizationContext,
 } from "@/lib/auth/rbac";
 import type { InvoicePermissions } from "../types/invoices";
@@ -12,17 +13,8 @@ export function readInvoicePermissions(
     canRead: adminCan(user, "admin.invoices.read"),
     canCreate: adminCan(user, "admin.invoices.create"),
     canUpdate: adminCan(user, "admin.invoices.update"),
-    canIssue: adminCanAll(user, [
-      "admin.invoices.update",
-      "admin.invoices.critical",
-    ]),
-    canVoid: adminCanAll(user, [
-      "admin.invoices.void",
-      "admin.invoices.critical",
-    ]),
-    canRecordOfflinePayment: adminCanAll(user, [
-      "admin.wallet.manage",
-      "admin.billing.critical",
-    ]),
+    canIssue: adminCanAll(user, ADMIN_RBAC_CRITICAL.INVOICES_ISSUE),
+    canVoid: adminCanAll(user, ADMIN_RBAC_CRITICAL.INVOICES_VOID),
+    canRecordOfflinePayment: adminCanAll(user, ADMIN_RBAC_CRITICAL.BILLING_PAYMENT_MANAGE),
   };
 }

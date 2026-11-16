@@ -25,6 +25,7 @@ export function useTenantStorageMigration() {
   const requestGeneration = useRef(0);
   const requestAbort = useRef<AbortController | null>(null);
   const pollTimer = useRef<number | null>(null);
+  const lastKnownMigration = useRef<TenantStorageMigrationView | null>(null);
   // Holds the latest fetchOnce so the scheduled poll below can call it
   // without closing over the useCallback binding before it's declared.
   const fetchOnceRef = useRef<((id: string) => Promise<void>) | null>(null);
@@ -42,23 +43,27 @@ export function useTenantStorageMigration() {
     const controller = new AbortController();
     requestAbort.current = controller;
     setIsLoading(true);
-    setError(null);
     try {
       const result = await tenantStorageMigrationApi.get(id, controller.signal);
-      if (generation !== requestGeneration.current) return;
+      if (generation !== requestGeneration.current || controller.signal.aborted) return;
+      lastKnownMigration.current = result;
       setMigration(result);
-      // A committed migration holding its retained source has stopped
-      // changing even though its status is not terminal. Polling it would
-      // wait forever for a status that only an operator's confirmed deletion
-      // can produce.
-      if (!isStorageMigrationSettled(result)) {
-        pollTimer.current = window.setTimeout(() => void fetchOnceRef.current?.(id), POLL_INTERVAL_MS);
-      }
+      setError(null);
     } catch (caught) {
       if (generation !== requestGeneration.current || controller.signal.aborted) return;
       setError(normalizeApiError(caught));
     } finally {
-      if (generation === requestGeneration.current) setIsLoading(false);
+      if (generation === requestGeneration.current && !controller.signal.aborted) {
+        setIsLoading(false);
+        // A committed migration holding its retained source has stopped
+        // changing even though its status is not terminal. Polling it would
+        // wait forever for a status that only an operator's confirmed deletion
+        // can produce. A failed poll keeps retrying from the last known state.
+        const knownMigration = lastKnownMigration.current;
+        if (knownMigration && !isStorageMigrationSettled(knownMigration)) {
+          pollTimer.current = window.setTimeout(() => void fetchOnceRef.current?.(id), POLL_INTERVAL_MS);
+        }
+      }
     }
   }, []);
   // Ref writes must happen after render, not during it — this runs after
@@ -73,7 +78,9 @@ export function useTenantStorageMigration() {
     (id: string) => {
       clearPoll();
       setMigrationId(id);
+      lastKnownMigration.current = null;
       setMigration(null);
+      setError(null);
       void fetchOnce(id);
     },
     [clearPoll, fetchOnce],
@@ -84,6 +91,7 @@ export function useTenantStorageMigration() {
     requestGeneration.current += 1;
     requestAbort.current?.abort();
     setMigrationId(null);
+    lastKnownMigration.current = null;
     setMigration(null);
     setError(null);
   }, [clearPoll]);

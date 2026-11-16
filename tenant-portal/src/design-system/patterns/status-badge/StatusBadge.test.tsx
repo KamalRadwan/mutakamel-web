@@ -11,6 +11,24 @@ vi.mock("@/i18n/I18nContext", () => ({
 afterEach(cleanup);
 
 describe("StatusBadge", () => {
+  it.each(["NEW", "DISCOVERY", "QUALIFICATION", "PROPOSAL", "NEGOTIATION", "CONTRACTING"])("uses the shared active progress treatment for opportunity %s", (value) => {
+    const { container } = render(<StatusBadge value={value} kind="OpportunityStageFlag" />);
+    expect(screen.getByText(value)).toHaveClass("bg-info-subtle", "text-info-subtle-foreground");
+    expect(container.querySelector(".dot-pending")).toHaveClass("bg-current");
+  });
+
+  it.each([
+    ["WON", "bg-success-subtle"], ["LOST", "bg-destructive-subtle"], ["ON_HOLD", "bg-warning-subtle"],
+  ])("preserves the semantic outcome tone for opportunity %s", (value, tone) => {
+    const { container } = render(<StatusBadge value={value} kind="OpportunityStageFlag" />);
+    expect(screen.getByText(value)).toHaveClass(tone);
+    expect(container.querySelector(".dot-pending")).toBeNull();
+  });
+
+  it("keeps an unknown opportunity stage neutral", () => {
+    render(<StatusBadge value="FUTURE_STAGE" kind="OpportunityStageFlag" />);
+    expect(screen.getByText("FUTURE_STAGE").closest("span")).toHaveClass("bg-muted");
+  });
   it("renders a mapped value with its role's tone and a text label", () => {
     render(<StatusBadge value="CONVERTED" kind="LeadStatus" />);
     expect(screen.getByText("CONVERTED")).toBeInTheDocument();

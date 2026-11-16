@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   isProtectedLeadStage,
+  LEAD_STAGE_LIMIT,
   protectedLeadStageIds,
   type LeadStageItem,
   type UpdateLeadStageFormData,
@@ -25,10 +27,12 @@ export type { LeadStageItem } from "../lead-stage-contract";
 export function useLeadStages() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("crm.lead_stages.manage") ?? false;
+  const { canMutate } = useAccessMode();
+  const canManage = canMutate && (user?.permissions.includes("crm.lead_stages.manage") ?? false);
   const [items, setItems] = useState<LeadStageItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [needsReload, setNeedsReload] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The catalogue fetch's own failure. Handed to DataTable so the error
   // state replaces the empty state rather than stacking with it.
@@ -44,8 +48,10 @@ export function useLeadStages() {
   const reconcileCatalogue = useCallback(async (): Promise<boolean> => {
     try {
       setItems(await readLeadStageCatalogue());
+      setNeedsReload(false);
       return true;
     } catch {
+      setNeedsReload(true);
       return false;
     }
   }, []);
@@ -56,9 +62,11 @@ export function useLeadStages() {
     setLoadError(null);
     try {
       setItems(await readLeadStageCatalogue(signal));
+      setNeedsReload(false);
     } catch (caught) {
       if (isAbortError(caught)) return;
       setItems([]);
+      setNeedsReload(true);
       setLoadError(normalizeApiError(caught));
     } finally {
       if (!signal?.aborted) setIsLoading(false);
@@ -74,7 +82,7 @@ export function useLeadStages() {
   }, [fetchStages]);
 
   const mutations = useLeadStageMutations({
-    canManage,
+    canManage: canManage && !isLoading && !needsReload && !loadError,
     setItems,
     reconcile: reconcileCatalogue,
     notify: setError,
@@ -100,6 +108,9 @@ export function useLeadStages() {
     error,
     loadError,
     canManage,
+    writesBlocked: isLoading || needsReload || loadError !== null || mutations.isMutating,
+    atCapacity: items.length >= LEAD_STAGE_LIMIT,
+    needsReload,
     searchQuery,
     setSearchQuery,
     // A reorder writes the WHOLE catalogue order, so it is driven by the
@@ -108,15 +119,18 @@ export function useLeadStages() {
     isFiltered: searchQuery.trim().length > 0,
     fixedStageIds,
     isCreating: mutations.isCreating,
+    isMutating: mutations.isMutating,
     isDeleting: mutations.isDeleting,
     isUpdating: mutations.isUpdating,
     isReordering: mutations.isReordering,
     settingDefaultId: mutations.settingDefaultId,
     createError: mutations.createError,
     deleteError: mutations.deleteError,
+    deleteBlocked: mutations.deleteBlocked,
     editError: mutations.editError,
     isCreateOpen,
     openCreate: () => {
+      if (!canManage || isLoading || needsReload || loadError || mutations.isMutating || items.length >= LEAD_STAGE_LIMIT) return;
       mutations.clearCreateError();
       setIsCreateOpen(true);
     },
@@ -125,8 +139,9 @@ export function useLeadStages() {
       mutations.clearCreateError();
       setIsCreateOpen(false);
     },
-    selectedForDelete,
+    selectedForDelete: items.find(({ id }) => id === selectedForDelete?.id) ?? selectedForDelete,
     openDelete: (stage: LeadStageItem) => {
+      if (!canManage || isLoading || needsReload || loadError || mutations.isMutating || isProtectedLeadStage(stage) || stage.isDefault) return;
       mutations.clearDeleteError();
       setSelectedForDelete(stage);
     },
@@ -135,9 +150,9 @@ export function useLeadStages() {
       mutations.clearDeleteError();
       setSelectedForDelete(null);
     },
-    selectedForEdit,
+    selectedForEdit: items.find(({ id }) => id === selectedForEdit?.id) ?? selectedForEdit,
     openEdit: (stage: LeadStageItem) => {
-      if (!canManage || isProtectedLeadStage(stage)) return;
+      if (!canManage || isLoading || needsReload || loadError || mutations.isMutating || isProtectedLeadStage(stage)) return;
       mutations.clearEditError();
       setSelectedForEdit(stage);
     },
@@ -148,14 +163,14 @@ export function useLeadStages() {
     },
     handleCreate: mutations.create,
     handleUpdate: async (form: UpdateLeadStageFormData): Promise<boolean> => {
-      const target = selectedForEdit;
+      const target = items.find(({ id }) => id === selectedForEdit?.id) ?? selectedForEdit;
       if (!target) return false;
       const ok = await mutations.update(target, form);
       if (ok) setSelectedForEdit(null);
       return ok;
     },
     handleDelete: async () => {
-      const target = selectedForDelete;
+      const target = items.find(({ id }) => id === selectedForDelete?.id) ?? selectedForDelete;
       if (!target) return;
       if (await mutations.remove(target)) setSelectedForDelete(null);
     },

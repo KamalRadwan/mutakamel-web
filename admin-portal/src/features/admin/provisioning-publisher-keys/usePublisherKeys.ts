@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getApiRequestOutcome } from "@/lib/api/axiosClient";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import {
   normalizeApiError,
@@ -70,11 +70,8 @@ export function usePublisherKeys() {
     user,
     "admin.provisioning.publisher-keys.manage",
   );
-  const canCritical = adminCan(user, "admin.provisioning.critical");
-  const canRegisterOrRevoke = adminCanAll(user, [
-    "admin.provisioning.publisher-keys.manage",
-    "admin.provisioning.critical",
-  ]);
+  const canCritical = adminCan(user, ADMIN_RBAC_CRITICAL.PROVISIONING_PUBLISHER_KEYS_MANAGE[1]);
+  const canRegisterOrRevoke = adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_PUBLISHER_KEYS_MANAGE);
 
   const [listRevision, setListRevision] = useState(0);
   const [directory, setDirectory] =

@@ -1,114 +1,53 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useCan, useRealtimeResync } from "@/design-system";
+import { useRealtimeResync } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   createOrgNode,
   deleteOrgNode,
   fetchOrgNodes,
+  ORG_NODE_SORT_FIELDS,
   readDeletionBlockers,
   updateOrgNode,
   type OrgLevel,
   type OrgNodeOf,
-  type OrgNodeStatus,
-  ORG_NODE_SORT_FIELDS,
   type OrgNodeSortField,
+  type OrgNodeStatus,
+  type OrgHierarchyFilters,
 } from "../../contracts/organization-contract";
-import { ORG_LEVEL_CONFIG, ORG_PARENT_BODY_KEY } from "../level-config";
+import { ORG_LEVEL_CONFIG } from "../level-config";
+import {
+  buildCreateBody,
+  buildUpdateBody,
+  hasSavedCompanyCurrency,
+  ORG_CURRENCY_PATTERN,
+  type OrgNodeFormValues,
+} from "../organization-payloads";
+import {
+  canManageOrgNode,
+  canOpenOrgCreate,
+  canSubmitOrgCreate,
+} from "../organization-permissions";
+import { useOrgLookupResolver } from "./useOrgLookupResolver";
+import type { QuickViewTarget } from "./useQuickViewNode";
 
-export interface OrgNodeFormValues {
-  code: string;
-  name: string;
-  parentId: string;
-  status: OrgNodeStatus;
-  legalName: string;
-  taxNumber: string;
-  currencyCode: string;
-  address: string;
-  phone: string;
-  isHeadquarters: boolean;
-  leadUserId: string;
-}
-
-export const EMPTY_ORG_NODE_FORM: OrgNodeFormValues = {
-  code: "",
-  name: "",
-  parentId: "",
-  status: "ACTIVE",
-  legalName: "",
-  taxNumber: "",
-  currencyCode: "",
-  address: "",
-  phone: "",
-  isHeadquarters: false,
-  leadUserId: "",
-};
-
-function optionalText(value: string): string | undefined {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-/**
- * Only the keys the DTO declares are sent. Core runs `forbidNonWhitelisted`, so
- * a stray key from the shared form object is a 400 rather than a silent ignore.
- */
-function buildCreateBody(level: OrgLevel, values: OrgNodeFormValues): Record<string, unknown> {
-  const config = ORG_LEVEL_CONFIG[level];
-  const body: Record<string, unknown> = {
-    code: values.code.trim().toUpperCase(),
-    name: values.name.trim(),
-  };
-  if (config.parent) {
-    body[ORG_PARENT_BODY_KEY[level as keyof typeof ORG_PARENT_BODY_KEY]] = values.parentId;
-  }
-  if (config.fields.includes("legalName")) body.legalName = optionalText(values.legalName);
-  if (config.fields.includes("taxNumber")) body.taxNumber = optionalText(values.taxNumber);
-  if (config.fields.includes("currencyCode")) {
-    body.currencyCode = optionalText(values.currencyCode.toUpperCase());
-  }
-  if (config.fields.includes("address")) body.address = optionalText(values.address);
-  if (config.fields.includes("phone")) body.phone = optionalText(values.phone);
-  if (config.fields.includes("isHeadquarters")) body.isHeadquarters = values.isHeadquarters;
-  if (config.fields.includes("leadUserId")) body.leadUserId = optionalText(values.leadUserId);
-  return stripUndefined(body);
-}
-
-/** Update DTOs clear text with `""` and the team lead with `null`; omission preserves values. */
-function buildUpdateBody(level: OrgLevel, values: OrgNodeFormValues): Record<string, unknown> {
-  const config = ORG_LEVEL_CONFIG[level];
-  const body: Record<string, unknown> = {
-    name: values.name.trim(),
-    status: values.status,
-  };
-  if (config.fields.includes("legalName")) body.legalName = values.legalName.trim();
-  if (config.fields.includes("taxNumber")) body.taxNumber = values.taxNumber.trim();
-  if (config.fields.includes("currencyCode")) {
-    body.currencyCode = values.currencyCode.trim().toUpperCase();
-  }
-  if (config.fields.includes("address")) body.address = values.address.trim();
-  if (config.fields.includes("phone")) body.phone = values.phone.trim();
-  if (config.fields.includes("isHeadquarters")) body.isHeadquarters = values.isHeadquarters;
-  if (config.fields.includes("leadUserId")) body.leadUserId = optionalText(values.leadUserId) ?? null;
-  return body;
-}
-
-function stripUndefined(body: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
-}
+const ORG_NODE_NOT_EMPTY_CODE = "ORG_NODE_NOT_EMPTY";
+const ORG_HQ_TRANSFER_REQUIRED_CODE = "ORG_HQ_TRANSFER_REQUIRED";
 
 export function useOrganizationLevel<L extends OrgLevel>(level: L) {
   const { t, lang } = useI18n();
+  const { user } = useTenantAuth();
   const config = ORG_LEVEL_CONFIG[level];
-  const canManage = useCan(config.managePermission, { tenantWide: level === "companies" });
+  const canCreate = canOpenOrgCreate(user, level);
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [serverSearch, setServerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrgNodeStatus | undefined>(undefined);
-  const [parentFilter, setParentFilter] = useState<string | undefined>(undefined);
+  const [hierarchyFilters, setHierarchyFilters] = useState<OrgHierarchyFilters>({});
   const [sort, setSortState] = useState<{ id: OrgNodeSortField; direction: "asc" | "desc" }>({
     id: "name",
     direction: "asc",
@@ -123,9 +62,14 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
   const [mutationError, setMutationError] = useState<NormalizedApiError | null>(null);
   const [editing, setEditing] = useState<OrgNodeOf<L> | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [draftDepartmentId, setDraftDepartmentId] = useState("");
+  const [quickViewTarget, setQuickViewTarget] = useState<QuickViewTarget | null>(null);
+
   const [pendingDelete, setPendingDelete] = useState<OrgNodeOf<L> | null>(null);
   const [blockedNode, setBlockedNode] = useState<OrgNodeOf<L> | null>(null);
   const [blockers, setBlockers] = useState<string[]>([]);
+  const [hqTransferBlockedNode, setHqTransferBlockedNode] = useState<OrgNodeOf<L> | null>(null);
+  const [hqTransferError, setHqTransferError] = useState<NormalizedApiError | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -136,9 +80,6 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
   }, [searchQuery]);
 
   useEffect(() => {
-    // Deferred past the effect body on purpose: a synchronous setState there
-    // cascades an extra render (react-hooks/set-state-in-effect), and the abort
-    // check means a torn-down screen never writes at all.
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -148,37 +89,68 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
         page,
         search: serverSearch,
         status: statusFilter,
-        parentId: parentFilter,
+        ...hierarchyFilters,
         sortBy: sort.id,
         sortDir: sort.direction === "asc" ? "ASC" : "DESC",
         signal: controller.signal,
       })
         .then((result) => {
           if (controller.signal.aborted) return;
+          const validPage =
+            typeof result.totalPages === "number"
+              ? Math.max(1, result.totalPages)
+              : Math.max(1, Math.ceil(result.total / Math.max(1, result.limit)));
+          if (page > validPage) {
+            setPage(validPage);
+            return;
+          }
           setRows(result.items as OrgNodeOf<L>[]);
           setPageInfo({ page: result.page, limit: result.limit, total: result.total });
+          setIsLoading(false);
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
           setRows([]);
           setQueryError(normalizeApiError(error));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setIsLoading(false);
+          setIsLoading(false);
         });
     });
     return () => controller.abort();
-  }, [level, page, serverSearch, statusFilter, parentFilter, reloadToken, sort]);
+  }, [level, page, hierarchyFilters, reloadToken, serverSearch, sort, statusFilter]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
-
-  // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
-  // an ALL-scoped resync, a realtime reconnect, and a return from offline.
   useRealtimeResync(reload);
 
+  const lookupTargets = useMemo(() => {
+    const records: OrgNodeOf<L>[] = editing ? [...rows, editing] : rows;
+    const rowDeptIds = records.flatMap((row) =>
+      "departmentId" in row ? [row.departmentId] : [],
+    );
+    return {
+      companyIds: records.flatMap((row) => ("companyId" in row ? [row.companyId] : [])),
+      branchIds: records.flatMap((row) => ("branchId" in row ? [row.branchId] : [])),
+      departmentIds: draftDepartmentId ? [...rowDeptIds, draftDepartmentId] : rowDeptIds,
+      userIds: records.flatMap((row) =>
+        "leadUserId" in row && row.leadUserId ? [row.leadUserId] : [],
+      ),
+    };
+  }, [draftDepartmentId, editing, rows]);
+
+  const lookups = useOrgLookupResolver(lookupTargets);
+
+  const canManageRow = useCallback(
+    (node: OrgNodeOf<L>) => canManageOrgNode(user, level, node, lookups),
+    [level, lookups, user],
+  );
+
+  const canSubmitCreate = useCallback(
+    (values: OrgNodeFormValues) => canSubmitOrgCreate(user, level, values, lookups),
+    [level, lookups, user],
+  );
+
   const runWrite = useCallback(
-    async (work: () => Promise<void>): Promise<boolean> => {
-      if (!canManage) return false;
+    async (allowed: boolean, work: () => Promise<void>): Promise<boolean> => {
+      if (!allowed) return false;
       setIsSubmitting(true);
       setMutationError(null);
       try {
@@ -192,33 +164,37 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
         setIsSubmitting(false);
       }
     },
-    [canManage, reload],
+    [reload],
   );
 
   const handleCreate = useCallback(
     (values: OrgNodeFormValues) =>
-      runWrite(async () => {
+      runWrite(canSubmitCreate(values), async () => {
         await createOrgNode(level, buildCreateBody(level, values));
         setIsCreateOpen(false);
       }),
-    [level, runWrite],
+    [canSubmitCreate, level, runWrite],
   );
 
   const handleUpdate = useCallback(
     (values: OrgNodeFormValues) => {
       const target = editing;
-      if (!target) return Promise.resolve(false);
-      return runWrite(async () => {
+      if (!target || !canManageRow(target)) return Promise.resolve(false);
+      if ("currencyCode" in target && hasSavedCompanyCurrency(target.currencyCode)) {
+        const trimmed = values.currencyCode.trim().toUpperCase();
+        if (!ORG_CURRENCY_PATTERN.test(trimmed)) return Promise.resolve(false);
+      }
+      return runWrite(true, async () => {
         await updateOrgNode(level, target.id, buildUpdateBody(level, values));
         setEditing(null);
       });
     },
-    [editing, level, runWrite],
+    [canManageRow, editing, level, runWrite],
   );
 
   const handleDelete = useCallback(async () => {
     const target = pendingDelete;
-    if (!target || !canManage) return;
+    if (!target || !canManageRow(target)) return;
     setIsSubmitting(true);
     setMutationError(null);
     try {
@@ -229,7 +205,13 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
       const normalized = normalizeApiError(error);
       const found = readDeletionBlockers(normalized);
       setPendingDelete(null);
-      if (found.length > 0) {
+      if (normalized.status === 409 && normalized.code === ORG_HQ_TRANSFER_REQUIRED_CODE) {
+        setHqTransferError(normalized);
+        setHqTransferBlockedNode(target);
+      } else if (
+        found.length > 0 ||
+        (normalized.status === 409 && normalized.code === ORG_NODE_NOT_EMPTY_CODE)
+      ) {
         setBlockers(found);
         setBlockedNode(target);
       } else {
@@ -238,7 +220,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canManage, level, pendingDelete, reload]);
+  }, [canManageRow, level, pendingDelete, reload]);
 
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
     const field = ORG_NODE_SORT_FIELDS.find((allowed) => allowed === next.id);
@@ -247,51 +229,62 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
     setPage(1);
   }, []);
 
-  return useMemo(
-    () => ({
-      t,
-      lang,
-      sort,
-      setSort,
-      config,
-      canManage,
-      rows,
-      pageInfo,
-      isLoading,
-      queryError,
-      searchQuery,
-      setSearchQuery,
-      statusFilter,
-      setStatusFilter,
-      parentFilter,
-      setParentFilter,
-      page,
-      setPage,
-      reload,
-      isSubmitting,
-      mutationError,
-      clearMutationError: () => setMutationError(null),
-      isCreateOpen,
-      openCreate: () => canManage && setIsCreateOpen(true),
-      closeCreate: () => setIsCreateOpen(false),
-      editing,
-      startEdit: (node: OrgNodeOf<L>) => canManage && setEditing(node),
-      cancelEdit: () => setEditing(null),
-      pendingDelete,
-      requestDelete: (node: OrgNodeOf<L>) => canManage && setPendingDelete(node),
-      cancelDelete: () => setPendingDelete(null),
-      blockedNode,
-      blockers,
-      dismissBlockers: () => setBlockedNode(null),
-      handleCreate,
-      handleUpdate,
-      handleDelete,
-    }),
-    [
-      blockedNode, blockers, canManage, config, editing, handleCreate, handleDelete,
-      handleUpdate, isCreateOpen, isLoading, isSubmitting, lang, mutationError, page,
-      pageInfo, parentFilter, pendingDelete, queryError, reload, rows, searchQuery,
-      setSort, sort, statusFilter, t,
-    ],
+  const openQuickView = useCallback(
+    (node: OrgNodeOf<L>) => setQuickViewTarget({ kind: "node", level, node }),
+    [level],
   );
+
+  return {
+    t,
+    lang,
+    sort,
+    setSort,
+    config,
+    canManage: canCreate,
+    canCreate,
+    canManageRow,
+    canSubmitCreate,
+    lookups,
+    rows,
+    pageInfo,
+    isLoading,
+    queryError,
+    searchQuery,
+    setSearchQuery,
+    statusFilter,
+    setStatusFilter,
+    hierarchyFilters,
+    setHierarchyFilters,
+    page,
+    setPage,
+    reload,
+    isSubmitting,
+    mutationError,
+    clearMutationError: () => setMutationError(null),
+    isCreateOpen,
+    openCreate: () => canCreate && setIsCreateOpen(true),
+    closeCreate: () => setIsCreateOpen(false),
+    setDraftDepartmentId,
+    editing,
+    startEdit: (node: OrgNodeOf<L>) => canManageRow(node) && setEditing(node),
+    cancelEdit: () => setEditing(null),
+    quickViewTarget,
+    openQuickView,
+    closeQuickView: () => setQuickViewTarget(null),
+    pendingDelete,
+    requestDelete: (node: OrgNodeOf<L>) => canManageRow(node) && setPendingDelete(node),
+    cancelDelete: () => setPendingDelete(null),
+    blockedNode,
+    blockers,
+    dismissBlockers: () => setBlockedNode(null),
+    hqTransferBlockedNode,
+    hqTransferError,
+    dismissHqTransfer: () => {
+      setHqTransferBlockedNode(null);
+      setHqTransferError(null);
+    },
+    handleCreate,
+    handleUpdate,
+    handleDelete,
+  };
 }

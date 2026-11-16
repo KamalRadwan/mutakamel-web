@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { TagColor } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient, type TenantApiRequestConfig } from "@/lib/api/axiosClient";
@@ -18,6 +18,7 @@ import {
   type CrmTagCatalogueItem,
 } from "../../shared/tag-contract";
 import type { CrmTagFormTarget } from "./useCrmTags";
+import { CRM_TAG_CATALOGUE_LIMIT } from "../tag-limits";
 
 // Neither write is idempotent in the Gateway contract: no replay, no key.
 const WRITE_CONFIG: TenantApiRequestConfig = {
@@ -34,6 +35,7 @@ export interface UseCrmTagFormOptions {
   onSaved: (tag: CrmTagCatalogueItem) => void;
   /** An outcome the list must re-read before anyone acts again. */
   onReloadNeeded: (message: string) => void;
+  canWrite: boolean;
 }
 
 /**
@@ -41,7 +43,7 @@ export interface UseCrmTagFormOptions {
  * textColor }`; edit patches only the keys that changed, with the colours as a
  * pair — see `buildUpdateCrmTagBody`.
  */
-export function useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded }: UseCrmTagFormOptions) {
+export function useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded, canWrite }: UseCrmTagFormOptions) {
   const { t } = useI18n();
   const errors = t.crmTags.errors;
   const original = target.mode === "edit" ? target.tag : null;
@@ -51,6 +53,14 @@ export function useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded }:
   const [serverError, setServerError] = useState<string | null>(null);
   const [nameTaken, setNameTaken] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
+  const completed = useRef(false);
+  const [colorValid, setColorValid] = useState(true);
+  const colorValidity = useRef(true);
+  const handleColorValidityChange = useCallback((valid: boolean) => {
+    colorValidity.current = valid;
+    setColorValid(valid);
+  }, []);
 
   const trimmed = name.trim();
   const updateBody = original ? buildUpdateCrmTagBody(original, name, color) : null;
@@ -71,23 +81,36 @@ export function useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded }:
 
   async function submit() {
     setTouched(true);
-    if (validate() !== null || isSubmitting) return;
+    if (!canWrite || validate() !== null || submitting.current || completed.current) return;
+    if (!colorValidity.current) {
+      setServerError(errors.colorIncomplete);
+      return;
+    }
+    if (!original && existingTags.length >= CRM_TAG_CATALOGUE_LIMIT) {
+      setServerError(errors.limitExceeded);
+      return;
+    }
     if (original && updateBody === null) {
       setServerError(errors.updateEmpty);
       return;
     }
+    submitting.current = true;
     setIsSubmitting(true);
     setServerError(null);
     try {
       const response = original
         ? await axiosClient.patch<unknown>(crmTagPath(original.id), updateBody, WRITE_CONFIG)
         : await axiosClient.post<unknown>(CRM_TAGS_PATH, buildCreateCrmTagBody(trimmed, color), WRITE_CONFIG);
-      onSaved(parseCrmTagCatalogueItem(response.data));
+      const saved = parseCrmTagCatalogueItem(response.data);
+      completed.current = true;
+      onSaved(saved);
     } catch (error) {
       const failure = readCrmTagError(error);
       if (failure === null || failure.status >= 500) {
+        completed.current = true;
         onReloadNeeded(errors.uncertain);
       } else if (failure.code === "CRM_TAG_NOT_FOUND" || failure.status === 404) {
+        completed.current = true;
         onReloadNeeded(errors.notFound);
       } else if (failure.code === "CRM_TAG_NAME_TAKEN" || failure.status === 409) {
         setNameTaken(true);
@@ -95,6 +118,7 @@ export function useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded }:
         setServerError(crmTagErrorMessage(failure, errors));
       }
     } finally {
+      submitting.current = false;
       setIsSubmitting(false);
     }
   }
@@ -106,21 +130,25 @@ export function useCrmTagForm({ target, existingTags, onSaved, onReloadNeeded }:
     nameError,
     serverError,
     isSubmitting,
-    isDirty: original ? updateBody !== null : trimmed.length > 0 || color !== null,
+    isDirty: !colorValid || (original ? updateBody !== null : trimmed.length > 0 || color !== null),
     // An edit with nothing changed would be `422 CRM_TAG_UPDATE_EMPTY`.
-    submitDisabled: isSubmitting || trimmed.length === 0 || (original !== null && updateBody === null),
+    submitDisabled: !canWrite || !colorValid || isSubmitting || trimmed.length === 0 || (original !== null && updateBody === null),
     maxChars: CRM_TAG_NAME_MAX_LENGTH,
-    charCount: [...name].length,
+    charCount: [...trimmed].length,
+    isPending: () => submitting.current,
     handleNameChange: (next: string) => {
+      if (submitting.current) return;
       setName(next);
       setNameTaken(false);
       setServerError(null);
     },
     handleNameBlur: () => setTouched(true),
     handleColorChange: (next: TagColor | null) => {
+      if (submitting.current) return;
       setColor(next);
       setServerError(null);
     },
+    handleColorValidityChange,
     submit: () => void submit(),
   };
 }

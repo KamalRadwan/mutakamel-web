@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/ToastContext";
+import { useI18n } from "@/i18n/I18nContext";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import { safeSessionStorage } from "@/lib/safeStorage";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
@@ -37,6 +39,8 @@ const EMPTY_PRICES: PriceTierView[] = [];
 
 export function useApplicationCatalogue(applicationId: string | null) {
   const toast = useToast();
+  const { t } = useI18n();
+  const copy = t.applications.notifications;
   const { getIdempotencyKey, resetKey } = useIdempotency();
   const applicationIdRef = useRef(applicationId);
   const selectedTierIdRef = useRef<string | null>(null);
@@ -79,15 +83,12 @@ export function useApplicationCatalogue(applicationId: string | null) {
   const reportError = useCallback(
     (error: unknown, setError: (message: string) => void) => {
       const normalized = normalizeApiError(error);
-      const correlation = normalized.correlationId
-        ? ` · ${normalized.correlationId}`
-        : "";
-      const message = `${normalized.message}${correlation}`;
+      const message = localizeApplicationError(normalized, t);
       setError(message);
-      toast.error("Action failed", message);
+      toast.error(t.applications.errorTitle, message);
       return normalized;
     },
-    [toast],
+    [toast, t],
   );
 
   const commitSelectedTier = useCallback((tierId: string | null) => {
@@ -100,14 +101,14 @@ export function useApplicationCatalogue(applicationId: string | null) {
     setPrices([]);
   }, []);
 
-  const loadCatalogue = useCallback(async () => {
+  const loadCatalogue = useCallback(async (background = false) => {
     const requestedApplicationId = applicationId;
     if (!requestedApplicationId) return null;
     const generation = ++catalogueGeneration.current;
     catalogueAbort.current?.abort();
     const controller = new AbortController();
     catalogueAbort.current = controller;
-    setIsLoading(true);
+    if (!background) setIsLoading(true);
     setCatalogueError(null);
 
     const [tierResult, featureResult] = await Promise.allSettled([
@@ -142,11 +143,11 @@ export function useApplicationCatalogue(applicationId: string | null) {
         : featureResult.status === "rejected"
           ? featureResult.reason
           : null;
-    if (failure) setCatalogueError(normalizeApiError(failure).message);
-    setLoadedApplicationId(null);
+    if (failure) setCatalogueError(localizeApplicationError(failure, t));
+    if (!background) setLoadedApplicationId(null);
     setIsLoading(false);
     return null;
-  }, [applicationId, commitSelectedTier]);
+  }, [applicationId, commitSelectedTier, t]);
 
   const loadTierDetails = useCallback(async (tierId: string | null) => {
     const requestedApplicationId = applicationIdRef.current;
@@ -183,14 +184,14 @@ export function useApplicationCatalogue(applicationId: string | null) {
         : priceResult.status === "rejected"
           ? priceResult.reason
           : null;
-    if (failure) setTierDetailError(normalizeApiError(failure).message);
+    if (failure) setTierDetailError(localizeApplicationError(failure, t));
     setLoadedTierId(
       grantResult.status === "fulfilled" && priceResult.status === "fulfilled"
         ? tierId
         : null,
     );
     setIsTierLoading(false);
-  }, []);
+  }, [t]);
 
   const loadAudit = useCallback(async (page = 1) => {
     const requestedApplicationId = applicationId;
@@ -219,10 +220,10 @@ export function useApplicationCatalogue(applicationId: string | null) {
         !controller.signal.aborted &&
         applicationIdRef.current === requestedApplicationId
       ) {
-        setAuditError(normalizeApiError(error).message);
+        setAuditError(localizeApplicationError(error, t));
       }
     }
-  }, [applicationId]);
+  }, [applicationId, t]);
 
   useEffect(() => {
     applicationIdRef.current = applicationId;
@@ -321,7 +322,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
       );
       resetKey();
       if (applicationIdRef.current === requestedApplicationId) {
-        toast.success("Saved", message);
+        toast.success(copy.saved, message);
         await Promise.all([loadCatalogue(), loadAudit()]);
         await reloadSelectedTierDetails(requestedApplicationId, requestedTierId);
       }
@@ -358,7 +359,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
       if (recovered) {
         setPendingCreateAttempt(null);
         if (attempt.kind === "tier") commitSelectedTier(recovered.id);
-        toast.success("Create reconciled", `${recovered.name} already exists and is now loaded.`);
+        toast.success(copy.reconciled, copy.recovered.replace("{{name}}", recovered.name));
         await loadAudit();
         return recovered;
       }
@@ -367,7 +368,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
     } finally {
       if (applicationIdRef.current === attempt.applicationId) setPendingAction(null);
     }
-  }, [commitSelectedTier, loadAudit, loadCatalogue, pendingCreateAttempt, setPendingCreateAttempt, toast]);
+  }, [commitSelectedTier, loadAudit, loadCatalogue, pendingCreateAttempt, setPendingCreateAttempt, toast, copy]);
 
   const clearAbsentPendingCreateAttempt = useCallback(() => {
     if (pendingCreateAttempt?.absenceConfirmed) setPendingCreateAttempt(null);
@@ -376,12 +377,12 @@ export function useApplicationCatalogue(applicationId: string | null) {
   const createTier = async (dto: CreateTierDto) => {
     const requestedApplicationId = applicationId;
     if (!requestedApplicationId) return;
-    if (pendingCreateAttempt) throw new Error("Resolve the previous create outcome before sending another create request.");
+    if (pendingCreateAttempt) throw new Error(copy.resolveCreate);
     setPendingAction("tier:create");
     try {
       const tier = await applicationsApi.createTier(requestedApplicationId, dto);
       if (applicationIdRef.current === requestedApplicationId) {
-        toast.success("Tier created", `${tier.name} is ready to configure.`);
+        toast.success(copy.tierCreated, copy.tierReady.replace("{{name}}", tier.name));
         await Promise.all([loadCatalogue(), loadAudit()]);
         commitSelectedTier(tier.id);
       }
@@ -404,7 +405,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
         if (recovered) {
           setPendingCreateAttempt(null);
           commitSelectedTier(recovered.id);
-          toast.success("Create reconciled", `${recovered.name} was created and is now loaded.`);
+          toast.success(copy.reconciled, copy.recovered.replace("{{name}}", recovered.name));
           return recovered as TierView;
         }
         if (snapshot) setPendingCreateAttempt({ ...attempt, absenceConfirmed: true });
@@ -418,12 +419,12 @@ export function useApplicationCatalogue(applicationId: string | null) {
   const createFeature = async (dto: CreateFeatureDto) => {
     const requestedApplicationId = applicationId;
     if (!requestedApplicationId) return;
-    if (pendingCreateAttempt) throw new Error("Resolve the previous create outcome before sending another create request.");
+    if (pendingCreateAttempt) throw new Error(copy.resolveCreate);
     setPendingAction("feature:create");
     try {
       const feature = await applicationsApi.createFeature(requestedApplicationId, dto);
       if (applicationIdRef.current === requestedApplicationId) {
-        toast.success("Feature created", `${feature.name} is available for tier grants.`);
+        toast.success(copy.featureCreated, copy.featureReady.replace("{{name}}", feature.name));
         await Promise.all([loadCatalogue(), loadAudit()]);
       }
       return feature;
@@ -444,7 +445,7 @@ export function useApplicationCatalogue(applicationId: string | null) {
           : null;
         if (recovered) {
           setPendingCreateAttempt(null);
-          toast.success("Create reconciled", `${recovered.name} was created and is now loaded.`);
+          toast.success(copy.reconciled, copy.recovered.replace("{{name}}", recovered.name));
           return recovered as FeatureView;
         }
         if (snapshot) setPendingCreateAttempt({ ...attempt, absenceConfirmed: true });
@@ -484,25 +485,25 @@ export function useApplicationCatalogue(applicationId: string | null) {
     clearAbsentPendingCreateAttempt,
     createTier,
     updateTier: (tierId: string, dto: UpdateTierDto) =>
-      runMutation(`tier:update:${tierId}`, dto, (key) => applicationsApi.updateTier(tierId, dto, key), "Tier updated."),
+      runMutation(`tier:update:${tierId}`, dto, (key) => applicationsApi.updateTier(tierId, dto, key), copy.tierUpdated),
     deleteTier: (tierId: string) =>
-      runMutation(`tier:delete:${tierId}`, null, (key) => applicationsApi.deleteTier(tierId, key), "Tier deleted."),
+      runMutation(`tier:delete:${tierId}`, null, (key) => applicationsApi.deleteTier(tierId, key), copy.tierDeleted),
     createFeature,
     updateFeature: (featureId: string, dto: UpdateFeatureDto) =>
-      runMutation(`feature:update:${featureId}`, dto, (key) => applicationsApi.updateFeature(featureId, dto, key), "Feature updated."),
+      runMutation(`feature:update:${featureId}`, dto, (key) => applicationsApi.updateFeature(featureId, dto, key), copy.featureUpdated),
     deleteFeature: (featureId: string) =>
-      runMutation(`feature:delete:${featureId}`, null, (key) => applicationsApi.deleteFeature(featureId, key), "Feature deleted."),
+      runMutation(`feature:delete:${featureId}`, null, (key) => applicationsApi.deleteFeature(featureId, key), copy.featureDeleted),
     replaceGrants: (tierId: string, dto: SetTierFeaturesDto) => {
       if (tierId !== selectedTierIdRef.current || tierId !== loadedTierId) {
         return Promise.reject(new Error("TIER_CONTEXT_CHANGED"));
       }
-      return runMutation(`grants:replace:${tierId}`, dto, (key) => applicationsApi.replaceTierGrants(tierId, dto, key), "Tier feature grants replaced.");
+      return runMutation(`grants:replace:${tierId}`, dto, (key) => applicationsApi.replaceTierGrants(tierId, dto, key), copy.grantsReplaced);
     },
     replacePrices: (tierId: string, dto: SetPriceTiersDto) => {
       if (tierId !== selectedTierIdRef.current || tierId !== loadedTierId) {
         return Promise.reject(new Error("TIER_CONTEXT_CHANGED"));
       }
-      return runMutation(`prices:replace:${tierId}:${dto.billingCycle}`, dto, (key) => applicationsApi.replacePriceLadder(tierId, dto, key), `${dto.billingCycle === "MONTHLY" ? "Monthly" : "Annual"} price ladder replaced.`);
+      return runMutation(`prices:replace:${tierId}:${dto.billingCycle}`, dto, (key) => applicationsApi.replacePriceLadder(tierId, dto, key), dto.billingCycle === "MONTHLY" ? copy.monthlyPricesReplaced : copy.annualPricesReplaced);
     },
     pricesFor: (cycle: BillingCycle) => visiblePrices.filter((row) => row.billingCycle === cycle),
   };

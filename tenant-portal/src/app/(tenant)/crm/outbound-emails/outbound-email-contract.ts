@@ -186,9 +186,7 @@ export function buildOutboundEmailListQuery(
     limit: String(OUTBOUND_EMAIL_PAGE_SIZE),
   });
   if (filters.status) params.set("status", filters.status);
-  // sourceType and sourceId are independently optional on this DTO, unlike the
-  // activities list — but a source filter without its id narrows nothing, so
-  // both are sent together or neither.
+  // The service validates the source pair together (validateHistoryQuery).
   if (filters.sourceType && filters.sourceId) {
     params.set("sourceType", filters.sourceType);
     params.set("sourceId", filters.sourceId);
@@ -207,6 +205,7 @@ export function buildOptionsRequest(
   sourceType: OutboundEmailSourceType,
   sourceId: string,
 ): Record<string, unknown> {
+  if (!isMember(OUTBOUND_EMAIL_SOURCE_TYPES, sourceType)) throw new Error("CRM_EMAIL_SOURCE_INVALID");
   if (!isAnyUuid(sourceId)) throw new Error("CRM_EMAIL_SOURCE_INVALID");
   // `locale` is optional and the server falls back to the tenant's configured
   // default. Nothing here guesses one.
@@ -231,8 +230,8 @@ export function buildSendRequest(
 }
 
 export function buildRetryRequest(reason: string): Record<string, unknown> {
-  const trimmed = reason.trim();
-  if (trimmed.length === 0 || trimmed.length > RETRY_REASON_MAX_LENGTH) {
+  const trimmed = reason.normalize("NFC").trim();
+  if (trimmed.length === 0 || [...trimmed].length > RETRY_REASON_MAX_LENGTH || /[\u0000-\u001f\u007f-\u009f]/u.test(trimmed)) {
     throw new Error("CRM_EMAIL_RETRY_REASON_INVALID");
   }
   return { reason: trimmed };
@@ -314,7 +313,7 @@ export function parsePreviewResponse(payload: unknown): OutboundEmailPreview {
 export function parseAcceptedResponse(payload: unknown): OutboundEmailAccepted {
   const source = requireRecord(payload);
   if (
-    typeof source.outboundEmailId !== "string" ||
+    typeof source.outboundEmailId !== "string" || !isUuid(source.outboundEmailId) ||
     source.status !== "QUEUED" ||
     !isTimestamp(source.requestedAt)
   ) {
@@ -533,8 +532,8 @@ function parseParty(payload: unknown): {
   };
 }
 
-// Outbound-email ids are `@IsUUID()` with no version — unlike the rest of CRM,
-// which pins v7 — so a v4 id is legitimate here.
+// Source/recipient UUID DTOs accept any UUID version. Outbound email path
+// parameters use ParseUUIDPipe({ version: '7' }) in the owning controller.
 const ANY_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const UUID_V7_PATTERN =

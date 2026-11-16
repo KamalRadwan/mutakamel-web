@@ -47,10 +47,12 @@ export function useReleaseDetail(releaseId: string) {
   const [revision, setRevision] = useState(0);
   const [retireDraft, setRetireDraft] = useState<RetireDraft>({ ...EMPTY_RETIRE });
   const [retireErrors, setRetireErrors] = useState<ReleaseValidationErrors>({});
+  const [retireConfirmationVersion, setRetireConfirmationVersion] = useState<string | null>(null);
   const [mutation, setMutation] = useState<ReleaseMutationState>(EMPTY_MUTATION);
   const requestGeneration = useRef(0);
   const hasSnapshot = useRef(false);
   const intents = useRef(createReleaseIntentStore());
+  const retirePending = useRef(false);
   const catalogue = useReleaseCatalogue(revision, permissions.canRead);
   const standing = snapshot
     ? releaseCatalogueStanding(snapshot.data, catalogue.catalogue)
@@ -74,6 +76,7 @@ export function useReleaseDetail(releaseId: string) {
       setSnapshot(null);
       setRetireDraft({ ...EMPTY_RETIRE });
       setRetireErrors({});
+      setRetireConfirmationVersion(null);
       setMutation(EMPTY_MUTATION);
     });
     return () => {
@@ -121,7 +124,19 @@ export function useReleaseDetail(releaseId: string) {
     });
   }, []);
 
-  const retire = useCallback(async () => {
+  const requestRetireConfirmation = useCallback(() => {
+    const errors = validateRetireDraft({ ...retireDraft, confirmed: true });
+    setRetireErrors(errors);
+    if (!Object.keys(errors).length && snapshot && mutation.phase !== "PENDING") {
+      setRetireConfirmationVersion(snapshot.data.releaseVersion);
+    }
+  }, [mutation.phase, retireDraft, snapshot]);
+
+  const closeRetireConfirmation = useCallback(() => {
+    if (!retirePending.current) setRetireConfirmationVersion(null);
+  }, []);
+
+  const retire = useCallback(async (confirmationText = "") => {
     const release = snapshot?.data;
     if (
       !release ||
@@ -130,17 +145,22 @@ export function useReleaseDetail(releaseId: string) {
       standing === "CURRENT" ||
       !standingSettled ||
       !permissions.canRetireCritical ||
+      retirePending.current ||
       mutation.phase === "PENDING"
     ) {
       return null;
     }
-    const errors = validateRetireDraft(retireDraft);
+    const errors = validateRetireDraft({
+      ...retireDraft,
+      confirmed: retireConfirmationVersion === release.releaseVersion && confirmationText === release.releaseVersion,
+    });
     setRetireErrors(errors);
     if (Object.keys(errors).length) return null;
     const dto = buildRetireReleaseDto(release.manifestChecksum, retireDraft);
     const scope = `release:retire:${release.releaseId}`;
     const key = intents.current.get(scope, stableReleaseFingerprint(dto));
     setMutation({ name: "RETIRE", phase: "PENDING", error: null, correlationId: null });
+    retirePending.current = true;
     try {
       const result = await provisioningReleasesApi.retireRelease(release.releaseId, dto, key);
       intents.current.clear(scope);
@@ -162,8 +182,11 @@ export function useReleaseDetail(releaseId: string) {
         setRevision((current) => current + 1);
       }
       return null;
+    } finally {
+      retirePending.current = false;
+      setRetireConfirmationVersion(null);
     }
-  }, [applyRelease, mutation.phase, permissions.canRetireCritical, retireDraft, snapshot, standing, standingSettled]);
+  }, [applyRelease, mutation.phase, permissions.canRetireCritical, retireConfirmationVersion, retireDraft, snapshot, standing, standingSettled]);
 
   const visibleState: ResourceState = isAuthLoading
     ? "LOADING"
@@ -178,6 +201,9 @@ export function useReleaseDetail(releaseId: string) {
     isRefreshing,
     retireDraft,
     retireErrors,
+    retireConfirmationVersion,
+    requestRetireConfirmation,
+    closeRetireConfirmation,
     mutation,
     standing,
     catalogueState: catalogue.state,

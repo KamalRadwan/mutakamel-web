@@ -1,233 +1,82 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Button,
-  Combobox,
-  DetailSection,
-  EmptyState,
-  ErrorState,
-  Field,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Skeleton,
-  useToast,
-} from "@/design-system";
+import { Info, RefreshCw } from "lucide-react";
+import { Badge, Button, Combobox, DegradedBanner, EmptyState, ErrorState, Field, PermissionGate,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Skeleton } from "@/design-system";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
-import { useTenantAuth } from "@/context/AuthContext";
-import { useI18n } from "@/i18n/I18nContext";
-import { localizedValue } from "@/lib/format/localized";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
-import {
-  CRM_RECORD_SOURCE_TYPES,
-  useCrmRecordOptions,
-  type CrmRecordSourceType,
-} from "@/hooks/useCrmRecordOptions";
-import type { CustomFieldItem } from "../custom-field-contract";
-import { useCustomFieldValues } from "../hooks/useCustomFieldValues";
-import { CustomFieldValueInput } from "../../shared/components/CustomFieldValueInput";
+import { CRM_RECORD_SOURCE_TYPES, type CrmRecordSourceType } from "@/hooks/useCrmRecordOptions";
+import type { useCustomFieldRecordValues } from "../hooks/useCustomFieldRecordValues";
+import { CustomFieldValueRow } from "./CustomFieldValueRow";
 
-interface CustomFieldValuesPanelProps {
-  definitions: CustomFieldItem[];
-  canManage: boolean;
-}
+export type CustomFieldRecordValuesState = ReturnType<typeof useCustomFieldRecordValues>;
 
-/**
- * `GET`/`POST /custom-fields/values` — the values half of task 8.19.
- *
- * Values belong to a record, so this panel asks for one: a branch, an owner
- * type and an owner record. Nothing is fetched until all three resolve, and
- * nothing is invented in the meantime — the empty state says which step is
- * outstanding rather than showing a form over no record.
- */
-export function CustomFieldValuesPanel({
-  definitions,
-  canManage,
-}: CustomFieldValuesPanelProps) {
-  const { t, lang } = useI18n();
-  const toast = useToast();
-  const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  const [ownerType, setOwnerType] = useState<CrmRecordSourceType>("LEAD");
-  const [ownerId, setOwnerId] = useState<string | undefined>(undefined);
-  const [ownerLabel, setOwnerLabel] = useState<string | undefined>(undefined);
-  const [drafts, setDrafts] = useState<Record<string, unknown>>({});
-  const records = useCrmRecordOptions(ownerType, branchId);
-  const values = useCustomFieldValues(branchId);
-
-  // A definition applies to this owner when its ownerType matches, and a
-  // LEAD_AND_PARTY definition applies to both halves of that pair.
-  const applicable = useMemo(
-    () =>
-      definitions.filter(
-        (definition) =>
-          definition.isActive &&
-          (definition.ownerType === ownerType ||
-            (definition.ownerType === "LEAD_AND_PARTY" &&
-              (ownerType === "LEAD" || ownerType === "CUSTOMER_PROFILE"))),
-      ),
-    [definitions, ownerType],
-  );
-
-  const storedValue = (fieldId: string): unknown =>
-    values.values.find((entry) => entry.fieldDefinitionId === fieldId)?.value;
-
-  function selectOwner(next: string | undefined) {
-    setOwnerId(next);
-    setOwnerLabel(records.options.find((option) => option.value === next)?.label);
-    setDrafts({});
-    if (next) void values.load(ownerType, next);
-    else values.reset();
-  }
-
-  return (
-    <DetailSection
-      title={t.crmCustomFields.valuesTitle}
-      description={t.crmCustomFields.valuesDescription}
-      columns={1}
-    >
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <TenantBranchSelect
-            branchIds={branchIds}
-            branchId={branchId}
-            onChange={(next) => {
-              selectBranch(next);
-              selectOwner(undefined);
-            }}
-          />
-          <div className="min-w-44">
-            <Field label={t.crmCustomFields.owner}>
-              <Select
-                value={ownerType}
-                onValueChange={(next) => {
-                  setOwnerType(next as CrmRecordSourceType);
-                  selectOwner(undefined);
-                }}
-              >
-                <SelectTrigger size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CRM_RECORD_SOURCE_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {t.crmCustomFields.ownerTypes[type] ?? type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <div className="min-w-64 flex-1">
-            <Field label={t.crmCustomFields.ownerRecord}>
-              <Combobox
-                value={ownerId}
-                selectedLabel={ownerLabel}
-                onValueChange={selectOwner}
-                options={records.options}
-                onSearch={records.search}
-                loading={records.isLoading}
-                placeholder={t.crmCustomFields.ownerRecordPlaceholder}
-                searchPlaceholder={t.common.search}
-                loadingLabel={t.common.loading}
-                emptyLabel={
-                  records.error
-                    ? t.crmCustomFields.ownerRecordsUnavailable
-                    : t.crmCustomFields.ownerRecordsEmpty
-                }
-                clearLabel={t.common.dismiss}
-              />
-            </Field>
-          </div>
-        </div>
-
-        {!branchId ? (
-          <EmptyState
-            title={t.crmCustomFields.branchRequiredTitle}
-            description={t.crmCustomFields.branchRequiredDescription}
-          />
-        ) : !ownerId ? (
-          <EmptyState
-            title={t.crmCustomFields.pickOwnerTitle}
-            description={t.crmCustomFields.pickOwnerDescription}
-          />
-        ) : values.loadError ? (
-          <ErrorState
-            title={t.crmCustomFields.valuesLoadFailed}
-            description={t.crmCustomFields.valuesLoadFailedHint}
-            retryLabel={t.common.retry}
-            onRetry={() => void values.load(ownerType, ownerId)}
-          />
-        ) : values.isLoading ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : applicable.length === 0 ? (
-          <EmptyState
-            title={t.crmCustomFields.noApplicableTitle}
-            description={t.crmCustomFields.noApplicableDescription}
-          />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {applicable.map((field) => {
-              const draft = field.id in drafts ? drafts[field.id] : storedValue(field.id);
-              return (
-                <li key={field.id} className="flex flex-wrap items-end gap-2">
-                  <div className="min-w-64 flex-1">
-                    <Field
-                      label={localizedValue(field.nameAr, field.nameEn, lang)}
-                      hint={field.fieldKey}
-                      readOnly={!canManage}
-                    >
-                      <CustomFieldValueInput
-                        field={field}
-                        value={draft}
-                        disabled={!canManage || values.isSaving}
-                        onChange={(next) =>
-                          setDrafts((current) => ({ ...current, [field.id]: next }))
-                        }
-                      />
-                    </Field>
-                  </div>
-                  {canManage ? (
-                    <Button size="sm"
-                      variant="outline"
-                      disabled={!(field.id in drafts) || values.isSaving}
-                      onClick={() => {
-                        void values
-                          .save(field, ownerType, ownerId, drafts[field.id])
-                          .then((result) => {
-                            if (result.ok) {
-                              setDrafts((current) => {
-                                const next = { ...current };
-                                delete next[field.id];
-                                return next;
-                              });
-                              toast.success(t.crmCustomFields.valueSaved);
-                              return;
-                            }
-                            if (result.error && !toast.outcomeFromApi(result.error)) {
-                              toast.errorFromApi(
-                                t.crmCustomFields.valueSaveFailed,
-                                result.error,
-                              );
-                            }
-                          });
-                      }}
-                    >
-                      {t.common.save}
-                    </Button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+export function CustomFieldValuesPanel({ state }: { state: CustomFieldRecordValuesState }) {
+  const { t, values } = state;
+  return <section className="overflow-hidden rounded-lg border border-border bg-card">
+    <div className="flex flex-wrap items-end gap-3 border-b border-border p-3">
+      <div className="flex min-w-40 flex-col gap-1.5">
+        <span className="text-xs font-medium">{t.common.branch}</span>
+        {state.branchIds.length < 2 ? <span className="min-h-7 text-sm">{state.branchLabel}</span> :
+          <TenantBranchSelect branchIds={state.branchIds} branchId={state.branchId}
+            disabled={values.isSaving} onChange={state.changeBranch} />}
       </div>
-    </DetailSection>
-  );
+      <Field label={t.crmCustomFields.owner} showLabel className="min-w-40">
+        <Select value={state.ownerType} disabled={values.isSaving}
+          onValueChange={(next) => state.selectType(next as CrmRecordSourceType)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>{CRM_RECORD_SOURCE_TYPES.map((type) =>
+            <SelectItem key={type} value={type}>{t.crmCustomFields.ownerTypes[type]}</SelectItem>)}</SelectContent>
+        </Select>
+      </Field>
+      <Field label={t.crmCustomFields.ownerRecord} showLabel className="min-w-48 flex-1">
+        <Combobox value={state.ownerId} selectedLabel={state.ownerLabel} onValueChange={state.selectOwner}
+          disabled={!state.branchId || values.isSaving} options={state.records.options} onSearch={state.records.search}
+          loading={state.records.isLoading} placeholder={t.crmCustomFields.ownerRecordPlaceholder}
+          searchPlaceholder={t.common.search} loadingLabel={t.common.loading}
+          emptyLabel={state.records.error ? t.crmCustomFields.ownerRecordsUnavailable : t.crmCustomFields.ownerRecordsEmpty}
+          clearLabel={t.common.dismiss} />
+      </Field>
+    </div>
+    <div className="flex flex-col gap-3 p-3">
+      {state.records.error?.status === 403 ? <PermissionGate require="crm.custom_fields.read" denied><span /></PermissionGate> :
+        state.records.error ? <div className="flex flex-wrap items-center gap-2">
+          <DegradedBanner message={t.crmCustomFields.ownerRecordsUnavailable} />
+          <Button variant="outline" size="sm" onClick={() => state.records.search("")}>{t.crmCustomFields.recordListRetry}</Button>
+        </div> : null}
+      {state.notice ? <DegradedBanner message={state.notice} /> : null}
+      {state.records.error?.status === 403 ? null : !state.branchId ? <EmptyState title={t.crmCustomFields.branchRequiredTitle} description={t.crmCustomFields.branchRequiredDescription} /> :
+        !state.ownerId ? <EmptyState title={t.crmCustomFields.pickOwnerTitle} description={t.crmCustomFields.pickOwnerDescription} /> :
+          values.loadError?.status === 403 || state.access.error?.status === 403 ?
+            <PermissionGate require="crm.custom_fields.read" denied><span /></PermissionGate> :
+            values.loadError ? <ErrorState title={t.crmCustomFields.valuesLoadFailed} description={t.crmCustomFields.valuesLoadFailedHint}
+              retryLabel={t.common.retry} onRetry={state.reload} /> :
+              values.isLoading ? <div aria-busy="true" className="flex flex-col gap-3">
+                <Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div> :
+                state.applicable.length === 0 ? <EmptyState title={t.crmCustomFields.noApplicableTitle} description={t.crmCustomFields.noApplicableDescription} /> :
+                  <>
+                    <header className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-sm font-semibold">{state.ownerLabel}</h2>
+                        <Badge tone="neutral">{t.crmCustomFields.ownerTypes[state.ownerType]}</Badge>
+                        <span className="text-xs text-muted-foreground">{state.branchLabel}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{t.crmCustomFields.valuesDescription}</p>
+                    </header>
+                    {state.access.isLoading ? <p role="status" className="text-xs text-muted-foreground">{t.crmCustomFields.valueAccessLoading}</p> :
+                      state.access.error ? <div className="flex flex-wrap items-center gap-2">
+                        <DegradedBanner message={t.crmCustomFields.valueAccessUnavailable} />
+                        <Button size="sm" variant="outline" onClick={state.access.retry}>
+                          <RefreshCw className="size-3.5" aria-hidden="true" />{t.crmCustomFields.valueAccessRetry}</Button>
+                      </div> : !state.canEdit ? <p className="text-xs text-muted-foreground">
+                        {state.access.converted ? t.crmCustomFields.valueErrors.LEAD_ALREADY_CONVERTED : t.crmCustomFields.valueAccessDenied}
+                      </p> : null}
+                    {state.isDirty && <p role="status"><Badge tone="caution">{t.crmCustomFields.valuesUnsaved}</Badge></p>}
+                    <ul className="divide-y divide-border">
+                      {state.applicable.map((field) => <CustomFieldValueRow key={field.id} field={field} state={state} />)}
+                    </ul>
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Info className="size-3.5" aria-hidden="true" />{t.crmCustomFields.valuesNotAutosaved}</p>
+                  </>}
+    </div>
+  </section>;
 }

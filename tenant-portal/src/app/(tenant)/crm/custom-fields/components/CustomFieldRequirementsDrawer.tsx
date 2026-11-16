@@ -1,97 +1,72 @@
 "use client";
 
-import { useState } from "react";
-import { Field, FormDrawer, Switch } from "@/design-system";
+import { ShieldCheck } from "lucide-react";
+import { Badge, Button, DegradedBanner, Field, FormModal, Switch } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import {
-  CRM_FIELD_REQUIREMENT_OPERATIONS,
-  type CustomFieldItem,
-} from "../custom-field-contract";
-import type { RequirementFlags } from "../hooks/useCustomFieldRequirements";
+import { localizedValue } from "@/lib/format/localized";
+import { CRM_FIELD_REQUIREMENT_OPERATIONS } from "../custom-field-contract";
+import type { useCustomFieldRequirements } from "../hooks/useCustomFieldRequirements";
 
-interface CustomFieldRequirementsDrawerProps {
-  field: CustomFieldItem | null;
-  initialFlags: RequirementFlags | null;
-  isSubmitting: boolean;
-  error: string | null;
-  onClose: () => void;
-  onSubmit: (flags: RequirementFlags) => void;
-}
-
-const EMPTY: RequirementFlags = {
-  CREATE: false,
-  UPDATE: false,
-  CONVERT: false,
-};
-
-// POST /custom-fields/:id/requirements, one call per changed operation.
-// Requirements are per-operation, never global: a field required for CREATE
-// blocks the create form and leaves edit alone.
-export function CustomFieldRequirementsDrawer({
-  field,
-  initialFlags,
-  isSubmitting,
-  error,
-  onClose,
-  onSubmit,
-}: CustomFieldRequirementsDrawerProps) {
-  const { t } = useI18n();
-  // Seeded once; the caller remounts this drawer per field it opens for.
-  const [flags, setFlags] = useState<RequirementFlags>(initialFlags ?? EMPTY);
-
-  const baseline = initialFlags ?? EMPTY;
-  const isDirty = CRM_FIELD_REQUIREMENT_OPERATIONS.some(
-    (operation) => flags[operation] !== baseline[operation],
-  );
-
+export function CustomFieldRequirementsDrawer({ requirements }: {
+  requirements: ReturnType<typeof useCustomFieldRequirements>;
+}) {
+  const { t, lang } = useI18n();
   return (
-    <FormDrawer
-      open={field !== null}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-      title={t.crmCustomFields.requirementsTitle}
-      description={t.crmCustomFields.requirementsDescription}
-      isDirty={isDirty}
-      isSubmitting={isSubmitting}
-      submitDisabled={!isDirty}
-      error={error ?? undefined}
-      onSubmit={() => onSubmit(flags)}
-      labels={{
-        submit: t.common.save,
-        cancel: t.common.cancel,
-        discardTitle: t.common.discardTitle,
-        discardDescription: t.common.discardDescription,
-        discardConfirm: t.common.discardConfirm,
-        discardCancel: t.common.cancel,
-      }}
-    >
-      {CRM_FIELD_REQUIREMENT_OPERATIONS.map((operation) => (
-        <Field
-          key={operation}
-          label={t.crmCustomFields.requirementOperations[operation]}
-          hint={t.crmCustomFields.requirementHints[operation]}
-        >
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={flags[operation]}
-              aria-label={t.crmCustomFields.requirementOperations[operation]}
-              onCheckedChange={(checked) =>
-                setFlags((current) => ({ ...current, [operation]: checked }))
-              }
-            />
-            <span className="text-sm text-foreground">
-              {flags[operation]
-                ? t.crmCustomFields.required
-                : t.crmCustomFields.optional}
-            </span>
+    <FormModal size="card" density="compact" open={requirements.field !== null}
+      onOpenChange={(open) => { if (!open) requirements.close(); }}
+      title={t.crmCustomFields.requirementsTitle} description={t.crmCustomFields.requirementsDescription}
+      headerIcon={<ShieldCheck className="size-5 text-primary" aria-hidden="true" />}
+      isDirty={requirements.isDirty} isSubmitting={requirements.isSubmitting}
+      submitDisabled={!requirements.isDirty || !requirements.canChange}
+      error={requirements.error ?? undefined} onSubmit={() => void requirements.save()}
+      footerLeading={<p className="text-xs text-muted-foreground">{t.crmCustomFields.requirementsSaveNote}</p>}
+      labels={{ submit: t.common.save, cancel: t.common.cancel, discardTitle: t.common.discardTitle,
+        discardDescription: t.common.discardDescription, discardConfirm: t.common.discardConfirm, discardCancel: t.common.cancel,
+        sections: t.crmCustomFields.requirementsTitle, sectionInvalid: t.crmCustomFields.invalidNames }}>
+      {requirements.field ? <div className="flex flex-col gap-1 border-b border-border pb-2">
+        <p className="text-sm font-medium">{localizedValue(requirements.field.nameAr, requirements.field.nameEn, lang)}</p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{t.crmCustomFields.ownerTypes[requirements.field.ownerType]}</span>
+          <code className="font-mono" dir="ltr">{requirements.field.fieldKey}</code>
+        </div>
+      </div> : null}
+      {requirements.field && !requirements.field.isActive ? <DegradedBanner message={t.crmCustomFields.inactiveRequirements} /> : null}
+      {requirements.needsReload ? <Button variant="outline" size="sm" disabled={requirements.isSubmitting} onClick={() => void requirements.refresh()}>
+        {t.crmCustomFields.requirementsReload}
+      </Button> : null}
+      <div className="divide-y divide-border">
+        {CRM_FIELD_REQUIREMENT_OPERATIONS.map((operation) => (
+          <div key={operation} className="flex items-center justify-between gap-4 py-3">
+            <Field label={t.crmCustomFields.requirementOperations[operation]} showLabel className="flex-1"
+              hint={operation === "CONVERT" && requirements.field?.ownerType === "OPPORTUNITY" ?
+                t.crmCustomFields.conversionUnavailable : t.crmCustomFields.requirementHints[operation]}>
+              <Switch checked={requirements.flags[operation]}
+                disabled={!requirements.canChange || (operation === "CONVERT" && requirements.field?.ownerType === "OPPORTUNITY")}
+                onCheckedChange={(checked) => requirements.change(operation, checked)} />
+            </Field>
+            <Badge tone={operation === "CONVERT" && requirements.field?.ownerType === "OPPORTUNITY" ? "neutral" :
+              requirements.flags[operation] ? "caution" : "neutral"}>
+              {operation === "CONVERT" && requirements.field?.ownerType === "OPPORTUNITY" ? t.crmCustomFields.unavailableOperation :
+                requirements.flags[operation] ? t.crmCustomFields.required : t.crmCustomFields.optional}
+            </Badge>
           </div>
-        </Field>
-      ))}
-
-      <p className="text-xs text-muted-foreground">
-        {t.crmCustomFields.requirementsScopeNote}
-      </p>
-    </FormDrawer>
+        ))}
+      </div>
+      {requirements.field?.requirements.some((rule) => rule.entityScope !== null) ? (
+        <section className="flex flex-col gap-2 rounded-md border border-border bg-muted/25 p-2">
+          <p className="text-xs text-muted-foreground">{t.crmCustomFields.scopedRulesReadOnly}</p>
+          <ul className="flex flex-col gap-1">
+            {requirements.field.requirements.filter((rule) => rule.entityScope !== null).map((rule) => (
+              <li key={rule.operation + "-" + rule.entityScope} className="flex flex-wrap items-center gap-2 text-xs">
+                <span>{rule.entityScope ? t.crmCustomFields.ownerTypes[rule.entityScope] : ""}</span>
+                <span>{t.crmCustomFields.requirementOperations[rule.operation]}</span>
+                <Badge tone={rule.isRequired ? "caution" : "neutral"}>{rule.isRequired ? t.crmCustomFields.required : t.crmCustomFields.optional}</Badge>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <p className="text-xs text-muted-foreground">{t.crmCustomFields.requirementsScopeNote}</p>
+    </FormModal>
   );
 }

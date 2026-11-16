@@ -1,11 +1,8 @@
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   TRADE_V1,
-  isBoundedString,
   isTradeDecimal,
   isTradeStatus,
-  isTradeTimestamp,
-  isVersion,
   jsonObject,
   nullableJsonObject,
   nullableString,
@@ -16,7 +13,7 @@ import {
   type TradeDocumentHeader,
 } from "../documents/trade-document-contract";
 
-// Sales orders — 12 routes, feature gate `trade.sales`, every route targeting
+// Sales orders — feature gate `trade.sales`, every route targeting
 // `BRANCH`. Verified against documents.controller.ts, documents.service.ts and
 // packages/database/src/entities/tenant/document.entities.ts.
 
@@ -71,28 +68,12 @@ export interface SalesOrderDetail extends SalesOrder {
   lines: SalesOrderLine[];
 }
 
-/**
- * `POST /:id/confirm` — **200 or 202**, decided by the handler from the
- * idempotency record rather than by an `@HttpCode`.
- *
- * On a 202 the handler also sets `Retry-After: 2` and a `Location` that is not
- * a Gateway path and cannot be called (Q34). The poll URL is built from
- * `orderId` and `attemptId` in the body instead.
- */
+/** `POST /:id/confirm` returns a completed synchronous confirmation receipt. */
 export interface SalesOrderConfirmation {
-  statusCode: number;
+  statusCode: 200;
   orderId: string;
   attemptId: string;
-  status: string;
-}
-
-/** `TradeSalesOrderConfirmationAttemptEntity`. */
-export interface SalesOrderAttempt {
-  id: string;
-  version: number;
-  status: string;
-  deadlineAt: string | null;
-  lastErrorCode: string | null;
+  status: "COMPLETED";
 }
 
 export function parseSalesOrder(payload: unknown): SalesOrder {
@@ -122,10 +103,10 @@ export function parseSalesOrderConfirmation(payload: unknown): SalesOrderConfirm
   const result = record(payload);
   if (
     !result ||
-    typeof result.statusCode !== "number" ||
+    result.statusCode !== 200 ||
     !isUUIDv7(result.orderId) ||
     !isUUIDv7(result.attemptId) ||
-    !isBoundedString(result.status, 32)
+    result.status !== "COMPLETED"
   ) {
     tradeInvalidResponse();
   }
@@ -134,32 +115,6 @@ export function parseSalesOrderConfirmation(payload: unknown): SalesOrderConfirm
     orderId: result.orderId,
     attemptId: result.attemptId,
     status: result.status,
-  };
-}
-
-export function parseSalesOrderAttempt(payload: unknown): SalesOrderAttempt {
-  const attempt = record(payload);
-  if (
-    !attempt ||
-    !isUUIDv7(attempt.id) ||
-    !isVersion(attempt.version) ||
-    !isTradeStatus(attempt.status)
-  ) {
-    tradeInvalidResponse();
-  }
-  return {
-    id: attempt.id,
-    // The attempt carries its **own** version, and
-    // `cancelSalesOrderConfirmationAttempt` asserts `If-Match` against it —
-    // not against the order. trade-documents.md says the order's; the service
-    // reads `attempt.version`.
-    version: attempt.version,
-    status: attempt.status,
-    deadlineAt: attempt.deadlineAt == null ? null : timestamp(attempt.deadlineAt),
-    lastErrorCode:
-      attempt.lastErrorCode == null || attempt.lastErrorCode === ""
-        ? null
-        : String(attempt.lastErrorCode).slice(0, 120),
   };
 }
 
@@ -198,10 +153,6 @@ function parseSalesOrderLine(payload: unknown): SalesOrderLine {
 function optionalDecimal(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   return isTradeDecimal(value) ? value : tradeInvalidResponse();
-}
-
-function timestamp(value: unknown): string {
-  return isTradeTimestamp(value) ? value : tradeInvalidResponse();
 }
 
 /** Every snapshot key the order carries, for the totals panel. */

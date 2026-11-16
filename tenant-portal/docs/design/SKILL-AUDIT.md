@@ -115,7 +115,7 @@ No action needed. Recorded so a future pass does not "fix" what is correct.
 | `color-accessible-pairs` (4.5:1 / 3:1) | Every pairing computed by `design:contrast`, plus a negative control that has to keep failing |
 | `exit-faster-than-enter` (~60–70%) | Enter 120ms / exit 90ms = 75% |
 | `toast-dismiss` (3–5s) | 4000ms default |
-| `adaptive-navigation` (≥1024px sidebar) | Section menus at `xl`, sheet below — see [shell.md](shell.md#the-menus-appear-at-xl-not-lg) |
+| `adaptive-navigation` (≥1024px sidebar) | Section menus at `xl`, sheet below — see [shell.md](shell.md#the-menus-appear-at-lg) |
 
 ---
 

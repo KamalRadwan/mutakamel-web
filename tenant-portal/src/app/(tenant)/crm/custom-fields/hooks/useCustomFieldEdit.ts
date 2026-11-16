@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient, TenantApiClientError } from "@/lib/api/axiosClient";
 import { normalizeApiError } from "@/lib/api/errors";
@@ -14,23 +14,34 @@ export function useCustomFieldEdit(
   const { t } = useI18n();
   const [selected, setSelected] = useState<CustomFieldItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [optionConflict, setOptionConflict] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const saving = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   async function save(input: UpdateCustomFieldInput): Promise<boolean> {
-    if (!selected || saving.current) return false;
+    if (!mounted.current || !selected || saving.current) return false;
     if (!canManage) { setError(t.crmCustomFields.editForbidden); return false; }
     saving.current = true;
     setIsSaving(true);
     setError(null);
+    setOptionConflict(false);
     try {
       // Whitelist metadata: fieldKey, ownerType and type remain fixed in this editor.
       const payload: UpdateCustomFieldInput = { nameAr: input.nameAr.trim(), nameEn: input.nameEn.trim(),
         isActive: input.isActive, isSearchable: input.isSearchable,
+        ...(input.placeholderAr !== undefined ? { placeholderAr: input.placeholderAr } : {}),
+        ...(input.placeholderEn !== undefined ? { placeholderEn: input.placeholderEn } : {}),
+        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
         ...(input.options ? { options: input.options } : {}) };
       const response = await axiosClient.patch<unknown>(customFieldPath(selected.id), payload, {
         cache: "no-store", nonReplayable: true, skipAutoIdempotency: true, maxResponseBytes: 250_000,
       });
+      if (!mounted.current) return false;
       const updated = parseCrmCustomField(response.data);
       if (updated.id !== selected.id) throw new Error("Unexpected custom-field id.");
       // PATCH does not attach requirement rows; retain the list's confirmed flags.
@@ -38,11 +49,14 @@ export function useCustomFieldEdit(
       setSelected(null);
       return true;
     } catch (caught) {
+      if (!mounted.current) return false;
       if (!(caught instanceof TenantApiClientError) || caught.response.status === 0 || caught.response.status >= 500) {
         const refreshed = await reload();
+        if (!mounted.current) return false;
         setSelected(null);
         setError(refreshed ? t.crmCustomFields.editUncertain : t.crmCustomFields.editUncertainStale);
       } else if (normalizeApiError(caught).code === "CUSTOM_FIELD_OPTION_IN_USE") {
+        setOptionConflict(true);
         setError(t.crmCustomFields.optionInUse);
       } else {
         setError(caught.message || t.crmCustomFields.editFailed);
@@ -50,21 +64,24 @@ export function useCustomFieldEdit(
       return false;
     } finally {
       saving.current = false;
-      setIsSaving(false);
+      if (mounted.current) setIsSaving(false);
     }
   }
 
   return {
-    selected, error, isSaving, save,
+    selected, error, optionConflict, isSaving, save,
+    clearOptionConflict: () => { setOptionConflict(false); setError(null); },
     select: (field: CustomFieldItem) => {
       if (!canManage || saving.current) return;
       setSelected(field);
       setError(null);
+      setOptionConflict(false);
     },
     close: () => {
       if (saving.current) return;
       setSelected(null);
       setError(null);
+      setOptionConflict(false);
     },
   };
 }

@@ -3,6 +3,7 @@
 import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ar } from "@/i18n/dictionaries/ar";
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 import { en } from "@/i18n/dictionaries/en";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
 import { useAcquisitionSources } from "../../acquisition-sources/hooks/useAcquisitionSources";
@@ -28,7 +29,6 @@ vi.mock("@/design-system", async (importOriginal) => ({
 const settings = {
   id: "01900100-0000-7000-8000-000000000001",
   requireQualifiedStageForConversion: true,
-  defaultLeadStageId: null,
   defaultPipelineId: "01900100-0000-7000-8000-000000000002",
   outboundEmailContentRetentionDays: 730,
   outboundEmailRetentionPolicyRevision: 1,

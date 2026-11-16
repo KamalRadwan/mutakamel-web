@@ -45,13 +45,16 @@ export type TradeStatusKind =
   | "TradeRenderJobStatus";
 
 const STATUS_ROLES: Record<TradeStatusKind, Record<string, TradeStatusRole | null>> = {
-  // documents.service.ts `quotationAction` — the five literals it writes.
+  // Quotation list vocabulary, including the EXPIRED filter (REVIEW-M-5).
   TradeQuotationStatus: {
     DRAFT: null,
     SENT: null,
     ACCEPTED: "positive",
+    // DocumentsService.convertQuotation commits this after creating its order.
+    CONVERTED: "positive",
     REJECTED: "negative",
     CANCELLED: "negative",
+    EXPIRED: "caution",
   },
   // The revision carries its own status. `DRAFT` is the literal
   // `createQuotationRevision` assigns and the one `send` requires.
@@ -61,6 +64,8 @@ const STATUS_ROLES: Record<TradeStatusKind, Record<string, TradeStatusRole | nul
     ACCEPTED: "positive",
     REJECTED: "negative",
     CANCELLED: "negative",
+    // QuotationExpiryService expires the sent revision alongside its header.
+    EXPIRED: "caution",
   },
   // `DocumentLifecycleStatus` has four members. CLOSED is exported and never
   // assigned anywhere in trade-app/src; it is listed so a projection that sets

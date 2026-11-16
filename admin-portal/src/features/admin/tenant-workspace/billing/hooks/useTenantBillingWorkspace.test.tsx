@@ -42,7 +42,7 @@ vi.mock("../model/permissions", () => ({
 
 import { useTenantBillingWorkspace } from "./useTenantBillingWorkspace";
 import { useCommercialChangeWorkspace } from "@/features/admin/subscriptions/commercial-change/hooks/useCommercialChangeWorkspace";
-import { commercialFixture, commercialOperationFixture, commercialPreviewFixture } from "../model/subscription-commercial-fixtures";
+import { commercialFixture, commercialOperationFixture, commercialPreviewFixture, commercialReceiptFixture } from "../model/subscription-commercial-fixtures";
 import { adaptSubscriptionCommercial } from "../model/subscription-commercial";
 
 const NONE: TenantBillingPermissions = {
@@ -110,6 +110,32 @@ describe("useTenantBillingWorkspace", () => {
     await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
     await act(async () => { expect(await result.current.cancelSubscription()).toBeNull(); });
     expect(api.cancelSubscription).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "short", "   123456789   ", "x".repeat(501)])("refuses an invalid refund note without a request: %s", async (note) => {
+    permissionState.current = { ...NONE, canReadWallet: true, canRefundPayment: true };
+    api.getWallet.mockResolvedValue({ status: "ACTIVE" });
+    api.getInputCurrencies.mockResolvedValue({ items: [] });
+    api.getLedger.mockResolvedValue(emptyPage());
+    api.getPayments.mockResolvedValue({ ...emptyPage(), items: [{ paymentId: "payment", status: "SUCCEEDED" }] });
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.paymentsState).toBe("ready"));
+    await act(async () => { expect(await result.current.refundPayment("payment", note)).toBeNull(); });
+    expect(result.current.mutation.error?.errorCode).toBe("PAYMENT_REFUND_NOTE_INVALID");
+    expect(api.refundPayment).not.toHaveBeenCalled();
+  });
+
+  it.each([10, 500])("sends the trimmed refund note at the %i character boundary", async (length) => {
+    permissionState.current = { ...NONE, canReadWallet: true, canRefundPayment: true };
+    api.getWallet.mockResolvedValue({ status: "ACTIVE" });
+    api.getInputCurrencies.mockResolvedValue({ items: [] });
+    api.getLedger.mockResolvedValue(emptyPage());
+    api.getPayments.mockResolvedValue({ ...emptyPage(), items: [{ paymentId: "payment", status: "SUCCEEDED" }] });
+    api.refundPayment.mockResolvedValue({ paymentId: "payment", status: "REFUNDED" });
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.paymentsState).toBe("ready"));
+    await act(async () => { await result.current.refundPayment("payment", `  ${"x".repeat(length)}  `); });
+    expect(api.refundPayment).toHaveBeenCalledWith("payment", "x".repeat(length), expect.any(String));
   });
 
   it("fails closed by resource permission without issuing requests", async () => {
@@ -283,6 +309,59 @@ describe("useTenantBillingWorkspace", () => {
     expect(result.current.ledgerError?.errorCode).toBe("LEDGER_UNAVAILABLE");
   });
 
+  it.each<{ field: string; mismatch: Partial<WalletAdjustmentPreviewView> }>([
+    { field: "direction", mismatch: { direction: "DEBIT", reasonCode: "MANUAL_DEBIT" } },
+    { field: "source amount", mismatch: { sourceAmount: "25.0001" } },
+    { field: "source currency", mismatch: { sourceCurrencyCode: "EGP" } },
+  ])("rejects a preview with a mismatched $field and clears the previous quote", async ({ mismatch }) => {
+    allowWalletAdjustments();
+    api.previewWalletAdjustment
+      .mockResolvedValueOnce(walletQuote())
+      .mockResolvedValueOnce({ ...walletQuote(), ...mismatch });
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => { await result.current.previewWalletAdjustment(walletDraft); });
+    expect(result.current.walletPreview).not.toBeNull();
+
+    await act(async () => {
+      expect(await result.current.previewWalletAdjustment(walletDraft)).toBeNull();
+    });
+    expect(result.current.walletPreview).toBeNull();
+    expect(result.current.mutation.error).toMatchObject({ httpStatus: 409, errorCode: "WALLET_PREVIEW_MISMATCH" });
+    await act(async () => { await result.current.confirmWalletAdjustment("Reviewed note"); });
+    expect(api.confirmWalletAdjustment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["25", "25.0000"],
+    ["25.10", "25.1000"],
+    ["0.0001", "0.0001"],
+    ["99999999999999.9999", "99999999999999.9999"],
+  ])("accepts the same decimal amount %s quoted as %s", async (sourceAmount, quotedAmount) => {
+    allowWalletAdjustments();
+    const quote = { ...walletQuote(), sourceAmount: quotedAmount };
+    api.previewWalletAdjustment.mockResolvedValue(quote);
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => {
+      expect(await result.current.previewWalletAdjustment({ ...walletDraft, sourceAmount })).toEqual(quote);
+    });
+    expect(result.current.walletPreview).toEqual(quote);
+    expect(result.current.mutation.error).toBeNull();
+  });
+
+  it("rejects a one-unit fractional mismatch in a large source amount", async () => {
+    allowWalletAdjustments();
+    api.previewWalletAdjustment.mockResolvedValue({ ...walletQuote(), sourceAmount: "99999999999999.9998" });
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => {
+      await result.current.previewWalletAdjustment({ ...walletDraft, sourceAmount: "99999999999999.9999" });
+    });
+    expect(result.current.walletPreview).toBeNull();
+    expect(result.current.mutation.error?.errorCode).toBe("WALLET_PREVIEW_MISMATCH");
+  });
+
   it("recovers one committed adjustment after a lost response, reload and quote expiry", async () => {
     allowWalletAdjustments();
     const quote = walletQuote();
@@ -439,6 +518,71 @@ describe("useTenantBillingWorkspace", () => {
     expect(result.current.preview?.previewId).toBe(preview.previewId);
   });
 
+  it("reports a rejected post-commit refresh through the banner state and keeps operation refresh usable", async () => {
+    allowCommercial();
+    const receipt = commercialReceiptFixture();
+    const failure = normalizedError(503, "BILLING_REFRESH_UNAVAILABLE");
+    const onCommitted = vi.fn().mockRejectedValue(failure);
+    const unhandled = vi.fn();
+    window.addEventListener("unhandledrejection", unhandled);
+    try {
+      commercialApi.prepare.mockResolvedValue(commercialOperationFixture());
+      const preview = commercialPreviewFixture();
+      preview.pricedAt = new Date().toISOString();
+      preview.expiresAt = new Date(Date.parse(preview.pricedAt) + 300_000).toISOString();
+      commercialApi.preview.mockResolvedValue(preview);
+      commercialApi.apply.mockResolvedValue(receipt);
+      commercialApi.getOperation.mockResolvedValue({ ...commercialOperationFixture(), state: "COMMITTED",
+        phase: "COMMITTED", terminalAt: "2026-09-09T00:00:00.000Z", relatedPreviewId: receipt.previewId,
+        committedReceiptRef: receipt.previewId, projectionState: "PENDING" });
+      commercialApi.getReceipt.mockResolvedValue(receipt);
+      const { result } = await commercialHook(true, onCommitted);
+      await act(async () => { await result.current.prepare(); });
+      await act(async () => { await result.current.price(); });
+      act(() => result.current.setReviewed(true));
+      await act(async () => { await result.current.apply(); });
+      await waitFor(() => expect(result.current.error).toEqual(failure));
+      expect(result.current.errorMessage).toBe(failure.message);
+      expect(result.current.receipt).toEqual(receipt);
+      expect(result.current.busy).toBe(false);
+
+      await act(async () => { await result.current.refreshOperation(); });
+      expect(commercialApi.getOperation).toHaveBeenCalledTimes(1);
+      expect(commercialApi.getReceipt).toHaveBeenCalledTimes(1);
+      expect(result.current.error).toBeNull();
+      expect(result.current.receipt).toEqual(receipt);
+      expect(onCommitted).toHaveBeenCalledTimes(1);
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("unhandledrejection", unhandled);
+    }
+  });
+
+  it("consumes a post-commit refresh rejection after unmount", async () => {
+    allowCommercial();
+    let rejectRefresh!: (cause: unknown) => void;
+    const onCommitted = vi.fn(() => new Promise<void>((_resolve, reject) => { rejectRefresh = reject; }));
+    commercialApi.prepare.mockResolvedValue(commercialOperationFixture());
+    const preview = commercialPreviewFixture();
+    preview.pricedAt = new Date().toISOString();
+    preview.expiresAt = new Date(Date.parse(preview.pricedAt) + 300_000).toISOString();
+    commercialApi.preview.mockResolvedValue(preview);
+    commercialApi.apply.mockResolvedValue(commercialReceiptFixture());
+    const { result, unmount } = await commercialHook(true, onCommitted);
+    await act(async () => { await result.current.prepare(); });
+    await act(async () => { await result.current.price(); });
+    act(() => result.current.setReviewed(true));
+    await act(async () => { await result.current.apply(); });
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    unmount();
+    await act(async () => {
+      rejectRefresh(new Error("Refresh finished after unmount"));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(result.current.error).toBeNull();
+  });
+
   it("records a normalized offline payment only for the authoritative open invoice", async () => {
     permissionState.current = {
       ...NONE,
@@ -529,8 +673,8 @@ function allowWalletAdjustments() {
 function allowCommercial() {
   authState.current.user.permissions = ["admin.subscriptions.read", "admin.subscriptions.update", "admin.subscriptions.critical"];
 }
-async function commercialHook(edit = true) {
-  const source = commercialFixture(); const onCommitted = vi.fn();
+async function commercialHook(edit = true, onCommitted: () => void | Promise<void> = vi.fn()) {
+  const source = commercialFixture();
   const hook = renderHook(() => useCommercialChangeWorkspace({ source, lang: "en", onCommitted }));
   await waitFor(() => expect(hook.result.current.journalReady).toBe(true));
   if (edit) act(() => hook.result.current.updateTarget(hook.result.current.targets[0].selectionKey, { seats: 31 }));

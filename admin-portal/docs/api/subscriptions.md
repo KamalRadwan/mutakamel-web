@@ -3,6 +3,10 @@
 Status: PARTIAL SOURCE INTEGRATION. Last source verification: 2026-09-09; amended 2026-10-11 for the release-upgrade refusal of a preparation (Core commit `77447fb9`); subscription loader and independent detail-route permissions reverified 2026-10-18 (CXADMIN-110, CXCORE-ADM-112).
 Owner: Core. No authenticated runtime, financial execution or package-adoption acceptance is claimed by this change.
 
+Quote expiry display source reviewed 2026-10-31: initial-commercial and commercial-change
+quotes use the billing panel's locale date convention (`ar-EG` / `en-US`, medium
+date and short time). The `time` element retains the original ISO `datetime`.
+
 ## Routes
 
 | Method and canonical browser path | Permissions | Current Admin use |
@@ -27,6 +31,14 @@ Preparation plans the selection's provisioning closure, which runs only current 
 Preparation uses `expectedSubscriptionRevision,changes,reason?`; preview adds `preparationId`. Admin's editor sends no optional reason, prices or actor claims. The 13-field preview preserves22fields per change, complete before/after accepted prices and the owner's nine-field financial observation, including `canApply`. It retains a five-minute expiry and a separate `preparation:{preparationId}` binding. The reader checks the reviewed request's exact selections and retained arithmetic without calculating prices, proration or eligibility. The operator explicitly reviews all amounts before the exact empty-object apply request.
 
 Apply's nine-field original receipt binds the reviewed preview, next subscription revision, actual created/existing selection mappings and wallet settlement. Its `projection.state:"PENDING"` is historical evidence. The13-field operation receipt uses real durable `operationRevision` and source-owned state/phase; READY is not current usable access. Operation GET accepts an original preparation ID or bound preview-operation alias; Admin checks a separately known preparation ID when available and does not assume the requested alias equals the returned ID. Reads require current read permission, no body/query/organization/idempotency and private uncached handling. Progress refresh is explicit, and a committed operation resolves its original receipt. A verified current receipt triggers the authoritative billing refresh once; unrelated historical lookup cannot unlock a pending intent.
+
+Post-commit refresh handling updated **2026-10-31** (AUDIT29X-APB-7): a rejected
+`onCommitted` refresh is caught and normalized into the existing workspace error
+banner while the workspace is mounted. The committed receipt stays visible and
+the operation refresh control remains usable; the receipt notification still runs
+once per preview. Late rejections after unmount are consumed without updating
+state. Regression coverage is source-only; unit execution, typecheck, lint and
+the admin production rebuild remain pending lead verification.
 
 Owner-verified retry semantics: the same preview key/body returns its original preview even after expiry. A fresh key may request a fresh five-minute preview from the same unresolved preparation, subject to current owner checks. Only one financial commit is allowed per preparation. Commands retain the exact UUIDv7 key/body through shared session refresh and reauthorize actor and scope. Gateway never retries these writes at the transport layer and does not replay edge receipts. Bodies require application/json, measured256KiB, exact UUIDv7 paths, no query or organization selectors and private/no-store handling.
 
@@ -58,6 +70,9 @@ The cross-tenant directory returns each complete detail plus required `tenant:{i
 
 ## Initial quote and seed
 
+Initial-seed review behaviour source verification: **2026-10-31** (AUDIT29X-APB-6);
+automated checks and runtime verification remain pending with the lead.
+
 Canonical terms are:
 
 ```ts
@@ -79,6 +94,13 @@ Quote adds `purpose:"TENANT_CREATION"`, or `purpose:"INITIAL_SEED",targetTenantI
 Quote returns201 with purpose, target (null for creation), resolved trial duration, created/expiry timestamps, nested accepted prices and separate totals. Expiry is15minutes. Private request hashes, provisioning intent and aggregate price revisions never cross this public boundary. Quote response cap is4MiB. Quote has no idempotency key and `replayAfterRefresh:false`; another operator request creates another quote.
 
 Admin requires a current reviewed quote before create/seed. Editing the selection, actor/tenant/permission changes or expiry disown it. Pending quote requests block duplicate dispatch. Creation keeps its identity/placement validation and status-only uncertain-create recovery; see [tenants](./tenants.md).
+
+For an existing tenant's first subscription, Submit also requires the operator
+to tick the Arabic/English acknowledgement of quoted totals, resolved trial days
+and quote expiry. Every draft edit (including restore) clears acknowledgement;
+a replacement quote requires fresh acknowledgement. The submit handler also
+checks this review state. An uncertain seed keeps its original exact-retry path
+and does not start a new subscription intent.
 
 The tenant billing empty state mounts the canonical initial commercial workspace. The options picker additionally requires the genuine `admin.tenants.create` options permission; it does not widen catalogue authority. Seed uses one UUIDv7 intent key and the exact reviewed body. Safe session-refresh replay keeps the same key, body, tenant and identity so Core reauthorizes and returns its original SQL receipt.
 

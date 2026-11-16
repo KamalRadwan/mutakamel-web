@@ -138,6 +138,17 @@ export const SETTINGS_UI_REGISTRY: Record<string, SettingUIMetadata> = {
   },
 
   // Notifications
+  "notifications.retention_days": {
+    key: "notifications.retention_days",
+    titleEn: "Notification Retention (Days)",
+    titleAr: "مدة الاحتفاظ بالإشعارات (أيام)",
+    inputType: "number",
+    defaultValue: 180,
+    descEn: "Days to retain read or dismissed tenant inbox notifications.",
+    descAr: "عدد أيام الاحتفاظ بإشعارات المستأجر المقروءة أو المستبعدة.",
+    min: 1,
+    max: 3650,
+  },
   "notifications.in_app_enabled": {
     key: "notifications.in_app_enabled",
     titleEn: "In-App Notifications",

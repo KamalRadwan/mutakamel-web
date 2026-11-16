@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useStablePermissions } from "@/hooks/useStablePermissions";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { readCorePage, readCrmBody } from "@/lib/api/envelope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -156,7 +157,7 @@ function initialStates(
  */
 export function useGlobalSearch(initialTerm: string): GlobalSearchState {
   const { user } = useTenantAuth();
-  const permissions = useMemo(() => user?.permissions ?? [], [user]);
+  const permissions = useStablePermissions(user);
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
 
   const [draft, setDraft] = useState(initialTerm);

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { requiresSameKeyRecovery } from "@/lib/api/outcomes";
 import { generateUUIDv7 } from "@/lib/uuid";
 import { isTradeReplay, type TradeResult } from "../../trade-api";
 import { tradeDocumentMessage } from "../trade-document-errors";
@@ -19,6 +20,10 @@ interface TradeAmbiguousWrite {
 interface TradeWriteRequest {
   /** Already translated — names the write in a toast and in the ambiguous panel. */
   operation: string;
+  /** Existing write identity for an explicitly recovered request. */
+  idempotencyKey?: string;
+  /** Recheck local admission before replaying an unresolved request. */
+  canRetry?: () => boolean;
   /** Receives the key so the same one is replayed on retry, never a fresh one. */
   send: (headers: Record<string, string>) => Promise<TradeResult>;
   onSuccess?: (result: TradeResult) => void | Promise<unknown>;
@@ -41,12 +46,12 @@ export interface TradeWriteState {
  * Four Trade-specific rules are applied here rather than in each of the
  * thirty-odd call sites:
  *
- * 1. **The idempotency key is generated up front and reused on retry.** Trade
+ * 1. **The idempotency key is chosen up front and reused on retry.** Trade
  *    sets `Idempotency-Replayed` itself and sets it to the string `"false"` on
  *    first execution, so presence proves nothing — only `=== "true"` is a
  *    replay, and a replay is a **success**: the write ran once and this is its
  *    stored result. `isTradeReplay` is the only correct test.
- * 2. **A `status: 0` failure is ambiguous, not failed.** The request left the
+ * 2. **A transport, 5xx or processing response retains the key.** The request left the
  *    browser and no response came back, so it may have applied. That evidence
  *    goes in-body with its key, never in a four-second toast.
  * 3. **A 403 raises nothing here** — `axiosClient` already fires its own toast,
@@ -68,10 +73,11 @@ export function useTradeWrite(): TradeWriteState {
       // Refs close the gap before React commits disabled controls, including
       // double clicks and calls through a callback from an earlier render.
       if (inFlight.current || unresolved.current) return false;
-      const { send, onSuccess, operation } = request;
-      const idempotencyKey = generateUUIDv7();
+      const { send, onSuccess, operation, canRetry } = request;
+      const idempotencyKey = request.idempotencyKey ?? generateUUIDv7();
       const attempt = async (recovery = false): Promise<boolean> => {
         if (inFlight.current || (recovery && unresolved.current?.idempotencyKey !== idempotencyKey)) return false;
+        if (recovery && canRetry?.() === false) return false;
         inFlight.current = true;
         setIsWriting(true);
         setWriteError(null);
@@ -81,7 +87,7 @@ export function useTradeWrite(): TradeWriteState {
             result = await send({ "x-idempotency-key": idempotencyKey });
           } catch (error) {
             const normalized = normalizeApiError(error);
-            if (normalized.status === 0) {
+            if (requiresSameKeyRecovery(normalized)) {
               const pending: TradeAmbiguousWrite = {
                 operation,
                 idempotencyKey,

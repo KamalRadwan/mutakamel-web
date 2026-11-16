@@ -15,6 +15,8 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { generateUUIDv7 } from "@/lib/uuid";
 import type { CrmActionCapability } from "../crm-capabilities";
 import { crmCapabilityAllowsOwner } from "../crm-capabilities";
@@ -54,10 +56,8 @@ export interface RecordAttachmentsSectionProps {
  * in `MAX_SIZE_BYTES[BUCKETS.ATTACHMENTS]`. See `CRM_ATTACHMENT_MAX_BYTES` for
  * why the plan's "26 MiB" is a different limit.
  *
- * Download is a browser navigation, not a transport call: the route streams
- * bytes and the one `fetch` in this app reads every body as text first, which
- * would corrupt them. `Content-Disposition: attachment` means the page does not
- * navigate away.
+ * Fetch downloads before handing the file to the browser, so HTTP
+ * failures stay in the record's error area and preserve unsaved page state.
  */
 export function RecordAttachmentsSection(props: RecordAttachmentsSectionProps) {
   return (
@@ -86,6 +86,32 @@ function RecordAttachmentsContent({
   const [queue, setQueue] = useState<UploadFile[]>([]);
   const [rejections, setRejections] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<CrmAttachment | null>(null);
+  const [downloadError, setDownloadError] = useState<NormalizedApiError | null>(null);
+
+  async function download(id: string, fileName: string) {
+    setDownloadError(null);
+    try {
+      const path = crmAttachmentDownloadPath(id);
+      const response = await axiosClient.get<Blob>(path, {
+        responseType: "blob",
+        cache: "no-store",
+      });
+      const objectUrl = URL.createObjectURL(response.data);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      try {
+        anchor.click();
+      } finally {
+        anchor.remove();
+        // Give the browser a turn to start reading before releasing the file.
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      }
+    } catch (error) {
+      setDownloadError(normalizeApiError(error));
+    }
+  }
 
   const canUpload =
     !readOnly && crmCapabilityAllowsOwner(createCapability, sourceOwnerUserId);
@@ -166,6 +192,15 @@ function RecordAttachmentsContent({
             />
           )}
 
+          {downloadError && (
+            <ErrorState
+              title={t.crmAttachments.downloadFailedTitle}
+              description={describeError(downloadError) ?? undefined}
+              onRetry={() => setDownloadError(null)}
+              retryLabel={t.common.dismiss}
+            />
+          )}
+
           {attachments.ambiguity && (
             <AmbiguousOutcomePanel
               operation={
@@ -210,9 +245,7 @@ function RecordAttachmentsContent({
               uploadVariant={uploadVariant}
               disabled={attachments.isUploading || attachments.pendingId !== null ||
                 attachments.ambiguity !== null || attachments.appliedUnreadable !== null}
-              onDownload={(attachment) => {
-                window.location.href = crmAttachmentDownloadPath(attachment.id);
-              }}
+              onDownload={(attachment) => void download(attachment.id, attachment.name)}
               onDelete={
                 canDelete
                   ? (attachment) => {

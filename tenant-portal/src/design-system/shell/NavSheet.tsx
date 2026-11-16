@@ -7,6 +7,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../lib/cn";
 import { Sheet, SheetContent, SheetTitle } from "../primitives/Sheet";
 import type { NavAppId, NavApp, NavSection } from "./nav-config";
+import { crmSettingsDestination } from "./crm-settings-navigation";
 
 export interface NavSheetProps {
   sections: NavSection[];
@@ -59,7 +60,14 @@ export function NavSheet({
           {t.nav[appLabelKey as keyof typeof t.nav]}
         </SheetTitle>
         <nav aria-label={t.nav.mainNavigation} className="flex flex-col gap-1 px-2 pb-4">
-          {sections.map((section) => (
+          {sections.map((section) => section.globalNavDisplay === "settings" ? (
+            <Link key={section.id} href={crmSettingsDestination(section.items)?.href ?? "/crm/settings"}
+              onClick={() => onOpenChange(false)}
+              aria-current={section.items.some((item) => item.id === activeItemId) ? "page" : undefined}
+              className="mt-3 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-accent">
+              {t.nav[section.menuLabelKey as keyof typeof t.nav]}
+            </Link>
+          ) : (
             <div key={section.id} className="flex flex-col gap-0.5">
               <p className="px-2 pb-1 pt-3 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
                 {t.nav[(section.labelKey ?? section.menuLabelKey) as keyof typeof t.nav]}

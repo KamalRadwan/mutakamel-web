@@ -32,8 +32,6 @@ export interface SalesOrderScreenState {
   canHold: boolean;
   canRelease: boolean;
   canCancel: boolean;
-  /** Holding is refused outright while a confirmation attempt is pending. */
-  isHoldBlocked: boolean;
   openReason: SalesOrderReasonAction | null;
   requestReason: (action: SalesOrderReasonAction) => void;
   closeReason: () => void;
@@ -51,7 +49,7 @@ export function useSalesOrderScreen(id: string): SalesOrderScreenState {
   const order = detail.document;
   const { headers, canWrite } = detail.scope;
   const write = useTradeWrite();
-  const pdf = useTradePdfJob(SALES_ORDERS_PATH, id, headers);
+  const pdf = useTradePdfJob(SALES_ORDERS_PATH, id, headers, order?.version.toString());
   const [openReason, setOpenReason] = useState<SalesOrderReasonAction | null>(null);
 
   const reload = useCallback(async () => {
@@ -103,8 +101,6 @@ export function useSalesOrderScreen(id: string): SalesOrderScreenState {
     );
   }, [order, pdf, t]);
 
-  const isPendingConfirmation = order?.confirmationStatus === "PENDING";
-
   return {
     detail,
     confirmation,
@@ -121,7 +117,6 @@ export function useSalesOrderScreen(id: string): SalesOrderScreenState {
     canRelease: order?.holdStatus === "HELD" && canWrite(SALES_ORDER_PERMISSIONS.hold),
     canCancel:
       order?.lifecycleStatus !== "CANCELLED" && canWrite(SALES_ORDER_PERMISSIONS.cancel),
-    isHoldBlocked: isPendingConfirmation === true,
     openReason,
     requestReason: (action: SalesOrderReasonAction) => setOpenReason(action),
     closeReason: () => setOpenReason(null),

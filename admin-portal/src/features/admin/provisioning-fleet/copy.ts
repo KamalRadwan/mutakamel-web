@@ -1,4 +1,5 @@
 import type { CopyShape } from "@/i18n/copy-shape";
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export type FleetLanguage = "ar" | "en";
 
@@ -55,10 +56,10 @@ const en = {
   emptyTenants: "No tenant evidence exists on this page.",
   forbiddenRollouts: "You do not have permission to read provisioning rollouts.",
   forbiddenPreviewCreate: "Preview creation requires admin.provisioning.rollouts.create.",
-  forbiddenRolloutCreate: "Rollout creation requires admin.provisioning.rollouts.create and admin.provisioning.critical.",
-  forbiddenManage: "Lifecycle controls require admin.provisioning.rollouts.manage and admin.provisioning.critical.",
+  forbiddenRolloutCreate: `Rollout creation requires ${ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_CREATE.join(" and ")}.`,
+  forbiddenManage: `Lifecycle controls require ${ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_MANAGE.join(" and ")}.`,
   forbiddenReport: "Report access requires admin.provisioning.rollouts.report.",
-  forbiddenAttest: "Attestation requires admin.provisioning.rollouts.report and admin.provisioning.critical.",
+  forbiddenAttest: `Attestation requires ${ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_ATTEST.join(" and ")}.`,
   unavailable: "Provisioning fleet is temporarily unavailable.",
   notFound: "The requested fleet resource was not found.",
   invalidRouteId: "The route identifier is not a canonical UUIDv7.",
@@ -277,10 +278,10 @@ const ar: CopyShape<typeof en> = {
   emptyTenants: "لا توجد أدلة مستأجرين في هذه الصفحة.",
   forbiddenRollouts: "ليست لديك صلاحية قراءة عمليات طرح التهيئة.",
   forbiddenPreviewCreate: "يتطلب إنشاء المعاينة صلاحية admin.provisioning.rollouts.create.",
-  forbiddenRolloutCreate: "يتطلب إنشاء الطرح صلاحيتي admin.provisioning.rollouts.create وadmin.provisioning.critical.",
-  forbiddenManage: "تتطلب عناصر التحكم صلاحيتي admin.provisioning.rollouts.manage وadmin.provisioning.critical.",
+  forbiddenRolloutCreate: `يتطلب إنشاء الطرح صلاحيتي ${ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_CREATE.join(" و")}.`,
+  forbiddenManage: `تتطلب عناصر التحكم صلاحيتي ${ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_MANAGE.join(" و")}.`,
   forbiddenReport: "يتطلب الوصول إلى التقرير صلاحية admin.provisioning.rollouts.report.",
-  forbiddenAttest: "يتطلب التصديق صلاحيتي admin.provisioning.rollouts.report وadmin.provisioning.critical.",
+  forbiddenAttest: `يتطلب التصديق صلاحيتي ${ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_ATTEST.join(" و")}.`,
   unavailable: "أسطول التهيئة غير متاح مؤقتًا.",
   notFound: "لم يتم العثور على مورد الأسطول المطلوب.",
   invalidRouteId: "معرّف المسار ليس UUIDv7 قياسيًا.",

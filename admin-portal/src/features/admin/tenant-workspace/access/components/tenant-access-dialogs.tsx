@@ -438,12 +438,16 @@ export function RolesDialog({
         <h3 className="text-sm font-semibold">{copy.branchRoles}</h3>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <div className="space-y-2">
-            <DialogInputField id="tenant-role-branch-search" name="branchSearch" label={copy.searchBranches} type="search" maxLength={120} value={branches.search} onChange={branches.setSearch} disabled={controller.command.pending} />
+            <DialogInputField id="tenant-role-branch-search" name="branchSearch" label={copy.searchBranches} type="search" maxLength={120} value={branches.search} onChange={branches.setSearch} disabled={controller.command.pending} onKeyDown={(event) => {
+              if (event.key === "Enter") event.preventDefault();
+            }} />
             <DialogSelectField id="tenant-role-branch" label={copy.branch} value={branchId} onValueChange={setBranchId} options={branchOptions} disabled={controller.command.pending || !optionsReady} />
             <RoleCatalogueFeedback label={copy.branch} picker={branches} copy={copy} disabled={controller.command.pending} />
           </div>
           <div className="space-y-2">
-            <DialogInputField id="tenant-role-role-search" name="roleSearch" label={copy.searchRoles} type="search" maxLength={120} value={roles.search} onChange={roles.setSearch} disabled={controller.command.pending} />
+            <DialogInputField id="tenant-role-role-search" name="roleSearch" label={copy.searchRoles} type="search" maxLength={120} value={roles.search} onChange={roles.setSearch} disabled={controller.command.pending} onKeyDown={(event) => {
+              if (event.key === "Enter") event.preventDefault();
+            }} />
             <DialogSelectField id="tenant-role-role" label={copy.roles} value={roleId} onValueChange={setRoleId} options={roleOptions} disabled={controller.command.pending || !optionsReady} />
             <RoleCatalogueFeedback label={copy.roles} picker={roles} copy={copy} disabled={controller.command.pending} />
           </div>
@@ -538,6 +542,8 @@ export function TransferOwnershipDialog({
   onClose,
   onSuccess,
 }: SharedDialogProps & { user: TenantUserView }) {
+  const [ownerEmailConfirmation, setOwnerEmailConfirmation] = useState("");
+  const ownerEmailConfirmed = ownerEmailConfirmation === user.email;
   const picker = useOwnershipTransferCandidates(controller, user.id);
   const { resource, selected } = picker;
   const candidates = resource.data?.items ?? [];
@@ -547,7 +553,7 @@ export function TransferOwnershipDialog({
   const candidatesReady = resource.status === "ready" || resource.status === "empty";
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selected || !candidatesReady || controller.command.pending) return;
+    if (!selected || !candidatesReady || !ownerEmailConfirmed || controller.command.pending) return;
     try {
       await controller.transferOwnership(user, selected.id);
       onSuccess(copy.transferOwnershipSucceeded);
@@ -575,6 +581,9 @@ export function TransferOwnershipDialog({
           maxLength={200}
           disabled={controller.command.pending}
           onChange={picker.setSearch}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.preventDefault();
+          }}
         />
         {resource.status === "loading" ? (
           <p role="status" aria-busy="true" className="text-sm text-muted-foreground">{copy.transferCandidatesLoading}</p>
@@ -620,6 +629,21 @@ export function TransferOwnershipDialog({
             <Button type="button" size="sm" variant="outline" disabled={controller.command.pending || !candidatesReady || !resource.data.hasNext} onClick={() => picker.setPage(picker.page + 1)}>{copy.next}</Button>
           </div>
         ) : null}
+        <FormField id="tenant-owner-transfer-confirmation" label={copy.transferEmailConfirmation} required>
+          {(field) => (
+            <Input
+              {...field}
+              type="text"
+              inputMode="email"
+              size="sm"
+              dir="ltr"
+              autoComplete="off"
+              value={ownerEmailConfirmation}
+              onChange={(event) => setOwnerEmailConfirmation(event.target.value)}
+              disabled={controller.command.pending}
+            />
+          )}
+        </FormField>
         <DialogError controller={controller} />
         <div className="flex justify-end gap-2">
           <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
@@ -627,7 +651,7 @@ export function TransferOwnershipDialog({
             size="sm"
             type="submit"
             variant="primary"
-            disabled={controller.command.pending || !selected || !candidatesReady}
+            disabled={controller.command.pending || !selected || !candidatesReady || !ownerEmailConfirmed}
           >
             {copy.transferOwnership}
           </Button>
@@ -654,6 +678,8 @@ export function ConfirmationDialog({
   onClose,
   onSuccess,
 }: SharedDialogProps & { user: TenantUserView; action: ConfirmationAction }) {
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const canConfirm = action !== "delete" || deleteConfirmation === user.email;
   const definition = {
     "reset-password": [copy.resetPassword, copy.confirmReset],
     "resend-invite": [copy.resendInvite, copy.confirmResend],
@@ -663,6 +689,7 @@ export function ConfirmationDialog({
     restore: [copy.restore, copy.confirmRestore],
   }[action];
   const confirm = async () => {
+    if (!canConfirm || controller.command.pending) return;
     try {
       let successMessage: string = action === "resend-invite" ? copy.deliveryQueued : copy.commandSucceeded;
       if (action === "reset-password") {
@@ -684,6 +711,23 @@ export function ConfirmationDialog({
     <DialogFrame title={definition[0]} onClose={onClose} locale={locale}>
       <p className="text-sm leading-6 text-foreground/90">{definition[1]}</p>
       <p className="mt-2 rounded-lg bg-muted p-2 text-sm font-semibold text-foreground">{user.firstName} {user.lastName} · {user.email}</p>
+      {action === "delete" ? (
+        <FormField id="tenant-user-delete-confirmation" label={copy.deleteEmailConfirmation} required className="mt-3">
+          {(field) => (
+            <Input
+              {...field}
+              type="text"
+              inputMode="email"
+              size="sm"
+              dir="ltr"
+              autoComplete="off"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              disabled={controller.command.pending}
+            />
+          )}
+        </FormField>
+      ) : null}
       <DialogError
         controller={controller}
         localError={action === "reset-password" && controller.command.error?.errorCode === "TENANT_USER_PASSWORD_RESET_UNAVAILABLE"
@@ -692,7 +736,7 @@ export function ConfirmationDialog({
       />
       <div className="mt-5 flex justify-end gap-2">
         <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
-        <Button size="sm" type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</Button>
+        <Button size="sm" type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending || !canConfirm} onClick={() => void confirm()}>{copy.confirm}</Button>
       </div>
     </DialogFrame>
   );

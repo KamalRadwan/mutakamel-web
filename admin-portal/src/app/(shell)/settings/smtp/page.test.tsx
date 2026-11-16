@@ -2,10 +2,11 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { useSmtpSettings } from "./hooks/useSmtpSettings";
 
 const { smtpMock, toastMock } = vi.hoisted(() => ({
   smtpMock: {
-    lang: "en" as const,
+    lang: "en" as "ar" | "en",
     snapshot: {
       data: {
         configured: true,
@@ -47,7 +48,7 @@ const { smtpMock, toastMock } = vi.hoisted(() => ({
       error: null,
       localCode: null,
       correlationId: null,
-    },
+    } as ReturnType<typeof useSmtpSettings>["mutation"],
     canRead: true,
     canSaveCritical: false,
     canVerify: true,
@@ -70,6 +71,33 @@ vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
 import SmtpSettingsPage from "./page";
 
 describe("SmtpSettingsPage", () => {
+  it.each([
+    ["en", "The From address domain must match the sender domain."],
+    ["ar", "يجب أن يتطابق نطاق عنوان البريد المرسل مع نطاق المرسل."],
+  ] as const)("shows sender-domain mismatch guidance in %s", (lang, message) => {
+    const previousMutation = smtpMock.mutation;
+    smtpMock.lang = lang;
+    smtpMock.mutation = {
+      action: "SAVE",
+      phase: "FAILED",
+      error: {
+        isNormalized: true,
+        httpStatus: 422,
+        errorCode: "PLATFORM_SMTP_SENDER_DOMAIN_MISMATCH",
+        message: "Backend message",
+      },
+      localCode: null,
+      correlationId: null,
+    };
+    try {
+      render(<SmtpSettingsPage />);
+      expect(screen.getByText(message)).toBeTruthy();
+    } finally {
+      smtpMock.lang = "en";
+      smtpMock.mutation = previousMutation;
+    }
+  });
+
   it("hides critical save controls and disables testing while the form differs from saved Core state", () => {
     render(<SmtpSettingsPage />);
     expect(screen.queryByRole("button", { name: "Save configuration" })).toBeNull();

@@ -4,6 +4,7 @@ import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import { applicationsApi } from "../api/applications.api";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import type { CreateApplicationDto, OnboardApplicationDto } from "../types";
 
 /** Application registration mutations only; this hook never loads the catalogue. */
@@ -24,7 +25,7 @@ export function useApplicationRegistration(onChanged?: () => void) {
     } catch (error) {
       const normalized = normalizeApiError(error);
       if (shouldRotateWriteCommandKey(normalized)) createIntent.resetKey();
-      toast.error(t.applications.errorTitle, normalized.message);
+      toast.error(t.applications.errorTitle, localizeApplicationError(normalized, t));
       throw normalized;
     }
   };
@@ -40,7 +41,7 @@ export function useApplicationRegistration(onChanged?: () => void) {
     } catch (error) {
       const normalized = normalizeApiError(error);
       if (shouldRotateWriteCommandKey(normalized)) onboardingIntent.resetKey();
-      toast.error(t.applications.errorTitle, normalized.message);
+      toast.error(t.applications.errorTitle, localizeApplicationError(normalized, t));
       throw normalized;
     }
   };

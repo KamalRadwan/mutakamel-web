@@ -1,4 +1,4 @@
-import { adminCan, adminCanAll, type AdminAuthorizationContext } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL, type AdminAuthorizationContext } from "@/lib/auth/rbac";
 import type { ReleasePermissions } from "../types/provisioning-releases";
 
 export function readReleasePermissions(
@@ -7,13 +7,7 @@ export function readReleasePermissions(
   return {
     canRead: adminCan(user, "admin.provisioning.releases.read"),
     canManageDrafts: adminCan(user, "admin.provisioning.releases.publish"),
-    canPublishCritical: adminCanAll(user, [
-      "admin.provisioning.releases.publish",
-      "admin.provisioning.critical",
-    ]),
-    canRetireCritical: adminCanAll(user, [
-      "admin.provisioning.releases.retire",
-      "admin.provisioning.critical",
-    ]),
+    canPublishCritical: adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_RELEASE_PUBLISH),
+    canRetireCritical: adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_RELEASE_RETIRE),
   };
 }

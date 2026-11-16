@@ -1,56 +1,38 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { safeStorage } from "@/lib/safeStorage";
-import { ar, type Dictionary } from "./dictionaries/ar";
-import { en } from "./dictionaries/en";
+import { createContext, use, useContext, useState, useSyncExternalStore } from "react";
+import type { Dictionary } from "./dictionaries/ar";
+import {
+  getLanguageSnapshot,
+  loadLanguageSnapshot,
+  readLanguage,
+  seedLanguageSnapshot,
+  subscribeLanguage,
+  type Language,
+  type LanguageSnapshot,
+} from "./dictionary-store";
 
-export type Language = "ar" | "en";
+export { hydrateAccountLanguage, setLanguage } from "./dictionary-store";
+export type { Language } from "./dictionary-store";
 
-// A lookup, not a ternary. Branching on the language to pick the dictionary
-// would add a site to the census's languageTernaries counter, whose floor is
-// documented as 5 in docs/design/enforcement.md — a record says the same thing
-// without the syntax the gate looks for.
-export const DICTIONARIES: Record<Language, Dictionary> = { ar, en };
+export const LanguageSnapshotContext = createContext<LanguageSnapshot | null>(null);
 
-const STORAGE_KEY = "tenant_lang";
-
-// localStorage.setItem does not fire a "storage" event in the tab that wrote
-// it, only in other tabs. This event is what lets a same-tab toggle update
-// every useLanguage() subscriber without a reload.
-const LOCAL_CHANGE_EVENT = "tenant-lang-change";
-
-function readLanguage(): Language {
-  return safeStorage.getItem(STORAGE_KEY) === "en" ? "en" : "ar";
-}
-
-export function setLanguage(lang: Language): void {
-  safeStorage.setItem(STORAGE_KEY, lang);
-  window.dispatchEvent(new Event(LOCAL_CHANGE_EVENT));
-}
-
-export function hydrateAccountLanguage(value: string | null): void {
-  if (safeStorage.getItem(STORAGE_KEY) !== null) return;
-  if (value === "ar" || value === "en") setLanguage(value);
-}
-
-function subscribe(callback: () => void): () => void {
-  window.addEventListener("storage", callback);
-  window.addEventListener(LOCAL_CHANGE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(LOCAL_CHANGE_EVENT, callback);
-  };
-}
-
-// Matches the server-rendered <html lang="ar">, so the first client render
-// already agrees with what src/app/layout.tsx's bootstrap script wrote.
-function getServerSnapshot(): Language {
-  return "ar";
+export function useLanguageSnapshot(initial?: LanguageSnapshot): LanguageSnapshot | null {
+  const inherited = useContext(LanguageSnapshotContext);
+  const [serverSnapshot] = useState(() => {
+    const snapshot = initial ?? inherited;
+    if (snapshot) seedLanguageSnapshot(snapshot);
+    return snapshot;
+  });
+  return useSyncExternalStore(
+    subscribeLanguage,
+    getLanguageSnapshot,
+    () => serverSnapshot,
+  ) ?? serverSnapshot;
 }
 
 export function useLanguage(): Language {
-  return useSyncExternalStore(subscribe, readLanguage, getServerSnapshot);
+  return useLanguageSnapshot()?.lang ?? readLanguage();
 }
 
 /**
@@ -65,12 +47,14 @@ export function useLanguage(): Language {
  * without `useI18n`, and ten test suites render them bare.
  *
  * It lives here rather than in `I18nContext` for the same reason `useDirection`
- * does — this module is the provider-free layer. `useLanguage()` is a
- * `useSyncExternalStore` over localStorage and needs no React context, so the
- * value is identical to the provider's `t` and still re-renders on a toggle.
+ * does — this module is the provider-free layer. Normal routes receive their
+ * snapshot from the server. Standalone boundaries load their selected copy
+ * on demand; no synchronous fallback imports both languages into every route.
  */
 export function useDictionary(): Dictionary {
-  return DICTIONARIES[useLanguage()];
+  const snapshot = useLanguageSnapshot();
+  if (snapshot) return snapshot.dictionary;
+  return use(loadLanguageSnapshot(readLanguage())).dictionary;
 }
 
 export function useDirection(): "rtl" | "ltr" {

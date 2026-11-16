@@ -60,39 +60,3 @@ export type ActiveStatus = "ACTIVE" | "INACTIVE";
 export function isActiveStatus(value: unknown): value is ActiveStatus {
   return value === "ACTIVE" || value === "INACTIVE";
 }
-
-export interface CorePage<T> {
-  readonly items: T[];
-  readonly total: number;
-  readonly page: number;
-  readonly limit: number;
-}
-
-/**
- * `PaginatedResult<T>` — shared-libs/packages/database/src/interfaces/
- * paginated-result.interface.ts. `totalPages`/`hasNext`/`hasPrev` also ride
- * along; `Pagination` derives what it needs from total/page/limit, so they are
- * read but not re-exposed.
- */
-export function parseCorePage<T>(
-  payload: unknown,
-  parseItem: (value: unknown) => T,
-  invalid: () => never,
-): CorePage<T> {
-  const page = record(payload);
-  if (
-    !page ||
-    !Array.isArray(page.items) ||
-    !isBoundedInteger(page.total, 0, Number.MAX_SAFE_INTEGER) ||
-    !isBoundedInteger(page.page, 1, Number.MAX_SAFE_INTEGER) ||
-    !isBoundedInteger(page.limit, 1, 100)
-  ) {
-    invalid();
-  }
-  return {
-    items: page.items.map(parseItem),
-    total: page.total,
-    page: page.page,
-    limit: page.limit,
-  };
-}

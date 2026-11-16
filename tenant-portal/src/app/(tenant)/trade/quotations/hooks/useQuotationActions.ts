@@ -7,10 +7,20 @@ import {
   tradeDocumentActionPath,
 } from "../../documents/trade-document-contract";
 import { useTradeWrite, type TradeWriteState } from "../../documents/hooks/useTradeWrite";
-import { QUOTATIONS_PATH, type QuotationDetail } from "../quotation-contract";
+import {
+  QUOTATIONS_PATH,
+  TRADE_EVIDENCE_REF_MAX_LENGTH,
+  type QuotationDetail,
+} from "../quotation-contract";
+import { TRADE_REASON_CODE_MAX_LENGTH } from "../../documents/trade-document-contract";
 
 /** The four lifecycle transitions plus the two that carry a reason. */
 type QuotationAction = "send" | "accept" | "reject" | "cancel";
+
+interface QuotationReasonInput {
+  reasonCode: string;
+  evidenceRef?: string;
+}
 
 export interface QuotationActionsState {
   write: TradeWriteState;
@@ -18,7 +28,7 @@ export interface QuotationActionsState {
   openReason: QuotationAction | null;
   requestReason: (action: QuotationAction) => void;
   closeReason: () => void;
-  run: (action: QuotationAction, reasonCode?: string) => Promise<void>;
+  run: (action: QuotationAction, reason?: string | QuotationReasonInput) => Promise<void>;
 }
 
 export interface QuotationActionLabels {
@@ -47,38 +57,53 @@ export function useQuotationActions(
   headers: Record<string, string>,
   labels: QuotationActionLabels,
   onChanged: () => Promise<unknown>,
+  sharedWrite?: TradeWriteState,
 ): QuotationActionsState {
-  const write = useTradeWrite();
+  const internalWrite = useTradeWrite();
+  const write = sharedWrite ?? internalWrite;
   const [pending, setPending] = useState<QuotationAction | null>(null);
   const [openReason, setOpenReason] = useState<QuotationAction | null>(null);
 
   const run = useCallback(
-    async (action: QuotationAction, reasonCode?: string): Promise<void> => {
+    async (action: QuotationAction, reason?: string | QuotationReasonInput): Promise<void> => {
       if (!quotation) return;
       setPending(action);
       const needsReason = action === "reject" || action === "cancel";
-      await write.runWrite({
-        operation: labels[action],
-        send: (idempotency) =>
-          tradePost(
-            tradeDocumentActionPath(QUOTATIONS_PATH, quotation.id, action),
-            needsReason ? { reasonCode } : undefined,
-            {
-              headers: {
-                ...headers,
-                ...idempotency,
-                // Trade has one If-Match parser and answers 400
-                // TRADE.CONCURRENCY.IF_MATCH_REQUIRED when it is missing or
-                // unparseable — never 428. The strong form is what it emits.
-                "if-match": tradeIfMatch(quotation.version),
+      const normalizedReason =
+        typeof reason === "string"
+          ? { reasonCode: reason.trim().slice(0, TRADE_REASON_CODE_MAX_LENGTH) }
+          : reason
+            ? {
+                reasonCode: reason.reasonCode.trim().slice(0, TRADE_REASON_CODE_MAX_LENGTH),
+                ...(reason.evidenceRef && reason.evidenceRef.trim()
+                  ? { evidenceRef: reason.evidenceRef.trim().slice(0, TRADE_EVIDENCE_REF_MAX_LENGTH) }
+                  : {}),
+              }
+            : undefined;
+      try {
+        await write.runWrite({
+          operation: labels[action],
+          send: (idempotency) =>
+            tradePost(
+              tradeDocumentActionPath(QUOTATIONS_PATH, quotation.id, action),
+              needsReason ? normalizedReason : undefined,
+              {
+                headers: {
+                  ...headers,
+                  ...idempotency,
+                  "if-match": tradeIfMatch(quotation.version),
+                },
+                maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
               },
-              maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
-            },
-          ),
-      });
-      setPending(null);
-      setOpenReason(null);
-      await onChanged();
+            ),
+          onSuccess: async () => {
+            setOpenReason(null);
+            await onChanged();
+          },
+        });
+      } finally {
+        setPending(null);
+      }
     },
     [quotation, headers, labels, write, onChanged],
   );

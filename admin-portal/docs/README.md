@@ -55,6 +55,102 @@ alert. Test expiry, checksum mismatch and missing approval use `UNTESTED`,
 without speculative portal mappings. This is source integration; runtime,
 typecheck and lint remain lead verification gates.
 
+## Tenant storage migration lookup
+
+Source behavior updated **2026-10-31**: after a successful lookup of an
+in-flight migration, the workspace keeps polling every five seconds even if
+a poll fails. The last known migration stays visible alongside the error;
+only a successful response clears that error. Polling stops when the migration
+is settled (including a retained source awaiting release), on `clear()`, or
+when the lookup unmounts. Cancelled requests cannot restart polling.
+
+## Tenant ownership transfer confirmation
+
+Source behavior updated **2026-10-31** (AUDIT29X-APB-2): the transfer dialog
+requires the current owner's email exactly, including case and whitespace,
+before enabling transfer. The submit handler enforces the same check. Enter
+in the candidate search field is prevented from submitting even after the
+email matches and a candidate is selected. The Arabic/English prompt uses
+local dialog state; the confirmation email is not added to the command.
+Regression specs cover both languages; automated checks and the admin
+production rebuild remain pending lead verification.
+
+## Tenant component decommission confirmation
+
+Source behavior updated **2026-10-31**: **Create decommission** requires the
+retention acknowledgment, then opens the shared `DestructiveActionModal`.
+Confirmation requires the exact tenant `name` plus ` · ` plus the selected
+component key. Opening, cancelling, or entering a different name sends no
+command. The hook captures the validated request body when opening the dialog
+and submits it only on confirmation. Background polling pauses while the
+dialog is open. Confirmation and dismissal are blocked while a command is in
+flight, and repeated confirmation clicks send the command once. English and
+Arabic share this behavior; runtime and check execution remain pending lead
+verification.
+
+## Localized operational error feedback
+
+Source behavior updated **2026-10-31** (AUDIT29X-APB-5): tenant billing,
+FQDN preflight and command failures, destruction load/refresh failures,
+initial-commercial create options, and commercial-change catalogue failures
+select reviewed Arabic/English messages through the shared error helper.
+Local billing and FQDN codes have explicit mappings; unknown codes use the
+localized generic fallback. Error codes and correlation IDs remain below
+the message. Existing wallet recovery and release-upgrade guidance is retained.
+Regression specs cover both languages; checks and the admin rebuild remain
+pending lead verification.
+
+Source behavior updated **2026-10-31** (AUDIT29X-APW-5): publisher keys,
+database migration mutation notices, storage server list/detail screens, and
+provisioning governance use `shared/api/localized-api-error.ts` to select
+reviewed Arabic or English copy by error code. Unknown codes and local
+exceptions use a localized generic fallback; raw backend/exception messages
+are never used as display text on these surfaces, including errors passed to
+the shared error-state component and storage action toasts. Error codes and
+correlation IDs remain visible. Storage form validation keeps its existing
+localized field guidance, and migration precondition diagnostics are preserved.
+
+The reviewed `ADMIN_PERMISSION_DENIED` reason
+`admin.migrations.manage is required to start a migration.` selects a dedicated
+Arabic/English dictionary entry. Both the code and exact reason must match;
+other text under that code uses the general permission guidance. Display text
+always comes from the dictionary, preserving actionable permission information
+without exposing appended or unknown backend wording.
+
+Regression specs cover the affected displays in Arabic and English, including
+unknown codes and preserved diagnostics. Unit execution, typecheck, lint, and
+the admin production rebuild remain lead verification gates.
+
+## Billing currency rate confirmations
+
+Source behavior updated **2026-10-31** (AUDIT29X-APS-1): activating or
+deactivating a managed currency opens the shared confirmation modal before any
+write. Batch Save opens a confirmation showing the changed-row count and each
+changed currency's old and new exact decimal rate and status, including new
+currencies and status-only changes. Decimal padding alone does not count as a
+change. Confirmation submits the captured batch; every listed row is upserted
+and omitted currencies remain unchanged. Cancel sends nothing and keeps the
+batch draft. No audit reason is sent until the backend accepts that field
+(AUDIT29X-PRC-2).
+
+All row actions are disabled during saving. A shared synchronous ref guard
+prevents overlapping single and batch writes, including rapid confirmations,
+while preserving the existing idempotency-key behavior. Arabic and English use
+the same flow. Unit execution, typecheck, lint, and the admin production rebuild
+remain pending lead verification.
+
+## Tenant billing refund and cancellation confirmation
+
+Source behavior updated **2026-10-31** (AUDIT29X-APB-4): refunds require a
+trimmed audit note of 10–500 characters. The refund button enforces these
+limits, and the hook refuses invalid notes without sending a request, with
+reviewed Arabic/English validation copy. The confirmation shows the payment's
+provider amount and currency. Cancellation and each payment's refund checkbox
+clear when an attempt starts and remain unticked after success or failure;
+another attempt requires fresh confirmation. Cancellation still sends no body.
+Regression specs cover validation and confirmation reset; automated checks and
+the admin production rebuild remain pending lead verification.
+
 ## Documentation map
 
 | Area | Reference |
@@ -66,6 +162,7 @@ typecheck and lint remain lead verification gates.
 | API contracts | [api/README.md](api/README.md) |
 | Full Gateway method/path inventory | [generated/admin-core-api-routes.md](generated/admin-core-api-routes.md) |
 | HTTP success/error envelopes | [architecture/http-and-error-contract.md](architecture/http-and-error-contract.md) |
+| Document CSP, nonce flow and security headers | [architecture/security-headers.md](architecture/security-headers.md) |
 | Permissions/idempotency/data states | [architecture/permissions-idempotency-and-state.md](architecture/permissions-idempotency-and-state.md) |
 | Shared DTOs | [models/dtos.md](models/dtos.md) |
 | Wire enums | [models/enums.md](models/enums.md) |

@@ -20,6 +20,7 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { TradeScopeBar } from "../../TradeScopeBar";
+import { useTradeScope } from "../../useTradeScope";
 import { TRADE_PERMISSIONS } from "../../trade-scope";
 import { tradeLocalizedName } from "../../trade-validation";
 import { useActiveUoms } from "../hooks/useActiveUoms";
@@ -40,6 +41,7 @@ import { ItemImageManager } from "./ItemImageManager";
 import { ItemStandardCostSection } from "./ItemStandardCostSection";
 
 export function ItemDetailScreen({ id }: { id: string }) {
+  const { channels } = useTradeScope();
   const { t, lang, detail, isLoading, error, isGone, reload, applyImageChange } = useItemDetail(id);
   const profiles = useItemProfiles(
     id,
@@ -369,10 +371,8 @@ export function ItemDetailScreen({ id }: { id: string }) {
                           >
                             <span className="min-w-0">
                               <span className="flex items-center gap-1.5">
-                                <Badge tone="brand">
-                                  <IdentifierText className="text-xs">
-                                    {listing.channelId}
-                                  </IdentifierText>
+                                <Badge tone="brand" size="compact" className="font-sans font-normal normal-case">
+                                  <bdi>{channels.find((channel) => channel.id === listing.channelId)?.name ?? t.common.nameUnavailable}</bdi>
                                 </Badge>
                               </span>
                               <span className="mt-1 block text-xs text-muted-foreground">

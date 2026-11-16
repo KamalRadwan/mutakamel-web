@@ -132,6 +132,23 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     vi.restoreAllMocks();
   });
 
+  it.each([true, false])('hydrates the server email entitlement (%s)', async (entitled) => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(profileResponse({
+      featureEntitlements: { "crm.outbound_email": entitled },
+    }))));
+    const { result } = renderHook(() => useTenantAuth(), { wrapper: TenantAuthProvider });
+    await waitFor(() => expect(result.current.user?.featureEntitlements["crm.outbound_email"]).toBe(entitled));
+  });
+
+  it.each([undefined, {}, [], { "crm.outbound_email": "true" }])('rejects a missing or malformed entitlement projection (%j)', async (featureEntitlements) => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(profileResponse({ featureEntitlements }))));
+    const { result } = renderHook(() => useTenantAuth(), { wrapper: TenantAuthProvider });
+    await waitFor(() => expect(result.current.authState).not.toBe("BOOTSTRAPPING"));
+    expect(result.current.user).toBeNull();
+  });
+
   it("keeps the challenge signed out until a leading-zero code establishes a session", async () => {
     const step = { mfaRequired: true, challengeId: "a".repeat(43), expiresIn: 600, resendAfterSeconds: 60 };
     const fetchMock = vi.fn(async (url: string) => {
@@ -1199,6 +1216,7 @@ function profileResponse(overrides: Record<string, unknown> = {}): Record<string
       accessibleBranchCompanies: [],
       accessScope: { mode: "FULL", branchesTruncated: false, companiesTruncated: false, teamMembershipsTruncated: false, teamMembershipsTotal: 0 },
       permissions: [],
+      featureEntitlements: { "crm.outbound_email": false },
       permissionScopes: {},
       teamMemberships: [],
       ...overrides,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useStablePermissions } from "@/hooks/useStablePermissions";
 import { readCrmBody } from "@/lib/api/envelope";
 import { normalizeApiError } from "@/lib/api/errors";
 import {
@@ -74,7 +75,7 @@ function holds(permissions: readonly string[], permission: string): boolean {
  */
 export function useFirstRunChecklist(): FirstRunChecklist {
   const { user } = useTenantAuth();
-  const permissions = useMemo(() => user?.permissions ?? [], [user]);
+  const permissions = useStablePermissions(user);
   // The only state the effect writes, and it is written after the await. The
   // "still checking" flag and the discard of a superseded reply are both
   // derived from whether the stored outcome's key matches the current probe

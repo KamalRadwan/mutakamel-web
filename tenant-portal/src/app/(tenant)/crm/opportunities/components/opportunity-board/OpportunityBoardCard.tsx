@@ -1,7 +1,7 @@
 "use client";
 
-import { BriefcaseBusiness, Building2, UserRound } from "lucide-react";
-import { Button, StatusBadge, TagChip, cardColorBorder, cardColorFill, cn } from "@/design-system";
+import { Building2, UserRound } from "lucide-react";
+import { Button, TagChip, cardColorBorder, cardColorFill, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
 import { CrmCardExpandButton } from "../../../shared/components/board/CrmCardIconButton";
@@ -22,7 +22,6 @@ export function OpportunityBoardCard(props: OpportunityBoardCardProps) {
   const { item } = props;
   const terminal = props.stage.flag === "WON" || props.stage.flag === "LOST";
   const ProfileIcon = card.corporate ? Building2 : UserRound;
-  const contactName = card.effective.primaryContact?.displayName ?? item.contactDisplayName;
 
   return (
     <article draggable={props.canDrag} onDragStart={card.startDrag} onDragEnd={props.onDragEnd}
@@ -59,20 +58,16 @@ export function OpportunityBoardCard(props: OpportunityBoardCardProps) {
           className="h-auto min-w-0 flex-1 justify-start p-0 text-start text-card-title font-medium leading-snug hover:bg-transparent">
           <span className="line-clamp-2">{item.title}</span>
         </Button>
-        <StatusBadge value={item.status} kind="OpportunityStatus" className="shrink-0 px-1.5 py-0 text-badge" />
       </div>
       <OpportunityBoardValueStrip item={card.effective} />
-      {(contactName || card.primaryPhone) && (
-        <div className="min-w-0 space-y-1 text-caption">
-          {contactName && <div className="flex items-center gap-1 text-muted-foreground">
-            <BriefcaseBusiness className="size-3 shrink-0" aria-hidden="true" /><span className="truncate">{contactName}</span>
-          </div>}
-          {card.primaryPhone && <CrmPhoneActionsRow phone={card.primaryPhone} country={card.effective.customerCountry} compact />}
+      {card.primaryPhone && (
+        <div className="min-w-0 text-caption">
+          <CrmPhoneActionsRow phone={card.primaryPhone} country={card.effective.customerCountry} compact />
         </div>
       )}
       {card.effective.tags.length > 0 && (
         <div className="flex flex-wrap items-center gap-1">
-          {card.effective.tags.slice(0, 3).map((tag) => <TagChip key={tag.id} label={tag.name}
+          {card.effective.tags.slice(0, 3).map((tag) => <TagChip key={tag.id} size="compact" label={tag.name}
             backgroundColor={tag.backgroundColor} textColor={tag.textColor} />)}
           {card.effective.tags.length > 3 && <span className="text-caption text-muted-foreground">+{formatNumber(card.effective.tags.length - 3, lang)}</span>}
         </div>

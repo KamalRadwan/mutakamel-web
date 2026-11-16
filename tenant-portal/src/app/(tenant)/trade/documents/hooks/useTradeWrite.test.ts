@@ -72,6 +72,23 @@ describe("document write recovery fence", () => {
     expect(send).toHaveBeenCalledOnce();
   });
 
+  it.each(["GW.IDEM.IN_FLIGHT", "IDEMPOTENCY_REQUEST_PROCESSING", "TRADE.IDEMPOTENCY.IN_FLIGHT"])(
+    "locks a processing %s response until its original key is replayed", async (code) => {
+      const send = sender().mockRejectedValueOnce({ status: 409, code }).mockResolvedValue(response());
+      const replacement = sender().mockResolvedValue(response());
+      const { result } = renderHook(() => useTradeWrite());
+      await act(async () => { await result.current.runWrite({ operation: "Create", send }); });
+      const pending = result.current.ambiguous!;
+      expect(pending).not.toBeNull(); expect(result.current.isBlocked).toBe(true);
+      expect(result.current.writeError).toBeNull(); expect(toast.outcomeFromApi).not.toHaveBeenCalled();
+      await act(async () => { await result.current.runWrite({ operation: "New attempt", send: replacement }); });
+      expect(replacement).not.toHaveBeenCalled();
+      await act(async () => { await pending.retry(); });
+      expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+      expect(result.current.isBlocked).toBe(false); expect(result.current.ambiguous).toBeNull();
+    },
+  );
+
   it("allows only one recovery attempt in flight", async () => {
     let finish!: (value: TradeResult) => void;
     const send = sender().mockRejectedValueOnce(new Error("Response lost"))
@@ -88,7 +105,7 @@ describe("document write recovery fence", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
-  it.each([403, 409, 429, 503])("retains the fence when recovery returns HTTP %s", async (status) => {
+  it.each([403, 409, 429])("retains the fence when recovery returns HTTP %s", async (status) => {
     const send = sender().mockRejectedValueOnce(new Error("Response lost")).mockRejectedValueOnce({ status });
     const { result } = renderHook(() => useTradeWrite());
     await act(async () => { await result.current.runWrite({ operation: "Create", send }); });
@@ -101,8 +118,25 @@ describe("document write recovery fence", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
-  it("allows correction after an ordinary HTTP rejection", async () => {
-    const send = sender().mockRejectedValueOnce({ status: 422 }).mockResolvedValue(response());
+  it.each([500, 503])("requires original-key recovery when an initial HTTP %s may have committed", async (status) => {
+    const send = sender().mockRejectedValueOnce({ status }).mockRejectedValueOnce({ status }).mockResolvedValue(response());
+    const replacement = sender().mockResolvedValue(response());
+    const { result } = renderHook(() => useTradeWrite());
+    await act(async () => { await result.current.runWrite({ operation: "Create", send }); });
+    const pending = result.current.ambiguous!;
+    expect(pending).not.toBeNull(); expect(result.current.isBlocked).toBe(true);
+    await act(async () => { await result.current.runWrite({ operation: "Create again", send: replacement }); });
+    expect(replacement).not.toHaveBeenCalled();
+    await act(async () => { await pending.retry(); });
+    expect(result.current.ambiguous?.idempotencyKey).toBe(pending.idempotencyKey);
+    expect(result.current.writeError).toBeNull(); expect(result.current.isBlocked).toBe(true);
+    await act(async () => { await result.current.ambiguous?.retry(); });
+    expect(send.mock.calls[1]).toEqual(send.mock.calls[0]); expect(send.mock.calls[2]).toEqual(send.mock.calls[0]);
+    expect(result.current.isBlocked).toBe(false);
+  });
+
+  it.each([403, 409, 422])("allows correction after an ordinary HTTP %s rejection", async (status) => {
+    const send = sender().mockRejectedValueOnce({ status }).mockResolvedValue(response());
     const { result } = renderHook(() => useTradeWrite());
     await act(async () => { await result.current.runWrite({ operation: "Create", send }); });
     expect(result.current.isBlocked).toBe(false);

@@ -3,11 +3,12 @@
 import { forwardRef, type CSSProperties, type HTMLAttributes, type ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/cn";
+import { useSettingsPresentation } from "../shell/settings-presentation";
 import { toTagColor, type TagColor } from "./tag-color";
 
 // A tag is a value the tenant chose, so it is a chip in sentence case — never
 // the Badge primitive, which states a record's STATE in uppercase semibold.
-// `sm` is the card-face chip, `xs` the one that fits a dense table cell.
+// `compact` keeps CRM tag rows small without scaling the label below its token.
 const tagChipVariants = cva(
   "inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border font-medium leading-none",
   {
@@ -15,6 +16,7 @@ const tagChipVariants = cva(
       size: {
         sm: "px-2 py-0.5 text-xs",
         xs: "px-1.5 py-0.5 text-2xs",
+        compact: "h-4 rounded-sm px-1 py-0 text-badge",
       },
     },
     defaultVariants: { size: "sm" },
@@ -62,11 +64,14 @@ export interface TagChipProps
 export const TagChip = forwardRef<HTMLSpanElement, TagChipProps>(
   ({ label, backgroundColor, textColor, size, className, title, children, ...props }, ref) => {
     const color = toTagColor(backgroundColor, textColor);
+    const settings = useSettingsPresentation();
     return (
       <span
         ref={ref}
         title={title ?? label}
-        className={cn(tagChipVariants({ size }), color === null && NEUTRAL_CHIP, className)}
+        className={cn(tagChipVariants({ size }), color === null && NEUTRAL_CHIP, className,
+          settings && "h-4 gap-0.5 rounded-full px-0.75 py-0 text-badge leading-none",
+        )}
         style={color ? tagColorStyle(color) : undefined}
         {...props}
       >
@@ -94,8 +99,11 @@ export interface TagChipOverflowProps extends VariantProps<typeof tagChipVariant
  * failure this exists to prevent.
  */
 export function TagChipOverflow({ label, hiddenNames, size, className }: TagChipOverflowProps) {
+  const settings = useSettingsPresentation();
   return (
-    <span className={cn(tagChipVariants({ size }), NEUTRAL_CHIP, "shrink-0", className)}>
+    <span className={cn(tagChipVariants({ size }), NEUTRAL_CHIP, "shrink-0", className,
+      settings && "h-4 rounded-full px-0.75 py-0 text-badge leading-none",
+    )}>
       <span aria-hidden="true">{label}</span>
       <span className="sr-only">{hiddenNames.join(", ")}</span>
     </span>

@@ -1,143 +1,71 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import {
   Button,
-  ConfirmActionModal,
-  CORE_IDENTITY_NAV_ITEMS,
+  Card,
   DataTable,
-  DeletionBlockerDialog,
+  DataTableSort,
   FilterBar,
-  FormDrawer,
   PageHeader,
   PermissionGate,
-  SubNav,
 } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
-import {
-  ORG_NODE_STATUSES,
-  ORG_CURRENCY_CODE_LENGTH,
-  type OrgLevel,
-  type OrgNodeOf,
-  type OrgNodeStatus,
-} from "../../contracts/organization-contract";
-import { useCoreErrorText } from "../../hooks/useCoreErrorText";
-import { useOrgNodeOptions, useTenantUserOptions } from "../../hooks/useCoreOptions";
-import {
-  EMPTY_ORG_NODE_FORM,
-  useOrganizationLevel,
-  type OrgNodeFormValues,
-} from "../hooks/useOrganizationLevel";
-import { OrganizationNodeForm } from "./OrganizationNodeForm";
+import type { OrgLevel, OrgNodeOf } from "../../contracts/organization-contract";
+import { useOrganizationWorkspace } from "../hooks/useOrganizationWorkspace";
+import { OrganizationDeleteDialogs } from "./OrganizationDeleteDialogs";
+import { OrganizationNodeFormModal } from "./OrganizationNodeFormModal";
+import { OrganizationQuickViewDialog } from "./OrganizationQuickViewDialog";
 import { useOrganizationColumns } from "./useOrganizationColumns";
 
-/** Narrows a `FilterBar` string back to the wire enum; anything else clears it. */
-function readOrgStatus(value: string): OrgNodeStatus | undefined {
-  return ORG_NODE_STATUSES.find((status) => status === value);
-}
-
 export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { level: L }) {
-  const screen = useOrganizationLevel(level);
-  const { t, config, canManage } = screen;
+  const workspace = useOrganizationWorkspace(level);
+  const { screen, formState } = workspace;
+  const { t, config, canCreate, canManageRow, lookups } = screen;
   const copy = t.coreIdentity;
   const levelCopy = copy.levels[level];
-  const describeError = useCoreErrorText();
-
-  const [form, setForm] = useState<OrgNodeFormValues>(EMPTY_ORG_NODE_FORM);
-  const [baseline, setBaseline] = useState<OrgNodeFormValues>(EMPTY_ORG_NODE_FORM);
-  const parentOptions = useOrgNodeOptions(config.parent ?? "companies", {
-    enabled: Boolean(config.parent),
-  });
-  const leadUserOptions = useTenantUserOptions(config.fields.includes("leadUserId"));
-
-  const patch = (next: Partial<OrgNodeFormValues>) =>
-    setForm((current) => ({ ...current, ...next }));
-
-  function openCreate() {
-    setForm(EMPTY_ORG_NODE_FORM);
-    setBaseline(EMPTY_ORG_NODE_FORM);
-    screen.openCreate();
-  }
-
-  function openEdit(node: OrgNodeOf<L>) {
-    const next: OrgNodeFormValues = {
-      ...EMPTY_ORG_NODE_FORM,
-      code: node.code,
-      name: node.name,
-      status: node.status,
-      legalName: "legalName" in node ? (node.legalName ?? "") : "",
-      taxNumber: "taxNumber" in node ? (node.taxNumber ?? "") : "",
-      currencyCode: "currencyCode" in node ? (node.currencyCode ?? "") : "",
-      address: "address" in node ? (node.address ?? "") : "",
-      phone: "phone" in node ? (node.phone ?? "") : "",
-      isHeadquarters: "isHeadquarters" in node ? node.isHeadquarters : false,
-      leadUserId: "leadUserId" in node ? (node.leadUserId ?? "") : "",
-    };
-    setForm(next);
-    setBaseline(next);
-    screen.startEdit(node);
-  }
 
   const columns = useOrganizationColumns<L>({
     config,
-    canManage,
-    onEdit: openEdit,
+    canManageRow,
+    lookups,
+    onQuickView: screen.openQuickView,
+    onEdit: workspace.openEdit,
     onDelete: screen.requestDelete,
   });
 
-  const mutationText = describeError(screen.mutationError);
-  const isDirty = JSON.stringify(form) !== JSON.stringify(baseline);
-
   return (
-    <PermissionGate require={config.readPermission}>
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
+    <PermissionGate
+      require={config.readPermission}
+      denied={screen.queryError?.status === 403}
+    >
+      <div className="flex min-w-0 flex-col gap-3 px-2 pb-4 pt-0 sm:px-5 sm:pb-5">
+        <PageHeader
+          className="sr-only p-0"
           title={levelCopy.title}
-          description={levelCopy.subtitle}
-          primaryAction={canManage ? { label: levelCopy.add, onClick: openCreate } : undefined}
+          primaryAction={
+            canCreate ? { label: levelCopy.add, icon: <Plus className="size-4" aria-hidden="true" />, onClick: workspace.openCreate } : undefined
+          }
           secondaryActions={
             <Button size="sm" variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
               <RefreshCw
                 className={`size-4 ${screen.isLoading ? "animate-spin" : ""}`}
                 aria-hidden="true"
               />
-              {t.common.retry}
+              {copy.actions.refresh}
             </Button>
           }
         />
 
-        <SubNav items={CORE_IDENTITY_NAV_ITEMS} />
-
+        <Card className="min-w-0 overflow-hidden p-0">
         <FilterBar
-          filters={[
-            {
-              id: "status",
-              kind: "select",
-              label: copy.fields.status,
-              options: [
-                { value: "ACTIVE", label: copy.orgStatus.ACTIVE },
-                { value: "INACTIVE", label: copy.orgStatus.INACTIVE },
-              ],
-              placeholder: copy.filters.anyStatus,
-            },
-          ]}
-          values={
-            screen.statusFilter
-              ? { status: { kind: "select", value: screen.statusFilter } }
-              : {}
-          }
-          onChange={(next) => {
-            const value = next.status;
-            screen.setStatusFilter(
-              value?.kind === "select" ? readOrgStatus(value.value) : undefined,
-            );
-            screen.setPage(1);
-          }}
-          onReset={() => {
-            screen.setStatusFilter(undefined);
-            screen.setPage(1);
-          }}
+          placement="inline"
+          className="border-b border-border p-4"
+          trailing={<DataTableSort columns={columns} value={screen.sort} onChange={screen.setSort} labels={{ label: copy.sortBy, ascending: t.views.sortAscending, descending: t.views.sortDescending }} />}
+          filters={workspace.filterDefs}
+          values={workspace.filterValues}
+          onChange={workspace.handleFilterChange}
+          onReset={workspace.handleFilterReset}
           searchValue={screen.searchQuery}
           onSearchChange={screen.setSearchQuery}
           searchPlaceholder={levelCopy.searchPlaceholder}
@@ -145,16 +73,17 @@ export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { leve
           clearAllLabel={t.filters.clearAll}
         />
 
-        {mutationText && !screen.isCreateOpen && !screen.editing ? (
+        {workspace.mutationText && !workspace.isFormOpen ? (
           <p
             role="alert"
-            className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+            className="rounded-sm border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
           >
-            {mutationText}
+            {workspace.mutationText}
           </p>
         ) : null}
 
         <DataTable
+          surface="embedded"
           columns={columns}
           rows={screen.rows}
           isLoading={screen.isLoading}
@@ -183,78 +112,48 @@ export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { leve
           }}
         />
 
-        <FormDrawer
-          open={screen.isCreateOpen || screen.editing !== null}
-          onOpenChange={(open) => {
-            if (open) return;
-            screen.closeCreate();
-            screen.cancelEdit();
-            screen.clearMutationError();
-          }}
-          title={screen.editing ? levelCopy.editTitle : levelCopy.addTitle}
-          description={screen.editing ? undefined : levelCopy.addDescription}
-          isDirty={isDirty}
+        </Card>
+        <OrganizationNodeFormModal
+          open={workspace.isFormOpen}
+          mode={workspace.mode}
+          config={config}
+          values={formState.form}
+          onChange={formState.patch}
+          isDirty={formState.isDirty}
           isSubmitting={screen.isSubmitting}
-          onSubmit={() => {
-            void (screen.editing ? screen.handleUpdate(form) : screen.handleCreate(form));
-          }}
-          error={mutationText}
-          submitDisabled={
-            form.name.trim().length === 0 ||
-            (screen.editing !== null && config.fields.includes("currencyCode") &&
-              form.currencyCode.trim().length !== ORG_CURRENCY_CODE_LENGTH) ||
-            (!screen.editing && form.code.trim().length === 0) ||
-            (!screen.editing && Boolean(config.parent) && form.parentId.length === 0)
-          }
-          labels={{
-            submit: t.common.save,
-            cancel: t.common.cancel,
-            discardTitle: t.common.discardTitle,
-            discardDescription: t.common.discardDescription,
-            discardConfirm: t.common.discardConfirm,
-            discardCancel: t.common.cancel,
-          }}
-        >
-          <OrganizationNodeForm
-            config={config}
-            values={form}
-            onChange={patch}
-            mode={screen.editing ? "edit" : "create"}
-            isSubmitting={screen.isSubmitting}
-            parentOptions={parentOptions}
-            leadUserOptions={leadUserOptions}
-          />
-        </FormDrawer>
-
-        <ConfirmActionModal
-          open={screen.pendingDelete !== null}
-          onOpenChange={(open) => {
-            if (!open) screen.cancelDelete();
-          }}
-          title={levelCopy.deleteTitle}
-          description={formatTemplate(levelCopy.deleteMessage, {
-            name: screen.pendingDelete?.name ?? "",
-          })}
-          confirmLabel={t.common.delete}
-          cancelLabel={t.common.cancel}
-          onConfirm={() => void screen.handleDelete()}
-          loading={screen.isSubmitting}
+          hasSavedCurrency={formState.hasSavedCurrency}
+          error={workspace.modalError}
+          submitDisabled={workspace.submitDisabled}
+          onClose={workspace.closeModal}
+          onSubmit={workspace.submitModal}
+          cascade={workspace.cascade}
+          leadUserOptions={workspace.leadUserOptions}
+          canReadUsers={workspace.canReadUsers}
+          selectedLeadLabel={workspace.selectedLeadLabel}
+          missingUpstreamPermission={workspace.missingUpstreamPermission}
+          validations={formState.validations}
+          editReadOnlyParents={workspace.editReadOnlyParents}
         />
 
-        <DeletionBlockerDialog
-          open={screen.blockedNode !== null}
-          onOpenChange={(open) => {
-            if (!open) screen.dismissBlockers();
-          }}
-          recordName={screen.blockedNode?.name ?? ""}
-          blockers={screen.blockers.map((blocker) => ({ id: blocker, label: blocker }))}
-          labels={{
-            title: t.deletionBlocker.title,
-            description: t.deletionBlocker.description,
-            blockersHeading: t.deletionBlocker.blockersHeading,
-            view: t.deletionBlocker.view,
-            close: t.deletionBlocker.close,
-          }}
+        <OrganizationQuickViewDialog
+          target={screen.quickViewTarget}
+          onClose={screen.closeQuickView}
+          canManage={workspace.quickViewCanManage}
+          onEdit={(node) => workspace.openEdit(node as OrgNodeOf<L>)}
+        />
+
+        <OrganizationDeleteDialogs
+          config={config}
+          pendingDelete={screen.pendingDelete}
+          isSubmitting={screen.isSubmitting}
+          onConfirmDelete={() => void screen.handleDelete()}
+          onCancelDelete={screen.cancelDelete}
+          blockedNode={screen.blockedNode}
+          blockers={screen.blockers}
+          onDismissBlockers={screen.dismissBlockers}
+          hqTransferBlockedNode={screen.hqTransferBlockedNode}
+          hqTransferError={screen.hqTransferError}
+          onDismissHqTransfer={screen.dismissHqTransfer}
         />
       </div>
     </PermissionGate>

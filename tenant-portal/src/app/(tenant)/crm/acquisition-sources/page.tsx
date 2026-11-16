@@ -1,310 +1,68 @@
 "use client";
 
-import { ChevronDown, ChevronUp, ImagePlus, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import {
-  Badge,
-  Button,
-  DataTable,
-  FilterBar,
-  PageHeader,
-  PermissionGate,
-  SubNav,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  NAV_SECTIONS,
-  type ColumnDef,
-} from "@/design-system";
-import { useI18n } from "@/i18n/I18nContext";
-import { alternateName, localizedName } from "@/lib/format/localized";
-import { formatTemplate } from "@/lib/format/template";
-import { AcquisitionSourceIcon } from "../shared/components/AcquisitionSourceIcon";
-import type { AcquisitionSource } from "./acquisition-source-contract";
+import { LockKeyhole, Plus, RefreshCw, Search } from "lucide-react";
+import { Button, Input, PageActions, PageHeader, PermissionGate } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
+import { AcquisitionSourceEditModal } from "./components/AcquisitionSourceEditModal";
 import { AcquisitionSourceIconDrawer } from "./components/AcquisitionSourceIconDrawer";
-import { AcquisitionSourceEditDrawer } from "./components/AcquisitionSourceEditDrawer";
+import { AcquisitionSourcesTable } from "./components/AcquisitionSourcesTable";
 import { CreateAcquisitionSourcesModal } from "./components/CreateAcquisitionSourcesModal";
 import { DeleteAcquisitionSourcesConfirmModal } from "./components/DeleteAcquisitionSourcesConfirmModal";
-import { useAcquisitionSourceIcon } from "./hooks/useAcquisitionSourceIcon";
-import { useAcquisitionSources } from "./hooks/useAcquisitionSources";
-import { useAcquisitionSourceEdit } from "./hooks/useAcquisitionSourceEdit";
-
-const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
+import { MoveAcquisitionSourceModal } from "./components/MoveAcquisitionSourceModal";
+import { useAcquisitionSourcesWorkspace } from "./hooks/useAcquisitionSourcesWorkspace";
 
 export default function AcquisitionSourcesPage() {
-  const { lang } = useI18n();
-  const {
-    t,
-    items,
-    hasLoadedItems,
-    searchQuery,
-    setSearchQuery,
-    isLoading,
-    isCreating,
-    isDeleting,
-    queryError,
-    mutationError,
-    canManage,
-    isCreateOpen,
-    openCreate,
-    closeCreate,
-    selectedForDelete,
-    selectForDelete,
-    closeDelete,
-    handleCreate,
-    handleDelete,
-    reload,
-    isFiltered,
-    reorderingId,
-    handleMove,
-    applyUpdatedSource,
-  } = useAcquisitionSources();
-  const icon = useAcquisitionSourceIcon(canManage, applyUpdatedSource);
-  const editor = useAcquisitionSourceEdit(canManage, applyUpdatedSource, reload);
+  const { user } = useTenantAuth();
+  const scope = useAuthScopeKey(user);
+  return <AcquisitionSourcesContent key={scope} />;
+}
 
-  const columns: ColumnDef<AcquisitionSource>[] = [
-    {
-      id: "source",
-      header: t.crmAcquisitionSources.source,
-      cell: (item) => (
-        <div className="flex items-center gap-2.5">
-          <AcquisitionSourceIcon source={item} size="md" />
-          <div>
-            <p className="font-medium text-foreground">{localizedName(item, lang)}</p>
-            <p className="text-2xs text-muted-foreground">{alternateName(item, lang)}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: "order",
-      header: t.crmAcquisitionSources.order,
-      numeric: true,
-      cell: (item) => item.sortOrder,
-    },
-    {
-      id: "status",
-      header: t.common.status,
-      cell: (item) => (
-        <Badge tone={item.isActive ? "positive" : "neutral"}>{item.isActive ? t.common.active : t.common.inactive}</Badge>
-      ),
-    },
-    ...(canManage
-      ? [
-          {
-            id: "actions",
-            header: t.common.actions,
-            align: "end" as const,
-            sticky: "end" as const,
-            cell: (item: AcquisitionSource) => (
-              <div className="flex items-center justify-end gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={editor.isSaving ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.editTitle}: ${localizedName(item, lang)}`}>
-                    <Button variant="ghost" size="sm" onClick={() => editor.select(item)} disabled={editor.isSaving}
-                      className="disabled:pointer-events-none"
-                      aria-label={`${t.crmAcquisitionSources.editTitle}: ${localizedName(item, lang)}`}>
-                      <Pencil className="size-4" aria-hidden="true" />
-                    </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{editor.isSaving ? t.crmConfigActionHints.pending : t.crmAcquisitionSources.editTitle}</TooltipContent>
-                </Tooltip>
-                {/* Reorder is earlier/later controls, not drag-only — the
-                    same rule the column header follows. Each press sends the
-                    COMPLETE ordered id list, so it is suppressed while a
-                    search narrows the view: the visible order would not be
-                    the order being written. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isFiltered || reorderingId !== null || item.sortOrder <= 1 ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.moveEarlier}: ${localizedName(item, lang)}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleMove(item, -1)}
-                  disabled={isFiltered || reorderingId !== null || item.sortOrder <= 1}
-                  className="disabled:pointer-events-none"
-                  aria-label={`${t.crmAcquisitionSources.moveEarlier}: ${localizedName(item, lang)}`}
-                >
-                  <ChevronUp className="size-4" aria-hidden="true" />
-                </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{isFiltered ? t.crmConfigActionHints.filteredReorder
-                    : reorderingId !== null ? t.crmConfigActionHints.pending
-                    : item.sortOrder <= 1 ? t.crmConfigActionHints.firstSource : t.crmAcquisitionSources.moveEarlier}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isFiltered || reorderingId !== null || item.sortOrder >= items.length ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.moveLater}: ${localizedName(item, lang)}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleMove(item, 1)}
-                  disabled={isFiltered || reorderingId !== null || item.sortOrder >= items.length}
-                  className="disabled:pointer-events-none"
-                  aria-label={`${t.crmAcquisitionSources.moveLater}: ${localizedName(item, lang)}`}
-                >
-                  <ChevronDown className="size-4" aria-hidden="true" />
-                </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{isFiltered ? t.crmConfigActionHints.filteredReorder
-                    : reorderingId !== null ? t.crmConfigActionHints.pending
-                    : item.sortOrder >= items.length ? t.crmConfigActionHints.lastSource : t.crmAcquisitionSources.moveLater}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={icon.isUploading ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.iconTitle}: ${localizedName(item, lang)}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => icon.select(item)}
-                      disabled={icon.isUploading}
-                      className="disabled:pointer-events-none"
-                      aria-label={`${t.crmAcquisitionSources.iconTitle}: ${localizedName(item, lang)}`}
-                    >
-                      <ImagePlus className="size-4" aria-hidden="true" />
-                    </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{icon.isUploading ? t.crmConfigActionHints.pending : t.crmAcquisitionSources.iconTitle}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isDeleting ? 0 : undefined} aria-label={`${t.common.delete}: ${localizedName(item, lang)}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => selectForDelete(item)}
-                      disabled={isDeleting}
-                      className="disabled:pointer-events-none"
-                      aria-label={`${t.common.delete}: ${localizedName(item, lang)}`}
-                    >
-                      <Trash2 className="size-4 text-destructive" aria-hidden="true" />
-                    </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{isDeleting ? t.crmConfigActionHints.pending : t.common.delete}</TooltipContent>
-                </Tooltip>
-              </div>
-            ),
-          },
-        ]
-      : []),
-  ];
-
-  // A CRM route is reachable by direct URL even when the sidebar hides it, so
-  // the 403 is reachable in-body and gets the mandated surface rather than a
-  // load error — AGENTS.md, docs/design/states.md. Permission string and
-  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
+function AcquisitionSourcesContent() {
+  const workspace = useAcquisitionSourcesWorkspace();
+  const { state, editor, icon, busy } = workspace;
+  const { setFallbackElement } = workspace.dialogFocus;
+  const { t } = state;
   return (
-    <PermissionGate require="crm.acquisition_sources.read" denied={queryError?.status === 403}>
-      <div className="flex flex-col gap-4">
-        <PageHeader
-          className="sr-only"
-          title={t.crm.acquisitionSourcesAndMarket}
-          description={t.crmAcquisitionSources.subtitle}
-          primaryAction={canManage ? { label: t.crmAcquisitionSources.add, onClick: openCreate } : undefined}
-          secondaryActions={
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isLoading ? 0 : undefined} aria-label={t.crmAcquisitionSources.reload}>
-            <Button size="sm" variant="outline" className="disabled:pointer-events-none" onClick={() => void reload()} disabled={isLoading}>
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
-              {t.crmAcquisitionSources.reload}
-            </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{isLoading ? t.crmConfigActionHints.loading : t.crmAcquisitionSources.reload}</TooltipContent>
-            </Tooltip>
-          }
-        />
-
-        <SubNav items={CRM_SETUP_ITEMS} />
-
-        {editor.error && !editor.selected ? <p role="alert" className="text-xs text-destructive">{editor.error}</p> : null}
-
-        <FilterBar
-          filters={[]}
-          values={{}}
-          onChange={() => undefined}
-          onReset={() => undefined}
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder={t.crmAcquisitionSources.search}
-        />
-
-        {canManage && isFiltered && (
-          <p role="note" className="text-xs text-muted-foreground">{t.crmConfigActionHints.filteredReorder}</p>
-        )}
-
-        {mutationError && !selectedForDelete && !isCreateOpen ? (
-          <p role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
-            {mutationError}
-          </p>
-        ) : null}
-
-        {/* No pagination: this endpoint returns the whole list and declares no
-            page/limit query at all (verified in its controller). The fake
-            single-page object this replaced rendered working-looking controls
-            over data that could never advance —
-            docs/design/states.md#pagination-is-real-or-absent. */}
-        <DataTable
-          columns={columns}
-          rows={items}
-          isLoading={isLoading && !hasLoadedItems}
-          error={queryError}
-          onRetry={() => void reload()}
-          rowKey={(item) => item.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: t.crmAcquisitionSources.loadFailed,
-            emptyTitle: t.crmAcquisitionSources.empty,
-            selectAll: t.common.actions,
-            selectRow: t.common.actions,
-            sortAscending: t.common.actions,
-            sortDescending: t.common.actions,
-            notSorted: t.common.actions,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
-
-        {/* Both keys remount their dialog on open so it never reopens holding
-            the last edit. They are namespaced because these are siblings: two
-            "closed" keys in one parent is a duplicate-key warning, and React is
-            entitled to treat the pair as one child. */}
-        <CreateAcquisitionSourcesModal
-          key={isCreateOpen ? "create-open" : "create-closed"}
-          isOpen={isCreateOpen}
-          onClose={closeCreate}
-          onSubmit={handleCreate}
-          isSubmitting={isCreating}
-          error={mutationError}
-        />
-
-        <AcquisitionSourceIconDrawer
-          key={`icon-${icon.selected?.id ?? "closed"}`}
-          source={icon.selected}
-          isSubmitting={icon.isUploading}
-          error={icon.error}
-          onClose={icon.close}
-          onSubmit={icon.upload}
-        />
-
-        <AcquisitionSourceEditDrawer editor={editor} />
-
-        <DeleteAcquisitionSourcesConfirmModal
-          isOpen={!!selectedForDelete}
-          item={selectedForDelete}
-          onClose={closeDelete}
-          onConfirm={() => void handleDelete()}
-          isSubmitting={isDeleting}
-          error={mutationError}
-        />
+    <PermissionGate require="crm.acquisition_sources.read" denied={state.queryError?.status === 403}>
+      <div className="flex min-w-0 flex-col gap-4">
+        <PageHeader title={t.nav.acquisitionSources} description={t.crmAcquisitionSources.subtitle}
+          primaryAction={state.canManage ? { label: t.crmAcquisitionSources.add, icon: <Plus className="size-4" aria-hidden="true" />,
+            onClick: state.openCreate, disabled: busy || state.writeBlocked || state.isAtLimit || workspace.hasOpenForm || !!workspace.selectedForMove } : undefined}
+          secondaryActions={<Button variant="outline" size="sm" onClick={() => void state.reload()} disabled={state.isLoading || busy}>
+            <RefreshCw className={`size-4 ${state.isLoading ? "animate-spin" : ""}`} aria-hidden="true" />{t.crmAcquisitionSources.reload}
+          </Button>} />
+        <PageActions slot="search"><div className="relative w-full min-w-0 sm:w-64">
+          <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input ref={setFallbackElement} size="sm" type="search" className="ps-9" disabled={busy} value={state.searchQuery}
+            placeholder={t.crmAcquisitionSources.search} aria-label={t.crmAcquisitionSources.search} onChange={(event) => state.setSearchQuery(event.target.value)} />
+        </div></PageActions>
+        {!state.canManage && <p role="status" className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <LockKeyhole className="size-4 shrink-0" aria-hidden="true" />{t.crmAcquisitionSources.readOnly}
+        </p>}
+        {state.canManage && state.isAtLimit && <p role="note" className="text-xs text-muted-foreground">{t.crmAcquisitionSources.limitReached}</p>}
+        {state.canManage && state.isFiltered && <p role="note" className="text-xs text-muted-foreground">{t.crmConfigActionHints.filteredReorder}</p>}
+        {state.needsReload && <p role="status" className="text-xs text-muted-foreground">{t.crmAcquisitionSources.reloadRequired}</p>}
+        {editor.error && !editor.selected && <p role="alert" className="text-sm text-destructive">{editor.error}</p>}
+        {state.mutationError && !state.selectedForDelete && !state.isCreateOpen && !workspace.selectedForMove && <div role="alert" className="rounded-md border border-caution-200 bg-caution-100 p-3 text-sm text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
+          <p>{state.mutationError}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => void state.reload()} disabled={state.isLoading || busy}>{t.crmAcquisitionSources.reload}</Button>
+        </div>}
+        <AcquisitionSourcesTable workspace={workspace} />
+        {state.canManage && <p role="status" className="text-xs text-muted-foreground">{state.isReordering ? t.crmAcquisitionSources.saving : t.crmAcquisitionSources.reorderHint}</p>}
+        <p className="text-xs text-muted-foreground">{t.crmAcquisitionSources.inactiveHelp}</p>
+        <CreateAcquisitionSourcesModal key={state.isCreateOpen ? "create-open" : "create-closed"} isOpen={state.isCreateOpen}
+          onClose={state.closeCreate} onSubmit={state.handleCreate} isSubmitting={state.isCreating} error={state.mutationError} />
+        <AcquisitionSourceEditModal editor={editor} onManageIcon={workspace.openIconFromEditor} />
+        <MoveAcquisitionSourceModal key={workspace.selectedForMove?.id ?? "move-closed"} source={workspace.selectedForMove}
+          items={state.allItems} isSubmitting={state.isReordering} blocked={workspace.reorderBlocked}
+          error={state.mutationError} onClose={workspace.closeMove} onSubmit={workspace.moveSelected} />
+        <AcquisitionSourceIconDrawer key={`icon-${icon.selected?.id ?? "closed"}`} source={icon.selected}
+          isSubmitting={icon.isUploading} isUncertain={icon.isUncertain} reconcileOnly={icon.reconcileOnly} onReconcile={icon.reconcile}
+          error={icon.error} onClose={icon.close} onSubmit={icon.upload} />
+        <DeleteAcquisitionSourcesConfirmModal isOpen={!!state.selectedForDelete} item={state.selectedForDelete}
+          onClose={state.closeDelete} onConfirm={() => void state.handleDelete()} isSubmitting={state.isDeleting}
+          error={state.mutationError} blocked={state.deleteBlocked} onEdit={workspace.editBlockedSource} />
       </div>
     </PermissionGate>
   );

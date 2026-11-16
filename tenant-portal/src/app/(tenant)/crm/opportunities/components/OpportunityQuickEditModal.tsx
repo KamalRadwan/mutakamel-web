@@ -32,7 +32,6 @@ import {
   DOSSIER_KPI_PILL_CLASSES,
   DateTime,
   Money,
-  PermissionGate,
   StatusBadge,
   TagChip,
   cn,
@@ -53,7 +52,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { normalizeApiError } from "@/lib/api/errors";
-import { localizedName, localizedValue } from "@/lib/format/localized";
+import { localizedName } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -86,7 +85,6 @@ import {
   parseOpportunityDetailResponse,
   type OpportunityDetail,
 } from "../opportunity-contract";
-import { useOpportunityStageHistory } from "../hooks/useOpportunityStageHistory";
 import type { OpportunityCardPatch } from "../opportunity-card-contract";
 import { useOpportunityDocumentCounts } from "../hooks/useOpportunityDocumentCounts";
 import type {
@@ -227,7 +225,6 @@ export function OpportunityQuickEditModal({
     item?.cardColor ?? null,
   );
   const [localTags, setLocalTags] = useState<CrmTag[]>(item?.tags ?? []);
-  const history = useOpportunityStageHistory(item?.id, detailReload, onForbidden);
 
   const [isEditingDeal, setIsEditingDeal] = useState(false);
   const currencyOptions = useOpportunityCurrencyOptions(isEditingDeal);
@@ -1272,72 +1269,26 @@ export function OpportunityQuickEditModal({
               )}
 
               {activeDossierTab === "history" && (
-                <div className="space-y-4" aria-busy={history.loading}>
-                  {history.denied && <PermissionGate require="crm.opportunities.read" scoped denied>{null}</PermissionGate>}
-                  {history.items.length > 0 && (
-                    <div className="space-y-2">
-                      {history.items.map((entry) => {
-                        const fromName = entry.fromStageSnapshot
-                          ? localizedValue(
-                              entry.fromStageSnapshot.stageNameAr,
-                              entry.fromStageSnapshot.stageNameEn,
-                              lang,
-                            )
-                          : "—";
-                        const toName = entry.toStageSnapshot
-                          ? localizedValue(
-                              entry.toStageSnapshot.stageNameAr,
-                              entry.toStageSnapshot.stageNameEn,
-                              lang,
-                            )
-                          : "—";
-                        return (
-                          <div
-                            key={entry.id}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs"
-                          >
-                            <div>
-                              <span className="font-semibold text-foreground">
-                                {formatTemplate(
-                                  t.crmOpportunityDetail.stageMoved,
-                                  { from: fromName, to: toName },
-                                )}
-                              </span>
-                              {entry.reason && (
-                                <p className="mt-0.5 text-2xs text-muted-foreground">
-                                  {entry.reason}
-                                </p>
-                              )}
-                            </div>
-                            {entry.changedAt && (
-                              <DateTime
-                                value={entry.changedAt}
-                                precision="datetime"
-                                language={lang}
-                                className="text-2xs text-muted-foreground"
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                <RecordHistoryTab
+                  density="compact"
+                  entityType="Opportunity"
+                  entityId={fallbackDetail.id}
+                  relatedPartyIds={Array.from(
+                    new Set(
+                      [
+                        fallbackDetail.customerPartyId,
+                        fallbackDetail.contactPartyId,
+                        fallbackDetail.primaryContact?.partyId,
+                      ].filter((id): id is string => Boolean(id)),
+                    ),
                   )}
-
-                  {history.failed && !history.denied && <p role="alert">{t.crmOpportunityDetail.historyLoadFailed}</p>}
-                  {!history.denied && (history.nextCursor || history.failed) && (
-                    <Button variant="outline" size="sm" disabled={history.loading} onClick={() => void history.loadMore()}>
-                      {history.failed ? t.common.retry : t.crmOpportunityDetail.historyLoadMore}
-                    </Button>
-                  )}
-                  {history.loading && <p role="status">{t.common.loading}</p>}
-
-                  <RecordHistoryTab
-                    density="compact"
-                    entityType="Opportunity"
-                    entityId={fallbackDetail.id}
-                    refreshToken={fallbackDetail}
-                  />
-                </div>
+                  valueLabels={{
+                    stageId: Object.fromEntries(
+                      stages.map((stage) => [stage.id, localizedName(stage, lang)]),
+                    ),
+                  }}
+                  refreshToken={fallbackDetail}
+                />
               )}
 
               {activeDossierTab === "files" && (

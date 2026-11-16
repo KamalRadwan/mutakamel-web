@@ -17,6 +17,70 @@ const definition = parseCrmCustomField({
 });
 
 describe("custom-field form", () => {
+  it("restores saved activity without losing edited names, ordering or new options", () => {
+    const inactive = { key: "legacy", nameAr: "قديم", nameEn: "Legacy", sortOrder: 2, isActive: false };
+    const { result } = renderHook(() => useCustomFieldForm({ ...definition, options: [option, inactive] }));
+    act(() => {
+      result.current.updateOption(result.current.options[0].rowId, { nameEn: "Renamed", sortOrder: 5, isActive: false });
+      result.current.updateOption(result.current.options[1].rowId, { nameAr: "اسم معدل", isActive: true });
+      result.current.addOption();
+    });
+    act(() => result.current.updateOption(result.current.options[2].rowId, {
+      key: "new", nameAr: "جديد", nameEn: "New", isActive: false,
+    }));
+    expect(result.current.optionActivityChanged).toBe(true);
+    act(() => result.current.restoreOptionActivity());
+    expect(result.current.options).toEqual([
+      expect.objectContaining({ ...option, nameEn: "Renamed", sortOrder: 5, isActive: true, persisted: true }),
+      expect.objectContaining({ ...inactive, nameAr: "اسم معدل", isActive: false, persisted: true }),
+      expect.objectContaining({ key: "new", nameAr: "جديد", nameEn: "New", isActive: false, persisted: false }),
+    ]);
+    expect(result.current.optionActivityChanged).toBe(false);
+    expect(result.current.isDirty).toBe(true);
+  });
+
+  it("opens additional settings when hidden metadata fails validation", async () => {
+    const submit = vi.fn();
+    const { result } = renderHook(() => useCustomFieldForm());
+    expect(result.current.metadataOpen).toBe(false);
+    act(() => {
+      result.current.setNameAr("القناة"); result.current.setNameEn("Channel");
+      result.current.setFieldKey("channel"); result.current.setSortOrder("0");
+    });
+    await act(async () => result.current.submitCreate(submit, vi.fn()));
+    expect(result.current.metadataOpen).toBe(true);
+    expect(result.current.metadataError).toBe(en.crmCustomFields.invalidMetadata);
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("submits backed optional metadata and blocks invalid display orders and long placeholders", async () => {
+    const submit = vi.fn().mockResolvedValue(true);
+    const { result } = renderHook(() => useCustomFieldForm());
+    act(() => {
+      result.current.setNameAr("القناة"); result.current.setNameEn("Channel"); result.current.setFieldKey("channel");
+      result.current.setPlaceholderEn("Choose a channel"); result.current.setPlaceholderAr("اختر القناة");
+      result.current.setSortOrder("2"); result.current.setIsSearchable(true);
+    });
+    await act(async () => result.current.submitCreate(submit, vi.fn()));
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ placeholderEn: "Choose a channel", placeholderAr: "اختر القناة", sortOrder: 2, isSearchable: true }));
+    submit.mockClear();
+    for (const order of ["0", "-1", "1.5", "", "9007199254740992"]) {
+      act(() => result.current.setSortOrder(order));
+      await act(async () => result.current.submitCreate(submit, vi.fn()));
+    }
+    act(() => { result.current.setSortOrder("1"); result.current.setPlaceholderEn("x".repeat(181)); });
+    await act(async () => result.current.submitCreate(submit, vi.fn()));
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("can explicitly clear saved placeholders without changing a field identity", async () => {
+    const submit = vi.fn().mockResolvedValue(true);
+    const { result } = renderHook(() => useCustomFieldForm({ ...definition, placeholderEn: "Choose", placeholderAr: "اختر" }));
+    act(() => { result.current.setPlaceholderEn(""); result.current.setPlaceholderAr(""); result.current.setSortOrder("4"); });
+    await act(async () => result.current.submitEdit(submit));
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ placeholderEn: "", placeholderAr: "", sortOrder: 4 }));
+    expect(submit.mock.calls[0][0]).not.toHaveProperty("fieldKey");
+  });
   it.each(["SELECT", "MULTI_SELECT"] as const)("creates %s with DTO-only option fields", async (type) => {
     const submit = vi.fn().mockResolvedValue(true);
     const close = vi.fn();

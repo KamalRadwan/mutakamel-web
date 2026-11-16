@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
+import { catalogueFixture } from "./static-catalogue.test-fixture";
+import { filterStaticCatalogueGroups } from "./static-catalogue-groups";
 import {
   buildStaticCatalogueGroups,
   CRM_STATIC_DATA_PATH,
@@ -162,6 +164,24 @@ describe("Q121 · a permission label the server did not translate is not shown a
 });
 
 describe("catalogue presentation", () => {
+  it("keeps all 18 groups, five real attachment families and the size as a separate value", () => {
+    const groups = buildStaticCatalogueGroups(parseCrmStaticDataResponse(catalogueFixture), "en", NOTE, en.crmStaticCatalogue);
+    expect(groups).toHaveLength(18);
+    expect(groups.slice(0, 3).map((group) => group.key)).toEqual(["profileTypes", "customerStatuses", "leadStatuses"]);
+    expect(groups.find((group) => group.key === "attachmentPolicy")).toMatchObject({
+      entriesCount: 5, values: ["PDF", "Images", "Word", "Excel", "Text"], sizeLabel: "25 MB",
+    });
+    expect(groups.find((group) => group.key === "opportunityStatusByStageFlag")?.rules).toHaveLength(4);
+  });
+
+  it("searches technical identifiers as well as translated labels and clears to all groups", () => {
+    const groups = buildStaticCatalogueGroups(parseCrmStaticDataResponse(catalogueFixture), "ar", NOTE, ar.crmStaticCatalogue);
+    expect(filterStaticCatalogueGroups(groups, "  crm.leads.read.own  ", "ar").map((group) => group.key)).toEqual(["permissions"]);
+    expect(filterStaticCatalogueGroups(groups, "صور", "ar").map((group) => group.key)).toEqual(["attachmentPolicy"]);
+    expect(filterStaticCatalogueGroups(groups, "not-a-value", "ar")).toEqual([]);
+    expect(filterStaticCatalogueGroups(groups, " ", "ar")).toHaveLength(18);
+  });
+
   it.each([
     ["en", en.crmStaticCatalogue],
     ["ar", ar.crmStaticCatalogue],

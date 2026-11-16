@@ -79,6 +79,13 @@ describe("trade item lookup contract", () => {
     );
   });
 
+  it("validates catalogue presentation metadata rather than inventing product imagery", () => {
+    const parsed = parseTradeItems(page([item({ itemKind: "SERVICE", image: null })]), "SALES");
+    expect(parsed.items[0]).toMatchObject({ itemKind: "SERVICE", image: null });
+    expect(() => parseTradeItems(page([item({ image: { id: "bad-image" } })]), "SALES")).toThrow();
+    expect(() => parseTradeItems(page([item({ itemKind: "UNKNOWN" })]), "SALES")).toThrow();
+  });
+
   it("fails closed when the branch has not assorted the item", () => {
     const parsed = parseTradeItems(page([
       item(),

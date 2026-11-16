@@ -2,59 +2,78 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
-import { useCan } from "@/design-system";
+import {
+  computeReplacementDiff,
+  useCan,
+  type ReplacementDiff,
+  type ReplacementItem,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { can } from "@/lib/auth/permission-scope";
 import { localizedValue } from "@/lib/format/localized";
+import { formatNumber } from "@/lib/format/number";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
-  fetchPermissionCatalogue,
+  deleteTenantRole,
   fetchTenantRole,
   MAX_ROLE_PERMISSIONS,
+  MAX_SYSTEM_ROLE_PERMISSIONS,
   setRolePermissions,
   updateTenantRole,
-  type TenantPermission,
   type TenantRoleDetail,
 } from "../../../contracts/role-contract";
+import type { RoleBranchPermissionsDocument } from "../../contracts/role-branch-contract";
+import { usePermissionCatalogue } from "./usePermissionCatalogue";
 
-/**
- * `GET /permissions` is a `PaginationQueryDto` list capped at 100 rows a page,
- * and the editor needs the whole catalogue to group it. The page walk is bounded
- * so a runaway `hasNext` cannot spin forever.
- */
-const MAX_CATALOGUE_PAGES = 20;
-
-export interface PermissionGroup {
-  key: string;
-  label: string;
-  permissions: TenantPermission[];
-}
-
-export function useRolePermissionEditor(id: string) {
+export function useRolePermissionEditor(id: string, onDeleted?: () => void) {
   const { t, lang } = useI18n();
   const { user, retryBootstrap } = useTenantAuth();
   const canUpdate = useCan("roles.role.update", { tenantWide: true });
+  const canDelete = useCan("roles.role.delete", { tenantWide: true });
+  const canReadUsers = useCan("users.user.read");
   const canReadPermissions = user?.permissions.includes("roles.permission.read") ?? false;
+  const isTenantOwner = Boolean(user?.isTenantOwner);
 
   const [role, setRole] = useState<TenantRoleDetail | null>(null);
-  const [catalogue, setCatalogue] = useState<TenantPermission[]>([]);
-  const [isCatalogueLoaded, setIsCatalogueLoaded] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
-  const [catalogueError, setCatalogueError] = useState<NormalizedApiError | null>(null);
   const [isMissing, setIsMissing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [writeError, setWriteError] = useState<NormalizedApiError | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [blockedDeleteError, setBlockedDeleteError] = useState<NormalizedApiError | null>(null);
+  const [branchModalSession, setBranchModalSession] = useState<{
+    mode: "edit" | "view";
+    session: number;
+  } | null>(null);
+  const [savedBranchReceipt, setSavedBranchReceipt] = useState<string[] | null>(null);
+
+  const catalogueState = usePermissionCatalogue({
+    canReadPermissions,
+    user,
+    lang,
+    reloadToken,
+  });
+  const {
+    catalogueById,
+    isCatalogueLoaded,
+    isCatalogueTruncated,
+    catalogueError,
+    groups,
+    filteredGroups,
+    permissionSearch,
+    setPermissionSearch,
+    clearPermissionSearch,
+    grantableIds,
+    canGrantPermission,
+  } = catalogueState;
 
   useEffect(() => {
-    // Deferred past the effect body on purpose: a synchronous setState there
-    // cascades an extra render (react-hooks/set-state-in-effect), and the abort
-    // check means a torn-down screen never writes at all.
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -86,85 +105,76 @@ export function useRolePermissionEditor(id: string) {
     return () => controller.abort();
   }, [id, reloadToken]);
 
-  useEffect(() => {
-    // Deferred past the effect body on purpose: a synchronous setState there
-    // cascades an extra render (react-hooks/set-state-in-effect), and the abort
-    // check means a torn-down screen never writes at all.
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
-      setIsCatalogueLoaded(false);
-      setCatalogue([]);
-      setCatalogueError(null);
-      if (!canReadPermissions) return;
-      void (async () => {
-        try {
-          const all: TenantPermission[] = [];
-          for (let page = 1; page <= MAX_CATALOGUE_PAGES; page += 1) {
-            const result = await fetchPermissionCatalogue(page, controller.signal);
-            all.push(...result.items);
-            if (!result.hasNext) break;
-          }
-          if (!controller.signal.aborted) {
-            setCatalogue(all);
-            setIsCatalogueLoaded(true);
-          }
-        } catch (error) {
-          if (!controller.signal.aborted) {
-            setCatalogue([]);
-            setCatalogueError(normalizeApiError(error));
-          }
-        }
-      })();
-    });
-    return () => controller.abort();
-  }, [canReadPermissions, reloadToken]);
+  const reload = useCallback(() => {
+    setIsConfirmOpen(false);
+    setReloadToken((token) => token + 1);
+  }, []);
 
-  const groups = useMemo<PermissionGroup[]>(() => {
-    const byGroup = new Map<string, PermissionGroup>();
-    for (const permission of catalogue) {
-      const existing = byGroup.get(permission.group);
-      if (existing) {
-        existing.permissions.push(permission);
-        continue;
-      }
-      byGroup.set(permission.group, {
-        key: permission.group,
-        // The backend already localizes the group heading; never re-author it.
-        label: localizedValue(permission.groupNameAr, permission.groupNameEn, lang),
-        permissions: [permission],
-      });
-    }
-    return [...byGroup.values()].sort((a, b) => a.label.localeCompare(b.label));
-  }, [catalogue, lang]);
+  const isBranchMode =
+    role?.permissionMode === "BRANCH" || writeError?.code === "ROLE_BRANCH_MODE_REQUIRED";
+  const maxPermissions = role?.isSystem ? MAX_SYSTEM_ROLE_PERMISSIONS : MAX_ROLE_PERMISSIONS;
+  const canViewBranchPermissions = isTenantOwner && canReadPermissions;
+  const canAssignBranchPermissions =
+    isTenantOwner && canUpdate && canReadPermissions && !(role?.isSystem ?? false);
 
-  const reload = useCallback(() => setReloadToken((token) => token + 1), []);
-
-  const grantableIds = useMemo(() => new Set(catalogue
-    .filter((permission) => can(user, permission.key, { tenantWide: true }))
-    .map((permission) => permission.id)), [catalogue, user]);
-  const canGrantPermission = useCallback((permissionId: string) =>
-    grantableIds.has(permissionId), [grantableIds]);
-  // Core validates the entire replacement, including unchanged permissions.
-  // Unknown IDs fail closed until the full catalogue has been resolved.
-  const hasUngrantablePermissions = isCatalogueLoaded &&
+  const hasCatalogueFailure = catalogueError !== null || isCatalogueTruncated;
+  const hasUngrantablePermissions =
+    isCatalogueLoaded &&
     (role?.permissionIds.some((permissionId) => !grantableIds.has(permissionId)) ?? false);
-  const canEditPermissions = canUpdate && canReadPermissions && isCatalogueLoaded &&
-    !catalogueError && !role?.isSystem && !hasUngrantablePermissions;
-  const canSavePermissions = canEditPermissions && selectedIds.length <= MAX_ROLE_PERMISSIONS &&
+  const canEditPermissions =
+    canUpdate &&
+    canReadPermissions &&
+    isCatalogueLoaded &&
+    !hasCatalogueFailure &&
+    !role?.isSystem &&
+    !isBranchMode &&
+    !hasUngrantablePermissions;
+  const canSavePermissions =
+    canEditPermissions &&
+    selectedIds.length <= MAX_ROLE_PERMISSIONS &&
     selectedIds.every((permissionId) => grantableIds.has(permissionId));
 
-  const toggle = useCallback((permissionId: string) => {
-    if (!canEditPermissions || !canGrantPermission(permissionId) || isSubmitting) return;
-    setSelectedIds((current) =>
-      current.includes(permissionId)
-        ? current.filter((value) => value !== permissionId)
-        : [...current, permissionId],
-    );
-  }, [canEditPermissions, canGrantPermission, isSubmitting]);
+  const baseline = useMemo(() => role?.permissionIds ?? [], [role]);
+  const selectedSet = useMemo<ReadonlySet<string>>(() => new Set(selectedIds), [selectedIds]);
+  const isDirty =
+    selectedIds.length !== baseline.length ||
+    selectedIds.some((value) => !baseline.includes(value));
+
+  const diff = useMemo<ReplacementDiff>(() => {
+    const toItems = (ids: string[]): ReplacementItem[] =>
+      ids.map((permId) => {
+        const perm = catalogueById.get(permId);
+        return {
+          id: permId,
+          label: perm ? localizedValue(perm.nameAr, perm.nameEn, lang) : permId,
+          hint: perm?.key,
+        };
+      });
+    return computeReplacementDiff(toItems(baseline), toItems(selectedIds));
+  }, [baseline, catalogueById, lang, selectedIds]);
+
+  const toggle = useCallback(
+    (permissionId: string) => {
+      if (!canEditPermissions || !canGrantPermission(permissionId) || isSubmitting) return;
+      setSelectedIds((current) =>
+        current.includes(permissionId)
+          ? current.filter((value) => value !== permissionId)
+          : [...current, permissionId],
+      );
+    },
+    [canEditPermissions, canGrantPermission, isSubmitting],
+  );
 
   const save = useCallback(async () => {
-    if (!role || !canSavePermissions || isSubmitting) return;
+    if (!role || !isDirty || !isCatalogueLoaded || hasCatalogueFailure || !canSavePermissions || isSubmitting) {
+      return;
+    }
+    const stillAuthorized = selectedIds.every((permId) => {
+      const perm = catalogueById.get(permId);
+      return perm !== undefined && can(user, perm.key, { tenantWide: true });
+    });
+    if (!stillAuthorized) return;
+
     setIsSubmitting(true);
     setWriteError(null);
     try {
@@ -178,11 +188,11 @@ export function useRolePermissionEditor(id: string) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSavePermissions, isSubmitting, retryBootstrap, role, selectedIds]);
+  }, [canSavePermissions, catalogueById, hasCatalogueFailure, isCatalogueLoaded, isDirty, isSubmitting, retryBootstrap, role, selectedIds, user]);
 
   const rename = useCallback(
     async (body: { name?: string; description?: string }): Promise<boolean> => {
-      if (!role || !canUpdate) return false;
+      if (!role || role.isSystem || !canUpdate) return false;
       setIsSubmitting(true);
       setWriteError(null);
       try {
@@ -199,46 +209,72 @@ export function useRolePermissionEditor(id: string) {
     [canUpdate, role],
   );
 
-  const baseline = role?.permissionIds ?? [];
-  const isDirty =
-    selectedIds.length !== baseline.length ||
-    selectedIds.some((value) => !baseline.includes(value));
+  const removeRole = useCallback(async () => {
+    if (!role || role.isSystem || !canDelete || isSubmitting) return;
+    setIsSubmitting(true);
+    setWriteError(null);
+    try {
+      await deleteTenantRole(role.id);
+      setIsDeleteOpen(false);
+      setRole(null);
+      setIsMissing(true);
+      onDeleted?.();
+    } catch (error) {
+      const normalized = normalizeApiError(error);
+      setIsDeleteOpen(false);
+      if (normalized.code === "ROLE_IN_USE") setBlockedDeleteError(normalized);
+      else setWriteError(normalized);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [canDelete, isSubmitting, onDeleted, role]);
+
+  const openBranchModal = useCallback((mode: "edit" | "view") => {
+    setBranchModalSession((prev) => ({ mode, session: (prev?.session ?? 0) + 1 }));
+  }, []);
+
+  const handleBranchSaved = useCallback(
+    (_doc: RoleBranchPermissionsDocument, receiptLines: string[]) => {
+      setBranchModalSession(null);
+      setSavedBranchReceipt(receiptLines);
+      setWriteError(null);
+      reload();
+    },
+    [reload],
+  );
 
   return {
-    t,
-    lang,
-    role,
-    groups,
-    selectedIds,
-    isDirty,
-    isOverCap: selectedIds.length > MAX_ROLE_PERMISSIONS,
-    maxPermissions: MAX_ROLE_PERMISSIONS,
-    canUpdate,
-    canReadPermissions,
-    canEditPermissions,
-    canSavePermissions,
-    canGrantPermission,
-    hasUngrantablePermissions,
-    isLoading,
-    loadError,
-    catalogueError,
-    isMissing,
-    reload,
-    toggle,
+    t, lang, role, groups, filteredGroups, permissionSearch, setPermissionSearch,
+    clearPermissionSearch, isCatalogueLoaded, isCatalogueTruncated, selectedIds, selectedSet, diff,
+    formatCount: (count: number) => formatNumber(count, lang),
+    isDirty, isOverCap: selectedIds.length > maxPermissions,
+    maxPermissions,
+    isBranchMode, canViewBranchPermissions, canAssignBranchPermissions,
+    canUpdate, canDelete, canReadUsers, canReadPermissions, canEditPermissions,
+    canSavePermissions, canGrantPermission, hasUngrantablePermissions,
+    isLoading, loadError, catalogueError, isMissing, reload, toggle,
     resetSelection: () => setSelectedIds(baseline),
     isConfirmOpen,
-    openConfirm: () => canSavePermissions && !isSubmitting && setIsConfirmOpen(true),
-    closeConfirm: () => setIsConfirmOpen(false),
+    openConfirm: () => isDirty && canSavePermissions && !isSubmitting && setIsConfirmOpen(true),
+    handleConfirmOpenChange: (open: boolean) => { if (!open) setIsConfirmOpen(false); },
     isRenameOpen,
-    openRename: () => {
-      if (!canUpdate) return;
-      setWriteError(null);
-      setIsRenameOpen(true);
-    },
-    closeRename: () => setIsRenameOpen(false),
-    isSubmitting,
-    writeError,
+    openRename: () => { if (canUpdate && !role?.isSystem) { setWriteError(null); setIsRenameOpen(true); } },
+    closeRename: () => { setIsRenameOpen(false); setWriteError(null); },
+    isDeleteOpen,
+    openDelete: () => { if (canDelete && !role?.isSystem) { setWriteError(null); setIsDeleteOpen(true); } },
+    handleDeleteOpenChange: (open: boolean) => { if (!open) setIsDeleteOpen(false); },
+    blockedDeleteError,
+    handleDeleteBlockerOpenChange: (open: boolean) => { if (!open) setBlockedDeleteError(null); },
+    branchModalSession,
+    openBranchPermissions: () => openBranchModal(canAssignBranchPermissions ? "edit" : "view"),
+    closeBranchModal: () => setBranchModalSession(null),
+    handleBranchSaved,
+    savedBranchReceipt,
+    closeSavedBranchReceipt: () => setSavedBranchReceipt(null),
+    viewSavedBranchPermissions: () => { setSavedBranchReceipt(null); openBranchModal("view"); },
+    isSubmitting, writeError,
     save,
     rename,
+    confirmDelete: () => { void removeRole(); },
   };
 }

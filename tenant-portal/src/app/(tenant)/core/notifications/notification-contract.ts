@@ -11,8 +11,6 @@ import type { CorePath } from "@/lib/api/envelope";
 export const NOTIFICATIONS_PATH = "/api/tenant/core/v1/notifications";
 export const NOTIFICATIONS_CONFIG_PATH: CorePath =
   "/api/tenant/core/v1/notifications/config";
-export const NOTIFICATIONS_UNREAD_COUNT_PATH: CorePath =
-  "/api/tenant/core/v1/notifications/unread-count";
 export const NOTIFICATION_PREFERENCES_PATH: CorePath =
   "/api/tenant/core/v1/notifications/preferences";
 

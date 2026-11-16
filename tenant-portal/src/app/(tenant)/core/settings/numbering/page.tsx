@@ -1,48 +1,58 @@
 "use client";
 
-import { Pencil, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import {
   Button,
-  CORE_SETTINGS_NAV_ITEMS,
   DataTable,
-  FilterBar,
-  IdentifierText,
+  DegradedBanner,
+  EmptyState,
+  ErrorState,
+  NotFoundState,
   PageHeader,
   PermissionGate,
-  SubNav,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  type ColumnDef,
-  type FilterValues,
+  ReadOnlyGate,
 } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
-import { companyLabel } from "../company-options";
-import { formatNumberingValue, type NumberingSequence } from "./numbering-contract";
 import { CreateNumberingSequenceModal } from "./components/CreateNumberingSequenceModal";
 import { EditNumberingSequenceModal } from "./components/EditNumberingSequenceModal";
+import { buildNumberingColumns } from "./components/NumberingColumns";
+import { NumberingToolbar } from "./components/NumberingToolbar";
 import { useNumberingSequences } from "./hooks/useNumberingSequences";
 
 export default function NumberingPage() {
   const {
     t,
+    lang,
     canManage,
     canCreate,
     canManageScope,
+    effectiveAccessMode,
+    readOnlyLabels,
     tenantWideAllowed,
     manageableCompanies,
     companies,
+    companyFailure,
+    companiesTruncated,
+    retryCompanies,
     items,
+    hasRetainedRows,
     pageInfo,
     companyFilter,
     search,
+    hasActiveFilters,
+    clearAllFilters,
     isLoading,
     isRefreshing,
     isSubmitting,
-    queryError,
+    isQueryForbidden,
+    isQueryNotFound,
+    queryFailure,
     formError,
+    formFieldErrors,
+    clearServerFieldError,
     createOpen,
     editing,
+    editingNotFound,
     setPage,
     setCompanyFilter,
     setSearch,
@@ -57,175 +67,190 @@ export default function NumberingPage() {
     setSort,
   } = useNumberingSequences();
 
-  const filterValues: FilterValues = companyFilter
-    ? { companyId: { kind: "select", value: companyFilter } }
-    : {};
-
-  const columns: ColumnDef<NumberingSequence>[] = [
-    {
-      id: "code",
-      sortable: true,
-      header: t.coreSettings.numberingCode,
-      cell: (sequence) => <span className="font-medium text-foreground">{sequence.code}</span>,
-    },
-    {
-      id: "scope",
-      header: t.coreSettings.numberingScope,
-      cell: (sequence) =>
-        companyLabel(companies, sequence.companyId, t.coreSettings.numberingTenantWide),
-    },
-    {
-      id: "next",
-      sortable: true,
-      sortField: "nextValue",
-      header: t.coreSettings.numberingNextNumber,
-      // The counter is a bigint string; `formatNumberingValue` pads text and
-      // never converts it to a number.
-      cell: (sequence) => (
-        <IdentifierText className="text-foreground">
-          {formatNumberingValue(sequence.prefix ?? "", sequence.padding, sequence.nextValue)}
-        </IdentifierText>
-      ),
-    },
-    {
-      id: "value",
-      header: t.coreSettings.numberingNextValue,
-      align: "end",
-      cell: (sequence) => <IdentifierText>{sequence.nextValue}</IdentifierText>,
-    },
-    {
-      id: "padding",
-      header: t.coreSettings.numberingPadding,
-      numeric: true,
-      cell: (sequence) => sequence.padding,
-    },
-    ...(canManage
-      ? [
-          {
-            id: "actions",
-            header: t.common.actions,
-            align: "end" as const,
-            sticky: "end" as const,
-            cell: (sequence: NumberingSequence) => canManageScope(sequence.companyId) ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t.coreSettings.numberingEditTitle}
-                    onClick={() => openEdit(sequence)}
-                  >
-                    <Pencil className="size-4" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t.coreSettings.numberingEditTitle}</TooltipContent>
-              </Tooltip>
-            ) : null,
-          },
-        ]
-      : []),
-  ];
+  const columns = buildNumberingColumns({
+    t,
+    lang,
+    companies,
+    canManage,
+    canManageScope,
+    isSubmitting,
+    onEdit: openEdit,
+  });
 
   return (
-    <PermissionGate require="numbering.read">
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
-          title={t.coreSettings.numberingTitle}
-          description={t.coreSettings.numberingSubtitle}
-          primaryAction={
-            canCreate ? { label: t.coreSettings.numberingCreate, onClick: openCreate } : undefined
-          }
-          secondaryActions={
-            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
-              <RefreshCw className={isRefreshing ? "size-4 animate-spin" : "size-4"} aria-hidden="true" />
-              {t.coreSettings.reload}
-            </Button>
-          }
-        />
-
-        <SubNav items={CORE_SETTINGS_NAV_ITEMS} />
-
-        <FilterBar
-          filters={
-            companies.length > 0
-              ? [
-                  {
-                    id: "companyId",
-                    kind: "select" as const,
-                    label: t.coreSettings.numberingScope,
-                    placeholder: t.coreSettings.taxScopeAny,
-                    options: companies.map((company) => ({
-                      value: company.id,
-                      label: company.name,
-                    })),
-                  },
-                ]
-              : []
-          }
-          values={filterValues}
-          onChange={(next) => {
-            const company = next.companyId;
-            setCompanyFilter(company?.kind === "select" && company.value ? company.value : undefined);
-          }}
-          onReset={() => setCompanyFilter(undefined)}
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder={t.coreSettings.numberingSearch}
-          clearAllLabel={t.coreSettings.clearFilters}
-          filtersLabel={t.common.filter}
-        />
-
-        <DataTable
-          columns={columns}
-          rows={items}
-          isLoading={isLoading}
-          error={queryError}
-          onRetry={() => void reload()}
-          page={pageInfo}
-          onPageChange={setPage}
-          sort={sort}
-          onSortChange={setSort}
-          rowKey={(sequence) => sequence.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: t.coreSettings.numberingLoadFailed,
-            emptyTitle: t.coreSettings.numberingEmpty,
-            selectAll: t.common.actions,
-            selectRow: t.common.actions,
-            sortAscending: t.common.actions,
-            sortDescending: t.common.actions,
-            notSorted: t.common.actions,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
-
-        <CreateNumberingSequenceModal
-          key={createOpen ? "create-open" : "create-closed"}
-          isOpen={createOpen}
-          companies={manageableCompanies}
-          tenantWideAllowed={tenantWideAllowed}
-          onClose={closeCreate}
-          onSubmit={create}
-          isSubmitting={isSubmitting}
-          error={formError}
-        />
-
-        {editing ? (
-          <EditNumberingSequenceModal
-            key={editing.id}
-            sequence={editing}
-            companies={companies}
-            onClose={closeEdit}
-            onSubmit={update}
-            isSubmitting={isSubmitting}
-            error={formError}
+    <PermissionGate require="numbering.read" denied={!isLoading && isQueryForbidden}>
+      <ReadOnlyGate mode={effectiveAccessMode} labels={readOnlyLabels}>
+        <div className="flex flex-col gap-4">
+          <PageHeader
+            className="sr-only"
+            title={t.coreSettings.numberingTitle}
+            primaryAction={
+              canCreate
+                ? { label: t.coreSettings.numberingCreate, onClick: openCreate }
+                : undefined
+            }
           />
-        ) : null}
-      </div>
+
+          <NumberingToolbar
+            companies={companies}
+            companyFilter={companyFilter}
+            onCompanyFilterChange={setCompanyFilter}
+            searchValue={search}
+            onSearchChange={setSearch}
+            hasActiveFilters={hasActiveFilters}
+            onReset={clearAllFilters}
+            isRefreshing={isRefreshing}
+            onReload={() => void reload()}
+          />
+
+          {companyFailure ? (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs"
+            >
+              <div className="flex min-w-0 items-start gap-2">
+                <AlertTriangle
+                  className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-medium text-foreground">{companyFailure.title}</span>
+                  <span className="text-muted-foreground">{companyFailure.description}</span>
+                </div>
+              </div>
+              {companyFailure.retryable ? (
+                <Button type="button" variant="outline" size="xs" onClick={() => void retryCompanies()}>
+                  <RefreshCw className="size-3" aria-hidden="true" />
+                  {t.common.retry}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {companiesTruncated ? (
+            <DegradedBanner message={t.coreSettings.companyOptionsTruncated} />
+          ) : null}
+
+          {!isLoading && isQueryNotFound && queryFailure ? (
+            <NotFoundState
+              title={queryFailure.title}
+              description={queryFailure.description}
+              backLabel={t.coreSettings.clearFilters}
+              onBack={hasActiveFilters ? clearAllFilters : undefined}
+            />
+          ) : !isLoading && queryFailure && !hasRetainedRows ? (
+            <ErrorState
+              title={queryFailure.title}
+              description={queryFailure.description}
+              onRetry={queryFailure.retryable ? () => void reload() : undefined}
+              retryLabel={t.common.retry}
+            />
+          ) : (
+            <>
+              {!isLoading && queryFailure && hasRetainedRows ? (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs"
+                >
+                  <div className="flex min-w-0 items-start gap-2">
+                    <AlertTriangle
+                      className="mt-0.5 size-3.5 shrink-0 text-destructive"
+                      aria-hidden="true"
+                    />
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-medium text-foreground">{queryFailure.title}</span>
+                      <span className="text-muted-foreground">{queryFailure.description}</span>
+                    </div>
+                  </div>
+                  {queryFailure.retryable ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      disabled={isRefreshing}
+                      onClick={() => void reload()}
+                    >
+                      <RefreshCw className="size-3" aria-hidden="true" />
+                      {t.common.retry}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <DataTable
+                showRowNumbers={false}
+                columns={columns}
+                rows={items}
+                isLoading={isLoading}
+                error={null}
+                onRetry={() => void reload()}
+                page={pageInfo}
+                onPageChange={setPage}
+                sort={sort}
+                onSortChange={setSort}
+                rowKey={(sequence) => sequence.id}
+                emptyState={
+                  <EmptyState
+                    title={t.coreSettings.numberingEmpty}
+                    action={
+                      hasActiveFilters
+                        ? { label: t.coreSettings.clearFilters, onClick: clearAllFilters }
+                        : canCreate
+                          ? { label: t.coreSettings.numberingCreate, onClick: openCreate }
+                          : undefined
+                    }
+                  />
+                }
+                labels={{
+                  retry: t.common.retry,
+                  errorTitle: t.coreSettings.numberingLoadFailed,
+                  emptyTitle: t.coreSettings.numberingEmpty,
+                  selectAll: t.views.selectAll,
+                  selectRow: t.views.selectRow,
+                  sortAscending: t.views.sortAscending,
+                  sortDescending: t.views.sortDescending,
+                  notSorted: t.views.notSorted,
+                  pagination: {
+                    previous: t.common.previousPage,
+                    next: t.common.nextPage,
+                    summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+                  },
+                }}
+              />
+            </>
+          )}
+
+          {canManage ? (
+            <CreateNumberingSequenceModal
+              key={createOpen ? "create-open" : "create-closed"}
+              isOpen={createOpen}
+              companies={manageableCompanies}
+              tenantWideAllowed={tenantWideAllowed}
+              onClose={closeCreate}
+              onSubmit={create}
+              isSubmitting={isSubmitting}
+              error={formError}
+              serverFieldErrors={formFieldErrors}
+              onClearServerError={clearServerFieldError}
+            />
+          ) : null}
+
+          {canManage && editing ? (
+            <EditNumberingSequenceModal
+              key={`edit-${editing.id}`}
+              sequence={editing}
+              companies={companies}
+              onClose={closeEdit}
+              onSubmit={update}
+              isSubmitting={isSubmitting}
+              error={formError}
+              serverFieldErrors={formFieldErrors}
+              onClearServerError={clearServerFieldError}
+              notFound={editingNotFound}
+            />
+          ) : null}
+        </div>
+      </ReadOnlyGate>
     </PermissionGate>
   );
 }

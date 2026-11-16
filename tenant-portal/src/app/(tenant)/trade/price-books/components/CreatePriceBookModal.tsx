@@ -1,27 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { BookOpen, Lock, ShoppingBag, ShoppingCart } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Field,
-  FormModal,
-  IdentifierText,
-  Input,
-  SWATCH_SURFACE_PALETTES,
-  cn,
-} from "@/design-system";
+import { Check, Plus, Star } from "lucide-react";
+import { Badge, Button, Checkbox, Field, FormModal, Input, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
-import {
-  COMMON_CURRENCY_PRESETS,
-  EMPTY_PRICE_BOOK_FORM,
-  PRICE_BOOK_CODE_MAX_LENGTH,
-  PRICE_BOOK_PURPOSES,
-  type PriceBookFormValues,
-  type PriceBookPurpose,
-} from "../pricing-contract";
+import { PRICE_BOOK_CODE_MAX_LENGTH, PRICE_BOOK_PURPOSES, type PriceBook, type PriceBookFormValues, type PriceBookPurpose } from "../pricing-contract";
+import { useCreatePriceBookForm } from "../hooks/useCreatePriceBookForm";
+import { PriceBookCurrencyField } from "./PriceBookCurrencyField";
+import { PriceBookSeedFields } from "./PriceBookSeedFields";
 
 interface CreatePriceBookModalProps {
   isOpen: boolean;
@@ -29,15 +15,12 @@ interface CreatePriceBookModalProps {
   onSubmit: (values: PriceBookFormValues) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  existingBooks?: PriceBook[];
+  canManageDefaults?: boolean;
+  initialPurpose?: PriceBookPurpose;
+  initialCurrencyCode?: string;
+  initialSetDefault?: boolean;
 }
-
-const PURPOSE_META: Record<
-  PriceBookPurpose,
-  { hue: "indigo" | "green"; Icon: typeof ShoppingCart }
-> = {
-  SALES: { hue: "indigo", Icon: ShoppingCart },
-  PURCHASE: { hue: "green", Icon: ShoppingBag },
-};
 
 export function CreatePriceBookModal({
   isOpen,
@@ -45,98 +28,48 @@ export function CreatePriceBookModal({
   onSubmit,
   isSubmitting,
   error,
+  existingBooks = [],
+  canManageDefaults = false,
+  initialPurpose,
+  initialCurrencyCode,
+  initialSetDefault = false,
 }: CreatePriceBookModalProps) {
   const { t } = useI18n();
-  const [values, setValues] = useState<PriceBookFormValues>(EMPTY_PRICE_BOOK_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_PRICE_BOOK_FORM);
-
-  const selectedPurposePalette = SWATCH_SURFACE_PALETTES[PURPOSE_META[values.purpose].hue];
+  const form = useCreatePriceBookForm({
+    isOpen, initialPurpose, initialCurrencyCode, initialSetDefault,
+    existingBooks, onSubmit, onClose,
+  });
+  const { values, setValues } = form;
 
   return (
     <FormModal
       open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          setValues(EMPTY_PRICE_BOOK_FORM);
-          onClose();
-        }
-      }}
+      onOpenChange={form.onOpenChange}
       size="wide"
       title={t.tradePricing.bookCreateTitle}
       description={t.tradePricing.bookCreateDescription}
-      headerIcon={
-        <div
-          className={cn(
-            "flex size-9 items-center justify-center rounded-lg border",
-            selectedPurposePalette.iconBoxIdle,
-          )}
-        >
-          <BookOpen className="size-4" aria-hidden="true" />
-        </div>
-      }
       titleBadge={
-        <Badge tone="neutral">
+        <Badge tone="brand">
           {tradeStatusLabel(t.tradeStatus, values.purpose, t.common.unknownCode)}
         </Badge>
       }
-      isDirty={isDirty}
+      isDirty={form.isDirty}
       isSubmitting={isSubmitting}
-      onSubmit={() => void onSubmit(values)}
+      onSubmit={form.submit}
+      submitDisabled={form.submitDisabled}
       error={error ?? undefined}
-      asideSlot={
-        <div className="flex flex-col gap-3 p-4">
-          <div className={cn("rounded-lg border p-3.5", selectedPurposePalette.sectionCard)}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-foreground">
-                {t.tradePricing.livePreviewTitle}
-              </span>
-              <Badge tone="brand">{values.currencyCode.trim().toUpperCase() || "ISO"}</Badge>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">{t.tradePricing.livePreviewDesc}</p>
-            <div className="mt-3 flex flex-col gap-2 rounded-lg border border-border bg-card p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">{t.tradePricing.bookCode}</span>
-                <IdentifierText className="text-xs font-semibold text-foreground">
-                  {values.code.trim() || "PB-NEW-2026"}
-                </IdentifierText>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">{t.tradePricing.bookPurpose}</span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold",
-                    selectedPurposePalette.badge,
-                  )}
-                >
-                  <span className={cn("size-1.5 rounded-full", selectedPurposePalette.dot)} />
-                  {tradeStatusLabel(t.tradeStatus, values.purpose, t.common.unknownCode)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">{t.tradePricing.currencyCode}</span>
-                <IdentifierText className="text-xs font-semibold text-foreground">
-                  {values.currencyCode.trim().toUpperCase() || "SAR"}
-                </IdentifierText>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={cn(
-              "flex items-start gap-2.5 rounded-lg border p-3 text-xs",
-              SWATCH_SURFACE_PALETTES.amber.sectionCard,
-            )}
-          >
-            <Lock
-              className={cn("mt-0.5 size-4 shrink-0", SWATCH_SURFACE_PALETTES.amber.iconText)}
-              aria-hidden="true"
-            />
-            <span className="text-foreground">{t.tradePricing.immutableWarning}</span>
-          </div>
-        </div>
+      submitIcon={<Plus className="size-3.5" aria-hidden="true" />}
+      footerLeading={
+        <span className="truncate text-caption text-muted-foreground">
+          {values.seedMode === "CATALOG"
+            ? t.tradePricing.seedModeCatalogDesc
+            : values.seedMode === "CLONE"
+              ? t.tradePricing.seedModeCloneDesc
+              : t.tradePricing.seedModeEmptyDesc}
+        </span>
       }
       labels={{
-        submit: t.common.save,
+        submit: t.tradePricing.bookCreate,
         cancel: t.common.cancel,
         discardTitle: t.common.discardTitle,
         discardDescription: t.common.discardDescription,
@@ -147,85 +80,10 @@ export function CreatePriceBookModal({
       }}
     >
       <div className="flex flex-col gap-4">
-        <Field
-          label={t.tradePricing.bookCode}
-          hint={t.tradePricing.guideBookCode}
-          showLabel
-          hintPlacement="tooltip"
-          required
-        >
-          <Input
-            size="sm"
-            dir="ltr"
-            className="font-mono"
-            placeholder="PB-KSA-WHOLESALE-2026"
-            value={values.code}
-            maxLength={PRICE_BOOK_CODE_MAX_LENGTH}
-            disabled={isSubmitting}
-            onChange={(event) => setValues((current) => ({ ...current, code: event.target.value }))}
-          />
-        </Field>
-
-        <div className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-foreground">
-            {t.tradePricing.bookPurpose}
-          </span>
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {PRICE_BOOK_PURPOSES.map((purposeValue) => {
-              const meta = PURPOSE_META[purposeValue];
-              const palette = SWATCH_SURFACE_PALETTES[meta.hue];
-              const Icon = meta.Icon;
-              const isSelected = values.purpose === purposeValue;
-              return (
-                <Button
-                  key={purposeValue}
-                  type="button"
-                  variant="ghost"
-                  disabled={isSubmitting}
-                  onClick={() =>
-                    setValues((current) => ({
-                      ...current,
-                      purpose: purposeValue,
-                    }))
-                  }
-                  className={cn(
-                    "h-auto flex-col items-start justify-start gap-2 rounded-lg border p-3.5 text-start whitespace-normal",
-                    isSelected ? palette.tileActive : palette.tileIdle,
-                  )}
-                >
-                  <div className="flex w-full items-center justify-between gap-2">
-                    <span
-                      className={cn(
-                        "flex size-8 items-center justify-center rounded-lg border",
-                        isSelected ? palette.iconBoxActive : palette.iconBoxIdle,
-                      )}
-                    >
-                      <Icon className="size-4" aria-hidden="true" />
-                    </span>
-                    <IdentifierText className="text-xs font-semibold">
-                      {purposeValue}
-                    </IdentifierText>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-semibold text-foreground">
-                      {tradeStatusLabel(t.tradeStatus, purposeValue, t.common.unknownCode)}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {purposeValue === "SALES"
-                        ? t.tradePricing.purposeSalesDesc
-                        : t.tradePricing.purposePurchaseDesc}
-                    </span>
-                  </div>
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field
-            label={t.tradePricing.currencyCode}
-            hint={t.tradePricing.guideCurrencyCode}
+            label={t.tradePricing.bookCode}
+            hint={t.tradePricing.guideBookCode}
             showLabel
             hintPlacement="tooltip"
             required
@@ -233,45 +91,111 @@ export function CreatePriceBookModal({
             <Input
               size="sm"
               dir="ltr"
-              className="font-mono uppercase"
-              placeholder="SAR"
-              value={values.currencyCode}
-              maxLength={3}
+              className="font-mono font-semibold"
+              placeholder={t.tradePricing.bookCode}
+              value={values.code}
+              maxLength={PRICE_BOOK_CODE_MAX_LENGTH}
               disabled={isSubmitting}
               onChange={(event) =>
-                setValues((current) => ({
-                  ...current,
-                  currencyCode: event.target.value.toUpperCase(),
-                }))
+                setValues((current) => ({ ...current, code: event.target.value }))
               }
             />
           </Field>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">
-              {t.tradePricing.currencyPresetsLabel}:
-            </span>
-            {COMMON_CURRENCY_PRESETS.map((preset) => {
-              const active = values.currencyCode.trim().toUpperCase() === preset;
-              return (
-                <Button
-                  key={preset}
-                  type="button"
-                  size="xs"
-                  variant={active ? "primary" : "outline"}
-                  disabled={isSubmitting}
-                  onClick={() =>
-                    setValues((current) => ({
-                      ...current,
-                      currencyCode: preset,
-                    }))
-                  }
-                >
-                  <IdentifierText className="text-xs">{preset}</IdentifierText>
-                </Button>
-              );
-            })}
-          </div>
+
+          <Field label={t.tradePricing.bookNameAr} showLabel required>
+            <Input
+              size="sm"
+              placeholder={t.tradePricing.bookNameAr}
+              value={values.nameAr ?? ""}
+              maxLength={160}
+              disabled={isSubmitting}
+              onChange={(event) =>
+                setValues((current) => ({ ...current, nameAr: event.target.value }))
+              }
+            />
+          </Field>
+
+          <Field label={t.tradePricing.bookNameEn} showLabel>
+            <Input
+              size="sm"
+              dir="ltr"
+              placeholder={t.tradePricing.bookNameEn}
+              value={values.nameEn ?? ""}
+              maxLength={160}
+              disabled={isSubmitting}
+              onChange={(event) =>
+                setValues((current) => ({ ...current, nameEn: event.target.value }))
+              }
+            />
+          </Field>
         </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-foreground">
+              {`${t.tradePricing.bookPurpose} *`}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {PRICE_BOOK_PURPOSES.map((purposeValue) => {
+                const isSelected = values.purpose === purposeValue;
+                return (
+                  <Button
+                    key={purposeValue}
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={isSubmitting}
+                    onClick={() =>
+                      setValues((current) => ({
+                        ...current,
+                        purpose: purposeValue,
+                        sourceBookId: "",
+                        sourceVersionId: "",
+                      }))
+                    }
+                    className={cn(
+                      "justify-between rounded-lg border px-3 font-semibold",
+                      isSelected
+                        ? "border-primary bg-kpi-new-surface text-kpi-new-text"
+                        : "border-line-card bg-card text-foreground-secondary",
+                    )}
+                  >
+                    <span>
+                      {tradeStatusLabel(t.tradeStatus, purposeValue, t.common.unknownCode)}
+                    </span>
+                    {isSelected ? <Check className="size-3.5" aria-hidden="true" /> : null}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+
+          <PriceBookCurrencyField form={form} disabled={isSubmitting} />
+        </div>
+
+        <PriceBookSeedFields values={values} setValues={setValues}
+          compatibleSourceBooks={form.compatibleSourceBooks}
+          selectedSourceBook={form.selectedSourceBook} isSubmitting={isSubmitting} />
+
+        {canManageDefaults ? (
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-line-card bg-card px-3 py-2.5 text-xs font-semibold text-foreground">
+            <Checkbox
+              checked={Boolean(values.setAsCompanyDefault)}
+              disabled={isSubmitting}
+              onCheckedChange={(checked) =>
+                setValues((curr) => ({
+                  ...curr,
+                  setAsCompanyDefault: checked === true,
+                }))
+              }
+            />
+            <Star
+              className="size-4 shrink-0 fill-star-filled text-star-filled"
+              aria-hidden="true"
+            />
+            <span>{t.tradePricing.setDefaultAfterCreate}</span>
+          </label>
+        ) : null}
       </div>
     </FormModal>
   );

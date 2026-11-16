@@ -7,7 +7,6 @@ import {
   isCurrencyCode,
   isTradeDate,
   isTradeDecimal,
-  isTradeStatus,
   nullableString,
   parseTradeFinalizedDocument,
   record,
@@ -15,7 +14,7 @@ import {
   type TradeFinalizedDocument,
 } from "../documents/trade-document-contract";
 
-// Purchase quotations — 8 routes, feature gate `trade.purchasing`. All eight
+// Purchase quotations — 9 routes, feature gate `trade.purchasing`. All nine
 // target `BRANCH` **and** are Gateway `BRANCH_REQUIRED`, so the header shape is
 // validated twice.
 //
@@ -27,27 +26,14 @@ import {
 
 export const PURCHASE_QUOTATIONS_PATH = `${TRADE_V1}/purchase-quotations`;
 
-/**
- * Supplier accounts, used as the supplier picker.
- *
- * There is **no supplier name source in Trade**. `GET /commercial-accounts`
- * returns `TradeCommercialAccountEntity` rows, whose only identity column is
- * `party_id`; `GET /commercial-accounts/lookups` returns payment terms and
- * credit policies, not accounts. Quotations have `customer-options` with a
- * `displayName`; purchasing has no equivalent. Recorded as Q83.
- */
-const COMMERCIAL_ACCOUNTS_PATH = `${TRADE_V1}/commercial-accounts`;
-
 export const PURCHASE_QUOTATION_PERMISSIONS = {
   read: "trade.purchase_quotations.read",
   create: "trade.purchase_quotations.create",
   update: "trade.purchase_quotations.update",
   issue: "trade.purchase_quotations.issue",
-  /** The supplier picker's own grant, which the document grants do not imply. */
-  accounts: "trade.commercial_accounts.read",
 } as const;
 
-export interface PurchaseQuotation extends TradeFinalizedDocument {
+export interface PurchaseQuotation extends TradeFinalizedDocument<string | null> {
   validUntil: string | null;
 }
 
@@ -67,9 +53,8 @@ export interface PurchaseQuotationDetail extends PurchaseQuotation {
 }
 
 export interface SupplierAccountOption {
-  id: string;
   partyId: string;
-  status: string;
+  displayName: string;
 }
 
 export interface CreatePurchaseQuotationRequest {
@@ -85,18 +70,16 @@ export type UpdatePurchaseQuotationRequest = Omit<CreatePurchaseQuotationRequest
   lines?: CreatePurchaseQuotationRequest["lines"];
 };
 
-export function supplierAccountsPath(): TradePath {
+export function supplierAccountsPath(search = ""): TradePath {
   const query = new URLSearchParams({
-    page: "1",
-    limit: "100",
-    accountRole: "SUPPLIER",
-    status: "ACTIVE",
+    limit: "50",
   });
-  return `${COMMERCIAL_ACCOUNTS_PATH}?${query.toString()}` as TradePath;
+  if (search.trim()) query.set("search", search.trim());
+  return `${PURCHASE_QUOTATIONS_PATH}/supplier-options?${query.toString()}` as TradePath;
 }
 
 export function parsePurchaseQuotation(payload: unknown): PurchaseQuotation {
-  const document = parseTradeFinalizedDocument(payload);
+  const document = parseTradeFinalizedDocument(payload, { allowUnnumberedDraft: true });
   const row = record(payload);
   if (!row) tradeInvalidResponse();
   return {
@@ -122,10 +105,11 @@ export function parseSupplierAccounts(payload: unknown): SupplierAccountOption[]
   if (!page || !Array.isArray(page.items)) tradeInvalidResponse();
   return page.items.map((item) => {
     const account = record(item);
-    if (!account || !isUUIDv7(account.id) || !isUUIDv7(account.partyId) || !isTradeStatus(account.status)) {
+    if (!account || !isUUIDv7(account.partyId) ||
+        typeof account.displayName !== "string" || !account.displayName.trim()) {
       tradeInvalidResponse();
     }
-    return { id: account.id, partyId: account.partyId, status: account.status };
+    return { partyId: account.partyId, displayName: account.displayName };
   });
 }
 
@@ -215,8 +199,4 @@ export function buildUpdatePurchaseQuotation(
 
 export function isPurchaseQuotationDraft(quotation: PurchaseQuotation): boolean {
   return quotation.lifecycleStatus === "DRAFT";
-}
-
-export function supplierOptionLabel(option: SupplierAccountOption): string {
-  return option.partyId;
 }

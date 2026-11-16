@@ -32,6 +32,37 @@ export type BrandingOutcome =
   /** Derivable, but it breaks a token pair. The system brand stays. */
   | { kind: "rejectedContrast"; failures: BrandContrastPairId[] };
 
+const DEFAULT_ICON_HREF = "/favicon.ico";
+
+interface DefaultIconState {
+  link: HTMLLinkElement;
+  href: string;
+  type: string | null;
+}
+
+// Live branding saves can clear a previously applied icon or tab title without
+// reloading the document, so the first override captures what the server or
+// `RouteTitle` rendered before branding touched it.
+let defaultIcon: DefaultIconState | null = null;
+let defaultTitle: string | null = null;
+let appliedTabTitle: string | null = null;
+
+function applyBrandingTitle(tabTitle: string | null): void {
+  if (tabTitle) {
+    if (defaultTitle === null || document.title !== appliedTabTitle) {
+      defaultTitle = document.title;
+    }
+    document.title = tabTitle;
+    appliedTabTitle = document.title;
+    return;
+  }
+  if (defaultTitle !== null && document.title === appliedTabTitle) {
+    document.title = defaultTitle;
+  }
+  defaultTitle = null;
+  appliedTabTitle = null;
+}
+
 /**
  * Points the tab icon at the tenant's own, when they have uploaded one.
  *
@@ -51,10 +82,30 @@ export type BrandingOutcome =
 function applyBrandingIcon(iconUrl: string): void {
   const existing = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
   const link = existing ?? document.createElement("link");
+  if (!defaultIcon || defaultIcon.link !== link) {
+    defaultIcon = {
+      link,
+      href: existing?.getAttribute("href") || DEFAULT_ICON_HREF,
+      type: existing?.getAttribute("type") || null,
+    };
+  }
   link.rel = "icon";
   link.href = iconUrl;
   link.removeAttribute("type");
   if (!existing) document.head.appendChild(link);
+}
+
+function restoreBrandingIcon(): void {
+  const existing = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
+  if (defaultIcon && existing === defaultIcon.link) {
+    existing.href = defaultIcon.href;
+    if (defaultIcon.type) {
+      existing.setAttribute("type", defaultIcon.type);
+    } else {
+      existing.removeAttribute("type");
+    }
+  }
+  defaultIcon = null;
 }
 
 /**
@@ -72,8 +123,12 @@ function applyBrandingIcon(iconUrl: string): void {
  * `systemDefault` first would have silently skipped both.
  */
 export function applyBrandingTokens(branding: PublicBranding): BrandingOutcome {
-  if (branding.tabTitle) document.title = branding.tabTitle;
-  if (branding.iconUrl) applyBrandingIcon(branding.iconUrl);
+  applyBrandingTitle(branding.tabTitle);
+  if (branding.iconUrl) {
+    applyBrandingIcon(branding.iconUrl);
+  } else {
+    restoreBrandingIcon();
+  }
   // A live update can reset or reject a previously applied tenant colour.
   for (const step of BRAND_RAMP_STEPS) {
     document.documentElement.style.removeProperty(`--color-brand-${step}`);

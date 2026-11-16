@@ -1,26 +1,26 @@
 {
   "metadata": {
-    "generatedAt": "2026-10-17T18:32:01.827Z",
+    "generatedAt": "2026-10-27T23:05:25.244Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "0f84e3fbe923+dirty",
-    "backendRevision": "a51c1d6ccf36+dirty",
+    "frontendRevision": "9aae7b9a8778+dirty",
+    "backendRevision": "a70802f0a3b0+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 289,
+    "total": 298,
     "byMethod": {
-      "GET": 118,
-      "POST": 121,
+      "GET": 120,
+      "POST": 128,
       "DELETE": 16,
       "PATCH": 31,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 104,
-      "WRITE_SENSITIVE": 156,
-      "PUBLIC": 6,
+      "AUTHENTICATED": 106,
+      "WRITE_SENSITIVE": 161,
+      "PUBLIC": 8,
       "READ_HEAVY": 23
     },
     "byDomain": {
@@ -28,25 +28,26 @@
       "catalog": 17,
       "audit": 3,
       "auth-invalidation-outbox": 1,
-      "auth": 12,
+      "auth": 17,
       "dashboard": 1,
       "database-servers": 20,
+      "email-suppressions": 2,
       "invoices": 7,
       "logging": 6,
-      "notifications": 12,
+      "notifications": 9,
       "payments": 5,
       "permissions": 1,
       "provisioning": 35,
       "reports": 5,
-      "roles": 6,
+      "roles": 8,
       "storage-migrations": 3,
       "storage-servers": 13,
       "subscriptions": 12,
       "system-settings": 11,
       "tenant-fqdns": 1,
-      "tenants": 60,
+      "tenants": 62,
       "wallets": 6,
-      "users": 10
+      "users": 11
     }
   },
   "sourceHashes": {
@@ -54,13 +55,14 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon-assignment-write.route-contracts.ts": "46cc8a97ea8569748b0aa8651c096cefd593de337b5ef568bddae441ef98b9df",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon-configuration.route-contracts.ts": "095e6866b603ca31eca0ab916e78527d186e2aadeaad0fe7abe6b75880647f39",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon.route-contracts.ts": "a6c59d6f64da6c5aa4cca672a2e73eae8b736716fef1666fc0107dc144b4dc79",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-adoption-discovery.route-contracts.ts": "1a1f3b09d2088eca7046fa66ad6383be83a6501ea52ae21e4ff98270aeec5c26",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-command.route-contracts.ts": "5cd09f208fe88bcecc34645e5d06ef8a9fb051441afb6a8adc4dbb3551ae2474",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-email-suppression.route-contracts.ts": "1ee6342392f4343bb00f7e9380727ef7eebfde72d23ee488b3b3eb004d1552f7",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-adoption-discovery.route-contracts.ts": "9f6c7857d95e743fe8ef249fe15d8069f9f32964032ab512cea52b241ea2f7dd",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-command.route-contracts.ts": "893fc4e6142167817a40d257421d3050749ce05cf9788e80243d8508b1dc726c",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "508a64802b334d008de954e4a0ea1e0e04ef3fbde60c6402afe6fc12c26c32f3",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "7a84e929fae1891af3ab8141e6a6ca7faf6576c806494cdc2c5c6a4954983589",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-worker-evidence-authority.route-contracts.ts": "84a6d1d52d0699b6d40ba12d2521e0ee39c0dd55b106c1b80c1f317e2cef112e",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "395127b6c684f442cf06a276c0bc2cd28c6d11ffdde8b2f9a3afa33f93073b90",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "a9de0aba16a0f6834f2be0ceec3c26b36ff00af37c2549a8c87fda6232d92ef2",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "b65623a36307f29342d7eb2fb393653c04c9ee5889beb9756f05e940d7887d39"
   },
   "routes": [
     {
@@ -1060,6 +1062,81 @@
     },
     {
       "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/auth/mfa/resend",
+      "upstreamPath": "/api/v1/admin/auth/mfa/resend",
+      "routeKey": "core.admin.auth.mfa.resend",
+      "routeClass": "PUBLIC",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/auth/mfa/settings/challenge",
+      "upstreamPath": "/api/v1/admin/auth/mfa/settings/challenge",
+      "routeKey": "core.admin.auth.mfa.settings.challenge",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/auth/mfa/settings/confirm",
+      "upstreamPath": "/api/v1/admin/auth/mfa/settings/confirm",
+      "routeKey": "core.admin.auth.mfa.settings.confirm",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/auth/mfa/settings/resend",
+      "upstreamPath": "/api/v1/admin/auth/mfa/settings/resend",
+      "routeKey": "core.admin.auth.mfa.settings.resend",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/auth/mfa/verify",
+      "upstreamPath": "/api/v1/admin/auth/mfa/verify",
+      "routeKey": "core.admin.auth.mfa.verify",
+      "routeClass": "PUBLIC",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/auth/presence",
       "upstreamPath": "/api/v1/admin/auth/presence",
       "routeKey": "core.admin.auth.presence",
@@ -1574,6 +1651,42 @@
       "domainIdempotencyOperation": null
     },
     {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/email-suppressions/lift",
+      "upstreamPath": "/api/v1/admin/email-suppressions/lift",
+      "routeKey": "core.admin.email-suppressions.lift",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.settings.update",
+        "admin.settings.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.ADMIN.EMAIL_SUPPRESSION.LIFT"
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/email-suppressions/lookup",
+      "upstreamPath": "/api/v1/admin/email-suppressions/lookup",
+      "routeKey": "core.admin.email-suppressions.lookup",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.settings.update",
+        "admin.settings.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
       "method": "DELETE",
       "canonicalPath": "/api/admin/core/v1/features/:id",
       "upstreamPath": "/api/v1/admin/features/:id",
@@ -1872,43 +1985,9 @@
     },
     {
       "method": "POST",
-      "canonicalPath": "/api/admin/core/v1/notifications/:id/ack",
-      "upstreamPath": "/api/v1/admin/notifications/:id/ack",
-      "routeKey": "core.admin.notifications.by.id.ack.post",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "idempotencyMode": "NONE",
-      "requiredPermissions": [
-        "admin.notifications.manage"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/notifications/:id/acknowledge",
       "upstreamPath": "/api/v1/admin/notifications/:id/acknowledge",
       "routeKey": "core.admin.notifications.by.id.acknowledge.post",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "idempotencyMode": "NONE",
-      "requiredPermissions": [
-        "admin.notifications.manage"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "POST",
-      "canonicalPath": "/api/admin/core/v1/notifications/:id/dismiss",
-      "upstreamPath": "/api/v1/admin/notifications/:id/dismiss",
-      "routeKey": "core.admin.notifications.by.id.dismiss.post",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": false,
       "idempotencyMode": "NONE",
@@ -1953,23 +2032,6 @@
       "bodyLimitClass": null,
       "timeoutClass": null,
       "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "POST",
-      "canonicalPath": "/api/admin/core/v1/notifications/mark-all-read",
-      "upstreamPath": "/api/v1/admin/notifications/mark-all-read",
-      "routeKey": "core.admin.notifications.mark-all-read.post",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "idempotencyMode": "NONE",
-      "requiredPermissions": [
-        "admin.notifications.manage"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -2917,6 +2979,42 @@
       "requiredPermissions": [
         "admin.roles.update",
         "admin.roles.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": null,
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/roles/assignable-for-assignment",
+      "upstreamPath": "/api/v1/admin/roles/assignable-for-assignment",
+      "routeKey": "core.admin.roles.assignable-for-assignment",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": null,
+      "requiredPermissions": [
+        "admin.users.assign_roles",
+        "admin.users.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": null,
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/roles/assignable-for-invite",
+      "upstreamPath": "/api/v1/admin/roles/assignable-for-invite",
+      "routeKey": "core.admin.roles.assignable-for-invite",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": null,
+      "requiredPermissions": [
+        "admin.users.invite",
+        "admin.users.critical"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
@@ -4350,6 +4448,25 @@
     },
     {
       "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/tenants/:tenantId/provisioning/operations/close-failed",
+      "upstreamPath": "/api/v1/admin/tenants/:tenantId/provisioning/operations/close-failed",
+      "routeKey": "core.admin.tenants.provisioning.operations.close-failed",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.tenants.reprovision",
+        "admin.tenants.critical",
+        "admin.provisioning.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.CLOSE_FAILED"
+    },
+    {
+      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission",
       "upstreamPath": "/api/v1/admin/tenants/:tenantId/provisioning/operations/decommission",
       "routeKey": "core.admin.tenants.provisioning.operations.decommission",
@@ -4400,6 +4517,24 @@
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
       "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-releases/resend",
+      "upstreamPath": "/api/v1/admin/tenants/:tenantId/provisioning/prerequisite-releases/resend",
+      "routeKey": "core.admin.tenants.provisioning.prerequisite-releases.resend",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.provisioning.prerequisites.request",
+        "admin.provisioning.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.RESEND_RELEASE"
     },
     {
       "method": "POST",
@@ -4976,6 +5111,24 @@
       "bodyLimitClass": null,
       "timeoutClass": null,
       "transportRetryMode": null,
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/users/:id/resend-invite",
+      "upstreamPath": "/api/v1/admin/users/:id/resend-invite",
+      "routeKey": "core.admin.users.resend-invite",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": null,
+      "requiredPermissions": [
+        "admin.users.invite",
+        "admin.users.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {

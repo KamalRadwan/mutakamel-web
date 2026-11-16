@@ -1,109 +1,45 @@
 "use client";
 
-import { Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Search, Tags } from "lucide-react";
 import {
   Button,
+  Card,
   DataTable,
   DateTime,
-  FilterBar,
-  NAV_SECTIONS,
+  DegradedBanner,
+  EmptyState,
+  Input,
+  PageActions,
   PageHeader,
   PermissionGate,
-  SubNav,
-  TagChip,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
   cn,
-  findTagColorPreset,
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
-import { crmTagColor, type CrmTagCatalogueItem } from "../shared/tag-contract";
+import type { CrmTagCatalogueItem } from "../shared/tag-contract";
+import { CrmTagNameCell, CrmTagColourCell, CrmTagActionsCell } from "./components/CrmTagTableCells";
 import { CrmTagFormModal } from "./components/CrmTagFormModal";
 import { DeleteCrmTagConfirmModal } from "./components/DeleteCrmTagConfirmModal";
 import { useCrmTags } from "./hooks/useCrmTags";
-
-const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
 export default function CrmTagsPage() {
   const { t, lang } = useI18n();
   const tags = useCrmTags();
 
-  // The colour column names the pair in words — a preset by its name, a
-  // custom pair by its two hex values — so the chip's hue is never the only
-  // thing saying which colour a tag has.
-  function colourCell(item: CrmTagCatalogueItem) {
-    const color = crmTagColor(item);
-    if (color === null) return <span className="text-muted-foreground">{t.tagColors.none}</span>;
-    const preset = findTagColorPreset(color);
-    if (preset) return t.tagColors.names[preset.key];
-    return (
-      <span className="flex flex-wrap items-center gap-x-1.5">
-        {t.crmTags.customColour}
-        <bdi dir="ltr" className="font-mono text-xs text-muted-foreground">
-          {color.backgroundColor} / {color.textColor}
-        </bdi>
-      </span>
-    );
-  }
-
   const columns: ColumnDef<CrmTagCatalogueItem>[] = [
-    {
-      id: "tag",
-      header: t.crmTags.tag,
-      cell: (item) => (
-        <TagChip label={item.name} backgroundColor={item.backgroundColor} textColor={item.textColor} />
-      ),
-    },
-    { id: "colour", header: t.crmTags.colour, cell: colourCell },
-    {
-      id: "updated",
-      header: t.crmTags.updated,
-      cell: (item) => <DateTime value={item.updatedAt} language={lang} />,
-    },
-    ...(tags.canManage
-      ? [
-          {
-            id: "actions",
-            header: t.common.actions,
-            align: "end" as const,
-            sticky: "end" as const,
-            cell: (item: CrmTagCatalogueItem) => (
-              <div className="flex items-center justify-end gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => tags.openEdit(item)}
-                      aria-label={`${t.crmTags.edit}: ${item.name}`}
-                    >
-                      <Pencil className="size-4" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t.crmTags.edit}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => tags.selectForDelete(item)}
-                      disabled={tags.isDeleting}
-                      aria-label={`${t.common.delete}: ${item.name}`}
-                    >
-                      <Trash2 className="size-4 text-destructive" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t.common.delete}</TooltipContent>
-                </Tooltip>
-              </div>
-            ),
-          },
-        ]
-      : []),
+    { id: "tag", header: t.crmTags.tag, width: "40%", cell: (item) => <CrmTagNameCell item={item} /> },
+    { id: "colour", header: t.crmTags.colour, width: "25%", cell: (item) => <CrmTagColourCell item={item} /> },
+    { id: "updated", header: t.crmTags.updated, width: "20%", cell: (item) => (
+      <span className="whitespace-nowrap text-xs text-muted-foreground">
+        <DateTime value={item.updatedAt} precision="date" language={lang} />
+      </span>
+    ) },
+    ...(tags.canManage ? [{
+      id: "actions", header: t.common.actions, align: "end" as const, sticky: "end" as const,
+      cell: (item: CrmTagCatalogueItem) => <CrmTagActionsCell item={item} disabled={tags.writesBlocked}
+        onEdit={tags.openEdit} onDelete={tags.selectForDelete} />,
+    }] : []),
   ];
 
   // Permission string and scoping mirror CRM_ENTRY_ROUTES in
@@ -111,63 +47,103 @@ export default function CrmTagsPage() {
   return (
     <PermissionGate require="crm.tags.read" denied={tags.queryError?.status === 403}>
       <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
+        <PageHeader
           title={t.nav.crmTags}
-          description={t.crmTags.subtitle}
-          primaryAction={tags.canManage ? { label: t.crmTags.add, onClick: tags.openCreate } : undefined}
+          primaryAction={tags.canManage ? {
+            label: t.crmTags.add, icon: <Plus className="size-4" aria-hidden="true" />,
+            onClick: tags.openCreate, disabled: tags.writesBlocked || tags.atCapacity,
+          } : undefined}
           secondaryActions={
-            <Button size="sm" variant="outline" onClick={tags.reload} disabled={tags.isLoading}>
+            <Button size="sm" variant="outline" onClick={tags.reload} disabled={tags.isLoading || tags.isDeleting}>
               <RefreshCw className={cn("size-4", tags.isLoading && "animate-spin")} aria-hidden="true" />
               {t.crmTags.reload}
             </Button>
           }
         />
 
-        <SubNav items={CRM_SETUP_ITEMS} />
+        <PageActions slot="search">
+          <div className="relative w-full min-w-0 sm:w-64">
+            <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input size="sm" type="search" className="ps-9" value={tags.searchQuery}
+              placeholder={t.crmTags.search} aria-label={t.crmTags.search}
+              onChange={(event) => tags.setSearchQuery(event.target.value)} />
+          </div>
+        </PageActions>
 
-        <FilterBar
-          filters={[]}
-          values={{}}
-          onChange={() => undefined}
-          onReset={() => undefined}
-          searchValue={tags.searchQuery}
-          onSearchChange={tags.setSearchQuery}
-          searchPlaceholder={t.crmTags.search}
-        />
+        {!tags.canManage && tags.hasLoaded && <DegradedBanner message={t.crmTags.readOnly} />}
+        {tags.atCapacity && tags.canManage && <DegradedBanner message={t.crmTags.errors.limitExceeded} />}
 
         {tags.notice && (
-          <p role="alert" className="rounded-sm bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">
-            {tags.notice}
-          </p>
+          <div className="flex flex-col items-start gap-2" role="status">
+            <DegradedBanner message={tags.notice} />
+            {tags.needsReload && <Button size="sm" variant="outline" onClick={tags.reload} disabled={tags.isLoading}>
+              <RefreshCw className="size-4" aria-hidden="true" />{t.crmTags.reload}
+            </Button>}
+          </div>
         )}
 
-        {/* No pagination: GET /tags returns the whole catalogue (at most 500)
-            and declares no page/limit query — docs/design/states.md#pagination-is-real-or-absent. */}
-        <DataTable
-          columns={columns}
-          rows={tags.items}
-          isLoading={tags.isLoading && !tags.hasLoaded}
-          error={tags.queryError}
-          onRetry={tags.reload}
-          rowKey={(item) => item.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: t.crmTags.loadFailed,
-            emptyTitle: t.crmTags.empty,
-            selectAll: t.common.actions,
-            selectRow: t.common.actions,
-            sortAscending: t.common.actions,
-            sortDescending: t.common.actions,
-            notSorted: t.common.actions,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
+        <section aria-labelledby="tag-library-heading" aria-busy={tags.isLoading} className="min-w-0">
+          <Card className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <Tags className="mt-0.5 size-6 shrink-0 text-primary" aria-hidden="true" />
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <h2 id="tag-library-heading" className="text-lg font-semibold text-foreground">{t.nav.crmTags}</h2>
+                    {tags.catalogueCount !== undefined && <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-count-active-surface px-1.5 text-xs text-count-active-fg">
+                      {tags.catalogueCount}
+                    </span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t.crmTags.subtitle}</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">{t.crmTags.editAppliesEverywhere}</p>
+            </div>
 
-        {tags.formTarget && (
+            {/* No pagination: GET /tags returns the whole catalogue (at most 500)
+                and declares no page/limit query — docs/design/states.md#pagination-is-real-or-absent. */}
+            <DataTable
+              surface="embedded"
+              columns={columns}
+              rows={tags.items}
+              rowKey={(item) => item.id}
+              showRowNumbers={false}
+              density="default"
+              className="mx-3 [&_table]:min-w-xl [&_table]:text-sm [&_tbody_tr]:h-11 [&_td]:py-2 [&_thead_th]:h-9 [&_thead_th]:bg-muted"
+              isLoading={tags.isLoading && !tags.hasLoaded}
+              error={tags.queryError}
+              onRetry={tags.reload}
+              emptyState={<EmptyState
+                icon={Tags}
+                title={tags.isFiltered ? t.crmTags.empty : t.crmTags.emptyCatalogue}
+                description={tags.isFiltered ? t.crmTags.noMatchesHint : t.crmTags.emptyHint}
+                action={tags.isFiltered ? { label: t.crmTags.clearSearch, onClick: () => tags.setSearchQuery("") }
+                  : tags.canManage && !tags.writesBlocked ? { label: t.crmTags.add, onClick: tags.openCreate } : undefined}
+              />}
+              labels={{
+                retry: t.common.retry,
+                errorTitle: t.crmTags.loadFailed,
+                emptyTitle: t.crmTags.empty,
+                selectAll: t.views.selectAll,
+                selectRow: t.views.selectRow,
+                sortAscending: t.views.sortAscending,
+                sortDescending: t.views.sortDescending,
+                notSorted: t.views.notSorted,
+                pagination: {
+                  previous: t.common.previousPage,
+                  next: t.common.nextPage,
+                  summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
+                },
+              }}
+            />
+            {tags.catalogueCountLabel && <p role="status" aria-live="polite" aria-atomic="true"
+              className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+              {tags.catalogueCountLabel}
+            </p>}
+          </Card>
+        </section>
+
+        {tags.canManage && tags.formTarget && (
           <CrmTagFormModal
             key={tags.formTarget.mode === "edit" ? `edit-${tags.formTarget.tag.id}` : "create"}
             target={tags.formTarget}
@@ -175,13 +151,16 @@ export default function CrmTagsPage() {
             onClose={tags.closeForm}
             onSaved={tags.handleSaved}
             onReloadNeeded={tags.handleFormReload}
+            canWrite={!tags.writesBlocked}
           />
         )}
 
         <DeleteCrmTagConfirmModal
-          tag={tags.deleteTarget}
+          tag={tags.canManage ? tags.deleteTarget : null}
           error={tags.deleteError}
           isSubmitting={tags.isDeleting}
+          blocked={tags.deleteBlocked}
+          leadCount={tags.deleteLeadCount}
           onClose={tags.closeDelete}
           onConfirm={() => void tags.handleDelete()}
         />

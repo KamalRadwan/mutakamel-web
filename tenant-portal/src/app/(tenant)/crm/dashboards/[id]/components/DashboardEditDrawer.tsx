@@ -1,6 +1,7 @@
 "use client";
+import { DashboardRecoveryNotice, type DashboardRecoveryProps } from "../../components/DashboardRecoveryNotice";
 
-import { useState } from "react";
+import { useDashboardEditForm } from "../hooks/useDashboardEditForm";
 import { Field, FormDrawer, Input, Textarea } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
@@ -15,6 +16,8 @@ interface DashboardEditDrawerProps {
   initialDescription: string;
   isSubmitting: boolean;
   error?: string;
+  blocked?: boolean;
+  recovery?: DashboardRecoveryProps;
   onSubmit: (name: string, description: string) => void;
 }
 
@@ -36,10 +39,13 @@ export function DashboardEditDrawer({
   isSubmitting,
   error,
   onSubmit,
+  blocked = false,
+  recovery,
 }: DashboardEditDrawerProps) {
   const { t } = useI18n();
-  const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState(initialDescription);
+  const form = useDashboardEditForm(initialName, initialDescription, blocked, onSubmit);
+  const { name, description, setName, setDescription } = form;
+
 
   return (
     <FormDrawer
@@ -47,12 +53,10 @@ export function DashboardEditDrawer({
       onOpenChange={onOpenChange}
       title={t.crmDashboards.editTitle}
       description={t.crmDashboards.editDescription}
-      isDirty={name !== initialName || description !== initialDescription}
+      isDirty={form.dirty}
       isSubmitting={isSubmitting}
-      submitDisabled={name.trim().length === 0}
-      onSubmit={() => {
-        if (name.trim().length > 0) onSubmit(name, description);
-      }}
+      submitDisabled={form.disabled}
+      onSubmit={form.submit}
       error={error}
       labels={{
         submit: t.common.save,
@@ -63,17 +67,20 @@ export function DashboardEditDrawer({
         discardCancel: t.common.cancel,
       }}
     >
-      <Field label={t.crmDashboards.name} required>
+    {recovery && <DashboardRecoveryNotice {...recovery} />}
+      <Field showLabel label={t.crmDashboards.name} required>
         <Input size="sm" placeholder={t.crmDashboards.name}
           value={name}
+          disabled={isSubmitting}
           maxLength={DASHBOARD_NAME_MAX_LENGTH}
           autoComplete="off"
           onChange={(event) => setName(event.target.value)}
         />
       </Field>
-      <Field label={t.crmDashboards.description}>
+      <Field showLabel label={t.crmDashboards.description}>
         <Textarea placeholder={t.crmDashboards.description}
           value={description}
+          disabled={isSubmitting}
           maxLength={DASHBOARD_DESCRIPTION_MAX_LENGTH}
           onChange={(event) => setDescription(event.target.value)}
         />
@@ -82,3 +89,7 @@ export function DashboardEditDrawer({
     </FormDrawer>
   );
 }
+
+
+
+

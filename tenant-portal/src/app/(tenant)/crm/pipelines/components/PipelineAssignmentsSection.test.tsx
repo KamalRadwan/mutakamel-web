@@ -13,12 +13,12 @@ function makeState(): Parameters<typeof PipelineAssignmentsSection>[0]["state"] 
   return {
     assignments: { accessMode: "ALL", userIds: [], teamIds: [] },
     accessMode: "ALL", setAccessMode: vi.fn(), userIds: [], setUserIds: vi.fn(),
-    teamIds: [], setTeamIds: vi.fn(), users: [], teams: [], optionsQuery: "",
+    teamIds: [], setTeamIds: vi.fn(), users: [], teams: [], knownUsers: [], knownTeams: [], optionsQuery: "",
     searchOptions: vi.fn(), isLoading: false, isLoadingOptions: false,
-    isSaving: false, loadError: null, optionsError: null,
+    isSaving: false, needsReconciliation: false, writeBlocked: false, loadError: null, optionsError: null,
     userDiff: diff, teamDiff: diff, isDirty: false,
     save: vi.fn(async () => ({ ok: true, replayed: false, error: null })),
-    revert: vi.fn(), reload: vi.fn(async () => {}),
+    revert: vi.fn(), reload: vi.fn(async () => true), reconcile: vi.fn(async () => true), reloadOptions: vi.fn(async () => {}),
   };
 }
 

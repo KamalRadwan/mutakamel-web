@@ -10,9 +10,10 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { useLanguage } from "@/i18n/useLanguage";
 import { formatNumber } from "@/lib/format/number";
-import type {
-  ScopeRoleAssignment,
-  ScopeRoleAssignmentInput,
+import {
+  scopeRoleAssignmentKey,
+  type ScopeRoleAssignment,
+  type ScopeRoleAssignmentInput,
 } from "../../../contracts/role-assignment-contract";
 import type { RemoteOptions } from "../../../hooks/useCoreOptions";
 import type { useUserRoleGrants } from "../hooks/useUserRoleGrants";
@@ -28,11 +29,12 @@ interface ScopeRolesSectionProps {
   isTenantOwnerActor: boolean;
   describe: (assignment: ScopeRoleAssignmentInput) => { label: string; hint?: string };
   targetLabel: (assignment: ScopeRoleAssignment) => string;
+  writeError?: string;
 }
 
 /**
- * `tenant_user_scope_roles` — a role scoped to the tenant, one company, or one
- * branch, replaced atomically and only by an active tenant owner.
+ * `tenant_user_scope_roles` — owner-only exact-scope role summary table and
+ * centered atomic replacement modal.
  */
 export function ScopeRolesSection({
   panel,
@@ -42,6 +44,7 @@ export function ScopeRolesSection({
   isTenantOwnerActor,
   describe,
   targetLabel,
+  writeError,
 }: ScopeRolesSectionProps) {
   const { t } = useI18n();
   const lang = useLanguage();
@@ -51,7 +54,6 @@ export function ScopeRolesSection({
     {
       id: "role",
       header: copy.roles.singular,
-      // The stored row carries `null` where the DTO carries `undefined`.
       cell: (row) =>
         describe({
           scopeTarget: row.scopeTarget,
@@ -60,41 +62,65 @@ export function ScopeRolesSection({
           branchId: row.branchId ?? undefined,
         }).label,
     },
-    { id: "scope", header: copy.grants.scope, cell: (row) => copy.scopeTarget[row.scopeTarget] },
-    { id: "target", header: copy.grants.target, cell: targetLabel },
+    {
+      id: "scope",
+      header: copy.grants.scope,
+      cell: (row) => copy.scopeTarget[row.scopeTarget],
+    },
+    {
+      id: "target",
+      header: copy.grants.target,
+      cell: targetLabel,
+    },
   ];
 
+  const initialKeys = panel.scopeRoles.map(scopeRoleAssignmentKey);
+
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-xs font-medium text-foreground">{copy.grants.scopeRolesTitle}</h3>
-        <Badge tone="caution">{copy.grants.ownerOnly}</Badge>
-      </div>
-      <p className="text-2xs text-muted-foreground">{copy.grants.scopeRolesDescription}</p>
-
-      {isTenantOwnerActor ? <DataTable
-        columns={columns}
-        rows={panel.scopeRoles}
-        isLoading={panel.isScopeLoading}
-        error={panel.scopeError}
-        onRetry={panel.reload}
-        rowKey={(row) => row.id}
-        labels={listTableLabels(t, copy.grants.scopeLoadFailed, copy.grants.scopeEmpty)}
-      /> : (
-        <p className="text-2xs text-muted-foreground">{copy.grants.ownerOnlyExplanation}</p>
-      )}
-
-      {isTenantOwnerActor && panel.draft === null ? (
-        <div>
-          <Button variant="ghost" size="sm" onClick={panel.startScopeEdit}>
+    <section className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-xs font-medium text-foreground">
+              {copy.grants.scopeRolesTitle}
+            </h3>
+            <Badge tone="caution">{copy.grants.ownerOnly}</Badge>
+          </div>
+          <p className="text-2xs text-muted-foreground">
+            {copy.grants.scopeRolesDescription}
+          </p>
+        </div>
+        {isTenantOwnerActor ? (
+          <Button variant="outline" size="sm" onClick={panel.startScopeEdit}>
             {copy.grants.editScopeRoles}
           </Button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
-      {isTenantOwnerActor && panel.draft !== null ? (
+      {isTenantOwnerActor ? (
+        <DataTable
+          columns={columns}
+          rows={panel.scopeRoles}
+          isLoading={panel.isScopeLoading}
+          error={panel.scopeError}
+          onRetry={panel.reload}
+          rowKey={(row) => row.id}
+          labels={listTableLabels(
+            t,
+            copy.grants.scopeLoadFailed,
+            copy.grants.scopeEmpty,
+          )}
+        />
+      ) : (
+        <p className="text-2xs text-muted-foreground">
+          {copy.grants.ownerOnlyExplanation}
+        </p>
+      )}
+
+      {isTenantOwnerActor && panel.draft !== null && !panel.isReviewing ? (
         <ScopeRoleDraftEditor
           draft={panel.draft}
+          initialKeys={initialKeys}
           onDraftChange={panel.setDraft}
           roles={roles}
           companies={companies}
@@ -103,6 +129,7 @@ export function ScopeRolesSection({
           onReview={panel.review}
           onCancel={panel.cancelScopeEdit}
           isSubmitting={panel.isSubmitting}
+          error={writeError}
         />
       ) : null}
 

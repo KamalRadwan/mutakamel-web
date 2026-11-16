@@ -4,8 +4,12 @@
 // `forbidNonWhitelisted` is on, so an extra key is a 400 rather than an
 // ignored field.
 
-import { isExactMoneyDecimal, toMoneyWireNumber } from "../shared/money";
+import type { CardColor } from "@/design-system";
+import { isUUIDv7 } from "@/lib/uuid";
+import { isValidOpportunityCurrency, isValidOpportunityDate, opportunityAmountNumber, opportunityOptionalInteger } from "./opportunity-form-values";
 import type { OpportunityDetail } from "./opportunity-contract";
+
+export { isValidOpportunityAmount } from "./opportunity-form-values";
 
 export interface OpportunityForm {
   customerProfileId: string;
@@ -19,14 +23,12 @@ export interface OpportunityForm {
   expectedCloseDate: string;
   probabilityPercent: string;
   ownerUserId?: string;
+  contactPartyId?: string;
+  leadId?: string;
+  cardColor?: CardColor | null;
+  expectedUpdatedAt?: string;
   tagIds?: string[];
-  /**
-   * Keyed by `fieldKey`. `saveCustomFieldValues` runs with
-   * `CrmFieldRequirementOperationEnum.CREATE` here too, so a definition marked
-   * required-on-create fails the whole write with `422 CUSTOM_FIELD_REQUIRED`.
-   * `OPPORTUNITY` is the only owner type in scope — unlike a lead, which also
-   * picks up `LEAD_AND_PARTY`.
-   */
+  /** Active OPPORTUNITY values, keyed by fieldKey, with operation-specific requirements. */
   customFields: Record<string, unknown>;
 }
 
@@ -35,55 +37,26 @@ export const EMPTY_OPPORTUNITY_FORM: OpportunityForm = {
   pipelineId: "",
   stageId: "",
   title: "",
-  importance: "",
+  importance: "0",
   amount: "",
   currencyCode: "",
   description: "",
   expectedCloseDate: "",
   probabilityPercent: "",
   ownerUserId: "",
+  contactPartyId: "",
+  leadId: "",
   tagIds: [],
   customFields: {},
 };
 
-/**
- * `amount` is the one field on this form that becomes a JSON **number**, and
- * `../shared/money` checks currency scale and keeps every minor unit —
- * defect D3. Nothing converts it on the way in: it arrives as a decimal string
- * and renders through `Money`.
- */
-export function isValidOpportunityAmount(value: string, currencyCode = ""): boolean {
-  return isExactMoneyDecimal(value, currencyCode);
-}
-
-/**
- * Refusals this builder raises instead of dropping a key.
- *
- * Every one of them is a value the user typed that the API has no
- * representation for. Omitting the key made the box look saved and left the old
- * value in place — defect D8. They are thrown as codes, and
- * `useCrmErrorText` turns each into a sentence.
- */
+// Refusals are localized by useCrmErrorText, never rendered as raw constants.
 export const OPPORTUNITY_VALUE_OUT_OF_RANGE = "CRM_VALUE_OUT_OF_RANGE";
 export const OPPORTUNITY_TITLE_REQUIRED = "CRM_OPPORTUNITY_TITLE_REQUIRED";
 export const OPPORTUNITY_IMPORTANCE_REQUIRED = "CRM_OPPORTUNITY_IMPORTANCE_REQUIRED";
 export const OPPORTUNITY_CURRENCY_INVALID = "CRM_OPPORTUNITY_CURRENCY_INVALID";
 /** An edited form that produced nothing to send — never a silent close. */
 export const OPPORTUNITY_NOTHING_TO_SEND = "CRM_OPPORTUNITY_NOTHING_TO_SEND";
-
-function optionalInteger(
-  value: string,
-  min: number,
-  max: number,
-): number | undefined {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return undefined;
-  const parsed = Number(trimmed);
-  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
-    throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
-  }
-  return parsed;
-}
 
 export interface CreateOpportunityRequest {
   branchId: string;
@@ -98,6 +71,8 @@ export interface CreateOpportunityRequest {
   expectedCloseDate?: string;
   probabilityPercent?: number;
   ownerUserId?: string;
+  contactPartyId?: string;
+  leadId?: string;
   customFields?: Record<string, unknown>;
 }
 
@@ -112,23 +87,31 @@ export function buildCreateOpportunityRequest(
     stageId: form.stageId,
     title: form.title.trim(),
   };
-  const importance = optionalInteger(form.importance, 0, 3);
-  const amount = toMoneyWireNumber(form.amount, form.currencyCode);
-  const probabilityPercent = optionalInteger(form.probabilityPercent, 0, 100);
+  const importance = opportunityOptionalInteger(form.importance, 0, 3);
+  const amount = opportunityAmountNumber(form.amount, form.currencyCode);
+  const probabilityPercent = opportunityOptionalInteger(form.probabilityPercent, 0, 100);
   const currencyCode = form.currencyCode.trim().toUpperCase();
   const description = form.description.trim();
   const expectedCloseDate = form.expectedCloseDate.trim();
   const ownerUserId = (form.ownerUserId ?? "").trim();
+  if (!request.title || request.title.length > 180) throw new Error(OPPORTUNITY_TITLE_REQUIRED);
+  if (description.length > 2000) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
+  if (currencyCode && !isValidOpportunityCurrency(currencyCode)) throw new Error(OPPORTUNITY_CURRENCY_INVALID);
+  if (expectedCloseDate && !isValidOpportunityDate(expectedCloseDate)) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
 
   if (importance !== undefined) request.importance = importance;
   if (amount !== undefined) request.amount = amount;
   if (probabilityPercent !== undefined) {
     request.probabilityPercent = probabilityPercent;
   }
-  if (currencyCode.length === 3) request.currencyCode = currencyCode;
+  if (currencyCode) request.currencyCode = currencyCode;
   if (description.length > 0) request.description = description;
   if (expectedCloseDate.length > 0) request.expectedCloseDate = expectedCloseDate;
-  if (ownerUserId.length > 0) request.ownerUserId = ownerUserId;
+  for (const [key, value] of [["ownerUserId", ownerUserId], ["contactPartyId", form.contactPartyId], ["leadId", form.leadId]] as const) {
+    if (!value?.trim()) continue;
+    if (!isUUIDv7(value)) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
+    request[key] = value;
+  }
 
   const customFields = Object.entries(form.customFields).filter(([, value]) => {
     if (value === undefined || value === null) return false;
@@ -140,26 +123,8 @@ export function buildCreateOpportunityRequest(
   return request;
 }
 
-/**
- * `UpdateOpportunityDto`.
- *
- * **No `pipelineId` and no `stageId`.** A stage move is `POST /:id/stage` and a
- * pipeline change is `PUT /:id/pipeline`; sending either through the patch is a
- * 400, and both derive `status` server-side from the destination stage's flag.
- * `customerProfileId` is create-only for the same reason — an opportunity does
- * not change customer.
- */
-/**
- * Three states per key, not two — defect D8:
- *
- *   absent   the box was not touched, and the stored value survives;
- *   `null`   the box was emptied, and the stored value is cleared;
- *   a value  the box was set.
- *
- * `OpportunitiesService.update` keys its patch on `!== undefined`, and
- * `amountValue` preserves null. Currency can be cleared only together with
- * an explicit amount clear. Title and importance cannot be emptied.
- */
+// Omission preserves; null clears only fields the DTO permits. Stage/pipeline
+// have separate lifecycle commands; customer and source lead are immutable.
 export interface UpdateOpportunityRequest {
   title?: string;
   importance?: number;
@@ -169,6 +134,10 @@ export interface UpdateOpportunityRequest {
   expectedCloseDate?: string | null;
   probabilityPercent?: number | null;
   customFields?: Record<string, unknown>;
+  ownerUserId?: string;
+  contactPartyId?: string | null;
+  cardColor?: CardColor | null;
+  expectedUpdatedAt?: string;
 }
 
 export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
@@ -187,6 +156,11 @@ export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
     expectedCloseDate: item.expectedCloseDate ?? "",
     probabilityPercent:
       item.probabilityPercent === null ? "" : String(item.probabilityPercent),
+    ownerUserId: item.ownerUserId ?? "",
+    contactPartyId: item.contactPartyId ?? "",
+    leadId: item.leadId ?? "",
+    cardColor: item.cardColor,
+    expectedUpdatedAt: item.updatedAt,
     // Values have their own read endpoint; the edit hook supplies the stored
     // baseline after loading both definitions and values.
     customFields: {},
@@ -196,7 +170,7 @@ export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
 /** Every `OpportunityForm` key the PATCH builder diffs, i.e. the string ones. */
 type OpportunityTextField = Exclude<
   keyof OpportunityForm,
-  "customFields" | "ownerUserId" | "tagIds"
+  "customFields" | "ownerUserId" | "tagIds" | "contactPartyId" | "leadId" | "cardColor" | "expectedUpdatedAt"
 >;
 
 /** Only the changed keys, so a concurrent edit to another field survives. */
@@ -213,13 +187,16 @@ export function buildUpdateOpportunityRequest(
     // `@IsNotEmpty()`: there is no value that empties this column, so an
     // emptied box is a refusal the user is told about rather than a key that
     // quietly does not travel.
-    if (title.length === 0) throw new Error(OPPORTUNITY_TITLE_REQUIRED);
+    if (title.length === 0 || title.length > 180) throw new Error(OPPORTUNITY_TITLE_REQUIRED);
     request.title = title;
   }
 
   const description = changed("description");
   // `@IsString() @MaxLength(2000)` with no `@IsNotEmpty()`, so "" clears it.
-  if (description !== null) request.description = description;
+  if (description !== null) {
+    if (description.length > 2000) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
+    request.description = description;
+  }
 
   const currencyCode = changed("currencyCode");
   if (currencyCode !== null) {
@@ -229,12 +206,13 @@ export function buildUpdateOpportunityRequest(
       request.currencyCode = null;
       // The DTO requires this even when the stored amount is already empty.
       request.amount = null;
-    } else if (code.length === 3) request.currencyCode = code;
+    } else if (isValidOpportunityCurrency(code)) request.currencyCode = code;
     else throw new Error(OPPORTUNITY_CURRENCY_INVALID);
   }
 
   const expectedCloseDate = changed("expectedCloseDate");
   if (expectedCloseDate !== null) {
+    if (expectedCloseDate && !isValidOpportunityDate(expectedCloseDate)) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
     // "" is `@IsDateString()`'s 400. Clearing the picker sends null instead.
     request.expectedCloseDate =
       expectedCloseDate.length > 0 ? expectedCloseDate : null;
@@ -245,14 +223,14 @@ export function buildUpdateOpportunityRequest(
     // `smallint NOT NULL DEFAULT 0` — a null would be a constraint violation,
     // so an emptied star rating has no meaning to send.
     if (importance.length === 0) throw new Error(OPPORTUNITY_IMPORTANCE_REQUIRED);
-    request.importance = optionalInteger(importance, 0, 3);
+    request.importance = opportunityOptionalInteger(importance, 0, 3);
   }
 
   const probabilityPercent = changed("probabilityPercent");
   if (probabilityPercent !== null) {
     request.probabilityPercent =
       probabilityPercent.length > 0
-        ? optionalInteger(probabilityPercent, 0, 100)
+        ? opportunityOptionalInteger(probabilityPercent, 0, 100)
         : null;
   }
 
@@ -261,12 +239,23 @@ export function buildUpdateOpportunityRequest(
     if (amount.length === 0) request.amount = null;
     else {
       if (!form.currencyCode.trim()) throw new Error("OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED");
-      request.amount = toMoneyWireNumber(amount, form.currencyCode);
+      request.amount = opportunityAmountNumber(amount, form.currencyCode);
     }
   } else if (currencyCode !== null && form.amount.trim()) {
     // A currency-only change still has to fit the retained amount's scale.
-    toMoneyWireNumber(form.amount, form.currencyCode);
+    opportunityAmountNumber(form.amount, form.currencyCode);
   }
+  const owner = form.ownerUserId ?? "";
+  if (owner !== (baseline.ownerUserId ?? "")) {
+    if (!isUUIDv7(owner)) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
+    request.ownerUserId = owner;
+  }
+  const contact = form.contactPartyId ?? "";
+  if (contact !== (baseline.contactPartyId ?? "")) {
+    if (contact && !isUUIDv7(contact)) throw new Error(OPPORTUNITY_VALUE_OUT_OF_RANGE);
+    request.contactPartyId = contact || null;
+  }
+  if ((form.cardColor ?? null) !== (baseline.cardColor ?? null)) request.cardColor = form.cardColor ?? null;
   // Omitted keys retain their stored values; null explicitly clears a value.
   const customFields = Object.entries(form.customFields).filter(
     ([key, value]) =>
@@ -274,6 +263,7 @@ export function buildUpdateOpportunityRequest(
       JSON.stringify(value) !== JSON.stringify(baseline.customFields[key]),
   );
   if (customFields.length > 0) request.customFields = Object.fromEntries(customFields);
+  if (Object.keys(request).length > 0 && baseline.expectedUpdatedAt) request.expectedUpdatedAt = baseline.expectedUpdatedAt;
   return request;
 }
 

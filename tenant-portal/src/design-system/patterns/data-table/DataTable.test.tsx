@@ -1,11 +1,38 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { LANGUAGE_KEY } from "@/i18n/dictionary-store";
+import { setLanguage } from "@/i18n/useLanguage";
+import { safeStorage } from "@/lib/safeStorage";
 import { DataTable } from "./DataTable";
 import type { ColumnDef, DataTableLabels } from "./types";
 
-afterEach(cleanup);
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+if (typeof HTMLElement.prototype.hasPointerCapture === "undefined") {
+  HTMLElement.prototype.hasPointerCapture = () => false;
+}
+if (typeof HTMLElement.prototype.setPointerCapture === "undefined") {
+  HTMLElement.prototype.setPointerCapture = () => {};
+}
+if (typeof HTMLElement.prototype.releasePointerCapture === "undefined") {
+  HTMLElement.prototype.releasePointerCapture = () => {};
+}
+if (typeof Element.prototype.scrollIntoView === "undefined") {
+  Element.prototype.scrollIntoView = () => {};
+}
+
+afterEach(async () => {
+  cleanup();
+  safeStorage.removeItem(LANGUAGE_KEY);
+  await setLanguage("ar");
+});
 
 interface Row {
   id: string;
@@ -300,5 +327,130 @@ describe("DataTable row reordering", () => {
       />,
     );
     expect(screen.queryByLabelText(/Drag to reorder: /u)).toBeNull();
+  });
+});
+
+describe("DataTable optional pagination controls", () => {
+  it("keeps First/Last and renders no rows-per-page picker for default callers", async () => {
+    await act(async () => {
+      await setLanguage("en");
+    });
+
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: "1", name: "Alice" }]}
+        isLoading={false}
+        page={{ page: 1, limit: 20, total: 45 }}
+        onPageChange={vi.fn()}
+        rowKey={(row) => row.id}
+        labels={labels}
+      />,
+    );
+
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.getByRole("button", { name: "First page" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Last page" })).toBeInTheDocument();
+  });
+
+  it("forwards pageSizeOptions, onPageSizeChange, hideFirstLast, and rowsPerPage label in populated state (EN and AR)", async () => {
+    await act(async () => {
+      await setLanguage("en");
+    });
+
+    const onPageSizeChange = vi.fn();
+    const { rerender } = render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: "1", name: "Alice" }]}
+        isLoading={false}
+        page={{ page: 1, limit: 20, total: 120 }}
+        onPageChange={vi.fn()}
+        pageSizeOptions={[20, 50, 100]}
+        onPageSizeChange={onPageSizeChange}
+        hideFirstLast
+        rowKey={(row) => row.id}
+        labels={{
+          ...labels,
+          pagination: {
+            ...labels.pagination,
+            rowsPerPage: "Rows per page",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "First page" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Last page" })).toBeNull();
+
+    const enTrigger = screen.getByRole("combobox", { name: "Rows per page" });
+    fireEvent.click(enTrigger);
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "100" }));
+    expect(onPageSizeChange).toHaveBeenCalledTimes(1);
+    expect(onPageSizeChange).toHaveBeenCalledWith(100);
+
+    await act(async () => {
+      await setLanguage("ar");
+    });
+
+    rerender(
+      <DataTable
+        columns={columns}
+        rows={[{ id: "1", name: "Alice" }]}
+        isLoading={false}
+        page={{ page: 1, limit: 50, total: 120 }}
+        onPageChange={vi.fn()}
+        pageSizeOptions={[20, 50, 100]}
+        onPageSizeChange={onPageSizeChange}
+        hideFirstLast
+        rowKey={(row) => row.id}
+        labels={labels}
+      />,
+    );
+
+    const arTrigger = screen.getByRole("combobox", { name: "صفوف لكل صفحة" });
+    expect(arTrigger).toHaveTextContent("50");
+  });
+
+  it("forwards pageSizeOptions, onPageSizeChange, and hideFirstLast in the empty-page recovery branch", async () => {
+    await act(async () => {
+      await setLanguage("en");
+    });
+
+    const onPageChange = vi.fn();
+    const onPageSizeChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        rows={[]}
+        isLoading={false}
+        page={{ page: 2, limit: 20, total: 20 }}
+        onPageChange={onPageChange}
+        pageSizeOptions={[20, 50, 100]}
+        onPageSizeChange={onPageSizeChange}
+        hideFirstLast
+        rowKey={(row) => row.id}
+        labels={{
+          ...labels,
+          pagination: {
+            ...labels.pagination,
+            rowsPerPage: "Rows per page",
+          },
+        }}
+        emptyState={<p>Page emptied after delete</p>}
+      />,
+    );
+
+    expect(screen.getByText("Page emptied after delete")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "First page" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Last page" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Rows per page" }));
+    fireEvent.click(within(screen.getByRole("listbox")).getByRole("option", { name: "50" }));
+    expect(onPageSizeChange).toHaveBeenCalledTimes(1);
+    expect(onPageSizeChange).toHaveBeenCalledWith(50);
   });
 });

@@ -78,7 +78,7 @@ type LifecycleAction =
   | "abandon-destroy"
   | "resume-destroy";
 
-/** Actions confirmed by the shared dialog; abandon and resume have their own. */
+/** Actions dispatched together; destructive actions use typed confirmation. */
 type DialogAction = Exclude<LifecycleAction, "abandon-destroy" | "resume-destroy">;
 
 const DESTROY_STATUS_ID = "tenant-destroy-status";
@@ -130,12 +130,15 @@ export function TenantLifecyclePanel({
   };
   const actionHint: Partial<Record<DialogAction, string>> = {
     restore: text.restoreHint,
-    destroy: text.destroyHint,
   };
   const dialogAction =
     confirmation === "abandon-destroy" || confirmation === "resume-destroy"
       ? null
       : confirmation;
+  const typedAction =
+    dialogAction === "destroy" || dialogAction === "soft-delete"
+      ? dialogAction
+      : null;
   const en = tenantWorkspaceCopy("en");
   const ar = tenantWorkspaceCopy("ar");
 
@@ -319,8 +322,8 @@ export function TenantLifecyclePanel({
         )}
       </div>
 
-      <AlertDialog open={dialogAction !== null} onOpenChange={(open) => !open && setConfirmation(null)}>
-        {dialogAction ? (
+      <AlertDialog open={dialogAction !== null && typedAction === null} onOpenChange={(open) => !open && setConfirmation(null)}>
+        {dialogAction && !typedAction ? (
           <AlertDialogContent dir={locale === "ar" ? "rtl" : "ltr"}>
             <AlertDialogHeader>
               <AlertDialogTitle>{actionLabel[dialogAction]}</AlertDialogTitle>
@@ -334,7 +337,6 @@ export function TenantLifecyclePanel({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
               <AlertDialogAction
-                destructive={dialogAction === "soft-delete" || dialogAction === "destroy"}
                 disabled={busy}
                 onClick={(event) => {
                   event.preventDefault();
@@ -347,6 +349,31 @@ export function TenantLifecyclePanel({
           </AlertDialogContent>
         ) : null}
       </AlertDialog>
+
+      {typedAction ? (
+        <ConfirmActionModal
+          isOpen
+          onClose={() => setConfirmation(null)}
+          onConfirm={confirm}
+          titleEn={typedAction === "destroy" ? en.destroy : en.softDelete}
+          titleAr={typedAction === "destroy" ? ar.destroy : ar.softDelete}
+          descriptionEn={
+            typedAction === "destroy"
+              ? `${en.confirmAction(en.destroy)}\n\n${en.destroyHint}`
+              : en.confirmAction(en.softDelete)
+          }
+          descriptionAr={
+            typedAction === "destroy"
+              ? `${ar.confirmAction(ar.destroy)}\n\n${ar.destroyHint}`
+              : ar.confirmAction(ar.softDelete)
+          }
+          confirmTextEn={en.confirm}
+          confirmTextAr={ar.confirm}
+          requiredConfirmationText={tenant.name}
+          variant="danger"
+          isLoading={busy}
+        />
+      ) : null}
 
       <ConfirmActionModal
         isOpen={confirmation === "abandon-destroy"}
@@ -383,6 +410,7 @@ export function TenantLifecyclePanel({
         confirmTextAr={ar.resumeDestroy}
         loadingLabel={text.resuming}
         variant="danger"
+        requiredConfirmationText={tenant.name}
         isLoading={workspace.mutation.name === "resume-destroy"}
       />
     </Card>

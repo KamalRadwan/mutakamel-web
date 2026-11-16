@@ -32,7 +32,7 @@ interface UpdateLeadContactRequest {
  * - rating: 0, 1, 2, or 3 (null is invalid).
  * - cardColor: CardColor or null (to clear).
  * - acquisitionSourceId: UUIDv7 or null (to clear).
- * - honorificTitle, primaryMobile, email, companyEmail, companyWebsite, taxNumber,
+ * - honorificTitle, jobTitle, primaryMobile, email, companyEmail, companyWebsite, taxNumber,
  *   commercialRegistrationNumber: cleared with null.
  * - ownerUserId: UUIDv7 when supplied; cannot be cleared with null.
  * - description, interestSummary, expectedNeed: cleared with empty string "".
@@ -48,6 +48,7 @@ export interface UpdateLeadRequest {
   firstName?: string;
   lastName?: string;
   honorificTitle?: string | null;
+  jobTitle?: string | null;
   primaryMobile?: string | null;
   phones?: string[];
   /**

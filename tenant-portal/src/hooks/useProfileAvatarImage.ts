@@ -15,8 +15,12 @@ export function notifyProfileAvatarChanged(userId: string, removed: boolean) {
   }));
 }
 
-/** Cookie-authenticated images use the same origin as other Party images. */
-export function useProfileAvatarImage(userId: string | undefined) {
+/**
+ * Cookie-authenticated images use the same origin as other Party images.
+ * `hasAvatar` comes from Core `/auth/me`; without it the route only 404s, so
+ * the image is not requested until an upload in this tab announces one.
+ */
+export function useProfileAvatarImage(userId: string | undefined, hasAvatar: boolean | undefined) {
   const [change, setChange] = useState<AvatarChange | null>(null);
   useEffect(() => {
     const receive = (event: Event) => {
@@ -27,7 +31,8 @@ export function useProfileAvatarImage(userId: string | undefined) {
     return () => window.removeEventListener(AVATAR_CHANGED, receive);
   }, [userId]);
 
-  const revision = change?.userId === userId ? change?.revision : "current";
+  const initial = hasAvatar === true ? "current" : null;
+  const revision = change && change.userId === userId ? change.revision : initial;
   return userId && revision !== null
     ? `/api/tenant/core/v1/profile/avatar?v=${encodeURIComponent(`${userId}:${revision ?? "current"}`)}`
     : undefined;

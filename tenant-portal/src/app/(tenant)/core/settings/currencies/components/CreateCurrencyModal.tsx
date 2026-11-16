@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { FormDrawer } from "@/design-system";
+import { FormModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { EMPTY_CURRENCY_FORM, type CurrencyFormValues } from "../currency-contract";
+import type { BaseCurrencyStatus } from "../hooks/useBaseCurrency";
+import { useCurrencyForm } from "../hooks/useCurrencyForm";
 import { CurrencyFormFields } from "./CurrencyFormFields";
 
 interface CreateCurrencyModalProps {
@@ -12,6 +13,9 @@ interface CreateCurrencyModalProps {
   onSubmit: (values: CurrencyFormValues) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  errorCode?: string | null;
+  baseStatus?: BaseCurrencyStatus;
+  baseCurrencyCode?: string | null;
 }
 
 export function CreateCurrencyModal({
@@ -20,32 +24,39 @@ export function CreateCurrencyModal({
   onSubmit,
   isSubmitting,
   error,
+  errorCode,
+  baseStatus,
+  baseCurrencyCode,
 }: CreateCurrencyModalProps) {
   const { t } = useI18n();
-  const [values, setValues] = useState<CurrencyFormValues>(EMPTY_CURRENCY_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_CURRENCY_FORM);
-
-  const close = () => {
-    setValues(EMPTY_CURRENCY_FORM);
-    onClose();
-  };
-
-  const handleSubmit = async () => {
-    if (await onSubmit(values)) setValues(EMPTY_CURRENCY_FORM);
-  };
+  const form = useCurrencyForm({
+    open: isOpen,
+    mode: "create",
+    initialValues: EMPTY_CURRENCY_FORM,
+    codeReadOnly: false,
+    rateLocked: false,
+    baseStatus,
+    baseCurrencyCode,
+    isSubmitting,
+    error,
+    errorCode,
+    onClose,
+    onSubmit,
+  });
 
   return (
-    <FormDrawer
+    <FormModal
       open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) close();
-      }}
+      onOpenChange={form.handleOpenChange}
+      onOpenAutoFocus={form.handleOpenAutoFocus}
+      size="card"
+      density="compact"
+      bodyClassName="px-4 py-3.5"
       title={t.coreSettings.currencyCreateTitle}
-      description={t.coreSettings.currencyCreateDescription}
-      isDirty={isDirty}
-      isSubmitting={isSubmitting}
-      onSubmit={() => void handleSubmit()}
-      error={error ?? undefined}
+      isDirty={form.isDirty && !form.busy}
+      isSubmitting={form.busy}
+      onSubmit={() => void form.handleSubmit()}
+      error={form.generalError}
       labels={{
         submit: t.coreSettings.save,
         cancel: t.common.cancel,
@@ -53,16 +64,29 @@ export function CreateCurrencyModal({
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
+        sections: t.crmShared.formSectionsNav,
+        sectionInvalid: t.crmShared.formSectionInvalid,
+        close: t.common.close,
       }}
     >
       <CurrencyFormFields
-        values={values}
-        onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
-        isSubmitting={isSubmitting}
+        values={form.values}
+        onChange={form.handleChange}
+        isSubmitting={form.busy}
         codeReadOnly={false}
         rateLocked={false}
         showDefaultToggle
+        baseStatus={baseStatus}
+        baseCurrencyCode={baseCurrencyCode}
+        firstCurrencyDefault={form.isFirstCurrency}
+        rateRequired={form.rateRequired}
+        errors={form.fieldErrors}
+        errorSummary={form.errorSummary}
+        anchorIds={form.anchorIds}
+        fieldRefs={form.fieldRefs}
+        onBlurField={form.handleBlur}
+        onFocusField={form.focusField}
       />
-    </FormDrawer>
+    </FormModal>
   );
 }

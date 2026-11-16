@@ -19,6 +19,8 @@ export interface TagColorPickerProps {
   /** `null` is an uncoloured tag. */
   value: TagColor | null;
   onChange: (next: TagColor | null) => void;
+  /** Invalid visible drafts must not allow a form to save the last valid pair. */
+  onValidityChange?: (valid: boolean) => void;
   /** The text the preview chip shows — usually the tag's name as typed. */
   previewLabel?: string;
   disabled?: boolean;
@@ -42,10 +44,10 @@ const SWATCH = cn(
  * Generic on purpose — any app's tag uses it. A custom pair below 4.5:1 is
  * allowed (the tenant may know better) but always flagged, in words.
  */
-export function TagColorPicker({ value, onChange, previewLabel, disabled, className }: TagColorPickerProps) {
+export function TagColorPicker({ value, onChange, onValidityChange, previewLabel, disabled, className }: TagColorPickerProps) {
   const { t, lang } = useI18n();
   const copy = t.tagColors;
-  const picker = useTagColorPicker(value, onChange);
+  const picker = useTagColorPicker(value, onChange, onValidityChange);
   const presetsHeadingId = useId();
   const customHeadingId = useId();
   const warningId = useId();
@@ -78,6 +80,8 @@ export function TagColorPicker({ value, onChange, previewLabel, disabled, classN
             value={picker.drafts[channel]}
             onChange={(event) => picker.handleChannelChange(channel, event.target.value)}
             maxLength={7}
+            pattern={"\\s*#?[0-9A-Fa-f]{6}\\s*"}
+            required={picker.radioValue !== TAG_COLOR_NONE}
             spellCheck={false}
             autoComplete="off"
             aria-invalid={invalid || undefined}

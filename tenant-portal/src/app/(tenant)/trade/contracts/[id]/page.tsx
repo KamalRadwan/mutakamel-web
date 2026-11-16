@@ -56,7 +56,7 @@ export default function ContractDetailPage({
   );
   const contract = detail.document;
   const { headers, canWrite } = detail.scope;
-  const pdf = useTradePdfJob(CONTRACTS_PATH, id, headers);
+  const pdf = useTradePdfJob(CONTRACTS_PATH, id, headers, contract?.version.toString());
   const [editOpen, setEditOpen] = React.useState(false);
 
   const reload = useCallback(async () => {

@@ -55,6 +55,7 @@ function isAbortError(error: unknown): boolean {
 }
 
 interface LeadListOptions {
+  generation?: string | null;
   branchId: string | null;
   actorId: string | undefined;
   activeView: LeadsView;
@@ -71,7 +72,7 @@ interface LeadListOptions {
  * the scheduled one and reads now, so a write that reloads never pays for a
  * second identical request 250 ms later.
  */
-export function useLeadList({ branchId, actorId, activeView, onLoadStart }: LeadListOptions) {
+export function useLeadList({ branchId, actorId, activeView, onLoadStart, generation }: LeadListOptions) {
   const [items, setItems] = useState<LeadItem[]>([]);
   const [pageInfo, setPageInfo] = useState<LeadsPageInfo>(EMPTY_PAGE_INFO);
   // The question ON SCREEN. In Advanced it is a draft only Search promotes:
@@ -93,10 +94,13 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
   const timerRef = useRef<number | undefined>(undefined);
   const controllerRef = useRef<AbortController | null>(null);
 
-  const read = useCallback(async (): Promise<boolean> => {
+  const read = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+    if (signal?.aborted) return false;
     const epoch = ++epochRef.current;
     controllerRef.current?.abort();
     const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
     controllerRef.current = controller;
     const { page, sort: order, search: query } = queryRef.current;
     const myLeadsWithoutActor = query.mode === "basic" && query.basic.myLeads && !isUUIDv7(actorId);
@@ -105,6 +109,7 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
       setPageInfo(EMPTY_PAGE_INFO);
       setIsLoading(false);
       setLoadError(null);
+      signal?.removeEventListener("abort", abort);
       if (!branchId || myLeadsWithoutActor) return false;
       onLoadStart();
       return true;
@@ -145,6 +150,7 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
 
     try {
       let next = parseLeadsResponse((await readPage(page)).data, branchId);
+      if (controller.signal.aborted || epoch !== epochRef.current) return false;
       if (next.page !== page) throw new Error(INVALID_LEADS);
       // A delete elsewhere can leave the requested page past the end.
       const lastPage = Math.max(next.totalPages, 1);
@@ -154,19 +160,20 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
           throw new Error(INVALID_LEADS);
         }
       }
-      if (epoch !== epochRef.current) return false;
+      if (controller.signal.aborted || epoch !== epochRef.current) return false;
       const { items: nextItems, ...nextPageInfo } = next;
       queryRef.current = { ...queryRef.current, page: nextPageInfo.page };
       setItems(nextItems);
       setPageInfo(nextPageInfo);
       return true;
     } catch (caught) {
-      if (isAbortError(caught) || epoch !== epochRef.current) return false;
+      if (controller.signal.aborted || isAbortError(caught) || epoch !== epochRef.current) return false;
       setItems([]);
       setPageInfo((current) => ({ ...current, total: 0, totalPages: 0, hasNext: false, hasPrev: false }));
       setLoadError(normalizeApiError(caught));
       return false;
     } finally {
+      signal?.removeEventListener("abort", abort);
       if (epoch === epochRef.current) setIsLoading(false);
     }
   }, [activeView, actorId, branchId, onLoadStart]);
@@ -185,16 +192,17 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
     schedule();
     return () => {
       cancelScheduled();
+      epochRef.current += 1;
       controllerRef.current?.abort();
     };
-  }, [cancelScheduled, schedule]);
+  }, [cancelScheduled, schedule, generation]);
 
   /** Reads now, optionally from another page; cancels any scheduled read. */
   const reload = useCallback(
-    (page?: number) => {
+    (page?: number, signal?: AbortSignal) => {
       cancelScheduled();
       if (page !== undefined) queryRef.current = { ...queryRef.current, page };
-      return read();
+      return read(signal);
     },
     [cancelScheduled, read],
   );

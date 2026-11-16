@@ -7,6 +7,7 @@ import {
   ConfirmActionModal,
   DataTable,
   DegradedBanner,
+  IdentifierText,
   PageHeader,
   PermissionGate,
   SubNav,
@@ -15,16 +16,61 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import { formatDateTime } from "@/lib/format/date";
+import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
+import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { TEMPLATE_READ_PERMISSION } from "../templates-contract";
-import type { TemplateAssignment } from "../template-assignments-contract";
+import { assignmentScopeKey, isSalesQuotationSelector, type AssignmentScope, type TemplateAssignment } from "../template-assignments-contract";
+import { useTemplateAuthority } from "../hooks/useTemplateAuthority";
 import { AssignmentDrawer } from "./components/AssignmentDrawer";
+import { AssignmentScopeFields } from "./components/AssignmentScopeFields";
 import { ResolvePreviewPanel } from "./components/ResolvePreviewPanel";
+import { useAssignmentScope } from "./hooks/useAssignmentScope";
 import { useTemplateAssignments } from "./hooks/useTemplateAssignments";
 
 export default function TemplateAssignmentsPage() {
-  const assignments = useTemplateAssignments();
+  const authority = useTemplateAuthority();
+  const { t } = useI18n();
+  return authority.key ? (
+    <AssignmentScopeWorkspace key={authority.key} authority={authority.key} readAuthority={authority.readCurrent} />
+  ) : (
+    <PermissionGate require={TEMPLATE_READ_PERMISSION}>
+      <div className="flex flex-wrap items-center gap-2">
+        <DegradedBanner message={t.coreOperations.templates.assignmentsLoadFailed} />
+        <Button size="sm" variant="outline" onClick={() => void authority.retry()}
+          disabled={!authority.canRetry} loading={authority.recovering}>{t.common.retry}</Button>
+      </div>
+    </PermissionGate>
+  );
+}
+
+function AssignmentScopeWorkspace({ authority, readAuthority }: {
+  authority: string;
+  readAuthority: () => string | null;
+}) {
+  const selection = useAssignmentScope();
+  const { scope } = selection;
+  return (
+    <PermissionGate require={TEMPLATE_READ_PERMISSION} denied={selection.types.length === 0}>
+      <div className="flex flex-col gap-4">
+        <SubNav items={CORE_TEMPLATE_NAV_ITEMS} />
+        <AssignmentScopeFields selection={selection} />
+        {scope ? (
+          <AssignmentWorkspace key={assignmentScopeKey(scope)} scope={scope}
+            authority={authority} readAuthority={readAuthority} />
+        ) : null}
+      </div>
+    </PermissionGate>
+  );
+}
+
+function AssignmentWorkspace({ scope, authority, readAuthority }: {
+  scope: AssignmentScope;
+  authority: string;
+  readAuthority: () => string | null;
+}) {
+  const assignments = useTemplateAssignments(scope, authority, readAuthority);
   const { t, lang } = assignments;
   const copy = t.coreOperations.templates;
 
@@ -39,9 +85,19 @@ export default function TemplateAssignmentsPage() {
       cell: (assignment) => (
         <span className="flex flex-col">
           <span className="text-foreground">
-            {formatTemplate(copy.versionLabel, { number: String(assignment.versionNumber) })}
+            {formatTemplate(copy.versionLabel, { number: formatNumber(assignment.versionNumber, lang) })}
           </span>
           <span className="text-xs text-muted-foreground">{assignment.adapterKey}</span>
+          {isSalesQuotationSelector(assignment) ? (
+            <>
+              <span className="text-xs text-muted-foreground">
+                {copy.definitionTitle} <IdentifierText selectAll>{assignment.definitionId}</IdentifierText>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {copy.assignmentVersionId} <IdentifierText selectAll>{assignment.versionId}</IdentifierText>
+              </span>
+            </>
+          ) : null}
         </span>
       ),
     },
@@ -51,13 +107,13 @@ export default function TemplateAssignmentsPage() {
       cell: (assignment) =>
         `${copy.documentTypes[assignment.documentType] ?? assignment.documentType} · ${
           copy.outputChannels[assignment.outputChannel] ?? assignment.outputChannel
-        } · ${assignment.locale ?? copy.assignmentDefaultLocale}`,
+        } · ${assignment.locale ? copy.locales[assignment.locale as keyof typeof copy.locales] ?? assignment.locale : copy.assignmentDefaultLocale}`,
     },
     {
       id: "priority",
       header: copy.assignmentPriority,
       numeric: true,
-      cell: (assignment) => String(assignment.priority),
+      cell: (assignment) => formatNumber(assignment.priority, lang),
     },
     {
       id: "window",
@@ -113,7 +169,7 @@ export default function TemplateAssignmentsPage() {
   ];
 
   return (
-    <PermissionGate require={TEMPLATE_READ_PERMISSION}>
+    <PermissionGate require={TEMPLATE_READ_PERMISSION} denied={assignments.error?.status === 403}>
       <div className="flex flex-col gap-4">
         <PageHeader className="sr-only"
           title={copy.assignmentsTitle}
@@ -134,14 +190,14 @@ export default function TemplateAssignmentsPage() {
           }
         />
 
-        <SubNav items={CORE_TEMPLATE_NAV_ITEMS} />
-
         {assignments.cursor.wasReset ? <DegradedBanner message={copy.cursorExpired} /> : null}
 
         <ResolvePreviewPanel
+          selector={assignments.selector}
           resolved={assignments.resolved}
           isResolving={assignments.isResolving}
-          onResolve={(selector) => void assignments.resolve(selector)}
+          onChange={assignments.changeSelector}
+          onResolve={() => void assignments.resolve()}
         />
 
         <DataTable
@@ -170,7 +226,7 @@ export default function TemplateAssignmentsPage() {
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
-            {copy.pageIndicator} {assignments.cursor.pageNumber}
+            {copy.pageIndicator} {formatNumber(assignments.cursor.pageNumber, lang)}
           </span>
           <span className="flex items-center gap-2">
             <Button
@@ -194,15 +250,18 @@ export default function TemplateAssignmentsPage() {
           </span>
         </div>
 
-        <AssignmentDrawer
-          key={assignments.editing?.id ?? "assignment-create"}
-          assignment={assignments.editing}
-          isOpen={assignments.isCreateOpen || assignments.editing !== null}
-          onClose={assignments.editing ? assignments.closeEdit : assignments.closeCreate}
-          onSubmit={assignments.submit}
-          isSubmitting={assignments.isSubmitting}
-          error={assignments.formError}
-        />
+        {assignments.isCreateOpen || assignments.editing ? (
+          <AssignmentDrawer
+            key={assignments.editing?.id ?? "assignment-create"}
+            assignment={assignments.editing}
+            scope={scope}
+            onClose={assignments.editing ? assignments.closeEdit : assignments.closeCreate}
+            onSubmit={assignments.submit}
+            isSubmitting={assignments.isSubmitting}
+            error={assignments.formError}
+            isCurrent={assignments.canWrite}
+          />
+        ) : null}
 
         <ConfirmActionModal
           open={assignments.deleting !== null}
@@ -210,8 +269,12 @@ export default function TemplateAssignmentsPage() {
             if (!open) assignments.closeDelete();
           }}
           title={copy.assignmentDeactivateTitle}
-          description={copy.assignmentDeactivateDescription}
-          confirmLabel={copy.assignmentDeactivate}
+          description={assignments.deleteOutcome === "conflict" ? copy.assignmentDeactivateConflict
+            : assignments.deleteOutcome === "check" ? copy.assignmentDeactivateCheck
+              : assignments.deleteOutcome === "uncertain" ? copy.assignmentDeactivateUncertain : copy.assignmentDeactivateDescription}
+          confirmLabel={assignments.deleteOutcome === "conflict" ? copy.conflictReload
+            : assignments.deleteOutcome === "check" ? copy.assignmentCheckStatus
+              : assignments.deleteOutcome === "uncertain" ? t.common.retry : copy.assignmentDeactivate}
           cancelLabel={t.common.cancel}
           onConfirm={() => void assignments.remove()}
           loading={assignments.pendingId !== null}

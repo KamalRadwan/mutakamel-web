@@ -15,6 +15,7 @@ import { tenantNotificationRuntime } from "@/lib/notifications/tenant-notificati
 import { coordinateTenantSessionRefresh } from "@/lib/api/axiosClient";
 import { OfflineBanner, useConnectivity } from "@/design-system";
 import { en } from "@/i18n/dictionaries/en";
+import { subscribeTenantLeadRealtime } from "./tenant-lead-realtime";
 import {
   TENANT_REALTIME_SHELL_EVENTS,
   TenantRealtimeBinding,
@@ -26,6 +27,47 @@ const generationA = "tenant:session-a:user-a";
 const generationB = "tenant:session-b:user-b";
 
 describe("TenantRealtimeBinding", () => {
+  it("bridges validated CRM invalidation independently of notification permission", async () => {
+    const harness = createHarness();
+    const listener = vi.fn();
+    const unsubscribe = subscribeTenantLeadRealtime(listener);
+    const view = render(<TenantRealtimeBinding coordinator={harness.coordinator} generation={generationA}
+      mode="on" notificationsAuthorized={false}><span /></TenantRealtimeBinding>);
+    try {
+      await waitFor(() => expect(harness.connects).toBe(1));
+      const transport = harness.transports[0];
+      const payload = { tenantId: validUuid(20), branchId: validUuid(21), leadId: validUuid(22),
+        revision: "9007199254740993", changeKind: "UPDATED" };
+      act(() => {
+        transport.emitServer("session.ready.v1", readyEvent());
+        transport.emitServer("crm.leads.changed.v1", serverEvent(payload));
+        transport.emitServer("crm.leads.scope-resync.v1", serverEvent({ scope: "CRM_LEADS", reason: "SCOPE_CHANGED" }));
+        transport.emitServer("realtime.sync.required.v1", serverEvent({
+          scope: "CRM_LEADS", reason: "RECOVERY_INCOMPLETE", lastCommittedNotificationCursor: null,
+        }));
+      });
+      expect(listener.mock.calls.map(([signal]) => signal)).toEqual([
+        { generation: generationA, kind: "ready" },
+        { generation: generationA, kind: "changed", payload },
+        { generation: generationA, kind: "resync" },
+        { generation: generationA, kind: "resync" },
+      ]);
+      expect(fetch).not.toHaveBeenCalled();
+      view.rerender(<TenantRealtimeBinding coordinator={harness.coordinator} generation={generationB}
+        mode="on" notificationsAuthorized={false}><span /></TenantRealtimeBinding>);
+      await waitFor(() => expect(harness.connects).toBe(2));
+      act(() => transport.emitServer("crm.leads.changed.v1", serverEvent(payload)));
+      expect(listener).toHaveBeenCalledTimes(4);
+      act(() => harness.transports[1].emitServer("crm.leads.changed.v1", serverEvent({
+        ...payload, revision: "1", snapshot: { name: "must not cross the bridge" },
+      })));
+      expect(listener).toHaveBeenCalledTimes(4);
+      expect(harness.coordinator.getSnapshot().blockedReason).toBe("invalid_server_event");
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it.each([
     ["stop", "classified_permanent"],
     ["refresh_credential", "credential_refresh_failed"],
@@ -975,6 +1017,7 @@ function readyEvent(notificationResyncRequired = false) {
       recovered: false,
       recoveryComplete: true,
       capabilities: {
+        crmLeads: { receive: true },
         notifications: { receive: true },
         presence: { publishSelf: true, watchMode: "SELF" },
       },

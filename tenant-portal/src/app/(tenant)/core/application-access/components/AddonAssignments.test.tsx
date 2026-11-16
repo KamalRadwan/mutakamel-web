@@ -20,7 +20,7 @@ function arrange(denied = false) {
   mocks.read.mockReturnValue({ t, data: { items: body.data, meta: body.meta }, loading: false, denied, error: null,
     reload: vi.fn(), changePage: vi.fn(), canBrowseUsers: false,
     labels: { retry: t.common.retry, errorTitle: t.addonAssignments.loadFailed, emptyTitle: t.addonAssignments.empty,
-      selectAll: t.common.actions, selectRow: t.common.actions, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
+      selectAll: t.views.selectAll, selectRow: t.views.selectRow, sortAscending: t.views.sortAscending, sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
       pagination: { previous: t.common.previousPage, next: t.common.nextPage, summary: (from: number, to: number, total: number) => `${from}-${to}/${total}` } } });
 }
 afterEach(cleanup);

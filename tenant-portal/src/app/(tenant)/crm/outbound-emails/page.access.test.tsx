@@ -33,11 +33,15 @@ vi.mock("./hooks/useOutboundEmailComposer", () => ({ useOutboundEmailComposer: (
 vi.mock("./components/ComposeEmailDrawer", () => ({ ComposeEmailDrawer: () => null }));
 
 import { I18nProvider } from "@/i18n/I18nContext";
+import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";
-import { DICTIONARIES, type Language } from "@/i18n/useLanguage";
+import type { Language } from "@/i18n/useLanguage";
 import { TooltipProvider } from "@/design-system";
 import OutboundEmailsPage from "./page";
 import OutboundEmailDetailPage from "./[id]/page";
+
+// Tests are not in the client bundle, so they may import both copies.
+const DICTIONARIES = { ar, en } as const;
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -34,7 +34,7 @@ vi.mock("../hooks/useDashboardShares", () => ({ useDashboardShares: () => ({}) }
 vi.mock("../hooks/useAvailableWidgets", () => ({ useAvailableWidgets: () => ({}) }));
 vi.mock("../hooks/useWidgetDrilldown", () => ({ useWidgetDrilldown: () => ({}) }));
 vi.mock("../hooks/useDashboardSwitcher", () => ({
-  useDashboardSwitcher: () => ({}),
+  useDashboardSwitcher: () => ({ items: [], unprovisionedTemplates: [] }),
 }));
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -63,3 +63,4 @@ describe("dashboard server access denial", () => {
     expect(screen.queryByText(t.crmDashboards.noWidgets)).not.toBeInTheDocument();
   });
 });
+

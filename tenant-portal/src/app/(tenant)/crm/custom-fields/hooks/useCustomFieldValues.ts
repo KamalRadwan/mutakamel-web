@@ -13,6 +13,8 @@ import {
   CRM_CUSTOM_FIELDS_PATH,
   type CustomFieldItem,
 } from "../custom-field-contract";
+import { assertCustomFieldValueWrite, isBlankFieldValue, parseCustomFieldValues,
+  type CustomFieldValue } from "../custom-field-values-contract";
 
 const VALUES_PATH = `${CRM_CUSTOM_FIELDS_PATH}/values`;
 const READ_CONFIG = { cache: "no-store", maxResponseBytes: 512 * 1024 } as const;
@@ -22,16 +24,12 @@ const WRITE_CONFIG = {
   nonReplayable: true,
 } as const;
 
-export interface CustomFieldValue {
-  fieldDefinitionId: string;
-  ownerType: string;
-  ownerId: string;
-  value: unknown;
-}
-
 export interface ValueWriteResult {
   ok: boolean;
   error: NormalizedApiError | null;
+  uncertain?: boolean;
+  refreshFailed?: boolean;
+  confirmed?: boolean;
 }
 
 /**
@@ -51,7 +49,9 @@ export function useCustomFieldValues(branchId: string | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const saving = useRef(false);
   // Defect D5. This hook is mounted ONCE and re-pointed at whichever record the
   // user selects, so two loads for two different owners overlap by design. With
   // no epoch and no abort, record A's response could land after record B's and
@@ -87,7 +87,7 @@ export function useCustomFieldValues(branchId: string | null) {
         // D4: with no resolved scope nothing was asked, and the screen says so
         // rather than showing the Gateway's 400.
         setLoadError(isUUIDv7(branchId) && !scope.ready ? SCOPE_UNRESOLVED_ERROR : null);
-        return;
+        return false;
       }
       const controller = new AbortController();
       inFlightRef.current = controller;
@@ -101,15 +101,17 @@ export function useCustomFieldValues(branchId: string | null) {
         );
         // Parsed against the owner that was ASKED for. A row for another record
         // is not a value this screen may show, whatever the request looked like.
-        const parsed = parseValues(response.data, ownerType, ownerId);
-        if (epoch !== epochRef.current) return;
+        const parsed = parseCustomFieldValues(response.data, ownerType, ownerId);
+        if (epoch !== epochRef.current) return false;
         setValues(parsed);
         setHasLoaded(true);
+        return true;
       } catch (error) {
-        if (isAbortError(error) || epoch !== epochRef.current) return;
+        if (isAbortError(error) || epoch !== epochRef.current) return false;
         setValues([]);
         setHasLoaded(false);
         setLoadError(normalizeApiError(error));
+        return false;
       } finally {
         if (epoch === epochRef.current) {
           inFlightRef.current = null;
@@ -130,25 +132,36 @@ export function useCustomFieldValues(branchId: string | null) {
       return { ok: false, error: { status: 0, code: "OWNER_REQUIRED" } };
     }
     if (!scope.ready) return { ok: false, error: SCOPE_UNRESOLVED_ERROR };
+    if (saving.current) return { ok: false, error: null };
+    saving.current = true;
     setIsSaving(true);
+    setSavingFieldId(field.id);
     try {
-      await axiosClient.post<unknown>(
+      const response = await axiosClient.post<unknown>(
         VALUES_PATH,
         {
           branchId,
           fieldDefinitionId: field.id,
           ownerType,
           ownerId,
-          value,
+          value: isBlankFieldValue(value) ? null : value,
         },
-        { ...WRITE_CONFIG, headers: scope.headers },
+        { ...WRITE_CONFIG, skipAutoIdempotency: true, headers: scope.headers },
       );
-      await load(ownerType, ownerId);
+      assertCustomFieldValueWrite(response.data, field.id, ownerType, ownerId, isBlankFieldValue(value));
+      if (!(await load(ownerType, ownerId))) return { ok: false, error: null, confirmed: true, refreshFailed: true };
       return { ok: true, error: null };
     } catch (error) {
-      return { ok: false, error: normalizeApiError(error) };
+      const normalized = normalizeApiError(error);
+      if (normalized.status === 0 || normalized.status >= 500) {
+        const refreshed = await load(ownerType, ownerId);
+        return { ok: false, error: normalized, uncertain: true, refreshFailed: !refreshed };
+      }
+      return { ok: false, error: normalized };
     } finally {
+      saving.current = false;
       setIsSaving(false);
+      setSavingFieldId(null);
     }
   };
 
@@ -157,6 +170,7 @@ export function useCustomFieldValues(branchId: string | null) {
     hasLoaded,
     isLoading,
     isSaving,
+    savingFieldId,
     loadError,
     load,
     save,
@@ -179,48 +193,4 @@ export function useCustomFieldValues(branchId: string | null) {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
-}
-
-/**
- * The response rows, checked against the owner the request asked about.
- *
- * The owner match is the third D5 guard and the only one that survives an
- * abort losing the race: a row carrying another record's `ownerId` is rejected
- * outright rather than rendered under whichever record happens to be selected.
- */
-function parseValues(
-  payload: unknown,
-  expectedOwnerType: string,
-  expectedOwnerId: string,
-): CustomFieldValue[] {
-  if (!Array.isArray(payload) || payload.length > 500) {
-    throw new Error("Invalid CRM custom-field values response.");
-  }
-  return payload.map((entry) => {
-    const value = record(entry);
-    if (
-      !value ||
-      !isUUIDv7(value.fieldDefinitionId) ||
-      typeof value.ownerType !== "string" ||
-      !isUUIDv7(value.ownerId) ||
-      value.ownerType !== expectedOwnerType ||
-      value.ownerId !== expectedOwnerId
-    ) {
-      throw new Error("Invalid CRM custom-field values response.");
-    }
-    return {
-      fieldDefinitionId: value.fieldDefinitionId,
-      ownerType: value.ownerType,
-      ownerId: value.ownerId,
-      // `value` is `unknown` in the entity and its shape follows the field
-      // type. It is rendered through the definition, never guessed at here.
-      value: value.value,
-    };
-  });
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 }

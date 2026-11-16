@@ -18,7 +18,7 @@ export const ToggleGroup = forwardRef<
 >(({ className, size = "md", children, ...props }, ref) => (
   <ToggleGroupPrimitive.Root
     ref={ref}
-    className={cn("inline-flex items-center gap-1 rounded-sm bg-muted p-1", className)}
+    className={cn("inline-flex items-center gap-0.5 rounded-full border border-primary/15 bg-primary/5 p-0.5", className)}
     {...props}
   >
     <ToggleGroupSizeContext.Provider value={size}>{children}</ToggleGroupSizeContext.Provider>
@@ -36,8 +36,8 @@ export const ToggleGroupItem = forwardRef<
     <ToggleGroupPrimitive.Item
       ref={ref}
       className={cn(
-        "inline-flex cursor-pointer items-center justify-center rounded-xs font-medium whitespace-nowrap",
-        "text-muted-foreground transition-colors hover:text-foreground",
+        "inline-flex cursor-pointer items-center justify-center rounded-full font-medium whitespace-nowrap",
+        "text-foreground transition-colors hover:bg-primary/10",
         // The active segment is a state, not an identity: it takes contrast
         // and elevation, never a per-item hue. Three tabs do not get three
         // colours — docs/design/anti-patterns.md#4-hue-coded-controls.

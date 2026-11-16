@@ -146,7 +146,7 @@ export function LeadBoardExpandedCard({
           </span>
           <div className="flex flex-wrap items-center gap-1">
             {lead.tags.map((tag) => (
-              <TagChip key={tag.id} size="sm" label={tag.name}
+              <TagChip key={tag.id} size="compact" label={tag.name}
                 backgroundColor={tag.backgroundColor} textColor={tag.textColor} />
             ))}
           </div>

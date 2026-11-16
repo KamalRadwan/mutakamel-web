@@ -25,7 +25,7 @@ Current source baseline inspected for this work is recorded by the backend contr
 
 | Current documented surface | Addon target, not a claim it exists today |
 | --- | --- |
-| [Subscription](core-billing.md#subscription--4-routes): owner-only, single-App preview/apply; portal seat-increase flow and missing tenant offer enumeration Q25 | Safe tenant App/Tier/Addon offers; versioned bounded changes; preparation and authoritative recovery. Q25 is not closed merely by writing this target. |
+| [Subscription](core-billing.md#subscription--10-routes): owner-only, single-App preview/apply; portal seat-increase flow and missing tenant offer enumeration Q25 | Safe tenant App/Tier/Addon offers; versioned bounded changes; preparation and authoritative recovery. Q25 is not closed merely by writing this target. |
 | [Users and organization](core-identity.md): base module assignments and scoped roles | Separate purchased-addon user assignments and Company/Branch activation/configuration; no replacement identity/RBAC engine. |
 | [CRM catalogues/settings](crm-catalogues.md) | Keep CRM-owned stages, custom fields and configuration; buying an industry addon is a Core commercial action, not CRUD in CRM static data. |
 | [Permissions](../reference/permissions.md) and owner capabilities | Addon use needs source-aware entitlement, counted seats and exact scope in addition to domain permissions. Client checks remain advisory. |

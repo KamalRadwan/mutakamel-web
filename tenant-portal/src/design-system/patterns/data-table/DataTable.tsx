@@ -5,6 +5,7 @@ import { DragDropContext, type DragStart, type DropResult } from "@hello-pangea/
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { Table, TableBody, TableCell, TableRow } from "../../primitives/Table";
 import { cn } from "../../lib/cn";
+import { useSettingsPresentation } from "../../shell/settings-presentation";
 import { useVirtualWindow } from "../../views/useVirtualWindow";
 import { EmptyState } from "../empty-state/EmptyState";
 import { ErrorState } from "../error-state/ErrorState";
@@ -41,6 +42,8 @@ const VIRTUALIZE_ABOVE = 100;
 const ESTIMATED_ROW_PX = 44;
 
 export interface DataTableProps<T> {
+  /** An embedded table shares its border and footer with its containing card. */
+  surface?: "default" | "embedded";
   columns: ColumnDef<T>[];
   rows: T[];
   isLoading: boolean;
@@ -48,6 +51,9 @@ export interface DataTableProps<T> {
   onRetry?: () => void;
   page?: PageInfo;
   onPageChange?: (page: number) => void;
+  pageSizeOptions?: readonly number[];
+  onPageSizeChange?: (size: number) => void;
+  hideFirstLast?: boolean;
   sort?: SortState;
   onSortChange?: (sort: SortState) => void;
   rowKey: (row: T) => string;
@@ -86,6 +92,7 @@ export interface DataTableProps<T> {
 // of these. Feature code reaches it through TableView, which adapts it to the
 // shared view contract. See docs/design/patterns.md#datatable.
 export function DataTable<T>({
+  surface = "default",
   columns,
   rows,
   isLoading,
@@ -93,6 +100,9 @@ export function DataTable<T>({
   onRetry,
   page,
   onPageChange,
+  pageSizeOptions,
+  onPageSizeChange,
+  hideFirstLast = false,
   sort,
   onSortChange,
   rowKey,
@@ -104,9 +114,11 @@ export function DataTable<T>({
   layoutLabels,
   showRowNumbers = true,
   rowReorder,
-  density = "default",
+  density: requestedDensity,
   className,
 }: DataTableProps<T>) {
+  const settings = useSettingsPresentation();
+  const density = requestedDensity ?? (settings ? "compact" : "default");
   // Resolved every render rather than stored: the declared column set is the
   // source of truth, and a layout persisted before a column existed must not
   // hide it.
@@ -194,13 +206,23 @@ export function DataTable<T>({
     return <ErrorState title={labels.errorTitle} onRetry={onRetry} retryLabel={labels.retry} className={className} />;
   }
 
+  const paginationNode =
+    page && onPageChange ? (
+      <Pagination
+        page={page}
+        onPageChange={onPageChange}
+        pageSizeOptions={pageSizeOptions}
+        onPageSizeChange={onPageSizeChange}
+        hideFirstLast={hideFirstLast}
+        labels={labels.pagination}
+      />
+    ) : null;
+
   if (rows.length === 0) {
     return (
       <div className={cn("flex flex-col gap-3", className)}>
         {emptyState ?? <EmptyState title={labels.emptyTitle} />}
-        {page && onPageChange && (
-          <Pagination page={page} onPageChange={onPageChange} labels={labels.pagination} />
-        )}
+        {paginationNode}
       </div>
     );
   }
@@ -266,16 +288,16 @@ export function DataTable<T>({
   );
 
   const grid = (
-    <div className={cn("flex flex-col gap-3", range && "h-full min-h-0", className)}>
+    <div className={cn("flex flex-col gap-3", surface === "embedded" && "gap-0", range && "h-full min-h-0", className)}>
       {/* Horizontal overflow lives inside this container — the page itself
           never scrolls sideways. When the body is windowed this container also
           owns the vertical scroll, which is what finally gives the sticky
           header something to stick to. */}
       <div
         ref={scrollRef}
-        className={cn("overflow-x-auto rounded-md border border-border", range && "min-h-0 flex-1 overflow-y-auto")}
+        className={cn("overflow-x-auto rounded-md border border-border", surface === "embedded" && "rounded-none border-0", range && "min-h-0 flex-1 overflow-y-auto")}
       >
-        <Table>
+        <Table className={surface === "embedded" ? "[&_th]:normal-case [&_th]:tracking-normal" : undefined}>
           <DataTableHeader
             columns={orderedColumns}
             sort={sort}
@@ -294,8 +316,10 @@ export function DataTable<T>({
           {body}
         </Table>
       </div>
-      {page && onPageChange && (
-        <Pagination page={page} onPageChange={onPageChange} labels={labels.pagination} />
+      {paginationNode && (
+        <div className={surface === "embedded" ? "border-t border-border px-4 py-3" : undefined}>
+          {paginationNode}
+        </div>
       )}
     </div>
   );

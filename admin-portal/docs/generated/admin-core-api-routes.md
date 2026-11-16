@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-10-17T18:32:01.827Z**
+Generated at: **2026-10-27T23:05:25.244Z**
 
-Frontend revision: `0f84e3fbe923+dirty`
+Frontend revision: `9aae7b9a8778+dirty`
 
-Backend revision: `a51c1d6ccf36+dirty`
+Backend revision: `a70802f0a3b0+dirty`
 
 ## Coverage
 
-This inventory contains **289** browser-visible Core Admin routes.
+This inventory contains **298** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 104 |
-| PUBLIC | 6 |
+| AUTHENTICATED | 106 |
+| PUBLIC | 8 |
 | READ_HEAVY | 23 |
-| WRITE_SENSITIVE | 156 |
-| **Total** | **289** |
+| WRITE_SENSITIVE | 161 |
+| **Total** | **298** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -33,26 +33,27 @@ Machine-readable source:
 | --- | ---: |
 | applications | 42 |
 | audit | 3 |
-| auth | 12 |
+| auth | 17 |
 | auth-invalidation-outbox | 1 |
 | catalog | 17 |
 | dashboard | 1 |
 | database-servers | 20 |
+| email-suppressions | 2 |
 | invoices | 7 |
 | logging | 6 |
-| notifications | 12 |
+| notifications | 9 |
 | payments | 5 |
 | permissions | 1 |
 | provisioning | 35 |
 | reports | 5 |
-| roles | 6 |
+| roles | 8 |
 | storage-migrations | 3 |
 | storage-servers | 13 |
 | subscriptions | 12 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
-| tenants | 60 |
-| users | 10 |
+| tenants | 62 |
+| users | 11 |
 | wallets | 6 |
 
 ## Routes
@@ -117,6 +118,11 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/auth/logout` | PUBLIC | yes | ALL | — | `core.admin.auth.logout` |
 | POST | `/api/admin/core/v1/auth/logout-all` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.logout-all` |
 | GET | `/api/admin/core/v1/auth/me` | AUTHENTICATED | yes | ALL | — | `core.admin.auth.me` |
+| POST | `/api/admin/core/v1/auth/mfa/resend` | PUBLIC | no | ALL | — | `core.admin.auth.mfa.resend` |
+| POST | `/api/admin/core/v1/auth/mfa/settings/challenge` | WRITE_SENSITIVE | no | ALL | — | `core.admin.auth.mfa.settings.challenge` |
+| POST | `/api/admin/core/v1/auth/mfa/settings/confirm` | WRITE_SENSITIVE | no | ALL | — | `core.admin.auth.mfa.settings.confirm` |
+| POST | `/api/admin/core/v1/auth/mfa/settings/resend` | WRITE_SENSITIVE | no | ALL | — | `core.admin.auth.mfa.settings.resend` |
+| POST | `/api/admin/core/v1/auth/mfa/verify` | PUBLIC | no | ALL | — | `core.admin.auth.mfa.verify` |
 | POST | `/api/admin/core/v1/auth/presence` | AUTHENTICATED | no | ALL | — | `core.admin.auth.presence` |
 | POST | `/api/admin/core/v1/auth/refresh` | PUBLIC | no | ALL | — | `core.admin.auth.refresh` |
 | POST | `/api/admin/core/v1/auth/reset-password` | PUBLIC | no | ALL | — | `core.admin.auth.reset-password` |
@@ -147,6 +153,8 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/database-servers/:id/system-principals/:purpose/credential/regenerate` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.credentials.rotate + admin.database_servers.critical | `core.admin.database-servers.system-principal.credential.regenerate` |
 | PATCH | `/api/admin/core/v1/database-servers/:id/system-principals/:purpose/rotation-policy` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.database-servers.system-principal.rotation-policy.update` |
 | POST | `/api/admin/core/v1/database-servers/check-connectivity` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.create | `core.admin.database-servers.check-connectivity` |
+| POST | `/api/admin/core/v1/email-suppressions/lift` | WRITE_SENSITIVE | yes | ALL | admin.settings.update + admin.settings.critical | `core.admin.email-suppressions.lift` |
+| POST | `/api/admin/core/v1/email-suppressions/lookup` | WRITE_SENSITIVE | yes | ALL | admin.settings.update + admin.settings.critical | `core.admin.email-suppressions.lookup` |
 | DELETE | `/api/admin/core/v1/features/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.features.delete` |
 | PATCH | `/api/admin/core/v1/features/:id` | WRITE_SENSITIVE | yes | ALL | admin.catalog.manage + admin.catalog.critical | `core.admin.catalog.features.update` |
 | GET | `/api/admin/core/v1/invoices` | AUTHENTICATED | yes | ALL | admin.invoices.read | `core.admin.invoices.list` |
@@ -164,12 +172,9 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/logging/level-overrides/live` | AUTHENTICATED | no | ALL | admin.logging.read + admin.logging.critical | `core.admin.logging.live` |
 | GET | `/api/admin/core/v1/notifications` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.get` |
 | DELETE | `/api/admin/core/v1/notifications/:id` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.delete` |
-| POST | `/api/admin/core/v1/notifications/:id/ack` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.ack.post` |
 | POST | `/api/admin/core/v1/notifications/:id/acknowledge` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.acknowledge.post` |
-| POST | `/api/admin/core/v1/notifications/:id/dismiss` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.dismiss.post` |
 | POST | `/api/admin/core/v1/notifications/:id/read` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.read.post` |
 | GET | `/api/admin/core/v1/notifications/config` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.config.get` |
-| POST | `/api/admin/core/v1/notifications/mark-all-read` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.mark-all-read.post` |
 | GET | `/api/admin/core/v1/notifications/preferences` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.preferences.get` |
 | PUT | `/api/admin/core/v1/notifications/preferences` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.preferences.put` |
 | POST | `/api/admin/core/v1/notifications/read-all` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.read-all.post` |
@@ -225,6 +230,8 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/roles/:id` | AUTHENTICATED | yes | ALL | admin.roles.read | `core.admin.roles.get` |
 | PATCH | `/api/admin/core/v1/roles/:id` | WRITE_SENSITIVE | yes | ALL | admin.roles.update | `core.admin.roles.update` |
 | PATCH | `/api/admin/core/v1/roles/:id/permissions` | WRITE_SENSITIVE | yes | ALL | admin.roles.update + admin.roles.critical | `core.admin.roles.permissions.set` |
+| GET | `/api/admin/core/v1/roles/assignable-for-assignment` | AUTHENTICATED | yes | ALL | admin.users.assign_roles + admin.users.critical | `core.admin.roles.assignable-for-assignment` |
+| GET | `/api/admin/core/v1/roles/assignable-for-invite` | AUTHENTICATED | yes | ALL | admin.users.invite + admin.users.critical | `core.admin.roles.assignable-for-invite` |
 | GET | `/api/admin/core/v1/storage-migrations/:id` | AUTHENTICATED | yes | ALL | admin.storage_migrations.read | `core.admin.storage-migrations.get` |
 | POST | `/api/admin/core/v1/storage-migrations/:id/release-source` | WRITE_SENSITIVE | yes | ALL | admin.storage_migrations.execute + admin.storage_migrations.critical | `core.admin.storage-migrations.release-source` |
 | GET | `/api/admin/core/v1/storage-servers` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.list` |
@@ -306,9 +313,11 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning-state/components` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning-state.components.list` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning-state/seeds` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning-state.seeds.list` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/add-application` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.add-application + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.add-application` |
+| POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/close-failed` | WRITE_SENSITIVE | yes | ALL | admin.tenants.reprovision + admin.tenants.critical + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.close-failed` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.decommission + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.decommission` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/operations/repair` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.repair + admin.provisioning.critical | `core.admin.tenants.provisioning.operations.repair` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-evidence` | READ_HEAVY | yes | ALL | admin.provisioning.prerequisites.read | `core.admin.tenants.provisioning.prerequisite-evidence.list` |
+| POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-releases/resend` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.prerequisites.request + admin.provisioning.critical | `core.admin.tenants.provisioning.prerequisite-releases.resend` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/prerequisite-requests` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.prerequisites.request + admin.provisioning.critical | `core.admin.tenants.provisioning.prerequisite-requests.create` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/provisioning/seed-conflicts/:seedStateId/resolve` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.conflicts.resolve + admin.provisioning.critical | `core.admin.tenants.provisioning.seed-conflicts.resolve` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/provisioning/updates` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.provisioning.updates.list` |
@@ -342,6 +351,7 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/users/:id` | AUTHENTICATED | yes | ALL | admin.users.read | `core.admin.users.get` |
 | PATCH | `/api/admin/core/v1/users/:id` | WRITE_SENSITIVE | yes | ALL | admin.users.update + admin.users.critical | `core.admin.users.update` |
 | POST | `/api/admin/core/v1/users/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.users.suspend + admin.users.critical | `core.admin.users.activate` |
+| POST | `/api/admin/core/v1/users/:id/resend-invite` | WRITE_SENSITIVE | yes | ALL | admin.users.invite + admin.users.critical | `core.admin.users.resend-invite` |
 | PATCH | `/api/admin/core/v1/users/:id/roles` | WRITE_SENSITIVE | yes | ALL | admin.users.assign_roles + admin.users.critical | `core.admin.users.roles.set` |
 | POST | `/api/admin/core/v1/users/:id/suspend` | WRITE_SENSITIVE | yes | ALL | admin.users.suspend + admin.users.critical | `core.admin.users.suspend` |
 | GET | `/api/admin/core/v1/users/me/profile` | AUTHENTICATED | yes | ALL | — | `core.admin.users.profile.get` |

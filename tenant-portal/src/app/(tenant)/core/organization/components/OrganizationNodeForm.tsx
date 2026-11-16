@@ -15,27 +15,35 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import {
   ORG_ADDRESS_MAX_LENGTH,
-  ORG_CODE_MAX_LENGTH,
-  ORG_CURRENCY_CODE_LENGTH,
   ORG_LEGAL_NAME_MAX_LENGTH,
-  ORG_NAME_MAX_LENGTH,
   ORG_NODE_STATUSES,
   ORG_PHONE_MAX_LENGTH,
   ORG_TAX_NUMBER_MAX_LENGTH,
 } from "../../contracts/organization-contract";
 import type { RemoteOptions } from "../../hooks/useCoreOptions";
+import type { OrganizationCascadeResult } from "../../hooks/useOrganizationCascade";
+import type { OrgFormValidations } from "../hooks/useOrganizationForm";
 import type { OrgLevelConfig } from "../level-config";
-import type { OrgNodeFormValues } from "../hooks/useOrganizationLevel";
+import { hasSavedCompanyCurrency, type OrgNodeFormValues } from "../organization-payloads";
+import { OrganizationCascadeFields, type EditReadOnlyParents } from "./OrganizationCascadeFields";
+import { OrganizationIdentityFields } from "./OrganizationIdentityFields";
 
 interface OrganizationNodeFormProps {
   config: OrgLevelConfig;
   values: OrgNodeFormValues;
   onChange: (patch: Partial<OrgNodeFormValues>) => void;
-  /** Create sends `code` and the parent id; update sends neither, plus `status`. */
+  /** Create sends `code` and the direct parent id; update sends neither, plus `status`. */
   mode: "create" | "edit";
   isSubmitting: boolean;
-  parentOptions: RemoteOptions;
+  hasSavedCurrency?: boolean;
+  cascade?: OrganizationCascadeResult;
+  parentOptions?: RemoteOptions;
   leadUserOptions: RemoteOptions;
+  canReadUsers?: boolean;
+  selectedLeadLabel?: string;
+  missingUpstreamPermission?: boolean;
+  validations?: OrgFormValidations;
+  editReadOnlyParents?: EditReadOnlyParents;
 }
 
 export function OrganizationNodeForm({
@@ -44,61 +52,47 @@ export function OrganizationNodeForm({
   onChange,
   mode,
   isSubmitting,
+  hasSavedCurrency,
+  cascade,
   parentOptions,
   leadUserOptions,
+  canReadUsers = true,
+  selectedLeadLabel,
+  missingUpstreamPermission = false,
+  validations,
+  editReadOnlyParents,
 }: OrganizationNodeFormProps) {
   const { t } = useI18n();
   const copy = t.coreIdentity;
-  const levelCopy = copy.levels[config.level];
+  const currencyRequired =
+    mode === "edit" && (hasSavedCurrency ?? hasSavedCompanyCurrency(values.currencyCode));
 
   return (
     <div className="flex flex-col gap-4">
-      {mode === "create" && config.parent ? (
-        <Field label={copy.levels[config.parent].parentLabel} required>
-          <Combobox
-            value={values.parentId || undefined}
-            selectedLabel={parentOptions.labelFor(values.parentId)}
-            onValueChange={(next) => onChange({ parentId: next ?? "" })}
-            options={parentOptions.options}
-            onSearch={parentOptions.search}
-            loading={parentOptions.isLoading}
-            disabled={isSubmitting}
-            placeholder={copy.picker.placeholder}
-            searchPlaceholder={copy.picker.searchPlaceholder}
-            loadingLabel={copy.picker.loading}
-            emptyLabel={copy.picker.empty}
-          />
-        </Field>
-      ) : null}
+      <OrganizationCascadeFields
+        config={config}
+        mode={mode}
+        values={values}
+        isSubmitting={isSubmitting}
+        cascade={cascade}
+        parentOptions={parentOptions}
+        onDirectParentChange={(parentId) => onChange({ parentId })}
+        missingUpstreamPermission={missingUpstreamPermission}
+        parentValidation={validations?.parent}
+        editReadOnlyParents={editReadOnlyParents}
+      />
 
-      {mode === "create" ? (
-        <Field label={copy.fields.code} hint={copy.fields.codeHint} required>
-          <Input size="sm" placeholder={copy.fields.code}
-            dir="ltr"
-            value={values.code}
-            onChange={(event) => onChange({ code: event.target.value })}
-            maxLength={ORG_CODE_MAX_LENGTH}
-            disabled={isSubmitting}
-            required
-          />
-        </Field>
-      ) : null}
-
-      <Field label={levelCopy.nameLabel} required>
-        <Input size="sm" placeholder={levelCopy.nameLabel}
-          value={values.name}
-          onChange={(event) => onChange({ name: event.target.value })}
-          maxLength={ORG_NAME_MAX_LENGTH}
-          disabled={isSubmitting}
-          required
-        />
-      </Field>
+      <OrganizationIdentityFields config={config} values={values} onChange={onChange} mode={mode}
+        isSubmitting={isSubmitting} currencyRequired={currencyRequired} validations={validations} />
 
       {config.fields.includes("legalName") ? (
-        <Field label={copy.fields.legalName}>
-          <Input size="sm" placeholder={copy.fields.legalName}
+        <Field label={copy.fields.legalName} error={validations?.legalName.error} showLabel>
+          <Input
+            size="sm"
+            placeholder={copy.fields.legalName}
             value={values.legalName}
             onChange={(event) => onChange({ legalName: event.target.value })}
+            onBlur={validations?.legalName.fieldProps.onBlur}
             maxLength={ORG_LEGAL_NAME_MAX_LENGTH}
             disabled={isSubmitting}
           />
@@ -106,54 +100,39 @@ export function OrganizationNodeForm({
       ) : null}
 
       {config.fields.includes("taxNumber") ? (
-        <Field label={copy.fields.taxNumber}>
-          <Input size="sm" placeholder={copy.fields.taxNumber}
-            dir="ltr"
-            value={values.taxNumber}
-            onChange={(event) => onChange({ taxNumber: event.target.value })}
-            maxLength={ORG_TAX_NUMBER_MAX_LENGTH}
-            disabled={isSubmitting}
-          />
+        <Field label={copy.fields.taxNumber} error={validations?.taxNumber.error} showLabel>
+          <Input size="sm" placeholder={copy.fields.taxNumber} dir="ltr" value={values.taxNumber}
+            onChange={event => onChange({ taxNumber: event.target.value })}
+            onBlur={validations?.taxNumber.fieldProps.onBlur} maxLength={ORG_TAX_NUMBER_MAX_LENGTH}
+            disabled={isSubmitting} />
         </Field>
       ) : null}
 
-      {config.fields.includes("currencyCode") ? (
-        <Field
-          label={copy.fields.currencyCode}
-          hint={mode === "edit" ? copy.fields.currencyCodeRequiredHint : copy.fields.currencyCodeHint}
-          required={mode === "edit"}
-        >
-          <Input size="sm" placeholder={copy.fields.currencyCode}
+      {config.fields.includes("phone") ? (
+        <Field label={copy.fields.phone} error={validations?.phone.error} showLabel>
+          <Input
+            size="sm"
+            placeholder={copy.fields.phone}
             dir="ltr"
-            value={values.currencyCode}
-            onChange={(event) => onChange({ currencyCode: event.target.value })}
-            required={mode === "edit"}
-            maxLength={ORG_CURRENCY_CODE_LENGTH}
+            value={values.phone}
+            onChange={(event) => onChange({ phone: event.target.value })}
+            onBlur={validations?.phone.fieldProps.onBlur}
+            maxLength={ORG_PHONE_MAX_LENGTH}
             disabled={isSubmitting}
           />
         </Field>
       ) : null}
 
       {config.fields.includes("address") ? (
-        <Field label={copy.fields.address}>
-          <Textarea placeholder={copy.fields.address}
+        <Field label={copy.fields.address} error={validations?.address.error} showLabel>
+          <Textarea
+            placeholder={copy.fields.address}
             value={values.address}
             onChange={(event) => onChange({ address: event.target.value })}
+            onBlur={validations?.address.fieldProps.onBlur}
             maxLength={ORG_ADDRESS_MAX_LENGTH}
             disabled={isSubmitting}
             rows={3}
-          />
-        </Field>
-      ) : null}
-
-      {config.fields.includes("phone") ? (
-        <Field label={copy.fields.phone}>
-          <Input size="sm" placeholder={copy.fields.phone}
-            dir="ltr"
-            value={values.phone}
-            onChange={(event) => onChange({ phone: event.target.value })}
-            maxLength={ORG_PHONE_MAX_LENGTH}
-            disabled={isSubmitting}
           />
         </Field>
       ) : null}
@@ -174,15 +153,23 @@ export function OrganizationNodeForm({
       ) : null}
 
       {config.fields.includes("leadUserId") ? (
-        <Field label={copy.fields.leadUser}>
+        <Field
+          label={copy.fields.leadUser}
+          hint={!canReadUsers ? t.crmLeadDetail.usersPermissionRequired : undefined}
+          error={validations?.leadUser.error}
+          showLabel
+        >
           <Combobox
             value={values.leadUserId || undefined}
-            selectedLabel={leadUserOptions.labelFor(values.leadUserId)}
-            onValueChange={(next) => onChange({ leadUserId: next ?? "" })}
+            selectedLabel={leadUserOptions.labelFor(values.leadUserId) ?? selectedLeadLabel}
+            onValueChange={(next) => {
+              onChange({ leadUserId: next ?? "" });
+              validations?.leadUser.fieldProps.onBlur();
+            }}
             options={leadUserOptions.options}
             onSearch={leadUserOptions.search}
             loading={leadUserOptions.isLoading}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !canReadUsers}
             placeholder={copy.picker.placeholder}
             searchPlaceholder={copy.picker.searchPlaceholder}
             loadingLabel={copy.picker.loading}
@@ -193,7 +180,7 @@ export function OrganizationNodeForm({
       ) : null}
 
       {mode === "edit" ? (
-        <Field label={copy.fields.status} hint={copy.fields.statusHint}>
+        <Field label={copy.fields.status} hint={copy.fields.statusHint} showLabel>
           <Select
             value={values.status}
             onValueChange={(next) =>

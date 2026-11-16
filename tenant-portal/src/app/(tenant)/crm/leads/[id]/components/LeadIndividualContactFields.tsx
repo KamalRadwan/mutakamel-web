@@ -15,11 +15,11 @@ export function LeadIndividualContactFields({ lead, edit, disabled }: {
   disabled: boolean;
 }) {
   const { t } = useI18n();
-  const textField = (field: "displayName" | "firstName" | "lastName" | "email", label: string) => {
+  const textField = (field: "displayName" | "firstName" | "lastName" | "email" | "jobTitle", label: string) => {
     const maxLength = field === "firstName" || field === "lastName"
       ? LEAD_CONTACT_EDIT_LIMITS.name : LEAD_CONTACT_EDIT_LIMITS[field];
     return edit.form ? (
-      <Field label={label} error={edit.errors[field]}>
+      <Field label={label} error={edit.errors[field] ?? (field === "firstName" ? edit.errors.displayName : undefined)}>
         <Input size="sm" placeholder={label} value={edit.form[field]} maxLength={maxLength} disabled={disabled}
           type={field === "email" ? "email" : "text"}
           dir={field === "email" ? "ltr" : undefined}
@@ -67,6 +67,7 @@ export function LeadIndividualContactFields({ lead, edit, disabled }: {
         },
         {
           label: t.crmLeadDetail.honorificTitle,
+          third: !!edit.form,
           value: edit.form ? (
             <Field label={t.crmLeadDetail.honorificTitle} error={edit.errors.honorificTitle}>
               <HonorificSelect
@@ -80,14 +81,15 @@ export function LeadIndividualContactFields({ lead, edit, disabled }: {
             lead.honorificTitle
           ),
         },
-        { label: t.crmLeads.name, value: textField("displayName", t.crmLeads.name) },
-        { label: t.crmLeadDetail.firstName, value: textField("firstName", t.crmLeadDetail.firstName) },
-        { label: t.crmLeadDetail.lastName, value: textField("lastName", t.crmLeadDetail.lastName) },
+        ...(!edit.form ? [{ label: t.crmLeads.name, value: textField("displayName", t.crmLeads.name) }] : []),
+        { label: t.crmLeadDetail.firstName, third: !!edit.form, value: textField("firstName", t.crmLeadDetail.firstName) },
+        { label: t.crmLeadDetail.lastName, third: !!edit.form, value: textField("lastName", t.crmLeadDetail.lastName) },
         { label: t.crmLeads.email, value: textField("email", t.crmLeads.email) },
-        {
+        { label: t.crmLeadConvert.contactJobTitle, value: textField("jobTitle", t.crmLeadConvert.contactJobTitle) },
+        ...(!edit.form ? [{
           label: t.crmCustomerProfiles.type,
           value: t.crmCustomerProfiles.profileTypes[lead.leadProfileType],
-        },
+        }] : []),
       ]}
     />
   );

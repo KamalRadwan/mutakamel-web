@@ -1,5 +1,41 @@
 # Shell & Navigation
 
+## CRM analytics and Settings navigation — 2026-11-05
+
+CRM navigation ends with one direct **Settings** link, after **Reports**. It
+opens Lead Stages when that route is permitted, otherwise the first permitted
+settings destination. There is no Settings dropdown. The command palette still
+indexes the individual destinations and their existing URLs.
+
+Only CRM settings pages render the internal 240px aside. The nine entries
+keep their order and use the same permission filtering as the global nav.
+Sales configuration and Data & communication are visual groups.
+The active destination stays visible, and long bilingual labels wrap.
+The page action bar sits in the content column beside this aside; its portals
+retain the page's state and event handlers. Under `lg`, the **Settings sections**
+button opens a logical-start sheet, closes on navigation, and restores focus.
+
+Route ownership uses the longest matching navigation destination. In particular,
+`/crm/dashboard`, `/crm/dashboards`, `/crm/widgets` and their descendants
+are full-width analytics workspaces. The top-level Dashboard link opens the
+existing default resolver. The Reports menu contains Report explorer,
+Dashboard library and Widget library, each filtered by its actual read permission.
+Analytics is independent of settings access. Leads, Customers,
+Opportunities, Activities, Workspace and Trade keep their full-width layout.
+
+Analytics also keeps its PageHeader title, description and single primary action
+together in the workspace. The shared PageHeader still owns the only primary
+button implementation. Other apps and CRM record pages retain action-bar
+portals, and settings retain their compact presentation. Library search is in
+the full-width library body; permission, mutation and recovery handlers stay
+with the owning feature hook.
+
+The height chain remains `h-dvh` → `flex-1 min-h-0` → content column → main.
+All screen roots stay direct children of main so boards retain a defined height.
+
+Verification: `crm-settings-navigation.test.ts`, `CrmSettingsAside.test.tsx`,
+`AppShell.actions.test.tsx`, and the nav configuration/menu tests.
+
 Status: **Implemented**
 
 Written: **2026-08-27**
@@ -247,9 +283,11 @@ the trip a reader makes from a record far more often than any other, and it is
 why a detail screen no longer needs to draw its own back arrow in the body.
 
 Matching is **longest prefix wins, at a path boundary**. Both halves matter:
-`/core/settings` and `/core/settings/currencies` are both nav items and both
-prefix the currencies route, so a first-match scan labels every settings screen
-"All settings"; and `/crm/leads` must not claim `/crm/lead-stages`.
+a parent entry route and a child route (for example `/core/directory` and
+`/core/directory/settings`) can both be nav items where one prefixes the other,
+and `/crm/leads` must not claim `/crm/lead-stages`. (`/core/settings` itself is
+a redirect-only entry resolving the first accessible item in
+`CORE_SETTINGS_NAV_ITEMS`, not a standalone nav item.)
 
 It is plain text, not a `<nav>` — the sections have no index route, so there is
 nothing to link, and a second navigation landmark would only add noise to the
@@ -418,9 +456,14 @@ other reason it survives untouched.
 
 ## Sub-navigation
 
-CRM setup's five screens, Core settings' six, and eight other groups share
+CRM setup's five screens and sibling multi-screen groups (such as billing,
+identity, directory, and templates) share
 `SubNav` — a horizontal second-level nav with an active underline driven by
-`usePathname()`, rendered in the page body under `PageHeader`.
+`usePathname()`, rendered in the page body under `PageHeader`. Core settings
+screens (`workspace`, `currencies`, `taxes`, `numbering`, `email`, `branding`,
+`updates`, `webphone`) omit the repeated body `SubNav` and rely on `GlobalNav`'s
+Settings menu plus `PageActionBar`, while `/core/settings` redirects to the
+first accessible entry in `CORE_SETTINGS_NAV_ITEMS` (or `/unavailable`).
 
 **It did not fold into either bar.** The global nav's section menu answers "what
 else is in this section" one click away; `SubNav` answers it without the click,

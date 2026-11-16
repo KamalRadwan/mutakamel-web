@@ -5,15 +5,18 @@ import { Button } from "@/design-system";
 import { useToast } from "@/components/ui/ToastContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
+import { useSettingsSaveConfirmation } from "../hooks/useSettingsSaveConfirmation";
+import { SettingsSaveConfirmation } from "./SettingsSaveConfirmation";
 
 interface SaveSettingsBannerProps {
   hasUnsavedChanges: boolean;
   isSaving: boolean;
   onSave: () => Promise<void>;
   lang: string;
+  confirmationDescription?: string;
 }
 
-export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }: SaveSettingsBannerProps) {
+export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang, confirmationDescription }: SaveSettingsBannerProps) {
   useToast();
   const copy = (lang === "ar" ? ar : en).settings.banner;
 
@@ -24,6 +27,7 @@ export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }
       // Errors are handled and toasted centrally inside the hook
     }
   };
+  const confirmation = useSettingsSaveConfirmation(handleSave);
 
   if (!hasUnsavedChanges && !isSaving) return null;
 
@@ -39,13 +43,19 @@ export function SaveSettingsBanner({ hasUnsavedChanges, isSaving, onSave, lang }
         type="button"
         variant="primary"
         size="sm"
-        onClick={handleSave}
+        onClick={confirmation.request}
         loading={isSaving}
+        disabled={isSaving}
         className="w-full sm:w-auto"
       >
         {!isSaving && <Save className="size-3.5" />}
         {copy.saveChanges}
       </Button>
+      <SettingsSaveConfirmation
+        confirmation={confirmation}
+        description={confirmationDescription ?? (lang === "ar" ? ar : en).settings.confirmation.generic}
+        lang={lang}
+      />
     </div>
   );
 }

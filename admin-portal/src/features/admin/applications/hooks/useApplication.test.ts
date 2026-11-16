@@ -3,6 +3,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PublishApplicationDto } from "../types";
+import { en } from "@/i18n/dictionaries/en";
+
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
 
 const { getMock, getManifestsMock, mutateMock, publishMock, toastMock } = vi.hoisted(() => ({
   getMock: vi.fn(),

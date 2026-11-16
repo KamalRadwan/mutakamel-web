@@ -1,15 +1,22 @@
 "use client";
 
-import { Archive, Eye, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { useRef, type RefObject } from "react";
+import { Archive, Eye, LockKeyhole, RotateCcw } from "lucide-react";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   ConfirmActionModal,
+  DataTable,
   DetailSection,
   DegradedBanner,
   EmptyState,
   ErrorState,
-  IdentifierText,
+  PermissionGate,
   ReasonDialog,
   Skeleton,
 } from "@/design-system";
@@ -18,19 +25,53 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { useCoreOperationsErrorText } from "../../../hooks/useCoreOperationsErrorText";
 import type { useTemplateRelease } from "../hooks/useTemplateRelease";
+import type { TemplateVersion } from "../../template-lifecycle-contract";
+import { TEMPLATE_READ_PERMISSION } from "../../templates-contract";
+import { templateVersionHistoryCopy } from "../../template-version-history-copy";
+
+import { isTemplateFocusTarget } from "../feedback/inspector-feedback-context";
+import { focusTemplateRegionWhenIdle } from "../feedback/published-preview-focus";
+
+type VersionRestoreOpener = { element: HTMLButtonElement; isCurrent: () => boolean };
+
+export function restoreTemplateVersionFocus(event: Event, opener: VersionRestoreOpener | null, scope: HTMLElement | null) {
+  event.preventDefault();
+  if (!opener?.isCurrent() || !scope) return;
+  const target = isTemplateFocusTarget(opener.element, scope) ? opener.element : scope;
+  focusTemplateRegionWhenIdle(target);
+}
 
 export function TemplateVersionsPanel({
   release,
   canRestore,
   canPublish,
+  designHref,
+  currentVersionId,
+  focusScope,
+  isRestoreFocusCurrent,
 }: {
   release: ReturnType<typeof useTemplateRelease>;
   canRestore: boolean;
   canPublish: boolean;
+  designHref?: string;
+  currentVersionId?: string;
+  focusScope: RefObject<HTMLDivElement | null>;
+  isRestoreFocusCurrent: () => boolean;
 }) {
+  const restoreOpener = useRef<VersionRestoreOpener | null>(null);
   const { t, lang } = useI18n();
   const copy = t.coreOperations.templates;
+  const history = templateVersionHistoryCopy[lang];
   const describeError = useCoreOperationsErrorText();
+  const { versionDetail: detail, registerVersionDetail, registerVersionHistory } = release;
+
+  if (release.versionsError?.status === 403) {
+    return (
+      <DetailSection title={copy.versionsTitle} description={copy.versionsDescription}>
+        <PermissionGate require={TEMPLATE_READ_PERMISSION} denied>{null}</PermissionGate>
+      </DetailSection>
+    );
+  }
 
   return (
     <DetailSection title={copy.versionsTitle} description={copy.versionsDescription}>
@@ -50,41 +91,58 @@ export function TemplateVersionsPanel({
       ) : release.versions.length === 0 ? (
         <EmptyState title={copy.versionsEmpty} description={copy.versionsEmptyDescription} />
       ) : (
-        <ul className="flex flex-col divide-y divide-border">
-          {release.versions.map((version) => (
-            <li
-              key={version.id}
-              className="flex flex-wrap items-center justify-between gap-2 py-2"
-              aria-busy={release.pendingVersionId === version.id}
-            >
-              <span className="flex min-w-0 flex-col">
-                <span className="text-sm text-foreground">
-                  {formatTemplate(copy.versionLabel, { number: String(version.versionNumber) })}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {version.changeNote ?? formatDateTime(version.publishedAt, lang)}
-                </span>
-              </span>
-              <span className="flex items-center gap-2">
+        <DataTable<TemplateVersion>
+          surface="embedded" rows={release.versions} isLoading={false} showRowNumbers={false} rowKey={version => version.id}
+          labels={{
+            retry: t.common.retry, errorTitle: copy.versionsLoadFailed, emptyTitle: copy.versionsEmpty,
+            selectAll: t.views.selectAll, selectRow: t.views.selectItem, sortAscending: t.views.sortAscending,
+            sortDescending: t.views.sortDescending, notSorted: t.views.notSorted,
+            pagination: { previous: t.common.previousPage, next: t.common.nextPage, summary: () => "" },
+          }}
+          columns={[
+            { id: "version", header: history.version, cell: version => formatTemplate(copy.versionLabel, { number: String(version.versionNumber) }) },
+            { id: "status", header: t.common.status, cell: version => (
+              <span className="flex flex-wrap gap-1">
                 <Badge tone={version.lifecycleStatus === "PUBLISHED" ? "positive" : "neutral"}>
                   {copy.versionStatuses[version.lifecycleStatus] ?? version.lifecycleStatus}
                 </Badge>
+                {version.id === currentVersionId && version.lifecycleStatus === "PUBLISHED" && <Badge tone="positive">{history.current}</Badge>}
+              </span>
+            ) },
+            { id: "publishedAt", header: history.publishedAt, cell: version => <time dateTime={version.publishedAt}>{formatDateTime(version.publishedAt, lang)}</time> },
+            { id: "publisher", header: history.publisher, cell: version => <bdi>{version.publisherName ?? t.detail.notRecorded}</bdi> },
+            { id: "changeNote", header: copy.changeNote, cell: version => <span dir="auto">{version.changeNote ?? t.detail.notRecorded}</span> },
+            { id: "actions", header: t.common.actions, cell: version => (
+              <span className="flex flex-wrap items-center gap-1">
                 <Button
-                  variant="ghost"
-                  size="xs"
+                  variant={detail?.row.id === version.id ? "secondary" : "ghost"}
+                  size="sm"
                   aria-label={`${copy.versionView}: ${version.versionNumber}`}
-                  disabled={release.pendingVersionId !== null}
-                  onClick={() => release.openVersion(version)}
+                  aria-expanded={detail?.row.id === version.id}
+                  aria-controls={detail?.row.id === version.id ? release.versionDetailId : undefined}
+                  disabled={!release.canOpenVersion || release.pendingVersionId !== null}
+                  onClick={event => void release.openVersion(version, event.currentTarget)}
                 >
                   <Eye className="size-3.5" aria-hidden="true" />
                 </Button>
+                {designHref && version.lifecycleStatus === "PUBLISHED" ? (
+                  <Button asChild variant="outline" size="xs">
+                    <Link href={`${designHref}?previewVersion=${version.id}`}
+                      aria-label={`${t.quotationPdf.preview} v${version.versionNumber}`}>
+                      {t.quotationPdf.preview}
+                    </Link>
+                  </Button>
+                ) : null}
                 {canRestore ? (
                   <Button
                     variant="ghost"
                     size="xs"
                     aria-label={`${copy.restoreToDraft}: ${version.versionNumber}`}
                     disabled={release.pendingVersionId !== null}
-                    onClick={() => release.openRestore(version)}
+                    onClick={event => {
+                      restoreOpener.current = { element: event.currentTarget, isCurrent: isRestoreFocusCurrent };
+                      release.openRestore(version);
+                    }}
                   >
                     <RotateCcw className="size-3.5" aria-hidden="true" />
                   </Button>
@@ -94,19 +152,20 @@ export function TemplateVersionsPanel({
                     variant="ghost"
                     size="xs"
                     aria-label={`${copy.retire}: ${version.versionNumber}`}
-                    disabled={release.pendingVersionId !== null}
+                    disabled={release.pendingVersionId !== null || version.id === currentVersionId}
+                    title={version.id === currentVersionId ? t.coreOperations.errors["CORE.TEMPLATE.VERSION.RETIRE_CURRENT"] : undefined}
                     onClick={() => release.openRetire(version)}
                   >
                     <Archive className="size-3.5" aria-hidden="true" />
                   </Button>
                 ) : null}
               </span>
-            </li>
-          ))}
-        </ul>
+            ) },
+          ]}
+        />
       )}
 
-      <nav aria-label={copy.versionsTitle} className="flex items-center justify-end gap-2">
+      <nav ref={registerVersionHistory} tabIndex={-1} aria-label={copy.versionsTitle} className="flex items-center justify-end gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -125,42 +184,59 @@ export function TemplateVersionsPanel({
         </Button>
       </nav>
 
-      {release.selected ? (
-        <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs">
-          <span className="text-sm font-medium text-foreground">
-            {formatTemplate(copy.versionLabel, {
-              number: String(release.selected.versionNumber),
-            })}
-          </span>
-          {release.isLoadingSelected ? (
-            <Skeleton className="h-4 w-40" />
-          ) : (
-            <>
-              <span className="text-muted-foreground">
-                {formatTemplate(copy.versionPublishedAt, {
-                  at: formatDateTime(release.selected.publishedAt, lang),
-                })}
-              </span>
-              <IdentifierText className="text-muted-foreground">
-                {formatTemplate(copy.versionChecksum, {
-                  checksum: release.selected.templateContentChecksum,
-                })}
-              </IdentifierText>
-              {release.selected.compilerVersion ? (
-                <span className="text-muted-foreground">
-                  {formatTemplate(copy.versionCompiler, {
-                    compiler: release.selected.compilerVersion,
-                    targets: release.selected.rendererTargets.join(", ") || "—",
-                  })}
-                </span>
-              ) : null}
-            </>
-          )}
-          <Button variant="ghost" size="xs" onClick={release.closeVersion}>
-            {t.common.dismiss}
-          </Button>
+      {detail && (
+        <div id={release.versionDetailId} ref={registerVersionDetail} tabIndex={-1} role="region"
+          aria-labelledby={`${release.versionDetailId}-title`}>
+          <Card>
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {detail.state === "ready" && <LockKeyhole className="size-4 text-muted-foreground" aria-hidden="true" />}
+                <CardTitle id={`${release.versionDetailId}-title`}>
+                  {formatTemplate(copy.versionLabel, { number: String(detail.state === "ready" ? detail.version.versionNumber : detail.row.versionNumber) })}
+                </CardTitle>
+                {detail.state === "ready" && <Badge tone="neutral">{history.readOnly}</Badge>}
+              </div>
+              <Button variant="ghost" size="sm" onClick={release.closeVersion}>{t.common.dismiss}</Button>
+            </CardHeader>
+            <CardContent>
+              {detail.state === "pending" ? (
+                <div role="status" aria-busy="true">
+                  <span className="sr-only">{t.common.loading}</span>
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : detail.state === "failed" ? (
+                detail.error.status === 403
+                  ? <PermissionGate require={TEMPLATE_READ_PERMISSION} denied>{null}</PermissionGate>
+                  : <ErrorState title={copy.versionsLoadFailed} description={describeError(detail.error)}
+                      onRetry={() => void release.openVersion(detail.row)} retryLabel={t.common.retry} />
+              ) : (
+                <div className="space-y-3">
+                  <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                    <div><dt className="text-muted-foreground">{history.publishedAt}</dt>
+                      <dd><time dateTime={detail.version.publishedAt}>{formatDateTime(detail.version.publishedAt, lang)}</time></dd></div>
+                    <div><dt className="text-muted-foreground">{history.publisher}</dt>
+                      <dd><bdi>{detail.version.publisherName ?? t.detail.notRecorded}</bdi></dd></div>
+                    <div><dt className="text-muted-foreground">{history.targets}</dt>
+                      <dd className="flex flex-wrap gap-1">
+                        {detail.version.rendererTargets.length ? detail.version.rendererTargets.map(target =>
+                          <Badge key={target} tone="neutral"><bdi>{target}</bdi></Badge>) : t.detail.notRecorded}
+                      </dd></div>
+                  </dl>
+                  <p className="break-all text-sm text-muted-foreground">
+                    {formatTemplate(copy.versionChecksum, { checksum: detail.version.templateContentChecksum })}
+                  </p>
+                  {detail.version.compilerVersion && <p className="text-sm text-muted-foreground">
+                    {formatTemplate(copy.versionCompiler, {
+                      compiler: detail.version.compilerVersion, targets: detail.version.rendererTargets.join(", ") || t.detail.notRecorded,
+                    })}
+                  </p>}
+                  <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">{history.immutable}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      ) : null}
+      )}
 
       {/* Restore-to-draft records an operator reason; it is required, not decorative. */}
       <ReasonDialog
@@ -168,11 +244,17 @@ export function TemplateVersionsPanel({
         onOpenChange={(open) => {
           if (!open) release.closeRestore();
         }}
+        onCloseAutoFocus={event => {
+          const opener = restoreOpener.current;
+          restoreOpener.current = null;
+          restoreTemplateVersionFocus(event, opener, focusScope.current);
+        }}
         title={copy.restoreVersionTitle}
         description={copy.restoreVersionDescription}
         reasonRequired
         onConfirm={(reason) => void release.restoreVersion(reason)}
         loading={release.pendingVersionId !== null}
+        keepFocusWhileLoading
         labels={{
           reason: copy.restoreReason,
           reasonHint: copy.restoreReasonHint,

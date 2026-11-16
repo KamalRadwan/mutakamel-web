@@ -5,6 +5,7 @@ import { normalizeApiError } from "@/shared/api/normalized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { useApplicationRegistration } from "./useApplicationRegistration";
+import { localizeApplicationError } from "../lib/application-error-copy";
 import {
   ApplicationListQueryDto,
   ApplicationView,
@@ -84,22 +85,25 @@ export function useApplications() {
     } catch (err) {
       if (!isCurrent()) return;
       const normalized = normalizeApiError(err);
-      setError(normalized.message);
-      toast.error(t.applications.errorTitle, normalized.message);
+      const message = localizeApplicationError(normalized, t);
+      setError(message);
+      toast.error(t.applications.errorTitle, message);
     } finally {
       if (isCurrent()) setIsLoading(false);
     }
-  }, [page, limit, search, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, deploymentFilter, toast, t.applications.errorTitle]);
+  }, [page, limit, search, typeFilter, commercialFilter, visibilityFilter, lifecycleFilter, publicationFilter, deploymentFilter, toast, t]);
 
   useEffect(() => {
     let disposed = false;
+    // The ref object is stable; the counter must be bumped as it is at cleanup.
+    const generationRef = listGeneration;
     queueMicrotask(() => {
       if (!disposed) void fetchApplications();
     });
     return () => {
       disposed = true;
       // Invalidate even if the transport completes despite cancellation.
-      ++listGeneration.current;
+      ++generationRef.current;
       listController.current?.abort();
     };
   }, [fetchApplications]);
@@ -119,7 +123,7 @@ export function useApplications() {
       return receipt;
     } catch (err) {
       const normalized = normalizeApiError(err);
-      toast.error(t.applications.errorTitle, normalized.message);
+      toast.error(t.applications.errorTitle, localizeApplicationError(normalized, t));
       throw normalized;
     }
   };

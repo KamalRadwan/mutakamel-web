@@ -1,6 +1,7 @@
 import {
   adminCan,
   adminCanAll,
+  ADMIN_RBAC_CRITICAL,
   type AdminAuthorizationContext,
 } from "@/lib/auth/rbac";
 import type { ProvisioningPermissions } from "../types";
@@ -9,47 +10,22 @@ export const PROVISIONING_PERMISSION_REQUIREMENTS = {
   read: ["admin.tenants.read"],
   retryOrCancel: [
     "admin.tenants.read",
-    "admin.tenants.reprovision",
-    "admin.tenants.critical",
+    ...ADMIN_RBAC_CRITICAL.TENANTS_REPROVISION,
   ],
   // Gateway `core.admin.tenants.operations.resync`: the same pair as retry
   // and cancel, although the command changes nothing by itself.
   resync: [
     "admin.tenants.read",
-    "admin.tenants.reprovision",
-    "admin.tenants.critical",
+    ...ADMIN_RBAC_CRITICAL.TENANTS_REPROVISION,
   ],
-  applyUpdates: [
-    "admin.tenants.reprovision",
-    "admin.tenants.critical",
-    "admin.provisioning.critical",
-  ],
+  applyUpdates: ADMIN_RBAC_CRITICAL.PROVISIONING_TENANT_UPDATE,
   readPrerequisites: ["admin.provisioning.prerequisites.read"],
-  requestPrerequisites: [
-    "admin.provisioning.prerequisites.request",
-    "admin.provisioning.critical",
-  ],
-  closeFailed: [
-    "admin.tenants.reprovision",
-    "admin.tenants.critical",
-    "admin.provisioning.critical",
-  ],
-  addApplication: [
-    "admin.provisioning.add-application",
-    "admin.provisioning.critical",
-  ],
-  repair: [
-    "admin.provisioning.repair",
-    "admin.provisioning.critical",
-  ],
-  decommission: [
-    "admin.provisioning.decommission",
-    "admin.provisioning.critical",
-  ],
-  resolveConflicts: [
-    "admin.provisioning.conflicts.resolve",
-    "admin.provisioning.critical",
-  ],
+  requestPrerequisites: ADMIN_RBAC_CRITICAL.PROVISIONING_PREREQUISITES_REQUEST,
+  closeFailed: ADMIN_RBAC_CRITICAL.PROVISIONING_TENANT_UPDATE,
+  addApplication: ADMIN_RBAC_CRITICAL.PROVISIONING_ADD_APPLICATION,
+  repair: ADMIN_RBAC_CRITICAL.PROVISIONING_REPAIR,
+  decommission: ADMIN_RBAC_CRITICAL.PROVISIONING_DECOMMISSION,
+  resolveConflicts: ADMIN_RBAC_CRITICAL.PROVISIONING_CONFLICTS_RESOLVE,
 } as const;
 
 export function deriveProvisioningPermissions(

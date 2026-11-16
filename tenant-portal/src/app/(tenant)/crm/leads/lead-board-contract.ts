@@ -27,10 +27,3 @@ export function buildLeadInitialBoardRequest(...args: Parameters<typeof buildLea
   return body;
 }
 
-/** KPI counts share search predicates, without ordering or a page window. */
-export function buildLeadKpisRequest(...args: Parameters<typeof buildLeadBoardRequest>) {
-  const { sort, limit, ...body } = buildLeadInitialBoardRequest(...args);
-  void sort;
-  void limit;
-  return body;
-}

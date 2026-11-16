@@ -208,6 +208,12 @@ const ORG_PARENT_QUERY_KEY = {
 export const ORG_NODE_SORT_FIELDS = ["name", "code", "createdAt"] as const;
 export type OrgNodeSortField = (typeof ORG_NODE_SORT_FIELDS)[number];
 
+export interface OrgHierarchyFilters {
+  companyId?: string;
+  branchId?: string;
+  departmentId?: string;
+}
+
 export async function fetchOrgNodes<L extends OrgLevel>(
   level: L,
   options: {
@@ -215,6 +221,9 @@ export async function fetchOrgNodes<L extends OrgLevel>(
     search: string;
     status?: OrgNodeStatus;
     parentId?: string;
+    companyId?: string;
+    branchId?: string;
+    departmentId?: string;
     limit?: number;
     sortBy?: OrgNodeSortField;
     sortDir?: "ASC" | "DESC";
@@ -233,6 +242,9 @@ export async function fetchOrgNodes<L extends OrgLevel>(
     filters: {
       status: options.status,
       ...(parentKey ? { [parentKey]: options.parentId } : {}),
+      ...(options.companyId ? { companyId: options.companyId } : {}),
+      ...(options.branchId ? { branchId: options.branchId } : {}),
+      ...(options.departmentId ? { departmentId: options.departmentId } : {}),
     },
   });
 

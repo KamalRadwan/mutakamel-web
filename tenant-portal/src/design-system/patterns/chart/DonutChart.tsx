@@ -39,7 +39,10 @@ export interface DonutChartProps {
   centerLabel?: string;
   showLegend?: boolean;
   numberFormat?: Intl.NumberFormatOptions;
+  valueFormatter?: (value: number) => string;
+  showValues?: boolean;
   className?: string;
+  variant?: "donut" | "pie";
 }
 
 interface ResolvedSlice {
@@ -99,10 +102,14 @@ export function DonutChart({
   centerLabel,
   showLegend = true,
   numberFormat,
+  valueFormatter,
+  showValues = false,
   className,
+  variant = "donut",
 }: DonutChartProps) {
   const direction = useChartDirection();
-  const { format } = useChartNumberFormat(numberFormat);
+  const { format: defaultFormat } = useChartNumberFormat(numberFormat);
+  const format = valueFormatter ?? defaultFormat;
   const resolved = resolve(slices);
 
   return (
@@ -114,13 +121,15 @@ export function DonutChart({
               data={resolved}
               dataKey="value"
               nameKey="label"
-              innerRadius="58%"
+              innerRadius={variant === "pie" ? 0 : "58%"}
               outerRadius="82%"
               // Arabic reads right to left, so the sweep does too.
               startAngle={direction.reversed ? -270 : 90}
               endAngle={direction.reversed ? 90 : -270}
               stroke={SEGMENT_SEPARATOR}
               strokeWidth={2}
+              label={showValues ? ({ value }) => format(Number(value ?? 0)) : false}
+              labelLine={showValues}
               {...CHART_ANIMATION}
             >
               {resolved.map((slice) => (
@@ -153,7 +162,7 @@ export function DonutChart({
           </PieChart>
         </ResponsiveContainer>
 
-        {centerValue && (
+        {variant === "donut" && centerValue && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-lg font-semibold tabular-nums text-foreground">
               <bdi>{centerValue}</bdi>

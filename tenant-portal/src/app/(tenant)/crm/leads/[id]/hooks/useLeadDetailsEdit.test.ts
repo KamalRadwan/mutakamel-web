@@ -80,6 +80,7 @@ describe("useLeadDetailsEdit", () => {
     act(() => result.current.change("description", "New"));
     await act(() => result.current.save());
     expect(result.current.form).toBeNull();
+    expect(result.current.tagsEditable).toBe(false);
     expect(onReconcile).toHaveBeenCalledOnce();
     expect(onSaved).not.toHaveBeenCalled();
     act(() => result.current.change("description", "Retry"));
@@ -88,16 +89,20 @@ describe("useLeadDetailsEdit", () => {
     rerender({ subject: { ...lead, description: "Verified" }, editable: true });
     expect(result.current.form?.description).toBe("Verified");
     expect(result.current.editable).toBe(true);
+    expect(result.current.tagsEditable).toBe(true);
   });
   it("does not allow edits without capability or after conversion", async () => {
     const denied = setup(lead, false);
     act(() => denied.result.current.change("description", "Denied"));
     await act(() => denied.result.current.save());
     expect(denied.result.current.form).toBeNull();
+    expect(denied.result.current.tagsEditable).toBe(false);
     const converted = setup({ ...lead, status: "CONVERTED" });
     act(() => converted.result.current.change("description", "Denied"));
     await act(() => converted.result.current.save());
     expect(converted.result.current.form).toBeNull();
+    expect(converted.result.current.editable).toBe(false);
+    expect(converted.result.current.tagsEditable).toBe(true);
     expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 

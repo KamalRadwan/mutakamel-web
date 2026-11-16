@@ -102,10 +102,24 @@ afterEach(() => {
 });
 
 describe("Lead stages — ranking by drag", () => {
+  it("shows each record name in its own column and recovers from a search with no matches", async () => {
+    renderPage();
+    const arabicName = await screen.findByText(CONTACTED.nameAr);
+    expect(arabicName.closest("td")).not.toHaveTextContent(CONTACTED.nameEn);
+    expect(screen.getByText(CONTACTED.nameEn, { selector: 'bdi[dir="ltr"]' }).closest("td")).not.toHaveTextContent(CONTACTED.nameAr);
+    expect(screen.getByRole("columnheader", { name: en.crmLeadStages.arabicName })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: en.crmLeadStages.englishName })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: en.crmLeadStages.category })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "no-stage-matches-this" } });
+    expect(await screen.findByText(en.crmLeadStages.empty)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeadStages.clearSearch }));
+    expect(await screen.findByLabelText("Drag to reorder: Contacted")).toBeInTheDocument();
+  });
+
   it("hides create, row writes and reorder for a read-only tenant with manage permission", async () => {
     authMock.user.accessMode = "READ_ONLY";
     renderPage();
-    await screen.findByRole("cell", { name: "Contacted" });
+    await screen.findByText(CONTACTED.nameEn, { selector: 'bdi[dir="ltr"]' });
     expect(screen.queryByRole("button", { name: en.crm.addANewStage })).toBeNull();
     expect(screen.queryByRole("button", { name: `${en.crmLeadStages.editTitle}: Contacted` })).toBeNull();
     expect(screen.queryByRole("button", { name: `${en.crmLeadStages.setDefault}: Contacted` })).toBeNull();

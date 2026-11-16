@@ -10,6 +10,7 @@ import {
   TRADE_LOOKUP_RESPONSE_BYTES,
   TRADE_PRICING_EVALUATE_PATH,
   parseTradePriceDecision,
+  type TradePriceDecision,
   type TradePricePurpose,
 } from "../trade-lookup-contract";
 
@@ -22,6 +23,7 @@ interface PricingLine {
 
 interface LinePrice {
   unitPrice: string | null;
+  decision: TradePriceDecision | null;
   error: NormalizedApiError | null;
 }
 
@@ -32,15 +34,18 @@ interface PricingQuery {
   purpose: TradePricePurpose;
   lines: PricingLine[];
   enabled: boolean;
+  useBasePrice?: boolean;
 }
 
 /** PricingEvaluateDto has no client-authoritative price override. */
 export function useTradeDocumentPricing(query: PricingQuery) {
   const [settled, setSettled] = useState<{ request: object; prices: LinePrice[] } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   // Include scope and raw inputs: a render after an edit must invalidate old
   // evidence immediately, before the next effect or a late response runs.
   const key = JSON.stringify({
     ...query,
+    attempt,
     headers: Object.fromEntries(Object.entries(query.headers).sort(([a], [b]) => a.localeCompare(b))),
   });
   const request = useMemo(() => ({ key }), [key]);
@@ -55,7 +60,7 @@ export function useTradeDocumentPricing(query: PricingQuery) {
     const controller = new AbortController();
     // Debounce typing without leaving the previous price available to submit.
     const timer = setTimeout(() => {
-      void Promise.all(current.lines.map(async (line): Promise<LinePrice> => {
+      const evaluateLine = async (line: PricingLine): Promise<LinePrice> => {
         try {
           const response = await tradePost(TRADE_PRICING_EVALUATE_PATH, {
             purpose: current.purpose,
@@ -68,18 +73,27 @@ export function useTradeDocumentPricing(query: PricingQuery) {
             headers: current.headers,
             signal: controller.signal,
             maxResponseBytes: TRADE_LOOKUP_RESPONSE_BYTES,
+            ...(current.useBasePrice ? { suppressForbiddenToast: true } : {}),
           });
           const decision = parseTradePriceDecision(response.data);
-          if (decision.currencyCode !== current.currencyCode || !NON_NEGATIVE_DECIMAL.test(decision.unitPrice)) {
+          const unitPrice = current.useBasePrice ? decision.baselineUnitPrice : decision.unitPrice;
+          if (decision.currencyCode !== current.currencyCode || unitPrice === undefined || !NON_NEGATIVE_DECIMAL.test(unitPrice)) {
             tradeInvalidResponse();
           }
-          return { unitPrice: decision.unitPrice, error: null };
+          return { unitPrice, decision, error: null };
         } catch (error) {
-          return { unitPrice: null, error: normalizeApiError(error) };
+          return { unitPrice: null, decision: null, error: normalizeApiError(error) };
         }
-      })).then((prices) => {
+      };
+      void (async () => {
+        const prices: LinePrice[] = [];
+        // Advisory quotation prices use the per-line API and may have many items.
+        const batchSize = current.useBasePrice ? 6 : current.lines.length;
+        for (let offset = 0; offset < current.lines.length && !controller.signal.aborted; offset += batchSize) {
+          prices.push(...await Promise.all(current.lines.slice(offset, offset + batchSize).map(evaluateLine)));
+        }
         if (!controller.signal.aborted) setSettled({ request, prices });
-      });
+      })();
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [request, valid]);
@@ -88,9 +102,11 @@ export function useTradeDocumentPricing(query: PricingQuery) {
   return {
     prices: query.lines.map((_, index) => ({
       unitPrice: prices?.[index]?.unitPrice ?? null,
+      decision: prices?.[index]?.decision ?? null,
       error: prices?.[index]?.error ?? null,
       isPricing: valid && prices === null,
     })),
     ready: valid && prices !== null && prices.every((price) => price.unitPrice !== null),
+    retry: () => setAttempt((value) => value + 1),
   };
 }

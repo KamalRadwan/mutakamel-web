@@ -15,6 +15,8 @@ import {
 import { Switch } from "../../primitives/Switch";
 import { normalizeFilterValue, type FilterDef, type FilterValue } from "./filter-types";
 
+const ALL_FILTER_VALUE = "__filter_all__";
+
 interface FilterControlProps {
   filter: FilterDef;
   value: FilterValue | undefined;
@@ -45,13 +47,16 @@ export function FilterControl({ filter, value, onValueChange, className }: Filte
     case "select":
       return (
         <Select
-          value={value?.kind === "select" ? value.value : ""}
-          onValueChange={(next) => commit(next ? { kind: "select", value: next } : undefined)}
+          value={value?.kind === "select" ? value.value : filter.allLabel ? ALL_FILTER_VALUE : ""}
+          onValueChange={(next) => commit(next && next !== ALL_FILTER_VALUE ? { kind: "select", value: next } : undefined)}
         >
-          <SelectTrigger size="sm" className={cn("w-40", className)} aria-label={filter.label}>
-            <SelectValue placeholder={filter.placeholder ?? filter.label} />
+          <SelectTrigger size="sm" textSize={filter.nameOnly ? "compact" : "default"} className={cn("w-40", className)} aria-label={filter.label}>
+            <SelectValue placeholder={filter.placeholder ?? filter.label}>
+              {filter.nameOnly && value?.kind === "select" ? filter.options.find((option) => option.value === value.value)?.label ?? filter.label : undefined}
+            </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent textSize={filter.nameOnly ? "compact" : "default"}>
+            {filter.allLabel && <SelectItem value={ALL_FILTER_VALUE}>{filter.allLabel}</SelectItem>}
             {filter.options.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
@@ -69,8 +74,9 @@ export function FilterControl({ filter, value, onValueChange, className }: Filte
           values={value?.kind === "multiSelect" ? value.values : []}
           onValuesChange={(next) => commit({ kind: "multiSelect", values: next })}
           options={filter.options}
-          placeholder={filter.label}
           {...filter.labels}
+          placeholder={filter.label}
+          ariaLabel={filter.label}
         />
       );
 

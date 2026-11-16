@@ -6,6 +6,9 @@ import { TenantApiClientError } from "@/lib/api/axiosClient";
 import { DASHBOARDS_PATH, DASHBOARDS_CATALOG_PATH, dashboardFromTemplatePath } from "../../dashboard-contract";
 import { useDashboardSwitcher } from "./useDashboardSwitcher";
 
+let sessionGeneration = 0;
+vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ realtimeAuthGeneration: sessionGeneration, user: { id: "01900300-0000-7000-8000-000000000001", isTenantOwner: true, permissions: [], accessibleBranches: [], teamMemberships: [] } }) }));
+
 const { get, put } = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/axiosClient")>()),
@@ -29,6 +32,7 @@ const serverError = () => new TenantApiClientError("Server error", {
 });
 
 beforeEach(() => {
+  sessionGeneration++;
   get.mockImplementation(async (path: string) => ({ data: path === DASHBOARDS_PATH ? { items: [dashboard], nextCursor: null } : catalog }));
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
@@ -109,3 +113,5 @@ describe("dashboard switcher templates", () => {
     expect(result.current.unprovisionedTemplates).toHaveLength(1);
   });
 });
+
+

@@ -213,13 +213,13 @@ export function CustomerCompanySection({
               error={errors.existingCompanyPartyId}
               showLabel
             >
-              <Combobox
+              <Combobox textSize="compact"
                 size="sm"
                 value={existingCompanyPartyId || NEW_COMPANY_VALUE}
                 selectedLabel={
                   existing
                     ? (selectedCompany?.displayName ??
-                      (form.companyName || existingCompanyPartyId))
+                      (form.companyName || t.common.nameUnavailable))
                     : t.crmLeads.newCompany
                 }
                 options={comboboxOptions}
@@ -249,7 +249,7 @@ export function CustomerCompanySection({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-foreground">
                     {selectedCompany?.displayName ??
-                      (form.companyName || existingCompanyPartyId)}
+                      (form.companyName || t.common.nameUnavailable)}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full border border-swatch-green-soft bg-swatch-green-soft px-2 py-0.5 text-2xs font-semibold text-swatch-green-deep">
                     <CheckCircle2 className="size-2.5" aria-hidden="true" />

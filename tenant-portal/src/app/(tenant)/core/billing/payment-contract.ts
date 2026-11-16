@@ -54,14 +54,31 @@ function paymentStatusPath(paymentId: string): CorePath {
   return `/api/tenant/core/v1/billing/payments/${encodeURIComponent(paymentId)}`;
 }
 
-// The provider checkout URL, accepted only over https. It leaves this origin
-// entirely, so the one thing worth asserting is the scheme: a `javascript:`
-// value reaching an anchor would be an XSS sink handed over by an upstream
-// nobody in the browser can vouch for.
+// Providers are configured server side; reject malformed or credential-bearing
+// links before they reach an anchor without imposing a browser host allowlist.
 export function checkoutUrl(source: Record<string, unknown>): string | null {
   const value = source.checkoutUrl;
   if (value === undefined || value === null) return null;
-  if (typeof value !== "string" || !value.startsWith("https://") || value.length > 2048) {
+  if (
+    typeof value !== "string" ||
+    value.length > 2048 ||
+    /[\s\p{Cc}]/u.test(value) ||
+    !/^https:\/\/[^/\\?#]/iu.test(value)
+  ) {
+    invalidBillingResponse();
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return invalidBillingResponse();
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    !parsed.hostname
+  ) {
     invalidBillingResponse();
   }
   return value;

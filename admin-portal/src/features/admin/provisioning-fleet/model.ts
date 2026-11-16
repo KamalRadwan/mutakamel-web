@@ -1,5 +1,5 @@
 import type { UserProfile } from "@/context/AuthContext";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import {
   isAmbiguousWriteOutcome,
   shouldRotateWriteCommandKey,
@@ -47,19 +47,10 @@ export function deriveProvisioningFleetPermissions(
       user,
       "admin.provisioning.rollouts.create",
     ),
-    canCreateRollout: adminCanAll(user, [
-      "admin.provisioning.rollouts.create",
-      "admin.provisioning.critical",
-    ]),
-    canManage: adminCanAll(user, [
-      "admin.provisioning.rollouts.manage",
-      "admin.provisioning.critical",
-    ]),
+    canCreateRollout: adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_CREATE),
+    canManage: adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_MANAGE),
     canReadReport: adminCan(user, "admin.provisioning.rollouts.report"),
-    canAttest: adminCanAll(user, [
-      "admin.provisioning.rollouts.report",
-      "admin.provisioning.critical",
-    ]),
+    canAttest: adminCanAll(user, ADMIN_RBAC_CRITICAL.PROVISIONING_ROLLOUT_ATTEST),
   };
 }
 

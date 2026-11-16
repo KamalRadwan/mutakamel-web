@@ -13,6 +13,8 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
 export const CRM_CUSTOM_FIELDS_PATH = "/api/tenant/crm/v1/custom-fields";
+// crm-app/src/crm/common/custom-fields/custom-field-write.helper.ts
+export const CRM_CUSTOM_FIELDS_LIMIT = 100;
 
 export const CRM_CUSTOM_FIELD_OWNER_TYPES = [
   "LEAD",
@@ -92,6 +94,8 @@ export interface CustomFieldItem {
   isActive: boolean;
   sortOrder: number;
   requirements: CustomFieldRequirement[];
+  placeholderAr?: string;
+  placeholderEn?: string;
 }
 
 
@@ -104,6 +108,9 @@ export interface CreateCustomFieldInput {
   type: CrmCustomFieldType;
   isSearchable: boolean;
   options?: CustomFieldOption[];
+  placeholderAr?: string;
+  placeholderEn?: string;
+  sortOrder?: number;
 }
 
 export interface UpdateCustomFieldInput {
@@ -112,6 +119,9 @@ export interface UpdateCustomFieldInput {
   isActive: boolean;
   isSearchable: boolean;
   options?: CustomFieldOption[];
+  placeholderAr?: string;
+  placeholderEn?: string;
+  sortOrder?: number;
 }
 
 export function customFieldPath(id: string): string {
@@ -172,6 +182,8 @@ export function parseCrmCustomField(payload: unknown): CustomFieldItem {
     typeof source.isActive !== "boolean" ||
     !Number.isSafeInteger(source.sortOrder) ||
     (source.sortOrder as number) < 1
+    || [source.placeholderAr, source.placeholderEn].some((value) =>
+      value != null && (typeof value !== "string" || value.length > 180))
   ) {
     invalidResponse();
   }
@@ -196,6 +208,8 @@ export function parseCrmCustomField(payload: unknown): CustomFieldItem {
     isActive: source.isActive,
     sortOrder: source.sortOrder as number,
     requirements: parseRequirements(source.requirements),
+    placeholderAr: typeof source.placeholderAr === "string" ? source.placeholderAr : "",
+    placeholderEn: typeof source.placeholderEn === "string" ? source.placeholderEn : "",
   };
 }
 
@@ -205,9 +219,13 @@ function parseOption(payload: unknown): CustomFieldOption {
     !option ||
     typeof option.key !== "string" ||
     option.key.length === 0 ||
+    option.key.length > 64 ||
     typeof option.nameAr !== "string" ||
+    option.nameAr.length === 0 || option.nameAr.length > 120 ||
     typeof option.nameEn !== "string" ||
+    option.nameEn.length === 0 || option.nameEn.length > 120 ||
     !Number.isSafeInteger(option.sortOrder) ||
+    (option.sortOrder as number) < 1 ||
     typeof option.isActive !== "boolean"
   ) {
     invalidResponse();

@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system";
+import { TenantOrganizationSelect } from "@/components/tenant/TenantOrganizationSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuditFilters } from "../hooks/useAuditFilters";
 import { auditCatalogue } from "@/lib/audit/catalogue";
@@ -43,7 +44,7 @@ export function AuditFilterPanel({
 }) {
   const { t, lang } = useI18n();
   const copy = t.coreOperations.audit;
-  const { draft, range, change, applyRange, clear, apply } = useAuditFilters(filters, onApply);
+  const { branchIds, draft, range, change, applyRange, clear, apply } = useAuditFilters(filters, onApply);
 
   return (
     <DetailSection title={copy.filtersTitle} description={copy.filtersDescription}>
@@ -53,8 +54,9 @@ export function AuditFilterPanel({
             onChange={(event) => change({ q: event.target.value || undefined })} />
         </Field> : null}
         <Field label={t.audit.ledger.branch}>
-          <Input size="sm" value={draft.branchId ?? ""} disabled={disabled}
-            onChange={(event) => change({ branchId: event.target.value || undefined })} />
+          <TenantOrganizationSelect kind="branch" ids={branchIds} value={draft.branchId ?? ANY} disabled={disabled}
+            placeholder={t.common.selectBranch} allOption={{ value: ANY, label: t.common.allBranches }}
+            onValueChange={(next) => change({ branchId: next === ANY ? undefined : next })} />
         </Field>
         <Field label={t.audit.ledger.owner}>
           <Input size="sm" value={draft.ownerUserId ?? ""} disabled={disabled}

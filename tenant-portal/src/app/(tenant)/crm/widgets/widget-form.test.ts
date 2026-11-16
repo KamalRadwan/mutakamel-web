@@ -1,315 +1,146 @@
 import { describe, expect, it } from "vitest";
 import type { DashboardCatalog } from "../dashboards/dashboard-catalog-contract";
-import type { WidgetQuerySpec } from "../dashboards/widget-contract";
-import {
-  EMPTY_WIDGET_FORM,
-  buildQuerySpec,
-  buildWidgetUpdate,
-  buildableVisualizations,
-  isSpecEditable,
-  metricsFor,
-  validateWidgetForm,
-  widgetSpecLimitations,
-  widgetToForm,
-  type WidgetFormState,
-} from "./widget-form";
-
+import { EMPTY_WIDGET_FORM, buildQuerySpec, buildWidgetUpdate, buildableVisualizations, isSpecEditable, validateWidgetForm, widgetInput, widgetToForm, type WidgetFormState } from "./widget-form";
+import { buildCreateWidgetRequest } from "../dashboards/widget-contract";
+import { widgetDraftContent } from "./widget-draft-contract";
+import { buildWidgetDraft, restoreWidgetEditorDraft } from "./widget-draft-form";
 const catalog: DashboardCatalog = {
-  gridColumns: 12,
-  maxWidgets: 20,
-  visualizations: [
-    {
-      key: "METRIC_CARD",
-      shapes: ["SCALAR"],
-      minSeries: 1,
-      maxSeries: 1,
-      requiresTarget: false,
-      supportsPeriodComparison: true,
-    },
-    {
-      key: "SEMI_CIRCLE_GAUGE",
-      shapes: ["SCALAR"],
-      minSeries: 1,
-      maxSeries: 1,
-      requiresTarget: true,
-      supportsPeriodComparison: false,
-    },
-    {
-      key: "LINE",
-      shapes: ["TIME_SERIES", "CATEGORY"],
-      minSeries: 1,
-      maxSeries: 4,
-      requiresTarget: false,
-      supportsPeriodComparison: true,
-    },
-    {
-      key: "MULTI_KPI",
-      shapes: ["SCALAR"],
-      minSeries: 2,
-      maxSeries: 4,
-      requiresTarget: false,
-      supportsPeriodComparison: false,
-    },
-  ],
-  metrics: [
-    {
-      key: "crm.leads.created.count",
-      nameAr: "العملاء المحتملون الجدد",
-      nameEn: "New leads",
-      unit: "COUNT",
-      shape: "SCALAR",
-      dimensions: ["none"],
-      supportsPeriodComparison: true,
-    },
-    {
-      key: "crm.opportunities.open.count",
-      nameAr: "الفرص المفتوحة",
-      nameEn: "Open opportunities",
-      unit: "COUNT",
-      shape: "SCALAR",
-      dimensions: ["none"],
-      supportsPeriodComparison: false,
-    },
-    {
-      key: "crm.leads.created.trend",
-      nameAr: "اتجاه العملاء المحتملين",
-      nameEn: "Leads trend",
-      unit: "COUNT",
-      shape: "TIME_SERIES",
-      dimensions: ["time"],
-      supportsPeriodComparison: true,
-    },
-  ],
-  dimensions: [
-    { key: "none", grains: [] },
-    { key: "time", grains: ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"] },
-  ],
-  templates: [],
-};
+ gridColumns:12,maxWidgets:20,templates:[],dimensions:[{key:"none",grains:[]},{key:"time",grains:["DAY","WEEK"]},{key:"source",grains:[]}],
+ visualizations:[
+ {key:"METRIC_CARD",shapes:["SCALAR"],minSeries:1,maxSeries:1,requiresTarget:false,supportsPeriodComparison:true},
+ {key:"COLUMN",shapes:["CATEGORY","TIME_SERIES"],minSeries:1,maxSeries:4,requiresTarget:false,supportsPeriodComparison:true,supportsDualAxis:true},
+ {key:"MULTI_KPI",shapes:["SCALAR"],minSeries:2,maxSeries:4,requiresTarget:false,supportsPeriodComparison:false,supportsMixedUnits:true},
+ {key:"SEMI_CIRCLE_GAUGE",shapes:["SCALAR"],minSeries:1,maxSeries:1,requiresTarget:true,supportsPeriodComparison:false},
+ {key:"ALERT_LIST",shapes:["ROWS"],minSeries:1,maxSeries:1,requiresTarget:false,supportsPeriodComparison:false}
+ ],
+ metrics:[
+ {key:"crm.count",nameAr:"عدد",nameEn:"Count",unit:"COUNT",shape:"SCALAR",dimensions:["none"],supportsPeriodComparison:true},
+ {key:"crm.snapshot",nameAr:"حالي",nameEn:"Snapshot",unit:"COUNT",shape:"SCALAR",dimensions:["none"],supportsPeriodComparison:false},
+ {key:"crm.opportunities.won.estimated_value",nameAr:"فرص رابحة",nameEn:"Won value",unit:"MONEY",shape:"SCALAR",dimensions:["none"],
+  supportsPeriodComparison:true,comparisonTypes:["TARGET","GOVERNED_TARGET"]},
+ {key:"crm.trend",nameAr:"اتجاه",nameEn:"Trend",unit:"COUNT",shape:"TIME_SERIES",dimensions:["time"],supportsPeriodComparison:true,
+  datasetComparison:{bases:["PERIOD","BRANCH"],visualizations:["COLUMN"]}},
+ {key:"crm.sources",nameAr:"مصادر",nameEn:"Sources",unit:"COUNT",shape:"CATEGORY",dimensions:["source"],supportsPeriodComparison:true},
+ {key:"crm.money",nameAr:"مبلغ",nameEn:"Money",unit:"MONEY",shape:"CATEGORY",dimensions:["source"],supportsPeriodComparison:true},
+ {key:"crm.score",nameAr:"نقاط",nameEn:"Score",unit:"SCORE",shape:"CATEGORY",dimensions:["source"],supportsPeriodComparison:true},
+ {key:"crm.alerts",nameAr:"تنبيهات",nameEn:"Alerts",unit:"COUNT",shape:"ROWS",rowKind:"ALERT",dimensions:["none"],supportsPeriodComparison:false},
+ {key:"crm.ranked",nameAr:"ترتيب",nameEn:"Ranked",unit:"COUNT",shape:"ROWS",rowKind:"RANKED",dimensions:["none"],supportsPeriodComparison:false}
+ ]};
+const series=(metricKey="crm.count",axis:""|"LEFT"|"RIGHT"="")=>({metricKey,axis,label:"",color:""});
+const form=(patch:Partial<WidgetFormState>={}):WidgetFormState=>({...structuredClone(EMPTY_WIDGET_FORM),name:"Leads",visualizationType:"METRIC_CARD",series:[series()],...patch});
+describe("advanced widget authoring",()=>{
+ it("keeps a governed target through an incomplete draft, then publishes the binding without a literal amount",()=>{
+  const branchId="018f0000-0000-7000-8000-000000000001";
+  const governedTarget={branchId,subjectId:branchId,subjectType:"BRANCH" as const,currencyCode:"EGP",periodGrain:"MONTH" as const};
+  const draft=form({name:"",visualizationType:"SEMI_CIRCLE_GAUGE",series:[series("crm.opportunities.won.estimated_value")],
+   comparison:"GOVERNED_TARGET",governedTarget,target:"42"});
+  const restored=restoreWidgetEditorDraft(buildWidgetDraft(draft,catalog))!;
+  expect(restored.governedTarget).toEqual(governedTarget);
+  const valid={...restored,name:"Won value against target"};
+  expect(validateWidgetForm(valid,catalog)).toBeNull();
+  expect(buildWidgetDraft(valid,catalog).querySpec.comparison).toEqual({type:"GOVERNED_TARGET",governedTarget});
+  expect(validateWidgetForm({...valid,filters:{currencyCode:"SAR"}},catalog)).toBe("FILTER_INVALID");
+ });
 
-const form = (overrides: Partial<WidgetFormState> = {}): WidgetFormState => ({
-  ...EMPTY_WIDGET_FORM,
-  name: "New leads",
-  visualizationType: "METRIC_CARD",
-  metricKey: "crm.leads.created.count",
-  dimensionKey: "none",
-  ...overrides,
+ it("preserves partial controls across draft saves and promotes complete settings to a query spec",()=>{
+  const partial=form({visualizationType:"COLUMN",series:[series("crm.trend")],dimensionKey:"time",grain:"WEEK",
+   comparison:"DATASETS",datasetBasis:"PERIOD",datasets:[{datePreset:"CUSTOM",dateFrom:"2026-11-01"},{datePreset:"LAST_MONTH"}],
+   target:"1.",filters:{currencyCode:"US",limit:"1.",branchId:null},displaySpec:{color:"#F",title:" Draft title "}});
+  const saved=buildWidgetDraft(partial,catalog);
+  expect(saved.querySpec).toHaveProperty("editorDraft");
+  const restored=restoreWidgetEditorDraft(saved)!;
+  expect(restored).toEqual(partial);
+  const complete={...restored,datasets:[{datePreset:"CUSTOM",dateFrom:"2026-11-01",dateTo:"2026-11-10"},{datePreset:"LAST_MONTH"}],
+   filters:{currencyCode:"USD",limit:"10"},displaySpec:{color:"#FFFFFF"}};
+  const ready=buildWidgetDraft(complete,catalog);
+  expect(ready.querySpec).not.toHaveProperty("editorDraft");
+  expect(ready.querySpec).toMatchObject({series:[{metricKey:"crm.trend"}],filters:{currencyCode:"USD",limit:10}});
+ });
+
+ it("does not restore an unknown saved-editor representation over an existing definition",()=>{
+  const saved=buildWidgetDraft(form({name:""}),catalog);
+  expect(()=>restoreWidgetEditorDraft({...saved,querySpec:{...saved.querySpec,series:[]}})).toThrow();
+  expect(()=>restoreWidgetEditorDraft({...saved,querySpec:{editorDraft:{version:2}}})).toThrow();
+ });
+
+ it("round-trips explicit comparison datasets and rejects duplicate or unsupported selections",()=>{
+  const draft=form({visualizationType:"COLUMN",series:[series("crm.trend")],dimensionKey:"time",grain:"WEEK",
+   comparison:"DATASETS",datasetBasis:"PERIOD",datasets:[{datePreset:"LAST_MONTH"},{datePreset:"CURRENT_MONTH"},{datePreset:"LAST_QUARTER"}]});
+  expect(validateWidgetForm(draft,catalog)).toBeNull();
+  const input=widgetInput(draft);
+  expect(isSpecEditable(input.querySpec)).toBe(true);
+  expect(buildQuerySpec(widgetToForm(input)).comparison).toEqual(input.querySpec.comparison);
+  expect(validateWidgetForm({...draft,datasets:[{datePreset:"LAST_MONTH"},{datePreset:"LAST_MONTH"}]},catalog)).toBe("DATASETS_INVALID");
+  expect(validateWidgetForm({...draft,series:[series("crm.trend"),series("crm.trend")]},catalog)).toBe("COMPARISON_UNSUPPORTED");
+ });
+ it("distinguishes inherited comparison from an explicitly disabled stored comparison",()=>{
+  const stored={name:"Leads",visualizationType:"METRIC_CARD" as const,querySpec:{series:[{metricKey:"crm.count"}],comparison:{type:"NONE" as const}},displaySpec:{}};
+  const disabled=widgetToForm(stored);
+  expect(disabled.comparison).toBe("NONE");
+  expect(buildQuerySpec(disabled).comparison).toEqual({type:"NONE"});
+  expect(buildWidgetUpdate({...disabled,name:"Renamed"},stored)).toEqual({name:"Renamed"});
+  const changed={...disabled,series:[series("crm.snapshot")]};
+  expect(buildWidgetUpdate(changed,stored).querySpec?.comparison).toEqual({type:"NONE"});
+  const inherited=widgetToForm({...stored,querySpec:{series:[{metricKey:"crm.count"}]}});
+  expect(inherited.comparison).toBe("INHERIT");
+  expect(buildQuerySpec(inherited)).not.toHaveProperty("comparison");
+  expect(buildWidgetUpdate({...disabled,comparison:"INHERIT"},stored).querySpec).not.toHaveProperty("comparison");
+  expect(buildWidgetUpdate({...inherited,comparison:"NONE"},{...stored,querySpec:{series:[{metricKey:"crm.count"}]}}).querySpec?.comparison).toEqual({type:"NONE"});
+ });
+ it("canonicalizes proven trimmed display fields for create and update without changing scalar options",()=>{
+  const display={title:" Sales chart ",subtitle:" Period summary ",options:{customScalar:" keep spaces "}};
+  const input=widgetInput(form({displaySpec:display}));
+  expect(input.displaySpec).toEqual({title:"Sales chart",subtitle:"Period summary",options:display.options});
+  expect(buildCreateWidgetRequest({...input,displaySpec:display}).displaySpec).toEqual(input.displaySpec);
+  expect(widgetDraftContent({...input,displaySpec:display}).displaySpec).toEqual(input.displaySpec);
+  const stored={name:"Leads",visualizationType:"METRIC_CARD" as const,querySpec:input.querySpec,displaySpec:input.displaySpec};
+  expect(buildWidgetUpdate({...widgetToForm(stored),name:"Renamed",displaySpec:display},stored)).toEqual({name:"Renamed"});
+ });
+ it("offers the full server catalogue, including multi-series visualizations",()=>expect(buildableVisualizations(catalog).map(v=>v.key)).toContain("MULTI_KPI"));
+ it("enforces visualization series bounds",()=>{
+  expect(validateWidgetForm(form({visualizationType:"MULTI_KPI"}),catalog)).toBe("SERIES_INVALID");
+  expect(validateWidgetForm(form({visualizationType:"MULTI_KPI",series:[series(),series()]}),catalog)).toBeNull();
+  expect(validateWidgetForm(form({series:[series(),series()]}),catalog)).toBe("SERIES_INVALID");
+ });
+ it("refuses incompatible shapes and row contracts",()=>{
+  expect(validateWidgetForm(form({visualizationType:"COLUMN",dimensionKey:"none"}),catalog)).toBe("SHAPE_INVALID");
+  expect(validateWidgetForm(form({visualizationType:"ALERT_LIST",series:[series("crm.ranked")]}),catalog)).toBe("SHAPE_INVALID");
+  expect(validateWidgetForm(form({visualizationType:"ALERT_LIST",series:[series("crm.alerts")]}),catalog)).toBeNull();
+ });
+ it("requires axes for two units and refuses more than two",()=>{
+  const mixed=form({visualizationType:"COLUMN",dimensionKey:"source",series:[series("crm.sources"),series("crm.money")]});
+  expect(validateWidgetForm(mixed,catalog)).toBe("AXIS_REQUIRED");
+  expect(validateWidgetForm({...mixed,series:[series("crm.sources","LEFT"),series("crm.money","RIGHT")]},catalog)).toBeNull();
+  expect(validateWidgetForm({...mixed,series:[series("crm.sources","LEFT"),series("crm.money","RIGHT"),series("crm.score","RIGHT")]},catalog)).toBe("UNITS_INVALID");
+ });
+ it("requires every metric to support comparison",()=>{
+  expect(validateWidgetForm(form({visualizationType:"MULTI_KPI",series:[series(),series("crm.snapshot")],comparison:"PREVIOUS_PERIOD"}),catalog)).toBe("COMPARISON_UNSUPPORTED");
+ });
+ it("requires real time grains and finite targets >= 0.000001",()=>{
+  expect(validateWidgetForm(form({visualizationType:"COLUMN",series:[series("crm.trend")],dimensionKey:"time",grain:""}),catalog)).toBe("GRAIN_REQUIRED");
+  for(const target of ["","0","-1","Infinity","0.0000001"]) expect(validateWidgetForm(form({visualizationType:"SEMI_CIRCLE_GAUGE",comparison:"TARGET",target}),catalog)).toBe("TARGET_INVALID");
+  expect(validateWidgetForm(form({visualizationType:"SEMI_CIRCLE_GAUGE",comparison:"TARGET",target:"25"}),catalog)).toBeNull();
+ });
+ it("blocks visible invalid filters, style and display values",()=>{
+  expect(validateWidgetForm(form({filters:{limit:"abc"}}),catalog)).toBe("FILTER_INVALID");
+  expect(validateWidgetForm(form({filters:{datePreset:"CUSTOM",dateFrom:"2026-11-04",dateTo:"2026-11-01"}}),catalog)).toBe("FILTER_INVALID");
+  expect(validateWidgetForm(form({series:[{...series(),color:"blue"}]}),catalog)).toBe("SERIES_STYLE_INVALID");
+  expect(validateWidgetForm(form({displaySpec:{color:"bad"}}),catalog)).toBe("DISPLAY_INVALID");
+ });
+ it("preserves all advanced settings and omits query/display for a name-only edit",()=>{
+  const stored={name:"Sources",visualizationType:"COLUMN" as const,querySpec:{series:[{metricKey:"crm.sources",axis:"LEFT" as const,label:"Count",color:"#123456"},{metricKey:"crm.money",axis:"RIGHT" as const}],dimension:{key:"source"},filters:{compare:"NONE",limit:20}},displaySpec:{title:"Source performance",options:{showValues:true,customScalar:"retained"}}};
+  const draft=widgetToForm(stored); expect(isSpecEditable(stored.querySpec,stored.displaySpec)).toBe(true);
+  expect(buildQuerySpec(draft)).toEqual(stored.querySpec);
+  expect(buildWidgetUpdate({...draft,name:"Renamed"},stored)).toEqual({name:"Renamed"});
+  const edited={...draft,displaySpec:{...draft.displaySpec,title:"Changed"}};
+  expect(buildWidgetUpdate(edited,stored).displaySpec?.options).toEqual(stored.displaySpec.options);
+ });
+ it("keeps retired and unknown query formats at a safe boundary",()=>{
+  const spec={series:[{metricKey:"crm.count"}]};
+  expect(isSpecEditable({...spec,engine:"SEMANTIC_V1"})).toBe(false);
+  expect(isSpecEditable({...spec,topN:10})).toBe(false);
+  expect(isSpecEditable({...spec,filters:{unexpected:"value"}})).toBe(false);
+  expect(isSpecEditable(spec)).toBe(true);
+ });
 });
 
-describe("Widget form", () => {
-  it("offers only the visualizations a one-metric form can satisfy", () => {
-    const offered = buildableVisualizations(catalog).map((capability) => capability.key);
-    expect(offered).toContain("METRIC_CARD");
-    // MULTI_KPI needs two series; every submission would be a 422.
-    expect(offered).not.toContain("MULTI_KPI");
-  });
-
-  it("filters metrics by the shapes the chosen visualization accepts", () => {
-    const forLine = metricsFor(catalog, catalog.visualizations[2]).map((metric) => metric.key);
-    expect(forLine).toEqual(["crm.leads.created.trend"]);
-  });
-
-  it("refuses a dimension the metric does not declare", () => {
-    expect(validateWidgetForm(form(), catalog)).toBeNull();
-    expect(validateWidgetForm(form({ dimensionKey: "time" }), catalog)).toBe("DIMENSION_REQUIRED");
-  });
-
-  it("requires a positive target where the visualization requires one", () => {
-    expect(
-      validateWidgetForm(form({ visualizationType: "SEMI_CIRCLE_GAUGE" }), catalog),
-    ).toBe("TARGET_REQUIRED");
-    expect(
-      validateWidgetForm(
-        form({ visualizationType: "SEMI_CIRCLE_GAUGE", comparison: "TARGET", target: "0" }),
-        catalog,
-      ),
-    ).toBe("TARGET_INVALID");
-    expect(
-      validateWidgetForm(
-        form({ visualizationType: "SEMI_CIRCLE_GAUGE", comparison: "TARGET", target: "25" }),
-        catalog,
-      ),
-    ).toBeNull();
-  });
-
-  it("refuses a period comparison on a snapshot metric", () => {
-    expect(
-      validateWidgetForm(
-        form({ metricKey: "crm.opportunities.open.count", comparison: "PREVIOUS_PERIOD" }),
-        catalog,
-      ),
-    ).toBe("COMPARISON_UNSUPPORTED");
-  });
-
-  it("sends a grain with a time dimension and none without one", () => {
-    expect(
-      buildQuerySpec(
-        form({
-          visualizationType: "LINE",
-          metricKey: "crm.leads.created.trend",
-          dimensionKey: "time",
-          grain: "WEEK",
-        }),
-      ),
-    ).toEqual({
-      series: [{ metricKey: "crm.leads.created.trend" }],
-      dimension: { key: "time", grain: "WEEK" },
-    });
-    expect(buildQuerySpec(form())).toEqual({
-      series: [{ metricKey: "crm.leads.created.count" }],
-      dimension: { key: "none" },
-    });
-  });
-
-  it("never sends a semantic-engine field without the engine", () => {
-    const spec = buildQuerySpec(form()) as unknown as Record<string, unknown>;
-    for (const key of ["engine", "semanticVersion", "source", "semanticFilters", "topN", "maxPoints"]) {
-      expect(spec[key]).toBeUndefined();
-    }
-  });
-
-  it("round-trips a stored widget back into the form", () => {
-    expect(
-      widgetToForm({
-        name: "Win rate",
-        visualizationType: "SEMI_CIRCLE_GAUGE",
-        querySpec: {
-          series: [{ metricKey: "crm.opportunities.win.rate" }],
-          dimension: { key: "none" },
-          comparison: { type: "TARGET", target: 35 },
-        },
-      }),
-    ).toEqual({
-      name: "Win rate",
-      visualizationType: "SEMI_CIRCLE_GAUGE",
-      metricKey: "crm.opportunities.win.rate",
-      dimensionKey: "none",
-      grain: "DAY",
-      comparison: "TARGET",
-      target: "35",
-    });
-  });
-});
-
-/**
- * D23 — editing a widget's name must not destroy its query spec.
- *
- * The fixture is `TRENDS_COMPARISONS`'s "Count & Estimated Value" widget,
- * copied from `CRM_DASHBOARD_TEMPLATES` in crm-app's `dashboard-catalog.ts`
- * rather than invented. It matters that this is a real shipped widget: its
- * `LINE_AREA` type declares `minSeries: 1`, so the picker offers it and the
- * editor opened it with nothing to warn the user that the form models one
- * series and the widget has two.
- */
-const twoSeriesWidget = {
-  name: "Count & Estimated Value",
-  visualizationType: "LINE_AREA",
-  querySpec: {
-    series: [
-      { metricKey: "crm.opportunities.created.count.trend", axis: "LEFT", label: "Opportunity count" },
-      { metricKey: "crm.opportunities.created.estimated_value.trend", axis: "RIGHT", label: "Estimated value" },
-    ],
-    dimension: { key: "time", grain: "DAY" },
-    filters: { compare: "NONE" },
-  },
-} as const satisfies { name: string; visualizationType: "LINE_AREA"; querySpec: WidgetQuerySpec };
-
-const semanticWidget = {
-  name: "Top lead sources",
-  visualizationType: "BAR",
-  querySpec: {
-    engine: "SEMANTIC_V1",
-    semanticVersion: 1,
-    source: "leads",
-    semanticFilters: [{ field: "status", operator: "IN", values: ["NEW", "QUALIFIED"] }],
-    series: [{ metricKey: "crm.leads.by_source.count" }],
-    dimension: { key: "source" },
-    topN: 5,
-  },
-} as const satisfies { name: string; visualizationType: "BAR"; querySpec: WidgetQuerySpec };
-
-const plainWidget = {
-  name: "New leads",
-  visualizationType: "METRIC_CARD",
-  querySpec: {
-    series: [{ metricKey: "crm.leads.created.count" }],
-    dimension: { key: "none" },
-  },
-} as const satisfies { name: string; visualizationType: "METRIC_CARD"; querySpec: WidgetQuerySpec };
-
-describe("D23 · a widget update never narrows a spec the form does not model", () => {
-  it("names every part of a stored spec the single-series form cannot represent", () => {
-    expect(widgetSpecLimitations(twoSeriesWidget.querySpec).sort()).toEqual([
-      "FILTERS",
-      "MULTI_SERIES",
-      "SERIES_STYLING",
-    ]);
-    expect(widgetSpecLimitations(semanticWidget.querySpec).sort()).toEqual([
-      "RESULT_LIMITS",
-      "SEMANTIC_ENGINE",
-    ]);
-    expect(widgetSpecLimitations(plainWidget.querySpec)).toEqual([]);
-  });
-
-  it("refuses to open the editor for a spec it cannot represent", () => {
-    // widget-detail-workspace.tsx gates on this. Before it existed, the editor
-    // opened for both of these and saving collapsed them.
-    expect(isSpecEditable(twoSeriesWidget.querySpec)).toBe(false);
-    expect(isSpecEditable(semanticWidget.querySpec)).toBe(false);
-    expect(isSpecEditable(plainWidget.querySpec)).toBe(true);
-  });
-
-  it("omits querySpec entirely when only the name changed", () => {
-    // The whole defect in one assertion. `PATCH /widgets/:id` replaces
-    // querySpec wholesale, so the only safe rename is one that does not send
-    // it at all — see docs/api/crm-dashboards.md.
-    const update = buildWidgetUpdate(
-      { ...widgetToForm(twoSeriesWidget), name: "Renamed" },
-      twoSeriesWidget,
-    );
-    expect(update.name).toBe("Renamed");
-    expect(update.visualizationType).toBe("LINE_AREA");
-    expect(update).not.toHaveProperty("querySpec");
-  });
-
-  it("preserves both series and the filters of a two-series widget across a rename", () => {
-    const update = buildWidgetUpdate(
-      { ...widgetToForm(twoSeriesWidget), name: "Renamed" },
-      twoSeriesWidget,
-    );
-    // Nothing is sent, so the server keeps what it stored. Asserted against the
-    // fixture so a future change that starts sending a rebuilt spec fails here.
-    expect(update.querySpec).toBeUndefined();
-    expect(twoSeriesWidget.querySpec.series).toHaveLength(2);
-    expect(twoSeriesWidget.querySpec.filters).toEqual({ compare: "NONE" });
-  });
-
-  it("omits querySpec on a rename even for a widget the form fully models", () => {
-    // Not only the unsafe case: a rename is a rename. This also keeps a stored
-    // `comparison: { type: "NONE" }` from being silently dropped, which
-    // buildQuerySpec would do.
-    const update = buildWidgetUpdate({ ...widgetToForm(plainWidget), name: "Renamed" }, plainWidget);
-    expect(update).not.toHaveProperty("querySpec");
-  });
-
-  it("sends the rebuilt spec when the user actually edited the query", () => {
-    const update = buildWidgetUpdate(
-      { ...widgetToForm(plainWidget), metricKey: "crm.opportunities.open.count" },
-      plainWidget,
-    );
-    expect(update.querySpec).toEqual({
-      series: [{ metricKey: "crm.opportunities.open.count" }],
-      dimension: { key: "none" },
-    });
-  });
-
-  it("documents why the guard is needed: rebuilding a two-series spec is lossy", () => {
-    // Not a guard — the record of what the editor used to send. buildQuerySpec
-    // is unchanged and still narrows; it is simply no longer reachable for a
-    // spec like this one.
-    const rebuilt = buildQuerySpec(widgetToForm(twoSeriesWidget));
-    expect(rebuilt.series).toHaveLength(1);
-    expect(rebuilt.series[0]).toEqual({ metricKey: "crm.opportunities.created.count.trend" });
-    expect(rebuilt.filters).toBeUndefined();
-  });
-});

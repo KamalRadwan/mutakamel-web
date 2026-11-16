@@ -13,6 +13,7 @@ import {
   Tags,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import { useToast } from "@/components/ui/ToastContext";
 import {
   AmbiguousOutcomePanel,
@@ -846,17 +847,19 @@ function DiscoveryWorkspace({
             </p>
           ) : null}
           {view.mutation.error ? (
-            <AmbiguousOutcomePanel
-              className="mt-3"
-              message={view.mutation.error.message}
-              correlationId={view.mutation.error.correlationId}
-              retrying={view.mutation.isPending}
-              onRetryExact={
-                view.mutation.exactRetryAvailable
-                  ? () => void view.runDiscovery(command)
-                  : undefined
-              }
-            />
+            <div className="mt-3 space-y-1">
+              <AmbiguousOutcomePanel
+                message={getLocalizedApiErrorMessage(view.mutation.error, lang)}
+                correlationId={view.mutation.error.correlationId}
+                retrying={view.mutation.isPending}
+                onRetryExact={
+                  view.mutation.exactRetryAvailable
+                    ? () => void view.runDiscovery(command)
+                    : undefined
+                }
+              />
+              <code dir="ltr" className="block break-all font-mono text-xs">{view.mutation.error.errorCode}</code>
+            </div>
           ) : null}
         </CardContent>
       </Card>
@@ -1124,10 +1127,11 @@ function PagedState<T>({
   retry: () => void;
   children: (data: Paginated<T>) => ReactNode;
 }) {
+  const { lang } = useI18n();
   if (view.state === "LOADING") return <Skeleton className="h-48 w-full rounded-lg" />;
   if (view.state === "FORBIDDEN") return <PermissionRequiredPanel title={forbidden} />;
   if (view.state === "UNAVAILABLE" || view.state === "ERROR")
-    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error} onRetry={retry} />;
+    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error ? { ...view.error, message: getLocalizedApiErrorMessage(view.error, lang) } : null} onRetry={retry} />;
   if (view.state === "EMPTY" || !view.data?.items.length) return <EmptyState title={empty} />;
   return <>{children(view.data)}</>;
 }
@@ -1143,10 +1147,11 @@ function DiscoveryState<T>({
   retry: () => void;
   children: (data: T) => ReactNode;
 }) {
+  const { lang } = useI18n();
   if (view.state === "LOADING") return <Skeleton className="h-48 w-full rounded-lg" />;
   if (view.state === "FORBIDDEN") return <PermissionRequiredPanel title={copy.forbiddenDiscovery} />;
   if (view.state === "UNAVAILABLE" || view.state === "ERROR")
-    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error} onRetry={retry} />;
+    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error ? { ...view.error, message: getLocalizedApiErrorMessage(view.error, lang) } : null} onRetry={retry} />;
   if (view.state === "EMPTY" || !view.data) return <EmptyState title={copy.emptyRuns} />;
   return <>{children(view.data)}</>;
 }
@@ -1160,10 +1165,11 @@ function DetailState<T>({
   copy: ProvisioningGovernanceCopy;
   children: (data: T) => ReactNode;
 }) {
+  const { lang } = useI18n();
   if (view.state === "LOADING") return <Skeleton className="h-48 w-full rounded-lg" />;
   if (view.state === "FORBIDDEN") return <PermissionRequiredPanel title={copy.forbiddenDiscovery} />;
   if (view.state === "UNAVAILABLE" || view.state === "ERROR")
-    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error} />;
+    return <ErrorState title={view.state === "UNAVAILABLE" ? copy.unavailable : copy.error} error={view.error ? { ...view.error, message: getLocalizedApiErrorMessage(view.error, lang) } : null} />;
   if (!view.data) return <EmptyState title={copy.emptyRuns} />;
   return <>{children(view.data)}</>;
 }

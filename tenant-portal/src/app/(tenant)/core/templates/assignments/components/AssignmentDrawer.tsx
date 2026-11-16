@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import {
   Field,
   FormDrawer,
+  IdentifierText,
   Input,
   Select,
   SelectContent,
@@ -13,6 +13,8 @@ import {
   Switch,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { formatNumber } from "@/lib/format/number";
+import { formatTemplate } from "@/lib/format/template";
 import {
   TEMPLATE_ADAPTER_KEYS,
   TEMPLATE_DOCUMENT_TYPES,
@@ -21,64 +23,66 @@ import {
 } from "../../templates-contract";
 import {
   ASSIGNMENT_PRIORITY_MAX,
+  type AssignmentScope,
   type TemplateAssignment,
 } from "../../template-assignments-contract";
-import {
-  EMPTY_ASSIGNMENT_FORM,
-  type AssignmentFormValues,
-} from "../hooks/useTemplateAssignments";
+import type { AssignmentFormValues, AssignmentVersionPin } from "../hooks/useTemplateAssignments";
+import { useAssignmentDrawer } from "../hooks/useAssignmentDrawer";
+import { AssignmentChoiceField } from "./AssignmentChoiceField";
 
-function toLocalInput(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
-}
+const ANY_LOCALE = "ANY";
 
 export function AssignmentDrawer({
   assignment,
-  isOpen,
+  scope,
   onClose,
   onSubmit,
   isSubmitting,
   error,
+  isCurrent,
 }: {
   assignment: TemplateAssignment | null;
-  isOpen: boolean;
+  scope: AssignmentScope;
   onClose: () => void;
-  onSubmit: (values: AssignmentFormValues) => Promise<boolean>;
+  onSubmit: (values: AssignmentFormValues, selectedPin?: AssignmentVersionPin) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  isCurrent: () => boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang, dir } = useI18n();
   const copy = t.coreOperations.templates;
-  const initial: AssignmentFormValues = assignment
-    ? {
-        versionId: assignment.versionId,
-        adapterKey: assignment.adapterKey,
-        documentType: assignment.documentType,
-        outputChannel: assignment.outputChannel,
-        locale: assignment.locale ?? "",
-        priority: String(assignment.priority),
-        isDefault: assignment.isDefault,
-        effectiveFrom: toLocalInput(assignment.effectiveFrom),
-        effectiveTo: assignment.effectiveTo ? toLocalInput(assignment.effectiveTo) : "",
-      }
-    : EMPTY_ASSIGNMENT_FORM;
-  const [values, setValues] = useState<AssignmentFormValues>(initial);
-  const change = (patch: Partial<AssignmentFormValues>) =>
-    setValues((current) => ({ ...current, ...patch }));
+  const form = useAssignmentDrawer(assignment, scope, isCurrent);
+  const { values, change, changeSelector } = form;
+  const templateOptions = form.templates.items.map(item => ({
+    value: item.id,
+    label: `${item.name} · ${item.code} · ${copy.locales[item.locale as keyof typeof copy.locales] ?? item.locale}`,
+  }));
+  if (form.template && !templateOptions.some(option => option.value === form.template?.id)) {
+    templateOptions.unshift({ value: form.template.id, label: `${form.template.name} · ${form.template.code}` });
+  }
+  const versionOptions = form.versions.items.map(item => ({
+    value: item.id,
+    label: formatTemplate(copy.versionLabel, { number: formatNumber(item.versionNumber, lang) }),
+  }));
+  if (form.selectedVersion && !versionOptions.some(option => option.value === form.selectedVersion?.id)) {
+    versionOptions.unshift({
+      value: form.selectedVersion.id,
+      label: formatTemplate(copy.versionLabel, { number: formatNumber(form.selectedVersion.versionNumber, lang) }),
+    });
+  }
 
   return (
     <FormDrawer
-      open={isOpen}
+      open
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
       title={assignment ? copy.assignmentEditTitle : copy.assignmentCreateTitle}
       description={copy.assignmentDescription}
-      isDirty={JSON.stringify(values) !== JSON.stringify(initial)}
+      isDirty={form.isDirty}
       isSubmitting={isSubmitting}
-      onSubmit={() => void onSubmit(values)}
+      onSubmit={() => void onSubmit(values, form.selectedPin)}
+      submitDisabled={!form.canSubmit}
       error={error ?? undefined}
       labels={{
         submit: t.common.save,
@@ -90,22 +94,13 @@ export function AssignmentDrawer({
       }}
     >
       <div className="flex flex-col gap-4">
-        <Field label={copy.assignmentVersionId} hint={copy.assignmentVersionIdHint} required>
-          <Input size="sm" placeholder={copy.assignmentVersionId}
-            dir="ltr"
-            value={values.versionId}
-            onChange={(event) => change({ versionId: event.target.value.trim() })}
-            disabled={isSubmitting}
-            required
-          />
-        </Field>
-
         {assignment ? null : (
           <>
-            <Field label={copy.documentType} required>
+            <Field label={copy.documentType} showLabel required>
               <Select
+                dir={dir}
                 value={values.documentType}
-                onValueChange={(value) => change({ documentType: value })}
+                onValueChange={(value) => changeSelector({ documentType: value })}
                 disabled={isSubmitting}
               >
                 <SelectTrigger size="sm">
@@ -121,10 +116,11 @@ export function AssignmentDrawer({
               </Select>
             </Field>
 
-            <Field label={copy.outputChannel} required>
+            <Field label={copy.outputChannel} showLabel required>
               <Select
+                dir={dir}
                 value={values.outputChannel}
-                onValueChange={(value) => change({ outputChannel: value })}
+                onValueChange={(value) => changeSelector({ outputChannel: value })}
                 disabled={isSubmitting}
               >
                 <SelectTrigger size="sm">
@@ -140,10 +136,11 @@ export function AssignmentDrawer({
               </Select>
             </Field>
 
-            <Field label={copy.dataSource} required>
+            <Field label={copy.dataSource} showLabel required>
               <Select
+                dir={dir}
                 value={values.adapterKey}
-                onValueChange={(value) => change({ adapterKey: value })}
+                onValueChange={(value) => changeSelector({ adapterKey: value })}
                 disabled={isSubmitting}
               >
                 <SelectTrigger size="sm">
@@ -159,16 +156,18 @@ export function AssignmentDrawer({
               </Select>
             </Field>
 
-            <Field label={copy.locale} hint={copy.assignmentLocaleHint}>
+            <Field label={copy.locale} showLabel>
               <Select
-                value={values.locale}
-                onValueChange={(value) => change({ locale: value })}
+                dir={dir}
+                value={values.locale || ANY_LOCALE}
+                onValueChange={(value) => changeSelector({ locale: value === ANY_LOCALE ? "" : value })}
                 disabled={isSubmitting}
               >
                 <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {form.sales ? <SelectItem value={ANY_LOCALE}>{copy.assignmentDefaultLocale}</SelectItem> : null}
                   {TEMPLATE_LOCALES.map((value) => (
                     <SelectItem key={value} value={value}>
                       {copy.locales[value]}
@@ -178,6 +177,32 @@ export function AssignmentDrawer({
               </Select>
             </Field>
           </>
+        )}
+
+        {form.sales ? (
+          <>
+            {!assignment ? (
+              <AssignmentChoiceField label={t.crmOutboundEmails.template} options={templateOptions} value={form.template?.id}
+                onChange={form.selectTemplate} disabled={isSubmitting} empty={copy.empty} failure={copy.loadFailed}
+                page={form.templates} />
+            ) : null}
+            {assignment || form.template ? (
+              <AssignmentChoiceField label={copy.assignmentVersion} options={versionOptions} value={values.versionId}
+                onChange={form.selectVersion} disabled={isSubmitting} empty={copy.versionsEmpty}
+                failure={copy.versionsLoadFailed} page={form.versions} />
+            ) : null}
+            {values.versionId ? <IdentifierText className="text-xs" selectAll>{values.versionId}</IdentifierText> : null}
+          </>
+        ) : (
+          <Field label={copy.assignmentVersionId} hint={copy.assignmentVersionIdHint} required>
+            <Input size="sm" placeholder={copy.assignmentVersionId}
+              dir="ltr"
+              value={values.versionId}
+              onChange={(event) => change({ versionId: event.target.value.trim() })}
+              disabled={isSubmitting}
+              required
+            />
+          </Field>
         )}
 
         <Field label={copy.assignmentPriority} hint={copy.assignmentPriorityHint} required>

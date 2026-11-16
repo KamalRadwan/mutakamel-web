@@ -107,7 +107,7 @@ export async function fetchWalletLedger(
   signal?: AbortSignal,
 ): Promise<{ items: WalletLedgerEntry[] } & CorePageMeta> {
   // No `sortBy` here: `getLedger` fixes the sort to `createdAt DESC` itself and
-  // `LedgerQueryDto` takes only page, limit and an optional currencyCode.
+  // `LedgerQueryDto` takes only page and limit.
   const query = new URLSearchParams({
     page: String(page),
     limit: String(BILLING_PAGE_SIZE),

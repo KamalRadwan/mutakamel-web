@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { Suspense } from "react";
-import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdminUser, AdminWebphoneExtension } from "../types";
 import type { WebphoneServer } from "../../settings/webphone/webphone-contract";
@@ -150,6 +150,51 @@ async function openEditor() {
 }
 
 describe("user detail role assignment and WebPhone editor", () => {
+  it.each([
+    { lang: "en", action: "suspend" },
+    { lang: "ar", action: "suspend" },
+    { lang: "en", action: "activate" },
+    { lang: "ar", action: "activate" },
+  ] as const)("confirms $action in $lang before sending a status request", async ({ lang, action }) => {
+    locale.lang = lang;
+    const t = lang === "ar" ? ar : en;
+    const suspending = action === "suspend";
+    api.getAdminUser.mockResolvedValue({ ...adminUser(), status: suspending ? "ACTIVE" : "SUSPENDED" });
+    const request = suspending ? api.suspendAdminUser : api.activateAdminUser;
+    let finishRequest!: (value: AdminUser) => void;
+    request.mockImplementationOnce(() => new Promise<AdminUser>((resolve) => { finishRequest = resolve; }));
+    const params = Promise.resolve({ id: USER_ID });
+    await act(async () => {
+      render(<Suspense fallback={null}><UserDetailPage params={params} /></Suspense>);
+    });
+    const label = suspending ? t.users.suspendAccount : t.users.activateAccount;
+    const button = await screen.findByRole("button", { name: label });
+    fireEvent.click(button);
+    let dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveAccessibleName(suspending ? t.users.suspendActionTitle : t.users.activateActionTitle);
+    expect(dialog).toHaveTextContent(suspending
+      ? t.users.suspendActionDescription("Omar Hassan")
+      : t.users.activateActionDescription("Omar Hassan"));
+    expect(api.suspendAdminUser).not.toHaveBeenCalled();
+    expect(api.activateAdminUser).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: lang === "ar" ? "إلغاء" : "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(api.suspendAdminUser).not.toHaveBeenCalled();
+    expect(api.activateAdminUser).not.toHaveBeenCalled();
+
+    fireEvent.click(button);
+    dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: lang === "ar" ? "تأكيد التنفيذ" : "Confirm Action" }));
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: label })).toBeDisabled();
+    expect(suspending ? api.activateAdminUser : api.suspendAdminUser).not.toHaveBeenCalled();
+    await act(async () => finishRequest({ ...adminUser(), status: suspending ? "SUSPENDED" : "ACTIVE" }));
+    await waitFor(() => expect(screen.getByRole("button", {
+      name: suspending ? t.users.activateAccount : t.users.suspendAccount,
+    })).toBeEnabled());
+  });
+
   it('resends a pending invitation with loading feedback and preserves its key after an ambiguous failure', async () => {
     const invited = { ...adminUser(), status: 'INVITED' as const };
     api.getAdminUser.mockResolvedValue(invited);

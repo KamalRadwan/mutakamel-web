@@ -20,8 +20,9 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { en as enDict } from "@/i18n/dictionaries/en";
 import { ar as arDict } from "@/i18n/dictionaries/ar";
 import { localeForLanguage } from "@/i18n/locale";
@@ -100,6 +101,47 @@ function tpCopy(isAr: boolean) {
   return (isAr ? arDict : enDict).tenantProvisioning;
 }
 
+function useUpdateConfirmation(model: TenantProvisioningWorkspaceModel) {
+  const [pending, setPending] = useState<{
+    targets: string;
+    apply: () => Promise<void>;
+  } | null>(null);
+  const inFlight = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+  const busy = submitting || model.provisioning.mutation.name !== null;
+  return {
+    pending,
+    busy,
+    request() {
+      if (busy || pending || !model.provisioning.permissions.canApplyUpdates) return;
+      const selected = model.provisioning.updates.data.items.filter((update) =>
+        model.selectedUpdateKeys.includes(update.componentKey),
+      );
+      if (!selected.length) return;
+      // Retain this render's command closure and its exact release evidence.
+      setPending({
+        targets: selected.map((update) => `${update.componentKey} → ${update.availableRelease.releaseVersion}`).join("\n"),
+        apply: model.applySelectedUpdates,
+      });
+    },
+    dismiss() {
+      if (!busy && !inFlight.current) setPending(null);
+    },
+    async confirm() {
+      if (!pending || busy || inFlight.current || !model.provisioning.permissions.canApplyUpdates) return;
+      inFlight.current = true;
+      setSubmitting(true);
+      try {
+        await pending.apply();
+      } finally {
+        setPending(null);
+        setSubmitting(false);
+        inFlight.current = false;
+      }
+    },
+  };
+}
+
 const SECTIONS = [
   ["operations", History, "Operations", "العمليات"],
   ["updates", RotateCcw, "Updates", "التحديثات"],
@@ -114,6 +156,7 @@ export function TenantProvisioningWorkspaceView({
   const ar = model.lang === "ar";
   const copy = tpCopy(ar);
   const { provisioning } = model;
+  const updateConfirmation = useUpdateConfirmation(model);
   const errorRef = useRef<HTMLDivElement>(null);
   const visibleError =
     model.localError ?? provisioning.mutation.error?.errorCode ?? null;
@@ -227,7 +270,7 @@ export function TenantProvisioningWorkspaceView({
 
       <div className="p-3 sm:p-3.5">
         {model.section === "operations" && <OperationsSection model={model} />}
-        {model.section === "updates" && <UpdatesSection model={model} />}
+        {model.section === "updates" && <UpdatesSection model={model} onRequestApply={updateConfirmation.request} />}
         {model.section === "state" && <StateSection model={model} />}
         {model.section === "prerequisites" && (
           <PrerequisitesSection model={model} />
@@ -235,24 +278,49 @@ export function TenantProvisioningWorkspaceView({
         {model.section === "managed" && <ManagedSection model={model} />}
       </div>
 
-      <ProvisioningConfirmationDialog model={model} />
+      <ProvisioningConfirmationDialog model={model} updateConfirmation={updateConfirmation} />
+      <DestructiveActionModal
+        isOpen={model.decommissionConfirmation !== null}
+        onClose={model.dismissDecommissionConfirmation}
+        onConfirm={model.submitDecommission}
+        title={copy.decommissionConfirmTitle}
+        description={copy.decommissionConfirmDescription}
+        targetName={model.decommissionConfirmation?.targetName ?? ""}
+        actionType="destroy"
+        requireNameTyping
+        isSubmitting={provisioning.mutation.name !== null}
+        confirmLabel={copy.createDecommissionButton}
+      />
     </section>
   );
 }
 
 /**
- * The one confirmation for cancel, re-provision and repair. It names the
+ * The one confirmation for updates, cancel, re-provision and repair. It names the
  * exact operation or component and states the consequence before anything
  * is sent; it cannot be dismissed while the confirmed command is in flight.
  */
-function ProvisioningConfirmationDialog({ model }: TenantProvisioningWorkspaceViewProps) {
+function ProvisioningConfirmationDialog({ model, updateConfirmation }: TenantProvisioningWorkspaceViewProps & {
+  updateConfirmation: ReturnType<typeof useUpdateConfirmation>;
+}) {
   const pending = model.confirmation;
-  const content = pending ? confirmationContent(pending) : null;
+  const updates = updateConfirmation.pending;
+  const en = enDict.tenantProvisioning;
+  const ar = arDict.tenantProvisioning;
+  const content = updates ? {
+    titleEn: en.applyUpdatesConfirmTitle,
+    titleAr: ar.applyUpdatesConfirmTitle,
+    descriptionEn: `${en.applyUpdatesConfirmDescription}\n\n${updates.targets}`,
+    descriptionAr: `${ar.applyUpdatesConfirmDescription}\n\n${updates.targets}`,
+    confirmEn: en.applyUpdatesConfirmButton,
+    confirmAr: ar.applyUpdatesConfirmButton,
+    variant: "warning" as const,
+  } : pending ? confirmationContent(pending) : null;
   return (
     <ConfirmActionModal
-      isOpen={pending !== null}
-      onClose={model.dismissConfirmation}
-      onConfirm={model.confirmPending}
+      isOpen={updates !== null || pending !== null}
+      onClose={updates ? updateConfirmation.dismiss : model.dismissConfirmation}
+      onConfirm={updates ? updateConfirmation.confirm : model.confirmPending}
       titleEn={content?.titleEn ?? ""}
       titleAr={content?.titleAr ?? ""}
       descriptionEn={content?.descriptionEn ?? ""}
@@ -260,7 +328,7 @@ function ProvisioningConfirmationDialog({ model }: TenantProvisioningWorkspaceVi
       confirmTextEn={content?.confirmEn}
       confirmTextAr={content?.confirmAr}
       variant={content?.variant ?? "warning"}
-      isLoading={model.provisioning.mutation.name !== null}
+      isLoading={updateConfirmation.busy}
     />
   );
 }
@@ -781,7 +849,9 @@ function ComponentKeyList({
   );
 }
 
-function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
+function UpdatesSection({ model, onRequestApply }: TenantProvisioningWorkspaceViewProps & {
+  onRequestApply: () => void;
+}) {
   const ar = model.lang === "ar";
   const copy = tpCopy(ar);
   const { provisioning } = model;
@@ -797,7 +867,7 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
             type="button"
             variant="primary"
             size="sm"
-            onClick={() => void model.applySelectedUpdates()}
+            onClick={onRequestApply}
             disabled={!provisioning.permissions.canApplyUpdates || !model.selectedUpdateKeys.length || provisioning.mutation.name !== null}
           >
             {copy.applySelectedButton(model.selectedUpdateKeys.length)}
@@ -1207,7 +1277,7 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
             <Checkbox id="retention-acknowledged" name="retentionAcknowledged" checked={model.retentionAcknowledged} onCheckedChange={(checked) => model.setRetentionAcknowledged(checked === true)} />
             <span>{copy.retentionAckLabel}</span>
           </label>
-          <Button type="button" variant="destructive" size="sm" disabled={model.hasOpenOperation || !provisioning.permissions.canDecommission || !model.retentionAcknowledged || provisioning.mutation.name !== null} onClick={() => void model.submitDecommission()}>{copy.createDecommissionButton}</Button>
+          <Button type="button" variant="destructive" size="sm" disabled={model.hasOpenOperation || !provisioning.permissions.canDecommission || !model.retentionAcknowledged || provisioning.mutation.name !== null} onClick={model.requestDecommission}>{copy.createDecommissionButton}</Button>
         </CommandCard>
       </div>
     </div>

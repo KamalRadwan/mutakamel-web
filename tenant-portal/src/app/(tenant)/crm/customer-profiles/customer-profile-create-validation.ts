@@ -10,6 +10,7 @@ import {
   type CrmFieldMessages,
 } from "../shared/crm-form-validation";
 import type { CrmFormErrors } from "../shared/hooks/useCrmCreateForm";
+import { safeWebsiteHref } from "../shared/safe-website-href";
 import {
   CUSTOMER_PROFILE_CREATE_LIMITS,
   isCorporateCustomerProfile,
@@ -122,9 +123,10 @@ export function validateCreateCustomerProfile(
       limits.commercialRegistrationNumber,
     );
     bag.email("companyEmail", form.companyEmail, limits.email);
-    // `@IsUrl({ require_protocol: true })` — `acme.com` is a 400 here, so the
-    // form says so rather than letting the whole write fail on it.
-    bag.url("companyWebsite", form.companyWebsite, limits.website);
+    if (form.companyWebsite.trim() && !safeWebsiteHref(form.companyWebsite)) {
+      bag.set("companyWebsite", messages.url);
+    }
+    bag.maxLength("companyWebsite", form.companyWebsite, limits.website);
     bag.phones("companyPhones", form.companyPhones);
     form.contacts
       .slice(0, limits.contacts)

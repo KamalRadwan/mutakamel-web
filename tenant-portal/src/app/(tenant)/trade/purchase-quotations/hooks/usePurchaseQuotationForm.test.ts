@@ -27,9 +27,10 @@ vi.mock("../../trade-api", () => ({
 const HEADERS = { "x-mutakamel-company-id": purchaseQuotationFixture().companyId };
 const REPLAY_HEADERS = { "x-idempotency-key": "019f0000-0000-7000-8000-000000000099" };
 
-function setup(existing: PurchaseQuotationDetail | null = null) {
+async function setup(existing: PurchaseQuotationDetail | null = null) {
   const onSaved = vi.fn().mockResolvedValue(undefined);
-  const hook = renderHook(() => usePurchaseQuotationForm(HEADERS, false, existing, onSaved));
+  const hook = renderHook(() => usePurchaseQuotationForm(HEADERS, true, existing, onSaved));
+  await waitFor(() => expect(hook.result.current.canUseSupplierPicker).toBe(true));
   return { ...hook, onSaved };
 }
 
@@ -39,10 +40,24 @@ function draftLines() {
   }));
 }
 
+function pricedDraftLines() {
+  return draftLines().map((line) => ({ ...line, priceBreakdown: {
+    unitPrice: line.unitPrice,
+    currencyCode: "EGP",
+    priceBookId: purchaseQuotationFixture().id,
+    minimumAllowedPrice: null,
+  } }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.saved = true;
-  mocks.get.mockRejectedValue(new Error("Catalogue unavailable"));
+  mocks.get.mockImplementation(async (path: string) => {
+    if (path.includes("/supplier-options?")) return { data: { items: [{
+      partyId: purchaseQuotationFixture().partyId, displayName: "Supplier",
+    }] } };
+    throw new Error("Catalogue unavailable");
+  });
   mocks.post.mockImplementation(async (path: string, body: { itemId?: string; currencyCode?: string }) => ({
     data: path.endsWith("/pricing/evaluate") ? {
       unitPrice: purchaseQuotationFixture().lines.find((line) => line.itemId === body.itemId)?.unitPrice,
@@ -64,11 +79,34 @@ beforeEach(() => {
 });
 
 describe("purchase quotation form line lifecycle", () => {
+  it("cannot open or submit without the supplier lookup permission", async () => {
+    const { result } = renderHook(() => usePurchaseQuotationForm(HEADERS, false, null, vi.fn()));
+    act(() => result.current.open());
+    await act(async () => result.current.submit());
+    expect(result.current.isOpen).toBe(false);
+    expect(result.current.canSubmit).toBe(false);
+    expect(mocks.get).not.toHaveBeenCalled();
+    expect(mocks.runWrite).not.toHaveBeenCalled();
+  });
+
+  it("retains the selected supplier name when a later search has no matches", async () => {
+    const { result } = await setup();
+    await act(async () => result.current.open());
+    act(() => result.current.setValue({ supplierPartyId: purchaseQuotationFixture().partyId }));
+    expect(result.current.selectedSupplierLabel).toBe("Supplier");
+    mocks.get.mockResolvedValue({ data: { items: [] } });
+    act(() => result.current.searchSuppliers("another supplier"));
+    await waitFor(() => expect(result.current.isLoadingSuppliers).toBe(false));
+    expect(result.current.suppliers).toEqual([]);
+    expect(result.current.selectedSupplierLabel).toBe("Supplier");
+    expect(result.current.values.supplierPartyId).toBe(purchaseQuotationFixture().partyId);
+  });
+
   it("hydrates every existing line and omits them from a header-only PATCH", async () => {
     const existing = purchaseQuotationFixture();
-    const { result, onSaved } = setup(existing);
+    const { result, onSaved } = await setup(existing);
     await act(async () => { result.current.open(); });
-    await waitFor(() => expect(result.current.lineDraft.lines).toEqual(draftLines()));
+    await waitFor(() => expect(result.current.lineDraft.lines).toEqual(pricedDraftLines()));
     expect(result.current.canSubmit).toBe(true);
     act(() => { result.current.setValue({ reference: "Changed reference" }); });
     await act(async () => { await result.current.submit(); });
@@ -82,7 +120,7 @@ describe("purchase quotation form line lifecycle", () => {
   });
 
   it("submits every line, including untouched siblings, after a quantity edit", async () => {
-    const { result } = setup(purchaseQuotationFixture());
+    const { result } = await setup(purchaseQuotationFixture());
     await act(async () => { result.current.open(); });
     await act(async () => { result.current.lineDraft.setQuantity(0, "4"); });
     await act(async () => { await result.current.submit(); });
@@ -94,15 +132,15 @@ describe("purchase quotation form line lifecycle", () => {
   });
 
   it("discards unsaved edit lines before reopening the same document", async () => {
-    const { result } = setup(purchaseQuotationFixture());
+    const { result } = await setup(purchaseQuotationFixture());
     await act(async () => { result.current.open(); });
     act(() => { result.current.lineDraft.removeLine(0); result.current.close(); });
     await act(async () => { result.current.open(); });
-    await waitFor(() => expect(result.current.lineDraft.lines).toEqual(draftLines()));
+    await waitFor(() => expect(result.current.lineDraft.lines).toEqual(pricedDraftLines()));
   });
 
   it.each(["cancel", "save"])("starts a fresh create draft after %s", async (action) => {
-    const { result, onSaved } = setup();
+    const { result, onSaved } = await setup();
     const existing = purchaseQuotationFixture();
     await act(async () => { result.current.open(); });
     act(() => {
@@ -131,13 +169,13 @@ describe("purchase quotation form line lifecycle", () => {
 
   it("retains the draft when a write is unsuccessful", async () => {
     mocks.saved = false;
-    const { result, onSaved } = setup(purchaseQuotationFixture());
+    const { result, onSaved } = await setup(purchaseQuotationFixture());
     await act(async () => { result.current.open(); });
     act(() => { result.current.setValue({ notes: "Retry this change" }); });
     await act(async () => { await result.current.submit(); });
     expect(result.current.isOpen).toBe(true);
     expect(result.current.values.notes).toBe("Retry this change");
-    await waitFor(() => expect(result.current.lineDraft.lines).toEqual(draftLines()));
+    await waitFor(() => expect(result.current.lineDraft.lines).toEqual(pricedDraftLines()));
     expect(onSaved).not.toHaveBeenCalled();
   });
 });

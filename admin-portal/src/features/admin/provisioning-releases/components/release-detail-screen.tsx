@@ -1,9 +1,11 @@
 "use client";
 
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Archive, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Button, Card, Checkbox, Field, Input, Textarea } from "@/design-system";
+import { Button, Card, ConfirmActionModal, Field, Input, Textarea } from "@/design-system";
 import { useReleaseDetail } from "../hooks/use-release-detail";
 import {
   formatDate,
@@ -131,7 +133,7 @@ function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDeta
     );
   }
   if (!detail.permissions.canRetireCritical) {
-    return <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail="admin.provisioning.releases.retire + admin.provisioning.critical" copy={copy} />;
+    return <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail={ADMIN_RBAC_CRITICAL.PROVISIONING_RELEASE_RETIRE.join(" + ")} copy={copy} />;
   }
   const superseded = detail.standing === "SUPERSEDED";
   return (
@@ -140,7 +142,7 @@ function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDeta
         aria-label={copy.retireTitle}
         onSubmit={(event) => {
           event.preventDefault();
-          void detail.retire();
+          detail.requestRetireConfirmation();
         }}
         className="space-y-3"
       >
@@ -175,20 +177,27 @@ function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDeta
           ) : null}
         </div>
         <ReleaseFieldError id="retirement-reason-error" code={detail.retireErrors.reasonCode} copy={copy} />
-        <label className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-card/60 p-2.5 text-xs font-semibold text-foreground">
-          <Checkbox
-            checked={detail.retireDraft.confirmed}
-            onCheckedChange={(next) => detail.updateRetireDraft("confirmed", next === true)}
-            className="mt-0.5"
-          />
-          <span>{copy.retireConfirm}</span>
-        </label>
         <ReleaseFieldError id="retirement-confirm-error" code={detail.retireErrors.confirmed} copy={copy} />
         <Button type="submit" variant="destructive" size="sm" disabled={!detail.canRetire || pending} loading={pending}>
           <Archive className="size-3.5" aria-hidden="true" />
           {pending ? copy.retiring : copy.retire}
         </Button>
       </form>
+      <ConfirmActionModal
+        key={detail.snapshot?.data.releaseId}
+        isOpen={detail.retireConfirmationVersion === detail.snapshot?.data.releaseVersion && detail.canRetire}
+        onClose={detail.closeRetireConfirmation}
+        onConfirm={() => { void detail.retire(detail.snapshot?.data.releaseVersion); }}
+        titleEn={RELEASE_COPY.en.retireTitle}
+        titleAr={RELEASE_COPY.ar.retireTitle}
+        descriptionEn={RELEASE_COPY.en.retireConfirm}
+        descriptionAr={RELEASE_COPY.ar.retireConfirm}
+        confirmTextEn={RELEASE_COPY.en.retire}
+        confirmTextAr={RELEASE_COPY.ar.retire}
+        requiredConfirmationText={detail.snapshot?.data.releaseVersion}
+        isLoading={pending}
+        loadingLabel={copy.retiring}
+      />
     </Card>
   );
 }

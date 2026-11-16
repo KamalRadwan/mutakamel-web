@@ -2,6 +2,54 @@
 
 Status: **verified**
 
+Read-all pagination source-reviewed: **2026-10-31** (AUDIT29X-TPC-5).
+Shared CRM attachment reads and both lead owner candidate readers stop after
+40 sequential pages (2000 attachments or 4000 users/owners at the requested
+page sizes). If page 40 still indicates more results, the entire read fails
+with a pagination error through the existing translated load-error/retry path;
+no partial list is returned. Reads finishing on or before page 40 are unchanged.
+Unit checks, typecheck/lint and the tenant rebuild await lead verification.
+
+Lead detail tag catalogue access source-reviewed: **2026-10-29** (AUDIT29-CRM-4).
+The attach-tag button and catalogue-opening handler require tag edit capability
+and either tenant ownership or `crm.tags.read`. Without read permission the
+card sends no catalogue GET; existing tag chips remain visible. An open picker
+is hidden if read permission is withdrawn. Checks and rebuild await the lead.
+
+Detail review source-reviewed: **2026-10-28** (FE-DETAIL-REVIEW-001).
+The lead hero shows its translated status when the stage bar is unavailable;
+the current stage is announced with `aria-current="step"` and its localized
+name remains in the screen-reader header. Detail breadcrumbs identify the
+current record, expose its full name, and mirror their separator in RTL.
+Contact editors derive display names only when first/last names change and
+both trimmed parts are present. A custom display name, including a name-only
+contact, is preserved; automatic updates continue only for empty or previously
+derived display names. Honorific edits never change the display name.
+After creating a tag, its attachment waits for any pending tag write and uses
+that write's settled tags. Attachment failure retains the catalogue entry and
+shows a specific Arabic/English notice so the user can select it again.
+Unit checks, typecheck/lint and the production rebuild await lead verification.
+
+Live lead invalidation source-reviewed: **2026-10-27** (LB-5-PORTAL).
+The portal pins `@mutakamel/realtime-app-client` to `0.0.6`.
+`TenantRealtimeProvider` bridges the client's validated `crm.leads.changed.v1`,
+ID-free `crm.leads.scope-resync.v1`, and `CRM_LEADS`/`ALL` sync signals.
+`useLeadRealtimeInvalidation` fences subscriptions by auth generation and
+selected branch. It reloads even for an unloaded lead, through the existing
+REST reconciliation: active list/page or board lanes and stage totals, followed
+by the KPI revision. Search, sort and submitted Advanced filters are preserved;
+socket payloads never patch rows or grant access. REST 403 handling is retained.
+
+Bursts debounce for 200 ms with a 1-second maximum wait, one reconciliation
+in flight and one trailing reconciliation if more changes arrive. Revision
+deduplication uses `BigInt`, retains distinct change kinds at equal revisions
+(including deletion), and holds at most 512 leads per branch/auth subscription.
+Revision gaps do not trigger special recovery. Readiness (including a workspace
+mounted after readiness), reconnect, scope resync and return online/foreground
+all reconcile over REST. Branch/session changes and unmount cancel timers and
+abort pending realtime reads; late responses cannot restore the previous scope.
+Unit checks and the production portal rebuild remain pending lead verification.
+
 Optimistic lead edits source-reviewed: **2026-10-26** (CRM-LEADS-027).
 `PATCH /api/tenant/crm/v1/leads/:id` accepts optional `expectedUpdatedAt`: the
 loaded lead's `updatedAt`, as an ISO timestamp with timezone and at most three
@@ -303,7 +351,11 @@ primary-contact details, email and phone aggregates of the list row. Card and
 Table remain global paginated list/search reads and become stage-filtered only
 when the user selects a stage.
 
-## POST /leads/kpis — the KPI strip (2026-10-14)
+## POST /leads/kpis — headline count API (2026-10-14)
+
+**UI updated 2026-11-03:** The Leads page no longer displays the Total,
+New, Rated 3 stars, Qualified or Overdue activity summary pills and no longer
+requests this endpoint. The backend contract below remains available.
 
 Body: the `POST /leads/search` body (`buildLeadBoardRequest` builds it; the
 backend ignores `sort`, `page` and `limit`). Response
@@ -313,33 +365,18 @@ lead the filters and scoped read access select — not the loaded page. "Today"
 uses the tenant's civil date. "Overdue" uses `due_at < now()`, including earlier
 today, matching `hasOverdueActivity: true`; the card's display classification
 follows [decision 9](../design/specs/crm-leads-v3.md), using a parseable
-`activityAt` before the server `bucket`. `useLeadKpis` reads it after every search and
-data revision, keyed on the serialized body. The strip displays an unknown count
-and disables its filter buttons when no KPI response is available; it never
-substitutes counts of loaded rows.
-Parser: `parseLeadKpisResponse` (`lead-bulk-contract.ts`).
+`activityAt` before the server `bucket`.
 
-Re-verified **2026-10-17** against `page.tsx`, `LeadKpiStrip`,
-`LeadStageFunnelBar`, `LeadSearchDto` and `LeadInsightsService`. All four
-filterable presets send server predicates before counting and pagination:
+Search compiler predicates remain available before counting and pagination:
 New uses `stageFlag = NEW`, Rated 3 stars uses `rating = 3`, and Qualified uses
 `stageFlag = QUALIFIED`; Overdue activity sends `hasOverdueActivity: true`.
 They are ANDed with the existing Basic or submitted
 Advanced search, including its owner, text and tag filters. Basic uses POST
 search while a preset is active; board and stage paging use the same compiler.
-Selecting a preset resets list paging to one. Selecting Total or pressing the
-active pill again removes only the preset. An Advanced draft stays unapplied
-when selecting a pill. The strip counts the base search without the preset,
-so each pill's count describes the result total obtained by selecting it.
-
-**CRM-LEADS-029 (2026-10-17):** Overdue activity uses the same localized,
-keyboard-operable toggle button and pressed state as the other pills. It
-retains its filter in Card/Table paging and board-stage More reads. Selecting
-Total or pressing the active pill clears it. The stage funnel still counts
-its supplied rows.
+The stage funnel still counts its supplied rows.
 
 **Source-reviewed 2026-10-18 — D-027, CRM-LEADS-DEAD-014:** the KPI response
-and parser expose only the six headline counts above. The backend aggregates
+exposes only the six headline counts above. The backend aggregates
 them directly without grouping by stage. For per-stage server counts, use board
 lane totals. List rows do not supply `contactsCount`; the list parser and card
 do not read or display an additional-contact count.
@@ -698,6 +735,24 @@ uses client router navigation to `/crm/leads`.
 Source: `crm-app/src/crm/leads/dto/lead.dto.ts`, the lead detail read model,
 `LeadsService.update` and `PartyDirectoryAdapter`. Verified 2026-10-17.
 
+Detail contact form layout source reviewed **2026-10-28** (FE-INDIVIDUAL-JOBTITLE):
+phones span the full first row; Honorific, First name and Last name share the
+next row; Email and Job title share the following row. Fields stack on narrow
+screens. The individual editor and
+corporate Add Contact form use the same order. Edit forms have no separate
+Name/Full name input or read-only Type field. First-name, last-name and
+honorific changes derive the required display name as
+`${firstName} ${lastName}`.trim(), excluding the honorific; existing validation
+and request builders still apply. Display-name errors appear by First name.
+Individual detail responses expose top-level `jobTitle` (`string | null`);
+missing, empty or non-text values parse as null during the CRM task B rollout.
+The individual read card displays it, and its editor seeds it from that field,
+validates a maximum of 120 characters, trims it, and PATCHes only changes;
+an empty value sends `jobTitle: null` to clear it. This top-level write is
+INDIVIDUAL-only; corporate contact titles remain relationship fields.
+Rebuild the portal only after CRM task B is live. Directory permission
+restrictions are unchanged.
+
 `GET /leads/:id` returns `contacts[]` with `partyId`, `relationshipId`,
 `displayName`, `firstName`, `lastName`, `honorificTitle`, `jobTitle`,
 `isPrimary`, `email` and `phones[]`. This list belongs to the lead, not the
@@ -813,10 +868,11 @@ catalogue items, `{ id, name, backgroundColor, textColor, createdAt, updatedAt }
 (re-verified 2026-09-24, see [catalogues](crm-catalogues.md#tags)).
 The backend permits attach/detach through the standalone tag routes under scoped
 `crm.leads.update` even after conversion (D-024, CRM-LEADS-014); this is an
-exception to the converted-lead field lock. The current detail tag controls use
-the Details editor's `editable` gate, which still excludes converted leads.
-**Planned — D-024:** separate that tag gate so converted leads with update
-access can attach/detach tags in the portal too.
+exception to the converted-lead field lock. Source-reviewed **2026-10-29**
+(AUDIT29-CRM-3): detail tag controls use a separate gate that permits scoped
+update access after conversion and blocks writes while reconciliation is pending.
+This gate covers the picker, attach/detach handlers and tag creation (which also
+requires tag-management access). Other converted-lead fields remain read-only.
 Owner/creator names use the authenticated actor when IDs match; otherwise
 `GET /api/tenant/core/v1/users/:id` requires `users.user.read`. Lead owner pickers
 were re-verified **2026-10-17** against the Gateway route contract and CRM's
@@ -953,10 +1009,18 @@ Lead GET/PATCH DTO or add another main-column attachments section.
   converted-record state for their `readOnly` boundary. Their create/delete
   controls use the source-owner capabilities for creation and attachment deletion;
   existing note edit/delete controls use the per-note response flags above.
-- Download uses same-origin navigation to
-  `GET /api/tenant/crm/v1/attachments/:id/download`; its attachment stream is
-  handled by the browser with session cookies, not the JSON transport. No
-  token, file bytes or invented public storage URL is put in the page.
+- Download (updated **2026-10-31**, AUDIT29X-TPC-4) fetches the full file from
+  `GET /api/tenant/crm/v1/attachments/:id/download` through `axiosClient` with
+  `responseType: "blob"` and `cache: no-store`. Cookie credentials, auth recovery
+  and request deadlines remain active; HTTP error bodies still use JSON parsing.
+  A failed download keeps the record mounted and shows a dismissible localized
+  error using `useCrmErrorText`. Success clicks a temporary object-URL anchor
+  with the attachment's filename, then removes the anchor and releases the URL.
+  The portal tab never navigates to the download endpoint.
+  The download regression uses a UUIDv7 attachment fixture so it reaches the
+  transport rather than failing local path validation. It asserts one download
+  request per click, inline 404 copy in Arabic and English, and object-URL
+  cleanup after success. Unit checks and typecheck/lint await lead verification.
 
 Attachment read handling reverified **2026-09-14** against the CRM attachment
 entity, notes/attachments controller/service and Gateway route contracts.

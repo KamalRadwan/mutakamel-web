@@ -47,7 +47,7 @@ describe("API request language", () => {
     { headers: [["accept-language", "en-GB,en;q=0.8"]] as [string, string][] },
   ])("preserves caller overrides for every HeadersInit form: %j", async ({ headers }) => {
     setLanguage("ar");
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -62,7 +62,7 @@ describe("API request language", () => {
     vi.spyOn(document, "cookie", "get").mockReturnValue(
       "mutakamel-http-tenant-csrf=csrf-proof",
     );
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       new Response(JSON.stringify({ message: "Rejected refresh" }), { status: 400 }));
     vi.stubGlobal("fetch", fetchMock);
 

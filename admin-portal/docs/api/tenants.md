@@ -1120,6 +1120,12 @@ release its placement.
 
 ### Soft delete
 
+Workspace confirmation source review: **2026-10-30** (AUDIT29V-AP-2).
+Soft delete uses the destructive `ConfirmActionModal`; its confirm button
+stays disabled until the operator types the exact tenant slug (`tenant.name`),
+including case and whitespace. Cancelling sends no command. Source review
+only; tests, typecheck, lint and the Admin Portal rebuild await lead verification.
+
 `DELETE /api/admin/core/v1/tenants/:id`
 
 Permissions: `admin.tenants.delete` + `admin.tenants.critical`.
@@ -1141,6 +1147,14 @@ from normal lists. Deleted records remain available through direct detail and
 `status=DELETED`.
 
 ### Permanent destroy
+
+Workspace confirmation source review: **2026-10-30** (AUDIT29V-AP-2).
+Both **Destroy permanently** and **Resume destruction** require the exact
+tenant slug (`tenant.name`) in the destructive `ConfirmActionModal` before
+confirmation is enabled. Destroy retains its irreversible-action hint; resume
+retains its phase-specific consequences. Suspend, activate, re-provision,
+cancel provisioning, restore and abandon keep their existing confirmations.
+Source review only; tests, typecheck, lint and rebuild await lead verification.
 
 Source verified: **2026-10-11** (Core `tenant-destroy.service.ts`,
 `dto/tenant-destroy-response.dto.ts`, `dto/tenant-destroy-params.dto.ts`,

@@ -39,12 +39,14 @@ export function SelectValue({
 
 export interface SelectTriggerProps
   extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>,
-    ControlSizeProps {}
+    ControlSizeProps {
+  textSize?: "default" | "compact";
+}
 
 export const SelectTrigger = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectTriggerProps
->(({ className, size = "sm", children, ...props }, ref) => {
+>(({ className, size = "sm", textSize = "default", children, ...props }, ref) => {
   // aria-readonly only, no native attribute: a trigger is a button element, and
   // `readonly` on a button is meaningless markup.
   const field = useFieldControl(props);
@@ -69,6 +71,7 @@ export const SelectTrigger = forwardRef<
         // takes the same 16px-below-sm step. Must follow controlSize —
         // tailwind-merge keeps the last font-size in a group.
         textEntrySize({ size }),
+        textSize === "compact" && "font-sans font-normal text-caption sm:text-caption",
         className,
       )}
       {...props}
@@ -85,8 +88,8 @@ SelectTrigger.displayName = "SelectTrigger";
 
 export const SelectContent = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { textSize?: "default" | "compact" }
+>(({ className, children, position = "popper", textSize = "default", ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -94,6 +97,7 @@ export const SelectContent = forwardRef<
       className={cn(
         "relative z-(--z-dropdown) max-h-96 min-w-32 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-pop",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        textSize === "compact" && "font-sans font-normal [&_[role=option]]:font-sans [&_[role=option]]:font-normal [&_[role=option]]:text-caption",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
         className,

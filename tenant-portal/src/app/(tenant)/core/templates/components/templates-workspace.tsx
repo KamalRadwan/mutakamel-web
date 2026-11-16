@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, type MouseEvent, type RefObject } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw, RotateCcw } from "lucide-react";
 import {
   Badge,
@@ -27,7 +27,12 @@ import {
   type TemplateListItem,
 } from "../templates-contract";
 import { useTemplateList } from "../hooks/useTemplateList";
+import { useTemplateCreate } from "../hooks/useTemplateCreate";
+import { useTemplateAuthority } from "../hooks/useTemplateAuthority";
+import { useTemplateDrawerIntent } from "../hooks/useTemplateDrawerIntent";
+import { useI18n } from "@/i18n/I18nContext";
 import { CreateTemplateDrawer } from "./CreateTemplateDrawer";
+import { TemplateFirstUse } from "./TemplateFirstUse";
 
 const VALIDATION_TONE: Record<string, "positive" | "negative" | "caution" | "neutral"> = {
   PASSED: "positive",
@@ -37,16 +42,53 @@ const VALIDATION_TONE: Record<string, "positive" | "negative" | "caution" | "neu
 };
 
 export function TemplatesWorkspace() {
-  const list = useTemplateList();
+  const { key, readCurrent, subscribe, retry, canRetry, recovering } = useTemplateAuthority();
+  const { t } = useI18n();
+  const region = useRef<HTMLElement | null>(null);
+  return (
+    <section ref={region} tabIndex={-1} aria-label={t.coreOperations.templates.listTitle}
+      className="focus-visible:outline-2 focus-visible:outline-ring">
+      {key ? (
+        <TemplatesWorkspaceForAuthority key={key} authority={key} readAuthority={readCurrent}
+          subscribeAuthority={subscribe} focusFallback={region} />
+      ) : (
+        <PermissionGate require={TEMPLATE_READ_PERMISSION}>
+          <div className="flex flex-wrap items-center gap-2">
+            <DegradedBanner message={t.coreOperations.templates.loadFailed} />
+            <Button type="button" size="sm" variant="outline" disabled={!canRetry} loading={recovering}
+              onClick={() => void retry()}>{t.common.retry}</Button>
+          </div>
+        </PermissionGate>
+      )}
+    </section>
+  );
+}
+
+function TemplatesWorkspaceForAuthority({ authority, readAuthority, subscribeAuthority, focusFallback }: {
+  authority: string;
+  readAuthority: () => string | null;
+  subscribeAuthority: (listener: () => void) => () => void;
+  focusFallback: RefObject<HTMLElement | null>;
+}) {
+  const list = useTemplateList(authority, readAuthority, subscribeAuthority);
   const { t, lang } = list;
   const copy = t.coreOperations.templates;
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const drawer = useTemplateDrawerIntent(authority, readAuthority, focusFallback);
+  const isCreateOpen = drawer.entry !== null && list.canRead && list.canCreate &&
+    !list.isEntitlementBlocked && !list.isPermissionDenied;
+  const create = useTemplateCreate(isCreateOpen, list.isFirstUseEmpty && list.canCreate);
+  const { retireScope } = drawer;
+  const createScopeKey = create.scope ? create.values.scopeKey : "";
+  useLayoutEffect(() => { retireScope(createScopeKey); }, [retireScope, createScopeKey]);
 
   // A tenant without `core.template_designer` gets 403 from every route here.
   // That is an entitlement boundary, not an empty list and not a permission
   // error, so it renders the unavailable surface.
   if (list.isEntitlementBlocked) {
-    return <UnavailableState backHref={TENANT_ROUTES.core} />;
+    return <UnavailableState backHref={TENANT_ROUTES.core} copy={copy.entitlementUnavailable} />;
+  }
+  if (list.isPermissionDenied) {
+    return <PermissionGate require={TEMPLATE_READ_PERMISSION} denied>{null}</PermissionGate>;
   }
 
   const columns: ColumnDef<TemplateListItem>[] = [
@@ -119,7 +161,8 @@ export function TemplatesWorkspace() {
           title={copy.listTitle}
           description={copy.listSubtitle}
           primaryAction={
-            list.canCreate ? { label: copy.create, onClick: () => setIsCreateOpen(true) } : undefined
+            list.canCreate && !list.isFirstUseEmpty ? { label: copy.create,
+              onClick: (event?: MouseEvent<HTMLButtonElement>) => drawer.open("create", event?.currentTarget ?? null) } : undefined
           }
           secondaryActions={
             <Button size="sm" variant="outline" onClick={list.reload} disabled={list.isLoading}>
@@ -209,6 +252,20 @@ export function TemplatesWorkspace() {
           isLoading={list.isLoading}
           error={list.error}
           onRetry={list.reload}
+          emptyState={list.isFirstUseEmpty ? (
+            <TemplateFirstUse
+              canCreate={list.canCreate}
+              documentTypes={create.documentTypes}
+              scopeLabel={create.scope ? create.scope.label ?? copy.scopeTenant : null}
+              onCreate={trigger => drawer.open("create", trigger)}
+              onChoose={(documentType, trigger) => {
+                create.change({ documentType });
+                drawer.open("create", trigger, create.values.scopeKey);
+              }}
+              onBrowse={create.hasCompatibleSource
+                ? trigger => drawer.open("starters", trigger, create.values.scopeKey) : undefined}
+            />
+          ) : undefined}
           rowKey={(template) => template.id}
           onRowClick={list.openTemplate}
           labels={{
@@ -265,7 +322,9 @@ export function TemplatesWorkspace() {
           </span>
         </div>
 
-        <CreateTemplateDrawer isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+        <CreateTemplateDrawer isOpen={isCreateOpen}
+          browseStarters={drawer.entry?.mode === "starters" && drawer.entry.scopeKey === create.values.scopeKey}
+          create={create} onClose={drawer.close} onCloseAutoFocus={event => drawer.restore(event, createScopeKey)} />
       </div>
     </PermissionGate>
   );

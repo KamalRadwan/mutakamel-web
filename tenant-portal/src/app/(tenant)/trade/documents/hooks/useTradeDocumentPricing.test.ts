@@ -31,6 +31,22 @@ beforeEach(() => { vi.useFakeTimers(); post.mockReset(); post.mockResolvedValue(
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe("document pricing lifecycle", () => {
+  it("reads the base price without a party even when the decision includes a promotion", async () => {
+    const decision = { ...response("90").data, baselineUnitPrice: "100.00" };
+    post.mockResolvedValue({ data: decision });
+    const query: Query = { ...QUERY, partyId: null, useBasePrice: true };
+    const { result, rerender } = renderHook((current: Query) => useTradeDocumentPricing(current), { initialProps: query });
+    await startRequest();
+    expect(post).toHaveBeenCalledWith("/api/tenant/trade/v1/pricing/evaluate", expect.objectContaining({
+      partyId: undefined, currencyCode: "SAR",
+    }), expect.objectContaining({ suppressForbiddenToast: true }));
+    expect(result.current.prices[0]?.unitPrice).toBe("100.00");
+
+    rerender(QUERY);
+    expect(result.current.prices[0]?.unitPrice).toBeNull();
+    await startRequest();
+    expect(result.current.prices[0]?.unitPrice).toBe("90");
+  });
   it("preserves exact server prices, including zero, without a manual override", async () => {
     const { result, rerender } = renderHook((query: Query) => useTradeDocumentPricing(query), { initialProps: QUERY });
     expect(result.current.ready).toBe(false);

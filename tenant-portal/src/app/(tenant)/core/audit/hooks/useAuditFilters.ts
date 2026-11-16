@@ -1,9 +1,11 @@
 "use client";
+import { useTenantAuth } from "@/context/AuthContext";
 import { useState } from "react";
 import type { DateRangeValue } from "@/design-system";
 import type { AuditFilters } from "@/lib/audit/audit-contract";
 
 export function useAuditFilters(filters: AuditFilters, onApply: (value: AuditFilters) => void) {
+  const { user } = useTenantAuth();
   const [draft, setDraft] = useState(filters);
   const [range, setRange] = useState<DateRangeValue | undefined>(() => {
     const from = filters.from ? new Date(filters.from) : undefined;
@@ -19,6 +21,6 @@ export function useAuditFilters(filters: AuditFilters, onApply: (value: AuditFil
     if (to) to.setDate(to.getDate() + 1);
     change({ from: value?.from?.toISOString(), to: to?.toISOString() });
   };
-  return { draft, range, change, applyRange, apply: () => onApply(draft),
+  return { branchIds: [...new Set([...(user?.accessibleBranches ?? []), ...(draft.branchId ? [draft.branchId] : [])])], draft, range, change, applyRange, apply: () => onApply(draft),
     clear: () => { setDraft({}); setRange(undefined); onApply({}); } };
 }

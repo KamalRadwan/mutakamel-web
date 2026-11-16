@@ -1,59 +1,29 @@
 "use client";
-
 import { useCallback, useEffect, useState } from "react";
-import { definitionListPath, mergeDefinitionItems } from '../../definition-pagination';
+import { mergeDefinitionItems } from "../../definition-pagination";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { WIDGETS_PATH, parseWidgetsResponse, type WidgetDefinition } from "../../widget-contract";
-
+import type { WidgetDefinition } from "../../widget-contract";
+import { isPlaceableWidget, parseWidgetLibraryResponse, widgetLibraryListPath } from "../../widget-library-contract";
+import { useDashboardSafety } from "../../hooks/useDashboardSafety";
 const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 } as const;
-
-/**
- * The widgets that can be placed on this dashboard.
- *
- * `GET /widgets` needs `crm.widgets.read`, which is a **separate** grant from
- * `crm.dashboards.update`: an actor may edit a dashboard's layout and still
- * not be allowed to list widgets. The picker degrades to its own error rather
- * than blocking the layout editor.
- */
 export function useAvailableWidgets(enabled: boolean) {
-  const [widgets, setWidgets] = useState<WidgetDefinition[]>([]);
-  const [error, setError] = useState<NormalizedApiError | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-
-  const load = useCallback(async (cursor?: string): Promise<void> => {
-    if (!enabled) return;
-    setError(null);
-    setIsLoading(true);
+  const { scope, startRead, currentRead, readSettled } = useDashboardSafety("widget-picker");
+  const [widgets, setWidgets] = useState<WidgetDefinition[]>([]); const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [isLoading, setIsLoading] = useState(false); const [nextCursor, setNextCursor] = useState<string | null>(null); const [dataScope, setDataScope] = useState<object | null>(null);
+  const load = useCallback(async (cursor?: string, signal?: AbortSignal) => {
+    const ticket = enabled ? startRead() : null; if (!ticket) return;
+    setError(null); setIsLoading(true);
     try {
-      const response = await axiosClient.get<unknown>(definitionListPath(WIDGETS_PATH, cursor), READ_CONFIG);
-      const page = parseWidgetsResponse(response.data);
-      setWidgets((current) => cursor ? mergeDefinitionItems(current, page.items) : page.items);
-      setNextCursor(page.nextCursor);
-    } catch (caught) {
-      setError(normalizeApiError(caught));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [enabled]);
-
-  // Deferred out of the effect body: a synchronous setState there cascades a
-  // render, which `react-hooks/set-state-in-effect` refuses. Same shape as
-  // every other loader in this app.
-  useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) void load();
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [load]);
-
-  return {
-    widgets, error, reload: () => load(), isLoading,
-    hasMore: nextCursor !== null,
-    loadMore: () => nextCursor && !isLoading ? load(nextCursor) : Promise.resolve(),
-  };
+      const response = await axiosClient.get<unknown>(widgetLibraryListPath({ search: "", access: null, status: "PUBLISHED", source: null, ownerUserId: null }, cursor), { ...READ_CONFIG, signal });
+      const page = parseWidgetLibraryResponse(response.data);
+      if (signal?.aborted || !currentRead(ticket)) return;
+      const placeable = page.items.filter(isPlaceableWidget);
+      setWidgets((current) => cursor ? mergeDefinitionItems(current, placeable) : placeable); setNextCursor(page.nextCursor); setDataScope(scope);
+    } catch (caught) { if (!signal?.aborted && currentRead(ticket)) { setError(normalizeApiError(caught)); setDataScope(scope); } }
+    finally { if (!signal?.aborted && readSettled(ticket)) setIsLoading(false); }
+  }, [enabled, scope, startRead, currentRead, readSettled]);
+  useEffect(() => { const controller = new AbortController(); queueMicrotask(() => { if (!controller.signal.aborted) void load(undefined, controller.signal); }); return () => controller.abort(); }, [load]);
+  return { widgets: enabled && dataScope === scope ? widgets : [], error: enabled && dataScope === scope ? error : null, reload: () => load(), isLoading,
+    hasMore: enabled && dataScope === scope && nextCursor !== null, loadMore: () => nextCursor && !isLoading ? load(nextCursor) : Promise.resolve() };
 }

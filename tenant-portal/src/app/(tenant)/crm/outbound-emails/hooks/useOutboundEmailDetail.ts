@@ -1,157 +1,101 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { isIdempotentReplay } from "@/lib/api/outcomes";
 import { canSendOutboundEmail } from "./useOutboundEmails";
+import { useOutboundEmailWrite, type EmailWriteResult } from "./useOutboundEmailWrite";
 import {
-  buildRetryRequest,
-  isPendingDelivery,
-  outboundEmailPath,
-  outboundEmailRetryPath,
-  parseAcceptedResponse,
-  parseDetailResponse,
-  type OutboundEmailDetail,
+  buildRetryRequest, isPendingDelivery, outboundEmailPath, outboundEmailRetryPath,
+  parseDetailResponse, type OutboundEmailDetail,
 } from "../outbound-email-contract";
-
-const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2_000_000 } as const;
-const WRITE_CONFIG = {
-  cache: "no-store",
-  maxResponseBytes: 512 * 1024,
-  nonReplayable: true,
-} as const;
 
 export type RetryResult =
   | { ok: true; outboundEmailId: string; replayed: boolean; error: null }
   | { ok: false; replayed: false; error: NormalizedApiError };
 
-/** `GET /outbound-emails/:id` and `POST /outbound-emails/:id/retry`. */
 export function useOutboundEmailDetail(outboundEmailId: string) {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const canSend = canSendOutboundEmail(user?.permissions);
+  const authScope = useAuthScopeKey(user);
+  const scope = authScope + ":" + user?.featureEntitlements?.["crm.outbound_email"] + ":" + outboundEmailId;
+  const canSend = canSendOutboundEmail(user?.permissions) && user?.featureEntitlements?.["crm.outbound_email"] !== false;
+  const live = useRef(scope);
+  useLayoutEffect(() => { live.current = scope; }, [scope]);
+  const generation = useRef(0);
+  const controller = useRef<AbortController | null>(null);
   const [detail, setDetail] = useState<OutboundEmailDetail | null>(null);
+  const [dataScope, setDataScope] = useState(scope);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const canRetry = canSend && !isLoading && !isRetrying &&
-    detail?.outboundEmailId === outboundEmailId && detail.status === "FAILED" &&
-    !detail.retriedById && detail.content.state === "AVAILABLE";
+  const [retainedError, setRetainedError] = useState<NormalizedApiError | null>(null);
+  const currentDetail = useRef<OutboundEmailDetail | null>(null);
+  const email = dataScope === scope && detail?.outboundEmailId === outboundEmailId ? detail : null;
+  useLayoutEffect(() => { currentDetail.current = email; }, [email]);
+  const write = useOutboundEmailWrite(scope, canSend);
+  const canRetry = canSend && !isLoading && !write.isPending && !write.uncertain && !retainedError &&
+    email?.status === "FAILED" && !email.retriedById && email.content.state === "AVAILABLE";
 
-  const load = useCallback(
-    async (signal?: AbortSignal) => {
-      setIsLoading(true);
-      setQueryError(null);
-      try {
-        const response = await axiosClient.get<unknown>(
-          outboundEmailPath(outboundEmailId),
-          { ...READ_CONFIG, signal },
-        );
-        setDetail(parseDetailResponse(response.data));
-      } catch (error) {
-        if (isAbortError(error)) return;
-        setDetail(null);
-        setQueryError(normalizeApiError(error));
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
-      }
-    },
-    [outboundEmailId],
-  );
+  const load = useCallback(async () => {
+    controller.current?.abort();
+    const request = new AbortController();
+    controller.current = request;
+    const requestGeneration = ++generation.current;
+    const current = () => !request.signal.aborted && requestGeneration === generation.current && live.current === scope;
+    setIsLoading(true); setQueryError(null); setRetainedError(null);
+    try {
+      const response = await axiosClient.get<unknown>(outboundEmailPath(outboundEmailId),
+        { cache: "no-store", maxResponseBytes: 2_000_000, signal: request.signal });
+      if (!current()) return;
+      const parsed = parseDetailResponse(response.data);
+      if (parsed.outboundEmailId !== outboundEmailId) throw new Error("Invalid CRM outbound-email response.");
+      setDetail(parsed); setDataScope(scope);
+    } catch (failure) {
+      if (!current()) return;
+      const error = normalizeApiError(failure);
+      if (currentDetail.current && error.status !== 403 && error.status !== 401 && error.status !== 404) setRetainedError(error);
+      else { setDetail(null); setQueryError(error); }
+    } finally { if (current()) setIsLoading(false); }
+  }, [outboundEmailId, scope]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
-    return () => controller.abort();
-  }, [load]);
+    let active = true;
+    const requestGeneration = generation.current;
+    queueMicrotask(() => { if (active && live.current === scope && requestGeneration === generation.current) void load(); });
+    return () => { active = false; controller.current?.abort(); };
+  }, [load, scope]);
 
-  /**
-   * `POST /:id/retry` — 202 Accepted, exactly like the original send. The
-   * retry is queued, not delivered, and the row it creates carries its own id.
-   */
-  const retry = async (reason: string): Promise<RetryResult> => {
-    if (!canSend) {
-      return {
-        ok: false,
-        replayed: false,
-        error: { status: 403, code: "FORBIDDEN" },
-      };
+  function finish(result: EmailWriteResult): RetryResult {
+    if (result.accepted) {
+      const child = result.accepted.outboundEmailId;
+      setDetail((current) => current?.outboundEmailId === outboundEmailId ? { ...current, retriedById: child } : current);
+      return { ok: true, outboundEmailId: child, replayed: result.replayed, error: null };
     }
-    if (!canRetry) {
-      return {
-        ok: false,
-        replayed: false,
-        error: {
-          status: 409,
-          code: detail?.retriedById
-            ? "CRM.EMAIL.RETRY_ALREADY_CREATED"
-            : "CRM.EMAIL.RETRY_NOT_ALLOWED",
-        },
-      };
-    }
+    return { ok: false, replayed: false,
+      error: result.error ?? { status: 409, code: "CRM.EMAIL.RETRY_NOT_ALLOWED" } };
+  }
+
+  async function retry(reason: string): Promise<RetryResult> {
+    if (!canSend) return { ok: false, replayed: false, error: { status: 403, code: "FORBIDDEN" } };
+    if (!canRetry || write.isBlocked()) return { ok: false, replayed: false, error: {
+      status: 409, code: email?.retriedById ? "CRM.EMAIL.RETRY_ALREADY_CREATED" : "CRM.EMAIL.RETRY_NOT_ALLOWED",
+    } };
     let body: Record<string, unknown>;
-    try {
-      body = buildRetryRequest(reason);
-    } catch (error) {
-      return {
-        ok: false,
-        replayed: false,
-        error: {
-          status: 0,
-          code: error instanceof Error ? error.message : "INVALID_INPUT",
-        },
-      };
-    }
-    setIsRetrying(true);
-    try {
-      const response = await axiosClient.post<unknown>(
-        outboundEmailRetryPath(outboundEmailId),
-        body,
-        WRITE_CONFIG,
-      );
-      // Parsed to prove the 202 body is the accepted shape before the screen
-      // claims anything about it.
-      const accepted = parseAcceptedResponse(response.data);
-      setDetail((current) => current?.outboundEmailId === outboundEmailId
-        ? { ...current, retriedById: accepted.outboundEmailId }
-        : current);
-      return {
-        ok: true,
-        outboundEmailId: accepted.outboundEmailId,
-        replayed: isIdempotentReplay(response.headers),
-        error: null,
-      };
-    } catch (error) {
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
-    } finally {
-      setIsRetrying(false);
-    }
-  };
+    try { body = buildRetryRequest(reason); }
+    catch { return { ok: false, replayed: false, error: { status: 0, code: "CRM_EMAIL_RETRY_REASON_INVALID" } }; }
+    const result = await write.submit(outboundEmailRetryPath(outboundEmailId), body);
+    if (result.error?.status === 409 || result.error?.status === 404) void load();
+    return finish(result);
+  }
 
   return {
-    t,
-    lang,
-    detail,
-    isLoading,
-    isRetrying,
-    queryError,
-    notFound: queryError?.status === 404,
-    canSend,
-    canRetry,
-    // Delivery state is written by the worker pipeline after the fact, so a
-    // QUEUED or DISPATCHING row is expected to change without anything the
-    // user did. The screen says so and offers a refresh.
-    isPending: detail ? isPendingDelivery(detail.status) : false,
-    retry,
-    reload: () => load(),
+    t, lang, scope, detail: email, isLoading, isRetrying: write.isPending,
+    queryError, retainedError, notFound: queryError?.status === 404,
+    canSend, canRetry, uncertain: write.uncertain,
+    isPending: email ? isPendingDelivery(email.status) : false,
+    retry, reconcile: async () => finish(await write.reconcile()), reload: load,
   };
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
 }

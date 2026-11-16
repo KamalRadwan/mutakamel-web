@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, Field, Textarea, Butt
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { useApplicationPrimaryComponentDialog } from "../hooks/useApplicationPrimaryComponentDialog";
 import { deriveTechnicalIdentityPreview } from "../lib/technical-provisioning-state";
+import { localizeApplicationError } from "../lib/application-error-copy";
 
 interface Props {
   isOpen: boolean;
@@ -61,11 +62,14 @@ export function ApplicationPrimaryComponentDialog({
     commandError?.errorCode === "GW.IDEM.IN_FLIGHT" ||
     (commandError?.httpStatus ?? 0) >= 500 ||
     commandError?.errorCode === "UNKNOWN_ERROR";
-  const commandMessage = commandError?.errorCode === "APPLICATION_TECHNICAL_DEFINITION_REVISION_STALE"
-    ? t.applications.technicalProvisioning.staleMessage
-    : commandError?.httpStatus === 403
-      ? t.applications.technicalProvisioning.forbiddenMessage
-      : commandError?.message;
+  const commandMessage = commandError ? localizeApplicationError({
+    ...commandError,
+    message: commandError.errorCode === "APPLICATION_TECHNICAL_DEFINITION_REVISION_STALE"
+      ? t.applications.technicalProvisioning.staleMessage
+      : commandError.httpStatus === 403
+        ? t.applications.technicalProvisioning.forbiddenMessage
+        : commandError.message,
+  }, t) : undefined;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
@@ -144,11 +148,6 @@ export function ApplicationPrimaryComponentDialog({
           {commandError && (
             <div role="alert" className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2.5 text-xs text-destructive-subtle-foreground">
               <p>{commandMessage}</p>
-              {commandError?.correlationId && (
-                <p className="mt-1 font-mono text-xs opacity-75" dir="ltr">
-                  {t.applications.technicalProvisioning.correlationId}: {commandError.correlationId}
-                </p>
-              )}
             </div>
           )}
 

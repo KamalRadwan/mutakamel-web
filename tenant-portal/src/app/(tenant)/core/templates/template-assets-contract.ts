@@ -1,5 +1,8 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import type { CorePath } from "@/lib/api/envelope";
+import { TenantApiClientError } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
+import { isUUIDv7 } from "@/lib/uuid";
 import { coreDelete, coreGet, corePost } from "../core-api";
 import {
   invalidCoreResponse,
@@ -154,6 +157,7 @@ export async function sha256Hex(file: File): Promise<string> {
 export async function uploadTemplateAsset(
   metadata: AssetUploadMetadata,
   file: File,
+  intent?: { readonly mutationId: string; readonly assertCurrent: () => void },
 ): Promise<TemplateAsset> {
   const body = new FormData();
   body.append("metadata", JSON.stringify(metadata));
@@ -161,8 +165,34 @@ export async function uploadTemplateAsset(
   const result = await corePost(TEMPLATE_ASSETS_PATH, body, {
     maxResponseBytes: 400_000,
     nonReplayable: true,
+    ...(intent && {
+      headers: { "x-idempotency-key": intent.mutationId },
+      assertCurrent: intent.assertCurrent,
+      requireExactResponseTarget: true,
+      suppressForbiddenToast: true,
+    }),
   });
+  if (intent && result.status !== 201) invalidCoreResponse();
   return parseAssetEnvelope(result.data);
+}
+
+export async function fetchUploadedTemplateAsset(assetId: string, assertCurrent: () => void): Promise<TemplateAsset | null> {
+  if (!isUUIDv7(assetId)) invalidCoreResponse();
+  const path = `${TEMPLATE_ASSETS_PATH}/${encodeURIComponent(assetId)}` as CorePath;
+  try {
+    const result = await coreGet(path, { assertCurrent, requireExactResponseTarget: true, suppressForbiddenToast: true,
+      maxResponseBytes: 400_000 });
+    if (result.status !== 200) invalidCoreResponse();
+    return parseAssetEnvelope(result.data);
+  } catch (error) {
+    if (error instanceof TenantApiClientError && error.provenance === "http" && error.response.status === 404 &&
+        normalizeApiError(error).code === "CORE.TEMPLATE.NOT_FOUND") {
+      const receipt = error.request;
+      if (receipt?.method === "GET" && receipt.endpoint === path && receipt.redirected === false && receipt.origin &&
+          receipt.finalUrl === `${receipt.origin}${path}`) return null;
+    }
+    throw error;
+  }
 }
 
 /** **204**, `If-Match` on the namespaced asset etag. Unreferenced assets only. */

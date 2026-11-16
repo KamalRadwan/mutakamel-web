@@ -4,9 +4,12 @@ import { createElement } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { OpportunitiesWorkspace } from "./opportunities-workspace";
 
 const state = vi.hoisted(() => ({
+  lang: "en" as "en" | "ar",
+  deleteError: null as { status: number; message: string } | null,
   view: "table" as "table" | "card" | "board",
   loadStatus: 0,
   listStatus: 0,
@@ -22,11 +25,13 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("@/hooks/useAccessMode", () => ({ useAccessMode: () => ({ canMutate: true }) }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { permissions: [] } }) }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/crm/opportunities" }));
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: { en, ar }[state.lang], lang: state.lang }) }));
 vi.mock("@/design-system", async () => ({
+  ...(await import("@/design-system/feedback/format-api-error")),
   ...(await import("@/design-system/primitives/Button")),
   ...(await import("@/design-system/patterns/confirm-action/ConfirmActionModal")),
+  ...(await import("@/design-system/views/board/useCollapsedColumns")),
   useWorkspaceState: () => ({ view: state.view, page: 1, setView: vi.fn() }),
   PageHeader: () => null, PageActions: () => null, Select: () => null,
   SelectContent: () => null, SelectItem: () => null, SelectTrigger: () => null,
@@ -38,14 +43,14 @@ vi.mock("@/design-system", async () => ({
 vi.mock("../hooks/useDeleteOpportunity", () => ({
   useDeleteOpportunity: () => ({
     deleteOpportunity: state.deleteOpportunity, isDeleting: false,
-    error: null, clearError: vi.fn(),
+    error: state.deleteError, clearError: vi.fn(),
   }),
 }));
 vi.mock("../hooks/useOpportunitiesList", () => ({
   useOpportunitiesList: () => ({
     items: state.items, search: { mode: "basic", basic: { filters: [] } },
     pageInfo: { total: 3 }, reload: state.reload,
-    error: state.listStatus ? { status: state.listStatus } : null,
+    error: state.listStatus ? { status: state.listStatus, message: "Internal backend prose" } : null,
   }),
 }));
 vi.mock("../hooks/usePipelineWorkspace", () => ({
@@ -69,18 +74,22 @@ vi.mock("@/components/activities/ActivitiesWorkspaceLink", () => ({ ActivitiesWo
 vi.mock("@/components/activities/ActivityModal", () => ({ ActivityModal: () => null }));
 vi.mock("@/components/tenant/TenantBranchSelect", () => ({ TenantBranchSelect: () => null }));
 vi.mock("./CreateOpportunityModal", () => ({ CreateOpportunityModal: () => null }));
-vi.mock("./DeleteOpportunityDialog", () => ({ DeleteOpportunityDialog: () => null }));
+vi.mock("./DeleteOpportunityDialog", () => ({
+  DeleteOpportunityDialog: ({ error }: { error: string | null }) => error ? <p role="alert">{error}</p> : null,
+}));
 vi.mock("./OpportunityExecutiveBoardView", () => ({ OpportunityExecutiveBoardView: () => null }));
 vi.mock("./OpportunityQuickEditModal", () => ({ OpportunityQuickEditModal: () => null }));
 vi.mock("./OpportunitySearchBar", () => ({ OpportunitySearchBar: () => null }));
 vi.mock("./OpportunityStageFunnelBar", () => ({ OpportunityStageFunnelBar: () => null }));
 vi.mock("./TerminalMoveDialog", () => ({ TerminalMoveDialog: () => null }));
 
-function SelectionView({ selectedIds, onSelectionChange }: {
+function SelectionView({ selectedIds, onSelectionChange, error }: {
+  error?: string | null;
   selectedIds: ReadonlySet<string>;
   onSelectionChange: (ids: Set<string>) => void;
 }) {
   return <>
+    {error && <p role="alert">{error}</p>}
     {createElement("button", { onClick: () => onSelectionChange(new Set(state.items.map(({ id }) => id))) }, "Select all")}
     <output data-testid="selection">{[...selectedIds].join(",")}</output>
   </>;
@@ -89,6 +98,8 @@ vi.mock("./OpportunityExecutiveTableView", () => ({ OpportunityExecutiveTableVie
 vi.mock("./OpportunityExecutiveCardView", () => ({ OpportunityExecutiveCardView: SelectionView }));
 
 beforeEach(() => {
+  state.lang = "en";
+  state.deleteError = null;
   vi.clearAllMocks();
   state.loadStatus = 0;
   state.listStatus = 0;
@@ -96,6 +107,29 @@ beforeEach(() => {
   state.deleteOpportunity.mockReset().mockResolvedValue(true);
 });
 afterEach(cleanup);
+
+describe.each(["ar", "en"] as const)("%s localized failures", (lang) => {
+  it.each([500, 409])("hides backend deletion prose for HTTP %s", (status) => {
+    state.lang = lang;
+    state.view = "table";
+    state.deleteError = { status, message: "Internal backend prose" };
+    render(<OpportunitiesWorkspace />);
+    const t = { ar, en }[lang];
+    expect(screen.getByRole("alert").textContent).toBe(
+      status === 409 ? t.crmShared.errorConflict : t.crmShared.errorGeneric,
+    );
+    expect(screen.queryByText("Internal backend prose")).toBeNull();
+  });
+
+  it.each(["table", "card"] as const)("hides backend list prose in %s", (view) => {
+    state.lang = lang;
+    state.view = view;
+    state.listStatus = 500;
+    render(<OpportunitiesWorkspace />);
+    expect(screen.getByRole("alert").textContent).toBe({ ar, en }[lang].crmOpportunities.loadFailed);
+    expect(screen.queryByText("Internal backend prose")).toBeNull();
+  });
+});
 
 function requestDeletion() {
   fireEvent.click(screen.getByRole("button", { name: "Select all" }));

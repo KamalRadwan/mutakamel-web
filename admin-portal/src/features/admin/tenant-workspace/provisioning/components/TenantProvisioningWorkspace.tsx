@@ -5,11 +5,13 @@ import { useTenantProvisioningWorkspace } from "../hooks/useTenantProvisioningWo
 
 export interface TenantProvisioningWorkspaceProps {
   tenantId: string;
+  tenantName: string;
 }
 
 export function TenantProvisioningWorkspace({
   tenantId,
+  tenantName,
 }: TenantProvisioningWorkspaceProps) {
-  const model = useTenantProvisioningWorkspace(tenantId);
+  const model = useTenantProvisioningWorkspace(tenantId, tenantName);
   return <TenantProvisioningWorkspaceView model={model} />;
 }

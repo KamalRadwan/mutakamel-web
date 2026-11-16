@@ -15,7 +15,6 @@ vi.mock("@/context/AuthContext", () => ({
 const loaded: CrmSettings = {
   id: "01900100-0000-7000-8000-000000000001",
   requireQualifiedStageForConversion: true,
-  defaultLeadStageId: null,
   defaultPipelineId: "01900100-0000-7000-8000-000000000002",
   outboundEmailContentRetentionDays: 730,
   outboundEmailRetentionPolicyRevision: 4,

@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Star, Trash2 } from "lucide-react";
+import { CheckCircle2, Eye, Pencil, Star, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -12,7 +12,7 @@ import {
 } from "@/design-system";
 import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
-import { alternateName, localizedName } from "@/lib/format/localized";
+import { localizedName } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
 import type { Pipeline } from "../pipeline-contract";
 
@@ -21,6 +21,8 @@ interface PipelineColumnOptions {
   pendingId: string | null;
   onSetDefault: (pipeline: Pipeline) => void;
   onDelete: (pipeline: Pipeline) => void;
+  onView?: (pipeline: Pipeline) => void;
+  onEdit?: (pipeline: Pipeline) => void;
 }
 
 export function usePipelineColumns({
@@ -28,23 +30,25 @@ export function usePipelineColumns({
   pendingId,
   onSetDefault,
   onDelete,
+  onView,
+  onEdit,
 }: PipelineColumnOptions): ColumnDef<Pipeline>[] {
   const { t, lang } = useI18n();
   const { canMutate } = useAccessMode();
 
   const columns: ColumnDef<Pipeline>[] = [
     {
-      id: "name",
-      header: t.crmPipelines.name,
+      id: "nameAr",
+      header: t.crmPipelines.nameAr,
       cell: (pipeline) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-foreground">
-            {localizedName(pipeline, lang)}
-          </p>
-          <p className="truncate text-2xs text-muted-foreground">
-            {alternateName(pipeline, lang)}
-          </p>
-        </div>
+        <bdi dir="rtl" className="block truncate text-foreground">{pipeline.nameAr}</bdi>
+      ),
+    },
+    {
+      id: "nameEn",
+      header: t.crmPipelines.nameEn,
+      cell: (pipeline) => (
+        <bdi dir="ltr" className="block truncate text-foreground">{pipeline.nameEn}</bdi>
       ),
     },
     {
@@ -92,7 +96,7 @@ export function usePipelineColumns({
     },
   ];
 
-  if (!canManage || !canMutate) return columns;
+  if (!onView && (!canManage || !canMutate)) return columns;
 
   return [
     ...columns,
@@ -102,16 +106,23 @@ export function usePipelineColumns({
       align: "end",
       sticky: "end",
       cell: (pipeline) => (
-        <div className="flex items-center justify-end gap-1">
-          {pipeline.isDefault ? null : (
+        <div className="flex items-center justify-end gap-1 font-sans">
+          {onView && <Button variant="outline" size="sm" className="size-8 p-0" aria-label={`${t.crmPipelines.review.openPipeline}: ${localizedName(pipeline, lang)}`}
+            onClick={(event) => { event.stopPropagation(); onView(pipeline); }}><Eye className="size-4" aria-hidden="true" /></Button>}
+          {canManage && canMutate && onEdit && <Button variant="outline" size="sm" disabled={pendingId !== null}
+            aria-label={`${t.crmPipelines.edit}: ${localizedName(pipeline, lang)}`}
+            onClick={(event) => { event.stopPropagation(); onEdit(pipeline); }}>
+            <Pencil className="size-4" aria-hidden="true" />{t.crmPipelines.edit}
+          </Button>}
+          {canManage && canMutate && !pipeline.isDefault && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={pendingId !== null || !pipeline.isActive || pipeline.accessMode !== "ALL" ? 0 : undefined} aria-label={`${t.crmPipelines.makeDefault}: ${localizedName(pipeline, lang)}`}>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   disabled={pendingId !== null || !pipeline.isActive || pipeline.accessMode !== "ALL"}
-                  className="disabled:pointer-events-none"
+                  className="size-8 p-0 disabled:pointer-events-none"
                   aria-label={`${t.crmPipelines.makeDefault}: ${localizedName(pipeline, lang)}`}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -127,15 +138,15 @@ export function usePipelineColumns({
                 : pendingId !== null ? t.crmConfigActionHints.pending : t.crmPipelines.makeDefault}</TooltipContent>
             </Tooltip>
           )}
-          {!pipeline.isDefault && (
+          {canManage && canMutate && !pipeline.isDefault && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={pendingId !== null ? 0 : undefined} aria-label={`${t.common.delete}: ${localizedName(pipeline, lang)}`}>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   disabled={pendingId !== null}
-                  className="disabled:pointer-events-none"
+                  className="size-8 p-0 disabled:pointer-events-none"
                   aria-label={`${t.common.delete}: ${localizedName(pipeline, lang)}`}
                   onClick={(event) => {
                     event.stopPropagation();

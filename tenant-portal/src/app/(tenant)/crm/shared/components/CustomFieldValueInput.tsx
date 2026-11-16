@@ -14,12 +14,14 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
 import type { CustomFieldItem } from "../../custom-fields/custom-field-contract";
+import { fromLocalCustomFieldDateTime, toLocalCustomFieldDateTime } from "../custom-field-datetime";
 
 interface CustomFieldValueInputProps {
   field: CustomFieldItem;
   value: unknown;
   disabled: boolean;
   onChange: (next: unknown) => void;
+  showPlaceholder?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export function CustomFieldValueInput({
   value,
   disabled,
   onChange,
+  showPlaceholder = true,
 }: CustomFieldValueInputProps) {
   const { t, lang } = useI18n();
 
@@ -55,7 +58,7 @@ export function CustomFieldValueInput({
     );
   }
 
-  const fieldPlaceholder = localizedValue(field.nameAr, field.nameEn, lang) || t.crmCustomFields.valuePlaceholder;
+  const fieldPlaceholder = showPlaceholder ? localizedValue(field.nameAr, field.nameEn, lang) || t.crmCustomFields.valuePlaceholder : "";
 
   if (field.type === "TEXTAREA") {
     return (
@@ -63,7 +66,7 @@ export function CustomFieldValueInput({
         placeholder={fieldPlaceholder}
         value={typeof value === "string" ? value : ""}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
       />
     );
   }
@@ -101,10 +104,10 @@ export function CustomFieldValueInput({
       return (
         <MultiSelect
           values={Array.isArray(value) ? (value as string[]) : []}
-          onValuesChange={onChange}
+          onValuesChange={(next) => onChange(next.length === 0 ? null : next)}
           options={options}
           disabled={disabled}
-          placeholder={t.crmCustomFields.valuePlaceholder}
+          placeholder={showPlaceholder ? t.crmCustomFields.valuePlaceholder : ""}
           emptyLabel={t.crmCustomFields.noOptions}
           moreLabel={t.crmPipelines.moreChips}
           removeLabel={t.crmPipelines.removeChip}
@@ -120,7 +123,7 @@ export function CustomFieldValueInput({
         onValueChange={onChange}
       >
         <SelectTrigger size="sm">
-          <SelectValue placeholder={t.crmCustomFields.valuePlaceholder} />
+          <SelectValue placeholder={showPlaceholder ? t.crmCustomFields.valuePlaceholder : ""} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
@@ -133,18 +136,25 @@ export function CustomFieldValueInput({
     );
   }
 
+  if (field.type === "DATETIME") {
+    return <Input size="sm" type="datetime-local" step="0.001" placeholder={fieldPlaceholder}
+      value={toLocalCustomFieldDateTime(value)} disabled={disabled}
+      onChange={(event) => {
+        const next = fromLocalCustomFieldDateTime(event.target.value, value);
+        if (next !== undefined) onChange(next);
+      }} />;
+  }
+
   const inputType =
     field.type === "DATE"
       ? "date"
-      : field.type === "DATETIME"
-        ? "datetime-local"
-        : field.type === "EMAIL"
-          ? "email"
-          : field.type === "URL"
-            ? "url"
-            : field.type === "PHONE"
-              ? "tel"
-              : "text";
+      : field.type === "EMAIL"
+        ? "email"
+        : field.type === "URL"
+          ? "url"
+          : field.type === "PHONE"
+            ? "tel"
+            : "text";
 
   return (
     <Input size="sm"
@@ -152,7 +162,7 @@ export function CustomFieldValueInput({
       placeholder={fieldPlaceholder}
       value={typeof value === "string" ? value : ""}
       disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
+      onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
     />
   );
 }

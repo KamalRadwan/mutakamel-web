@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError } from "@/lib/api/errors";
-import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
+import { useLeadStageErrorText } from "./useLeadStageErrorText";
 import {
   LEAD_STAGES_PATH,
   buildLeadStageReorderRequest,
@@ -17,6 +18,7 @@ import {
   LEAD_STAGES_REORDER_PATH,
   NON_REPLAYABLE_MUTATION,
   REPLAYABLE_MUTATION,
+  isAmbiguousLeadStageMutation,
 } from "./lead-stage-requests";
 import type { LeadStageCataloguePort } from "./useLeadStageMutations";
 
@@ -26,9 +28,12 @@ export function useLeadStageOrdering({
   setItems,
   reconcile,
   notify,
-}: Omit<LeadStageCataloguePort, "onCreated">) {
+  beginWrite,
+  endWrite,
+}: Omit<LeadStageCataloguePort, "onCreated"> & { beginWrite: () => boolean; endWrite: () => void }) {
   const { t } = useI18n();
-  const errorText = useCrmErrorText();
+  const toast = useToast();
+  const errorText = useLeadStageErrorText();
   const [isReordering, setIsReordering] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
@@ -57,6 +62,7 @@ export function useLeadStageOrdering({
       return;
     }
     const previous = [...stages];
+    if (!beginWrite()) return;
     setIsReordering(true);
     // Optimistic: the row lands where it was dropped, re-ranked exactly the way
     // the endpoint renumbers — dense and one-based.
@@ -72,15 +78,21 @@ export function useLeadStageOrdering({
         payload,
         REPLAYABLE_MUTATION,
       );
-      setItems(parseLeadStageCatalogueResponse(response.data));
+      const confirmed = parseLeadStageCatalogueResponse(response.data);
+      if (confirmed.length !== orderedIds.length || confirmed.some((stage, index) => stage.id !== orderedIds[index])) {
+        throw new Error("Invalid reordered catalogue.");
+      }
+      setItems(confirmed);
+      toast.success(t.crmLeadStages.orderSaved);
     } catch (caught) {
       // Roll back AND say why: a silent revert leaves the user watching their
       // own change undo itself (docs/design/states.md, state 8).
       setItems(previous);
-      notify(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.reorderFailed);
+      notify(`${t.crmLeadStages.orderRestored} ${errorText(normalizeApiError(caught))}`);
       await reconcile();
     } finally {
       setIsReordering(false);
+      endWrite();
     }
   };
 
@@ -98,6 +110,7 @@ export function useLeadStageOrdering({
       notify(t.crmLeadStages.manageForbidden);
       return;
     }
+    if (!beginWrite()) return;
     setSettingDefaultId(stage.id);
     try {
       const response = await axiosClient.post<unknown>(
@@ -106,7 +119,8 @@ export function useLeadStageOrdering({
         NON_REPLAYABLE_MUTATION,
       );
       try {
-        const updated = parseLeadStageResponse(response.data);
+        const updated = parseLeadStageResponse(response.data, stage.id);
+        if (!updated.isDefault || !canBeDefaultLeadStage(updated)) throw new Error("Invalid default stage.");
         // Exactly one stage is default, so the flag moves rather than toggling.
         setItems((current) =>
           current.map((candidate) =>
@@ -115,18 +129,22 @@ export function useLeadStageOrdering({
               : { ...candidate, isDefault: false },
           ),
         );
+        toast.success(t.crmLeadStages.defaultSaved);
       } catch {
         notify(
           (await reconcile())
-            ? t.crmLeadStages.defaultInvalidResponseReloaded
-            : t.crmLeadStages.defaultInvalidResponseStale,
+            ? t.crmLeadStages.defaultAmbiguousReloaded
+            : t.crmLeadStages.defaultAmbiguousStale,
         );
       }
     } catch (caught) {
-      await reconcile();
-      notify(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.defaultFailed);
+      const refreshed = await reconcile();
+      notify(isAmbiguousLeadStageMutation(caught)
+        ? refreshed ? t.crmLeadStages.defaultAmbiguousReloaded : t.crmLeadStages.defaultAmbiguousStale
+        : errorText(normalizeApiError(caught)));
     } finally {
       setSettingDefaultId(null);
+      endWrite();
     }
   };
 

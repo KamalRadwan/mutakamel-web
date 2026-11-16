@@ -2,7 +2,32 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-09-29** (Worker message verification; existing settings registry last verified 2026-08-28)
+Last source verification: **2026-10-29** (generic settings registry and consumers; Worker message verification remains 2026-09-29)
+
+### Notification retention metadata (source reviewed 2026-10-29)
+
+`notifications.retention_days` has English and Arabic titles and descriptions.
+The portal accepts whole numbers from 1 through 3650 days (default 180),
+validating edits locally before a PUT. This retention applies to read or
+dismissed tenant inbox notifications. A source parity spec reads the canonical
+Core registry from the sibling backend checkout and requires UI metadata for
+every key. Checks and the admin portal rebuild remain pending lead verification.
+
+### Portal save confirmations (source reviewed 2026-10-29)
+
+The shared generic-settings Save banner opens a confirmation before any PUT,
+including wallet minimum/maximum top-up limits and token TTL settings. Platform
+maintenance changes show separate enable/disable warnings: enabling blocks
+tenant logins; disabling allows them again. Disabling saved fatal-alert delivery
+and changing the SMTP host, username or password also require confirmation
+before their PATCH. The dialog never displays credentials.
+
+Cancel retains the pending form values and returns focus to Save. The modal
+traps focus and exposes its title, impact description and `aria-modal` state.
+Confirm calls the existing save handlers; validation, write ordering and exact
+idempotency-key/ambiguous-write recovery behavior remain unchanged. Arabic and
+English have the same confirmation flow. Checks and the production portal
+rebuild remain pending lead verification.
 
 Verified against the current API Gateway route contracts, Core controller,
 DTOs, registry, services, entities, migrations, SMTP verifier, the private
@@ -36,7 +61,7 @@ contract.
 | Guard | `AdminGuard` |
 | Read permission | `admin.settings.read` |
 | Mutation permission | Generic PUT, SMTP PATCH, fatal-alert PATCH, and storage-runtime PATCH: `admin.settings.update` + `admin.settings.critical`; SMTP verification: `admin.settings.update` |
-| Generic registry keys | 14 |
+| Generic registry keys | 15 |
 | Gateway method/path contracts | 11 |
 | Current Admin Portal integration | All eleven routes are source-integrated, including exact by-key reload, settings, SMTP, fatal-alert switching, storage-runtime controls, and verification states |
 
@@ -106,6 +131,13 @@ interface GatewayProblemDetails {
 
 Normalize `errorCode` and `code` while preserving `correlationId`.
 
+Generic settings save/reload feedback (source reviewed 2026-10-29) maps
+`SETTING_VALUE_INVALID`, `SETTING_READ_ONLY`, `SETTING_KEY_UNKNOWN`,
+`TOPUP_LIMITS_INVALID`, `SETTING_TOPUP_RANGE_INVALID` (AUDIT29-ADMIN-2), and Gateway idempotency errors to actionable Arabic
+and English messages. HTTP 403 and 429 use permission and rate-limit feedback.
+Unknown failures use a localized generic message with the correlation ID as a
+support reference when supplied; raw backend codes and messages are not shown.
+
 ## Idempotency
 
 For `PUT`, `PATCH`, and the connection-verification `POST`:
@@ -143,7 +175,7 @@ interface MergedSystemSetting {
 - `isDefault: true` means no stored override is active.
 - `readOnly: true` means an environment-managed value is exposed and cannot be
   changed through the DB API.
-- All 31 currently registered keys are editable and return
+- All 15 currently registered keys are editable and return
   `readOnly: false`. The read-only mechanism exists for future registry keys.
 - A custom `description` replaces both `descriptionI18n.en` and
   `descriptionI18n.ar` with that same custom text.
@@ -168,9 +200,9 @@ interface SystemSettingQueryDto {
 Filtering is a case-sensitive `key.startsWith(prefix)` operation. Examples:
 
 - `billing.` returns five settings.
-- `notifications.` returns four.
+- `notifications.` returns five.
 - an unknown prefix returns an empty array.
-- absent or empty `prefix` returns all 14 settings.
+- absent or empty `prefix` returns all 15 settings.
 
 The list follows registry insertion order. It is not searchable, sortable, or
 paginated.
@@ -223,29 +255,35 @@ The tables below are the current backend schema. Bounds are inclusive.
 | Key | Type | Default | Validation | Verified runtime effect |
 |:---|:---|:---|:---|:---|
 | `billing.default_currency` | string | `USD` | `USD`, `EUR`, `EGP`, `AED`, or `SAR`; exactly 3 uppercase characters | Registry value only today; invoice settlement remains canonical USD |
-| `billing.invoice_lead_days` | integer | `14` | `1..365` | Read by the billing-cycle service |
+| `billing.invoice_due_days` | integer | `14` | `1..365` | Read by the billing-cycle service as its advance invoice window (`invoiceLeadDays`) |
 | `billing.dunning_grace_days` | integer | `7` | `0..90` | Read by the billing-cycle service |
 | `billing.min_topup_usd` | integer | `1` | `1..1,000,000,000` | Read for every wallet top-up |
 | `billing.max_topup_usd` | integer | `100000` | `1..1,000,000,000` | Read for every wallet top-up |
-| `tenants.trial_days` | integer | `14` | `1..365` | Registry value only in current runtime code |
+| `tenants.trial_days` | integer | `7` | `1..365` | Initial commercial trial duration when no explicit duration is supplied; the resolved duration is pinned in the quote |
 
-The registry validates the two top-up values independently. It permits
-`min_topup_usd > max_topup_usd`, but payment processing then fails with
-`TOPUP_LIMITS_INVALID`. The UI must validate the pair before either write and
-sequence two changes so no invalid intermediate range is created.
+Top-up range source verification: **2026-10-29**. The registry validates each
+value's type and bounds; Core also validates the pair inside the write
+transaction, after acquiring advisory locks on both keys in a fixed order.
+The sibling value is its stored override or registry default when absent.
+An edit that would leave `min_topup_usd > max_topup_usd` returns
+`422 SETTING_TOPUP_RANGE_INVALID` without a setting write or change event.
+Equal bounds are allowed, and concurrent edits cannot commit an inverted range.
+The UI keeps its pair pre-check and localized server-error feedback. Raise the
+maximum before raising the minimum past the old maximum; lower the minimum
+before lowering the maximum below the old minimum.
 
 ### Authentication, support, and platform
 
 | Key | Type | Default | Validation | Verified runtime effect |
 |:---|:---|:---|:---|:---|
-| `auth.invite_token_ttl_minutes` | integer | `1440` | `5..43200` | Registry value only in current auth runtime |
-| `auth.reset_token_ttl_minutes` | integer | `60` | `5..1440` | Registry value only in current auth runtime |
+| `auth.invite_token_ttl_minutes` | integer | `1440` | `5..43200` | Read when issuing invitation tokens; converted from minutes to seconds |
+| `auth.reset_token_ttl_minutes` | integer | `60` | `5..1440` | Read when issuing password-reset tokens; converted from minutes to seconds |
 | `support.email` | string | `support@mutakamel.ai` | email-like pattern, max 254 | Registry/display value only |
-| `platform.maintenance_mode` | boolean | `false` | strict boolean | Registry value only; current login code does not read it |
+| `platform.maintenance_mode` | boolean | `false` | strict boolean | Tenant authentication rejects login with `503 PLATFORM_MAINTENANCE` while enabled |
 
-The descriptions express intended product behavior, but the verified runtime
-boundary above is authoritative. In particular, toggling maintenance mode does
-not currently prove that tenant login is blocked.
+Token TTL changes apply to newly issued tokens; they do not rewrite existing
+token expiry times. Maintenance mode is enforced by tenant authentication;
+admin authentication remains available.
 
 ### WebPhone (formerly the `asterisk.*` keys)
 
@@ -284,20 +322,29 @@ trust an invalid certificate by changing it.
 
 ### Notifications
 
-| Key | Type | Default | Runtime rule |
-|:---|:---|:---|:---|
-| `notifications.in_app_enabled` | boolean | `true` | Controls persisted in-app notification availability |
-| `notifications.realtime_enabled` | boolean | `false` | Also requires global notification and realtime environment flags |
-| `notifications.push_enabled` | boolean | `false` | Also requires global/push environment flags and Firebase provider configuration |
-| `notifications.email_enabled` | boolean | `false` | Also requires global/email environment flags |
+| Key | Type | Default | Validation | Verified runtime effect |
+|:---|:---|:---|:---|:---|
+| `notifications.retention_days` | integer | `180` | `1..3650` | Retention job uses this age threshold for bounded cleanup of read/dismissed tenant inbox recipients and old orphaned notifications |
+| `notifications.in_app_enabled` | boolean | `true` | strict boolean | Controls persisted in-app notification availability together with the global notification environment flag |
+| `notifications.realtime_enabled` | boolean | `false` | strict boolean | Also requires global notification and realtime environment flags |
+| `notifications.push_enabled` | boolean | `false` | strict boolean | Registry value only; current notification runtime does not read this switch |
+| `notifications.email_enabled` | boolean | `false` | strict boolean | Registry value only; current notification runtime does not read this switch |
 
-These values are desired DB switches, not the complete effective runtime
-configuration. A stored `true` cannot override a disabled environment feature
-or missing Firebase configuration.
+The in-app and realtime switches are not the complete effective runtime
+configuration: a stored `true` cannot override a disabled environment feature.
+The push and email registry descriptions express intended delivery behavior,
+but storing `true` does not activate a delivery path in the current consumer.
+
+Retention uses read/dismissed timestamps for recipients and creation time for
+orphaned notifications. Unread recipients and recipients linked to unresolved
+realtime delivery failures are retained; this sweep targets tenant inboxes.
 
 ## Platform SMTP
 
-The SMTP singleton is independent of the generic 31-key registry. Do not
+Sender-domain contract source reviewed **2026-10-29**; runtime checks and the
+portal rebuild remain pending lead verification.
+
+The SMTP singleton is independent of the generic 15-key registry. Do not
 attempt to write SMTP fields with `PUT /system-settings/:key`.
 
 ### Read configuration
@@ -354,6 +401,10 @@ Cross-field and normalization rules:
 - later patches retain every omitted field and retain the stored password when
   `smtpPassword` is omitted;
 - `fromAddress` is trimmed, lowercased, and revalidated;
+- the From address domain must equal `senderDomain` case-insensitively, including
+  on partial updates; a mismatch returns `422 PLATFORM_SMTP_SENDER_DOMAIN_MISMATCH`
+  before any configuration, audit, or outbox write. The portal displays dedicated
+  Arabic/English guidance. Saved connection verification enforces the same rule;
 - `fromName` is trimmed and may not be empty or contain CR/LF;
 - `senderDomain` and `smtpHost` are trimmed, lowercased, and must be
   multi-label domain names; IP addresses and `localhost` are rejected;
@@ -431,7 +482,7 @@ route is SMTP-only.
 
 ## Realtime fatal alerts
 
-This singleton is independent of both the generic 31-key registry and the SMTP
+This singleton is independent of both the generic 15-key registry and the SMTP
 singleton. Core is the only database authority; Realtime never connects to
 PostgreSQL and does not read `FATAL_ALERT_*` environment variables.
 
@@ -585,8 +636,10 @@ Typecheck, lint, specs and authenticated live verification remain lead gates.
 | `404` | `SETTING_KEY_UNKNOWN` | Remove/refresh unsupported local metadata |
 | `409` | `SETTING_READ_ONLY` | Refetch and disable the editor |
 | `422` | `SETTING_VALUE_INVALID` | Show the key-specific type/bounds/pattern error |
+| `422` | `SETTING_TOPUP_RANGE_INVALID` | Reload both top-up limits and show the localized range error |
 | `400` | `PLATFORM_SMTP_CONFIG_EMPTY_PATCH` | Require at least one changed field |
 | `422` | `PLATFORM_SMTP_CONFIG_INVALID` | Show the returned SMTP cross-field message |
+| `422` | `PLATFORM_SMTP_SENDER_DOMAIN_MISMATCH` | Explain that the From address domain must match the sender domain |
 | `400` | `PLATFORM_SMTP_CONNECTION_VERIFICATION_BODY_FORBIDDEN` | Retry with no body |
 | `503` | `SMTP_CONNECTION_VERIFICATION_FAILED` | Keep settings saved but show verification failure |
 | `400` | `REALTIME_FATAL_ALERT_CONFIG_EMPTY_PATCH` | Require at least one changed field |
@@ -609,7 +662,7 @@ caller-owned UUIDv7 keys for saves and verification. Current UI behavior:
    permission.
 2. Distinguishes loading, forbidden, unavailable, malformed, empty, read-only,
    saving, saved, and failed states while preserving code/correlation evidence.
-3. Enforces key-specific constraints, Asterisk JSON validation, and the billing
+3. Enforces current registry constraints and the billing
    minimum/maximum invariant both during editing and at the save boundary.
 4. Keeps SMTP unknown until the authoritative read settles, represents an
    unconfigured server without sample credentials, and keeps password input
@@ -652,6 +705,11 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/realtime-app/src/observability/core-fatal-alert-config.client.ts`
 - `../backend/mutakamel-apps/realtime-app/src/observability/core-managed-fatal-alert.sink.ts`
 - `../backend/mutakamel-apps/core-app/src/common/notifications/notifications.service.ts`
+- `../backend/mutakamel-apps/core-app/src/common/notifications/notification-retention.job.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-auth/admin-auth.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-users/admin-users.service.ts`
+- `../backend/mutakamel-apps/core-app/src/tenant/tenant-auth/tenant-auth.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/subscriptions/initial-commercial/initial-commercial-trial.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/billing/billing-cycle.service.ts`
 - `../backend/mutakamel-apps/core-app/src/tenant/payments/payments.service.ts`
 
@@ -715,7 +773,7 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 ```
 
 Initial SMTP setup must be complete. SMTP hostname/domain normalization,
-TLS/protocol/port compatibility, the 31 registered key schemas, bodyless
+TLS/protocol/port compatibility, the 15 registered key schemas, bodyless
 connection verification, runtime-effect boundaries, and UUIDv7 idempotency
 rules are documented in the
 [System Settings and Platform SMTP Frontend Contract](../api/system-settings.md).

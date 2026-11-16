@@ -184,6 +184,7 @@ describe("Role contract", () => {
     nameI18n: { ar: "محرر", en: "Editor" },
     descriptionI18n: { ar: "وصف", en: "Description" },
     isSystem: true,
+    permissionMode: "GLOBAL",
     permissionIds: [ID_2],
     createdAt: NOW,
     updatedAt: NOW,
@@ -195,16 +196,23 @@ describe("Role contract", () => {
     expect(parseTenantRoleDetail(withoutI18n).nameAr).toBe("Editor");
   });
 
-  it("refuses a permission set past the DTO's 200 cap or with duplicates", () => {
+  it("refuses duplicate permissions", () => {
     expect(() =>
       parseTenantRoleDetail({ ...role, permissionIds: [ID_2, ID_2] }),
     ).toThrow();
-    expect(() =>
-      parseTenantRoleDetail({
-        ...role,
-        permissionIds: Array.from({ length: 201 }, () => ID_2),
-      }),
-    ).toThrow();
+  });
+
+  it.each([undefined, null, "UNKNOWN"])("requires the current permission mode (%s)", (permissionMode) => {
+    expect(() => parseTenantRoleDetail({ ...role, permissionMode })).toThrow();
+  });
+
+  it("accepts the server's larger system-role read bound without widening custom roles", () => {
+    const ids = (count: number) => Array.from({ length: count }, (_, index) =>
+      `0199f2b0-1111-7222-8333-${(index + 1).toString(16).padStart(12, "0")}`);
+    expect(parseTenantRoleDetail({ ...role, permissionIds: ids(1000) }).permissionIds).toHaveLength(1000);
+    expect(() => parseTenantRoleDetail({ ...role, permissionIds: ids(1001) })).toThrow();
+    expect(parseTenantRoleDetail({ ...role, isSystem: false, permissionIds: ids(200) }).permissionIds).toHaveLength(200);
+    expect(() => parseTenantRoleDetail({ ...role, isSystem: false, permissionIds: ids(201) })).toThrow();
   });
 
   it("requires both localized blocks on a permission — the catalogue always sends them", () => {

@@ -65,11 +65,17 @@ export function useCrmRecordOptions(
   // them; the controller cancels the ones that lost.
   const epochRef = useRef(0);
   const inFlightRef = useRef<AbortController | null>(null);
+  const previousScopeRef = useRef({ sourceType, branchId });
 
   useEffect(() => () => inFlightRef.current?.abort(), []);
 
   const search = useCallback(
     async (query: string, external?: AbortSignal) => {
+      const previousScope = previousScopeRef.current;
+      previousScopeRef.current = { sourceType, branchId };
+      if (previousScope.sourceType !== sourceType || previousScope.branchId !== branchId) {
+        setOptions([]);
+      }
       const epoch = epochRef.current + 1;
       epochRef.current = epoch;
       inFlightRef.current?.abort();

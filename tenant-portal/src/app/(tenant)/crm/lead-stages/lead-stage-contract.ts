@@ -1,6 +1,8 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
 export const LEAD_STAGES_PATH = "/api/tenant/crm/v1/lead-stages";
+// lead-stages.service.ts / ReorderLeadStagesDto catalogue bound.
+export const LEAD_STAGE_LIMIT = 500;
 
 const LEAD_STAGE_FLAGS = [
   "NEW",
@@ -60,13 +62,7 @@ export interface CreateLeadStageFormData {
   isDefault: boolean;
 }
 
-/**
- * `PATCH /lead-stages/:id` — `UpdateLeadStageDto`.
- *
- * `isDefault` is absent because the DTO has no such field: the default moves
- * through `POST /lead-stages/:id/default`, and the service explicitly writes
- * `isDefault: stage.isDefault` back over the patch.
- */
+/** The update DTO excludes isDefault; the dedicated default endpoint moves it. */
 export interface UpdateLeadStageFormData {
   nameAr: string;
   nameEn: string;
@@ -87,12 +83,7 @@ export function toUpdateLeadStageForm(
   };
 }
 
-/**
- * The three lifecycle anchors are server-owned. They cannot be edited or
- * deleted, and a tenant stage cannot be changed into one of their flags.
- * Verified in
- * crm-app/src/crm/lead-stages/lead-stages.service.ts.
- */
+/** Server-owned anchors are immutable: crm-app/lead-stages/lead-stages.service.ts. */
 export function isProtectedLeadStage(stage: LeadStageItem): boolean {
   return PROTECTED_LEAD_STAGE_FLAGS.includes(
     stage.flag as (typeof PROTECTED_LEAD_STAGE_FLAGS)[number],
@@ -212,14 +203,18 @@ function parseLeadStage(value: unknown): LeadStageItem {
   };
 }
 
-export function parseLeadStageResponse(payload: unknown): LeadStageItem {
-  return parseLeadStage(payload);
+export function parseLeadStageResponse(payload: unknown, expectedId?: string): LeadStageItem {
+  const stage = parseLeadStage(payload);
+  if (expectedId !== undefined && stage.id !== expectedId) {
+    throw new Error("Invalid lead stages response.");
+  }
+  return stage;
 }
 
 export function parseLeadStageCatalogueResponse(
   payload: unknown,
 ): LeadStageItem[] {
-  if (!Array.isArray(payload) || payload.length > 500) {
+  if (!Array.isArray(payload) || payload.length > LEAD_STAGE_LIMIT) {
     throw new Error("Invalid lead stages response.");
   }
 
@@ -258,19 +253,7 @@ export function buildCreateLeadStageRequest(form: CreateLeadStageFormData) {
   };
 }
 
-/**
- * The complete ordered id list `PATCH /lead-stages/reorder` replaces the dense
- * one-based order with.
- *
- * Two refusals mirror `assertExactOrder` in
- * crm-app/src/crm/lead-stages/lead-stages.service.ts, which answers 422
- * `LEAD_STAGE_REORDER_INVALID`: the payload must carry **every non-deleted
- * stage exactly once** — so it is built from the unfiltered catalogue, never
- * from a searched subset — `NEW` stays first while `DISQUALIFIED` and
- * `CONVERTED` stay penultimate and last.
- * Checking both here means an order the server would reject never costs a round
- * trip, and never leaves the table showing an order that was never written.
- */
+/** Complete unfiltered catalogue, with the lifecycle anchors pinned as the service requires. */
 export function buildLeadStageReorderRequest(
   stages: readonly LeadStageItem[],
   orderedIds: readonly string[],

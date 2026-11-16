@@ -8,11 +8,11 @@ import type { CommercialApplyReceipt } from "../commercial-apply";
 import type { CommercialPreparationRequest } from "../commercial-command-request";
 import { clearCommercialIntent, parseTenantCommercialRequest, readCommercialIntent, retainCommercialIntent, type CommercialIntent, type CommercialPendingCommand } from "../commercial-intent";
 import { commercialPreviewIdentity, executeCommercialIntent, readCommercialHistory } from "../commercial-intent-execution";
-import { DEFINITION_ADOPTION_PERMISSION, parseDefinitionAdoptionRequest, parseDefinitionAdoptionSources, type DefinitionAdoptionSource } from "../definition-adoption-command";
+import { canAdoptDefinitions, parseDefinitionAdoptionRequest, parseDefinitionAdoptionSources, type DefinitionAdoptionSource } from "../definition-adoption-command";
 import type { CommercialOperationReceipt } from "../commercial-operation";
 import type { CommercialPreview } from "../commercial-preview";
 import { commercialRecoveryRequestSchema, type CommercialRecoveryRequest } from "../commercial-recovery";
-import type { SubscriptionView } from "../subscription-read";
+import { canChangePlan, type SubscriptionView } from "../subscription-read";
 
 interface State {
   key: string; intent: CommercialIntent | null; operation: CommercialOperationReceipt | null; preview: CommercialPreview | null;
@@ -21,6 +21,15 @@ interface State {
 }
 interface Owner { key: string; active: boolean; busy: boolean; controller: AbortController }
 const initial = (key: string): State => ({ key, intent: null, operation: null, preview: null, receipt: null, phase: "idle", error: null, receiptError: null });
+// Core admin/subscriptions/addons/purchase/commercial-command.errors.ts maps
+// these refusals; commercial-purchase-preparation.service.ts distinguishes replay.
+const preparationRejections = new Map<string, number>([
+  ["COMMERCIAL_CONTRACT_INVALID", 400],
+  ["COMMERCIAL_TARGET_INCOMPATIBLE", 409],
+  ["COMMERCIAL_PRICE_UNAVAILABLE", 422],
+  ["COMMERCIAL_CAPACITY_OCCUPIED", 409],
+  ["ADDON_PREPARATION_STALE", 409],
+]);
 
 /** The original command is retained before dispatch. A fresh subscription read
  * cannot establish the financial outcome of an uncertain request. */
@@ -29,7 +38,7 @@ export function useCommercialChange(view: SubscriptionView | null, onApplied: ()
   const actorId = user?.id ?? null;
   const adoption = adoptionRevision !== undefined;
   const purpose = adoption ? "ADOPTION" : "PURCHASE";
-  const allowed = isAuthenticated && !!user && (user.isTenantOwner || (adoption && user.permissions.includes(DEFINITION_ADOPTION_PERMISSION)));
+  const allowed = isAuthenticated && !!user && (adoption ? canAdoptDefinitions(user) : user.isTenantOwner);
   const key = JSON.stringify([actorId, realtimeAuthGeneration, allowed, purpose, authState]);
   const [state, setState] = useState<State | null>(null);
   const [quoteClock, setQuoteClock] = useState<{ preview: CommercialPreview; expired: boolean } | null>(null);
@@ -59,8 +68,7 @@ export function useCommercialChange(view: SubscriptionView | null, onApplied: ()
   }, [preview]);
   const denied = !allowed || current?.error?.status === 403;
   const ready = !denied && authState === "AUTHENTICATED" && realtimeAuthGeneration !== null;
-  const fresh = ready && enabled && (adoption ? adoptionRevision !== null : !!view && ["TRIAL", "ACTIVE"].includes(view.subscription.status)
-    && view.subscription.currentCollectionInvoiceId === null);
+  const fresh = ready && enabled && (adoption ? adoptionRevision !== null : canChangePlan(view));
   const sameSubscription = adoption ? current?.intent?.purpose === "ADOPTION" : !!view && current?.intent?.subscriptionId === view.subscription.id;
   const busy = current?.phase === "pending";
   const canStart = fresh && current?.phase === "idle";
@@ -116,7 +124,17 @@ export function useCommercialChange(view: SubscriptionView | null, onApplied: ()
         setState({ ...pendingState, intent, preview: result.value, phase: "saved" });
       }
     } catch (error) {
-      if (isCurrent(captured)) setState({ ...pendingState, phase: "uncertain", error: normalizeApiError(error) });
+      if (!isCurrent(captured)) return;
+      const normalized = normalizeApiError(error);
+      // Restored intents and retries may already have been accepted. Only the
+      // first dispatch from an empty journal can release a refused preparation.
+      const firstPreparation = current.phase === "idle" && current.intent === null
+        && retained.pending?.kind === "PREPARE" && retained.operationId === null;
+      if (firstPreparation && normalized.code && preparationRejections.get(normalized.code) === normalized.status) {
+        try { clearCommercialIntent(actorId, retained); }
+        catch { setState({ ...pendingState, phase: "storage", error: normalized }); return; }
+        setState({ ...initial(key), error: normalized });
+      } else setState({ ...pendingState, phase: "uncertain", error: normalized });
     } finally { captured.busy = false; }
   };
   const start = async (request: CommercialPreparationRequest, sources: DefinitionAdoptionSource[] = []) => {

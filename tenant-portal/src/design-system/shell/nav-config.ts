@@ -29,6 +29,7 @@ import {
   Mail,
   Network,
   Package,
+  PackageCheck,
   Palette,
   Percent,
   Puzzle,
@@ -84,7 +85,7 @@ export interface NavItem {
   // canAccessCrmRoute — only the output shape changes here, from
   // hook-computed booleans to data the nav iterates. Its tests carry
   // over unchanged, which is the proof this did not alter behavior.
-  hasAccess: (permissions: readonly string[], isTenantOwner?: boolean) => boolean;
+  hasAccess: (permissions: readonly string[], isTenantOwner?: boolean, featureEntitlements?: Readonly<Record<string, boolean>>) => boolean;
   /**
    * The route is behind `TenantOwnerGuard`, which is not a permission.
    *
@@ -115,7 +116,7 @@ export interface NavSection {
   /** The app whose nav this section belongs to. Exactly one. */
   app: NavAppId;
   /** Render every item as a first-level link in the desktop global nav. */
-  globalNavDisplay?: "menu" | "items";
+  globalNavDisplay?: "menu" | "items" | "settings";
   /**
    * The descriptive heading. `null` where the section never carried one.
    *
@@ -193,11 +194,11 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Users2,
     items: [
       {
-        id: "crmDashboardReports",
+        id: "crmDashboard",
         labelKey: "presetDashboards",
-        href: TENANT_ROUTES.crmDashboardReports,
+        href: TENANT_ROUTES.crmDashboard,
         icon: LayoutDashboard,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboardReports),
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboard),
       },
       {
         id: "leads",
@@ -226,8 +227,63 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    id: "crmActivities",
+    app: "crm",
+    globalNavDisplay: "items",
+    labelKey: "crmActivities",
+    menuLabelKey: "crmActivities",
+    icon: ListChecks,
+    items: [
+      {
+        id: "crmActivities",
+        labelKey: "crmActivities",
+        href: TENANT_ROUTES.crmActivities,
+        icon: ListChecks,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmActivities),
+      },
+    ],
+  },
+  {
+    id: "crmAnalytics",
+    app: "crm",
+    labelKey: "crmAnalytics",
+    menuLabelKey: "crmAnalytics",
+    icon: ChartNoAxesColumn,
+    items: [
+      {
+        id: "crmDashboardReports",
+        labelKey: "crmReports",
+        href: TENANT_ROUTES.crmDashboardReports,
+        icon: ChartNoAxesColumn,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboardReports),
+      },
+      {
+        id: "crmDashboards",
+        labelKey: "crmDashboardBuilder",
+        href: TENANT_ROUTES.crmDashboards,
+        icon: LayoutDashboard,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboards),
+      },
+      {
+        id: "crmWidgets",
+        labelKey: "crmWidgetLibrary",
+        href: TENANT_ROUTES.crmWidgets,
+        icon: SquareStack,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmWidgets),
+      },
+      {
+        id: "crmWidgetOwnership",
+        labelKey: "crmWidgetOwnership",
+        href: TENANT_ROUTES.crmWidgetOwnership,
+        icon: UserCog,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmWidgetOwnership),
+      },
+    ],
+  },
+  {
     id: "crmSetup",
     app: "crm",
+    globalNavDisplay: "settings",
     labelKey: "crmSetup",
     menuLabelKey: "navMenuSettings",
     icon: Settings,
@@ -295,37 +351,6 @@ export const NAV_SECTIONS: NavSection[] = [
         href: TENANT_ROUTES.crmStaticCatalogue,
         icon: Database,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmStaticCatalogue),
-      },
-      {
-        id: "crmDashboards",
-        labelKey: "crmDashboardBuilder",
-        href: TENANT_ROUTES.crmDashboards,
-        icon: LayoutDashboard,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboards),
-      },
-      {
-        id: "crmWidgets",
-        labelKey: "crmWidgetLibrary",
-        href: TENANT_ROUTES.crmWidgets,
-        icon: SquareStack,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmWidgets),
-      },
-    ],
-  },
-  {
-    id: "crmActivities",
-    app: "crm",
-    globalNavDisplay: "items",
-    labelKey: "crmActivities",
-    menuLabelKey: "crmActivities",
-    icon: ListChecks,
-    items: [
-      {
-        id: "crmActivities",
-        labelKey: "crmActivities",
-        href: TENANT_ROUTES.crmActivities,
-        icon: ListChecks,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmActivities),
       },
     ],
   },
@@ -442,16 +467,18 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: "tradeInvoices",
         href: TENANT_ROUTES.tradeInvoices,
         icon: ReceiptText,
-        hasAccess: (permissions) =>
-          canAccessTradeDocumentRoute(permissions, TENANT_ROUTES.tradeInvoices),
+        hasAccess: (permissions, _isTenantOwner, featureEntitlements) =>
+          featureEntitlements?.["trade.sales"] === true
+          && canAccessTradeDocumentRoute(permissions, TENANT_ROUTES.tradeInvoices),
       },
       {
         id: "tradeContracts",
         labelKey: "tradeContracts",
         href: TENANT_ROUTES.tradeContracts,
         icon: FileSignature,
-        hasAccess: (permissions) =>
-          canAccessTradeDocumentRoute(permissions, TENANT_ROUTES.tradeContracts),
+        hasAccess: (permissions, _isTenantOwner, featureEntitlements) =>
+          featureEntitlements?.["trade.sales"] === true
+          && canAccessTradeDocumentRoute(permissions, TENANT_ROUTES.tradeContracts),
       },
     ],
   },
@@ -536,6 +563,7 @@ export const NAV_SECTIONS: NavSection[] = [
         id: "tradePriceBooks",
         labelKey: "tradePriceBooks",
         href: TENANT_ROUTES.tradePriceBooks,
+        primaryPage: true,
         icon: BookOpen,
         hasAccess: (permissions) =>
           canAccessTradeRoute(permissions, TENANT_ROUTES.tradePriceBooks),
@@ -783,72 +811,6 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    id: "coreSettings",
-    app: "workspace",
-    labelKey: "coreSettings",
-    menuLabelKey: "navMenuSettings",
-    icon: Settings,
-    items: [
-      {
-        id: "coreSettingsHub",
-        labelKey: "coreSettingsHub",
-        href: TENANT_ROUTES.coreSettings,
-        icon: SquareStack,
-        // The hub renders only the sections the caller may reach, and says so
-        // when that set is empty — so it is reachable for anyone.
-        hasAccess: () => true,
-      },
-      {
-        id: "coreWorkspaceSettings",
-        labelKey: "coreWorkspaceSettings",
-        href: TENANT_ROUTES.coreSettingsWorkspace,
-        icon: Settings,
-        hasAccess: (permissions) =>
-          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsWorkspace),
-      },
-      {
-        id: "coreCurrencies",
-        labelKey: "coreCurrencies",
-        href: TENANT_ROUTES.coreSettingsCurrencies,
-        icon: Coins,
-        hasAccess: (permissions) =>
-          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsCurrencies),
-      },
-      {
-        id: "coreTaxes",
-        labelKey: "coreTaxes",
-        href: TENANT_ROUTES.coreSettingsTaxes,
-        icon: Percent,
-        hasAccess: (permissions) =>
-          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsTaxes),
-      },
-      {
-        id: "coreNumbering",
-        labelKey: "coreNumbering",
-        href: TENANT_ROUTES.coreSettingsNumbering,
-        icon: Hash,
-        hasAccess: (permissions) =>
-          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsNumbering),
-      },
-      {
-        id: "coreEmail",
-        labelKey: "coreEmail",
-        href: TENANT_ROUTES.coreSettingsEmail,
-        icon: Mail,
-        hasAccess: (permissions) =>
-          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsEmail),
-      },
-      {
-        id: "coreBranding",
-        labelKey: "coreBranding",
-        href: TENANT_ROUTES.coreSettingsBranding,
-        icon: Palette,
-        hasAccess: (permissions) =>
-          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsBranding),
-      },
-    ],
-  },
-  {
     id: "coreBilling",
     app: "workspace",
     labelKey: "coreBillingSection",
@@ -922,6 +884,73 @@ export const NAV_SECTIONS: NavSection[] = [
       },
     ],
   },
+  {
+    id: "coreSettings",
+    app: "workspace",
+    labelKey: "coreSettings",
+    menuLabelKey: "navMenuSettings",
+    icon: Settings,
+    items: [
+      {
+        id: "coreWorkspaceSettings",
+        labelKey: "coreWorkspaceSettings",
+        href: TENANT_ROUTES.coreSettingsWorkspace,
+        icon: Settings,
+        hasAccess: (permissions) =>
+          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsWorkspace),
+      },
+      {
+        id: "coreCurrencies",
+        labelKey: "coreCurrencies",
+        href: TENANT_ROUTES.coreSettingsCurrencies,
+        icon: Coins,
+        hasAccess: (permissions) =>
+          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsCurrencies),
+      },
+      {
+        id: "coreTaxes",
+        labelKey: "coreTaxes",
+        href: TENANT_ROUTES.coreSettingsTaxes,
+        icon: Percent,
+        hasAccess: (permissions) =>
+          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsTaxes),
+      },
+      {
+        id: "coreNumbering",
+        labelKey: "coreNumbering",
+        href: TENANT_ROUTES.coreSettingsNumbering,
+        icon: Hash,
+        hasAccess: (permissions) =>
+          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsNumbering),
+      },
+      {
+        id: "coreEmail",
+        labelKey: "coreEmail",
+        href: TENANT_ROUTES.coreSettingsEmail,
+        icon: Mail,
+        hasAccess: (permissions, _isTenantOwner, featureEntitlements) =>
+          (featureEntitlements?.["crm.outbound_email"] === true
+            && permissions.includes("workspace.email.read"))
+          || permissions.includes("workspace.email.manage"),
+      },
+      {
+        id: "coreBranding",
+        labelKey: "coreBranding",
+        href: TENANT_ROUTES.coreSettingsBranding,
+        icon: Palette,
+        hasAccess: (permissions) =>
+          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsBranding),
+      },
+      {
+        id: "coreComponentUpdates",
+        labelKey: "coreComponentUpdates",
+        href: TENANT_ROUTES.coreSettingsUpdates,
+        icon: PackageCheck,
+        hasAccess: (permissions) =>
+          canAccessCoreRoute(permissions, TENANT_ROUTES.coreSettingsUpdates),
+      },
+    ],
+  },
 ];
 
 // ---- The three app navs ---------------------------------------------------
@@ -940,7 +969,7 @@ export const NAV_SECTIONS: NavSection[] = [
 const sectionsForApp = (app: NavAppId): NavSection[] =>
   NAV_SECTIONS.filter((section) => section.app === app);
 
-/** Workspace: the portal itself — home, search, org, settings, billing, account. */
+/** Workspace: the portal itself — home, search, org, billing, account, settings. */
 export const WORKSPACE_NAV_SECTIONS: NavSection[] = sectionsForApp("workspace");
 
 /** CRM: leads and customers, the dashboard builder, and CRM's own setup. */
@@ -979,7 +1008,7 @@ export const NAV_APPS: NavApp[] = [
 /** The app that owns a route no `isSupported*Path` allowlist claims. */
 export const DEFAULT_NAV_APP: NavAppId = "workspace";
 
-/** The section a settings screen renders as its `SubNav`. */
+/** Ordered settings entries for navigation and `/core/settings` entry resolution. */
 export const CORE_SETTINGS_NAV_ITEMS: NavItem[] =
   NAV_SECTIONS.find((section) => section.id === "coreSettings")?.items ?? [];
 

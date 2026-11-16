@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";
 import { createSubscriptionFixture } from "../subscription-read.fixture";
+import { createCommercialLabels } from "../commercial-labels";
 const locale = vi.hoisted(() => ({ lang: "en" as "en" | "ar" }));
 const dictionaries = { en, ar };
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: dictionaries[locale.lang], lang: locale.lang }) }));
@@ -19,7 +20,8 @@ describe("accepted-price presentation", () => {
   it.each(["en", "ar"] as const)("shows accepted evidence and independent capacity in %s", (language) => {
     locale.lang = language;
     const t = dictionaries[language];
-    render(<SubscriptionAddonSelections view={createSubscriptionFixture().data} />);
+    const view = createSubscriptionFixture().data;
+    render(<SubscriptionAddonSelections view={view} labels={createCommercialLabels(view)} />);
     expect(screen.getByText(t.subscriptionAddons.acceptedBreakdown)).toBeInTheDocument();
     expect(screen.getByText(t.subscriptionAddons.separateSeats)).toBeInTheDocument();
     expect(screen.getByText(t.subscriptionAddons.projectionNotObserved)).toBeInTheDocument();

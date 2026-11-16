@@ -46,7 +46,7 @@ interface ComputedTradeEvidenceLine {
   priceSnapshot: Record<string, unknown>;
 }
 
-export interface ComputedTradeDocumentTotals {
+interface ComputedTradeDocumentTotals {
   lines: ComputedTradeEvidenceLine[];
   subtotal: string;
   discountTotal: string;

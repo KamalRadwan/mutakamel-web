@@ -8,6 +8,8 @@ import {
   type CrmFieldMessages,
 } from "../shared/crm-form-validation";
 import type { CrmFormErrors } from "../shared/hooks/useCrmCreateForm";
+import { isUUIDv7 } from "@/lib/uuid";
+import { isValidOpportunityCurrency, isValidOpportunityDate } from "./opportunity-form-values";
 import { isValidOpportunityAmount, type OpportunityForm } from "./opportunity-write-contract";
 
 export interface OpportunityCreateMessages extends CrmFieldMessages {
@@ -16,20 +18,18 @@ export interface OpportunityCreateMessages extends CrmFieldMessages {
   /** `@IsInt() @Min(0) @Max(3)` and `@Min(0) @Max(100)`, with the bounds filled in. */
   outOfRange: string;
   currencyLength: string;
+  dateInvalid?: string;
+  selectionInvalid?: string;
 }
 
 /** One `FormSection` id, and one key under `t.crmOpportunityDetail.create.sections`. */
-export const OPPORTUNITY_SECTION_IDS = [
-  "placement",
-  "deal",
-  "notes",
-  "customFields",
-] as const;
-
-export type OpportunitySectionId = (typeof OPPORTUNITY_SECTION_IDS)[number];
+export type OpportunitySectionId = "placement" | "deal" | "notes" | "customFields";
 
 const SECTION_BY_PREFIX: ReadonlyArray<readonly [string, OpportunitySectionId]> = [
   ["customerProfileId", "placement"],
+  ["contactPartyId", "placement"],
+  ["leadId", "placement"],
+  ["ownerUserId", "placement"],
   ["pipelineId", "placement"],
   ["stageId", "placement"],
   ["title", "deal"],
@@ -56,6 +56,7 @@ export function opportunitySectionErrorCount(
 function integerInRange(value: string, min: number, max: number): boolean {
   const trimmed = value.trim();
   if (trimmed.length === 0) return true;
+  if (!/^\d+$/.test(trimmed)) return false;
   const parsed = Number(trimmed);
   return Number.isInteger(parsed) && parsed >= min && parsed <= max;
 }
@@ -65,6 +66,7 @@ export function validateCreateOpportunity(
   messages: OpportunityCreateMessages,
   /** `fieldKey`s whose definition has a required CREATE requirement for OPPORTUNITY. */
   requiredCustomFieldKeys: readonly string[] = [],
+  mode: "create" | "update" = "create",
 ): CrmFormErrors {
   const bag = new CrmErrorBag(messages);
 
@@ -74,20 +76,27 @@ export function validateCreateOpportunity(
   bag.required("pipelineId", form.pipelineId);
   bag.required("stageId", form.stageId);
   if (bag.required("title", form.title)) bag.maxLength("title", form.title, 180);
+  for (const key of ["customerProfileId", "pipelineId", "stageId", "contactPartyId", "leadId", "ownerUserId"] as const) {
+    if (form[key] && !isUUIDv7(form[key])) bag.set(key, messages.selectionInvalid ?? messages.outOfRange);
+  }
 
   // The DTO allows three decimals; the service also enforces currency scale.
   if (form.amount.trim().length > 0 && !isValidOpportunityAmount(form.amount, form.currencyCode)) {
     bag.set("amount", messages.amountInvalid);
   }
 
-  // `@Length(3, 3)`. Not checked against any catalogue, because the server
-  // checks against none either — `"AAA"` is stored as happily as `"SAR"`.
+  // The service requires explicit currency when amount is set, including zero.
   const currencyCode = form.currencyCode.trim();
-  if (currencyCode.length > 0 && currencyCode.length !== 3) {
+  if (form.amount.trim() && !currencyCode) bag.set("currencyCode", messages.required);
+  else if (currencyCode && !isValidOpportunityCurrency(currencyCode)) {
     bag.set("currencyCode", messages.currencyLength);
+  }
+  if (form.expectedCloseDate && !isValidOpportunityDate(form.expectedCloseDate)) {
+    bag.set("expectedCloseDate", messages.dateInvalid ?? messages.outOfRange);
   }
 
   if (!integerInRange(form.importance, 0, 3)) bag.set("importance", messages.outOfRange);
+  if (mode === "update" && !form.importance.trim()) bag.set("importance", messages.required);
   if (!integerInRange(form.probabilityPercent, 0, 100)) {
     bag.set("probabilityPercent", messages.outOfRange);
   }
@@ -106,4 +115,12 @@ export function validateCreateOpportunity(
   }
 
   return bag.errors;
+}
+
+export function validateUpdateOpportunity(
+  form: OpportunityForm,
+  messages: OpportunityCreateMessages,
+  requiredCustomFieldKeys: readonly string[] = [],
+): CrmFormErrors {
+  return validateCreateOpportunity(form, messages, requiredCustomFieldKeys, "update");
 }

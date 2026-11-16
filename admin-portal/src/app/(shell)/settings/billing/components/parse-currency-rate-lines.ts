@@ -1,3 +1,5 @@
+import { CurrencyRateValidationError } from "../hooks/currency-rate-validation-error";
+
 export interface CurrencyRateLine {
   currencyCode: string;
   currencyUnitsPerUsd: string;
@@ -33,14 +35,14 @@ export function parseCurrencyRateLines(
     .filter(Boolean)
     .map((line) => {
       const cells = line.split(",").map((part) => part.trim());
-      if (cells.length > 3) throw new Error(messages.lineFormatInvalid);
+      if (cells.length > 3) throw new CurrencyRateValidationError(messages.lineFormatInvalid);
       const [currencyCode, currencyUnitsPerUsd, active = "true"] = cells;
       if (!currencyCode || !currencyUnitsPerUsd) {
-        throw new Error(messages.lineFormatInvalid);
+        throw new CurrencyRateValidationError(messages.lineFormatInvalid);
       }
       const normalizedActive = active.toLowerCase();
       if (normalizedActive !== "true" && normalizedActive !== "false") {
-        throw new Error(messages.activeFlagInvalid);
+        throw new CurrencyRateValidationError(messages.activeFlagInvalid);
       }
       return {
         currencyCode,

@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  PermissionGate,
   type ReplacementDiff,
   type ReplacementItem,
 } from "@/design-system";
@@ -30,6 +31,9 @@ interface PipelineAssignmentsSectionProps {
   canManage: boolean;
   isDefault: boolean;
   onSave: () => void;
+  error?: string;
+  blocked?: boolean;
+  onReconcile?: () => void;
 }
 
 /**
@@ -42,6 +46,9 @@ export function PipelineAssignmentsSection({
   canManage,
   isDefault,
   onSave,
+  error,
+  blocked,
+  onReconcile,
 }: PipelineAssignmentsSectionProps) {
   const { t, lang } = useI18n();
   const [confirming, setConfirming] = useState(false);
@@ -84,28 +91,32 @@ export function PipelineAssignmentsSection({
     );
   }
 
-  if (state.loadError) {
+  if (state.loadError && (!state.assignments || state.loadError.status === 403)) {
     return (
       <DetailSection title={t.crmPipelines.assignmentsTitle}>
-        <ErrorState
+        <PermissionGate require="crm.pipelines.manage" denied={state.loadError.status === 403}><ErrorState
           title={t.crmPipelines.assignmentsUnavailable}
           description={t.crmPipelines.assignmentsUnavailableHint}
           retryLabel={t.common.retry}
           onRetry={() => void state.reload()}
-        />
+        /></PermissionGate>
       </DetailSection>
     );
   }
 
   const restricted = state.accessMode === "RESTRICTED";
+  const draftError = restricted && state.userIds.length + state.teamIds.length === 0
+    ? t.crmPipelines.review.accessRequired
+    : state.userIds.length > 100 || state.teamIds.length > 100 ? t.crmPipelines.review.accessLimit : undefined;
 
   return (
     <DetailSection
       title={t.crmPipelines.assignmentsTitle}
       description={t.crmPipelines.assignmentsDescription}
       columns={1}
-      action={
-        <div className="flex items-center gap-2">
+    >
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             variant="ghost"
             size="sm"
@@ -117,26 +128,26 @@ export function PipelineAssignmentsSection({
           <Button
             variant="outline"
             size="sm"
-            disabled={!state.isDirty || state.isSaving || (isDefault && state.accessMode !== "ALL")}
+            disabled={!state.isDirty || state.isSaving || blocked || Boolean(draftError) || (isDefault && state.accessMode !== "ALL")}
             onClick={() => setConfirming(true)}
           >
             {t.crmPipelines.saveAssignments}
           </Button>
         </div>
-      }
-    >
-      <div className="flex flex-col gap-3">
+        {state.loadError && <DegradedBanner message={t.crmPipelines.assignmentsUnavailableHint} />}
         {state.optionsError ? (
-          <DegradedBanner message={t.crmPipelines.optionsUnavailable} />
+          <div className="space-y-2"><DegradedBanner message={t.crmPipelines.optionsUnavailable} />
+            <Button variant="outline" onClick={() => void state.reloadOptions()} disabled={state.isLoadingOptions}>{t.common.retry}</Button>
+          </div>
         ) : null}
 
-        <Field
+        <Field showLabel
           label={t.crmPipelines.accessMode}
           hint={isDefault ? t.crmPipelines.defaultAccessModeHint : t.crmPipelines.accessModeHint}
         >
           <Select
             value={state.accessMode}
-            disabled={isDefault}
+            disabled={isDefault || state.isSaving}
             onValueChange={(next) => {
               if (!isDefault && PIPELINE_ACCESS_MODES.includes(next as "ALL")) {
                 state.setAccessMode(next as "ALL" | "RESTRICTED");
@@ -158,27 +169,28 @@ export function PipelineAssignmentsSection({
 
         {restricted ? (
           <>
-            <Field
+            <Field showLabel
               label={t.crmPipelines.optionsSearch}
               hint={formatTemplate(t.crmPipelines.optionsLimitHint, {
                 limit: formatNumber(50, lang),
               })}
             >
-              <Input size="sm" placeholder={t.crmPipelines.optionsSearch}
+              <Input size="sm" placeholder={t.crmPipelines.optionsSearch} maxLength={80} disabled={state.isSaving}
                 value={state.optionsQuery}
                 autoComplete="off"
                 onChange={(event) => state.searchOptions(event.target.value)}
               />
             </Field>
 
-            <Field label={t.crmPipelines.assignmentUsers}>
+            <Field showLabel label={t.crmPipelines.assignmentUsers}>
               <MultiSelect
+                disabled={state.isSaving}
                 values={state.userIds}
                 onValuesChange={state.setUserIds}
                 options={state.users.map((user) => ({
                   value: user.id,
                   label: user.label,
-                  description: user.status,
+                  description: user.status === "ACTIVE" ? t.common.active : t.crmPipelines.review.invited,
                 }))}
                 placeholder={t.crmPipelines.assignmentUsersPlaceholder}
                 searchPlaceholder={t.common.search}
@@ -194,8 +206,9 @@ export function PipelineAssignmentsSection({
               />
             </Field>
 
-            <Field label={t.crmPipelines.assignmentTeams}>
+            <Field showLabel label={t.crmPipelines.assignmentTeams}>
               <MultiSelect
+                disabled={state.isSaving}
                 values={state.teamIds}
                 onValuesChange={state.setTeamIds}
                 options={state.teams.map((team) => ({
@@ -223,6 +236,10 @@ export function PipelineAssignmentsSection({
           </p>
         )}
       </div>
+
+      {draftError && <p role="alert" className="text-sm text-destructive">{draftError}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {blocked && onReconcile && <Button variant="outline" onClick={onReconcile}>{t.crmPipelines.review.checkCurrent}</Button>}
 
       <AtomicReplacementConfirm
         open={confirming}

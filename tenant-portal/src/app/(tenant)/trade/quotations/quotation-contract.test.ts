@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  QUOTATION_LIFECYCLE_STATUSES,
   buildCreateQuotation,
+  buildQuotationReasonPayload,
+  buildUpdateQuotationHeader,
+  computePriceLockStatus,
+  extractPartyContactCoordinates,
   parseQuotationCustomerPage,
   parseQuotationDetail,
+  parseQuotationItemDetailLookup,
+  parseQuotationLegacySkuSearch,
   quotationCustomerOptionsPath,
+  readQuotationLineSnapshot,
   type QuotationCustomerOption,
 } from "./quotation-contract";
 
@@ -40,6 +48,7 @@ const quotation = {
 
 const option: QuotationCustomerOption = {
   partyId: UUID,
+  partyType: "ORGANIZATION",
   displayName: "Acme",
   crmCustomerProfileId: null,
   commercialAccountStatus: "ACTIVE",
@@ -60,6 +69,7 @@ describe("the quotation detail", () => {
           status: "DRAFT",
           validUntil: "2026-09-30",
           grandTotal: "125.5",
+          subtotal: "125.5", discountTotal: "0", pricingMode: "PROMOTIONS", discountSnapshot: {},
           termsSnapshot: {},
           sentAt: null,
           acceptedAt: null,
@@ -136,5 +146,140 @@ describe("buildCreateQuotation", () => {
 
   it("refuses a currency that is not three letters", () => {
     expect(() => buildCreateQuotation(option, "EG", "")).toThrow();
+  });
+
+  it("includes optional contactPartyId and extensionValues when valid", () => {
+    const req = buildCreateQuotation(option, "usd", "  RFQ-99 ", {
+      contactPartyId: OTHER,
+      extensionValues: [{ fieldKey: "project_code", value: "P-100" }],
+    });
+    expect(req).toEqual({
+      partyId: UUID,
+      currencyCode: "USD",
+      draftReference: "RFQ-99",
+      contactPartyId: OTHER,
+      extensionValues: [{ fieldKey: "project_code", value: "P-100" }],
+    });
+  });
+});
+
+describe("lifecycle statuses, header PATCH, reason DTO, and price-lock helpers", () => {
+  it("lists closed and expired statuses without a fabricated CONVERTED state", () => {
+    expect(QUOTATION_LIFECYCLE_STATUSES).toEqual([
+      "DRAFT",
+      "SENT",
+      "ACCEPTED",
+      "REJECTED",
+      "CANCELLED",
+      "EXPIRED",
+    ]);
+    expect(QUOTATION_LIFECYCLE_STATUSES).not.toContain("CONVERTED");
+  });
+
+  it("builds UpdateQuotationDto with nullable draftReference and contactPartyId", () => {
+    expect(
+      buildUpdateQuotationHeader({
+        draftReference: "  DRAFT-101  ",
+        contactPartyId: OTHER,
+      }),
+    ).toEqual({
+      draftReference: "DRAFT-101",
+      contactPartyId: OTHER,
+    });
+
+    expect(
+      buildUpdateQuotationHeader({
+        draftReference: "   ",
+        contactPartyId: "",
+      }),
+    ).toEqual({
+      draftReference: null,
+      contactPartyId: null,
+    });
+
+    expect(() =>
+      buildUpdateQuotationHeader({ contactPartyId: "not-a-uuid" }),
+    ).toThrow("QUOTATION_FORM_CONTACT_PARTY");
+  });
+
+  it("builds DocumentReasonDto with bounded reasonCode and optional evidenceRef", () => {
+    expect(buildQuotationReasonPayload(" CUSTOMER_REQUESTED ", "  ")).toEqual({
+      reasonCode: "CUSTOMER_REQUESTED",
+    });
+    expect(
+      buildQuotationReasonPayload("COMPETITOR_SELECTED", " Email ref #4481 "),
+    ).toEqual({
+      reasonCode: "COMPETITOR_SELECTED",
+      evidenceRef: "Email ref #4481",
+    });
+    expect(() => buildQuotationReasonPayload("   ")).toThrow(
+      "QUOTATION_REASON_REQUIRED",
+    );
+  });
+
+  it("extracts contact coordinates and evaluates price lock status accurately", () => {
+    expect(
+      extractPartyContactCoordinates({
+        primaryEmail: "procurement@mutahida.eg",
+        whatsappPhone: "+20 100 123 4567",
+      }),
+    ).toEqual({
+      email: "procurement@mutahida.eg",
+      phone: "+20 100 123 4567",
+      contactName: null,
+    });
+
+    const baseNow = Date.parse("2026-09-01T00:00:00.000Z");
+    expect(computePriceLockStatus("ACCEPTED", null, baseNow)).toEqual({
+      state: "pinned",
+      hoursLeft: null,
+    });
+    expect(
+      computePriceLockStatus(
+        "SENT",
+        {
+          id: OTHER,
+          revisionNumber: 1,
+          status: "SENT",
+          validUntil: "2026-09-30",
+          grandTotal: "500.00",
+          subtotal: "500.00", discountTotal: "0", pricingMode: "PROMOTIONS", discountSnapshot: {},
+          termsSnapshot: {},
+          sentAt: "2026-09-01T00:00:00.000Z",
+          acceptedAt: null,
+          rejectedAt: null,
+          priceLockExpiresAt: "2026-09-01T12:00:00.000Z",
+        },
+        baseNow,
+      ),
+    ).toEqual({ state: "expiring", hoursLeft: 12 });
+  });
+
+  it("sorts currentLines by printLineNumber ASC and validates line snapshot + item lookup contracts", () => {
+    const ITEM = "01890000-0000-7000-8000-000000000010";
+    const BOOK = "01890000-0000-7000-8000-000000000011";
+    const detail = parseQuotationDetail({
+      ...quotation,
+      currentLines: [
+        { id: OTHER, printLineNumber: 2, clientLineId: OTHER, descriptionSnapshot: "Second", uomId: UUID, quantity: "1.0000", unitPrice: "20.00000000", discountTotal: "0", lineTotal: "20.00000000", discountSnapshot: {}, itemCompanyProfileId: UUID, taxSnapshot: { sku: "SKU-2", uomCode: "EA" } },
+        { id: UUID, printLineNumber: 1, clientLineId: UUID, descriptionSnapshot: "First", uomId: UUID, quantity: "2.0000", unitPrice: "50.00000000", discountTotal: "10.00000000", lineTotal: "90.00000000", discountSnapshot: { itemId: ITEM, uomId: UUID, clientLineId: UUID, priceBookId: BOOK, discount: { type: "PERCENT", value: "10.00000000" } } },
+      ],
+    });
+    expect(detail.currentLines.map((l) => l.printLineNumber)).toEqual([1, 2]);
+    expect(readQuotationLineSnapshot(detail.currentLines[0]!)).toMatchObject({ itemId: ITEM, priceBookId: BOOK, discount: { type: "PERCENT", value: "10" }, corrupted: false });
+    expect(readQuotationLineSnapshot(detail.currentLines[1]!)).toMatchObject({ itemId: null, itemCompanyProfileId: UUID, sku: "SKU-2", uomCode: "EA", corrupted: false });
+    expect(readQuotationLineSnapshot({ ...detail.currentLines[0]!, discountSnapshot: { itemId: "bad" } }).corrupted).toBe(true);
+
+    const lookedUp = parseQuotationItemDetailLookup({
+      id: ITEM, canonicalCode: "SKU-1", localizedNames: { en: "Valve" }, status: "ACTIVE", baseUomId: UUID,
+      companyProfile: { id: OTHER, version: 1, status: "ACTIVE", canSell: true, canPurchase: true, canPos: false, defaultSalesUomId: null, defaultPurchaseUomId: null },
+      branchProfile: { id: UUID, version: 1, isAssorted: true },
+    });
+    expect(lookedUp.isSellEligible).toBe(true);
+    expect(lookedUp.item?.eligibility.defaultSalesUomId).toBe(UUID);
+
+    const searchPage = { items: [lookedUp.item], total: 1, page: 1, limit: 100 };
+    expect(parseQuotationLegacySkuSearch(searchPage, "SKU-1", OTHER)?.id).toBe(ITEM);
+    expect(parseQuotationLegacySkuSearch(searchPage, "SKU-1", UUID)).toBeNull();
   });
 });

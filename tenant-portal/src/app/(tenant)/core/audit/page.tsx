@@ -8,8 +8,10 @@ import { auditCatalogue } from "@/lib/audit/catalogue";
 import { wireLabel } from "@/lib/format/wire-label";
 import { AuditFilterPanel } from "./components/AuditFilterPanel";
 import { useAuditLedger } from "./hooks/useAuditLedger";
+import { useCoreOperationsErrorText } from "../hooks/useCoreOperationsErrorText";
 
 export default function AuditPage() {
+  const describeError = useCoreOperationsErrorText();
   const ledger = useAuditLedger();
   const { t, lang, events, error, isLoading } = ledger;
   const copy = t.audit.ledger;
@@ -26,7 +28,7 @@ export default function AuditPage() {
       </div>
       <AuditFilterPanel key={String(ledger.deletedOnly)} filters={ledger.filters} onApply={ledger.applyFilters}
         disabled={isLoading} deletedOnly={ledger.deletedOnly} />
-      {error ? <ErrorState title={t.coreOperations.audit.loadFailed} description={error.status ? error.message : undefined} onRetry={ledger.reload} retryLabel={t.common.retry} />
+      {error ? <ErrorState title={t.coreOperations.audit.loadFailed} description={describeError(error)} onRetry={ledger.reload} retryLabel={t.common.retry} />
         : isLoading ? <Skeleton className="h-48 w-full" />
         : events.length === 0 ? <EmptyState title={t.coreOperations.audit.emptyTitle} description={t.coreOperations.audit.emptyDescription} />
         : <Table>

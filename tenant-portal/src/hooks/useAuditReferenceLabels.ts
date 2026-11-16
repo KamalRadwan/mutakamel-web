@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuthScopeKey } from "./useAuthScopeKey";
+import { useStablePermissions } from "./useStablePermissions";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -11,13 +13,14 @@ import { auditReferencePermission, readAuditReferenceLabel, type AuditValueLabel
 export function useAuditReferenceLabels(events: readonly EntityAuditEvent[], provided: AuditValueLabels | undefined, enabled: boolean, refreshToken?: object | number) {
   const { user, realtimeAuthGeneration } = useTenantAuth();
   const { lang, t } = useI18n();
-  const permissions = user?.permissions ?? [];
+  const permissions = useStablePermissions(user);
   const keys = [...new Set(events.flatMap((event) => event.changes.flatMap((change) => {
     const permission = auditReferencePermission(change.field);
     return permission && permissions.includes(permission) ? [change.before, change.after].flat()
       .filter(isUUIDv7).filter((id) => !provided?.[change.field]?.[id]).map((id) => `${change.field}:${id}`) : [];
   })))].sort().join(",");
-  const scope = JSON.stringify([enabled, lang, user?.id, realtimeAuthGeneration, permissions, user?.accessibleBranches, user?.accessibleCompanies, user?.teamMemberships]);
+  const authScope = useAuthScopeKey(user);
+  const scope = useMemo(() => JSON.stringify([enabled, lang, realtimeAuthGeneration, authScope]), [enabled, lang, realtimeAuthGeneration, authScope]);
   const cache = useRef<{ scope: string; refreshToken?: object | number; entries: Map<string, string | null> }>({ scope: "", entries: new Map() });
   const [snapshot, setSnapshot] = useState<{ scope: string; refreshToken?: object | number; entries: ReadonlyMap<string, string | null> }>({ scope: "", entries: new Map() });
 

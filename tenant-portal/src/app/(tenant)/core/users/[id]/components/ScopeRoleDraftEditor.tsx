@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   Button,
   Combobox,
+  Field,
+  FormModal,
   Select,
   SelectContent,
   SelectItem,
@@ -16,12 +17,13 @@ import {
   SCOPE_ROLE_TARGETS,
   scopeRoleAssignmentKey,
   type ScopeRoleAssignmentInput,
-  type ScopeRoleTarget,
 } from "../../../contracts/role-assignment-contract";
 import type { RemoteOptions } from "../../../hooks/useCoreOptions";
+import { useScopeRoleDraftForm } from "../hooks/useScopeRoleDraftForm";
 
 interface ScopeRoleDraftEditorProps {
   draft: ScopeRoleAssignmentInput[];
+  initialKeys: string[];
   onDraftChange: (next: ScopeRoleAssignmentInput[]) => void;
   roles: RemoteOptions;
   companies: RemoteOptions;
@@ -30,16 +32,16 @@ interface ScopeRoleDraftEditorProps {
   onReview: () => void;
   onCancel: () => void;
   isSubmitting: boolean;
+  error?: string;
 }
 
 /**
- * The pre-write editor for the owner-only atomic replacement.
- *
- * Nothing here writes. It builds the complete set the `PUT` would send, so the
- * diff dialog can show what disappears before the transaction runs.
+ * Centered modal editor for owner-only exact-scope role grants
+ * (`PUT /users/:userId/scope-role-assignments`), without side rails.
  */
 export function ScopeRoleDraftEditor({
   draft,
+  initialKeys,
   onDraftChange,
   roles,
   companies,
@@ -48,13 +50,11 @@ export function ScopeRoleDraftEditor({
   onReview,
   onCancel,
   isSubmitting,
+  error,
 }: ScopeRoleDraftEditorProps) {
   const { t } = useI18n();
   const copy = t.coreIdentity;
-  const [scopeTarget, setScopeTarget] = useState<ScopeRoleTarget>("TENANT");
-  const [roleId, setRoleId] = useState("");
-  const [companyId, setCompanyId] = useState("");
-  const [branchId, setBranchId] = useState("");
+  const form = useScopeRoleDraftForm({ draft, initialKeys, onDraftChange });
 
   const pickerLabels = {
     placeholder: copy.picker.placeholder,
@@ -63,121 +63,165 @@ export function ScopeRoleDraftEditor({
     emptyLabel: copy.picker.empty,
   };
 
-  function addRow() {
-    if (!roleId) return;
-    const candidate: ScopeRoleAssignmentInput = {
-      scopeTarget,
-      roleId,
-      companyId: scopeTarget === "COMPANY" ? companyId || undefined : undefined,
-      branchId: scopeTarget === "BRANCH" ? branchId || undefined : undefined,
-    };
-    const key = scopeRoleAssignmentKey(candidate);
-    if (draft.some((item) => scopeRoleAssignmentKey(item) === key)) return;
-    onDraftChange([...draft, candidate]);
-    setRoleId("");
-  }
+  const companyOptions =
+    form.cascade.companies.options.length > 0 ? form.cascade.companies : companies;
+  const branchOptions = form.companyId ? form.cascade.branches : branches;
+
+  const selectedRoleLabel = form.roleId
+    ? (roles.labelFor(form.roleId) ??
+      (roles.isLoading ? copy.picker.loading : copy.grants.nameUnavailable))
+    : undefined;
+  const selectedCompanyLabel = form.companyId
+    ? (form.cascade.companies.labelFor(form.companyId) ??
+      companies.labelFor(form.companyId) ??
+      (companyOptions.isLoading ? copy.picker.loading : copy.grants.nameUnavailable))
+    : undefined;
+  const selectedBranchLabel = form.branchId
+    ? (form.cascade.branches.labelFor(form.branchId) ??
+      branches.labelFor(form.branchId) ??
+      (branchOptions.isLoading ? copy.picker.loading : copy.grants.nameUnavailable))
+    : undefined;
 
   return (
-    <div className="flex flex-col gap-2 rounded-sm border border-border bg-muted p-3">
-      <p className="text-2xs text-muted-foreground">{copy.grants.replaceHint}</p>
+    <FormModal
+      open
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+      size="wide"
+      title={copy.grants.editScopeRoles}
+      description={copy.grants.scopeRolesDescription}
+      isDirty={form.isDirty}
+      isSubmitting={isSubmitting}
+      onSubmit={onReview}
+      error={error}
+      labels={{
+        submit: copy.grants.review,
+        cancel: t.common.cancel,
+        close: copy.actions.close,
+        discardTitle: t.common.discardTitle,
+        discardDescription: t.common.discardDescription,
+        discardConfirm: t.common.discardConfirm,
+        discardCancel: t.common.cancel,
+        sections: t.common.general,
+        sectionInvalid: copy.errors.UNKNOWN,
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-muted-foreground">{copy.grants.replaceHint}</p>
 
-      <ul className="flex flex-col gap-1">
-        {draft.map((item) => {
-          const key = scopeRoleAssignmentKey(item);
-          const described = describe(item);
-          return (
-            <li key={key} className="flex items-center justify-between gap-2 text-xs">
-              <span className="text-foreground">
-                {described.label} — {described.hint}
-              </span>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() =>
-                  onDraftChange(draft.filter((entry) => scopeRoleAssignmentKey(entry) !== key))
-                }
-                aria-label={`${t.common.delete}: ${described.label}`}
-              >
-                <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={copy.grants.scope} showLabel required>
+            <Select
+              value={form.scopeTarget}
+              onValueChange={form.handleScopeTargetChange}
+            >
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SCOPE_ROLE_TARGETS.map((target) => (
+                  <SelectItem key={target} value={target}>
+                    {copy.scopeTarget[target]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <Select
-          value={scopeTarget}
-          onValueChange={(next) =>
-            setScopeTarget(SCOPE_ROLE_TARGETS.find((target) => target === next) ?? "TENANT")
-          }
-        >
-          <SelectTrigger size="sm" className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SCOPE_ROLE_TARGETS.map((target) => (
-              <SelectItem key={target} value={target}>
-                {copy.scopeTarget[target]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Field label={copy.roles.singular} showLabel required>
+            <Combobox
+              {...pickerLabels}
+              value={form.roleId || undefined}
+              selectedLabel={selectedRoleLabel}
+              onValueChange={(next) => form.setRoleId(next ?? "")}
+              options={roles.options}
+              onSearch={roles.search}
+              loading={roles.isLoading}
+              disabled={isSubmitting}
+            />
+          </Field>
 
-        <div className="min-w-44 flex-1">
-          <Combobox
-            {...pickerLabels}
-            value={roleId || undefined}
-            selectedLabel={roles.labelFor(roleId)}
-            onValueChange={(next) => setRoleId(next ?? "")}
-            options={roles.options}
-            onSearch={roles.search}
-            loading={roles.isLoading}
-          />
+          {form.scopeTarget === "COMPANY" || form.scopeTarget === "BRANCH" ? (
+            <Field label={copy.levels.companies.singular} showLabel required>
+              <Combobox textSize="compact"
+                {...pickerLabels}
+                value={form.companyId || undefined}
+                selectedLabel={selectedCompanyLabel}
+                onValueChange={form.cascade.selectCompany}
+                options={companyOptions.options}
+                onSearch={companyOptions.search}
+                loading={companyOptions.isLoading}
+                disabled={isSubmitting}
+              />
+            </Field>
+          ) : null}
+
+          {form.scopeTarget === "BRANCH" ? (
+            <Field
+              label={copy.levels.branches.singular}
+              hint={!form.companyId ? copy.cascade.chooseCompanyFirst : undefined}
+              showLabel
+              required
+            >
+              <Combobox textSize="compact"
+                {...pickerLabels}
+                value={form.branchId || undefined}
+                selectedLabel={selectedBranchLabel}
+                onValueChange={form.cascade.selectBranch}
+                options={branchOptions.options}
+                onSearch={branchOptions.search}
+                loading={branchOptions.isLoading}
+                disabled={isSubmitting || !form.companyId}
+              />
+            </Field>
+          ) : null}
         </div>
 
-        {scopeTarget === "COMPANY" ? (
-          <div className="min-w-44 flex-1">
-            <Combobox
-              {...pickerLabels}
-              value={companyId || undefined}
-              selectedLabel={companies.labelFor(companyId)}
-              onValueChange={(next) => setCompanyId(next ?? "")}
-              options={companies.options}
-              onSearch={companies.search}
-              loading={companies.isLoading}
-            />
-          </div>
-        ) : null}
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={form.addRow}
+            disabled={!form.canAdd || isSubmitting}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            {copy.grants.addScopeRole}
+          </Button>
+        </div>
 
-        {scopeTarget === "BRANCH" ? (
-          <div className="min-w-44 flex-1">
-            <Combobox
-              {...pickerLabels}
-              value={branchId || undefined}
-              selectedLabel={branches.labelFor(branchId)}
-              onValueChange={(next) => setBranchId(next ?? "")}
-              options={branches.options}
-              onSearch={branches.search}
-              loading={branches.isLoading}
-            />
-          </div>
-        ) : null}
-
-        <Button variant="outline" size="sm" onClick={addRow} disabled={!roleId}>
-          <Plus className="size-4" aria-hidden="true" />
-          {copy.grants.addScopeRole}
-        </Button>
+        {draft.length === 0 ? (
+          <p className="rounded-sm border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
+            {copy.grants.scopeEmpty}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1.5 rounded-sm border border-border p-2.5">
+            {draft.map((item) => {
+              const key = scopeRoleAssignmentKey(item);
+              const described = describe(item);
+              return (
+                <li
+                  key={key}
+                  className="flex items-center justify-between gap-2 text-xs"
+                >
+                  <span className="text-foreground">
+                    {described.label} — {described.hint}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={isSubmitting}
+                    onClick={() => form.removeRow(key)}
+                    aria-label={`${t.common.delete}: ${described.label}`}
+                  >
+                    <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
-
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={onReview} disabled={isSubmitting}>
-          {copy.grants.review}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          {t.common.cancel}
-        </Button>
-      </div>
-    </div>
+    </FormModal>
   );
 }

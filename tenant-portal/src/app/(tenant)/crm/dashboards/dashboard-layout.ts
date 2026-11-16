@@ -20,6 +20,7 @@ export interface PlacementBox {
 }
 
 const GRID_COLUMNS = 12;
+const MAX_POSITION_ROW = 10000;
 /** `@Max(10000)` on `y`; a dashboard is capped at 20 widgets of height ≤ 24. */
 const MAX_ROWS = 2000;
 
@@ -87,6 +88,36 @@ export function movePlacement(
   const next = [...ordered];
   [next[index], next[target]] = [next[target], next[index]];
   return next;
+}
+
+export interface PlacementSizeBounds { minW: number; maxW: number; minH: number; maxH: number }
+export interface PlacementAdjustment { property: "x" | "y" | "width" | "height"; step: -1 | 1 }
+export type PlacementGeometry = Omit<PlacementBox, "id">;
+
+function overlaps(a: PlacementBox, b: PlacementBox) {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+export function adjustPlacement(ordered: readonly PlacementBox[], obstacles: readonly PlacementBox[], id: string,
+  adjustment: PlacementAdjustment, bounds: PlacementSizeBounds): PlacementBox[] | null {
+  const current = ordered.find((box) => box.id === id);
+  if (!current) return null;
+  const { property, step } = adjustment;
+  return placeAtGeometry(ordered, obstacles, id, { ...current, [property]: current[property] + step }, bounds);
+}
+
+export function placeAtGeometry(ordered: readonly PlacementBox[], obstacles: readonly PlacementBox[], id: string,
+  geometry: PlacementGeometry, bounds: PlacementSizeBounds): PlacementBox[] | null {
+  const current = ordered.find((box) => box.id === id);
+  if (!current) return null;
+  const { x, y, width, height } = geometry;
+  const next = { id, x, y, width, height };
+  if (![x, y, width, height].every(Number.isSafeInteger)
+    || (x === current.x && y === current.y && width === current.width && height === current.height)) return null;
+  if (next.x < 0 || next.x + next.width > GRID_COLUMNS || next.y < 0 || next.y > MAX_POSITION_ROW
+    || next.width < bounds.minW || next.width > bounds.maxW || next.height < bounds.minH || next.height > bounds.maxH) return null;
+  if (ordered.some((box) => box.id !== id && overlaps(next, box)) || obstacles.some((box) => overlaps(next, box))) return null;
+  return ordered.map((box) => box.id === id ? next : box);
 }
 
 /** Order as the server renders it: `sort_order`, then y, then x, then id. */

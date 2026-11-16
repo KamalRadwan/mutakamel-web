@@ -119,7 +119,7 @@ describe("NavMenu", () => {
 // the fifteen sections and reads back what is inside.
 describe("every nav item survives the move to menus", () => {
   it.each(NAV_SECTIONS.filter(
-    (entry) => entry.items.length > 1 && entry.globalNavDisplay !== "items",
+    (entry) => entry.items.length > 1 && entry.globalNavDisplay !== "items" && entry.globalNavDisplay !== "settings",
   ).map((entry) => [entry.id, entry]))(
     "lists all of %s's items",
     (_id, entry) => {

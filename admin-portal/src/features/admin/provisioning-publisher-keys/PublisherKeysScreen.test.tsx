@@ -4,6 +4,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublisherKeysScreen } from "./PublisherKeysScreen";
 import type { PublisherKeysView } from "./usePublisherKeys";
+import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
+import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import {
   ACTIVE_KEY,
   CHALLENGE_ID,
@@ -232,6 +235,38 @@ describe("PublisherKeysScreen", () => {
     expect(confirmButton).toBeEnabled();
     fireEvent.click(confirmButton);
     expect(view.confirmMutation).toHaveBeenCalledOnce();
+  });
+
+  it.each(["ar", "en"] as const)("localizes unknown read errors and retains diagnostics (%s)", (lang) => {
+    languageMock.lang = lang;
+    const error: NormalizedApiError = {
+      isNormalized: true, httpStatus: 500, errorCode: "FUTURE.PUBLISHER_FAILURE",
+      message: "Private publisher backend wording", correlationId: "019f1000-0000-7000-8000-000000000999",
+    };
+    const view = makeView();
+    view.directory = { ...view.directory, data: null, state: "ERROR", error };
+    viewBox.current = view;
+    render(<PublisherKeysScreen />);
+    expect(screen.getByText((lang === "ar" ? ar : en).apiErrorMessages.generic)).toBeInTheDocument();
+    expect(screen.getByText(error.errorCode)).toBeInTheDocument();
+    expect(screen.getByText(error.correlationId!)).toBeInTheDocument();
+    expect(screen.queryByText(error.message)).toBeNull();
+  });
+
+  it.each(["ar", "en"] as const)("localizes unknown mutation errors and retains diagnostics (%s)", (lang) => {
+    languageMock.lang = lang;
+    const error: NormalizedApiError = {
+      isNormalized: true, httpStatus: 500, errorCode: "FUTURE.PUBLISHER_FAILURE",
+      message: "Private publisher backend wording", correlationId: "019f1000-0000-7000-8000-000000000999",
+    };
+    const view = makeView();
+    view.mutation = { ...view.mutation, state: "ERROR", error, correlationId: error.correlationId! };
+    viewBox.current = view;
+    render(<PublisherKeysScreen />);
+    expect(screen.getByText((lang === "ar" ? ar : en).apiErrorMessages.generic)).toBeInTheDocument();
+    expect(screen.getByText(error.errorCode)).toBeInTheDocument();
+    expect(screen.getByText(error.correlationId!)).toBeInTheDocument();
+    expect(screen.queryByText(error.message)).toBeNull();
   });
 
   it("uses feature-local Arabic copy and RTL direction", () => {

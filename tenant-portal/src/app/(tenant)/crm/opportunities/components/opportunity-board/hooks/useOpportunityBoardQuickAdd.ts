@@ -22,7 +22,7 @@ export function useOpportunityBoardQuickAdd({
   const currencyOptions = useOpportunityCurrencyOptions(true);
   const [probabilityPercent, setProbabilityPercent] = useState("50");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
-  const [importance, setImportance] = useState<number>(2);
+  const [importance, setImportance] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isForbidden, setIsForbidden] = useState(false);

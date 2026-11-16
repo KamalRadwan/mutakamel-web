@@ -177,11 +177,18 @@ re-implements one.
 - **Search.** One search input; debounced 300ms; `q` in the URL.
 - **Branch scope.** One `TenantBranchSelect`. Every CRM read is branch-scoped —
   `branchId` is a **required** query parameter on all three list endpoints, so
-  `useTenantBranchSelection` falls back to the actor's primary branch. A screen
+  `useTenantBranchSelection` restores the actor's saved branch from the current
+  tab's `sessionStorage`, validating it against current access. Without a valid
+  preference it falls back to the actor's primary/sole branch. A screen
   whose reads narrow by branch only when asked passes
   `useTenantBranchSelection(user, { optional: true })` and
-  `<TenantBranchSelect allowAll />`: it opens on "All accessible branches"
-  (`null`, no `branchId`), offered first in the list.
+  `<TenantBranchSelect allowAll />`: without a saved branch it opens on "All
+  accessible branches" (`null`, no `branchId`), offered first in the list.
+  Updated **2026-11-03**: the selector shows names with `text-caption`, without
+  UUIDs or ID suffixes; unavailable names use translated ordinal labels. Two or
+  three branches use `Select`; more than three use the existing `Combobox` with
+  a local name search, keyboard selection and a no-match message. A single
+  accessible branch remains implicit and the selector stays hidden.
 - **Permissions.** Action visibility comes from the screen's `capabilities`
   endpoint, not from guessing at `/auth/me` strings. See
   [api/crm-leads.md](../api/crm-leads.md#get-leadscapabilities).

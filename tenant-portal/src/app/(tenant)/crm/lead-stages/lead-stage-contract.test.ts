@@ -43,6 +43,7 @@ describe("Lead-stage API contract", () => {
   });
 
   it("rejects enveloped, duplicate, and opportunity-only stage shapes", () => {
+    expect(() => parseLeadStageResponse(stage, "01900100-0000-7000-8000-000000000099")).toThrow("Invalid lead stages response.");
     expect(() =>
       parseLeadStageCatalogueResponse([stage, { ...stage }]),
     ).toThrow("Invalid lead stages response.");

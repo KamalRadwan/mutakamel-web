@@ -10,6 +10,7 @@ import {
   FormModal,
   IdentifierText,
   Input,
+  NameSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -20,6 +21,7 @@ import {
   TooltipProvider,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { useTradeScope } from "../../useTradeScope";
 import { useCatalogUoms } from "../hooks/useCatalogUoms";
 import { useItemReferenceData } from "../hooks/useItemReferenceData";
 import type { CatalogUomPurpose } from "../../uoms/uom-contract";
@@ -660,6 +662,7 @@ export function ListingDrawer({
   onSubmit: (values: ListingFormValues) => Promise<boolean>;
 }) {
   const { t } = useI18n();
+  const { channels, isLoadingChannels } = useTradeScope();
   const labels = useDrawerLabels();
   const initial = listing ? toListingForm(listing) : EMPTY_LISTING_FORM;
   const [values, setValues] = useState<ListingFormValues>(initial);
@@ -705,17 +708,11 @@ export function ListingDrawer({
               readOnly={listing !== null}
               required={listing === null}
             >
-              <Input
-                size="sm"
-                placeholder={t.trade.listingChannel}
-                dir="ltr"
-                className="font-mono"
-                value={values.channelId}
-                onChange={(event) => change({ channelId: event.target.value })}
-                disabled={isSubmitting}
-                readOnly={listing !== null}
-                required={listing === null}
-              />
+              {listing ? <Input size="sm" className="font-sans font-normal text-caption sm:text-caption"
+                value={channels.find((channel) => channel.id === listing.channelId)?.name ?? t.common.nameUnavailable} readOnly /> :
+                <NameSelect placeholder={t.trade.listingChannel} value={values.channelId || undefined}
+                  options={channels.map((channel) => ({ value: channel.id, label: channel.name }))}
+                  onValueChange={(next) => change({ channelId: next })} disabled={isSubmitting || isLoadingChannels} />}
             </Field>
 
             <Field

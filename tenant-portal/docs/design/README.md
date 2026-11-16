@@ -49,7 +49,7 @@ engineers. Not occasional visitors.
 Three consequences run through every decision below:
 
 - **Density serves them, microscopic type does not.** The floor is 13px, and
-  Arabic gets a lift above that.
+  Arabic and English share the same type sizes and line-heights (updated 2026-11-04).
 - **Controls are touched constantly.** 32px default control height, and since
   the token port that is 32 real pixels rather than the 28.8 a 0.9 scale used
   to produce. Compact and comfortable remain a user setting.
@@ -76,12 +76,14 @@ and lifecycle stages are not colors.** `LeadStageFlagEnum` has 8 values.
 distinguishable under colorblindness at badge size — attempting it is what
 produces the confetti-colored CRM look.
 
-Stage is communicated by **position, label, and progress**. Only *outcome*
-takes a stage hue:
+Stage is communicated by **position, label, and progress**. CRM lifecycle and
+category progress use one shared active hue, while outcomes retain semantic
+roles (updated 2026-11-04):
 
 | Outcome | Role | Wire values |
 | --- | --- | --- |
-| In progress / open | `ink` + motion | `OPEN`, `IN_PROGRESS`, and every intermediate stage flag |
+| Lead/opportunity stage and category progress | `brand` + motion | Intermediate stage flags; category `OPEN`, `IN_PROGRESS` |
+| Other in-progress statuses | `ink` + motion | Other status kinds' pending values |
 | Succeeded | `positive` | `WON`, `CONVERTED`, `ACTIVE_CUSTOMER` |
 | Paused / needs attention | `caution` | `ON_HOLD`, `NURTURING`, `PENDING` |
 | Failed / ended badly | `negative` | `LOST`, `DISQUALIFIED`, `BLACKLISTED` |
@@ -133,7 +135,7 @@ it from direction rather than hardcoding — see [theming.md](theming.md#rtl).
 | **Everything, in one file — start here** | **[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)** |
 | Third-party UI/UX audit — 17 gaps to refactor | [SKILL-AUDIT.md](SKILL-AUDIT.md) |
 | Color roles, OKLCH ramps, semantic tokens, status & swatch mapping | [tokens.md](tokens.md) |
-| Font pairing, type scale, weights, Arabic lift, numerals | [typography.md](typography.md) |
+| Font pairing, type scale, weights, bilingual size parity, numerals | [typography.md](typography.md) |
 | Radius, spacing, control heights, row density, elevation | [geometry.md](geometry.md) |
 | Animation budget and permitted keyframes | [motion.md](motion.md) |
 | Icon sizes, the one RTL mirror, the icon-per-concept map | [icons.md](icons.md) |
@@ -210,5 +212,61 @@ so here is the current line.
 
 **Decided here, from this product's own requirements**: the role *names* and
 the runtime brand override they exist to serve, every component, RTL and the
-Arabic type lift, the toast rule, the status→role mapping, and all of the
+Arabic tracking, the toast rule, the status→role mapping, and all of the
 per-screen design.
+
+## Accounting design process
+
+The accounting app is the portal's fourth app. Its screens are designed before
+their APIs are coded, and each design is reconciled with the frozen contracts
+before any screen is built (accounting implementation plan P03, task P03.T08).
+The process has three rules.
+
+**1. One brief per subtask.** The lead fills the
+[Antigravity brief template](../../../../backend/docs/plans/accounting-app-template-antigravity-brief.md)
+for one tracker id (`Pnn.Tmm.Sk`) and saves it as
+`backend/.omc/artifacts/ask/accounting/agy-<id>.md`. The brief:
+
+- lists the screen inventory rows it covers, with route, permission, feature key
+  and scope target;
+- names the DTOs, routes, error codes and enums the screen may use, so the
+  design never invents a field;
+- tells the designer to consult the `ui-ux-pro-max` skill before designing, as
+  this portal's `AGENTS.md` requires.
+
+The run is `agy --model gemini-4-argon-high`, started in the background so it
+notifies the lead when it ends. A design run never shares a file with a running
+Codex run.
+
+**2. The lead reviews every result against this checklist** before anything is
+copied into this folder:
+
+- Every screen traces to a screen inventory row: use case, journey step, route,
+  permission, feature key and scope target.
+- There are mockups in all four combinations: Arabic RTL and English LTR, each
+  in light and dark.
+- Status is never carried by colour alone. Only the four role hues are used, and
+  the status-to-role mapping of [tokens.md](tokens.md) holds.
+- Waiting states show the deadline, the owner and the next allowed action, and
+  never imply a resend.
+- Error copy states the cause, the effect and the action. A timeout of an
+  idempotent write keeps its key.
+- Identifiers and amounts are LTR islands with Western digits
+  (`ar-EG-u-nu-latn`), and only logical properties are used.
+- Every field, filter, action and state maps to a DTO member or a route of the
+  accounting Endpoint Catalogue. Each gap is listed in the run's "Contract gaps"
+  section. P03.T11 then fixes it in the accounting docs first, or files it for
+  its stage.
+
+**3. Approved artifacts move here; drafts do not.** The run writes under
+`backend/.omc/artifacts/ask/accounting/`. After the review passes, the lead
+copies:
+
+- the spec to `specs/accounting-<name>.md`;
+- the mockups to `mockups/accounting-<name>/`;
+- each screen's status into the accounting screen inventory
+  (`docs/plans/accounting-screen-inventory.md`).
+
+A rejected run gets a new brief with the review findings; nothing from it is
+copied. The accounting specs cite the accounting LLD
+(`backend/docs/LLD/accounting-app`) and never restate a contract.

@@ -32,6 +32,7 @@ vi.mock("../opportunity-contract", async (importOriginal) => ({
   opportunityPath: (id: string) => `/api/tenant/crm/v1/opportunities/${id}`,
 }));
 vi.mock("@/design-system", async () => ({
+  ...(await import("@/design-system/feedback/format-api-error")),
   ...(await import("@/design-system/primitives/Button")),
   ...(await import("@/design-system/patterns/confirm-action/ConfirmActionModal")),
   useWorkspaceState: () => ({ view: state.view, page: 1, setView: vi.fn() }),

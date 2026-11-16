@@ -1,10 +1,9 @@
-// Pipeline-wide Lead routes — the bulk bar, the KPI strip and the create
+// Pipeline-wide Lead routes — the bulk bar and the create
 // form's duplicate warning.
 //
 //   POST /api/tenant/crm/v1/leads/bulk-stage        200 { stageId, updatedIds, unchangedIds }
 //   POST /api/tenant/crm/v1/leads/bulk-update       200 { updatedIds, unchangedIds }
 //   POST /api/tenant/crm/v1/leads/bulk-delete       200 { deletedIds }
-//   POST /api/tenant/crm/v1/leads/kpis              200 LeadKpis
 //   POST /api/tenant/crm/v1/leads/duplicate-check   200 { matches }
 //   POST /api/tenant/crm/v1/leads/document-counts   200 { countsByPartyId }
 //
@@ -22,7 +21,6 @@ import { LEADS_PATH } from "./lead-contract";
 export const LEADS_BULK_STAGE_PATH = `${LEADS_PATH}/bulk-stage`;
 export const LEADS_BULK_UPDATE_PATH = `${LEADS_PATH}/bulk-update`;
 export const LEADS_BULK_DELETE_PATH = `${LEADS_PATH}/bulk-delete`;
-export const LEADS_KPIS_PATH = `${LEADS_PATH}/kpis`;
 export const LEADS_DUPLICATE_CHECK_PATH = `${LEADS_PATH}/duplicate-check`;
 export const LEADS_DOCUMENT_COUNTS_PATH = `${LEADS_PATH}/document-counts`;
 
@@ -89,37 +87,6 @@ export function bulkLeadFields(patch: BulkLeadFieldsPatch): BulkLeadFieldsPatch 
     ...(patch.ownerUserId !== undefined ? { ownerUserId: patch.ownerUserId } : {}),
     ...(patch.cardColor !== undefined ? { cardColor: patch.cardColor } : {}),
     ...(patch.acquisitionSourceId !== undefined ? { acquisitionSourceId: patch.acquisitionSourceId } : {}),
-  };
-}
-
-/* ── KPIs ─────────────────────────────────────────────────────────────── */
-
-export interface LeadKpis {
-  totalLeads: number;
-  newStageLeads: number;
-  newTodayLeads: number;
-  hotLeads: number;
-  overdueActivityLeads: number;
-  qualifiedLeads: number;
-}
-
-function count(value: unknown, field: string): number {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`Invalid lead KPI response: ${field}.`);
-  }
-  return value;
-}
-
-export function parseLeadKpisResponse(value: unknown): LeadKpis {
-  if (typeof value !== "object" || value === null) throw new Error("Invalid lead KPI response.");
-  const body = value as Record<string, unknown>;
-  return {
-    totalLeads: count(body.totalLeads, "totalLeads"),
-    newStageLeads: count(body.newStageLeads, "newStageLeads"),
-    newTodayLeads: count(body.newTodayLeads, "newTodayLeads"),
-    hotLeads: count(body.hotLeads, "hotLeads"),
-    overdueActivityLeads: count(body.overdueActivityLeads, "overdueActivityLeads"),
-    qualifiedLeads: count(body.qualifiedLeads, "qualifiedLeads"),
   };
 }
 

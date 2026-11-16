@@ -3,6 +3,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
+
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
 
 const api = vi.hoisted(() => ({
   listTiers: vi.fn(),
@@ -173,6 +176,8 @@ describe("useApplicationCatalogue tier detail freshness", () => {
     await act(async () => {
       await result.current.replacePrices("tier-a", {
         billingCycle: "MONTHLY",
+        expectedPricingRevision: 'UNCONFIGURED',
+        reason: 'Initial pricing',
         brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "9.0000" }],
       });
     });

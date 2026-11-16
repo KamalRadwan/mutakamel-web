@@ -1,11 +1,10 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import Link from "next/link";
 import { Building2, CreditCard } from "lucide-react";
 import {
   Button,
-  DegradedBanner,
   DetailHeader,
   DetailSection,
   DropdownMenu,
@@ -57,7 +56,6 @@ export default function SalesOrderDetailPage({
   const screen = useSalesOrderScreen(id);
   const { detail, confirmation, write, pdf } = screen;
   const order = detail.document;
-  const [attemptCancelOpen, setAttemptCancelOpen] = useState(false);
   const editReference = useTradeDraftReference(
     SALES_ORDERS_PATH,
     id,
@@ -151,7 +149,7 @@ export default function SalesOrderDetailPage({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {screen.canHold && !screen.isHoldBlocked ? (
+                        {screen.canHold ? (
                           <DropdownMenuItem
                             onSelect={() => screen.requestReason("hold")}
                           >
@@ -213,10 +211,6 @@ export default function SalesOrderDetailPage({
             <TradeWriteOutcome write={confirmation.write} />
             <TradeWriteOutcome write={pdf.write} />
             <TradeWriteOutcome write={editReference.write} />
-
-            {screen.isHoldBlocked ? (
-              <DegradedBanner message={td.salesOrders.holdBlocked} />
-            ) : null}
 
             <SalesOrderAxes order={order} />
 
@@ -374,7 +368,6 @@ export default function SalesOrderDetailPage({
             <SalesOrderConfirmationPanel
               state={confirmation}
               canConfirm={screen.canConfirm}
-              onCancelAttempt={() => setAttemptCancelOpen(true)}
             />
 
             <TradePdfPanel
@@ -409,26 +402,6 @@ export default function SalesOrderDetailPage({
                 reason: td.reasonCode,
                 reasonHint: td.reasonCodeHint,
                 confirm: t.common.save,
-                cancel: t.common.cancel,
-              }}
-            />
-
-            <ReasonDialog
-              open={attemptCancelOpen}
-              onOpenChange={setAttemptCancelOpen}
-              title={td.salesOrders.attemptCancelTitle}
-              reasonRequired
-              destructive
-              maxLength={TRADE_REASON_CODE_MAX_LENGTH}
-              loading={confirmation.write.isWriting}
-              onConfirm={(reason) => {
-                setAttemptCancelOpen(false);
-                void confirmation.cancelAttempt(reason.trim());
-              }}
-              labels={{
-                reason: td.reasonCode,
-                reasonHint: td.reasonCodeHint,
-                confirm: td.salesOrders.attemptCancel,
                 cancel: t.common.cancel,
               }}
             />

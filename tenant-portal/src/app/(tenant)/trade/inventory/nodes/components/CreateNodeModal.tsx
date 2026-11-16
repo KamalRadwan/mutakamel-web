@@ -1,21 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import { Warehouse } from "lucide-react";
 import {
-  Badge,
   cn,
+  Button,
   FormModal,
   SWATCH_SURFACE_PALETTES,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   EMPTY_NODE_FORM,
-  INVENTORY_NODES_MANAGE_PERMISSION,
-  parseBranchIdsPreview,
   type NodeFormValues,
 } from "../../inventory-contract";
 import { NodeFormFields } from "./NodeFormFields";
+import { useNodeForm } from "../hooks/useNodeForm";
 
 interface CreateNodeModalProps {
   isOpen: boolean;
@@ -23,6 +21,10 @@ interface CreateNodeModalProps {
   onSubmit: (values: NodeFormValues) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  initialValues?: NodeFormValues;
+  unresolved?: boolean;
+  onRetryOriginal?: () => Promise<boolean>;
+  canRetryOriginal?: boolean;
 }
 
 export function CreateNodeModal({
@@ -31,30 +33,27 @@ export function CreateNodeModal({
   onSubmit,
   isSubmitting,
   error,
+  initialValues,
+  unresolved = false,
+  onRetryOriginal,
+  canRetryOriginal = false,
 }: CreateNodeModalProps) {
   const { t } = useI18n();
-  const [values, setValues] = useState<NodeFormValues>(EMPTY_NODE_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_NODE_FORM);
-  const branchPreview = parseBranchIdsPreview(values.branchIds);
-  const readyCount = [
-    values.code.trim().length > 0,
-    values.name.trim().length > 0,
-    values.timezone.trim().length > 0,
-    branchPreview.validIds.length > 0 && branchPreview.invalidEntries.length === 0,
-  ].filter(Boolean).length;
+  const form = useNodeForm(initialValues ?? EMPTY_NODE_FORM, onSubmit);
 
   return (
     <FormModal
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) {
-          setValues(EMPTY_NODE_FORM);
+        if (!open && (!unresolved || !canRetryOriginal)) {
+          form.reset();
           onClose();
         }
       }}
       size="wide"
       title={t.tradeInventory.nodeCreateTitle}
       description={t.tradeInventory.nodeCreateDescription}
+      footerLeading={unresolved ? <div className="flex flex-col gap-2"><p role="status" className="text-caption text-muted-foreground">{t.tradeInventory.governanceUnknownWrite}</p><Button variant="outline" disabled={!canRetryOriginal || isSubmitting} onClick={() => void onRetryOriginal?.()}>{t.tradeInventory.governanceRetryOriginal}</Button></div> : <span className="text-caption text-muted-foreground">{t.tradeInventory.nodeStartsActive}</span>}
       headerIcon={
         <div
           className={cn(
@@ -65,26 +64,13 @@ export function CreateNodeModal({
           <Warehouse className="size-4" aria-hidden="true" />
         </div>
       }
-      headerAside={
-        <Badge tone={readyCount === 4 ? "positive" : "brand"}>
-          {`${readyCount}/4`}
-        </Badge>
-      }
-      footerLeading={
-        <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
-          COMPANY • {INVENTORY_NODES_MANAGE_PERMISSION}
-        </span>
-      }
-      isDirty={isDirty}
+      isDirty={form.isDirty}
       isSubmitting={isSubmitting}
-      onSubmit={() => {
-        void onSubmit(values).then((saved) => {
-          if (saved) setValues(EMPTY_NODE_FORM);
-        });
-      }}
-      error={error ?? undefined}
+      submitDisabled={unresolved}
+      onSubmit={() => void form.submit()}
+      error={error ?? form.error ?? undefined}
       labels={{
-        submit: t.common.save,
+        submit: t.tradeInventory.nodeCreate,
         cancel: t.common.cancel,
         discardTitle: t.common.discardTitle,
         discardDescription: t.common.discardDescription,
@@ -95,9 +81,10 @@ export function CreateNodeModal({
       }}
     >
       <NodeFormFields
-        values={values}
-        onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
-        isSubmitting={isSubmitting}
+        values={form.values}
+        errors={form.fieldErrors}
+        onChange={form.patch}
+        isSubmitting={isSubmitting || unresolved}
         isEdit={false}
       />
     </FormModal>

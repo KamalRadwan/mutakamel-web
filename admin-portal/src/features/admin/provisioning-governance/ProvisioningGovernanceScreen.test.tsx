@@ -19,6 +19,9 @@ vi.mock("./useProvisioningGovernance", () => ({
 import { COMPONENT_PAGE, RELEASE_PAGE, RUN } from "./test-fixtures";
 import type { ProvisioningGovernanceView } from "./useProvisioningGovernance";
 import { ProvisioningGovernanceScreen } from "./ProvisioningGovernanceScreen";
+import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
+import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 
 function baseView(): ProvisioningGovernanceView {
   return {
@@ -165,6 +168,39 @@ describe("ProvisioningGovernanceScreen", () => {
     expect(screen.getByLabelText("Requires maintenance")).toBeInTheDocument();
     expect(screen.getAllByLabelText("Sort field")).toHaveLength(2);
     expect(screen.getAllByLabelText("Rows per page")).toHaveLength(2);
+  });
+
+  it.each(["ar", "en"] as const)("localizes unknown discovery command failures (%s)", (lang) => {
+    languageMock.lang = lang;
+    const error: NormalizedApiError = {
+      isNormalized: true, httpStatus: 500, errorCode: "FUTURE.DISCOVERY_FAILURE",
+      message: "Private discovery backend wording", correlationId: "019f1000-0000-7000-8000-000000000999",
+    };
+    const view = baseView();
+    view.mutation.error = error;
+    hookMock.mockReturnValue(view);
+    render(<ProvisioningGovernanceScreen />);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: lang === "ar" ? "عمليات الاكتشاف" : "Discovery runs" }));
+    expect(screen.getByText((lang === "ar" ? ar : en).apiErrorMessages.generic)).toBeInTheDocument();
+    expect(screen.getByText(error.errorCode)).toBeInTheDocument();
+    expect(screen.getByText(error.correlationId!)).toBeInTheDocument();
+    expect(screen.queryByText(error.message)).toBeNull();
+  });
+
+  it.each(["ar", "en"] as const)("localizes unknown catalogue failures passed to ErrorState (%s)", (lang) => {
+    languageMock.lang = lang;
+    const error: NormalizedApiError = {
+      isNormalized: true, httpStatus: 500, errorCode: "FUTURE.CATALOGUE_FAILURE",
+      message: "Private catalogue backend wording", correlationId: "019f1000-0000-7000-8000-000000000999",
+    };
+    const view = baseView();
+    view.catalogue = { ...view.catalogue, data: null, state: "ERROR", error };
+    hookMock.mockReturnValue(view);
+    render(<ProvisioningGovernanceScreen />);
+    expect(screen.getByText((lang === "ar" ? ar : en).apiErrorMessages.generic)).toBeInTheDocument();
+    expect(screen.getByText(error.errorCode)).toBeInTheDocument();
+    expect(screen.getByText(error.correlationId!)).toBeInTheDocument();
+    expect(screen.queryByText(error.message)).toBeNull();
   });
 
   it("requires an exact typed confirmation before submitting discovery", () => {

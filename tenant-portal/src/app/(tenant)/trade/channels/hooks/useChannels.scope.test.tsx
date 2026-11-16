@@ -21,11 +21,19 @@ const fixture = vi.hoisted(() => ({
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
 vi.mock("@/context/AuthContext", () => {
   const user = {
+    id: "019f0000-0000-7000-8000-000000000020",
     accessibleCompanies: [fixture.company], accessibleBranches: [fixture.branch],
     teamMemberships: [], isTenantOwner: true, permissions: [],
   };
   return { useTenantAuth: () => ({ user }) };
 });
+vi.mock("@/app/(tenant)/core/contracts/organization-contract", async (original) => ({
+  ...await original<typeof import("@/app/(tenant)/core/contracts/organization-contract")>(),
+  fetchOrgNodes: vi.fn(async () => ({ items: [{ id: fixture.branch, companyId: fixture.company,
+    code: "CAIRO", name: "Cairo", status: "ACTIVE", createdAt: "2026-11-04T00:00:00.000Z",
+    updatedAt: "2026-11-04T00:00:00.000Z", address: null, phone: null, isHeadquarters: false }],
+  page: 1, limit: 100, total: 1, totalPages: 1, hasNext: false, hasPrev: false })),
+}));
 vi.mock("@/design-system", () => ({
   useToast: () => ({ success: vi.fn() }),
 }));
@@ -90,6 +98,8 @@ afterEach(cleanup);
 
 describe("channel administration scope", () => {
   it("refreshes operating choices after create and deactivation without channel headers", async () => {
+    // This administration scenario lists company channels before a branch is selected.
+    localStorage.removeItem("tenant_trade_branch");
     const { result } = renderHook(() => ({ scope: useTradeScope(), list: useChannels() }), {
       wrapper: TradeScopeProvider,
     });
@@ -148,7 +158,9 @@ describe("channel administration scope", () => {
     const { result } = renderHook(() => ({
       scope: useTradeScope(), detail: useChannelDetail(fixture.channel),
     }), { wrapper: TradeScopeProvider });
-    await waitFor(() => expect(result.current.scope.context.channelId).toBe(fixture.channel));
+    await waitFor(() => expect(result.current.scope.context.branchId).toBe(fixture.branch));
+    await waitFor(() => expect(result.current.scope.isLoadingChannels).toBe(false));
+    expect(result.current.scope.context.channelId).toBe(existing ? fixture.channel : null);
     await waitFor(() => expect(result.current.detail.channel).not.toBeNull());
     await act(async () => result.current.detail.saveBranchMapping(true));
     const headers = {

@@ -66,6 +66,26 @@ describe("Trade control tower contract", () => {
     expect(RESOLUTION_CODES).toEqual(["SOURCE_CORRECTED", "OWNER_RESULT_APPLIED"]);
   });
 
+  it.each(RESOLUTION_CODES)("preserves the chosen %s and evidence", (resolutionCode) => {
+    expect(buildResolveExceptionRequest(resolutionCode, "  fixed  ", '{"ticket":"OPS-42","result":{"applied":true}}')).toEqual({
+      resolutionCode,
+      reason: "fixed",
+      evidence: { ticket: "OPS-42", result: { applied: true } },
+    });
+  });
+
+  it.each(["", "UNSUPPORTED"])("rejects an unchosen or invalid resolution code: %s", (code) => {
+    expect(() => buildResolveExceptionRequest(code, "fixed", "{}")).toThrow(
+      "CONTROL_TOWER_FORM_RESOLUTION_CODE",
+    );
+  });
+
+  it.each(["{", "[]", "null", "true", "42", '"proof"'])("rejects non-object evidence: %s", (evidence) => {
+    expect(() => buildResolveExceptionRequest("OWNER_RESULT_APPLIED", "fixed", evidence)).toThrow(
+      "CONTROL_TOWER_FORM_EVIDENCE",
+    );
+  });
+
   it("renders an unmapped severity as itself rather than dropping it", () => {
     const page = parseControlTowerExceptionsResponse({
       items: [

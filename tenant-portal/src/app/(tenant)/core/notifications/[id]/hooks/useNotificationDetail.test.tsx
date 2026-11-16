@@ -80,21 +80,77 @@ describe("notification detail lookup", () => {
     expect(result.current.isPending).toBe(false);
   });
 
-  it("fences an older lookup when a successful command invalidates the detail", async () => {
+  it("follows an in-flight lookup with the successful command's recipient state", async () => {
     const { result } = renderHook(() => useNotificationDetail(id));
     await waitFor(() => expect(result.current.status).toBe("found"));
     let finishOld!: (value: { data: typeof notification }) => void;
     api.get.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
     let invalidating!: Promise<void>;
     act(() => { invalidating = tenantNotificationRuntime.invalidateQueries(); });
-    const signal = api.get.mock.calls[1][1].signal as AbortSignal;
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
     const readAt = "2026-10-17T12:00:00.000Z";
     api.get.mockResolvedValue({ data: { ...notification, readAt, recipientStateVersion: 1 } });
-    await act(async () => result.current.markRead());
-    expect(signal.aborted).toBe(true);
-    await act(async () => { finishOld({ data: notification }); await invalidating; });
+    let marking!: Promise<void>;
+    act(() => { marking = result.current.markRead(); });
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      finishOld({ data: notification });
+      await invalidating;
+      await marking;
+    });
+    expect(api.get).toHaveBeenCalledTimes(3);
     expect(result.current.notification?.readAt).toBe(readAt);
     expect(result.current.status).toBe("found");
+  });
+
+  it("retains the found object and status throughout silent revalidation", async () => {
+    const statuses: string[] = [];
+    const { result } = renderHook(() => {
+      const detail = useNotificationDetail(id);
+      statuses.push(detail.status);
+      return detail;
+    });
+    await waitFor(() => expect(result.current.status).toBe("found"));
+    const current = result.current.notification;
+    statuses.length = 0;
+    let finish!: (value: { data: typeof notification }) => void;
+    api.get.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    let invalidating!: Promise<void>;
+    act(() => { invalidating = tenantNotificationRuntime.invalidateQueries(); });
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
+    expect(result.current.status).toBe("found");
+    expect(result.current.notification).toBe(current);
+    await act(async () => {
+      finish({ data: { ...notification, title: "Updated notification" } });
+      await invalidating;
+    });
+    expect(result.current.notification?.title).toBe("Updated notification");
+    expect(statuses).not.toContain("loading");
+  });
+
+  it("keeps the current detail when silent revalidation fails", async () => {
+    const { result } = renderHook(() => useNotificationDetail(id));
+    await waitFor(() => expect(result.current.status).toBe("found"));
+    const current = result.current.notification;
+    api.get.mockRejectedValue(new Error("offline"));
+    await act(async () => { await tenantNotificationRuntime.invalidateQueries(); });
+    expect(result.current.status).toBe("found");
+    expect(result.current.notification).toBe(current);
+  });
+
+  it("exits initial loading if an invalidation supersedes the first lookup and fails", async () => {
+    let finishInitial!: (value: { data: typeof notification }) => void;
+    api.get.mockImplementationOnce(() => new Promise((resolve) => { finishInitial = resolve; }));
+    const { result } = renderHook(() => useNotificationDetail(id));
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(1));
+    const signal = api.get.mock.calls[0][1].signal as AbortSignal;
+    api.get.mockRejectedValue(new Error("offline"));
+    await act(async () => { await tenantNotificationRuntime.invalidateQueries(); });
+    expect(signal.aborted).toBe(true);
+    expect(result.current.status).toBe("failed");
+    await act(async () => { finishInitial({ data: notification }); });
+    expect(result.current.status).toBe("failed");
+    expect(result.current.notification).toBeNull();
   });
 
   it("revalidates an open detail when another projection invalidates it", async () => {

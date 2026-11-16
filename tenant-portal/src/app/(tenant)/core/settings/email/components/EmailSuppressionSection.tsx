@@ -1,64 +1,119 @@
 "use client";
 
-import { Button, Field, Input, ConfirmActionModal, PermissionGate, useCan } from "@/design-system";
+import { Search } from "lucide-react";
+import {
+  Button,
+  Card,
+  Field,
+  Input,
+  PermissionGate,
+  useCan,
+} from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useI18n } from "@/i18n/I18nContext";
 import { useEmailSuppression } from "../hooks/useEmailSuppression";
+import { EmailSuppressionModal } from "./EmailSuppressionModal";
 
-export function EmailSuppressionSection() {
+interface EmailSuppressionSectionProps {
+  onOverlayChange?: (open: boolean) => void;
+}
+
+export function EmailSuppressionSection({ onOverlayChange }: EmailSuppressionSectionProps) {
   const { user, realtimeAuthGeneration } = useTenantAuth();
   const allowed = useCan("workspace.email.manage", { tenantWide: true });
   if (!user || !allowed) return null;
-  return <EmailSuppressionForm key={realtimeAuthGeneration ?? user.id} />;
+  return (
+    <EmailSuppressionForm
+      key={realtimeAuthGeneration ?? user.id}
+      onOverlayChange={onOverlayChange}
+    />
+  );
 }
 
-function EmailSuppressionForm() {
-  const form = useEmailSuppression();
-  const { copy, result } = form;
+function EmailSuppressionForm({ onOverlayChange }: EmailSuppressionSectionProps) {
+  const { t } = useI18n();
+  const form = useEmailSuppression(onOverlayChange);
+  const { copy } = form;
+  const inlineError =
+    !form.isLookupModalOpen && !form.confirming ? form.error : undefined;
+
   return (
     <PermissionGate require="workspace.email.manage" denied={form.denied}>
-      <section className="space-y-3 rounded-lg border border-border bg-card p-4" aria-labelledby="email-suppression-title">
-        <h2 id="email-suppression-title" className="text-sm font-semibold">{copy.title}</h2>
-        <p className="text-xs text-muted-foreground">{copy.description}</p>
-
-        <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void form.lookup(); }}>
-          <Field label={copy.address} showLabel hint={copy.privacy} error={form.error} required>
-            <Input type="email" dir="ltr" autoComplete="off" spellCheck={false} maxLength={320}
-              value={form.address} onChange={(event) => form.updateAddress(event.target.value)}
-              disabled={form.pending || form.denied} required />
-          </Field>
-          <Button type="submit" variant="outline" disabled={form.pending || form.denied || !form.address.trim()}>
-            {form.pending ? copy.working : copy.lookup}
-          </Button>
-        </form>
-        <div role="status" aria-live="polite" aria-busy={form.pending}>
-          {form.notice ? <p className="text-sm">{form.notice}</p> : null}
-          {result ? (
-            <div className="space-y-2">
-              <p className="text-sm">{result.suppressed ? copy.suppressed : copy.notSuppressed}</p>
-              {result.suppressed ? (
-                <>
-                  <dl className="grid gap-2 text-xs sm:grid-cols-2">
-                    <div><dt className="text-muted-foreground">{copy.reason}</dt><dd>{copy.reasons[result.reasonCode]}</dd></div>
-                    <div><dt className="text-muted-foreground">{copy.firstOccurred}</dt><dd>{form.date(result.firstOccurredAt)}</dd></div>
-                    <div><dt className="text-muted-foreground">{copy.lastOccurred}</dt><dd>{form.date(result.lastOccurredAt)}</dd></div>
-                  </dl>
-                  <Button type="button" variant="outline" disabled={form.pending || form.denied} onClick={() => form.setConfirming(true)}>
-                    {copy.lift}
-                  </Button>
-                </>
-              ) : null}
+      <section aria-labelledby="email-suppression-title">
+        <Card className="px-4 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <h3
+                  id="email-suppression-title"
+                  className="text-sm font-semibold text-foreground"
+                >
+                  {copy.title}
+                </h3>
+              </div>
+              <p className="text-xs text-muted-foreground">{copy.description}</p>
+              <p className="text-xs text-muted-foreground">{copy.privacy}</p>
             </div>
-          ) : null}
-        </div>
+
+            <form
+              className="flex w-full flex-col gap-2 sm:flex-row sm:items-start lg:w-auto lg:min-w-80"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void form.lookup();
+              }}
+            >
+              <div className="min-w-0 flex-1">
+                <Field label={copy.address} showLabel={false} error={inlineError} required>
+                  <Input
+                    aria-label={copy.address}
+                    size="sm"
+                    type="email"
+                    dir="ltr"
+                    placeholder={copy.addressPlaceholder}
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={320}
+                    value={form.address}
+                    onChange={(event) => form.updateAddress(event.target.value)}
+                    disabled={form.pending || form.denied}
+                    required
+                  />
+                </Field>
+              </div>
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={form.pending || form.denied || !form.address.trim()}
+              >
+                {form.pending && !form.isLookupModalOpen && !form.confirming
+                  ? copy.working
+                  : copy.lookup}
+              </Button>
+            </form>
+          </div>
+        </Card>
       </section>
-      <ConfirmActionModal
-        open={form.confirming} onOpenChange={form.setConfirming}
-        title={copy.confirmTitle} description={copy.confirmDescription}
-        confirmLabel={copy.lift} cancelLabel={copy.cancel}
-        loading={form.pending}
-        onConfirm={() => void form.lift()}
+
+      <EmailSuppressionModal
+        copy={copy}
+        closeLabel={t.common.close}
+        retryLabel={t.common.retry}
+        address={form.address}
+        result={form.result}
+        pending={form.pending}
+        confirming={form.confirming}
+        isLookupModalOpen={form.isLookupModalOpen}
+        error={form.error}
+        notice={form.notice}
+        noticeKind={form.noticeKind}
+        formatDate={form.date}
+        onCloseLookup={form.closeLookupModal}
+        onSetConfirming={form.setConfirming}
+        onRetryLookup={() => void form.lookup()}
+        onConfirmLift={() => void form.lift()}
       />
     </PermissionGate>
   );
 }
-

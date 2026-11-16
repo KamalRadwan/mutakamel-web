@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
 
 const useApplicationCatalogueMock = vi.hoisted(() => vi.fn());
 const replacePrices = vi.hoisted(() => vi.fn());
@@ -10,7 +11,7 @@ vi.mock("../hooks/useApplicationCatalogue", () => ({
   useApplicationCatalogue: useApplicationCatalogueMock,
 }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", dir: "ltr" }),
+  useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
 }));
 vi.mock("./CatalogueResourceDialog", () => ({ CatalogueResourceDialog: () => null }));
 
@@ -21,8 +22,8 @@ import { ApplicationCatalogueWorkspace } from "./ApplicationCatalogueWorkspace";
  * that at $3 with no upper bound.
  */
 const SAVED_LADDER = [
-  { billingCycle: "MONTHLY", minUsers: 1, maxUsers: 10, unitPrice: "5.0000" },
-  { billingCycle: "MONTHLY", minUsers: 11, maxUsers: null, unitPrice: "3.0000" },
+  { billingCycle: "MONTHLY", minUsers: 1, maxUsers: 10, unitPrice: "5.0000", pricingRevision: "a".repeat(64) },
+  { billingCycle: "MONTHLY", minUsers: 11, maxUsers: null, unitPrice: "3.0000", pricingRevision: "a".repeat(64) },
 ];
 
 describe("ApplicationCatalogueWorkspace pricing ladder deletion", () => {
@@ -72,6 +73,8 @@ describe("ApplicationCatalogueWorkspace pricing ladder deletion", () => {
     await waitFor(() =>
       expect(replacePrices).toHaveBeenCalledWith("tier-1", {
         billingCycle: "MONTHLY",
+        expectedPricingRevision: "a".repeat(64),
+        reason: "Reviewed pricing",
         brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "5.0000" }],
       }),
     );
@@ -96,14 +99,46 @@ describe("ApplicationCatalogueWorkspace pricing ladder deletion", () => {
     await waitFor(() =>
       expect(replacePrices).toHaveBeenCalledWith("tier-1", {
         billingCycle: "MONTHLY",
+        expectedPricingRevision: "a".repeat(64),
+        reason: "Reviewed pricing",
         brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "3.0000" }],
       }),
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it('requires a non-blank reason before saving', async () => {
+    await openPricingTab();
+    fireEvent.change(screen.getByLabelText(en.tierPricing.reason), { target: { value: '   ' } });
+    const save = screen.getByRole('button', { name: 'Replace monthly ladder' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(replacePrices).not.toHaveBeenCalled();
+  });
+
+  it('uses UNCONFIGURED when the loaded cycle has no saved rows', async () => {
+    useApplicationCatalogueMock.mockReturnValue({
+      ...useApplicationCatalogueMock(), prices: [],
+    });
+    await openPricingTab(1);
+    fireEvent.change(screen.getByLabelText('USD per user'), { target: { value: '10.0000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Replace monthly ladder' }));
+    await waitFor(() => expect(replacePrices).toHaveBeenCalledWith('tier-1', {
+      billingCycle: 'MONTHLY', expectedPricingRevision: 'UNCONFIGURED', reason: 'Reviewed pricing',
+      brackets: [{ minUsers: 1, maxUsers: null, unitPrice: '10.0000' }],
+    }));
+  });
+
+  it('catches a rejected replacement so the operator can review the reloaded ladder', async () => {
+    replacePrices.mockRejectedValueOnce(new Error('stale revision'));
+    await openPricingTab();
+    fireEvent.click(screen.getByRole('button', { name: 'Replace monthly ladder' }));
+    await waitFor(() => expect(replacePrices).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText(en.tierPricing.reason)).toHaveValue('  Reviewed pricing  ');
+  });
 });
 
-async function openPricingTab() {
+async function openPricingTab(expectedRows = 2) {
   render(
     <ApplicationCatalogueWorkspace
       applicationId="application-1"
@@ -117,5 +152,6 @@ async function openPricingTab() {
     button: 0,
     ctrlKey: false,
   });
-  await screen.findByRole("button", { name: "Remove bracket 2" });
+  await waitFor(() => expect(screen.getAllByLabelText('Minimum users')).toHaveLength(expectedRows));
+  fireEvent.change(screen.getByLabelText(en.tierPricing.reason), { target: { value: '  Reviewed pricing  ' } });
 }

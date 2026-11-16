@@ -18,6 +18,7 @@ import {
   Button,
 } from "@/design-system";
 import type { ApplicationView, UpdateApplicationDatabasePolicyDto, UpdateApplicationDto } from "../types";
+import { localizeApplicationError } from "../lib/application-error-copy";
 
 interface Props {
   mode: "metadata" | "policy" | null;
@@ -110,7 +111,7 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
       }
       onClose();
     } catch (submissionError) {
-      setSubmissionError(submissionError instanceof Error ? submissionError.message : copy.failed);
+      setSubmissionError(localizeApplicationError(submissionError, t));
       queueMicrotask(() => submissionErrorRef.current?.focus());
     }
   };

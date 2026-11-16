@@ -1,6 +1,7 @@
 "use client";
+import { DashboardRecoveryNotice, type DashboardRecoveryProps } from "../../components/DashboardRecoveryNotice";
 
-import { useState } from "react";
+import { useDashboardShareForm } from "../hooks/useDashboardShareForm";
 import { Trash2 } from "lucide-react";
 import {
   Badge,
@@ -46,6 +47,8 @@ interface ShareDrawerProps {
     expiresAt: string;
   }) => Promise<boolean>;
   onRevoke: (shareId: string) => void;
+  blocked?: boolean;
+  recovery?: DashboardRecoveryProps;
 }
 
 export function ShareDrawer({
@@ -63,13 +66,12 @@ export function ShareDrawer({
   onRetryTargetSearch,
   onShare,
   onRevoke,
+  blocked = false,
+  recovery,
 }: ShareDrawerProps) {
   const { t } = useI18n();
-  const [subjectId, setSubjectId] = useState<string | undefined>(undefined);
-  const [accessLevel, setAccessLevel] = useState<ShareAccessLevel>("VIEW");
-  const [expiresAt, setExpiresAt] = useState<Date | undefined>(undefined);
-
-  const selected = targets.find((target) => target.id === subjectId);
+  const form = useDashboardShareForm(targets, onShare, blocked);
+  const { selected, accessLevel, expiresAt } = form;
 
   return (
     <FormDrawer
@@ -77,24 +79,10 @@ export function ShareDrawer({
       onOpenChange={onOpenChange}
       title={t.crmDashboards.shareTitle}
       description={t.crmDashboards.shareDescription}
-      isDirty={subjectId !== undefined}
+      isDirty={form.dirty}
       isSubmitting={isSubmitting}
-      submitDisabled={!selected}
-      onSubmit={() => {
-        if (!selected) return;
-        void onShare({
-          subjectType: selected.type,
-          subjectId: selected.id,
-          accessLevel,
-          // A date-only pick becomes an instant; the server refuses a past one
-          // with `422 CRM_SHARE_EXPIRY_INVALID`.
-          expiresAt: expiresAt ? expiresAt.toISOString() : "",
-        }).then((succeeded) => {
-          if (!succeeded) return;
-          setSubjectId(undefined);
-          setExpiresAt(undefined);
-        });
-      }}
+      submitDisabled={blocked || !selected}
+      onSubmit={form.submit}
       error={error}
       labels={{
         submit: t.crmDashboards.shareSubmit,
@@ -105,11 +93,12 @@ export function ShareDrawer({
         discardCancel: t.common.cancel,
       }}
     >
-      <Field label={t.crmDashboards.shareTarget} required>
+    {recovery && <DashboardRecoveryNotice {...recovery} />}
+      <Field showLabel label={t.crmDashboards.shareTarget} required>
         <Combobox
-          value={subjectId}
+          value={selected?.id}
           selectedLabel={selected?.name}
-          onValueChange={setSubjectId}
+          onValueChange={form.select}
           options={targets.map((target) => ({
             value: target.id,
             label: `${target.name} · ${t.crmDashboards.subjectTypes[target.type]}`,
@@ -134,10 +123,11 @@ export function ShareDrawer({
         </div>
       ) : null}
 
-      <Field label={t.crmDashboards.shareAccessLevel}>
+      <Field showLabel label={t.crmDashboards.shareAccessLevel}>
         <Select
           value={accessLevel}
-          onValueChange={(next) => setAccessLevel(next as ShareAccessLevel)}
+          disabled={isSubmitting || blocked}
+          onValueChange={(next) => form.setAccessLevel(next as ShareAccessLevel)}
         >
           <SelectTrigger size="sm">
             <SelectValue />
@@ -152,10 +142,11 @@ export function ShareDrawer({
         </Select>
       </Field>
 
-      <Field label={t.crmDashboards.shareExpiry} hint={t.crmDashboards.shareExpiryHint}>
+      <Field showLabel label={t.crmDashboards.shareExpiry} hint={t.crmDashboards.shareExpiryHint} error={form.invalidExpiry ? t.crmDashboards.errors.CRM_SHARE_EXPIRY_INVALID : undefined}>
         <DatePicker
           value={expiresAt}
-          onValueChange={setExpiresAt}
+          disabled={isSubmitting || blocked}
+          onValueChange={form.changeExpiry}
           placeholder={t.crmDashboards.shareExpiryPlaceholder}
           clearLabel={t.crmDashboards.clearExpiry}
           startMonth={new Date()}
@@ -202,7 +193,7 @@ export function ShareDrawer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || blocked}
                     aria-label={`${t.crmDashboards.revokeShare}: ${share.subjectName ?? share.subjectId}`}
                     onClick={() => onRevoke(share.id)}
                   >
@@ -217,3 +208,7 @@ export function ShareDrawer({
     </FormDrawer>
   );
 }
+
+
+
+

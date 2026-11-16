@@ -1,89 +1,73 @@
 "use client";
 
-import Link from "next/link";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { Lock, Plus, RefreshCw } from "lucide-react";
 import {
-  Badge,
   Button,
+  Card,
   ConfirmActionModal,
-  CORE_IDENTITY_NAV_ITEMS,
   DataTable,
+  DataTableSort,
+  DeletionBlockerDialog,
   FilterBar,
   PageHeader,
   PermissionGate,
-  SubNav,
-  type ColumnDef,
+  TooltipProvider,
 } from "@/design-system";
 import { localizedValue } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import type { TenantRole } from "../contracts/role-contract";
 import { useCoreErrorText } from "../hooks/useCoreErrorText";
-import { RoleFormDrawer } from "./components/RoleFormDrawer";
+import {
+  RoleCreatedDialog,
+  RolePermissionsSavedDialog,
+  SystemRoleProtectedDialog,
+} from "./components/RoleBranchDialogs";
+import { RoleBranchPermissionsModal } from "./components/RoleBranchPermissionsModal";
+import { RoleFormModal } from "./components/RoleFormDrawer";
+import { useRoleColumns } from "./components/useRoleColumns";
 import { useTenantRoles } from "./hooks/useTenantRoles";
+import { useRoleBranchModalScopeKey } from "./hooks/useRoleBranchModalScopeKey";
 
 export default function TenantRolesPage() {
+  const scopeKey = useRoleBranchModalScopeKey(null, true);
+  return <TenantRolesContent key={scopeKey} />;
+}
+
+function TenantRolesContent() {
   const screen = useTenantRoles();
   const { t, lang } = screen;
   const copy = t.coreIdentity.roles;
   const describeError = useCoreErrorText();
   const mutationText = describeError(screen.mutationError);
+  const blockerText =
+    describeError(screen.blockerError) ?? t.coreIdentity.errors.ROLE_IN_USE;
 
-  const columns: ColumnDef<TenantRole>[] = [
-    {
-      id: "name",
-      sortable: true,
-      header: copy.name,
-      cell: (role) => (
-        <div className="flex items-center gap-1.5">
-          <Link
-            href={`${TENANT_ROUTES.coreRoles}/${role.id}`}
-            className="font-medium text-foreground hover:underline"
-          >
-            {localizedValue(role.nameAr, role.nameEn, lang)}
-          </Link>
-          {role.isSystem ? <Badge tone="brand">{copy.systemRole}</Badge> : null}
-        </div>
-      ),
-    },
-    {
-      id: "description",
-      header: copy.description,
-      cell: (role) => localizedValue(role.descriptionAr, role.descriptionEn, lang),
-    },
-    ...(screen.canDelete
-      ? [
-          {
-            id: "actions",
-            header: t.common.actions,
-            align: "end" as const,
-            sticky: "end" as const,
-            cell: (role: TenantRole) =>
-              role.isSystem ? (
-                <span className="text-2xs text-muted-foreground">{copy.readOnly}</span>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => screen.requestDelete(role)}
-                  aria-label={`${t.common.delete}: ${localizedValue(role.nameAr, role.nameEn, lang)}`}
-                >
-                  <Trash2 className="size-4 text-destructive" aria-hidden="true" />
-                </Button>
-              ),
-          },
-        ]
-      : []),
-  ];
+  const columns = useRoleColumns({
+    canUpdate: screen.canUpdate,
+    canDelete: screen.canDelete,
+    canAssignBranchPermissions: screen.canAssignBranchPermissions,
+    canViewBranchPermissions: screen.canViewBranchPermissions,
+    roleBranchSummaries: screen.roleBranchSummaries,
+    onAssignPermissions: screen.openAssignPermissions,
+    onInspectSystemRole: screen.openSystemRoleDialog,
+    onEdit: screen.startEdit,
+    onDelete: screen.requestDelete,
+  });
 
   return (
-    <PermissionGate require="roles.role.read">
-      <div className="flex flex-col gap-4">
-        <PageHeader className="sr-only"
+    <PermissionGate require="roles.role.read" denied={screen.queryError?.status === 403}>
+      <div className="flex min-w-0 flex-col gap-3 px-2 pb-4 pt-0 sm:px-5 sm:pb-5">
+        <PageHeader
+          className="sr-only p-0"
           title={copy.title}
-          description={copy.subtitle}
           primaryAction={
-            screen.canCreate ? { label: copy.create, onClick: screen.openCreate } : undefined
+            screen.canCreate
+              ? {
+                  label: copy.create,
+                  icon: <Plus className="size-4" aria-hidden="true" />,
+                  onClick: screen.openCreate,
+                }
+              : undefined
           }
           secondaryActions={
             <Button size="sm" variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
@@ -91,87 +75,93 @@ export default function TenantRolesPage() {
                 className={`size-4 ${screen.isLoading ? "animate-spin" : ""}`}
                 aria-hidden="true"
               />
-              {t.common.retry}
+              {t.coreIdentity.actions.refresh}
             </Button>
           }
         />
 
-        <SubNav items={CORE_IDENTITY_NAV_ITEMS} />
-
-        <FilterBar
-          filters={[
-            {
-              id: "isSystem",
-              kind: "select",
-              label: copy.systemFilter,
-              options: [
-                { value: "true", label: copy.systemOnly },
-                { value: "false", label: copy.customOnly },
-              ],
-              placeholder: copy.allRoles,
-            },
-          ]}
-          values={
-            screen.isSystemFilter === undefined
-              ? {}
-              : { isSystem: { kind: "select", value: String(screen.isSystemFilter) } }
-          }
-          onChange={(next) => {
-            const value = next.isSystem;
-            if (value?.kind !== "select") {
-              screen.setIsSystemFilter(undefined);
-              return;
+        <Card className="min-w-0 overflow-hidden p-0">
+          <FilterBar
+            placement="inline"
+            className="border-b border-border p-4"
+            trailing={
+              <DataTableSort
+                columns={columns}
+                value={screen.sort}
+                onChange={screen.setSort}
+                labels={{
+                  label: t.coreIdentity.sortBy,
+                  ascending: t.views.sortAscending,
+                  descending: t.views.sortDescending,
+                }}
+              />
             }
-            screen.setIsSystemFilter(value.value === "true" ? true : value.value === "false" ? false : undefined);
-          }}
-          onReset={() => screen.setIsSystemFilter(undefined)}
-          searchValue={screen.searchQuery}
-          onSearchChange={screen.setSearchQuery}
-          searchPlaceholder={copy.searchPlaceholder}
-          filtersLabel={t.filters.label}
-          clearAllLabel={t.filters.clearAll}
-        />
+            filters={screen.filterDefs}
+            values={screen.filterValues}
+            onChange={screen.handleFilterChange}
+            onReset={screen.resetFilters}
+            searchValue={screen.searchQuery}
+            onSearchChange={screen.setSearchQuery}
+            searchPlaceholder={copy.searchPlaceholder}
+            filtersLabel={t.filters.label}
+            clearAllLabel={t.filters.clearAll}
+          />
 
-        {mutationText && !screen.isCreateOpen ? (
-          <p
-            role="alert"
-            className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
-          >
-            {mutationText}
-          </p>
-        ) : null}
+          {screen.hasSystemRow ? (
+            <p
+              role="status"
+              className="flex items-center gap-2 border-b border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground"
+            >
+              <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+              <span>{t.coreIdentity.errors.ROLE_IS_SYSTEM}</span>
+            </p>
+          ) : null}
 
-        <DataTable
-          columns={columns}
-          rows={screen.rows}
-          isLoading={screen.isLoading}
-          error={screen.queryError}
-          onRetry={screen.reload}
-          page={screen.pageInfo}
-          onPageChange={screen.setPage}
-          sort={screen.sort}
-          onSortChange={screen.setSort}
-          rowKey={(role) => role.id}
-          labels={{
-            retry: t.common.retry,
-            errorTitle: copy.loadFailed,
-            emptyTitle: copy.empty,
-            selectAll: t.views.selectAll,
-            selectRow: t.views.selectItem,
-            sortAscending: t.views.sortAscending,
-            sortDescending: t.views.sortDescending,
-            notSorted: t.views.notSorted,
-            pagination: {
-              previous: t.common.previousPage,
-              next: t.common.nextPage,
-              summary: (from, to, total) =>
-                formatTemplate(t.common.showingOf, { from, to, total }),
-            },
-          }}
-        />
+          {mutationText && !screen.isModalOpen ? (
+            <p
+              role="alert"
+              className="border-b border-border bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
+            >
+              {mutationText}
+            </p>
+          ) : null}
 
-        <RoleFormDrawer
-          key={screen.isCreateOpen ? "open" : "closed"}
+          <TooltipProvider>
+            <DataTable
+              surface="embedded"
+              columns={columns}
+              rows={screen.rows}
+              isLoading={screen.isLoading}
+              error={screen.queryError}
+              onRetry={screen.reload}
+              page={screen.pageInfo}
+              onPageChange={screen.setPage}
+              sort={screen.sort}
+              onSortChange={screen.setSort}
+              rowKey={(role) => role.id}
+              labels={{
+                retry: t.common.retry,
+                errorTitle: copy.loadFailed,
+                emptyTitle: copy.empty,
+                selectAll: t.views.selectAll,
+                selectRow: t.views.selectItem,
+                sortAscending: t.views.sortAscending,
+                sortDescending: t.views.sortDescending,
+                notSorted: t.views.notSorted,
+                pagination: {
+                  previous: t.common.previousPage,
+                  next: t.common.nextPage,
+                  summary: (from, to, total) =>
+                    formatTemplate(t.common.showingOf, { from, to, total }),
+                },
+              }}
+            />
+          </TooltipProvider>
+        </Card>
+
+        <RoleFormModal
+          key={screen.isCreateOpen ? "role-create-open" : "role-create-closed"}
+          mode="create"
           isOpen={screen.isCreateOpen}
           initial={{ name: "", description: "" }}
           title={copy.createTitle}
@@ -182,21 +172,118 @@ export default function TenantRolesPage() {
           error={screen.isCreateOpen ? mutationText : undefined}
         />
 
+        <RoleFormModal
+          key={screen.editingRole ? `role-edit-${screen.editingRole.id}` : "role-edit-closed"}
+          mode="edit"
+          isOpen={screen.editingRole !== null}
+          initial={{
+            name: screen.editingRole?.name ?? "",
+            description: screen.editingRole
+              ? localizedValue(
+                  screen.editingRole.descriptionAr,
+                  screen.editingRole.descriptionEn,
+                  lang,
+                )
+              : "",
+          }}
+          title={copy.renameTitle}
+          description={copy.renameDescription}
+          onClose={screen.closeEdit}
+          onSubmit={screen.handleUpdate}
+          isSubmitting={screen.isSubmitting}
+          error={screen.editingRole ? mutationText : undefined}
+        />
+
+        <RoleCreatedDialog
+          open={screen.createdRole !== null}
+          roleName={
+            screen.createdRole
+              ? localizedValue(screen.createdRole.nameAr, screen.createdRole.nameEn, lang)
+              : ""
+          }
+          canAssign={screen.canAssignBranchPermissions}
+          t={t}
+          onAssign={screen.assignCreatedRolePermissions}
+          onClose={screen.closeCreatedRole}
+        />
+
+        <SystemRoleProtectedDialog
+          open={screen.systemDialogRole !== null}
+          roleName={
+            screen.systemDialogRole
+              ? localizedValue(
+                  screen.systemDialogRole.nameAr,
+                  screen.systemDialogRole.nameEn,
+                  lang,
+                )
+              : ""
+          }
+          t={t}
+          onViewPermissions={screen.viewSystemRolePermissions}
+          onClose={screen.closeSystemRoleDialog}
+        />
+
+        <RoleBranchPermissionsModal
+          key={
+            screen.branchModalTarget
+              ? `role-branch-${screen.branchModalTarget.roleId}-${screen.branchModalTarget.session}`
+              : "role-branch-closed"
+          }
+          open={screen.branchModalTarget !== null}
+          roleId={screen.branchModalTarget?.roleId ?? null}
+          roleDisplayName={screen.branchModalTarget?.roleName ?? ""}
+          isSystemHint={screen.branchModalTarget?.isSystem ?? false}
+          initialMode={screen.branchModalTarget?.mode ?? "view"}
+          onClose={screen.closeBranchModal}
+          onSaved={screen.handleBranchPermissionsSaved}
+        />
+
+        <RolePermissionsSavedDialog
+          open={screen.savedReceipt !== null}
+          roleName={screen.savedReceipt?.roleName ?? ""}
+          summaryLines={screen.savedReceipt?.lines ?? []}
+          t={t}
+          onViewPermissions={screen.viewSavedPermissions}
+          onClose={screen.closeSavedReceipt}
+        />
+
         <ConfirmActionModal
           open={screen.pendingDelete !== null}
-          onOpenChange={(open) => {
-            if (!open) screen.cancelDelete();
-          }}
+          onOpenChange={screen.handleDeleteOpenChange}
           title={copy.deleteTitle}
           description={formatTemplate(copy.deleteMessage, {
             name: screen.pendingDelete
               ? localizedValue(screen.pendingDelete.nameAr, screen.pendingDelete.nameEn, lang)
               : "",
           })}
-          confirmLabel={t.common.delete}
+          confirmLabel={t.coreIdentity.actions.delete}
           cancelLabel={t.common.cancel}
-          onConfirm={() => void screen.handleDelete()}
+          onConfirm={screen.confirmDelete}
           loading={screen.isSubmitting}
+        />
+
+        <DeletionBlockerDialog
+          open={screen.blockedRole !== null}
+          onOpenChange={screen.handleBlockerOpenChange}
+          recordName={
+            screen.blockedRole
+              ? localizedValue(screen.blockedRole.nameAr, screen.blockedRole.nameEn, lang)
+              : ""
+          }
+          blockers={[
+            {
+              id: "role-in-use",
+              label: blockerText,
+              href: screen.canReadUsers ? TENANT_ROUTES.coreUsers : undefined,
+            },
+          ]}
+          labels={{
+            title: t.deletionBlocker.title,
+            description: t.deletionBlocker.description,
+            blockersHeading: t.deletionBlocker.blockersHeading,
+            view: t.deletionBlocker.view,
+            close: t.deletionBlocker.close,
+          }}
         />
       </div>
     </PermissionGate>

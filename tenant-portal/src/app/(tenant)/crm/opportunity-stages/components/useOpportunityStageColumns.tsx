@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Pencil, Trash2 } from "lucide-react";
+import { Eye, Lock, Pencil, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -11,13 +11,14 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { alternateName, localizedName } from "@/lib/format/localized";
+import { localizedName } from "@/lib/format/localized";
 import type { OpportunityStageDefinition } from "../../pipelines/pipeline-contract";
 
 interface OpportunityStageColumnOptions {
   canManage: boolean;
   pendingId: string | null;
   onEdit: (stage: OpportunityStageDefinition) => void;
+  onView: (stage: OpportunityStageDefinition) => void;
   onDelete: (stage: OpportunityStageDefinition) => void;
 }
 
@@ -25,23 +26,24 @@ export function useOpportunityStageColumns({
   canManage,
   pendingId,
   onEdit,
+  onView,
   onDelete,
 }: OpportunityStageColumnOptions): ColumnDef<OpportunityStageDefinition>[] {
   const { t, lang } = useI18n();
 
   const columns: ColumnDef<OpportunityStageDefinition>[] = [
     {
-      id: "name",
-      header: t.crmOpportunityStages.name,
+      id: "nameAr",
+      header: t.crmLeadStages.arabicName,
       cell: (stage) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-foreground">
-            {localizedName(stage, lang)}
-          </p>
-          <p className="truncate text-2xs text-muted-foreground">
-            {alternateName(stage, lang)}
-          </p>
-        </div>
+        <bdi dir="rtl" className="block min-w-32 whitespace-normal break-words text-start font-normal text-foreground">{stage.nameAr}</bdi>
+      ),
+    },
+    {
+      id: "nameEn",
+      header: t.crmLeadStages.englishName,
+      cell: (stage) => (
+        <bdi dir="ltr" className="block min-w-32 whitespace-normal break-words text-start font-normal text-foreground">{stage.nameEn}</bdi>
       ),
     },
     {
@@ -77,8 +79,6 @@ export function useOpportunityStageColumns({
     },
   ];
 
-  if (!canManage) return columns;
-
   return [
     ...columns,
     {
@@ -88,11 +88,14 @@ export function useOpportunityStageColumns({
       sticky: "end",
       cell: (stage) => (
         <div className="flex items-center justify-end gap-1">
-          <Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" className="size-8 p-0" disabled={pendingId !== null} aria-label={`${t.crmOpportunityStages.viewDetails}: ${localizedName(stage, lang)}`} onClick={(event) => { event.stopPropagation(); onView(stage); }}><Eye className="size-4" aria-hidden="true" /></Button></TooltipTrigger><TooltipContent>{t.crmOpportunityStages.summaryTitle}</TooltipContent></Tooltip>
+          {canManage && <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
+                className="size-8 p-0"
+                disabled={pendingId !== null}
                 aria-label={`${t.crmOpportunityStages.edit}: ${localizedName(stage, lang)}`}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -103,16 +106,17 @@ export function useOpportunityStageColumns({
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t.crmOpportunityStages.edit}</TooltipContent>
-          </Tooltip>
+          </Tooltip>}
           {/* A system stage cannot be deleted at all, so the control is
               absent rather than disabled — a dead tab stop that can never be
               enabled is an information leak, not an affordance. */}
-          {stage.isSystem ? null : (
+          {canManage && !stage.isSystem ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
+                  className="size-8 p-0"
                   disabled={pendingId !== null}
                   aria-label={`${t.common.delete}: ${localizedName(stage, lang)}`}
                   onClick={(event) => {
@@ -125,7 +129,7 @@ export function useOpportunityStageColumns({
               </TooltipTrigger>
               <TooltipContent>{t.common.delete}</TooltipContent>
             </Tooltip>
-          )}
+          ) : null}
         </div>
       ),
     },

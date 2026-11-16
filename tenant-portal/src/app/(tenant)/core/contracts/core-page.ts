@@ -1,6 +1,6 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
-// Shared response primitives for every Core identity screen under
+// Shared response primitives for Core identity and settings screens under
 // `app/(tenant)/core/`.
 //
 // This sits at the Core segment root rather than inside one screen because
@@ -124,10 +124,21 @@ function safeInteger(
 /**
  * Validates the `meta` half of a Core paginated envelope and re-derives every
  * field the server claims, so an inconsistent page cannot drive the pager.
+ *
+ * Out-of-range pages (`page > totalPages`) are accepted ONLY when `data` is
+ * empty (`itemCount === 0`) so callers can recover after deletions or filter
+ * changes; `page > totalPages` with non-empty items is rejected.
+ *
+ * Core currently emits two proven `hasPrev` variants ONLY when `total === 0` and
+ * `page > 1`:
+ * - `BaseRepository.envelope` (`shared-libs/packages/database/src/repositories/base.repository.ts`): `hasPrev = page > 1` (`true`)
+ * - `emptyPage` (`shared-libs/packages/database/src/query-engine/query-result.helpers.ts`, used on empty company/branch scopes): `hasPrev = false`
+ * Both return `false` on `page === 1`, and `total > 0` always goes through
+ * `BaseRepository.envelope` (`hasPrev = page > 1`).
  */
 export function parseCorePageMeta(payload: unknown, itemCount: number): CorePageMeta {
   const meta = record(payload);
-  if (!meta) invalidCoreResponse();
+  if (!meta || !Number.isSafeInteger(itemCount) || itemCount < 0) invalidCoreResponse();
 
   const page = safeInteger(meta, "page", 1);
   const limit = safeInteger(meta, "limit", 1);
@@ -135,14 +146,16 @@ export function parseCorePageMeta(payload: unknown, itemCount: number): CorePage
   const totalPages = safeInteger(meta, "totalPages", 0);
   const hasNext = requiredBoolean(meta, "hasNext");
   const hasPrev = requiredBoolean(meta, "hasPrev");
+  const validHasPrev = page === 1 ? !hasPrev : total === 0 || hasPrev;
 
   if (
     limit > CORE_MAX_PAGE_LIMIT ||
     itemCount > limit ||
     itemCount > total ||
+    (page > totalPages && itemCount > 0) ||
     totalPages !== (total === 0 ? 0 : Math.ceil(total / limit)) ||
     hasNext !== (page < totalPages) ||
-    hasPrev !== (page > 1 && totalPages > 0)
+    !validHasPrev
   ) {
     invalidCoreResponse();
   }

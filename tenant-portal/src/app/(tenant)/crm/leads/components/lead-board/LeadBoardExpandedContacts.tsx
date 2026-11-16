@@ -10,28 +10,10 @@ export function LeadBoardExpandedContacts({ lead, details }: {
   lead: LeadItem; details: ReturnType<typeof useLeadBoardExpandedCard>;
 }) {
   const { t } = useI18n();
-  const { isCompany, title, contactName, individualPhones, companyPhones,
+  const { isCompany, title, contactName, companyPhones,
     hasMultipleCorporateContacts, corporateContacts, singleCorporateContact,
     singleCorporateContactPhones } = details;
-  return <>
-    {!isCompany ? (
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted-foreground">
-          {t.crmLeads.executive.phoneNumbers}
-        </span>
-        {individualPhones.length > 0 ? (
-          individualPhones.map((ph, idx) => (
-            <LeadPhoneActionsRow compact
-              key={`ind-ph-${idx}-${ph}`}
-              phone={ph}
-              country={lead.country}
-            />
-          ))
-        ) : (
-          <LeadPhoneActionsRow compact phone="" country={lead.country} />
-        )}
-      </div>
-    ) : (
+  return isCompany ? (
       <>
         <div className="flex flex-col gap-1.5">
           <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -119,7 +101,5 @@ export function LeadBoardExpandedContacts({ lead, details }: {
           </div>
         )}
       </>
-    )}
-
-  </>;
+  ) : null;
 }

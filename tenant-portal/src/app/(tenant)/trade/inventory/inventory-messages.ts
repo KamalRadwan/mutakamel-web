@@ -72,6 +72,8 @@ export function inventoryMessage(
 export function inventoryFormMessage(error: unknown, t: Dictionary): string {
   const reason = error instanceof Error ? error.message : "";
   switch (reason) {
+    case "INVENTORY_UNRESOLVED_WRITE":
+      return t.tradeInventory.unresolvedWrite;
     case "INVENTORY_FORM_NODE":
       return t.tradeInventory.formNodeInvalid;
     case "INVENTORY_FORM_ITEM":

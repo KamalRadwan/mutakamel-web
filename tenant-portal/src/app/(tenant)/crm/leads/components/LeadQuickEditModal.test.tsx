@@ -295,6 +295,29 @@ afterEach(() => {
 });
 
 describe("LeadQuickEditModal — Dossier 360° Redesign", () => {
+  it.each(["javascript:alert(1)", "httpx:foo"])("renders stored website %s without an anchor", async (companyWebsite) => {
+    vi.mocked(axiosClient.get).mockResolvedValueOnce(detailResponse({ ...CORPORATE_DETAIL, companyWebsite }));
+    renderQuickEdit();
+    expect((await screen.findByText(companyWebsite)).closest("a")).toBeNull();
+  });
+
+  it.each(["en", "ar"] as const)("shows an inline website error without saving in %s", async (lang) => {
+    locale.lang = lang;
+    const copy = dictionaries[lang];
+    const { props } = renderQuickEdit();
+    fireEvent.click(await screen.findByRole("button", { name: new RegExp(copy.crmLeads.executive.editCompany) }));
+    const website = screen.getByLabelText<HTMLInputElement>("Company Website");
+    fireEvent.change(website, { target: { value: "javascript:alert(1)" } });
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(copy.crmLeads.executive.saveCompany) }));
+    expect(await screen.findByText(copy.crmShared.fieldUrl)).toBeTruthy();
+    expect(website).toHaveAttribute("aria-invalid", "true");
+    expect(website).toHaveAttribute("aria-describedby", "corp-website-error");
+    expect(website).toHaveValue("javascript:alert(1)");
+    expect(props.onSave).not.toHaveBeenCalled();
+    fireEvent.change(website, { target: { value: "example.com" } });
+    expect(screen.queryByText(copy.crmShared.fieldUrl)).toBeNull();
+  });
+
   it.each(["en", "ar"] as const)("localizes section headings and color accessible names (%s)", async (lang) => {
     locale.lang = lang;
     renderQuickEdit();

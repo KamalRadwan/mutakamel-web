@@ -22,7 +22,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
  * changes how the screen is drawn rather than what it holds; keeping it at a
  * fixed edge means it does not move as a screen gains or loses actions.
  */
-export type PageActionSlot = "primary" | "related" | "actions" | "search" | "view";
+export type PageActionSlot = "primary" | "crumb" | "related" | "actions" | "search" | "view";
 
 type SlotNodes = Record<PageActionSlot, HTMLElement | null>;
 
@@ -44,6 +44,7 @@ interface PageActionSlotsValue {
 
 const EMPTY_NODES: SlotNodes = {
   primary: null,
+  crumb: null,
   related: null,
   actions: null,
   search: null,

@@ -81,25 +81,6 @@ export interface OpportunityCommercialFields {
   probabilityPercent: number | null;
 }
 
-interface OpportunityStageSnapshot {
-  pipelineNameAr: string | null;
-  pipelineNameEn: string | null;
-  stageNameAr: string | null;
-  stageNameEn: string | null;
-  flag: StageFlag | null;
-}
-
-export interface OpportunityStageHistoryEntry {
-  id: string;
-  fromStatus: OpportunityStatus | null;
-  toStatus: OpportunityStatus | null;
-  changedAt: string | null;
-  changedByUserId: string | null;
-  reason: string | null;
-  fromStageSnapshot: OpportunityStageSnapshot | null;
-  toStageSnapshot: OpportunityStageSnapshot | null;
-}
-
 function invalid(): never {
   throw new Error("Invalid opportunity response.");
 }
@@ -198,73 +179,9 @@ export function parseOpportunityDetailResponse(
   };
 }
 
-const MAX_STAGE_HISTORY_ROWS = 100;
-
-export interface OpportunityStageHistoryPage {
-  items: OpportunityStageHistoryEntry[];
-  nextCursor: string | null;
-}
-
-function parseStageSnapshot(value: unknown): OpportunityStageSnapshot | null {
-  const snapshot = record(value);
-  if (!snapshot) return null;
-  return {
-    pipelineNameAr: nullableText(snapshot.pipelineNameAr),
-    pipelineNameEn: nullableText(snapshot.pipelineNameEn),
-    stageNameAr: nullableText(snapshot.stageNameAr),
-    stageNameEn: nullableText(snapshot.stageNameEn),
-    flag: isMember(STAGE_FLAGS, snapshot.flag) ? snapshot.flag : null,
-  };
-}
-
-/**
- * `GET /:id/stage-history` — a cursor page ordered by changedAt,id descending.
- *
- * The order is preserved exactly: re-sorting here
- * would silently disagree with the server on rows that share a timestamp.
- *
- * Restricted pipeline sides have null snapshots and stage IDs.
- */
-export function parseOpportunityStageHistory(
-  payload: unknown,
-): OpportunityStageHistoryPage {
-  const page = record(payload);
-  if (!page || !Array.isArray(page.items) || page.items.length > MAX_STAGE_HISTORY_ROWS
-    || (page.nextCursor !== null && (typeof page.nextCursor !== "string"
-      || !/^[A-Za-z0-9_-]{1,256}$/.test(page.nextCursor)))
-    || (page.items.length === 0 && page.nextCursor !== null)) {
-    invalid();
-  }
-  const items = page.items.map((entry) => {
-    const row = record(entry);
-    if (!row || !isUUIDv7(row.id)) invalid();
-    return {
-      id: row.id,
-      fromStatus: isMember(OPPORTUNITY_STATUSES, row.fromStatus)
-        ? row.fromStatus
-        : null,
-      toStatus: isMember(OPPORTUNITY_STATUSES, row.toStatus)
-        ? row.toStatus
-        : null,
-      changedAt: nullableText(row.changedAt) ?? nullableText(row.createdAt),
-      changedByUserId: nullableUuid(row.changedByUserId),
-      reason: nullableText(row.reason),
-      fromStageSnapshot: parseStageSnapshot(row.fromStageSnapshot),
-      toStageSnapshot: parseStageSnapshot(row.toStageSnapshot),
-    };
-  });
-  if (new Set(items.map(({ id }) => id)).size !== items.length) invalid();
-  return { items, nextCursor: page.nextCursor as string | null };
-}
-
 export function opportunityPath(id: string): string {
   if (!isUUIDv7(id)) throw new Error("Invalid opportunity id.");
   return `${OPPORTUNITIES_PATH}/${encodeURIComponent(id)}`;
-}
-
-export function opportunityStageHistoryPath(id: string, cursor?: string | null): string {
-  const path = `${opportunityPath(id)}/stage-history`;
-  return cursor ? `${path}?cursor=${encodeURIComponent(cursor)}` : path;
 }
 
 export function opportunityPipelinePath(id: string): string {

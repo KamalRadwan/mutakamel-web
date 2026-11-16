@@ -10,7 +10,9 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { applicationsApi } from "@/features/admin/applications/api/applications.api";
+import { MAX_BULK_APPLICATION_BIND_SERVERS } from "../lib/application-database-bind.constants";
 import type {
   ApplicationDatabaseServerBindReceipt,
   ApplicationDatabaseServerCandidateView,
@@ -37,10 +39,11 @@ type BindFn = (
 vi.mock("@/features/admin/applications/api/applications.api", () => ({
   applicationsApi: { listBindableDatabaseServers: vi.fn() },
 }));
-vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
-  useOptionalI18n: () => ({ lang: "en", dir: "ltr", t: en }),
-}));
+const locale = vi.hoisted(() => ({ lang: "en" as "ar" | "en" }));
+vi.mock("@/i18n/I18nContext", () => {
+  const value = () => ({ lang: locale.lang, dir: locale.lang === "ar" ? "rtl" : "ltr", t: locale.lang === "ar" ? ar : en });
+  return { useI18n: value, useOptionalI18n: value };
+});
 
 const publishActivateCopy = en.applications.detail.publishActivate;
 const bindCopy = en.applications.detail.databaseBind;
@@ -126,6 +129,7 @@ function receipt(
 
 afterEach(() => {
   cleanup();
+  locale.lang = "en";
   vi.clearAllMocks();
 });
 
@@ -223,7 +227,7 @@ describe("ApplicationPublishActivateDialog (step 1)", () => {
     submitWithReason();
 
     expect(
-      await screen.findByText("APPLICATION_CATALOGUE_REVISION_STALE"),
+      await screen.findByText(/The catalogue changed/),
     ).toBeTruthy();
     expect(onActivate).not.toHaveBeenCalled();
     expect(
@@ -312,6 +316,63 @@ describe("ApplicationDatabaseBindDialog (step 2)", () => {
     });
   }
 
+  it.each(["en", "ar"] as const)("caps a 30-server fleet and blocks manual overflow in %s", async (lang) => {
+    locale.lang = lang;
+    const copy = (lang === "ar" ? ar : en).applications.detail.databaseBind;
+    const servers = Array.from({ length: 30 }, (_, index) => candidate(
+      `01900000-0000-7000-8000-${String(index + 1).padStart(12, "0")}`,
+      { name: `fleet-server-${index + 1}` },
+    ));
+    listCandidates.mockResolvedValue(fleet(servers));
+    const { onBind } = renderDialog();
+    await fillReason();
+    expect(screen.getAllByRole("checkbox", { checked: true })).toHaveLength(MAX_BULK_APPLICATION_BIND_SERVERS);
+    fireEvent.click(screen.getByRole("button", { name: copy.clear }));
+    expect(screen.queryAllByRole("checkbox", { checked: true })).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: copy.selectAll }));
+    expect(screen.getAllByRole("checkbox", { checked: true })).toHaveLength(MAX_BULK_APPLICATION_BIND_SERVERS);
+    fireEvent.click(screen.getAllByRole("checkbox")[MAX_BULK_APPLICATION_BIND_SERVERS]!);
+    const confirm = screen.getByRole("button", { name: copy.confirm });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(copy.batchHint.replace("{{count}}", String(MAX_BULK_APPLICATION_BIND_SERVERS)))).toBeTruthy();
+    // Form submission must enforce the limit even when the button is bypassed.
+    fireEvent.submit(confirm.closest("form")!);
+    expect(onBind).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: copy.selectAll }));
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onBind).toHaveBeenCalledTimes(1));
+    expect(onBind.mock.calls[0]?.[0].databaseServerIds).toEqual(
+      servers.slice(0, MAX_BULK_APPLICATION_BIND_SERVERS).map((server) => server.databaseServerId),
+    );
+  });
+
+  it("caps retry-failed even if a receipt contains more failures than the current limit", async () => {
+    const servers = Array.from({ length: 30 }, (_, index) => candidate(
+      `01900000-0000-7000-8000-${String(index + 1).padStart(12, "0")}`,
+    ));
+    listCandidates.mockResolvedValue(fleet(servers));
+    const onBind = vi.fn<BindFn>()
+      .mockResolvedValueOnce(receipt({
+        requested: 30, failed: 30,
+        results: servers.map((server) => ({
+          databaseServerId: server.databaseServerId, databaseServerName: server.name,
+          outcome: "FAILED", databasePrincipal: null, credentialRevision: null,
+          bindingStatus: "PENDING", code: "DB_SERVER_APPLICATION_BIND_DEFERRED", message: null,
+        })),
+      }))
+      .mockResolvedValueOnce(receipt());
+    renderDialog(onBind);
+    await fillReason();
+    fireEvent.click(screen.getByRole("button", { name: bindCopy.confirm }));
+    const retry = await screen.findByRole("button", { name: bindCopy.retryFailed });
+    await waitFor(() => expect((retry as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(retry);
+    await waitFor(() => expect(onBind).toHaveBeenCalledTimes(2));
+    expect(onBind.mock.calls[1]?.[0].databaseServerIds).toEqual(
+      servers.slice(0, MAX_BULK_APPLICATION_BIND_SERVERS).map((server) => server.databaseServerId),
+    );
+  });
+
   it("pre-selects every bindable server and submits the fleet revisions", async () => {
     const { onBind } = renderDialog();
 
@@ -329,6 +390,24 @@ describe("ApplicationDatabaseBindDialog (step 2)", () => {
       expectedPolicyRevision: "2",
       reason: "Roll CRM out to the Cairo fleet",
     });
+  });
+
+  it("shows Arabic recovery copy and the LTR code for a FAILED bind receipt", async () => {
+    locale.lang = "ar";
+    const code = "DB_SERVER_APPLICATION_BOOTSTRAP_FAILED";
+    renderDialog(vi.fn<BindFn>(async () => receipt({
+      requested: 1, failed: 1,
+      results: [{
+        databaseServerId: SERVER_ONE, databaseServerName: "failed-server",
+        outcome: "FAILED", databasePrincipal: null, credentialRevision: null,
+        bindingStatus: "FAILED", code, message: "English backend failure",
+      }],
+    })));
+    await fillReason();
+    fireEvent.click(screen.getByRole("button", { name: ar.applications.detail.databaseBind.confirm }));
+    const message = await screen.findByText((text) => text.includes(ar.applications.errors[code]));
+    expect(message.textContent).toContain(`\u2066${code}\u2069`);
+    expect(screen.queryByText("English backend failure")).toBeNull();
   });
 
   it("leaves an already-bound server out of the selection and marks it", async () => {
@@ -430,10 +509,10 @@ describe("ApplicationDatabaseBindDialog (step 2)", () => {
       ),
     ).toBeTruthy();
     expect(
-      within(outcomes).getByText("An operational dependency is unavailable."),
+      within(outcomes).getByText(/An operational dependency is unavailable\./),
     ).toBeTruthy();
     expect(
-      within(outcomes).getByText("DB_SERVER_APPLICATION_NETWORK_FAILED"),
+      within(outcomes).getByText(/DB_SERVER_APPLICATION_NETWORK_FAILED/),
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: bindCopy.retryFailed }));

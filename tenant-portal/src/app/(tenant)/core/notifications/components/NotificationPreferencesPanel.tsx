@@ -15,11 +15,13 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import type { NotificationChannel } from "../notification-contract";
 import { useNotificationPreferences } from "../hooks/useNotificationPreferences";
+import { useCoreErrorText } from "../../hooks/useCoreErrorText";
 
 const CHANNELS: readonly NotificationChannel[] = ["inApp"];
 
 export function NotificationPreferencesPanel() {
   const { t } = useI18n();
+  const describeError = useCoreErrorText();
   const {
     canRead,
     canManage,
@@ -56,7 +58,7 @@ export function NotificationPreferencesPanel() {
         {error ? (
           <ErrorState
             title={t.coreNotifications.preferencesLoadFailed}
-            description={error.message}
+            description={describeError(error)}
             onRetry={() => void reload()}
             retryLabel={t.common.retry}
           />

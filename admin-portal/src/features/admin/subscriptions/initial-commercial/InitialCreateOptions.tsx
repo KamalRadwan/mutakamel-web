@@ -3,11 +3,14 @@ import { Button, Field, Select, SelectContent, SelectItem, SelectTrigger, Select
 import type { InitialCommercialCopy } from "./initial-commercial-copy";
 import type { InitialCommercialTerms } from "./initial-commercial-request";
 import { useInitialCreateOptions } from "./hooks/useInitialCreateOptions";
+import { useI18n } from "@/i18n/I18nContext";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 
 export function InitialCreateOptions({ scope, terms, onChange, locked, maxApplications, copy }: {
   scope: string; terms: InitialCommercialTerms; onChange: (next: InitialCommercialTerms) => void;
   locked: boolean; maxApplications: number; copy: InitialCommercialCopy;
 }) {
+  const { lang } = useI18n();
   const { errorRef, ...state } = useInitialCreateOptions(scope, terms, onChange, locked, maxApplications);
   return <section aria-label={copy.options} aria-busy={state.loading} className="min-w-0 space-y-3 rounded-md border border-border p-3">
     <h3 className="text-sm font-semibold">{copy.options}</h3><p className="text-xs text-muted-foreground">{copy.optionsBoundary}</p>
@@ -15,7 +18,7 @@ export function InitialCreateOptions({ scope, terms, onChange, locked, maxApplic
       <Button type="button" variant="outline" size="sm" disabled={locked || state.loading} loading={state.loading} onClick={() => void state.load()}>{copy.loadOptions}</Button>}
     {state.loading && <p role="status" className="text-sm">{copy.loadingOptions}</p>}
     {state.error && <div ref={errorRef} tabIndex={-1} role="alert" className="space-y-1 rounded-md border border-destructive p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <p>{copy.failure}</p><p>{state.error.message}</p><p className="break-all font-mono text-xs" dir="ltr">{state.error.errorCode} {state.error.correlationId}</p></div>}
+      <p>{copy.failure}</p><p>{getLocalizedApiErrorMessage(state.error, lang)}</p><p className="break-all font-mono text-xs" dir="ltr">{state.error.errorCode} {state.error.correlationId}</p></div>}
     {state.value?.applications.length === 0 && <p role="status" className="text-sm">{copy.optionsEmpty}</p>}
     {state.value?.applications.map(application => {
       const selected = terms.applications.find(item => item.applicationId === application.applicationId);

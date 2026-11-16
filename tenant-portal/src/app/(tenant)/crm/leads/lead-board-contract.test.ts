@@ -3,26 +3,20 @@ import { DEFAULT_LEAD_SEARCH } from "./lead-search-contract";
 import {
   buildLeadBoardRequest,
   buildLeadInitialBoardRequest,
-  buildLeadKpisRequest,
   LEAD_BOARD_STAGE_LIMIT,
 } from "./lead-board-contract";
 
 const BRANCH_ID = "01900100-0000-7000-8000-000000000001";
 const ACTOR_ID = "01900100-0000-7000-8000-000000000002";
 describe("Lead board request contract", () => {
-  it.each(["basic", "advanced"] as const)("sends only consumed options for %s board and KPI reads", (mode) => {
+  it.each(["basic", "advanced"] as const)("uses one compiler for initial and paginated %s board reads", (mode) => {
     const search = { ...DEFAULT_LEAD_SEARCH, mode, kpiPreset: "OVERDUE_ACTIVITY" as const };
     const window = { branchId: BRANCH_ID, page: 2, limit: 50, sortBy: "createdAt", sortDir: "DESC" } as const;
     const stage = buildLeadBoardRequest(search, window, ACTOR_ID);
     const initial = buildLeadInitialBoardRequest(search, window, ACTOR_ID);
-    const kpis = buildLeadKpisRequest(search, window, ACTOR_ID);
     expect({ ...initial, page: 2 }).toEqual(stage);
     expect(initial).not.toHaveProperty("page");
-    expect({ ...kpis, page: 2, limit: 50, sort: "createdAt:DESC" }).toEqual(stage);
-    for (const key of ["page", "limit", "sort", "withDeleted", "relations", "select", "addSelect"]) {
-      expect(kpis).not.toHaveProperty(key);
-    }
-    expect(kpis).toHaveProperty("hasOverdueActivity", true);
+    expect(initial).toHaveProperty("hasOverdueActivity", true);
   });
 
   it.each(["basic", "advanced"] as const)("keeps overdue as a sibling filter on both %s board pages", (mode) => {

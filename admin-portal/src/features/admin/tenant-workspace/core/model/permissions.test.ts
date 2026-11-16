@@ -13,7 +13,8 @@ const { allowed, canMock, canAllMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/auth/rbac", () => ({
+vi.mock("@/lib/auth/rbac", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/auth/rbac")>(),
   adminCan: canMock,
   adminCanAll: canAllMock,
 }));

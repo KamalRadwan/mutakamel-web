@@ -327,11 +327,14 @@ export function useUserDetail(id: string) {
 
   useEffect(() => {
     let active = true;
+    // The ref objects are stable; the counters must be bumped as they are at cleanup.
+    const userVersionRef = userReadVersion;
+    const webphoneVersionRef = webphoneReadVersion;
     queueMicrotask(() => { if (active) void loadUser(); });
     return () => {
       active = false;
-      userReadVersion.current++;
-      webphoneReadVersion.current++;
+      userVersionRef.current++;
+      webphoneVersionRef.current++;
     };
   }, [loadUser]);
 

@@ -6,7 +6,8 @@ import {
   acquisitionSourcePath,
   buildCreateAcquisitionSourceRequest,
   classifyIconFile,
-  moveAcquisitionSourceOrder,
+  moveAcquisitionSourceToPosition,
+  applyAcquisitionSourceOrder,
   parseAcquisitionSourceResponse,
   parseAcquisitionSourcesResponse,
   type AcquisitionSource,
@@ -122,13 +123,24 @@ describe("Acquisition-source icon and reorder contract", () => {
     // ReorderAcquisitionSourcesDto plus the service's own check require every
     // non-deleted source exactly once — never a single position delta, and
     // never a filtered subset.
-    expect(moveAcquisitionSourceOrder([third, first, second], second.id, -1)).toEqual([
+    expect(moveAcquisitionSourceToPosition([third, first, second], second.id, 1)).toEqual([
       second.id,
       first.id,
       third.id,
     ]);
-    expect(moveAcquisitionSourceOrder([first, second, third], first.id, -1)).toBeNull();
-    expect(moveAcquisitionSourceOrder([first, second, third], third.id, 1)).toBeNull();
+    expect(moveAcquisitionSourceToPosition([first, second, third], first.id, 3)).toEqual([second.id, third.id, first.id]);
+    expect(moveAcquisitionSourceToPosition([first, second, third], first.id, 0)).toBeNull();
+    expect(moveAcquisitionSourceToPosition([first, second, third], third.id, 4)).toBeNull();
+    expect(moveAcquisitionSourceToPosition([first, second, third], third.id, 1.5)).toBeNull();
+  });
+
+  it("refuses partial, duplicate, foreign and empty full-order sets", () => {
+    const items = [first, second, third];
+    expect(applyAcquisitionSourceOrder(items, [first.id, second.id])).toBeNull();
+    expect(applyAcquisitionSourceOrder(items, [first.id, first.id, third.id])).toBeNull();
+    expect(applyAcquisitionSourceOrder(items, [first.id, second.id, sourceId])).toBeNull();
+    expect(applyAcquisitionSourceOrder([], [])).toBeNull();
+    expect(applyAcquisitionSourceOrder(items, [third.id, first.id, second.id])?.map(({ id, sortOrder }) => [id, sortOrder])).toEqual([[third.id, 1], [first.id, 2], [second.id, 3]]);
   });
 
   it("classifies the three icon failures the route answers separately", () => {
@@ -137,6 +149,9 @@ describe("Acquisition-source icon and reorder contract", () => {
 
     expect(classifyIconFile(file("logo.png", "image/png", 1024))).toBeNull();
     expect(classifyIconFile(file("logo.jpg", "image/jpeg", 1024))).toBeNull();
+    expect(classifyIconFile(file("logo.ico", "", 1024))).toBeNull();
+    expect(classifyIconFile(file("logo.ico", "application/octet-stream", 1024))).toBeNull();
+    expect(classifyIconFile(file("logo.bin", "application/octet-stream", 1024))).toBe("unsupportedType");
     expect(classifyIconFile(file("logo.png", "image/png", 0))).toBe("empty");
     expect(
       classifyIconFile(

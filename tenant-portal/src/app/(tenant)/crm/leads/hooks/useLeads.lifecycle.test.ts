@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TenantApiClientError } from "@/lib/api/axiosClient";
+import { writeTenantBranchSelection } from "@/lib/tenant-branch-selection";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { emptyCreateLeadForm } from "../lead-create-contract";
@@ -91,6 +92,7 @@ function serverError(status: number): TenantApiClientError {
 }
 
 beforeEach(() => {
+  writeTenantBranchSelection(ACTOR, null);
   locale.lang = "en";
   vi.useFakeTimers();
   auth.mockReturnValue({

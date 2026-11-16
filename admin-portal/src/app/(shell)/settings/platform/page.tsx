@@ -20,6 +20,10 @@ export default function PlatformSettingsPage() {
   const support = useSettings("support.");
   const lang = platform.lang;
   const copy = (lang === "ar" ? ar : en).settings.pages.platform;
+  const confirmationCopy = (lang === "ar" ? ar : en).settings.confirmation;
+  const maintenance = platform.settings.find(
+    (setting) => setting.key === "platform.maintenance_mode" && setting.hasPendingChange,
+  );
   const allSettings = [...platform.settings, ...support.settings];
   const loadState = combineSettingsLoadStates([
     platform.loadState,
@@ -72,6 +76,9 @@ export default function PlatformSettingsPage() {
           isSaving={isSaving}
           onSave={saveAll}
           lang={lang}
+          confirmationDescription={maintenance
+            ? maintenance.value ? confirmationCopy.maintenanceOn : confirmationCopy.maintenanceOff
+            : undefined}
         />
         <div className="space-y-3">
           {filteredSettings.length ? (

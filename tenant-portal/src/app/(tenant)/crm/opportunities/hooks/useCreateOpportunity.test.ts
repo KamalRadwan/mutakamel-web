@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readCoreData } from "@/lib/api/envelope";
+import { axiosClient } from "@/lib/api/axiosClient";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { OPPORTUNITIES_PATH } from "../opportunity-contract";
 import type { OpportunityCreateMessages } from "../opportunity-create-validation";
@@ -11,6 +12,7 @@ import { useCreateOpportunity, useOpportunityCurrencyOptions } from "./useCreate
 const auth = vi.hoisted(() => ({ permissions: [] as string[] }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: auth }) }));
 vi.mock("@/lib/api/envelope", () => ({ readCoreData: vi.fn() }));
+vi.mock("@/lib/api/axiosClient", async (original) => ({ ...await original<typeof import("@/lib/api/axiosClient")>(), axiosClient: { get: vi.fn() } }));
 vi.mock("@/lib/api/idempotent-write", () => ({
   createWriteAttempt: vi.fn(), runIdempotentWrite: vi.fn(),
 }));
@@ -22,6 +24,7 @@ const draft = {
   pipelineId: "01900100-0000-7000-8000-000000000002",
   stageId: "01900100-0000-7000-8000-000000000003",
   amount: "12.34",
+  currencyCode: "EGP",
 };
 const messages: OpportunityCreateMessages = {
   required: "Required", email: "Email", maxLength: "Max {max}",
@@ -32,6 +35,7 @@ const messages: OpportunityCreateMessages = {
 beforeEach(() => {
   auth.permissions = [];
   vi.mocked(readCoreData).mockReset();
+  vi.mocked(axiosClient.get).mockReset().mockResolvedValue({ data: [], status: 200, statusText: "OK", headers: new Headers() });
   vi.mocked(createWriteAttempt).mockReset().mockImplementation(() => ({
     idempotencyKey: `01900100-0000-7000-8000-${String(vi.mocked(createWriteAttempt).mock.calls.length).padStart(12, "0")}`,
   }));
@@ -48,11 +52,11 @@ describe("opportunity creation currency", () => {
 
   it("omits untouched currency so CRM resolves the workspace default", async () => {
     const { result } = setup();
-    act(() => result.current.openModal(null, draft));
+    act(() => result.current.openModal(null, { ...draft, amount: "", currencyCode: "" }));
     expect(result.current.form.currencyCode).toBe("");
     await act(async () => { expect(await result.current.submit()).toBe(true); });
     expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({
-      body: expect.objectContaining({ title: draft.title, amount: 12.34 }),
+      body: expect.objectContaining({ title: draft.title }),
     }));
     expect(vi.mocked(runIdempotentWrite).mock.calls[0][0].body).not.toHaveProperty("currencyCode");
   });
@@ -66,6 +70,8 @@ describe("opportunity creation currency", () => {
     }));
     expect(result.current.open).toBe(true);
     expect(result.current.form.currencyCode).toBe("");
+    expect(result.current.form.importance).toBe("0");
+    expect(result.current.isDirty).toBe(false);
     act(() => {
       result.current.setField("title", draft.title);
       result.current.setField("customerProfileId", draft.customerProfileId);
@@ -78,8 +84,40 @@ describe("opportunity creation currency", () => {
     const { result } = setup();
     act(() => result.current.openModal(null, { ...draft, currencyCode: "JPY" }));
     act(() => result.current.closeModal());
-    act(() => result.current.openModal(null, draft));
+    act(() => result.current.openModal(null, { ...draft, currencyCode: "" }));
     expect(result.current.form.currencyCode).toBe("");
+  });
+
+  it("requires explicit currency whenever an amount is entered, including zero", async () => {
+    const { result } = setup();
+    act(() => result.current.openModal(null, { ...draft, amount: "0", currencyCode: "" }));
+    await act(async () => { expect(await result.current.submit()).toBe(false); });
+    expect(result.current.errors.currencyCode).toBe("Required");
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+  });
+
+  it("keeps default zero stars and resolved placement pristine across view changes", () => {
+    const { result } = setup();
+    act(() => result.current.openModal(null, draft));
+    expect(result.current.isDirty).toBe(false);
+    expect(result.current.form.importance).toBe("0");
+    act(() => result.current.setView("full"));
+    expect(result.current.view).toBe("full");
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.setField("description", "Draft notes"));
+    act(() => result.current.setView("fast"));
+    expect(result.current.form.description).toBe("Draft notes");
+    expect(result.current.isDirty).toBe(true);
+  });
+
+  it("clears dependent contact and source lead only when the customer changes", () => {
+    const { result } = setup();
+    act(() => result.current.openModal(null, { ...draft, contactPartyId: branchId, leadId: branchId }));
+    act(() => result.current.selectCustomer(draft.customerProfileId, "Same customer"));
+    expect(result.current.form.contactPartyId).toBe(branchId);
+    act(() => result.current.selectCustomer(branchId, "Another customer"));
+    expect(result.current.form.contactPartyId).toBe("");
+    expect(result.current.form.leadId).toBe("");
   });
 });
 
@@ -105,6 +143,9 @@ describe("opportunity create recovery", () => {
     await act(async () => { expect(await staleSubmit({ keepOpenAfterSuccess })).toBe(false); });
     const original = vi.mocked(runIdempotentWrite).mock.calls[0][0];
     const replay = result.current.ambiguity!.replay;
+    act(() => result.current.setView("full"));
+    expect(result.current.ambiguity!.attempt).toBe(original.attempt);
+    act(() => result.current.setView("fast"));
     act(() => {
       result.current.setField("title", "Changed after the uncertain request");
       result.current.selectCustomer(draft.customerProfileId, "Original customer");
@@ -212,7 +253,44 @@ describe("opportunity create recovery", () => {
       `${OPPORTUNITIES_PATH}/${draft.customerProfileId}/tags`,
       `${OPPORTUNITIES_PATH}/${draft.customerProfileId}/tags`,
     ]);
+    expect(onCreated).toHaveBeenCalledWith(draft.customerProfileId);
+    expect(result.current.open).toBe(false);
+  });
+
+  it("keeps an applied-unreadable receipt visible and blocks fresh or stale create callbacks", async () => {
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "applied_unreadable", error: { status: 201 } });
+    const { result, onCreated, onReconcile } = setup();
+    const staleSubmit = result.current.submit;
+    await act(async () => { expect(await staleSubmit()).toBe(true); });
+    expect(result.current.open).toBe(true);
+    expect(result.current.appliedUnreadable).not.toBeNull();
+    expect(result.current.form.importance).toBe("0");
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.openModal(null, draft));
+    await act(async () => {
+      expect(await result.current.submit()).toBe(false);
+      expect(await staleSubmit({ keepOpenAfterSuccess: true })).toBe(false);
+    });
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     expect(onCreated).not.toHaveBeenCalled();
+    expect(onReconcile).toHaveBeenCalledOnce();
+    act(() => result.current.dismissAppliedUnreadable());
+    expect(result.current.open).toBe(false);
+    expect(result.current.appliedUnreadable).toBeNull();
+  });
+
+  it.each([false, true])("retains the originating create-another intent through tag recovery (%s)", async (keepOpenAfterSuccess) => {
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: { id: draft.customerProfileId }, replayed: false }).mockResolvedValueOnce({ kind: "failed", error: { status: 422 } }).mockResolvedValueOnce({ kind: "success", value: {}, replayed: false });
+    const { result, onCreated } = setup();
+    act(() => result.current.setField("tagIds", [branchId]));
+    await act(async () => { await result.current.submit({ keepOpenAfterSuccess }); });
+    expect(result.current.tagRecovery?.keepOpenAfterSuccess).toBe(keepOpenAfterSuccess);
+    await act(async () => { await result.current.retryTagAttachment(); });
+    expect(result.current.open).toBe(keepOpenAfterSuccess);
+    expect(result.current.isDirty).toBe(false);
+    expect(result.current.form.importance).toBe("0");
+    expect(onCreated).toHaveBeenCalledTimes(keepOpenAfterSuccess ? 0 : 1);
+    expect(vi.mocked(runIdempotentWrite).mock.calls.filter(([request]) => request.path === OPPORTUNITIES_PATH)).toHaveLength(1);
   });
 
   it("reconciles an uncertain tag attachment with the same attempt", async () => {
@@ -231,6 +309,31 @@ describe("opportunity create recovery", () => {
       `${OPPORTUNITIES_PATH}/${draft.customerProfileId}/tags`,
     );
     expect(result.current.tagRecovery).toBeNull();
+    expect(axiosClient.get).toHaveBeenCalledWith(`${OPPORTUNITIES_PATH}/${draft.customerProfileId}/tags`, expect.any(Object));
+  });
+
+  it("does not repeat an uncertain tag write already confirmed by a read", async () => {
+    const tagId = "01900100-0000-7000-8000-000000000004";
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: { id: draft.customerProfileId }, replayed: false }).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } });
+    vi.mocked(axiosClient.get).mockResolvedValue({ data: [{ id: tagId, name: "Enterprise" }], status: 200, statusText: "OK", headers: new Headers() });
+    const { result } = setup();
+    act(() => result.current.setField("tagIds", [tagId]));
+    await act(async () => { await result.current.submit(); });
+    await act(async () => { await result.current.retryTagAttachment(); });
+    expect(runIdempotentWrite).toHaveBeenCalledTimes(2);
+    expect(result.current.tagRecovery).toBeNull();
+  });
+
+  it("retains tag recovery and blocks another create when readback fails", async () => {
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: { id: draft.customerProfileId }, replayed: false }).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } });
+    vi.mocked(axiosClient.get).mockRejectedValue(new Error("Read failed"));
+    const { result } = setup();
+    act(() => result.current.setField("tagIds", [branchId]));
+    await act(async () => { await result.current.submit(); });
+    await act(async () => { await result.current.retryTagAttachment(); });
+    expect(runIdempotentWrite).toHaveBeenCalledTimes(2);
+    expect(result.current.tagRecovery?.status).toBe("uncertain");
+    await act(async () => { expect(await result.current.submit()).toBe(false); });
   });
 });
 
@@ -277,3 +380,4 @@ describe("active tenant currency choices", () => {
     },
   );
 });
+

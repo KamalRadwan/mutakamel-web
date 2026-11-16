@@ -54,7 +54,6 @@ export interface CommercialAccount {
   partyId: string;
   companyId: string;
   accountRole: string;
-  paymentTermsId: string | null;
   /** `numeric(24,8)` — an exact decimal string. Never `Number()` it. */
   creditLimit: string | null;
   creditCurrencyCode: string | null;
@@ -78,7 +77,6 @@ export interface AccountBranchRule {
 export interface AccountFormValues {
   partyId: string;
   accountRole: AccountRole;
-  paymentTermsId: string;
   creditLimit: string;
   creditCurrencyCode: string;
   priceBookId: string;
@@ -89,7 +87,6 @@ export interface AccountFormValues {
 export const EMPTY_ACCOUNT_FORM: AccountFormValues = {
   partyId: "",
   accountRole: "CUSTOMER",
-  paymentTermsId: "",
   creditLimit: "",
   creditCurrencyCode: "",
   priceBookId: "",
@@ -101,7 +98,6 @@ export function toAccountForm(account: CommercialAccount): AccountFormValues {
   return {
     partyId: account.partyId,
     accountRole: isAccountRole(account.accountRole) ? account.accountRole : "CUSTOMER",
-    paymentTermsId: account.paymentTermsId ?? "",
     // Kept as the exact string the server sent. `fixedDecimalText` strips
     // trailing zeros, so `10.50` arrives as `"10.5"` — never re-pad it, and
     // never compare it to a locally formatted value.
@@ -185,7 +181,6 @@ export function buildCreateAccountRequest(values: AccountFormValues) {
     partyId,
     accountRole: values.accountRole,
     ...optionalCredit(values),
-    ...(optionalUuid(values.paymentTermsId) ? { paymentTermsId: values.paymentTermsId.trim() } : {}),
     ...(optionalUuid(values.priceBookId) ? { priceBookId: values.priceBookId.trim() } : {}),
     ...(optionalUuid(values.creditPolicyVersionId)
       ? { creditPolicyVersionId: values.creditPolicyVersionId.trim() }
@@ -204,7 +199,6 @@ export function buildUpdateAccountRequest(values: AccountFormValues) {
   const terms = optionalTerms(values.terms);
   return {
     ...optionalCredit(values),
-    ...(optionalUuid(values.paymentTermsId) ? { paymentTermsId: values.paymentTermsId.trim() } : {}),
     ...(optionalUuid(values.priceBookId) ? { priceBookId: values.priceBookId.trim() } : {}),
     ...(optionalUuid(values.creditPolicyVersionId)
       ? { creditPolicyVersionId: values.creditPolicyVersionId.trim() }
@@ -229,7 +223,6 @@ export function parseAccountResponse(payload: unknown): CommercialAccount {
     !isUuidV7(account.partyId) ||
     !isUuidV7(account.companyId) ||
     typeof account.accountRole !== "string" ||
-    !isNullableUuidV7(account.paymentTermsId) ||
     !isNullableTradeDecimalString(account.creditLimit) ||
     !isNullableUuidV7(account.priceBookId) ||
     !isNullableUuidV7(account.creditPolicyVersionId) ||
@@ -245,7 +238,6 @@ export function parseAccountResponse(payload: unknown): CommercialAccount {
     partyId: account.partyId,
     companyId: account.companyId,
     accountRole: account.accountRole,
-    paymentTermsId: (account.paymentTermsId as string | null | undefined) ?? null,
     creditLimit: (account.creditLimit as string | null | undefined) ?? null,
     creditCurrencyCode:
       typeof account.creditCurrencyCode === "string" ? account.creditCurrencyCode : null,

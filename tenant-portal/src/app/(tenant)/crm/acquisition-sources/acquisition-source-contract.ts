@@ -25,7 +25,8 @@ const ACQUISITION_SOURCE_ICON_EXTENSIONS: Record<string, string[]> = {
 /** The multipart field name the FileInterceptor binds to. */
 export const ACQUISITION_SOURCE_ICON_FIELD = "file";
 
-const MAX_ACQUISITION_SOURCES = 500;
+// acquisition-sources.service.ts caps the complete tenant catalogue at 500.
+export const MAX_ACQUISITION_SOURCES = 500;
 const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -49,6 +50,12 @@ export interface UpdateAcquisitionSourceInput extends CreateAcquisitionSourceInp
   isActive: boolean;
 }
 
+export function validateAcquisitionSourceNames(input: CreateAcquisitionSourceInput) {
+  const validate = (name: string) => !name.trim() ? "required" as const
+    : name.trim().length > ACQUISITION_SOURCE_NAME_MAX_LENGTH ? "tooLong" as const : null;
+  return { nameAr: validate(input.nameAr), nameEn: validate(input.nameEn) };
+}
+
 export function acquisitionSourcePath(id: string): string {
   if (!UUID_V7_PATTERN.test(id)) invalidResponse();
   return `${ACQUISITION_SOURCES_PATH}/${encodeURIComponent(id)}`;
@@ -66,20 +73,29 @@ export function acquisitionSourceIconPath(id: string): string {
  * (`ReorderAcquisitionSourcesDto` plus the service's own check), so this is
  * built from the unfiltered catalogue — never from a searched subset.
  */
-export function moveAcquisitionSourceOrder(
+export function moveAcquisitionSourceToPosition(
   sources: readonly AcquisitionSource[],
   sourceId: string,
-  direction: -1 | 1,
+  position: number,
 ): string[] | null {
   const ordered = [...sources].sort(
     (left, right) => left.sortOrder - right.sortOrder,
   );
   const index = ordered.findIndex(({ id }) => id === sourceId);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= ordered.length) return null;
+  const target = position - 1;
+  if (index < 0 || !Number.isSafeInteger(position) || target < 0 || target >= ordered.length) return null;
   const ids = ordered.map(({ id }) => id);
-  [ids[index], ids[target]] = [ids[target], ids[index]];
+  ids.splice(index, 1);
+  ids.splice(target, 0, sourceId);
   return ids;
+}
+
+/** ReorderAcquisitionSourcesDto plus the service's exact-set requirement. */
+export function applyAcquisitionSourceOrder(sources: readonly AcquisitionSource[], orderedIds: readonly string[]): AcquisitionSource[] | null {
+  if (orderedIds.length === 0 || orderedIds.length > MAX_ACQUISITION_SOURCES || orderedIds.length !== sources.length || new Set(orderedIds).size !== orderedIds.length) return null;
+  const byId = new Map(sources.map((source) => [source.id, source]));
+  if (orderedIds.some((id) => !byId.has(id))) return null;
+  return orderedIds.map((id, index) => ({ ...byId.get(id)!, sortOrder: index + 1 }));
 }
 
 /**
@@ -97,7 +113,10 @@ export type IconRejection = "empty" | "tooLarge" | "unsupportedType" | "extensio
 export function classifyIconFile(file: File): IconRejection | null {
   if (file.size <= 0) return "empty";
   if (file.size > ACQUISITION_SOURCE_ICON_MAX_BYTES) return "tooLarge";
-  const mimeType = file.type.trim().toLowerCase();
+  const rawMimeType = file.type.trim().toLowerCase();
+  // The controller normalizes a generic OS-provided MIME only for .ico files.
+  const mimeType = (rawMimeType === "" || rawMimeType === "application/octet-stream") && file.name.toLowerCase().endsWith(".ico")
+    ? "image/x-icon" : rawMimeType;
   const extensions = ACQUISITION_SOURCE_ICON_EXTENSIONS[mimeType];
   if (!extensions) return "unsupportedType";
   const dot = file.name.lastIndexOf(".");

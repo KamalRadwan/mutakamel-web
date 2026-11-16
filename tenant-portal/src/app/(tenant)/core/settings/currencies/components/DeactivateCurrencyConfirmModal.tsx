@@ -3,7 +3,7 @@
 import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
-import type { Currency } from "../currency-contract";
+import { formatCurrencyLabel, type Currency } from "../currency-contract";
 
 interface DeactivateCurrencyConfirmModalProps {
   currency: Currency | null;
@@ -21,6 +21,7 @@ export function DeactivateCurrencyConfirmModal({
   isSubmitting,
 }: DeactivateCurrencyConfirmModalProps) {
   const { t } = useI18n();
+  const currencyLabel = currency ? formatCurrencyLabel(currency) : "";
 
   return (
     <ConfirmActionModal
@@ -28,9 +29,13 @@ export function DeactivateCurrencyConfirmModal({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title={t.coreSettings.currencyDeactivateTitle}
+      title={
+        currencyLabel
+          ? `${t.coreSettings.currencyDeactivateTitle} — ${currencyLabel}`
+          : t.coreSettings.currencyDeactivateTitle
+      }
       description={formatTemplate(t.coreSettings.currencyDeactivateMessage, {
-        code: currency?.code ?? "",
+        code: currencyLabel,
       })}
       confirmLabel={t.coreSettings.deactivate}
       cancelLabel={t.common.cancel}

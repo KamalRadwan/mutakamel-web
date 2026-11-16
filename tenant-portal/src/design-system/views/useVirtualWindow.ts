@@ -49,6 +49,8 @@ export function useVirtualWindow({
   itemsPerRow = 1,
   overscan = 4,
 }: VirtualWindowOptions) {
+  "use no memo";
+
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
   const [measuredRowSize, setMeasuredRowSize] = useState<number | null>(null);
 
@@ -56,11 +58,9 @@ export function useVirtualWindow({
   const isWindowed = count > threshold;
   const rowSize = measuredRowSize ?? estimatedRowSize;
 
-  // React Compiler reports "Compilation Skipped: Use of incompatible library"
-  // here and declines to memoize this hook: useVirtualizer returns functions
-  // whose identity is deliberately unstable. That is the library D9 selected,
-  // and the cost is bounded — the hook returns a plain data range, so nothing
-  // downstream depends on those identities.
+  // TanStack Virtual's mutable instance is incompatible with React Compiler;
+  // this hook explicitly retains its existing uncompiled behavior.
+  // eslint-disable-next-line react-hooks/incompatible-library -- "use no memo" isolates the mutable virtualizer; only plain range values escape.
   const virtualizer = useVirtualizer({
     count: isWindowed ? Math.ceil(count / perRow) : 0,
     getScrollElement: () => scrollElement,

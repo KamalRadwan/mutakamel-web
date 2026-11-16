@@ -31,15 +31,14 @@ function deny(code: string) {
   ))));
 }
 
-it("keeps the Taxes company picker silent without company-read permission", async () => {
+it("exposes denied company reads inline without a duplicate toast", async () => {
   deny("MISSING_REQUIRED_PERMISSIONS");
   const toast = vi.fn();
   window.addEventListener("global-toast", toast);
   try {
     const { result } = renderHook(() => useCompanyOptions("taxes.tax.manage"));
-    const initialCompanies = result.current.companies;
     await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
-    await waitFor(() => expect(result.current.companies).not.toBe(initialCompanies));
+    await waitFor(() => expect(result.current.loadError?.status).toBe(403));
     expect(result.current.companies).toEqual([]);
     expect(toast).not.toHaveBeenCalled();
   } finally {

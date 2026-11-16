@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-10-17**
+Last source verification: **2026-11-11**
 
-Generated at: **2026-10-17T17:51:44.816Z**
+Generated at: **2026-11-11T05:04:59.211Z**
 
-Backend revision: `a51c1d6ccf36+dirty`
+Backend revision: `d98f27966914+dirty`
 
 Owning app: **crm-app**
 
-Routes: **157**
+Routes: **198**
 
 ## What this page is
 
@@ -28,6 +28,7 @@ shapes or error codes — those live in the hand-written pages:
 - [crm-customer-profiles.md](crm-customer-profiles.md)
 - [crm-opportunities.md](crm-opportunities.md)
 - [crm-catalogues.md](crm-catalogues.md)
+- [crm-dashboards.md](crm-dashboards.md)
 
 Read [README.md](README.md) first for envelopes, pagination, idempotency and
 the capabilities contract.
@@ -50,9 +51,9 @@ browser code.
 | PATCH | `/api/tenant/crm/v1/acquisition-sources/reorder` | `crm.acquisition.sources.reorder.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/activities` | `crm.activities.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/activities` | `crm.activities.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| DELETE | `/api/tenant/crm/v1/activities/:id` | `crm.activities.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/assignable-owners` | `crm.assignable.owners.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/attachments` | `crm.attachments.get` | AUTHENTICATED | yes | TENANT_PORTAL |
-| POST | `/api/tenant/crm/v1/attachments` | `crm.attachments.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/attachments/:id` | `crm.attachments.by.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/attachments/:id/download` | `crm.attachments.by.id.download.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/attachments/upload` | `crm.attachments.upload.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
@@ -86,6 +87,9 @@ browser code.
 | PUT | `/api/tenant/crm/v1/dashboards/:id/layout` | `crm.dashboard.builder.layout.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/dashboards/:id/placements` | `crm.dashboard.builder.placements.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/dashboards/:id/placements/:placementId` | `crm.dashboard.builder.placements.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/:id/placements/:placementId/version-policy` | `crm.dashboard.builder.placements.version-policy.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/crm/v1/dashboards/:id/placements/:placementId/version-policy` | `crm.dashboard.builder.placements.version-policy.patch` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/:id/placements/:placementId/version-policy/impact` | `crm.dashboard.builder.placements.version-policy.impact.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/dashboards/:id/run` | `crm.dashboard.builder.run.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/:id/shares` | `crm.dashboard.builder.shares.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/dashboards/:id/shares` | `crm.dashboard.builder.shares.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
@@ -93,17 +97,31 @@ browser code.
 | POST | `/api/tenant/crm/v1/dashboards/:id/widgets/:widgetId/drilldown` | `crm.dashboard.builder.widget.drilldown.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/action-center` | `crm.dashboards.action.center.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/activities-productivity` | `crm.dashboards.activities.productivity.get` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/blueprints` | `crm.dashboard.builder.blueprints.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PUT | `/api/tenant/crm/v1/dashboards/blueprints/:blueprintKey/adoption` | `crm.dashboard.builder.blueprints.adoption.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/catalog` | `crm.dashboard.builder.catalog.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/customer-intelligence` | `crm.dashboards.customer.intelligence.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/data-quality` | `crm.dashboards.data.quality.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/default` | `crm.dashboard.builder.default.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/dashboards/from-template/:templateKey` | `crm.dashboard.builder.from.template.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | PUT | `/api/tenant/crm/v1/dashboards/from-template/:templateKey` | `crm.dashboard.builder.from.template.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/inquiry-identities/:leadId` | `crm.dashboard.inquiry.identities.context.get` | READ_HEAVY | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/inquiry-identities/:leadId` | `crm.dashboard.inquiry.identities.review.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/lead-acquisition-quality-report` | `crm.dashboards.lead.acquisition.quality.report.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/lead-acquisition-report` | `crm.dashboards.lead.acquisition.report.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/lead-cohort-branches` | `crm.dashboards.lead.cohort.branches.get` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/lead-conversion-journey` | `crm.dashboards.lead.conversion.journey.get` | READ_HEAVY | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/lead-intake-allocation-report` | `crm.dashboards.lead.intake.allocation.report.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/lead-lifecycle-inventory-report` | `crm.dashboards.lead.lifecycle.inventory.report.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/dashboards/lead-source-mix-report` | `crm.dashboards.lead.source.mix.report.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/lead-team-cohort` | `crm.dashboards.lead.team.cohort.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/leads` | `crm.dashboards.leads.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/navigation` | `crm.dashboard.builder.navigation.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/overview` | `crm.dashboards.overview.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/sales-pipeline` | `crm.dashboards.sales.pipeline.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards/share-targets` | `crm.dashboard.builder.share.targets.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/won-sales-cycle` | `crm.dashboards.won.sales.cycle.get` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/dashboards/won-target-attainment` | `crm.dashboards.won.target.attainment.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/lead-stages` | `crm.lead.stages.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/lead-stages` | `crm.lead.stages.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/lead-stages/:id` | `crm.lead.stages.by.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
@@ -170,6 +188,7 @@ browser code.
 | PUT | `/api/tenant/crm/v1/pipelines/:id/assignments` | `crm.pipelines.by.id.assignments.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/pipelines/:id/board` | `crm.pipelines.by.id.board.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/pipelines/:id/cards` | `crm.pipelines.by.id.cards.get` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/pipelines/:id/configuration` | `crm.pipelines.by.id.configuration.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/crm/v1/pipelines/:id/default` | `crm.pipelines.by.id.default.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/pipelines/:id/reset` | `crm.pipelines.by.id.reset.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/pipelines/:id/stages` | `crm.pipelines.by.id.stages.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
@@ -186,14 +205,37 @@ browser code.
 | DELETE | `/api/tenant/crm/v1/tags/:id` | `crm.tags.by.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/tags/:id` | `crm.tags.by.id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/crm/v1/tags/:id` | `crm.tags.by.id.patch` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/targets` | `crm.targets.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/targets` | `crm.targets.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| DELETE | `/api/tenant/crm/v1/targets/:id` | `crm.targets.by.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/targets/:id` | `crm.targets.by.id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/crm/v1/targets/:id` | `crm.targets.by.id.patch` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/targets/working-calendars/:branchId/:year` | `crm.targets.working.calendars.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/targets/working-calendars/:branchId/:year` | `crm.targets.working.calendars.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/widgets` | `crm.dashboard.widgets.list.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/widgets` | `crm.dashboard.widgets.create.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/widgets/:id` | `crm.dashboard.widgets.by.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/widgets/:id` | `crm.dashboard.widgets.by.id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/crm/v1/widgets/:id` | `crm.dashboard.widgets.by.id.patch` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/widgets/:id/clone` | `crm.dashboard.widgets.clone.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/:id/draft` | `crm.dashboard.widgets.draft.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/draft/discard` | `crm.dashboard.widgets.draft.discard.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/lifecycle` | `crm.dashboard.widgets.lifecycle.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/lifecycle-impact` | `crm.dashboard.widgets.lifecycle-impact.post` | READ_HEAVY | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/:id/ownership-transfer` | `crm.dashboard.widgets.ownership-transfer.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/crm/v1/widgets/:id/ownership-transfer` | `crm.dashboard.widgets.ownership-transfer.patch` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/ownership-transfer/impact` | `crm.dashboard.widgets.ownership-transfer.impact.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/:id/ownership-transfer/targets` | `crm.dashboard.widgets.ownership-transfer.targets.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/publish` | `crm.dashboard.widgets.publish.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/publish-impact` | `crm.dashboard.widgets.publish-impact.post` | READ_HEAVY | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/widgets/:id/shares` | `crm.dashboard.widgets.shares.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/widgets/:id/shares` | `crm.dashboard.widgets.shares.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/widgets/:id/shares/:shareId` | `crm.dashboard.widgets.shares.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/:id/versions` | `crm.dashboard.widgets.versions.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/versions/compare` | `crm.dashboard.widgets.versions.compare.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/widgets/:id/versions/restore-draft` | `crm.dashboard.widgets.versions.restore-draft.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/catalog` | `crm.widgets.catalog.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/owner-options` | `crm.dashboard.widgets.owner-options.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/crm/v1/widgets/ownership-transfers` | `crm.dashboard.widgets.ownership-transfers.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/widgets/preview` | `crm.dashboard.widgets.preview.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/widgets/share-targets` | `crm.dashboard.widgets.share.targets.get` | AUTHENTICATED | yes | TENANT_PORTAL |

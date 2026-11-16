@@ -26,17 +26,22 @@ vi.mock("../../documents/hooks/useTradeLineDraft", () => ({
     lines: [{ clientLineId: "line", itemId: "item", uomId: "uom", quantity: "1" }],
   }),
 }));
-vi.mock("../../trade-api", () => ({
+vi.mock("../../trade-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../trade-api")>()),
   tradePost: mocks.post,
   tradeIfMatch: (version: number) => `"${version}"`,
 }));
+vi.mock("./useQuotationPricing", () => ({ useQuotationPricing: () => ({ ready: true,
+  request: { lines: [{ clientLineId: "line", itemId: "item", uomId: "uom", quantity: "1" }], pricing: { mode: "PROMOTIONS" } },
+  preview: { calculation: { fingerprint: "a".repeat(64) } },
+}) }));
 
 // Only these quotation fields are consumed by this hook; its collaborators are mocked.
-const quotation = { id: "01900500-0000-7000-8000-000000000001", version: 7, currencyCode: "SAR", partyId: "01900500-0000-7000-8000-000000000002" } as unknown as QuotationDetail;
+const quotation = { id: "01900500-0000-7000-8000-000000000001", version: 7, lifecycleStatus: "DRAFT", currencyCode: "SAR", partyId: "01900500-0000-7000-8000-000000000002" } as unknown as QuotationDetail;
 
 function setup() {
   const hook = renderHook(() => useQuotationRevision(quotation, {}, vi.fn()));
-  act(() => { hook.result.current.setValidUntil("2026-12-31"); });
+  act(() => { hook.result.current.open(); hook.result.current.setValidUntil("2026-12-31"); });
   return hook;
 }
 
@@ -48,6 +53,29 @@ beforeEach(() => {
 });
 
 describe("quotation revision duration terms", () => {
+  it("requires send authority and explicit confirmation before superseding an issued offer", async () => {
+    const issued = { ...quotation, lifecycleStatus: "SENT" };
+    const { result } = renderHook(() => useQuotationRevision(issued, {}, vi.fn(), { canSupersede: true }));
+    act(() => { result.current.open(); result.current.setValidUntil("2026-12-31"); });
+    expect(result.current.requiresSupersedeConfirmation).toBe(true); expect(result.current.canSubmit).toBe(false);
+    await act(async () => { await result.current.submit(); }); expect(mocks.runWrite).not.toHaveBeenCalled();
+    act(() => result.current.setSupersedeConfirmed(true)); expect(result.current.canSubmit).toBe(true);
+    await act(async () => { await result.current.submit(); }); expect(mocks.runWrite).toHaveBeenCalledOnce();
+    expect(issued.lifecycleStatus).toBe("SENT");
+  });
+  it("does not offer a sent revision without send permission even if confirmation is set", async () => {
+    const { result } = renderHook(() => useQuotationRevision({ ...quotation, lifecycleStatus: "SENT" }, {}, vi.fn()));
+    act(() => { result.current.open(); result.current.setValidUntil("2026-12-31"); result.current.setSupersedeConfirmed(true); });
+    expect(result.current.canSubmit).toBe(false);
+    await act(async () => { await result.current.submit(); }); expect(mocks.runWrite).not.toHaveBeenCalled();
+  });
+  it("keeps the opened version pinned and requires review after a concurrent source change", async () => {
+    const { result, rerender } = renderHook((source) => useQuotationRevision(source, {}, vi.fn()), { initialProps: quotation });
+    act(() => { result.current.open(); result.current.setValidUntil("2026-12-31"); });
+    rerender({ ...quotation, version: 8 });
+    expect(result.current.sourceChanged).toBe(true); expect(result.current.canSubmit).toBe(false);
+    await act(async () => { await result.current.submit(); }); expect(mocks.runWrite).not.toHaveBeenCalled();
+  });
   it.each<[string, string, number, number]>([
     ["0", "0", 0, 0],
     ["", "", 14, 12],

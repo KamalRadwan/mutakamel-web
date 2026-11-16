@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import {
   Badge,
   Button,
@@ -513,6 +514,7 @@ function MutationFeedback({
   view: PublisherKeysView;
   copy: PublisherKeyCopy;
 }) {
+  const { lang } = useI18n();
   const mutation = view.mutation;
   const noticeRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -569,8 +571,8 @@ function MutationFeedback({
             <h2 className="font-semibold">{title}</h2>
             {mutation.error ? (
               <div className="mt-2 space-y-1 text-xs">
+                <p>{getLocalizedApiErrorMessage(mutation.error, lang)}</p>
                 <p>{copy.errorCode}: <CodeValue>{mutation.error.errorCode}</CodeValue></p>
-                <p>{mutation.error.message}</p>
               </div>
             ) : null}
             {mutation.correlationId ? (
@@ -685,6 +687,7 @@ function StateNotice({
   action?: ReactNode;
   copy?: PublisherKeyCopy;
 }) {
+  const { lang } = useI18n();
   return (
     <div
       role={loading || tone === "neutral" ? "status" : "alert"}
@@ -698,8 +701,8 @@ function StateNotice({
           {body ? <p className="mt-1 text-xs leading-5">{body}</p> : null}
           {error ? (
             <div className="mt-2 space-y-1 text-xs">
+              <p>{getLocalizedApiErrorMessage(error, lang)}</p>
               <p>{copy?.errorCode}: <CodeValue>{error.errorCode}</CodeValue></p>
-              <p>{error.message}</p>
               {error.correlationId ? (
                 <p>{copy?.correlation}: <CodeValue>{error.correlationId}</CodeValue></p>
               ) : null}

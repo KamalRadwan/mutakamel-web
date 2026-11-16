@@ -2,14 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTradeBranchSelection } from "../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
-import { tradePost } from "../../trade-api";
-import { hasTradePermission, useTradeScope } from "../../trade-advanced-scope";
-import { isDecimalString } from "../../trade-advanced-validation";
+import { compareFixedDecimal } from "../../documents/fixed-decimal";
 import {
   CURRENCY_CODE_PATTERN,
   PRICING_EVALUATE_PATH,
@@ -19,6 +15,13 @@ import {
   type PricingDecisionResult,
 } from "../../price-books/pricing-contract";
 import { pricingFormMessage, pricingMessage } from "../../price-books/pricing-messages";
+import {
+  hasTradePermission,
+  useTradeScope,
+} from "../../trade-advanced-scope";
+import { useTradeScope as useSharedTradeScope } from "../../useTradeScope";
+import { isDecimalString } from "../../trade-advanced-validation";
+import { tradePost } from "../../trade-api";
 
 const EVALUATE_RESPONSE_LIMIT_BYTES = 120_000;
 
@@ -30,6 +33,8 @@ export interface EvaluateFormValues {
   currencyCode: string;
   priceBookId: string;
   partyId: string;
+  channelId?: string;
+  pricingAt?: string;
 }
 
 export interface PinnedEvaluationItem {
@@ -38,8 +43,6 @@ export interface PinnedEvaluationItem {
   readonly scopeHeaders: Readonly<Record<string, string>>;
   readonly decision: PricingDecisionResult;
 }
-
-export type EvaluationTab = "waterfall" | "candidates" | "comparison" | "receipt";
 
 const EMPTY_EVALUATE_FORM: EvaluateFormValues = {
   purpose: "SALES",
@@ -56,6 +59,8 @@ function readInitialEvaluateForm(): EvaluateFormValues {
   const params = new URLSearchParams(window.location.search);
   const purposeParam = params.get("purpose");
   const purpose: PriceBookPurpose = purposeParam === "PURCHASE" ? "PURCHASE" : "SALES";
+  const channelId = params.get("channelId") ?? "";
+  const pricingAt = params.get("pricingAt") ?? "";
   return {
     purpose,
     itemId: params.get("itemId") ?? "",
@@ -64,20 +69,24 @@ function readInitialEvaluateForm(): EvaluateFormValues {
     currencyCode: params.get("currencyCode") ?? "",
     priceBookId: params.get("priceBookId") ?? "",
     partyId: params.get("partyId") ?? "",
+    ...(channelId ? { channelId } : {}),
+    ...(pricingAt ? { pricingAt } : {}),
   };
 }
 
 export function usePricingEvaluation() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
-  const scope = useTradeScope("BRANCH", branchId);
+  const { context, branchIds, selectBranch } = useSharedTradeScope();
+  const branchId = context.branchId;
+  // `POST /pricing/evaluate` declares `@RequireTradeAccess(..., "COMPANY_OR_BRANCH")`
+  // (`trade-app/src/modules/pricing/pricing.controller.ts`), so company-wide ("All branches")
+  // and branch-pinned evaluations are both valid targets.
+  const scope = useTradeScope(branchId ? "BRANCH" : "COMPANY", branchId);
 
   const [values, setValues] = useState<EvaluateFormValues>(readInitialEvaluateForm);
   const [evaluation, setEvaluation] = useState<PinnedEvaluationItem | null>(null);
   const [responseKey, setResponseKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<EvaluationTab>("waterfall");
   const [pinnedEvaluations, setPinnedEvaluations] = useState<PinnedEvaluationItem[]>([]);
   const [noPrice, setNoPrice] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -89,16 +98,22 @@ export function usePricingEvaluation() {
     scope.isTenantOwner,
     PRICING_READ_PERMISSION,
   );
-  // Include scope so a decision cannot follow the form into another branch/company.
+  // Include scope so a decision cannot follow the form into another branch, channel, or company.
   const inputKey = JSON.stringify([values, scope.headers]);
   const matchesInputs = responseKey === inputKey && scope.isResolved && canRead;
   const currentEvaluation = matchesInputs ? evaluation : null;
   const result = currentEvaluation?.decision ?? null;
   const currentQueryError = matchesInputs ? queryError : null;
+  const hasStaleEdits = responseKey !== null && !matchesInputs && !isEvaluating;
 
   const evaluate = useCallback(async (): Promise<void> => {
     if (isEvaluating) return;
     setFormError(null);
+    if (!scope.isResolved || !canRead) return;
+    if (values.channelId && values.channelId !== context.channelId) {
+      setFormError(t.tradePricing.evalChannelScopeMismatch);
+      return;
+    }
     let request: Record<string, string>;
     try {
       request = buildEvaluateRequest(values);
@@ -136,7 +151,7 @@ export function usePricingEvaluation() {
     } finally {
       setIsEvaluating(false);
     }
-  }, [isEvaluating, values, scope.headers, inputKey, toast, t]);
+  }, [isEvaluating, values, scope.headers, scope.isResolved, canRead, context.channelId, inputKey, toast, t]);
 
   const pinCurrentResult = useCallback(() => {
     if (!currentEvaluation) return;
@@ -151,10 +166,11 @@ export function usePricingEvaluation() {
   }, []);
 
   const applyPreset = useCallback((preset: "retail" | "wholesale" | "vip") => {
+    setFormError(null);
     setValues((current) => ({
       ...current,
       purpose: "SALES",
-      currencyCode: current.currencyCode.trim() || "SAR",
+      currencyCode: current.currencyCode.trim(),
       quantity:
         preset === "retail"
           ? "10.00"
@@ -175,8 +191,7 @@ export function usePricingEvaluation() {
     values,
     result,
     evaluatedInputs: currentEvaluation?.inputs ?? null,
-    activeTab,
-    setActiveTab,
+    hasStaleEdits,
     pinnedEvaluations,
     pinCurrentResult,
     clearPinnedEvaluations,
@@ -186,10 +201,12 @@ export function usePricingEvaluation() {
     queryError: currentQueryError,
     queryErrorMessage: currentQueryError ? pricingMessage(currentQueryError, t) : undefined,
     formError,
-    setValue: (patch: Partial<EvaluateFormValues>) =>
-      setValues((current) => ({ ...current, ...patch })),
-    reset: () => {
-      setValues(EMPTY_EVALUATE_FORM);
+    setValue: (patch: Partial<EvaluateFormValues>) => {
+      setFormError(null);
+      setValues((current) => ({ ...current, ...patch }));
+    },
+    reset: (defaults?: Partial<EvaluateFormValues>) => {
+      setValues({ ...EMPTY_EVALUATE_FORM, ...defaults });
       setEvaluation(null);
       setResponseKey(null);
       setNoPrice(false);
@@ -200,13 +217,16 @@ export function usePricingEvaluation() {
   };
 }
 
+const ANY_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
 function buildEvaluateRequest(values: EvaluateFormValues): Record<string, string> {
   const itemId = values.itemId.trim();
   const uomId = values.uomId.trim();
   const quantity = values.quantity.trim();
   const currencyCode = values.currencyCode.trim().toUpperCase();
   if (!isUUIDv7(itemId) || !isUUIDv7(uomId)) throw new Error("PRICING_FORM_ENTRY_ID");
-  if (!isDecimalString(quantity) || Number(quantity) <= 0) {
+  if (!isDecimalString(quantity) || compareFixedDecimal(quantity, "0") <= 0) {
     throw new Error("PRICING_FORM_QUANTITY");
   }
   if (!CURRENCY_CODE_PATTERN.test(currencyCode)) throw new Error("PRICING_FORM_CURRENCY");
@@ -225,8 +245,19 @@ function buildEvaluateRequest(values: EvaluateFormValues): Record<string, string
   }
   const partyId = values.partyId.trim();
   if (partyId.length > 0) {
-    if (!isUUIDv7(partyId)) throw new Error("PRICING_FORM_ENTRY_ID");
+    if (!ANY_UUID_RE.test(partyId)) throw new Error("PRICING_FORM_ENTRY_ID");
     request.partyId = partyId;
+  }
+  const channelId = (values.channelId ?? "").trim();
+  if (channelId.length > 0) {
+    if (!ANY_UUID_RE.test(channelId)) throw new Error("PRICING_FORM_ENTRY_ID");
+    request.channelId = channelId;
+  }
+  const pricingAt = (values.pricingAt ?? "").trim();
+  if (pricingAt.length > 0) {
+    const dt = new Date(pricingAt);
+    if (Number.isNaN(dt.getTime())) throw new Error("PRICING_FORM_DATE");
+    request.pricingAt = dt.toISOString();
   }
   return request;
 }

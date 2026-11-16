@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { useAuth } from "@/context/AuthContext";
-import { adminCan, adminCanAll } from "@/lib/auth/rbac";
+import { adminCan, adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import {
   normalizeApiError,
   type NormalizedApiError,
@@ -101,18 +101,9 @@ export function useTenants() {
       canRead: adminCan(user, "admin.tenants.read"),
       canCreate: adminCan(user, "admin.tenants.create"),
       canReadDatabaseServers: adminCan(user, "admin.database_servers.read"),
-      canSuspendOrActivate: adminCanAll(user, [
-        "admin.tenants.suspend",
-        "admin.tenants.critical",
-      ]),
-      canReprovision: adminCanAll(user, [
-        "admin.tenants.reprovision",
-        "admin.tenants.critical",
-      ]),
-      canSoftDelete: adminCanAll(user, [
-        "admin.tenants.delete",
-        "admin.tenants.critical",
-      ]),
+      canSuspendOrActivate: adminCanAll(user, ADMIN_RBAC_CRITICAL.TENANTS_SUSPEND),
+      canReprovision: adminCanAll(user, ADMIN_RBAC_CRITICAL.TENANTS_REPROVISION),
+      canSoftDelete: adminCanAll(user, ADMIN_RBAC_CRITICAL.TENANTS_DELETE),
     }),
     [user],
   );
@@ -631,7 +622,7 @@ interface DirectoryCommandPermissions {
 
 /**
  * Who may run each row command — Core's permission pair for its route, each
- * with `admin.tenants.critical` — and the lifecycle state the directory offers
+ * with its critical tier — and the lifecycle state the directory offers
  * it from. A retry is offered here only after a failed initial provisioning;
  * retrying any other operation is the provisioning workspace's.
  */

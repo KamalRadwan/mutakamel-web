@@ -1,6 +1,38 @@
 import { Dictionary } from "./ar";
 
 export const en: Dictionary = {
+  apiErrorMessages: {
+    tenantReleaseUpgradeRequired: "A component this tenant already runs is on an earlier release, and the change is planned only on current releases. Update the tenant from the Updates section of its Provisioning tab first, then prepare the change again.",
+    billingActionForbidden: "You do not have permission to perform this billing action.",
+    billingActionConflict: "This billing action is not valid for the current server state. Refresh and review the latest state before continuing.",
+    billingIdentityMismatch: "The payment response does not match the requested record. Review the payment before continuing.",
+    offlinePaymentInvalid: "Review the offline payment amount, currency, reference and audit note before submitting.",
+    walletPreviewExpired: "The wallet preview has expired. Request and review a new preview before confirming.",
+    walletPreviewMismatch: "The wallet preview does not match the requested adjustment. Review the draft and request a new preview.",
+    walletRecoveryHelp: "This adjustment has an unresolved result. Recover the original command before starting another adjustment. Recovery reuses the original quote, audit note and key, even after quote expiry.",
+    walletRecoveryUnavailable: "Wallet recovery storage is unavailable or invalid. Adjustments are blocked. Restore browser storage access and refresh; do not clear an unresolved record.",
+    fqdnRequired: "Enter a domain before validating it.",
+    fqdnStateInvalid: "Domains can be changed only while the tenant is active.",
+    fqdnPreflightRequired: "Validate the current domain before attaching it.",
+    fqdnRemoveNotAllowed: "The primary domain cannot be removed.",
+    fqdnPromotionNotAllowed: "Only a verified domain on a legacy tenant can become primary.",
+    refundNoteInvalid: "Enter a refund audit note between 10 and 500 characters long.",
+    migrationManageRequired: "admin.migrations.manage is required to start a migration.",
+    generic: "The request could not be completed. Use the error code and correlation ID when contacting support.",
+    unauthenticated: "Your session has expired. Sign in again to continue.",
+    forbidden: "You do not have permission to perform this request.",
+    notFound: "The requested item does not exist or is no longer available.",
+    conflict: "The request conflicts with the current state. Review the latest state before continuing.",
+    validation: "The submitted data could not be accepted. Review the required fields.",
+    rateLimited: "Too many requests were sent. Wait a moment before continuing.",
+    unavailable: "The service is temporarily unavailable. Review the operation status before retrying.",
+    inFlight: "The request is still being processed. Review its status before sending another request.",
+  },
+  tierPricing: {
+    reason: "Reason for pricing change (required)",
+    reasonHint: "Enter 1 to 256 characters. The reason is saved in the audit log.",
+    reasonRequired: "Enter a reason between 1 and 256 characters long.",
+  },
   emailSuppression: {
     "numberLocale": "en",
     "title": "Email suppressions",
@@ -1557,6 +1589,66 @@ export const en: Dictionary = {
     rollingBackDetail: "The migration failed and is rolling back now.",
   },
   applications: {
+    baseFeaturePolicy: {
+      title: "Template Designer default availability",
+      included: "Included by default for eligible tenants",
+      excluded: "Not included by default",
+      unavailable: "Default availability unavailable. Refresh the policy.",
+      description: "Default availability is separate from the feature’s Active setting in the commercial catalogue. Tenant eligibility and access policies still apply.",
+      revision: "Policy revision",
+      permissionRequired: "Changing default availability requires catalogue management and critical-action permission.",
+      refresh: "Refresh policy",
+      include: "Include by default",
+      exclude: "Remove default inclusion",
+      reviewPending: "Review pending change",
+      confirmInclude: "Include Template Designer by default?",
+      confirmExclude: "Remove default Template Designer inclusion?",
+      includeConsequence: "Eligible tenants will receive Template Designer through the Core base policy. Their access policies still apply.",
+      excludeConsequence: "Eligible tenants will lose the default Core base grant for Template Designer. Access through other valid grants remains subject to tenant policy.",
+      scope: "This is a global Core policy change for eligible tenants, not a change to one tenant or a subscription tier.",
+      forbidden: "You no longer have permission to change this policy. Refresh your access before trying again.",
+      stale: "This policy changed. Refresh it and review the current inclusion before submitting a new change.",
+      notEligible: "The current Core publication and an active feature are required. Refresh and review the application’s release state.",
+      unknown: "The change outcome is unknown or still processing. Refresh the policy or retry this exact change with its original request key.",
+      failed: "The policy change was rejected. Refresh the policy before reviewing another change.",
+      refreshed: "Current default availability loaded. Review it before making a change.",
+      refreshFailed: "The current policy could not be confirmed. Try refreshing again.",
+      saved: "Default availability updated.",
+      retrySame: "Retry same change",
+      correlationId: "Correlation ID",
+    },
+    errors: {
+      APPLICATION_CATALOGUE_REVISION_STALE: "The catalogue changed. Refresh it and review your changes before retrying.",
+      APPLICATION_PUBLICATION_REVISION_STALE: "Publication changed. Refresh it before publishing again.",
+      APPLICATION_PUBLICATION_REQUIRED: "Publish the current application revision before activating it.",
+      APPLICATION_LIFECYCLE_TRANSITION_INVALID: "This lifecycle change is unavailable from the current state. Refresh the application.",
+      APPLICATION_DELETE_NOT_CATALOGUE_ONLY: "Only a catalogue-only draft can be deleted. Review its technical bindings.",
+      APPLICATION_IN_USE: "This application is in use and cannot be deleted.",
+      APPLICATION_DISABLE_CONVERGENCE_UNAVAILABLE: "Disabling cannot finish right now. Refresh the application and retry the original command.",
+      DB_SERVER_APPLICATION_NOT_AVAILABLE: "The application is unavailable for database binding. Refresh its release state.",
+      DB_SERVER_APPLICATION_REVISION_STALE: "The application or database policy changed. Refresh the servers before retrying.",
+      DB_SERVER_APPLICATION_ALREADY_BOUND_OR_NEEDS_RECOVERY: "This server is already bound or needs binding recovery. Refresh and review its binding state.",
+      DB_SERVER_SECURITY_ADMIN_CREDENTIALS_REQUIRED: "Configure security administrator credentials for this database server before binding.",
+      DB_SERVER_APPLICATION_BOOTSTRAP_FAILED: "Database setup failed. Review the server and its credentials before retrying.",
+      DB_SERVER_APPLICATION_BIND_DEFERRED: "Database binding was deferred. Refresh the server state and retry when it is ready.",
+      TIER_IN_USE: "This tier is in use and cannot be deleted.",
+      TIER_RANK_TAKEN: "Another tier uses this rank. Refresh the tiers and choose another rank.",
+    },
+    notifications: {
+      updated: "Application updated successfully.", policyUpdated: "Database policy updated.",
+      published: "Application revision published.", activated: "Application activated.",
+      bound: "Database binding command completed.", deprecated: "Application deprecated.",
+      disabled: "Application disabled.", deleted: "Application deleted.",
+      saved: "Saved", reconciled: "Create reconciled",
+      recovered: "{{name}} exists and is now loaded.",
+      tierCreated: "Tier created", tierReady: "{{name}} is ready to configure.",
+      featureCreated: "Feature created", featureReady: "{{name}} is available for tier grants.",
+      tierUpdated: "Tier updated.", tierDeleted: "Tier deleted.",
+      featureUpdated: "Feature updated.", featureDeleted: "Feature deleted.",
+      grantsReplaced: "Tier feature grants replaced.",
+      monthlyPricesReplaced: "Monthly price ladder replaced.", annualPricesReplaced: "Annual price ladder replaced.",
+      resolveCreate: "Resolve the previous create outcome before sending another create request.",
+    },
     pageTitle: "Application Catalogue",
     registerApplication: "Register Application",
     onboardApplication: "Onboard Application",
@@ -1690,6 +1782,7 @@ export const en: Dictionary = {
         continueToBind: "Continue: select databases",
       },
       databaseBind: {
+        batchHint: "Bind in batches of {{count}} servers. Select all and retry failed select up to this limit.",
         stepLabel: "Step 2 of 2",
         title: "Select databases to bind",
         description:
@@ -1745,6 +1838,9 @@ export const en: Dictionary = {
       deleteDescription:
         "Only an unused catalogue-only DRAFT can be deleted. This action has no password or credential export.",
       deleteReason: "Delete unused catalogue draft",
+      deleteConfirmName: "Type the exact Application name to confirm",
+      deleteReasonLabel: "Reason for deletion",
+      deleteReasonMinimum: "Enter a reason of at least 8 characters (excluding surrounding spaces).",
       lifecycle: {
         activate: "Activate",
         deprecate: "Deprecate",
@@ -1754,6 +1850,9 @@ export const en: Dictionary = {
         transitionJoin: "to",
         reason: "Reason",
         reasonRequired: "A lifecycle reason is required.",
+        disableWarning: "Disabling is permanent and cannot be undone. It removes this application's access for every tenant, clears its credentials, and starts decommissioning everywhere. This application cannot be activated again.",
+        confirmApplicationKey: "Type the exact application key to confirm",
+        disableReasonMinimum: "Enter a reason of at least 8 characters, excluding leading and trailing spaces.",
         failed: "The lifecycle change could not be completed.",
         confirm: "Confirm",
       },
@@ -2787,6 +2886,10 @@ export const en: Dictionary = {
     updatesNote:
       "Selections submit the exact current and target release evidence returned by Core. Core also moves every component on an earlier release that the selection depends on or that would not be compatible with the new releases; the planned operation lists each one. Nothing is offered while an Add-on binding pins a component an update would move to another release: re-bind or remove that Add-on first.",
     applySelectedButton: (count: number) => `Apply selected (${count})`,
+    applyUpdatesConfirmTitle: "Apply selected component updates?",
+    applyUpdatesConfirmDescription:
+      "This starts a live database and release upgrade to the target versions listed below. It cannot be cancelled once running. Core may also update dependent or incompatible components that are behind.",
+    applyUpdatesConfirmButton: "Apply updates",
     noUpdatesTitle: "No safe updates are currently offered.",
     currentLabel: "Current",
     targetLabel: "Target",
@@ -2845,6 +2948,9 @@ export const en: Dictionary = {
     retentionAckLabel:
       "I acknowledge that data is retained and the component is disabled rather than erased.",
     createDecommissionButton: "Create decommission",
+    decommissionConfirmTitle: "Decommission tenant component?",
+    decommissionConfirmDescription:
+      "This irreversible operation disables the selected component while retaining its data. Type the tenant name and component key exactly as shown to confirm.",
     loadingLabel: "Loading…",
     permissionRequiredTitle: "Permission required",
     permissionRequiredDescription:
@@ -3326,6 +3432,16 @@ export const en: Dictionary = {
     },
   },
   settings: {
+    confirmation: {
+      title: "Save platform-wide changes?",
+      cancel: "Cancel",
+      confirm: "Confirm and save",
+      generic: "These settings apply across the platform. Wallet minimum and maximum limits change which top-up amounts every tenant can pay. Review pending values before saving; access, token validity or notification delivery may also be affected.",
+      maintenanceOn: "Enabling maintenance mode blocks tenant logins across the platform. Confirm that the maintenance window is ready. Other pending settings on this page will also be saved.",
+      maintenanceOff: "Disabling maintenance mode allows tenant logins across the platform again. Confirm that the platform is ready for tenants. Other pending settings on this page will also be saved.",
+      fatalAlertsOff: "Disabling fatal alerts stops delivery of critical failure notifications across the platform. The saved webhook configuration is retained for re-enabling later.",
+      smtp: "Changing the platform SMTP host or credentials affects outgoing platform email and may interrupt delivery, including authentication emails. Confirm that the new server and credentials are ready.",
+    },
     pageTitle: "System & Control Plane Settings",
     pageSubtitle:
       "Configure authentication, platform branding, email transport, WebPhone SIP trunks, and alert notifications.",
@@ -3380,11 +3496,6 @@ export const en: Dictionary = {
       invalidBoolean: "Invalid boolean value.",
       invalidText: "Invalid text value.",
       invalidOption: "Invalid option selected.",
-      invalidIceServerArray:
-        "Enter a valid JSON array of RTCIceServer objects.",
-      invalidJsonObject: "Enter a valid JSON object.",
-      invalidWebsocketUrl:
-        "WebSocket URL must start with ws:// or wss:// and contain no spaces.",
       topUpMustBeIntegers: "Wallet top-up limits must be integers.",
       topUpMinGreaterThanMax: (maximum: number) =>
         `Minimum cannot be greater than the maximum (${maximum}).`,
@@ -3392,8 +3503,21 @@ export const en: Dictionary = {
         "A previous save has an unresolved outcome. Retry the exact original value before changing it.",
       dependentTopUpSkipped:
         "The dependent value was not sent because the first top-up limit write failed.",
-      saveFailedGeneric: (code: string) =>
-        `This setting could not be saved safely. Error code: ${code}`,
+      serverErrors: {
+        SETTING_VALUE_INVALID: "This value is invalid. Check the setting's allowed values and limits.",
+        SETTING_READ_ONLY: "This setting is managed by the environment and cannot be changed here.",
+        SETTING_KEY_UNKNOWN: "This setting is no longer available. Reload the settings before trying again.",
+        TOPUP_LIMITS_INVALID: "The minimum top-up must not exceed the maximum. Check both limits.",
+        SETTING_TOPUP_RANGE_INVALID: "The minimum top-up must not exceed the maximum. Reload the settings and check both limits.",
+        FORBIDDEN: "You do not have permission to change this setting. Ask an administrator for access.",
+        TOO_MANY_REQUESTS: "Too many requests. Wait a moment before trying again.",
+        "GW.IDEM.IN_FLIGHT": "This save is still processing. Check the saved value before retrying the same change.",
+        "GW.IDEM.MISSING": "The save request is missing its request key. Reload the page and try again.",
+        "GW.IDEM.BAD_VALUE": "The save request has an invalid request key. Reload the page and try again.",
+        "GW.IDEM.MISMATCH": "This request key belongs to a different change. Reload the settings and review the saved value before trying again.",
+      },
+      saveFailedGeneric: (correlationId?: string) =>
+        `This setting could not be saved safely. Try again or contact support.${correlationId ? ` Support reference: ${correlationId}` : ""}`,
     },
     save: {
       failedTitle: "Save failed",
@@ -3417,10 +3541,6 @@ export const en: Dictionary = {
         title: "Platform & Support",
         emptyFiltered: "No settings match your search.",
         emptyGroup: "No settings are registered in this group.",
-      },
-      asterisk: {
-        title: "WebRTC (Asterisk)",
-        empty: "No Asterisk settings are registered.",
       },
     },
     fatalAlerts: {
@@ -3504,6 +3624,14 @@ export const en: Dictionary = {
       batchDialogDescription:
         "One line per currency: CODE,RATE,ACTIVE. Omitted currencies stay unchanged.",
       saveBatch: "Save batch",
+      confirmStatusTitle: "Confirm currency rate status",
+      confirmStatusDescription: (code: string, action: string) => `${action} ${code}? This changes its availability for billing.`,
+      confirmBatchTitle: "Confirm currency rate batch",
+      confirmSingleTitle: "Confirm currency rate change",
+      confirmBatchDescription: (count: number) => `${count} changed row(s). Review the old → new rates and statuses below before applying. Every submitted row will be saved; omitted currencies stay unchanged.`,
+      confirmRateDiff: (code: string, oldRate: string, newRate: string, oldStatus: string, newStatus: string) => `${code}: ${oldRate} → ${newRate} (${oldStatus} → ${newStatus})`,
+      newRate: "New currency",
+      confirmApply: "Confirm and apply",
       validation: {
         actionFailedTitle: "Action failed",
         loadFailed: "Failed to load exchange rates.",
@@ -3512,6 +3640,7 @@ export const en: Dictionary = {
         saveFailed: "Failed to save currency rate.",
         rateSavedTitle: "Currency rate saved",
         batchSaveFailed: "Failed to save currency rates.",
+        rateChangeTooLarge: "This rate differs by more than 50%. Review the before and after values and confirm the change.",
         batchSavedTitle: "Currency rates saved",
         currencyCodeInvalid: "Currency code must be exactly three ISO letters.",
         usdImmutable: "USD is the fixed base currency and cannot be managed.",
@@ -3552,6 +3681,7 @@ export const en: Dictionary = {
       mutation: {
         succeeded: "The operation completed successfully.",
         saveBeforeVerify: "Save changes before testing the connection.",
+        senderDomainMismatch: "The From address domain must match the sender domain.",
         validationFailed: "Review and correct the highlighted fields.",
         noChanges: "There are no changes to save.",
         generic: (code: string) =>

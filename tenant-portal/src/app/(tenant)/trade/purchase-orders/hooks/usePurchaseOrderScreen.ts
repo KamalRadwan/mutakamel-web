@@ -13,6 +13,7 @@ import { useTradeWrite, type TradeWriteState } from "../../documents/hooks/useTr
 import {
   PURCHASE_ORDERS_PATH,
   PURCHASE_ORDER_REASON_REQUIRED,
+  canRetryPurchaseOrderDelivery,
   parsePurchaseOrderDetail,
   purchaseOrderLadder,
   type PurchaseOrderAction,
@@ -31,6 +32,8 @@ export interface PurchaseOrderScreenState {
   closeReason: () => void;
   run: (action: PurchaseOrderAction, reasonCode?: string) => Promise<void>;
   renderPdf: () => void;
+  canRetryDelivery: boolean;
+  retryDelivery: () => Promise<void>;
 }
 
 const EMPTY_LADDER: Record<PurchaseOrderAction, boolean> = {
@@ -59,7 +62,7 @@ export function usePurchaseOrderScreen(id: string): PurchaseOrderScreenState {
   const order = detail.document;
   const { headers, canWrite, userId } = detail.scope;
   const write = useTradeWrite();
-  const pdf = useTradePdfJob(PURCHASE_ORDERS_PATH, id, headers);
+  const pdf = useTradePdfJob(PURCHASE_ORDERS_PATH, id, headers, order?.version.toString());
   const [openReason, setOpenReason] = useState<PurchaseOrderAction | null>(null);
 
   const reload = useCallback(async () => {
@@ -103,6 +106,23 @@ export function usePurchaseOrderScreen(id: string): PurchaseOrderScreenState {
     [order, headers, write, labels, reload],
   );
 
+  const canRetryDelivery = order !== null && canRetryPurchaseOrderDelivery(order, canWrite);
+  const retryDelivery = useCallback(async () => {
+    if (!order || !canRetryDelivery) return;
+    await write.runWrite({
+      operation: t.tradeDocuments.purchaseOrders.retryDelivery,
+      send: (idempotency) => tradePost(
+        `${PURCHASE_ORDERS_PATH}/${order.id}/delivery/retry`,
+        {},
+        {
+          headers: { ...headers, ...idempotency, "if-match": tradeIfMatch(order.version) },
+          maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
+        },
+      ),
+      onSuccess: reload,
+    });
+  }, [order, canRetryDelivery, headers, write, t, reload]);
+
   const renderPdf = useCallback(() => {
     if (!order) return;
     void pdf.render(
@@ -125,5 +145,7 @@ export function usePurchaseOrderScreen(id: string): PurchaseOrderScreenState {
     closeReason: () => setOpenReason(null),
     run,
     renderPdf,
+    canRetryDelivery,
+    retryDelivery,
   };
 }

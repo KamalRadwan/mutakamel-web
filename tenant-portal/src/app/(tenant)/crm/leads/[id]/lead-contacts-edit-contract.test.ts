@@ -14,6 +14,17 @@ const lead = {
 const messages = { ...en.crmLeads.create.errors, url: en.crmShared.fieldUrl, invalid: en.crmShared.errorValidation, conflict: en.crmShared.errorConflict };
 
 describe("lead contacts edit contract", () => {
+  it("seeds, trims and clears the individual's title without sending it on corporate leads", () => {
+    const individual = { ...lead, leadProfileType: "INDIVIDUAL", jobTitle: "Consultant" } as LeadDetail;
+    const baseline = toLeadContactsForm(individual);
+    expect(baseline.jobTitle).toBe("Consultant");
+    expect(buildLeadContactsRequest(individual, { ...baseline, jobTitle: " Consultant " }, baseline)).toEqual({});
+    expect(buildLeadContactsRequest(individual, { ...baseline, jobTitle: " Director " }, baseline)).toEqual({ jobTitle: "Director" });
+    expect(buildLeadContactsRequest(individual, { ...baseline, jobTitle: " " }, baseline)).toEqual({ jobTitle: null });
+    const corporate = toLeadContactsForm(lead);
+    expect(buildLeadContactsRequest(lead, { ...corporate, jobTitle: "Director" }, corporate)).toEqual({});
+  });
+
   it("preserves every identity and unaffected relationship when clearing a title", () => {
     const baseline = toLeadContactsForm(lead);
     const form = toLeadContactsForm(lead);

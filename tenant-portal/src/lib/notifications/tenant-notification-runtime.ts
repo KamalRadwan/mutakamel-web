@@ -140,6 +140,9 @@ export class TenantNotificationRuntimeStore {
   private snapshot: TenantNotificationSnapshot = EMPTY_SNAPSHOT;
   private readonly listeners = new Set<Listener>();
   private readonly queryListeners = new Set<() => Promise<void>>();
+  private invalidationTimer: ReturnType<typeof setTimeout> | null = null;
+  private invalidationFlight: Promise<void> | null = null;
+  private invalidationPending = false;
   private readonly deliveryEvents = new Map<string, string>();
   private readonly notificationFingerprints = new Map<
     string,
@@ -171,12 +174,44 @@ export class TenantNotificationRuntimeStore {
 
   readonly subscribeInvalidation = (listener: () => Promise<void>): (() => void) => {
     this.queryListeners.add(listener);
-    return () => { this.queryListeners.delete(listener); };
+    return () => {
+      this.queryListeners.delete(listener);
+      if (this.queryListeners.size === 0) this.cancelScheduledInvalidation();
+    };
   };
 
-  readonly invalidateQueries = async (): Promise<void> => {
-    await Promise.allSettled([...this.queryListeners].map((listener) => listener()));
+  readonly invalidateQueries = (): Promise<void> => {
+    this.cancelScheduledInvalidation();
+    this.invalidationPending = true;
+    if (this.invalidationFlight) return this.invalidationFlight;
+    this.invalidationFlight = Promise.resolve().then(async () => {
+      try {
+        do {
+          this.invalidationPending = false;
+          await Promise.allSettled(
+            [...this.queryListeners].map((listener) => Promise.resolve().then(listener)),
+          );
+        } while (this.invalidationPending);
+      } finally {
+        this.invalidationFlight = null;
+      }
+    });
+    return this.invalidationFlight;
   };
+
+  private scheduleInvalidation(): void {
+    this.cancelScheduledInvalidation();
+    if (this.queryListeners.size === 0) return;
+    this.invalidationTimer = setTimeout(() => {
+      this.invalidationTimer = null;
+      void this.invalidateQueries();
+    }, 400);
+  }
+
+  private cancelScheduledInvalidation(): void {
+    if (this.invalidationTimer !== null) clearTimeout(this.invalidationTimer);
+    this.invalidationTimer = null;
+  }
 
   setLoadState(
     generation: string,
@@ -215,6 +250,8 @@ export class TenantNotificationRuntimeStore {
 
   bindGeneration(generation: string | null): void {
     if (this.snapshot.generation === generation) return;
+    this.cancelScheduledInvalidation();
+    this.invalidationPending = false;
     this.deliveryEvents.clear();
     this.notificationFingerprints.clear();
     this.recipientStateVersions.clear();
@@ -225,10 +262,12 @@ export class TenantNotificationRuntimeStore {
       unreadCount: 0,
       lastRealtimeCursor: null,
       loadState: "idle",
-    });
+    }, false);
   }
 
   clear(): void {
+    this.cancelScheduledInvalidation();
+    this.invalidationPending = false;
     this.deliveryEvents.clear();
     this.notificationFingerprints.clear();
     this.recipientStateVersions.clear();
@@ -239,7 +278,7 @@ export class TenantNotificationRuntimeStore {
       unreadCount: 0,
       lastRealtimeCursor: null,
       loadState: "idle",
-    });
+    }, false);
   }
 
   applyCreated(
@@ -347,7 +386,7 @@ export class TenantNotificationRuntimeStore {
     );
     if (index < 0) {
       if (!rememberedState) {
-        void this.invalidateQueries();
+        this.scheduleInvalidation();
         return "missing";
       }
       if (payload.recipientStateVersion < rememberedState.version) return "stale";
@@ -356,7 +395,7 @@ export class TenantNotificationRuntimeStore {
           ? "duplicate"
           : "conflict";
       }
-      void this.invalidateQueries();
+      this.scheduleInvalidation();
       return payload.recipientStateVersion > rememberedState.version + 1
         ? "gap"
         : "missing";
@@ -377,7 +416,7 @@ export class TenantNotificationRuntimeStore {
           : "conflict";
       }
       if (payload.recipientStateVersion !== prior.version + 1) {
-        void this.invalidateQueries();
+        this.scheduleInvalidation();
         return "gap";
       }
     }
@@ -530,7 +569,11 @@ export class TenantNotificationRuntimeStore {
       readonly revision?: number;
       readonly loadState?: TenantNotificationSnapshot["loadState"];
     },
+    invalidate = true,
   ): void {
+    const dataChanged = next.unreadCount !== this.snapshot.unreadCount ||
+      (next.items !== this.snapshot.items &&
+        JSON.stringify(next.items) !== JSON.stringify(this.snapshot.items));
     this.snapshot = Object.freeze({
       generation: next.generation,
       items: next.items,
@@ -540,7 +583,7 @@ export class TenantNotificationRuntimeStore {
       loadState: next.loadState ?? this.snapshot.loadState,
     });
     for (const listener of [...this.listeners]) listener();
-    void this.invalidateQueries();
+    if (invalidate && dataChanged) this.scheduleInvalidation();
   }
 }
 
@@ -973,8 +1016,8 @@ export async function revalidateTenantNotifications(): Promise<void> {
   const snapshot = tenantNotificationRuntime.getSnapshot();
   const queries = tenantNotificationRuntime.invalidateQueries();
   if (snapshot.generation !== null) {
-    // Start after any pre-command refresh, without delaying the screen's own
-    // recipient-scoped REST lookup or relying on realtime delivery.
+    // Shell reconciliation also waits for any pre-command refresh. Screen
+    // queries use their own recipient-scoped readers without realtime delivery.
     void refreshTenantNotifications(
       snapshot.generation, snapshot.lastRealtimeCursor, tenantNotificationRuntime, true,
     ).catch(() => { /* The shell exposes retryable refresh failures. */ });

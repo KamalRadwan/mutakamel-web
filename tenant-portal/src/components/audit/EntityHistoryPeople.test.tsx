@@ -10,14 +10,27 @@ vi.mock("@/lib/api/axiosClient", async (original) => ({ ...await original<typeof
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => auth }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: { en, ar }[locale.lang], lang: locale.lang }) }));
 vi.mock("@/design-system", async () => ({
+  ...await import("@/design-system/lib/cn"),
   ...await import("@/design-system/patterns/detail-section/DetailSection"),
+  ...await import("@/design-system/patterns/empty-state/EmptyState"),
   ...await import("@/design-system/patterns/error-state/ErrorState"),
-  ...await import("@/design-system/patterns/timeline/Timeline"),
+  ...await import("@/design-system/primitives/Avatar"),
+  ...await import("@/design-system/primitives/Badge"),
+  ...await import("@/design-system/primitives/Button"),
+  ...await import("@/design-system/primitives/Collapsible"),
+  ...await import("@/design-system/primitives/IdentifierText"),
   ...await import("@/design-system/primitives/RatingStars"),
+  ...await import("@/design-system/primitives/Skeleton"),
+  ...await import("@/design-system/primitives/ToggleGroup"),
+  ...await import("@/design-system/patterns/history-tree/history-tree-types"),
+  ...await import("@/design-system/patterns/history-tree/HistoryDiffList"),
+  ...await import("@/design-system/patterns/history-tree/HistoryTree"),
+  ...await import("@/design-system/patterns/history-tree/HistorySection"),
+  ...await import("@/design-system/primitives/Tabs"),
   ...await import("@/design-system/patterns/person-profile/PersonProfileLink"),
   ...await import("@/design-system/patterns/permission-gate/PermissionGate"),
 }));
-import { EntityHistoryCard } from "./EntityHistoryCard";
+import { RecordHistoryTab } from "./RecordHistoryTab";
 import { TenantApiClientError } from "@/lib/api/axiosClient";
 const LEAD = "01900100-0000-7000-8000-000000000010";
 const A = "01900100-0000-7000-8000-000000000011";
@@ -40,6 +53,7 @@ function serve(path: string) {
 beforeEach(() => {
   vi.clearAllMocks(); locale.lang = "en";
   auth.user = { id: LEAD, firstName: "Kamal", lastName: "Radwan", email: "kamal@example.com", status: "ACTIVE", isTenantOwner: false,
+    featureEntitlements: { "crm.outbound_email": false },
     permissions: ["audit.read", "users.user.read", "org.branch.read", "crm.acquisition_sources.read"],
     permissionScopes: Object.fromEntries(
       ["audit.read", "users.user.read", "org.branch.read", "crm.acquisition_sources.read"]
@@ -51,9 +65,12 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-async function renderHistory(props: Parameters<typeof EntityHistoryCard>[0] = { entityType: "Lead", entityId: LEAD }) {
-  // Flush the history read and dependent profile reads before querying people.
-  await act(async () => { render(<EntityHistoryCard {...props} />); });
+async function renderHistory(props: Parameters<typeof RecordHistoryTab>[0] = { entityType: "Lead", entityId: LEAD }) {
+  // Flush the history read and dependent profile reads, then expand the Level 3 details panel.
+  await act(async () => { render(<RecordHistoryTab {...props} />); });
+  const copy = { en, ar }[locale.lang];
+  const expandButton = screen.queryByRole("button", { name: copy.audit.expandAll });
+  if (expandButton) fireEvent.click(expandButton);
 }
 
 describe("audit names and reusable contact cards", () => {

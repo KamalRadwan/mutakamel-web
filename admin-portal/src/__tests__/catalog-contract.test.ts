@@ -108,7 +108,7 @@ describe("Application Catalogue API Contract Tests (30 Routes)", () => {
     const mockData = {
       data: {
         success: true,
-        data: [{ currencyCode: "EUR", currencyUnitsPerUsd: "0.92" }]
+        data: [{ currencyCode: "EUR", currencyUnitsPerUsd: "0.92", isActive: true }]
       }
     };
     vi.mocked(axiosClient.patch).mockResolvedValueOnce(asAxiosResponse(mockData));
@@ -155,8 +155,12 @@ describe("Application Catalogue API Contract Tests (30 Routes)", () => {
     await applicationsApi.deleteFeature("feature-1", key);
     await applicationsApi.getTierGrants("tier-1");
     await applicationsApi.getPriceLadder("tier-1", "ANNUAL");
-    await applicationsApi.replacePriceLadder("tier-1", { billingCycle: "MONTHLY", brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "15.0000" }] }, key);
+    await applicationsApi.replacePriceLadder("tier-1", { billingCycle: "MONTHLY", expectedPricingRevision: "UNCONFIGURED", reason: "Initial pricing", brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "15.0000" }] }, key);
     await applicationsApi.listCurrencyRates();
+    vi.mocked(axiosClient.patch).mockResolvedValueOnce(asAxiosResponse({ data: {
+      success: true,
+      data: { currencyCode: "EUR", currencyUnitsPerUsd: "0.9300", isActive: true },
+    } }));
     await applicationsApi.upsertCurrencyRate("eur", { currencyUnitsPerUsd: "0.9300", isActive: true }, key);
 
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/applications/crm%2Finjected");
@@ -182,7 +186,7 @@ describe("Application Catalogue API Contract Tests (30 Routes)", () => {
     expect(axiosClient.patch).toHaveBeenCalledWith("/api/admin/core/v1/features/feature-1", { name: "Lead management" }, { headers: { "x-idempotency-key": key } });
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1/features");
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1/price-tiers?billingCycle=ANNUAL");
-    expect(axiosClient.patch).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1/price-tiers", { billingCycle: "MONTHLY", brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "15.0000" }] }, { headers: { "x-idempotency-key": key } });
+    expect(axiosClient.patch).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1/price-tiers", { billingCycle: "MONTHLY", expectedPricingRevision: "UNCONFIGURED", reason: "Initial pricing", brackets: [{ minUsers: 1, maxUsers: null, unitPrice: "15.0000" }] }, { headers: { "x-idempotency-key": key } });
     expect(axiosClient.get).toHaveBeenCalledWith("/api/admin/core/v1/billing/currency-rates");
     expect(axiosClient.patch).toHaveBeenCalledWith("/api/admin/core/v1/billing/currency-rates/EUR", { currencyUnitsPerUsd: "0.9300", isActive: true }, { headers: { "x-idempotency-key": key } });
     expect(axiosClient.delete).toHaveBeenCalledWith("/api/admin/core/v1/tiers/tier-1", { headers: { "x-idempotency-key": key } });

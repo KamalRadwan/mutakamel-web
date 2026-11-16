@@ -2,7 +2,7 @@ import { isUUIDv7 } from '@/lib/uuid';
 import { boundedArray, invalidResponse, record } from './dashboard-parse';
 
 // dashboard-limits.ts and DashboardListQueryDto in crm-app.
-export const DEFINITION_PAGE_LIMIT = 100;
+const DEFINITION_PAGE_LIMIT = 100;
 
 export interface DefinitionPage<T> {
   items: T[];

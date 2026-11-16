@@ -63,6 +63,29 @@ async function pressSave() {
 afterEach(() => { cleanup(); locale.language = "en"; });
 
 describe("LeadCompanyCard", () => {
+  it.each(["javascript:alert(1)", "httpx:foo"])("renders %s as plain text without a link", (companyWebsite) => {
+    renderCard({ subject: { ...lead, companyWebsite } });
+    expect(screen.getByText(companyWebsite).closest("a")).toBeNull();
+  });
+
+  it("defaults a bare company website to an HTTPS link", () => {
+    renderCard({ subject: { ...lead, companyWebsite: "example.com" } });
+    expect(screen.getByRole("link", { name: /example.com/u })).toHaveAttribute("href", "https://example.com/");
+  });
+
+  it.each(["en", "ar"] as const)("retains an unsafe website with a field error and no write in %s", async (language) => {
+    locale.language = language;
+    const { save } = renderCard();
+    const copy = dictionaries[language];
+    fireEvent.click(screen.getByRole("button", { name: copy.crmLeadDetail.editCompany }));
+    const website = screen.getByLabelText<HTMLInputElement>(copy.crmLeadDetail.companyWebsite);
+    fireEvent.change(website, { target: { value: "javascript:alert(1)" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: copy.crmLeadDetail.saveCompany })));
+    expect(save).not.toHaveBeenCalled();
+    expect(screen.getByText(copy.crmShared.fieldUrl)).toBeTruthy();
+    expect(website).toHaveValue("javascript:alert(1)");
+  });
+
   it.each(["en", "ar"] as const)("gives the registration label its full single-line width in %s without enlarging its font", (language) => {
     locale.language = language;
     renderCard();

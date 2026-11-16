@@ -58,6 +58,7 @@ expect. Without it, every primitive built below renders with a hard cut.
 | Toast enter / exit | `sonner` defaults | 200ms |
 | Skeleton shimmer | `Skeleton` primitive | 1.4s loop |
 | Pending dot | `StatusBadge` in-progress | 1.8s loop |
+| Unread notification bell (requested 2026-11-04) | Whole shell bell control, while unread count is positive and popover closed | 1.2s shake once per 10s; explicitly enabled independently of OS motion suppression |
 | **Indeterminate progress** | `Progress` with a null value | **2s opacity loop** |
 | Spinner | `Button loading`, `ErrorState` retry | 700ms loop |
 | Board card drop settle | `@hello-pangea/dnd` | library default |
@@ -201,6 +202,12 @@ hardcoding `translateX(100%)`, or Arabic users get a sweep running backwards
 against their reading direction.
 
 ## Reduced motion
+
+**Explicit product exception, 2026-11-04:** the user requested the unread bell
+to keep shaking even when Windows disables interface animations. Only that
+closed bell control uses an important animation utility to override the reset
+below; it stops when the inbox opens or the unread count reaches zero. Other
+decorative animations and the toast transitions retain reduced-motion behavior.
 
 **Non-negotiable, and it must ship in the first foundation commit** —
 not deferred to a polish pass.

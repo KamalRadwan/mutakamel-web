@@ -80,6 +80,7 @@ describe("useTradeLineDraft item lookup", () => {
     expect(result.current.lines[0]?.quantity).toBe(raw);
     act(() => result.current.commitQuantity(0));
     expect(result.current.lines[0]?.quantity).toBe(expected);
+    if (raw === "0.0") expect(result.current.lineErrors[0]?.quantity).toBe("QUANTITY_INVALID");
   });
 
   it("searches the server with the document purpose and retains selected-result metadata", async () => {
@@ -103,5 +104,37 @@ describe("useTradeLineDraft item lookup", () => {
     expect(result.current.itemsById[FIRST.id]?.canonicalCode).toBe("SKU-FIRST");
     expect(result.current.itemsById[MATCH.id]?.barcode).toBe("622123");
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("preserves padded server price evidence while normalizing only the arithmetic input", async () => {
+    post.mockResolvedValue({ data: { unitPrice: "25.00000000", currencyCode: "EGP",
+      priceBookId: FIRST.id, minimumAllowedPrice: null } });
+    const { result } = renderHook(() =>
+      useTradeLineDraft(HEADERS, "EGP", FIRST.id, "SALES", true),
+    );
+    act(() => result.current.reset([{ clientLineId: "0192f3a0-0000-7000-8000-000000000099",
+      itemId: FIRST.id, uomId: UOM_ID, quantity: "1.12345678", unitPrice: null,
+      isPricing: false, priceError: null }]));
+    await waitFor(() => expect(result.current.lines[0]?.unitPrice).toBe("25.00000000"));
+    expect(result.current.runningTotal).toBe("28.0864195");
+    expect(result.current.invalidLineIndex).toBeNull();
+    expect(result.current.lineErrors).toEqual([{}]);
+  });
+
+  it("does not retry a failed hydrated-item UOM lookup on every catalogue state update", async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path.includes("/catalog/uoms")) throw new Error("UOM lookup unavailable");
+      return { data: { items: [FIRST], total: 1, page: 1, limit: 100 } };
+    });
+    const { result } = renderHook(() =>
+      useTradeLineDraft(HEADERS, "EGP", null, "SALES", true),
+    );
+    await waitFor(() => expect(result.current.items[0]?.id).toBe(FIRST.id));
+    act(() => result.current.reset([{ clientLineId: "0192f3a0-0000-7000-8000-000000000099",
+      itemId: FIRST.id, uomId: UOM_ID, quantity: "1", unitPrice: null,
+      isPricing: false, priceError: null }]));
+    await waitFor(() => expect(result.current.lookupError).not.toBeNull());
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(get.mock.calls.filter(([path]) => String(path).includes("/catalog/uoms"))).toHaveLength(1);
   });
 });

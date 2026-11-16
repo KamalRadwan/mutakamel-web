@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
@@ -24,11 +25,15 @@ export const metadata: Metadata = {
 // plumbing needed since this only has to beat first paint, not SSR.
 const LANG_DIR_BOOTSTRAP = `(function(){try{var l=window.localStorage.getItem("app_lang")==="en"?"en":"ar";document.documentElement.lang=l;document.documentElement.dir=l==="ar"?"rtl":"ltr";}catch(e){}})();`;
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Reading request headers keeps documents dynamic so each render uses the
+  // nonce minted by proxy.ts, including both pre-hydration bootstraps.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="ar"
@@ -37,10 +42,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>
-        <Script id="lang-dir-bootstrap" strategy="beforeInteractive">
+        <Script id="lang-dir-bootstrap" strategy="beforeInteractive" nonce={nonce}>
           {LANG_DIR_BOOTSTRAP}
         </Script>
         <ThemeProvider
+          nonce={nonce}
           attribute="class"
           defaultTheme="dark"
           enableSystem={false}

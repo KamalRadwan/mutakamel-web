@@ -1,3 +1,7 @@
+import { isUUIDv7 } from "@/lib/uuid";
+
+export const CRM_WIDGET_TRANSFER_PERMISSION = "crm.widgets.transfer_ownership";
+
 export const TENANT_ROUTES = {
   home: "/",
   // Two cross-module surfaces (Phase 13). Both sit at the top level rather
@@ -19,6 +23,7 @@ export const TENANT_ROUTES = {
   coreSettingsNumbering: "/core/settings/numbering",
   coreSettingsEmail: "/core/settings/email",
   coreSettingsBranding: "/core/settings/branding",
+  coreSettingsUpdates: "/core/settings/updates",
   coreBilling: "/core/billing",
   coreBillingInvoices: "/core/billing/invoices",
   coreSubscription: "/core/subscription",
@@ -66,6 +71,8 @@ export const TENANT_ROUTES = {
   // because they share a permission, a filter set and an envelope.
   crmDashboardReports: "/crm/dashboards/reports",
   crmWidgets: "/crm/widgets",
+  crmWidgetOwnership: "/crm/widgets/ownership-transfers",
+  crmWidgetNew: "/crm/widgets/new",
   trade: "/trade",
   // Phase 10 — Trade foundation, docs/api/trade-foundation.md.
   tradeItems: "/trade/items",
@@ -76,6 +83,7 @@ export const TENANT_ROUTES = {
   tradeConfiguration: "/trade/configuration",
   // Phase 11 — Trade commercial documents, docs/api/trade-documents.md.
   tradeQuotations: "/trade/quotations",
+  tradeQuotationCreate: "/trade/quotations/new",
   tradeSalesOrders: "/trade/sales-orders",
   tradePurchaseOrders: "/trade/purchase-orders",
   tradePurchaseQuotations: "/trade/purchase-quotations",
@@ -123,6 +131,8 @@ const CRM_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.crmDashboards,
   TENANT_ROUTES.crmDashboardReports,
   TENANT_ROUTES.crmWidgets,
+  TENANT_ROUTES.crmWidgetOwnership,
+  TENANT_ROUTES.crmWidgetNew,
 ]);
 
 const CRM_ENTRY_ROUTES = [
@@ -182,6 +192,10 @@ const CRM_ENTRY_ROUTES = [
   {
     href: TENANT_ROUTES.crmWidgets,
     requirements: [{ permission: "crm.widgets.read", acceptsScopedPermission: false }],
+  },
+  {
+    href: TENANT_ROUTES.crmWidgetOwnership,
+    requirements: [{ permission: CRM_WIDGET_TRANSFER_PERMISSION, acceptsScopedPermission: false }],
   },
   {
     href: TENANT_ROUTES.crmPipelines,
@@ -346,6 +360,7 @@ const CORE_ENTRY_ROUTES = [
   // BrandingController is the one part of Phase 6 that IS permission-gated;
   // billing and subscription carry no permission strings at all.
   { href: TENANT_ROUTES.coreSettingsBranding, permission: "branding.read" },
+  { href: TENANT_ROUTES.coreSettingsUpdates, permission: "workspace.read" },
 ] as const;
 
 export type CoreEntryRoute = (typeof CORE_ENTRY_ROUTES)[number]["href"];
@@ -362,31 +377,14 @@ export function canAccessCoreRoute(
   if (href === TENANT_ROUTES.coreAudit) {
     return ["audit.read", "audit.read.branch", "audit.read.own"].some((permission) => permissions.includes(permission));
   }
+  if (href === TENANT_ROUTES.coreSettingsEmail) {
+    return (
+      permissions.includes("workspace.email.read") ||
+      permissions.includes("workspace.email.manage")
+    );
+  }
   const route = CORE_ENTRY_ROUTES.find((candidate) => candidate.href === href);
   return route ? permissions.includes(route.permission) : false;
-}
-
-/**
- * The sections the `/core/settings` hub offers, in the order it renders them.
- *
- * Listed explicitly rather than derived from `CORE_ENTRY_ROUTES`: that array
- * carries every Core screen, and a hub that silently absorbs each new one
- * would start advertising pages it has no copy for.
- */
-const CORE_SETTINGS_HUB_ROUTES = [
-  TENANT_ROUTES.coreSettingsWorkspace,
-  TENANT_ROUTES.coreSettingsCurrencies,
-  TENANT_ROUTES.coreSettingsTaxes,
-  TENANT_ROUTES.coreSettingsNumbering,
-  TENANT_ROUTES.coreSettingsEmail,
-  TENANT_ROUTES.coreSettingsBranding,
-] as const;
-
-/** The settings hub lists only what the caller may actually open. */
-export function permittedCoreSettingsRoutes(
-  permissions: readonly string[],
-): CoreEntryRoute[] {
-  return CORE_SETTINGS_HUB_ROUTES.filter((href) => canAccessCoreRoute(permissions, href));
 }
 
 /**
@@ -424,8 +422,8 @@ const CORE_EXACT_PATHS = new Set<string>([
   ...CORE_OWNER_ROUTES,
 ]);
 
-// One detail segment per list, never two — a stale deep link below a detail
-// page redirects to /unavailable instead of rendering an empty shell.
+// Detail pages admit one segment. The designer is the explicit nested exception;
+// other deep links redirect to /unavailable.
 //
 // `directory` and `templates` also carry static children (`/settings`,
 // `/assets`, `/assignments`) that this pattern matches as well; those are
@@ -435,7 +433,8 @@ const CORE_DETAIL_PATHS =
   /^\/core\/(?:notifications|users|roles|directory|templates|billing\/invoices|organization\/(?:companies|branches|departments|teams))\/[^/]+$/u;
 
 export function isSupportedCorePath(pathname: string): boolean {
-  return CORE_EXACT_PATHS.has(pathname) || CORE_DETAIL_PATHS.test(pathname)
+  const designId = /^\/core\/templates\/([^/]+)\/design$/u.exec(pathname)?.[1];
+  return isUUIDv7(designId) || CORE_EXACT_PATHS.has(pathname) || CORE_DETAIL_PATHS.test(pathname)
     || /^\/core\/audit\/events\/[^/]+$/u.test(pathname)
     || /^\/core\/subscription\/(?:receipts|operations)\/[^/]+$/u.test(pathname)
     || /^\/core\/application-access\/addon-seats\/[^/]+$/u.test(pathname)
@@ -448,9 +447,8 @@ export function isSupportedCorePath(pathname: string): boolean {
 // not listed is redirected to /unavailable by the proxy, which is how six of
 // these shipped unreachable (Q40).
 //
-// `dashboards` and `widgets` are Phase 9. `/crm/dashboards/reports` matches
-// this pattern as well, and that is harmless: it is listed in
-// CRM_EXACT_PATHS and Next resolves the static segment before `[id]`.
+// The static report explorer and widget builder are listed in CRM_EXACT_PATHS.
+// Next resolves those static segments before `[id]`.
 const CRM_DETAIL_PATHS =
   /^\/crm\/(?:leads|opportunities|customer-profiles|pipelines|opportunity-stages|outbound-emails|dashboards|widgets)\/[^/]+$/u;
 
@@ -593,8 +591,15 @@ export function canAccessTradeDocumentRoute(
   return route ? permissions.includes(route.permission) : false;
 }
 
+export function canAccessTradeQuotationCreate(
+  permissions: readonly string[],
+): boolean {
+  return permissions.includes("trade.quotations.create");
+}
+
 const TRADE_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.trade,
+  TENANT_ROUTES.tradeQuotationCreate,
   TENANT_ROUTES.tradeDashboards,
   TENANT_ROUTES.tradeWidgets,
   ...TRADE_ENTRY_ROUTES.map((route) => route.href),
@@ -624,7 +629,7 @@ const TRADE_EXACT_PATHS = new Set<string>([
 // one, because a quotation revision, a confirmation attempt and a render job
 // are all read through their parent document's own routes.
 const TRADE_DETAIL_PATHS =
-  /^\/trade\/(?:items|categories|uoms|channels|commercial-accounts|quotations|sales-orders|purchase-orders|purchase-quotations|invoices|contracts|inventory\/(?:nodes|serials|decisions)|price-book-versions|decisions|extensions|import-mappings|imports|control-tower|dashboards|widgets|webhooks|webhooks\/deliveries)\/[^/]+$/u;
+  /^\/trade\/(?:items|categories|uoms|channels|commercial-accounts|quotations|sales-orders|purchase-orders|purchase-quotations|invoices|contracts|inventory\/(?:nodes|serials|decisions)|price-books|price-book-versions|decisions|extensions|import-mappings|imports|control-tower|dashboards|widgets|webhooks|webhooks\/deliveries)\/[^/]+$/u;
 
 /**
  * The `/trade/*` allowlist `proxy.ts` redirects against.

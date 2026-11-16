@@ -129,8 +129,10 @@ describe("CRM write attempts", () => {
 
   it("classifies a definite refusal as failed and an unknown outcome as ambiguous", () => {
     expect(isAmbiguousWriteFailure(apiError(409))).toBe(false);
+    expect(isAmbiguousWriteFailure(apiError(403))).toBe(false);
     expect(isAmbiguousWriteFailure(apiError(422))).toBe(false);
     expect(isAmbiguousWriteFailure(apiError(500))).toBe(true);
+    expect(isAmbiguousWriteFailure(apiError(503))).toBe(true);
     expect(isAmbiguousWriteFailure(new TypeError("network"))).toBe(true);
   });
 
@@ -148,6 +150,21 @@ describe("CRM write attempts", () => {
       "IDEMPOTENCY_BODY_MISMATCH",
     );
   });
+
+  it.each(["GW.IDEM.IN_FLIGHT", "IDEMPOTENCY_REQUEST_PROCESSING", "TRADE.IDEMPOTENCY.IN_FLIGHT"])(
+    "retains same-key recovery for an in-flight %s response", async (code) => {
+      const attempt = createWriteAttempt();
+      post.mockRejectedValueOnce(apiError(409, code)).mockResolvedValueOnce({
+        data: { id: "existing-record" }, status: 201, statusText: "",
+        headers: new Headers({ "idempotency-replayed": "true" }),
+      });
+      const send = () => runIdempotentWrite({ attempt, method: "post", path: "/api/tenant/crm/v1/notes",
+        body: { body: "Original intent" }, parse: (payload) => payload });
+      expect((await send()).kind).toBe("ambiguous");
+      expect(await send()).toMatchObject({ kind: "success", replayed: true });
+      expect(post.mock.calls[1]).toEqual(post.mock.calls[0]);
+    },
+  );
 
   // D2, corrected deliberately. This used to assert `failed`, which is the
   // defect: a plain failure invites the user to fill the form in again and

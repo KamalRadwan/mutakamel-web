@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -59,6 +59,10 @@ export function useDashboardDetail(id: string) {
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const loadController = useRef<AbortController | null>(null);
+  const runController = useRef<AbortController | null>(null);
+  const loadEpoch = useRef(0);
+  const runEpoch = useRef(0);
 
   // Mirrors assertAnyPermission: a supplied company must match the grant;
   // without one, any accessible grant scope is sufficient.
@@ -71,9 +75,25 @@ export function useDashboardDetail(id: string) {
     (user?.isTenantOwner === true || can(user, "trade.dashboards.share", permissionTarget));
 
   const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      setIsLoading(true);
-      setQueryError(null);
+    async ({ reset }: { reset: boolean }): Promise<void> => {
+      loadController.current?.abort();
+      runController.current?.abort();
+      runEpoch.current++;
+      const controller = new AbortController();
+      loadController.current = controller;
+      const { signal } = controller;
+      const epoch = ++loadEpoch.current;
+      if (reset) {
+        setDashboard(null);
+        setRun(null);
+        setShares([]);
+        setShareTargets([]);
+        setSharesUnavailable(false);
+        setPending(null);
+        setActionError(null);
+        setIsLoading(true);
+        setQueryError(null);
+      }
       const [detailResult, sharesResult, targetsResult] = await Promise.allSettled([
         tradeGet(dashboardPath(id), {
           signal,
@@ -92,6 +112,8 @@ export function useDashboardDetail(id: string) {
           maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
         }),
       ]);
+
+      if (signal.aborted || epoch !== loadEpoch.current) return;
 
       if (targetsResult.status === "fulfilled") {
         try {
@@ -130,29 +152,43 @@ export function useDashboardDetail(id: string) {
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    const loadLifetime = loadEpoch;
+    const runLifetime = runEpoch;
+    let disposed = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!disposed) void load({ reset: true });
     });
-    return () => controller.abort();
+    return () => {
+      disposed = true;
+      loadController.current?.abort();
+      runController.current?.abort();
+      loadLifetime.current++;
+      runLifetime.current++;
+    };
   }, [load]);
 
   const act = useCallback(
     async (action: PendingAction, call: () => Promise<unknown>, refresh = true): Promise<void> => {
       if (pending) return;
       if (action === "share" ? !canShare : !canEdit) return;
+      const epoch = loadEpoch.current;
       setPending(action);
       setActionError(null);
+      let succeeded = false;
       try {
         await call();
+        succeeded = true;
       } catch (error) {
+        if (epoch !== loadEpoch.current) return;
         const normalized = normalizeApiError(error);
         if (!toast.outcomeFromApi(normalized)) {
           setActionError(analyticsMessage(normalized, t) ?? analyticsFormMessage(error, t));
         }
       } finally {
-        setPending(null);
-        if (refresh) await load();
+        if (epoch === loadEpoch.current) {
+          setPending(null);
+          if (refresh && succeeded) await load({ reset: false });
+        }
       }
     },
     [pending, canEdit, canShare, toast, t, load],
@@ -160,23 +196,30 @@ export function useDashboardDetail(id: string) {
 
   const execute = useCallback(async (): Promise<void> => {
     if (pending) return;
+    runController.current?.abort();
+    const controller = new AbortController();
+    runController.current = controller;
+    const epoch = ++runEpoch.current;
     setPending("run");
     setActionError(null);
     try {
       const response = await tradePost(dashboardActionPath(id, "run"), buildRunRequest(), {
+        signal: controller.signal,
         headers: scope.headers,
         maxResponseBytes: RUN_RESPONSE_LIMIT_BYTES,
       });
+      if (controller.signal.aborted || epoch !== runEpoch.current) return;
       // A run that fails comes back **200 with a FAILED tile**, so the request
       // status alone proves nothing about the widgets.
       setRun(parseDashboardRunResult(response.data));
     } catch (error) {
+      if (controller.signal.aborted || epoch !== runEpoch.current || isAbortError(error)) return;
       const normalized = normalizeApiError(error);
       if (!toast.outcomeFromApi(normalized)) {
         setActionError(analyticsMessage(normalized, t) ?? analyticsFormMessage(error, t));
       }
     } finally {
-      setPending(null);
+      if (epoch === runEpoch.current) setPending(null);
     }
   }, [pending, id, scope.headers, toast, t]);
 
@@ -242,7 +285,7 @@ export function useDashboardDetail(id: string) {
           maxResponseBytes: 10_000,
         }),
       ),
-    reload: () => load(),
+    reload: () => load({ reset: true }),
   };
 }
 

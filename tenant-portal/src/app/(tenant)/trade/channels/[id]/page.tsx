@@ -26,6 +26,7 @@ import {
   cn,
 } from "@/design-system";
 import { formatDateTime } from "@/lib/format/date";
+import { useTenantBranchLabels } from "@/hooks/useTenantBranchLabels";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { TradeScopeBar } from "../../TradeScopeBar";
 import { TRADE_PERMISSIONS } from "../../trade-scope";
@@ -40,6 +41,7 @@ import {
 export default function TradeChannelDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const detail = useChannelDetail(id);
+  const branchLabels = useTenantBranchLabels();
   const { t, lang, channel } = detail;
   const copy = CHANNEL_UI_COPY[lang];
   const isKnownStatus =
@@ -320,9 +322,9 @@ export default function TradeChannelDetailPage({ params }: { params: Promise<{ i
                           </span>
                           <div>
                             <div className="flex items-center gap-2">
-                              <IdentifierText className="min-w-0 text-xs font-semibold text-foreground">
-                                {branch.branchId}
-                              </IdentifierText>
+                              <bdi className="min-w-0 font-sans text-caption font-normal text-foreground">
+                                {branchLabels.get(branch.branchId) ?? t.common.nameUnavailable}
+                              </bdi>
                               {isContextBranch ? (
                                 <Badge tone="brand">{copy.activeScopeBadge}</Badge>
                               ) : (

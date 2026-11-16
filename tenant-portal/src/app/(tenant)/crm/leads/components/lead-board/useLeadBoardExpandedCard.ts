@@ -47,18 +47,6 @@ export function useLeadBoardExpandedCard(lead: LeadItem, sources: readonly Acqui
     (matchedSource ? localizedName(matchedSource, lang) : "");
   const resolvedSourceIconUrl = lead.sourceIconUrl ?? matchedSource?.iconUrl ?? null;
 
-  const individualPhones = useMemo(() => {
-    const raw = [
-      ...(detail?.phones ?? []),
-      ...lead.phones,
-      lead.primaryMobile,
-      lead.phone,
-    ]
-      .map((p) => (p ?? "").trim())
-      .filter((p) => p.length > 0);
-    return Array.from(new Set(raw)).slice(0, 2);
-  }, [detail?.phones, lead.phone, lead.phones, lead.primaryMobile]);
-
   const corporateContacts = useMemo<
     ReadonlyArray<{
       partyId: string;
@@ -135,7 +123,7 @@ export function useLeadBoardExpandedCard(lead: LeadItem, sources: readonly Acqui
     : "";
   return {
     isCompany, title, contactName, sourceLabel, resolvedSourceIconUrl,
-    individualPhones, companyPhones, hasMultipleCorporateContacts, corporateContacts,
+    companyPhones, hasMultipleCorporateContacts, corporateContacts,
     singleCorporateContact, singleCorporateContactPhones, ownerFullName
   };
 }

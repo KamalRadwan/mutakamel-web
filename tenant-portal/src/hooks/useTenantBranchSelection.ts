@@ -1,15 +1,23 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  readTenantBranchSelection,
+  subscribeTenantBranchSelection,
+  writeTenantBranchSelection,
+} from "@/lib/tenant-branch-selection";
 import { isUUIDv7 } from "@/lib/uuid";
 
 export interface TenantBranchSource {
+  id?: string;
   accessibleBranches: readonly string[];
   teamMemberships: ReadonlyArray<{
     branchId: string | null;
     isPrimary: boolean;
   }>;
 }
+
+const serverSelection = () => null;
 
 export function resolveDefaultTenantBranchId(
   source: TenantBranchSource | null | undefined,
@@ -47,7 +55,18 @@ export function useTenantBranchSelection(
     () => (optional ? null : resolveDefaultTenantBranchId(source)),
     [optional, source],
   );
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const actorId = source?.id ?? null;
+  const subscribe = useCallback(
+    (listener: () => void) => actorId === null ? () => {} : subscribeTenantBranchSelection(actorId, listener),
+    [actorId],
+  );
+  const getSnapshot = useCallback(
+    () => actorId === null ? null : readTenantBranchSelection(actorId),
+    [actorId],
+  );
+  const savedBranchId = useSyncExternalStore(subscribe, getSnapshot, serverSelection);
+  const [localBranchId, setLocalBranchId] = useState<string | null>(null);
+  const selectedBranchId = actorId === null ? localBranchId : savedBranchId;
   const branchId =
     selectedBranchId && branchIds.includes(selectedBranchId)
       ? selectedBranchId
@@ -55,13 +74,14 @@ export function useTenantBranchSelection(
 
   const selectBranch = useCallback(
     (nextBranchId: string | null) => {
-      setSelectedBranchId(
+      const next =
         nextBranchId !== null && branchIds.includes(nextBranchId)
           ? nextBranchId
-          : null,
-      );
+          : null;
+      if (actorId === null) setLocalBranchId(next);
+      else writeTenantBranchSelection(actorId, next);
     },
-    [branchIds],
+    [actorId, branchIds],
   );
 
   return { branchIds, branchId, selectBranch };

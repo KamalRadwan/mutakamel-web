@@ -26,6 +26,41 @@ const failure = (status: number, code = "SAVE_FAILED") => new TenantApiClientErr
 });
 
 describe("custom-field edit transport", () => {
+  it.each(["success", "failure"])("does not apply a stale edit %s after the workspace unmounts", async (outcome) => {
+    let finish!: (value: { data: typeof field }) => void;
+    let fail!: (error: Error) => void;
+    patch.mockReturnValue(new Promise<{ data: typeof field }>((resolve, reject) => { finish = resolve; fail = reject; }));
+    const onSaved = vi.fn();
+    const reload = vi.fn().mockResolvedValue(true);
+    const { result, unmount } = renderHook(() => useCustomFieldEdit(true, onSaved, reload));
+    act(() => result.current.select(field));
+    let saving!: Promise<boolean>;
+    act(() => { saving = result.current.save(input); });
+    unmount();
+    await act(async () => {
+      if (outcome === "success") finish({ data: field });
+      else fail(failure(503));
+      expect(await saving).toBe(false);
+    });
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("returns an unconfirmed edit result when unmounted during its reconciliation", async () => {
+    let finish!: (value: boolean) => void;
+    const reload = vi.fn(() => new Promise<boolean>((resolve) => { finish = resolve; }));
+    const onSaved = vi.fn();
+    patch.mockRejectedValue(failure(503));
+    const { result, unmount } = renderHook(() => useCustomFieldEdit(true, onSaved, reload));
+    act(() => result.current.select(field));
+    let saving!: Promise<boolean>;
+    await act(async () => { saving = result.current.save(input); });
+    expect(reload).toHaveBeenCalledOnce();
+    unmount();
+    await act(async () => { finish(true); expect(await saving).toBe(false); });
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("PATCHes names, active and searchable flags and retains requirements missing from PATCH", async () => {
     const onSaved = vi.fn();
     patch.mockResolvedValue({ data: { ...field, ...input, nameAr: "القناة", nameEn: "Acquisition channel", requirements: undefined } });
@@ -58,6 +93,11 @@ describe("custom-field edit transport", () => {
     await act(async () => { await result.current.save(input); });
     expect(result.current.selected?.id).toBe(field.id);
     expect(result.current.error).toBe(en.crmCustomFields.optionInUse);
+    expect(result.current.optionConflict).toBe(true);
+    act(() => result.current.clearOptionConflict());
+    expect(result.current.error).toBeNull();
+    expect(result.current.optionConflict).toBe(false);
+    expect(result.current.selected?.id).toBe(field.id);
   });
 
   it.each([true, false])("refreshes an uncertain save without replay (refresh=%s)", async (refreshed) => {

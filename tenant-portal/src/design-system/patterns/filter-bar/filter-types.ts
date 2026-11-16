@@ -33,8 +33,12 @@ interface FilterDefBase {
 
 export interface SelectFilterDef extends FilterDefBase {
   kind: "select";
+  /** Compact entity names, with no identifier fallback in controls or chips. */
+  nameOnly?: boolean;
   options: FilterOption[];
   placeholder?: string;
+  /** A selectable reset option; its sentinel never reaches the filter state. */
+  allLabel?: string;
 }
 
 export interface MultiSelectFilterDef extends FilterDefBase {
@@ -99,8 +103,8 @@ export interface ChipFormatters {
   numericRange: (min?: string, max?: string) => string;
 }
 
-function optionLabel(options: FilterOption[], value: string): string {
-  return options.find((option) => option.value === value)?.label ?? value;
+function optionLabel(options: FilterOption[], value: string, fallback = value): string {
+  return options.find((option) => option.value === value)?.label ?? fallback;
 }
 
 /**
@@ -126,7 +130,8 @@ export function describeFilters(
         chips.push({
           key: filter.id,
           filterId: filter.id,
-          text: `${filter.label}: ${optionLabel((filter as SelectFilterDef).options, value.value)}`,
+          text: `${filter.label}: ${optionLabel((filter as SelectFilterDef).options, value.value,
+            (filter as SelectFilterDef).nameOnly ? filter.label : value.value)}`,
           nextValue: undefined,
         });
         break;

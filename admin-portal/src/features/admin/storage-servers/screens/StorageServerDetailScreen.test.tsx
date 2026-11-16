@@ -2,12 +2,13 @@
 
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StorageServerStatus, StorageServerView } from "../types";
 import type { StorageCredentialRotationReceipt } from "../lib/rotation-receipt";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
+import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 
 const SERVER_ID = "019f0000-0000-7000-8000-000000000010";
 
@@ -40,7 +41,7 @@ const { i18nMock, toastMock, routerMock, detailMock } = vi.hoisted(() => ({
     abortCredentialRotation: vi.fn(),
     isLoading: false,
     isMutating: false,
-    error: null,
+    error: null as NormalizedApiError | null,
     isAuthLoading: false,
     canRead: true,
     canUpdate: true,
@@ -331,6 +332,103 @@ describe("StorageServerDetailScreen credential actions", () => {
     render(<StorageServerDetailScreen id={SERVER_ID} />);
     expect(screen.queryByRole("button", { name: en.storageServerDetail.safeRotationButton })).toBeNull();
     expect(screen.queryByRole("button", { name: en.storageServerDetail.rotateButton })).toBeNull();
+  });
+});
+
+describe.each(["en", "ar"] as const)("StorageServerDetailScreen error feedback (%s)", (lang) => {
+  const dictionary = lang === "ar" ? ar : en;
+  const copy = dictionary.storageServerDetail;
+  const error: NormalizedApiError = {
+    isNormalized: true, httpStatus: 500, errorCode: "FUTURE.STORAGE_FAILURE",
+    message: "Private storage backend wording", correlationId: "019f1000-0000-7000-8000-000000000999",
+  };
+
+  beforeEach(() => {
+    i18nMock.lang = lang;
+    i18nMock.dir = lang === "ar" ? "rtl" : "ltr";
+    detailMock.server = makeServer("ACTIVE");
+    detailMock.error = null;
+    detailMock.currentRotation = null;
+    detailMock.isLoading = false;
+    detailMock.isAuthLoading = false;
+    detailMock.isMutating = false;
+    detailMock.canRead = true;
+    detailMock.canUpdate = true;
+    detailMock.update.mockReset();
+    detailMock.probe.mockReset();
+    detailMock.rotateCredentials.mockReset();
+    toastMock.error.mockClear();
+  });
+  afterEach(() => { detailMock.error = null; });
+
+  it.each(["initial", "refresh", "action", "editor", "rotation"] as const)(
+    "hides unknown backend text and retains diagnostics for %s failures",
+    async (site) => {
+      if (site === "initial") {
+        detailMock.server = null;
+        detailMock.error = error;
+      } else if (site === "refresh") {
+        detailMock.error = error;
+      } else if (site === "action") {
+        detailMock.probe.mockRejectedValue(error);
+      } else if (site === "editor") {
+        detailMock.update.mockRejectedValue(error);
+      } else {
+        detailMock.server = makeServer("ACTIVE", { isPlatformDefault: true });
+        detailMock.rotateCredentials.mockRejectedValue(error);
+      }
+      const rendered = render(<StorageServerDetailScreen id={SERVER_ID} />);
+      await act(async () => { await Promise.resolve(); });
+
+      if (site === "action") {
+        fireEvent.click(screen.getByRole("button", { name: copy.runConnectionTestButton }));
+      } else if (site === "editor") {
+        fireEvent.click(screen.getByRole("button", { name: copy.editButton }));
+        fireEvent.change(screen.getByPlaceholderText(`${copy.nameLabel} *`), { target: { value: "Updated storage name" } });
+        fireEvent.submit(document.getElementById("storage-server-editor-form")!);
+      } else if (site === "rotation") {
+        fireEvent.click(screen.getByRole("button", { name: copy.safeRotationButton }));
+        fireEvent.change(screen.getByPlaceholderText(`${copy.newAccessKeyIdLabel} *`), { target: { value: "NEW-ACCESS-KEY" } });
+        fireEvent.change(screen.getByPlaceholderText(`${copy.newSecretAccessKeyLabel} *`), { target: { value: "test-secret-material-for-rotation" } });
+        fireEvent.submit(document.getElementById("safe-rotation-form")!);
+      }
+
+      expect(await screen.findByText(dictionary.apiErrorMessages.generic)).toBeInTheDocument();
+      expect(screen.getByText(error.errorCode)).toBeInTheDocument();
+      expect(screen.getByText(error.correlationId!)).toBeInTheDocument();
+      expect(screen.queryByText(error.message)).toBeNull();
+      if (site === "action") {
+        expect(toastMock.error).toHaveBeenCalledWith(copy.connectionTestCouldNotRunTitle, dictionary.apiErrorMessages.generic);
+      }
+      if (site === "refresh") {
+        i18nMock.lang = lang === "ar" ? "en" : "ar";
+        i18nMock.dir = lang === "ar" ? "ltr" : "rtl";
+        rendered.rerender(<StorageServerDetailScreen id={SERVER_ID} />);
+        expect(screen.getByText((lang === "ar" ? en : ar).apiErrorMessages.generic)).toBeInTheDocument();
+      }
+    },
+  );
+
+  it("retains local HTTPS validation without sending a request", async () => {
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: copy.editButton }));
+    fireEvent.change(screen.getByPlaceholderText(`${copy.endpointLabel} *`), { target: { value: "http://s3.example.com" } });
+    fireEvent.submit(document.getElementById("storage-server-editor-form")!);
+    expect(await screen.findByText(copy.httpsOnlyError)).toBeInTheDocument();
+    expect(detailMock.update).not.toHaveBeenCalled();
+  });
+
+  it("retains local grace-window validation without sending a request", async () => {
+    detailMock.server = makeServer("ACTIVE", { isPlatformDefault: true });
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: copy.safeRotationButton }));
+    const dialog = screen.getByRole("dialog", { name: copy.safeRotationEditorTitle });
+    fireEvent.change(within(dialog).getByRole("spinbutton"), { target: { value: "0" } });
+    fireEvent.submit(document.getElementById("safe-rotation-form")!);
+    expect(await screen.findByText(copy.graceWindowRangeError)).toBeInTheDocument();
+    expect(detailMock.rotateCredentials).not.toHaveBeenCalled();
   });
 });
 

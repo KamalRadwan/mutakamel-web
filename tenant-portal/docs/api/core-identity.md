@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31** (re-verified against controllers and services while building Phase 4)
+Last source verification: **2026-11-01** (re-verified against Gateway route contracts, owning Core controllers, DTOs, services, and `TenantPermissionScopeService` for the Organization & Identity redesign)
 
 User/contact and organization detail reads re-verified **2026-09-14** for the
 shared audit-name and contact-card integration described below.
@@ -10,51 +10,77 @@ shared audit-name and contact-card integration described below.
 Owning app: **core-app**
 
 Canonical prefixes: `/api/tenant/core/v1/organization`, `.../users`,
-`.../roles`, `.../permissions`
+`.../profile/avatar`, `.../roles`, `.../permissions`
 
 Upstream: `/api/v1/tenant/organization`, `/api/v1/tenant/users`,
-`/api/v1/tenant/` (roles and permissions share the bare `tenant` controller
-prefix — see the note under [Roles](#roles--7-routes))
+`/api/v1/tenant/profile/avatar`, `/api/v1/tenant/` (roles, permissions, and
+`/users/:userId/assignment*` share the bare `tenant` controller prefix — see the
+note under [Roles](#roles--9-routes))
 
-Portal status: **built** — MASTER-PLAN Phase 4 landed 2026-08-31. All 50 routes
-are called from a screen under `src/app/(tenant)/core/{organization,users,roles,profile}`
-and every response passes a validator in `app/(tenant)/core/contracts/`.
-`pnpm docs:verify-called-routes` proves the path set matches this page exactly.
+Portal status: **built** — MASTER-PLAN Phase 4 landed 2026-08-31 and was
+expanded with self-service profile/avatar, grant options, invitation resend, and
+admin session revocation. Organization, user administration, role/permission,
+grant-option, module-seat, and `users/me/profile` contracts live in
+`src/app/(tenant)/core/contracts/`, while `PATCH /users/me` and `/profile/avatar`
+live in `src/app/(tenant)/core/profile/` and `src/hooks/useProfileAvatarImage.ts`
+(and the shared contact projection lives in `src/lib/people/user-profile.ts`).
+Companion commercial Addon seat routes under `/users/:userId/addon-*` are
+documented in [addon-assignments.md](addon-assignments.md).
 
-Three states this page asks for **cannot be discriminated from the wire**, and
-the screens say so rather than guessing — see Q18, Q20 and Q21 in
-[../build/OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md).
+Remaining wire-level non-discrimination notes are recorded in Q18 and Q20 of
+[../build/OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md); Q21 (resend
+invitation) is superseded by `POST /api/tenant/core/v1/users/:id/resend-invite`
+verified below.
 
 Source inspected:
+`../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`,
 `core-app/src/tenant/organization/organization.controller.ts`,
+`core-app/src/tenant/organization/organization.service.ts`,
 `core-app/src/tenant/organization/dto/*.dto.ts`,
 `core-app/src/tenant/tenant-users/tenant-users.controller.ts`,
+`core-app/src/tenant/tenant-users/tenant-users.service.ts`,
 `core-app/src/tenant/tenant-users/dto/*.dto.ts`,
 `core-app/src/tenant/tenant-roles/tenant-roles.controller.ts`,
+`core-app/src/tenant/tenant-roles/tenant-roles.service.ts`,
 `core-app/src/tenant/tenant-roles/dto/*.dto.ts`,
 `core-app/src/tenant/scope-role-assignments/scope-role-assignments.controller.ts`,
+`core-app/src/tenant/scope-role-assignments/scope-role-assignments.service.ts`,
 `core-app/src/tenant/user-modules/user-modules.controller.ts`,
+`core-app/src/common/tenant-access/tenant-permission-scope.service.ts`,
 `core-app/src/main.ts` (global prefix `api`, URI versioning, default `1`),
 `core-app/src/common/common.module.ts` (global guard order),
 `docs/generated/tenant-api-routes.json`.
 
-**50 routes.** Organization 21 · Users 22 · Roles 6 · Permissions 1.
+**57 routes on this page** (plus 4 commercial Addon seat routes in
+[addon-assignments.md](addon-assignments.md)): Organization 21 · Users &
+self-service profile 29 · Roles 6 · Permissions 1.
 
 ---
 
 ## What applies to every route on this page
 
-- **Class-level `TenantGuard`** on all four controllers — the caller's token
+- **Class-level `TenantGuard`** on all owning controllers — the caller's token
   audience must be `tenant`, else `403 TENANT_ACCESS_REQUIRED`.
-- **`@RequirePermissions(...)` is AND**, not OR. Every listed key must be held.
-  Missing ones come back in `details.permissions` with
+- **`@RequirePermissions(...)` is AND**, not OR, on these controllers. Every
+  listed key must be held. Missing ones come back in `details.permissions` with
   `MISSING_REQUIRED_PERMISSIONS`.
-- **Permissions are resolved server-side from the tenant database**, never read
-  from the JWT, and cached against the signed `authorizationVersion`. A role
-  change bumps that version and silently invalidates the cache.
+- **Permissions and scopes are resolved server-side from the tenant database**
+  via `TenantPermissionScopeService`, never trusted from JWT claims, and cached
+  against the signed `authorizationVersion`. Any role or grant mutation bumps
+  that version so subsequent requests re-resolve immediately.
+- **Additive scope union, no narrower `Deny` override**: effective permissions
+  combine branch role grants (`tenant_user_branch_roles`) and scoped role grants
+  (`tenant_user_scope_roles` at `TENANT`, `COMPANY`, or `BRANCH`). A broader
+  `TENANT` or `COMPANY` grant cannot be subtracted on a child branch; scoping
+  checks return `403 TENANT_WIDE_PERMISSION_REQUIRED`,
+  `403 COMPANY_PERMISSION_DENIED`, or `403 BRANCH_PERMISSION_DENIED`.
+- **Catalogue boundaries**: roles (`/roles`) and permissions (`/permissions`)
+  are tenant-wide catalogues rather than per-company isolated partitions. Do not
+  imply absolute cross-company non-discovery for shared catalogues.
 - **Unknown request fields are a 400**, not a silent ignore — the global pipe
   runs `whitelist` + `forbidNonWhitelisted` + `forbidUnknownValues`.
-- **All identifiers are UUID v7** (`@IsUUID('7')`). A v4 is a 400.
+- **All identifiers on identity/organization DTOs are UUID v7** (`@IsUUID('7')`).
+  A v4 is a 400.
 - **List routes extend `PaginationQueryDto`**: `page` (1-based, default 1),
   `limit` (1–100), `sortBy`, `sortDir` (`ASC`/`DESC`), `search`. `sortBy` is
   validated against a per-endpoint whitelist — outside it is a 400.
@@ -67,12 +93,10 @@ Source inspected:
 
 ## Organization — 21 routes
 
-**Planned addition, 2026-09-07:** [Application Addons target](application-addons-target.md)
-adds separate Company/Branch activation/configuration and Tenant-wide addon
-seat allocation. These are not new fields on the current organization/user
-DTOs below. A discovered Company or shared Branch does not authorize
-Company-wide activation or global seat management; current base module
-assignments remain distinct from planned addon assignments.
+**Companion surface:** [Application Addons target](application-addons-target.md)
+and [addon-assignments.md](addon-assignments.md) cover Company/Branch addon
+activation and user addon seat allocation. Those are separate contracts and
+permissions, not fields on the organization or base user DTOs below.
 
 Four levels, strictly nested: **company → branch → department → team**. A child
 cannot be created under an inactive parent, and a parent cannot be deleted while
@@ -91,12 +115,12 @@ it has children or directly-placed users.
 | GET | `/api/tenant/core/v1/organization/branches/:id` | `org.branch.read` | — |
 | PATCH | `/api/tenant/core/v1/organization/branches/:id` | `org.branch.manage` | `UpdateBranchDto` |
 | DELETE | `/api/tenant/core/v1/organization/branches/:id` | `org.branch.manage` | — |
-| GET | `/api/tenant/core/v1/organization/departments` | `org.department.read` | `OrganizationQueryDto` + `branchId` |
+| GET | `/api/tenant/core/v1/organization/departments` | `org.department.read` | `OrganizationQueryDto` + `companyId`, `branchId` |
 | POST | `/api/tenant/core/v1/organization/departments` | `org.department.manage` | `CreateDepartmentDto` |
 | GET | `/api/tenant/core/v1/organization/departments/:id` | `org.department.read` | — |
 | PATCH | `/api/tenant/core/v1/organization/departments/:id` | `org.department.manage` | `UpdateDepartmentDto` |
 | DELETE | `/api/tenant/core/v1/organization/departments/:id` | `org.department.manage` | — |
-| GET | `/api/tenant/core/v1/organization/teams` | `org.team.read` | `OrganizationQueryDto` + `departmentId` |
+| GET | `/api/tenant/core/v1/organization/teams` | `org.team.read` | `OrganizationQueryDto` + `companyId`, `branchId`, `departmentId` |
 | POST | `/api/tenant/core/v1/organization/teams` | `org.team.manage` | `CreateTeamDto` |
 | GET | `/api/tenant/core/v1/organization/teams/:id` | `org.team.read` | — |
 | PATCH | `/api/tenant/core/v1/organization/teams/:id` | `org.team.manage` | `UpdateTeamDto` |
@@ -105,7 +129,11 @@ it has children or directly-placed users.
 ### Request bodies
 
 `code` is trimmed **and upper-cased** by a transform; `name` is trimmed.
-`status` appears only on the update DTOs, never on create.
+`code` and parent foreign keys (`companyId`, `branchId`, `departmentId`) are
+immutable after creation — they appear only on create DTOs (`CreateDepartmentDto`
+accepts `branchId` only, not `companyId`; `CreateTeamDto` accepts `departmentId`
+only, not `companyId` or `branchId`). `status` is omitted on create (new nodes
+start `ACTIVE`) and is editable via `PATCH` on update DTOs.
 
 | DTO | Fields |
 | --- | --- |
@@ -119,35 +147,48 @@ it has children or directly-placed users.
 | `UpdateTeamDto` | `name?`, `leadUserId?`, `status?` |
 | `OrganizationQueryDto` | `PaginationQueryDto` + `companyId?`, `branchId?`, `departmentId?`, `status?` — **one shared DTO for all four list endpoints** |
 
+Ancestor list filtering re-verified **2026-11-01**: branches accept company;
+departments intersect company and branch; teams intersect company, branch and
+department. The relational predicates also intersect the actor's allowed branch
+IDs. Omitting a filter means all visible values; no `All` sentinel reaches the
+API. Changing a parent in the list clears its selected descendants. Filter
+options include inactive nodes, while create-form pickers retain active-parent
+requirements and their existing sole-option selection rule. Live department
+reads returned one distinct department per company and zero for a mismatched
+company/branch pair. The current tenant has no teams, so a positive team-result
+fixture remains unproven live; predicate and authority tests cover that path.
+
 `status` is `OrgNodeStatusEnum`: **`ACTIVE`** · **`INACTIVE`**.
 
-Organization edits re-verified **2026-10-17** (CLXAPP-120) against the Gateway
-organization PATCH contracts, Core update DTOs and `OrganizationService`.
-The live edit drawer sends an empty string to clear company `legalName` /
-`taxNumber` and branch `address` / `phone`, and `null` to remove a team's
-`leadUserId`. These values survive request serialization; omission would keep
-the stored value. Creation still omits blank optional fields. Company currency
-cannot be cleared: the edit field is marked required with Arabic/English help,
-and saving is disabled unless its trimmed code has three characters. Core
-still validates that the currency is enabled. Existing permissions, response
-validation and error handling are unchanged.
+Organization edits re-verified **2026-10-17** (CLXAPP-120) and **2026-11-01**
+against Gateway organization PATCH contracts, Core update DTOs and
+`OrganizationService`. Sending an empty string clears company `legalName` /
+`taxNumber` and branch `address` / `phone`; sending `null` clears a team's
+`leadUserId`. Creation omits blank optional fields. Company `currencyCode`
+cannot be cleared once set and must reference an enabled workspace currency
+(`422 CURRENCY_NOT_ENABLED`). Team leads must belong to the team's branch
+(`404 ORG_LEAD_USER_NOT_FOUND`, `422 ORG_LEAD_BRANCH_REQUIRED`,
+`409 ORG_LEAD_CHANGE_CONFLICT`). Concurrent hierarchy shifts surface
+`409 ORG_BRANCH_SCOPE_STALE` or `409 ORG_NODE_SCOPE_STALE`.
 
 ### States the UI must render
 
 - **`GET /organization/tree` is bounded at 5 000 nodes per level** and returns
-  422 above it. A tenant that large needs the paginated list screens, not the
-  tree — say so rather than failing silently.
+  `422 ORG_TREE_TOO_LARGE` above it. Direct large tenants to the paginated list
+  screens rather than failing silently.
 - **Deletion blockers are 409s with meaning.** A company with branches, a branch
-  with departments, a department with teams, a team with placed users. Render
-  *which* children block it (MASTER-PLAN task 4.10 + the `DeletionBlockerDialog`
-  pattern), never a bare "failed". The list arrives as `details.blockers`, and it
-  is **server-authored English prose, not an enum** — `OrganizationService`
-  builds each phrase from a string literal, so the headline is localized from the
-  `ORG_NODE_NOT_EMPTY` code and the phrases render verbatim underneath.
-- **HQ uniqueness** — a company may have one headquarters branch. Setting a
-  second is a 409.
-- Creating under an **inactive** parent is rejected. Deactivating a parent that
-  still has active children is rejected.
+  with departments, a department with teams, or a node with placed users returns
+  `409 ORG_NODE_NOT_EMPTY` with `details.blockers` (server-authored English
+  summary strings; localize the headline from `ORG_NODE_NOT_EMPTY` and list the
+  blockers clearly).
+- **HQ uniqueness and transfer protection** — a company may have one
+  headquarters branch (`409 ORG_HQ_EXISTS` when creating a second). Attempting
+  to deactivate, delete, or unmark the current headquarters branch when another
+  branch exists returns `409 ORG_HQ_TRANSFER_REQUIRED` until another active
+  branch is promoted to headquarters.
+- Creating or reactivating under an **inactive** parent returns `409 ORG_PARENT_INACTIVE`.
+  Deactivating a parent that still has active children or placed users is
+  rejected with `409 ORG_NODE_NOT_EMPTY`.
 
 ---
 
@@ -181,12 +222,23 @@ The CRM acquisition-source detail reader separately consumes raw
 
 ## Users — 22 routes
 
-Users drawer behavior reviewed **2026-10-18** (FE-CORE-USERS-004): invite and
-edit forms mount only while open, so loading `/core/users` requests only the
-users list and does not load hidden organization or manager pickers. Invite
-remains visible to callers with `users.user.invite`, but is disabled with a
-translated explanation unless they also hold `org.company.read`,
-`org.branch.read` and `org.department.read` to complete the required placement.
+> **Heading anchor preserved for existing cross-links; current count is 29 routes**
+> across self-service profile/avatar (`6`), user administration & lifecycle
+> (`9`), team memberships (`4`), branch/scoped role grants & options (`7`), and
+> base module seats (`3`). Commercial Addon seat routes (`4`) live in
+> [addon-assignments.md](addon-assignments.md).
+
+Invite and edit modals mount their option queries only while open, so loading
+`/core/users` requests only the users list. Inviting remains visible to callers
+with `users.user.invite`, and requires `org.company.read`, `org.branch.read`
+and `org.department.read` to complete the required placement hierarchy.
+
+**Placement vs authorization**: `companyId`, `branchId`, `departmentId` and
+optional `teamId` establish the user's home organizational placement and keep
+their `isPrimary` team membership synchronized. Placement does **not** grant
+RBAC permissions on its own; operational and administrative permissions come
+from the additive union of `/users/:userId/assignments` and
+`/users/:userId/scope-role-assignments` (plus module/addon seats where enforced).
 
 ### Own avatar — verified 2026-10-17
 
@@ -195,6 +247,9 @@ linked person Party image. `PUT` on the same path accepts multipart `file` and
 returns 204; `DELETE` removes it and returns 204. These self-service routes need
 tenant authentication, with no Directory grant or client-selected Party ID.
 The canonical route maps to Core `/api/v1/tenant/profile/avatar`.
+The portal requests the image only when `/auth/me` reports `hasAvatar: true`, or
+after an upload in the same tab (`useProfileAvatarImage`). Without an image the
+GET returns 404, so the shell no longer probes for one.
 
 Uploads accept PNG, JPEG or WebP up to 2 MiB and 25 million pixels, with one
 non-animated image, matching extension/signature and successful server decoding.
@@ -210,11 +265,15 @@ Directory contact. No rendition, thumbnail or schema change is introduced.
 
 ### User administration and preferences
 
-`me/profile` is declared **before** `:id` in the controller so it cannot be
-swallowed by the id route. Keep that in mind when reading the source order.
+`me` and `me/profile` are declared **before** `:id` in `TenantUsersController`
+so they cannot be swallowed by the `:id` parameter routes.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
+| GET | `/api/tenant/core/v1/profile/avatar` | **none** — any authenticated tenant user | — |
+| PUT | `/api/tenant/core/v1/profile/avatar` | **none** — any authenticated tenant user | multipart `file` |
+| DELETE | `/api/tenant/core/v1/profile/avatar` | **none** — any authenticated tenant user | — |
+| PATCH | `/api/tenant/core/v1/users/me` | **none** — any authenticated tenant user | `UpdateOwnNameDto` |
 | GET | `/api/tenant/core/v1/users/me/profile` | **none** — any authenticated tenant user | — |
 | PUT | `/api/tenant/core/v1/users/me/profile` | **none** | `UpdateTenantProfileDto` |
 | GET | `/api/tenant/core/v1/users` | `users.user.read` | `TenantUserQueryDto` |
@@ -224,10 +283,15 @@ swallowed by the id route. Keep that in mind when reading the source order.
 | DELETE | `/api/tenant/core/v1/users/:id` | `users.user.delete` | — |
 | POST | `/api/tenant/core/v1/users/:id/suspend` | `users.user.deactivate` | — |
 | POST | `/api/tenant/core/v1/users/:id/activate` | `users.user.deactivate` | — |
+| POST | `/api/tenant/core/v1/users/:id/resend-invite` | `users.user.invite` | — |
+| POST | `/api/tenant/core/v1/users/:id/sessions/revoke` | `users.user.deactivate` | — |
 | GET | `/api/tenant/core/v1/users/:id/team-memberships` | `users.user.read` | — |
 | PUT | `/api/tenant/core/v1/users/:id/team-memberships` | `users.user.manage_memberships` | `SetTenantUserTeamMembershipsDto` |
 | POST | `/api/tenant/core/v1/users/:id/team-memberships` | `users.user.manage_memberships` | `TeamMembershipDto` |
 | DELETE | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId` | `users.user.manage_memberships` | — |
+| GET | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId/reporting-scopes` | `users.user.read` | — |
+| PATCH | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId/reporting-scopes` | `users.user.manage_memberships` | `PatchTeamReportingScopesDto` |
+| GET | `/api/tenant/core/v1/users/:userId/assignment-options` | `users.user.assign_roles` | `PaginationQueryDto` |
 | GET | `/api/tenant/core/v1/users/:userId/assignments` | `users.user.assign_roles` | — |
 | PUT | `/api/tenant/core/v1/users/:userId/assignments` | `users.user.assign_roles` | `SetUserBranchRolesDto` |
 | POST | `/api/tenant/core/v1/users/:userId/assignments` | `users.user.assign_roles` | `AddAssignmentDto` |
@@ -238,11 +302,18 @@ swallowed by the id route. Keep that in mind when reading the source order.
 | POST | `/api/tenant/core/v1/users/:userId/modules` | `users.user.manage_modules` | `AssignModuleDto` |
 | DELETE | `/api/tenant/core/v1/users/:userId/modules/:moduleKey` | `users.user.manage_modules` | — |
 
-Module-seat authorization re-verified **2026-10-18** (CORE-USERS-004).
-Only Workspace Administrator receives the new permission by default; owner
-RBAC remains implicit. Profile editing permission alone does not enable module
-controls. The live portal hides module mutations for self; Core refuses
-self-assignment with **403 `USER_SELF_FORBIDDEN`**, including for owners.
+Reporting scope source and Gateway verified **2026-11-09**. GET returns the
+visible branch subset and its membership revision. PATCH requires a UUIDv7
+`x-idempotency-key`, `expectedRevision`, and a nonempty add/remove delta. The
+command preserves HR placement and the HOME branch. Reload GET after a receipt
+or revision conflict. Core rechecks current authority on replay. The endpoint
+requires the Core reporting coverage migration and package adoption.
+
+Module-seat authorization re-verified **2026-10-18** (CORE-USERS-004) and
+**2026-11-01**. Only Workspace Administrator receives `users.user.manage_modules`
+by default; owner RBAC remains implicit. Profile editing permission alone does
+not enable module controls. The portal hides module mutations for self; Core
+refuses self-assignment with **403 `USER_SELF_FORBIDDEN`**, including for owners.
 Reads require `users.user.read` for the target branch, or tenant-wide permission
 for a branchless user. Missing actor/scope context fails closed before reading
 assignments, and a missing target returns **404 `TENANT_USER_NOT_FOUND`**.
@@ -252,75 +323,112 @@ assignments, and a missing target returns **404 `TENANT_USER_NOT_FOUND`**.
 | DTO | Fields |
 | --- | --- |
 | `CreateTenantUserDto` | `email` (trim+lowercase, ≤255), `firstName`/`lastName` (≤80), `employeeCode?` (≤32), **`companyId`, `branchId`, `departmentId` all required**, `teamId?`, `managerId?`, `partyId?`, `jobTitle?` (≤120), `roleAssignments?` (≤500, unique on `branchId:roleId`), `teamMemberships?` (≤500, unique on `teamId`) |
-| `UpdateTenantUserDto` | Every field optional. **No `email`, no `partyId`, no `roleAssignments`** — those are set at invite time or through the assignment routes |
+| `UpdateTenantUserDto` | Every field optional (`firstName?`, `lastName?`, `employeeCode?`, `companyId?`, `branchId?`, `departmentId?`, `teamId?` UUIDv7 or `null`, `managerId?` UUIDv7 or `null`, `jobTitle?`). **No `email`, no `partyId`, no `roleAssignments`** |
+| `UpdateOwnNameDto` | `firstName?` (trim, 1–80), `lastName?` (trim, 1–80) — at least one non-empty field required; updates linked Person Party display name |
 | `TenantUserQueryDto` | `PaginationQueryDto` + `status?`, `companyId?`, `branchId?`, `departmentId?`, `teamId?` |
 | `TeamMembershipDto` | `teamId`, `role?` (`TeamMembershipRoleEnum`), `isPrimary?` |
 | `SetTenantUserTeamMembershipsDto` | `memberships` — non-empty, ≤500, unique on `teamId` |
 | `UpdateTenantProfileDto` | `themeKey?` (≤64), `language?` (one of the supported set, ≤8), `extensions?` (object) |
-| `AssignModuleDto` | the subscribed module key |
+| `AssignModuleDto` | `moduleKey` (`^[a-z][a-z0-9_]*$`, ≤64) — subscribed base module key |
 
-User placement edits re-verified **2026-10-17** (CLXAPP-115) against Core's
-`UpdateTenantUserDto` and `TenantUsersService.update`. On
+User placement edits re-verified **2026-10-17** (CLXAPP-115) and **2026-11-01**
+against Core's `UpdateTenantUserDto` and `TenantUsersService.update`. On
 `PATCH /api/tenant/core/v1/users/:id`, `teamId` and `managerId` accept a UUIDv7
-or `null`; omission preserves the stored value. The live edit drawer sends
-only changed team/manager fields, using `null` when cleared. Changing company,
-branch or department resets the selected team, so saving a department move
-clears the old home team in the same request. Other placement IDs remain
-required in the form and cannot be cleared. Successful saves use the validated
-updated user response and close the drawer; failures retain the form and show
-the existing translated error (including `PLACEMENT_INCONSISTENT` for an
-invalid hierarchy).
+or `null`; omission preserves the stored value, while explicit `null` clears it.
+Optional text fields (`employeeCode`, `jobTitle`) clear when sent as empty
+strings. Changing company, branch or department resets downstream placement
+selections so stale child IDs are never submitted (`422 PLACEMENT_INCONSISTENT`
+if mismatched). Concurrent edits to the target user surface
+`409 TENANT_USER_CHANGED`.
 
 `status` is `UserStatusEnum`: **`INVITED`** · **`ACTIVE`** · **`SUSPENDED`** ·
 **`DEACTIVATED`**.
 `TeamMembershipRoleEnum`: **`MEMBER`** · **`LEAD`** · **`MANAGER`**.
 
-### States the UI must render
+### States and runtime details the UI must handle
 
 - **`POST /users` counts against the seat limit** (`@CountsAgainstUsers()`).
-  A tenant at cap gets **403 `USER_LIMIT_REACHED`** — an actionable outcome that
-  should link to the plan-change path, not a generic error (task 4.29).
+  A tenant at cap gets **403 `USER_LIMIT_REACHED`**. Suppressed recipient
+  addresses on `POST /users`, `POST /users/:id/resend-invite`, or
+  invite-restoring `POST /users/:id/activate` fail with
+  **422 `INVITE_EMAIL_UNDELIVERABLE`**.
 - **`POST /users/:userId/modules` has its own capacity check** behind a
-  PostgreSQL advisory lock. Seat exhaustion is a real, expected outcome — and it
-  is a **422 `SEAT_LIMIT_REACHED`**, not a 403: `UserModulesService.assign`
-  throws `UnprocessableEntityException`. `MODULE_NOT_SUBSCRIBED` and
-  `MODULE_NOT_FOUND` are 422 from the same method; `SUBSCRIPTION_NOT_FOUND` is
-  a 404.
-- **Suspend and activate both advance the security epoch**, so every existing
-  token for that user goes stale immediately. Activate is *not* a no-op undo —
-  it re-admits the user with fresh credentials required.
-- **Owner and self protections**: a user cannot delete or deactivate themselves,
-  and the tenant owner cannot be removed. Both are refusals with distinct codes.
-  User-detail management protections re-verified **2026-10-17**: Edit is disabled
-  for the actor's own record and the tenant owner's record, with a localized
-  explanation. Team memberships remain readable with no write controls. Role
-  grant editors and their assignment/option fetches are skipped for these
-  protected targets, so opening one's own detail never requests
-  `/users/:self/assignments`. Other users retain permission-gated management.
-  Own records link **Edit my name** to `/core/profile`, whose existing
-  self-service name form uses `PATCH /api/tenant/core/v1/users/me`.
-- **The primary team membership cannot be removed** — only replaced through the
-  `PUT`.
-- **`DEACTIVATED` is a fourth state, not a synonym for deleted.** The plan's
-  verb set ("suspend / activate / delete") does not cover it; the list filter
-  does. Render all four.
-- **`INVITED`**: pending badge and revoke (`DELETE /users/:id`) are built.
-  **There is no resend route on this controller** — `TenantUsersService.invite`
-  sends the invitation once from `POST /users` — so the screen states that
-  rather than offering a control with nothing behind it (Q21).
+  PostgreSQL advisory lock: **422 `SEAT_LIMIT_REACHED`** (not 403),
+  **422 `MODULE_NOT_SUBSCRIBED`**, **422 `MODULE_NOT_FOUND`**, and
+  **404 `SUBSCRIPTION_NOT_FOUND`**. Allowance sync fences can return
+  **409 `APPLICATION_ALLOWANCE_NOT_READY`**, **409 `APPLICATION_ALLOWANCE_STALE`**,
+  **409 `TENANT_USER_ASSIGNMENTS_CHANGED`**, or
+  **503 `APPLICATION_ALLOWANCE_UNAVAILABLE`**; `DELETE /users/:userId/modules/:moduleKey`
+  returns **409 `ADDON_ASSIGNMENTS_EXIST`** while dependent add-on seats remain
+  assigned.
+- **Runtime vs Swagger HTTP status mismatch on `suspend` and `activate`**
+  (verified **2026-11-01** in `TenantUsersController`): both `@Post(':id/suspend')`
+  and `@Post(':id/activate')` declare `@ApiEndpointDoc({ status: HttpStatus.OK })`
+  (Swagger `200`), **but omit `@HttpCode(HttpStatus.OK)`**, so NestJS returns
+  **`201 Created`** at runtime. By contrast, `@Post(':id/resend-invite')` and
+  `@Post(':id/sessions/revoke')` explicitly carry `@HttpCode(HttpStatus.OK)` and
+  return **`200 OK`**. Frontend callers use `writeCoreData` (`response.ok`) and
+  validate `data` rather than hardcoding `status === 200`.
+- **Suspend, activate, and session revocation**:
+  - `POST /users/:id/suspend` advances `securityEpoch`, revokes active sessions,
+    and sets `status = 'SUSPENDED'`.
+  - `POST /users/:id/activate` requires `user.status === 'SUSPENDED'` (else
+    **409 `INVALID_STATUS_TRANSITION`**), advances `securityEpoch`, and revokes
+    prior sessions. If the user already has a password hash, `status` becomes
+    **`ACTIVE`**; if the account was suspended before ever accepting its invite,
+    `status` returns to **`INVITED`**, prior unused invite tokens are marked
+    used, and a fresh invitation email is queued. Use the returned `user.status`
+    as authoritative rather than assuming `ACTIVE`.
+  - `POST /users/:id/sessions/revoke` requires `users.user.deactivate`, advances
+    `securityEpoch`, and revokes all active sessions (`ADMIN_REVOKED`) **without
+    changing `user.status`**, returning the updated `TenantUserView`.
+- **Resending an invitation (`POST /users/:id/resend-invite`)** — verified
+  **2026-11-01** (supersedes Q21):
+  - Requires `users.user.invite` on the target user's branch (or tenant-wide if
+    branchless) and full target authority coverage (`assertTargetAuthorityCovered`).
+  - Requires `user.status === 'INVITED'`, else **409 `INVALID_STATUS_TRANSITION`**
+    (active owner/self accounts fail this status gate on the server, and the UI
+    suppresses resend on non-`INVITED`, self, and owner records).
+  - Rate-limited at **5 requests per 60 seconds** (`tenantInviteResendTracker`)
+    with `@FailClosedRateLimit()`.
+  - Marks earlier unused `INVITE` action tokens as `used: true`, enqueues a new
+    invite email in the outbox, and returns HTTP `200` with Core
+    `data: { deliveryStatus: "QUEUED" }`. Render `QUEUED` honestly as queued for
+    delivery — never claim confirmed inbox receipt.
+- **Owner, self, and target-authority protections**:
+  - Self-mutations on admin user endpoints fail with **403 `USER_SELF_FORBIDDEN`**;
+    own-name edits go through `PATCH /api/tenant/core/v1/users/me`.
+  - Mutations against the workspace owner fail with
+    **409 `TENANT_OWNER_PROTECTED`**.
+  - Non-owner actors cannot modify, suspend, activate, delete, resend invites,
+    revoke sessions, or change memberships/roles for a user whose effective
+    tenant/company/branch scope exceeds the actor's own scope
+    (**403 `TARGET_AUTHORITY_EXCEEDS_ACTOR`**).
+- **The primary team membership cannot be removed** directly
+  (**409 `PRIMARY_TEAM_MEMBERSHIP_PROTECTED`**) — it tracks the user's home
+  `teamId` placement or is replaced atomically via `PUT /team-memberships` with
+  a single primary entry (`422 TEAM_MEMBERSHIP_PRIMARY_CONFLICT`,
+  `422 TEAM_MEMBERSHIP_LIMIT_EXCEEDED`).
+- **`DEACTIVATED` is a fourth `UserStatusEnum` value**, distinct from deleted;
+  all four lifecycle values must remain filterable and renderable.
 
 ### Two role models coexist — this is not a mistake
 
 | Route | Table | Shape |
 | --- | --- | --- |
-| `/users/:userId/assignments` | `tenant_user_branch_roles` | A role scoped to **one branch**. Supports add and remove individually |
-| `/users/:userId/scope-role-assignments` | `tenant_user_scope_roles` | A role scoped to `TENANT`, `COMPANY` or `BRANCH`. **`PUT` only — a full atomic replacement**, and **owner-only** |
+| `/users/:userId/assignments` | `tenant_user_branch_roles` | A role scoped to **one branch**. Supports add (`POST`), remove (`DELETE`), and full-set replacement (`PUT`) |
+| `/users/:userId/scope-role-assignments` | `tenant_user_scope_roles` | A role scoped to `TENANT`, `COMPANY` or `BRANCH`. **`PUT` only — a full atomic replacement**, and **owner-only** (`403 SCOPE_ROLE_ASSIGNMENT_OWNER_REQUIRED`) |
 
-A user's effective permissions are the **union** of both. The UI must not imply
-that one supersedes the other. The scope-role `PUT` is the most destructive
-write in Core: it replaces the entire set in one transaction, so it needs a
-pre-write diff confirmation (task 4.21 + the `AtomicReplacementConfirm`
-pattern).
+A user's effective permissions are the **additive union** of both, with no
+narrower `Deny` override. The scope-role `PUT` replaces the entire set in one
+transaction (capped at 500 unique tuples; `409 SCOPE_ROLE_ASSIGNMENT_CONFLICT`,
+`422 SCOPE_ROLE_ASSIGNMENT_LIMIT_EXCEEDED`, `422 SCOPE_ROLE_ASSIGNMENT_INVALID`),
+so the UI confirms the diff before writing. Branch role grants also enforce
+per-branch privilege coverage (`403 ROLE_PRIVILEGE_ESCALATION`), owner-reserved
+role protection (`409 ROLE_RESERVED_FOR_OWNER`), self-grant prohibition
+(`403 ROLE_SELF_ASSIGNMENT_FORBIDDEN`), and user cap
+(`422 TENANT_ROLE_ASSIGNMENT_LIMIT_EXCEEDED` on write; `409` if stored rows
+exceed the 500-row fetch bound).
 
 Scope-role visibility source-reviewed **2026-10-18** (FE-CORE-USERS-003):
 both reading and replacing scope-role assignments require the tenant owner.
@@ -328,33 +436,41 @@ The user-detail panel skips scope-role requests for non-owners and shows the
 localized owner-only explanation instead of a table or Retry error. Branch-role
 assignments continue to load independently.
 
-Grant pickers re-verified **2026-10-17** (FE-CORE-USERS-002):
+Grant-picker contracts source-reviewed **2026-10-17** (FE-CORE-USERS-002) and **2026-11-01**:
 `GET /api/tenant/core/v1/users/:userId/assignment-options` requires only
 `users.user.assign_roles`. It accepts `PaginationQueryDto` (`page`, `limit`,
 `search`) and returns Core `data: { choices, hasMore, labels }` rather than a
-standard list envelope. Search matches stored role/branch names; ordering is
-role name, branch name, role ID, branch ID. The branch editor selects a single
-server-authorized role/branch pair and supports search and additional pages.
-Choices require active branches/companies, actor assignment authority and all
-role permissions on that branch. The owner-reserved role is excluded for
-non-owner recipients. Mutation checks remain authoritative.
+standard list envelope (`422 ROLE_ASSIGNMENT_LABELS_LIMIT_EXCEEDED` if stored
+grant labels exceed the safety bound). Search matches stored role/branch names;
+ordering is role name, branch name, role ID, branch ID. Choices require active
+branches/companies, actor assignment authority and all role permissions on that
+branch. The owner-reserved role is excluded for non-owner recipients. Mutation
+checks remain authoritative.
 
 `labels` contains names for existing visible branch grants and, for owners,
 exact-scope grants, independent of search, pagination and inactive status.
 Only these minimal names are exposed without companion read permissions.
 Option-read failures show Retry and disable branch writes; existing IDs are
-never used as display labels. The owner-only scope editor still uses the role,
-branch and company catalogues and stays disabled with a reason until all
-required reads succeed. Scope-role catalogues exclude the owner-reserved role
-for non-owner recipients.
+never used as display labels. The owner-only scope editor uses the role, branch
+and company catalogues and stays disabled with a reason until all required reads
+succeed.
+
+Live verification **2026-11-01** initially found assignment-options returning
+HTTP 500. The authorized Core fix now runs both reads inside the tenant
+repository transaction instead of its intentionally disabled `getRepository`
+accessor. After a Core image rebuild and a clean container source comparison,
+the authenticated tenant returned 18 choices and three existing-grant labels.
+The actual Grant picker loads names and enables its submit action for a valid
+selection; QA cancelled without granting access. See the resolution evidence in
+[Q143](../build/OPEN-QUESTIONS.md#q143--live-role-assignment-options-read-returns-500).
 
 ---
 
-## Roles — 7 routes
+## Roles — 9 routes
 
 > **Path note.** `TenantRolesController` is mounted on the bare `tenant`
 > prefix, not `tenant/roles`, so it also owns `/permissions` and the
-> `/users/:userId/assignments` routes listed above. The canonical browser paths
+> `/users/:userId/assignment*` routes listed above. The canonical browser paths
 > are unaffected; this only matters when reading the controller.
 
 | Method | Canonical path | Permission | Body / query |
@@ -365,6 +481,8 @@ for non-owner recipients.
 | GET | `/api/tenant/core/v1/roles/:id` | `roles.role.read` | — |
 | PATCH | `/api/tenant/core/v1/roles/:id` | `roles.role.update` | `UpdateTenantRoleDto` |
 | PUT | `/api/tenant/core/v1/roles/:id/permissions` | `roles.role.update` | `SetRolePermissionsDto` |
+| GET | `/api/tenant/core/v1/roles/:id/branch-permissions` | `roles.role.read` + `roles.permission.read`, active tenant owner | — |
+| PUT | `/api/tenant/core/v1/roles/:id/branch-permissions` | `roles.role.update` + `roles.permission.read`, active tenant owner | `SetRoleBranchPermissionsDto` |
 | DELETE | `/api/tenant/core/v1/roles/:id` | `roles.role.delete` | — |
 
 | DTO | Fields |
@@ -373,40 +491,105 @@ for non-owner recipients.
 | `UpdateTenantRoleDto` | `name?`, `description?` |
 | `SetRolePermissionsDto` | `permissionIds` **required**, ≤200, unique |
 | `TenantRoleQueryDto` | `PaginationQueryDto` + `isSystem?` |
+| `SetRoleBranchPermissionsDto` | `expectedRevision` non-negative integer **string** (transport maximum 64 characters); `catalogueRevision` non-empty string (maximum 128); `profiles` full replacement array |
+| `RoleBranchProfileInputDto` | `branchId` UUID v7; `permissionIds` unique UUID v7 array. Domain limits: **100 unique branches**, **200 unique permissions per branch**. Parser safety caps are 500 profiles / 1,000 IDs before domain validation. |
 
-`GET /permissions` returns the catalogue with **localized labels** —
+`GET /permissions` returns the tenant-wide catalogue with **localized labels** —
 `key`, `group`, `descriptionI18n`, `groupI18n`. Use those for the role editor;
-do not build your own permission descriptions.
+do not build client-invented permission descriptions. `GET /roles` returns
+`TenantRoleSummary` (`id`, `name`, `nameI18n`, `description`, `descriptionI18n`,
+`isSystem`, `permissionMode`, `branchProfileCount`, `createdAt`, `updatedAt`)
+with **no holder count** on the wire. `permissionMode` is required and is either
+`GLOBAL` or `BRANCH`; system roles remain `GLOBAL`.
+
+### Branch permission profiles — verified 2026-11-02
+
+`GET /roles/:id/branch-permissions` returns `roleId`, `roleName`, `isSystem`,
+`permissionMode`, decimal-string `revision`, `catalogueRevision`,
+`globalPermissionIds`, `profiles`, `catalogue` and `limits`. Profiles include
+branch/company IDs and names, `isActive` and permission IDs. Catalogue items carry
+human AR/EN labels, a module and nested groups, `BRANCH`/`TENANT` eligibility and
+the real `OWN`/`TEAM`/`ALL` record scope. Hydrate the editor from this document and
+canonical organization reads; do not invent keys, descriptions or scope variants.
+
+PUT sends only `{ expectedRevision, catalogueRevision, profiles: [{ branchId,
+permissionIds }] }`. Copy both revision values from GET. Company choices group
+branches in the UI and are not a request field or a company-wide grant. Branches
+and their parent companies must be live and active; permissions must belong to
+the current active branch-eligible catalogue. Unknown/unclassified eligibility
+is locked at workspace level. Inactive or unavailable saved choices can be
+reviewed and explicitly removed, rather than silently dropped.
+
+The first successful PUT transitions a custom role to `BRANCH`, clears its
+legacy global permission links and atomically replaces every branch profile.
+An empty profile is valid configuration with no authority. `profiles: []` clears
+all branch contributions and **stays `BRANCH`**. A missing branch profile grants
+nothing, including for future branches. Permissions from other roles still add
+access; an unselected permission is not a `Deny`. Branch-derived company discovery
+does not grant company mutation authority.
+
+The same transaction checks current owner authority, fences role/catalogue
+revisions, writes audit events and invalidates every live-assignment holder,
+including inactive holders. Do not retry the PUT automatically. After a timeout
+or uncertain result, GET and compare the authoritative revision and profiles.
+On conflict retain the draft, load the latest state for comparison, and require
+an explicit decision before another save. System-role GET is read-only; writes
+return `409 ROLE_IS_SYSTEM`. The global `/roles/:id/permissions` setter rejects
+`BRANCH` roles with `409 ROLE_BRANCH_MODE_REQUIRED`.
+
+| Canonical code | Status | UI behavior |
+| --- | --- | --- |
+| `ROLE_BRANCH_OWNER_REQUIRED` | 403 | Owner-only boundary; discard stale privileged controls. |
+| `ROLE_BRANCH_REVISION_CONFLICT` | 409 | Preserve draft and offer latest-version comparison. |
+| `ROLE_BRANCH_CATALOGUE_CHANGED` | 409 | Reload the catalogue and review the retained draft. |
+| `ROLE_BRANCH_SCOPE_INVALID` | 422 | Review deleted/inactive branch or parent-company choices. |
+| `ROLE_BRANCH_PERMISSION_INVALID` | 422 | Review unavailable or workspace-only permission choices. |
+| `ROLE_BRANCH_LIMIT_EXCEEDED` | 422 | Explain the branch/profile or effective-union limit. |
+| `ROLE_BRANCH_MODE_REQUIRED` | 409 | Use the branch editor instead of the global setter. |
+
+The UI uses centered modals and Scope → Permissions → Review, supports AR/EN and
+light/dark themes, and auto-selects a sole choice only from complete unsearched
+options. A later explicit uncheck is preserved. Module/group labels remain human
+names, and record scopes select actual catalogue variants.
 
 ### States the UI must render
 
-- **System roles are read-only.** `PATCH` and `DELETE` on one are refused.
-  The list filter `isSystem` exists so the UI can mark them.
-- **A role in use cannot be deleted** — 409 naming the holders.
-- **200 permissions is a hard cap** per role, enforced by the DTO.
+- **System roles are read-only** (`409 ROLE_IS_SYSTEM` on `PATCH`, `PUT`, or
+  `DELETE`; reserved system names on create/rename fail with
+  `409 ROLE_NAME_RESERVED`; duplicate names fail with `409 ROLE_NAME_TAKEN`).
+- **A role in use cannot be deleted** — `409 ROLE_IN_USE`.
+- **200 permissions is the custom-role write cap**, enforced by the DTO (`permissionIds`
+  may also be `[]` on `PUT /roles/:id/permissions` to clear all permissions on a
+  custom role; `409 TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED` if stored rows exceed
+  the fetch bound). Unknown permission IDs fail with `422 PERMISSION_UNKNOWN`.
+  Read-only system roles have a separate stored-read bound of 1,000, matching
+  Core `MAX_SYSTEM_TENANT_ROLE_PERMISSIONS`; the response parser accepts that
+  bound without widening the custom-role write limit.
 - **`PUT /roles/:id/permissions` bumps `authorizationVersion` for every holder**
   in a single transaction, and the backend asserts the fan-out set matches
-  exactly. Every affected user's next request re-resolves permissions. The UI
-  should say that the change takes effect immediately for all holders, because
-  it does.
+  exactly. Every affected user's next request re-resolves permissions
+  immediately without signing in again.
 
-Role permission editor re-verified **2026-10-17** against Core's grant check
-and `/auth/me` permission scope projection. Each catalogue key is grantable
-only when its `permissionScopes[key].tenantWide` is true. Company/branch
-grants do not authorize role definitions. Unavailable keys are disabled with
-a keyboard-accessible explanation. If the role already contains keys outside
-the actor's authority (including IDs absent from the catalogue), the permission
-editor is read-only and asks the actor to contact the workspace owner: Core
-validates the entire replacement, even unchanged keys. Saving requires a loaded
-catalogue and rechecks the current session authority. Missing
-`roles.permission.read`, or a catalogue 403, renders `PermissionGate`.
-`ROLE_PERMISSION_GRANT_DENIED` has Arabic and English messages.
+Role permission editor re-verified **2026-10-17** and **2026-11-01** against
+Core's grant check and `/auth/me` permission scope projection. Each catalogue
+key is grantable only when its `permissionScopes[key].tenantWide` is true.
+Company/branch grants do not authorize role definitions. Unavailable keys are
+disabled with a keyboard-accessible explanation. If the role already contains
+keys outside the actor's authority (including IDs absent from the catalogue),
+the permission editor is read-only and asks the actor to contact the workspace
+owner: Core validates the entire replacement, even unchanged keys
+(`403 ROLE_PERMISSION_GRANT_DENIED`, `422 ROLE_PERMISSION_AUTHORITY_EXCEEDED`,
+`422 ROLE_PERMISSION_GRANT_REQUEST_INVALID`). Saving requires a loaded catalogue
+and rechecks current session authority. Missing `roles.permission.read`, or a
+catalogue 403, renders `PermissionGate`.
 
 ---
 
 ## Not on this page
 
-`/api/tenant/core/v1/auth/*` is [core-auth.md](core-auth.md).
-`/api/tenant/core/v1/users/:id/webphone` and its call-log routes were removed
-from tenant-master exposure on 2026-08-30 — the inventory dropped from 199 Core
-routes to 195. Do not build against them.
+- `/api/tenant/core/v1/auth/*` is [core-auth.md](core-auth.md).
+- `/api/tenant/core/v1/users/:userId/addon-assignments*` and
+  `/api/tenant/core/v1/users/:userId/addon-assignment-options` are
+  [addon-assignments.md](addon-assignments.md).
+- `/api/tenant/core/v1/users/:id/webphone` and its call-log routes were removed
+  from tenant-master exposure on 2026-08-30. Do not build against them.

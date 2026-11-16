@@ -221,7 +221,7 @@ export interface MigrationPermissions {
   canRead: boolean;
   /** `admin.migrations.manage` — the LLD's `execute` tier. */
   hasExecute: boolean;
-  /** `admin.migrations.critical`. */
+  /** Critical tier from ADMIN_RBAC_CRITICAL.MIGRATIONS_MANAGE. */
   hasCritical: boolean;
   /**
    * Start, pause, resume, abort and retry-failed require

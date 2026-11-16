@@ -7,6 +7,7 @@ import { ar } from "@/i18n/dictionaries/ar";
 import { DetailHeader } from "@/design-system";
 import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import type { LeadDetail } from "../../lead-contract";
+import type { LeadStageItem } from "../../../lead-stages/lead-stage-contract";
 import { useLeadDetail } from "../hooks/useLeadDetail";
 import { LeadDetailWorkspace } from "./lead-detail-workspace";
 
@@ -40,7 +41,7 @@ vi.mock("@/design-system", async () => {
     DegradedBanner: () => null,
     useToast: () => ({ warning: deletion.warning }),
     DetailHeader: vi.fn(() => null), ErrorState: () => null,
-    PageActions: () => null, Skeleton: () => null, StatusBadge: () => null,
+    PageActions: ({ children }: { children: React.ReactNode }) => children, Skeleton: () => null,
   };
 });
 vi.mock("../../../shared/components/CrmScopeGate", () => ({ CrmScopeGate: () => null }));
@@ -69,7 +70,7 @@ const lead: LeadDetail = {
   acquisitionSourceNameAr: null, acquisitionSourceNameEn: null, status: "OPEN",
   branchId: "01900100-0000-7000-8000-000000000004",
   stageId: "01900100-0000-7000-8000-000000000005", stageFlag: "NEW",
-  firstName: null, lastName: null, honorificTitle: null, companyName: "Acme",
+  firstName: null, lastName: null, honorificTitle: null, jobTitle: null, companyName: "Acme",
   primaryMobile: null, email: null, companyPhone: null, companyEmail: null,
   companyWebsite: null, taxNumber: null, commercialRegistrationNumber: null,
   phones: [], address: null, acquisitionSourceId: null, description: null,
@@ -118,10 +119,33 @@ describe("LeadDetailWorkspace not found", () => {
 });
 
 describe("LeadDetailWorkspace card identity", () => {
-  it.each(["OPEN", "CONVERTED", "DISQUALIFIED", "ON_HOLD"] as const)("localizes the %s dossier status instead of displaying its wire value", (status) => {
+  const stage: LeadStageItem = { id: lead.stageId, nameEn: "New enquiry", nameAr: "استفسار جديد", flag: "NEW", category: "IN_PROGRESS", sortOrder: 0, isDefault: true, isActive: true };
+  it.each(["en", "ar"] as const)("shows the translated fallback status only without a stage bar in %s", (lang) => {
+    deletion.lang = lang;
+    const copy = { en, ar }[lang];
+    setLead(lead);
+    const detail = vi.mocked(useLeadDetail).getMockImplementation()!(lead.id);
+    const view = render(<LeadDetailWorkspace leadId={lead.id} />);
+    expect(screen.getByText(copy.statusValues["LeadStatus.OPEN"])).toBeVisible();
+    vi.mocked(useLeadDetail).mockReturnValue({ ...detail, stages: [stage], stagesDegraded: true });
+    view.rerender(<LeadDetailWorkspace leadId={lead.id} />);
+    expect(screen.getByText(copy.statusValues["LeadStatus.OPEN"])).toBeVisible();
+    expect(screen.queryByRole("button", { current: "step" })).not.toBeInTheDocument();
+    vi.mocked(useLeadDetail).mockReturnValue({ ...detail, stages: [stage], stagesDegraded: false });
+    view.rerender(<LeadDetailWorkspace leadId={lead.id} />);
+    expect(screen.queryByText(copy.statusValues["LeadStatus.OPEN"])).not.toBeInTheDocument();
+    const stageName = { en: stage.nameEn, ar: stage.nameAr }[lang];
+    expect(screen.getByRole("button", { current: "step" })).toHaveAccessibleName(`${stageName}. ${copy.crmLeadDetail.currentStageUnavailable}`);
+    expect(vi.mocked(DetailHeader).mock.calls.at(-1)?.[0].subtitle).toContain(stageName);
+    const crumb = screen.getByTitle(lead.displayName);
+    expect(crumb).toHaveAttribute("aria-current", "page");
+    expect(crumb.previousElementSibling).toHaveClass("size-3", "rtl:-scale-x-100");
+    expect(crumb.previousElementSibling).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it.each(["OPEN", "CONVERTED", "DISQUALIFIED", "ON_HOLD"] as const)("never displays the %s status wire value", (status) => {
     setLead({ ...lead, status });
     render(<LeadDetailWorkspace leadId={lead.id} />);
-    expect(screen.getByText(`● ${en.common.status}: ${en.statusValues[`LeadStatus.${status}`]}`)).toBeInTheDocument();
     expect(screen.queryByText(new RegExp(`\\b${status}\\b`))).toBeNull();
   });
 

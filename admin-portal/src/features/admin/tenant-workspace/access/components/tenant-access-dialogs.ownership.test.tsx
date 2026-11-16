@@ -88,10 +88,50 @@ describe.each(["en", "ar"] as const)("ownership candidates (%s)", (locale) => {
     await act(async () => { fireEvent.click(option); });
     await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
     expect(await screen.findByRole("combobox", { name: copy.newOwner })).toHaveTextContent("Zara Ali · zara@example.test");
+    fireEvent.change(screen.getByLabelText(copy.transferEmailConfirmation, { exact: false }), { target: { value: owner.email } });
     fireEvent.click(await screen.findByRole("button", { name: copy.transferOwnership }));
     await waitFor(() => expect(controller.transferOwnership).toHaveBeenCalledWith(owner, target.id));
     expect(onSuccess).toHaveBeenCalledWith(copy.transferOwnershipSucceeded);
     expect(controller.directory.data?.items).toEqual([owner]);
+  });
+
+  it("requires the exact current owner's email and prevents Enter in search from submitting", async () => {
+    mocks.listUsers.mockResolvedValue(pageFixture([target]));
+    const { copy, controller, onSuccess, onClose } = setup(locale);
+    fireEvent.click(await screen.findByRole("combobox", { name: copy.newOwner }));
+    const option = await screen.findByRole("option", { name: "Zara Ali · zara@example.test" });
+    await act(async () => { fireEvent.click(option); });
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+
+    const input = screen.getByLabelText(copy.transferEmailConfirmation, { exact: false });
+    const search = screen.getByRole("searchbox", { name: copy.transferCandidatesSearch });
+    const confirm = screen.getByRole("button", { name: copy.transferOwnership });
+    const form = input.closest("form")!;
+    expect(screen.getByText(copy.transferEmailConfirmation)).toBeVisible();
+    expect(confirm).toBeDisabled();
+    for (const value of ["", target.email, owner.email.toUpperCase(), ` ${owner.email} `]) {
+      fireEvent.change(input, { target: { value } });
+      expect(confirm).toBeDisabled();
+      fireEvent.click(confirm);
+      fireEvent.submit(form);
+      expect(controller.transferOwnership).not.toHaveBeenCalled();
+    }
+
+    fireEvent.change(input, { target: { value: owner.email } });
+    expect(confirm).toBeEnabled();
+    fireEvent.change(input, { target: { value: "" } });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(input, { target: { value: owner.email } });
+    expect(confirm).toBeEnabled();
+    expect(fireEvent.keyDown(search, { key: "Enter", code: "Enter" })).toBe(false);
+    expect(controller.transferOwnership).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledWith(copy.transferOwnershipSucceeded));
+    expect(controller.transferOwnership).toHaveBeenCalledExactlyOnceWith(owner, target.id);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("distinguishes loading, failed/retry and genuinely empty results", async () => {

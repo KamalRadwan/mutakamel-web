@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuthScopeKey } from "./useAuthScopeKey";
 import { useTenantAuth } from "@/context/AuthContext";
 import { normalizeApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -11,7 +12,8 @@ export function useUserProfiles(userIds: readonly string[], enabled = true, refr
   const { user, realtimeAuthGeneration } = useTenantAuth();
   const canRead = user?.permissions.includes(USER_PROFILE_READ_PERMISSION) ?? false;
   const idsKey = [...new Set(userIds.filter(isUUIDv7))].sort().join(",");
-  const scope = JSON.stringify([enabled, user?.id, realtimeAuthGeneration, user?.permissions, user?.accessibleBranches, user?.accessibleCompanies, user?.teamMemberships]);
+  const authScope = useAuthScopeKey(user);
+  const scope = useMemo(() => JSON.stringify([enabled, realtimeAuthGeneration, authScope]), [enabled, realtimeAuthGeneration, authScope]);
   const cache = useRef<{ scope: string; refreshToken?: object | number; entries: Map<string, UserProfileResult> }>({ scope: "", entries: new Map() });
   const [snapshot, setSnapshot] = useState<{ scope: string; refreshToken?: object | number; entries: ReadonlyMap<string, UserProfileResult> }>({ scope: "", entries: new Map() });
   const [retryCount, setRetryCount] = useState(0);

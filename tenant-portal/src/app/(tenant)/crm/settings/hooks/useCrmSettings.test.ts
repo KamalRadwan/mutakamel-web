@@ -7,7 +7,6 @@ import {
 const settings = {
   id: "01900100-0000-7000-8000-000000000001",
   requireQualifiedStageForConversion: true,
-  defaultLeadStageId: null,
   defaultPipelineId: "01900100-0000-7000-8000-000000000002",
   outboundEmailContentRetentionDays: 730,
   outboundEmailRetentionPolicyRevision: 4,
@@ -25,17 +24,27 @@ const settings = {
 };
 
 describe("CRM settings API contract", () => {
+  it("accepts the canonical singleton without the removed default lead-stage field", () => {
+    const parsed = parseCrmSettingsResponse(settings);
+    expect(parsed).not.toHaveProperty("defaultLeadStageId");
+    expect(parsed.defaultPipelineId).toBe(settings.defaultPipelineId);
+  });
   it("accepts the raw singleton and keeps only fields rendered by the portal", () => {
     expect(parseCrmSettingsResponse(settings)).toEqual({
       id: settings.id,
       requireQualifiedStageForConversion: true,
-      defaultLeadStageId: null,
       defaultPipelineId: settings.defaultPipelineId,
       outboundEmailContentRetentionDays: 730,
       outboundEmailRetentionPolicyRevision: 4,
       asteriskIntegration: {
         enabled: false,
         allowInvalidTlsCertificate: false,
+        registerExpires: 600,
+        sessionTimers: false,
+        traceSip: false,
+        stunServers: [],
+        turnServers: [],
+        iceServers: [],
       },
     });
   });
@@ -55,12 +64,6 @@ describe("CRM settings API contract", () => {
     ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
     expect(() =>
       parseCrmSettingsResponse({ ...settings, id: "settings" }),
-    ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
-    expect(() =>
-      parseCrmSettingsResponse({
-        ...settings,
-        defaultLeadStageId: "stage-one",
-      }),
     ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
     expect(() =>
       parseCrmSettingsResponse({ ...settings, defaultPipelineId: "pipeline" }),

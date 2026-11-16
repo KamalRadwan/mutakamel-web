@@ -11,6 +11,7 @@ import {
   CORE_LIST_RESPONSE_LIMIT_BYTES,
   CORE_WRITE_RESPONSE_LIMIT_BYTES,
   invalidCoreResponse,
+  isMember,
   nullableText,
   parseCorePage,
   record,
@@ -28,10 +29,13 @@ export const ROLE_NAME_MAX_LENGTH = 120;
 export const ROLE_DESCRIPTION_MAX_LENGTH = 2000;
 /** `SetRolePermissionsDto` — MAX_TENANT_ROLE_PERMISSIONS. A 201st is a 400. */
 export const MAX_ROLE_PERMISSIONS = 200;
-const PERMISSION_KEY_MAX_LENGTH = 160;
-const PERMISSION_LABEL_MAX_LENGTH = 500;
+/** Core tenant-role-permission-limits.ts bounds stored built-in role grants. */
+export const MAX_SYSTEM_ROLE_PERMISSIONS = 1000;
+export const PERMISSION_KEY_MAX_LENGTH = 160;
+export const PERMISSION_LABEL_MAX_LENGTH = 500;
 
-
+export const ROLE_PERMISSION_MODES = ["GLOBAL", "BRANCH"] as const;
+export type RolePermissionMode = (typeof ROLE_PERMISSION_MODES)[number];
 
 /** `LocalizedText` as the permission and role catalogues return it. */
 interface LocalizedText {
@@ -47,6 +51,8 @@ export interface TenantRole {
   descriptionAr: string | null;
   descriptionEn: string | null;
   isSystem: boolean;
+  permissionMode: RolePermissionMode;
+  branchProfileCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +84,14 @@ function parseLocalizedText(
   };
 }
 
+function parseOptionalBranchCount(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > 1000) {
+    invalidCoreResponse();
+  }
+  return value as number;
+}
+
 function parseRoleFields(payload: unknown): { source: Record<string, unknown> } & TenantRole {
   const source = record(payload);
   if (!source) invalidCoreResponse();
@@ -88,6 +102,11 @@ function parseRoleFields(payload: unknown): { source: Record<string, unknown> } 
     "descriptionI18n",
     ROLE_DESCRIPTION_MAX_LENGTH,
   );
+  const isSystem = requiredBoolean(source, "isSystem");
+  if (!isMember(ROLE_PERMISSION_MODES, source.permissionMode)) invalidCoreResponse();
+  if (isSystem && source.permissionMode !== "GLOBAL") invalidCoreResponse();
+  const permissionMode = source.permissionMode;
+  const branchProfileCount = parseOptionalBranchCount(source.branchProfileCount);
   return {
     source,
     id: requiredUuidV7(source, "id"),
@@ -99,7 +118,9 @@ function parseRoleFields(payload: unknown): { source: Record<string, unknown> } 
     nameEn: nameI18n?.en ?? name,
     descriptionAr: descriptionI18n?.ar ?? nullableText(source, "description", ROLE_DESCRIPTION_MAX_LENGTH),
     descriptionEn: descriptionI18n?.en ?? nullableText(source, "description", ROLE_DESCRIPTION_MAX_LENGTH),
-    isSystem: requiredBoolean(source, "isSystem"),
+    isSystem,
+    permissionMode,
+    ...(branchProfileCount !== undefined ? { branchProfileCount } : {}),
     createdAt: requiredTimestamp(source, "createdAt"),
     updatedAt: requiredTimestamp(source, "updatedAt"),
   };
@@ -114,7 +135,8 @@ function parseTenantRole(payload: unknown): TenantRole {
 export function parseTenantRoleDetail(payload: unknown): TenantRoleDetail {
   const { source, ...role } = parseRoleFields(payload);
   const permissionIds = source.permissionIds;
-  if (!Array.isArray(permissionIds) || permissionIds.length > MAX_ROLE_PERMISSIONS) {
+  const limit = role.isSystem ? MAX_SYSTEM_ROLE_PERMISSIONS : MAX_ROLE_PERMISSIONS;
+  if (!Array.isArray(permissionIds) || permissionIds.length > limit) {
     invalidCoreResponse();
   }
   if (!permissionIds.every((value) => isUUIDv7(value))) invalidCoreResponse();
@@ -144,7 +166,7 @@ export function parseTenantPermission(payload: unknown): TenantPermission {
   };
 }
 
-function rolePath(id: string, suffix = ""): CorePath {
+export function rolePath(id: string, suffix = ""): CorePath {
   if (!isUUIDv7(id)) invalidCoreResponse();
   return `${ROLES_PATH}/${encodeURIComponent(id)}${suffix}`;
 }

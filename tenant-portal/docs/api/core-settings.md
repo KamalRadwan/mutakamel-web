@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-11-02**
 
 Owning app: **core-app**
 
@@ -29,6 +29,64 @@ Email config 4 · Notifications 14.
 Everything under [core-identity.md § What applies to every route](core-identity.md#what-applies-to-every-route-on-this-page)
 applies here too — `TenantGuard`, AND-semantics permissions, `forbidNonWhitelisted`,
 UUID v7, the `data` envelope.
+
+## Paginated response envelope and empty-list metadata
+
+Source-verified **2026-11-01** against
+`../backend/mutakamel-apps/shared-libs/packages/common/src/interceptors/response-envelope.interceptor.ts`,
+`../backend/mutakamel-apps/shared-libs/packages/database/src/repositories/base.repository.ts`,
+and `../backend/mutakamel-apps/shared-libs/packages/database/src/query-engine/query-result.helpers.ts`.
+
+Every paginated Core HTTP list endpoint (`GET /api/tenant/core/v1/currencies`,
+`GET /api/tenant/core/v1/taxes`, `GET /api/tenant/core/v1/numbering`,
+`GET /api/tenant/core/v1/organization/companies`, and
+`GET /api/tenant/core/v1/provisioning/updates`) wraps its internal
+`PaginatedResult<T>` through `ResponseEnvelopeInterceptor` into the canonical
+wire shape:
+
+```json
+{
+  "success": true,
+  "data": [],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 0,
+    "totalPages": 0,
+    "hasNext": false,
+    "hasPrev": false
+  },
+  "correlationId": "01902001-…",
+  "timestamp": "2026-11-01T10:00:00.000Z"
+}
+```
+
+- **Paginated reads MUST use `readCorePage`** (`src/lib/api/envelope.ts`) paired
+  with `parseCorePage` or `parseCorePageMeta`
+  (`src/app/(tenant)/core/contracts/core-page.ts`). Do not read paginated Core
+  endpoints through `coreGet` or `readCoreData`: both unwrap `body.data` (`T[]`)
+  and discard `body.meta`. Never mock internal `{ items, total, page, limit }`
+  repository shapes at the HTTP client boundary.
+- **Singleton reads retain `coreGet`** (`src/app/(tenant)/core/core-api.ts`)
+  where response headers or status are required (such as strong `ETag` revisions
+  on `GET /api/tenant/core/v1/email-config`), or `readCoreData` where only the
+  unwrapped `data` object is needed (`GET /api/tenant/core/v1/branding`).
+- **Legitimate zero-total `meta.hasPrev` variance on `page > 1`.** When
+  `total === 0` and `page > 1`, Core currently has two live code paths:
+  `BaseRepository.envelope` emits `hasPrev: true` (`page > 1`), whereas
+  `@mutakamel/database` `emptyPage` (returned when company/branch scope resolves
+  to empty in `TaxesService`, `NumberingSequencesService`,
+  `OrganizationService`, and `TenantUsersService`) emits `hasPrev: false`.
+  `parseCorePageMeta` accepts both booleans **only** when `total === 0 && page > 1`,
+  while strictly requiring `hasPrev: false` on `page === 1` and `hasPrev: true`
+  whenever `total > 0 && page > 1`
+  ([Q141](../build/OPEN-QUESTIONS.md#q141--core-empty-list-pagination-metadata-emits-two-hasprev-values)).
+- **Out-of-range pages (`page > totalPages`) are valid only when `data` is empty.**
+  `parseCorePageMeta` accepts `page > totalPages` when `itemCount === 0` —
+  both when `total > 0` (`hasPrev: true`) and when `total === 0` under either
+  documented `hasPrev` variant — so list hooks can recover from stale page
+  numbers after deletions or filter changes. Non-empty out-of-range responses
+  (`page > totalPages && itemCount > 0`) are rejected.
 
 ---
 
@@ -66,6 +124,18 @@ Source: Gateway `core-email-suppression.route-contracts.ts`, Core
 `tenant/email-suppression/email-suppression.controller.ts` and DTOs.
 Typecheck, lint, specs and authenticated live verification remain lead gates.
 
+## Shared company choices for taxes and numbering
+
+Company pickers in taxes and numbering (verified **2026-10-30**) read active
+companies sequentially in pages of 100 until the reported total is reached,
+up to 1,000 rows. Reads and retries are abortable; a new retry cancels the prior
+read and unmount cancels pending work. Options are published only after a
+complete bounded read. Failures retain the last successful options and show a
+localized inline error with retry, independently of the settings table and
+write permission projection. A separate notice explains truncation at 1,000.
+Unresolved company names use the localized “Unknown company” label, including
+duplicate-code messages, and never expose the company UUID as a name.
+
 ## Workspace settings — 2 routes
 
 | Method | Canonical path | Permission | Body |
@@ -88,7 +158,30 @@ workspace is still being prepared", not as a failed save.
 
 The currency must already exist in the tenant catalogue and be active; the
 timezone and language are validated server-side. Each is a 422 with its own
-code, not a generic failure.
+code, not a generic failure. When the actor holds `currencies.currency.read`,
+`src/app/(tenant)/core/settings/workspace/currency-options.ts` loads active
+currencies through `readCorePage` + `parseCorePageMeta` in pages of 100 (up to
+500 rows) to populate the default-currency picker.
+
+### Self-service component updates — 3 routes
+
+| Method | Canonical path | Permission | Body / query |
+| --- | --- | --- | --- |
+| GET | `/api/tenant/core/v1/provisioning/updates` | `workspace.read` (tenant-wide) | `TenantAvailableUpdateQueryDto` |
+| POST | `/api/tenant/core/v1/provisioning/updates/apply` | `workspace.manage` (tenant-wide) | `ApplyTenantProvisioningUpdatesDto` |
+| GET | `/api/tenant/core/v1/provisioning/operations/:operationId` | `workspace.read` (tenant-wide) | — |
+
+All three endpoints enforce `@RequireTenantWidePermissions` and set
+`Cache-Control: private, no-store`. `GET /provisioning/updates` is enveloped by
+`ResponseEnvelopeInterceptor` as `{ data: TenantAvailableUpdate[], meta }` and
+validated with `readCorePage` + `parseCorePageMeta`; the service-internal
+`checkedAt` field is stripped by the paginated envelope and is intentionally not
+displayed or fabricated in the portal
+([Q142](../build/OPEN-QUESTIONS.md#q142--provisioning-updates-checkedat-is-dropped-by-responseenvelopeinterceptor)).
+`POST /provisioning/updates/apply` returns
+`202 Accepted` and requires a caller-supplied UUIDv7 `x-idempotency-key`,
+revalidating each selected component's current applied release and SHA-256
+manifest checksum before enqueueing a tenant provisioning operation.
 
 ---
 
@@ -102,7 +195,14 @@ code, not a generic failure.
 | POST | `/api/tenant/core/v1/currencies/:id/set-default` | `currencies.currency.manage` | — |
 | DELETE | `/api/tenant/core/v1/currencies/:id` | `currencies.currency.manage` | — |
 
-`CurrencyQueryDto` extends `PaginationQueryDto` with `status?` and `isDefault?`.
+`CurrencyQueryDto` extends `PaginationQueryDto` with `status?` and `isDefault?`
+(verified **2026-11-02** against
+`../backend/mutakamel-apps/shared-libs/packages/database/src/dtos/pagination-query.dto.ts`
+and `constants/pagination-defaults.constant.ts`: `page >= 1`, `limit` `1..100`
+default `20`). `/core/settings/currencies` offers server-backed `limit` choices
+`20`, `50` and `100` (resetting `page` to `1` while preserving active filter,
+search and sort) and keeps its independent default-currency lookup fixed at
+`page=1&limit=1&isDefault=true`.
 
 ### The invariants the UI must reflect, not enforce
 
@@ -119,8 +219,12 @@ Currency update contract verified **2026-10-17**: `UpdateCurrencyDto` accepts
 only `name`, `symbol`, `exchangeRate` and `status`. Code and decimal places
 are read-only in the edit form and omitted from PATCH; sending `decimalPlaces`
 returns a 400 non-whitelisted-field validation error, even if unchanged.
-Creation still accepts decimal places. Currency writes show dedicated Arabic
-and English messages for `CURRENCY_DECIMAL_PLACES_IMMUTABLE`,
+Creation accepts an optional ISO precision echo, but Core derives the actual
+precision from the currency code and rejects a mismatched echo with
+`CURRENCY_PRECISION_MISMATCH`. Source verified **2026-11-01** against
+`common/money/iso4217-minor-units.ts` and `CurrenciesService.create`: the portal
+displays this derived precision read-only and omits it from the create body.
+Currency writes show dedicated Arabic and English messages for `CURRENCY_DECIMAL_PLACES_IMMUTABLE`,
 `CURRENCY_REBASE_OUT_OF_RANGE` and `CURRENCY_NOT_FOUND`.
 
 - **Exactly one default.** `set-default` promotes the target and demotes the
@@ -130,8 +234,9 @@ and English messages for `CURRENCY_DECIMAL_PLACES_IMMUTABLE`,
   the row inactive. History is preserved. Label the control accordingly.
 - **The default currency cannot be deactivated**, and neither can one referenced
   by workspace settings. Both are 409s naming the reason.
-- Exchange rates are **decimal strings**. Render through `Money`; never
-  `Number()` one.
+- Exchange rates are **decimal strings**, expressing row-currency units per one
+  current-default unit. Preserve them with `formatDecimalString`, independently
+  of amount precision; never `Number()` a stored rate for display or rebasing.
 
 ---
 
@@ -145,11 +250,19 @@ and English messages for `CURRENCY_DECIMAL_PLACES_IMMUTABLE`,
 | DELETE | `/api/tenant/core/v1/taxes/:id` | `taxes.tax.manage` | — |
 
 `TaxQueryDto` extends `PaginationQueryDto` with `status?`, `companyId?`,
-`isInclusive?`.
+`isInclusive?` (verified **2026-11-02**: `limit` `1..100`, default `20`;
+`/core/settings/taxes` offers server-backed `20`, `50` and `100`, resetting
+`page` to `1` while preserving `companyId`, `status`, `isInclusive`, `search`
+and `sort`).
 
 A tax is optionally **company-scoped**, and its `code` is unique **within that
 scope** — the same code may exist for two companies. A duplicate is a 409 that
 should name the company, otherwise the message is baffling.
+
+Source verified **2026-11-01**: rates accept 0 through 100 with at most four
+decimal places. `UpdateTaxDto` accepts `name`, `rate`, `isInclusive` and `status`;
+code and company scope are immutable and omitted from PATCH. Reactivation uses
+`status: ACTIVE` and remains subject to Core's active-company checks.
 
 `DELETE` is a deactivation returning **204**, for the same reason as currencies:
 posted documents must keep resolving their tax.
@@ -172,12 +285,20 @@ a sequence can outrun `Number.MAX_SAFE_INTEGER`.
 `:code` is validated against `/^[A-Z0-9][A-Z0-9._:-]{0,63}$/` and **upper-cased**
 before lookup, so the URL is case-insensitive but the stored code is not.
 
-### `peek` is the whole point of the screen
+### Numbering preview (source verified 2026-10-29)
+
+Prefix validation verified **2026-10-29**: create/update trim surrounding whitespace
+and accept at most 16 Unicode letters/numbers or `._:/#-` characters. Whitespace-only
+input, internal whitespace, controls and bidi overrides are invalid. An empty
+string clears the prefix to SQL `NULL`; omitting it on update preserves its value.
+The portal request builders enforce the same rules with Arabic/English guidance.
 
 `GET /numbering/:code/peek` returns `{ code, companyId, nextValue, formatted }`
-and **consumes nothing**. Wire it to the create/edit form so prefix, padding and
-start value render a live preview of the next document number. That is the only
-way a user can tell what they are configuring.
+and **consumes nothing**. Only the edit modal reads and displays this saved
+server value. Both forms preview prefix, padding and counter changes with the
+local formatter, preserving the counter as a string. The create modal never
+probes `peek` while typing; POST reports conflicting codes with HTTP 409
+`SEQUENCE_CODE_TAKEN`.
 
 **`nextValue` may never move backward** — a lower value is a **422**, not a
 generic failure. Say what the current value is.
@@ -186,12 +307,45 @@ generic failure. Say what the current value is.
 
 ## Email configuration — 4 routes
 
+SMTP patch serialization verified against source **2026-10-29** (AUDIT28C-CORE-9):
+when SMTP is selected, every patch includes the effective `smtpSecure` and
+`smtpProtocol` form values, even when unchanged. Null saved settings use
+`false` and `"smtp"`, so switching from another provider initializes both
+settings explicitly. Other fields retain their existing change-only behavior.
+
+Portal form rules verified against source **2026-10-29** (AUDIT28C-CORE-4):
+new provider selections are limited to SMTP and platform-shared. Existing
+SES/SendGrid configurations still display their provider and remain readable;
+the portal cannot supply the versioned credential reference required to switch
+to either provider. Activation is disabled until the saved configuration has
+`dkimVerified: true`, and the patch builder rejects an unverified activation.
+Switching to SMTP requires a password when `smtpPasswordConfigured` is false;
+a blank password preserves an existing stored password. These form stops have
+Arabic/English guidance. API `TENANT_EMAIL_CONFIG_INVALID` rejections also map
+to translated configuration guidance. Core remains authoritative, including
+resetting verification and suspending delivery when its verification tuple changes.
+
+Source updated **2026-10-29** (AUDIT28C-CORE-2): all four routes require the CRM module and `crm.outbound_email`, in addition to their existing permissions. Core returns `403 ACCESS_POLICY_BLOCKED` before reading the configuration or probing SMTP when the entitlement is absent. `503 TENANT_EMAIL_CONFIG_NOT_READY` remains a provisioning failure for an entitled tenant.
+
+The staff-readable `/api/tenant/core/v1/auth/me` response includes `featureEntitlements: { "crm.outbound_email": boolean }`. Configuration queries must not mount when this entitlement is absent; direct navigation renders translated “not included in plan” guidance. Suppression lookup/lift has a separate tenant-wide `workspace.email.manage` admission and no email-config read or outbound entitlement guard; keep its entry independent of the configuration boundary. An API refusal after the page opened is distinct from provisioning errors. Core remains authoritative. Typecheck, lint, specs and live verification remain lead gates.
+
 | Method | Canonical path | Permission | Notes |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/core/v1/email-config` | `workspace.email.read` | Safe projection — **no secrets** |
 | PATCH | `/api/tenant/core/v1/email-config` | `workspace.email.manage` | Idempotency + `If-Match` required |
 | POST | `/api/tenant/core/v1/email-config/verify` | `workspace.email.manage` | **No body.** Idempotency + `If-Match` |
-| POST | `/api/tenant/core/v1/email-config/verify-connection` | `workspace.email.manage` | **No body** |
+| POST | `/api/tenant/core/v1/email-config/verify-connection` | `workspace.email.manage` | **No body.** Idempotency required |
+
+Quota projection source verified **2026-11-01** against
+`tenant/email-config/dto/tenant-email-config.dto.ts` and
+`TenantEmailConfigService.toDto`: GET includes `planDailyQuota`,
+`planRateLimitPerMin`, `planQuotaRevision`, nullable `dailyQuota` and
+`rateLimitPerMin`, and their two effective values. PATCH accepts nullable
+`dailyQuota` (integer 1–1,000,000) and `rateLimitPerMin` (integer 1–10,000).
+`null` inherits the plan; zero is invalid, and overrides cannot exceed the
+current plan caps. Plan fields are read-only evidence, never PATCH fields.
+The safe GET also includes server-derived `feedbackProfile` (`CRM_FEEDBACK_V1`
+or `null`); it is not an editable provider credential or an activation proof.
 
 ### This module has the strictest concurrency contract in Core
 
@@ -215,7 +369,7 @@ and never come back in `GET`. A settings form must therefore show "configured"
 rather than a masked value it does not have, and must not clear the stored
 secret when the user saves without retyping it.
 
-`verify` checks the saved sender domain (DKIM/SPF) at the exact revision;
+`verify` checks the saved sender domain's registered DKIM proof at the exact revision;
 `verify-connection` runs a bounded TLS-verified SMTP probe. Both return **201**.
 The probe result is deliberately vague about network detail — do not present it
 as a diagnostic log.
@@ -231,10 +385,7 @@ as a diagnostic log.
 | GET | `/api/tenant/core/v1/notifications/unread-count` | `notifications.notification.read` |
 | POST | `/api/tenant/core/v1/notifications/:id/read` | `notifications.notification.read` |
 | POST | `/api/tenant/core/v1/notifications/:id/acknowledge` | `notifications.notification.read` |
-| POST | `/api/tenant/core/v1/notifications/:id/ack` | `notifications.notification.read` |
-| POST | `/api/tenant/core/v1/notifications/:id/dismiss` | `notifications.notification.read` |
 | DELETE | `/api/tenant/core/v1/notifications/:id` | `notifications.notification.read` |
-| POST | `/api/tenant/core/v1/notifications/mark-all-read` | `notifications.notification.read` |
 | POST | `/api/tenant/core/v1/notifications/read-all` | `notifications.notification.read` |
 | GET | `/api/tenant/core/v1/notifications/preferences` | `notifications.preference.read` |
 | PUT | `/api/tenant/core/v1/notifications/preferences` | `notifications.preference.manage` |
@@ -281,14 +432,46 @@ so silently skips notifications.
 
 | Screen | Plan task | State |
 | --- | --- | --- |
-| `/core/settings/workspace` | 5.1 | live |
-| `/core/settings/currencies` | 5.2 | live |
-| `/core/settings/taxes` | 5.3 | live |
-| `/core/settings/numbering` | 5.4–5.6 | live |
-| `/core/settings/email` | 5.7–5.9 | live — DNS panel shows the host only, see below |
+| `/core/settings` | 5.14 | live — redirect-only entry resolving the first permitted `CORE_SETTINGS_NAV_ITEMS` route (or `/unavailable`), with no standalone hub page |
+| `/core/settings/workspace` | 5.1 | live — single-column layout, actions in `PageActionBar`, dirty draft guarded via `useUnsavedChangesGuard` |
+| `/core/settings/currencies` | 5.2 | live — canonical `readCorePage` pagination, actions in `PageActionBar` |
+| `/core/settings/taxes` | 5.3 | live — canonical `readCorePage` pagination + bounded company picker, actions in `PageActionBar` |
+| `/core/settings/numbering` | 5.4–5.6 | live — canonical `readCorePage` pagination + bounded company picker, actions in `PageActionBar` |
+| `/core/settings/email` | 5.7–5.9 | live — DNS panel shows the host only, see below; actions in `PageActionBar`, dirty draft guarded via `useUnsavedChangesGuard` |
+| `/core/settings/branding` | 6.x | live — contrast-checked identity & asset upload, actions in `PageActionBar`, dirty draft guarded via `useUnsavedChangesGuard` |
+| `/core/settings/updates` | — | live — canonical `readCorePage` discovery + idempotent 202 apply, no `checkedAt` assumption |
 | `/core/notifications` | 5.10–5.13 | live — inbox, preferences, devices |
 | `/core/notifications/[id]` | 5.19 | live — resolved from the list, no by-id route exists |
-| `/core/settings` hub | 5.14 | live |
+
+Core settings screens (`workspace`, `currencies`, `taxes`, `numbering`, `email`,
+`branding`, `updates`, `webphone`) keep `PageHeader` (`className="sr-only"`) so
+their primary and secondary actions portal into `PageActionBar` without
+repeating a second in-body `SubNav` or redundant page subtitle, retaining short
+decision-focused helper copy only where user choices depend on it (currency
+rates/rebasing, support-access consent, and DNS verification).
+
+Stateful Core settings forms (`workspace`, `email`, `branding`) pair
+`useUnsavedChangesGuard` (`src/hooks/useUnsavedChangesGuard.ts`) with
+`ConfirmActionModal`: when a draft is dirty, it intercepts ordinary same-origin
+`<a href>` clicks in capture phase (ignoring `#` hash jumps, self-links,
+downloads, modified clicks, external origins, and non-`_self` targets),
+registers `window` `beforeunload`, and gates explicit in-page `Discard` and
+`Reload` actions via `requestDiscard`. Where the browser exposes Navigation API,
+it also cancels cancellable same-document Back/Forward traversals and resumes
+the original history entry only after confirmation. The browser may permit an
+escape traversal; engines without Navigation API retain anchor and unload
+protection. No history methods are rewritten. Callers wrap their own direct
+imperative navigation in `requestDiscard`.
+
+Conflict overwrite in Workspace sends only fields edited against the original
+baseline, preserving unrelated concurrent changes. Branding asset upload merges
+clean metadata from the saved response while retaining both dirty values and
+their original per-field conflict baseline, including edits made during upload.
+Discard uses the latest saved metadata and retains uploaded assets. Upload and
+metadata save cannot run together. Email and Branding reject malformed successful
+reads as invalid responses, separately from network failures, and fence read
+completions after replacement or unmount. Email checks read permission before
+mounting its query hook.
 
 ### Three things the contract does not give the UI
 

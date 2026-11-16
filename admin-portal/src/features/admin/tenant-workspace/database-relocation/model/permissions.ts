@@ -1,10 +1,7 @@
-import { adminCan, type AdminAuthorizationContext } from "@/lib/auth/rbac";
+import { adminCan, ADMIN_RBAC_CRITICAL, type AdminAuthorizationContext } from "@/lib/auth/rbac";
 
 export const TENANT_RELOCATION_READ_PERMISSION = "admin.tenant_relocations.read";
-export const TENANT_RELOCATION_EXECUTE_PERMISSION =
-  "admin.tenant_relocations.execute";
-export const TENANT_RELOCATION_CRITICAL_PERMISSION =
-  "admin.tenant_relocations.critical";
+export const [TENANT_RELOCATION_EXECUTE_PERMISSION, TENANT_RELOCATION_CRITICAL_PERMISSION] = ADMIN_RBAC_CRITICAL.TENANT_RELOCATIONS_EXECUTE;
 
 export interface TenantRelocationPermissions {
   canRead: boolean;

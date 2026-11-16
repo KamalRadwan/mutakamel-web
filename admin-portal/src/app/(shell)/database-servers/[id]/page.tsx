@@ -109,7 +109,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
           }
           targetName={server.name}
           actionType={page.lifecycleAction ?? "offline"}
-          requireNameTyping={page.lifecycleAction === "offline"}
+          requireNameTyping={page.lifecycleAction === "drain" || page.lifecycleAction === "offline"}
           isSubmitting={page.isLifecycleSubmitting}
         />
 

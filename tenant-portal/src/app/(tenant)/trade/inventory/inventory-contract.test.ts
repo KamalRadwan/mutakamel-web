@@ -5,7 +5,6 @@ import {
   buildAvailabilityRequest,
   buildCreateNodeRequest,
   buildUpdateNodeRequest,
-  computeStockComposition,
   inventoryNodePath,
   parseBranchIdsPreview,
   parseInventoryAvailability,
@@ -17,7 +16,6 @@ import {
   buildCreatePeriodRequest,
   buildCreateUomConversionRequest,
   buildReasonCode,
-  computePeriodDays,
   convertQuantityPreview,
   inventoryDecisionPath,
   inventoryDecisionsListPath,
@@ -41,6 +39,8 @@ import {
   buildReleaseRequest,
   buildReservationRequest,
   buildReversalRequest,
+} from "./movements/movement-request-builders";
+import {
   parseMovementId,
   receiptActionPath,
 } from "./movements/movements-contract";
@@ -124,24 +124,13 @@ describe("Trade inventory contract", () => {
     expect(availability.availableQuantity).toBe("10.00000001");
     expect(availability.advisory).toBe(true);
 
-    const comp = computeStockComposition(availability);
-    expect(comp.availablePct).toBeGreaterThan(80);
-    expect(comp.reservedPct).toBeGreaterThan(15);
-
-    const zeroComp = computeStockComposition({
+    const zero = parseInventoryAvailability({
       ...availability,
       onHandQuantity: "0.00000000",
       reservedQuantity: "0.00000000",
       availableQuantity: "0.00000000",
     });
-    expect(zeroComp).toEqual({
-      onHand: 0,
-      reserved: 0,
-      available: 0,
-      availablePct: 0,
-      reservedPct: 0,
-      health: "depleted",
-    });
+    expect(zero.availableQuantity).toBe("0.00000000");
   });
 
   it("previews valid and invalid branch UUIDs before node submission", () => {
@@ -222,8 +211,6 @@ describe("Trade inventory contract", () => {
       endsOn: "2026-08-31",
       maxBackdateDays: 7,
     });
-    expect(computePeriodDays("2026-08-01", "2026-08-31")).toBe(31);
-    expect(computePeriodDays("2026-08-31", "2026-08-01")).toBeNull();
     expect(() =>
       buildCreatePeriodRequest({
         code: "AUG",
@@ -255,9 +242,9 @@ describe("Trade inventory contract", () => {
     expect(suggestIntegerFraction("2.4", "1")).toEqual({ numerator: "12", denominator: "5" });
     expect(suggestIntegerFraction("24", "1")).toBeNull();
     expect(suggestIntegerFraction("0", "1")).toBeNull();
-    expect(convertQuantityPreview(10, "12", "1")).toBe("120.0000");
-    expect(convertQuantityPreview(3, "3", "2")).toBe("4.5000");
-    expect(convertQuantityPreview(10, "12", "0")).toBe("0.0000");
+    expect(convertQuantityPreview("10", "12", "1")).toBe("120.00000000");
+    expect(convertQuantityPreview("3", "3", "2")).toBe("4.50000000");
+    expect(convertQuantityPreview("10", "12", "0")).toBeNull();
     expect(() =>
       buildCreateUomConversionRequest({
         itemCompanyProfileId: profileId,
@@ -280,6 +267,36 @@ describe("Trade inventory contract", () => {
       }),
     ).toThrow("INVENTORY_FORM_UOM");
   });
+
+  it.each([
+    ["0.1", "9007199254740993", "1", "900719925474099.30000000"],
+    ["9007199254740993.0001", "1", "1", "9007199254740993.00010000"],
+    ["1.23455", "1", "1", "1.23455000"],
+    ["0.00005", "1", "1", "0.00005000"],
+    ["0", "7", "9", "0.00000000"],
+    ["0.5", "1", "2", "0.25000000"],
+  ])("previews %s x %s / %s exactly as %s", (quantity, numerator, denominator, expected) => {
+    expect(convertQuantityPreview(quantity, numerator, denominator)).toBe(expected);
+  });
+
+  it.each([["1", "1", "3"], ["10", "7", "9"], ["1", "999999999999999999", "1"], ["0.00000001", "1", "2"]])(
+    "rejects an unrepresentable inventory conversion %s × %s / %s",
+    (quantity, numerator, denominator) => expect(convertQuantityPreview(quantity, numerator, denominator)).toBeNull(),
+  );
+
+  it.each(["abc", "", " ", ".", "1.2.3", "1e3", "NaN", "Infinity", "0x10", "1.234549999", "-0.00005", "-0.00001", ".5", "01"])(
+    "rejects invalid preview quantity %s instead of returning zero",
+    (quantity) => {
+      expect(convertQuantityPreview(quantity, "1", "3")).toBeNull();
+    },
+  );
+
+  it.each([["0", "1"], ["1", "0"], ["abc", "1"], ["1", "2.5"], ["-1", "1"]])(
+    "rejects invalid preview factors %s / %s",
+    (numerator, denominator) => {
+      expect(convertQuantityPreview("1", numerator, denominator)).toBeNull();
+    },
+  );
 
   it.each([
     ["1", "2.5", "2", "5"],
@@ -340,6 +357,7 @@ describe("Trade inventory contract", () => {
         maxBackdateDays: 0,
         version: 2,
         closedAt: "2026-08-31T00:00:00.000Z",
+        closedBy: itemId,
         closeReason: "MONTH_END",
       }).closedAt,
     ).toBe("2026-08-31T00:00:00.000Z");
@@ -365,6 +383,8 @@ describe("Trade inventory contract", () => {
       serialKey: "SN-2026-001",
       state: "DELIVERED",
       currentFulfillmentNodeId: null,
+      currentUomId: null,
+      currentReservationId: null,
       lastTransitionAt: "2026-08-31T02:00:00.000Z",
       version: 2,
       lifecycle: [
@@ -372,11 +392,25 @@ describe("Trade inventory contract", () => {
           id: uomId,
           eventType: "RECEIPT_POSTED",
           occurredAt: "2026-08-31T01:00:00.000Z",
+          fromState: null,
+          toState: "ON_HAND",
+          fulfillmentNodeId: branchId,
+          uomId,
+          sourceType: "INVENTORY_RECEIPT",
+          sourceId: itemId,
+          ledgerEntryId: otherUomId,
+          reservationId: null,
         },
       ],
     });
     expect(serialDetail.lifecycle).toHaveLength(1);
     expect(serialDetail.lifecycle[0].eventType).toBe("RECEIPT_POSTED");
+    expect(serialDetail.currentUomId).toBeNull();
+    expect(serialDetail.currentReservationId).toBeNull();
+    expect(serialDetail.lifecycle[0]).toMatchObject({
+      fromState: null, toState: "ON_HAND", fulfillmentNodeId: branchId,
+      uomId, sourceType: "INVENTORY_RECEIPT", sourceId: itemId, ledgerEntryId: otherUomId, reservationId: null,
+    });
 
     // safeInventoryDecision sends only outcome, selectedValue and
     // explanationCode out of `result`.
@@ -386,12 +420,20 @@ describe("Trade inventory contract", () => {
         decisionType: "ELIGIBILITY",
         aggregateType: "INVENTORY_RESERVATION",
         aggregateId: itemId,
-        result: { outcome: "ALLOW", explanationCode: "OK" },
+        result: { outcome: "ALLOW", explanationCode: "OK", selectedValue: { reservedQuantity: "9007199254740993.00000001" } },
+        companyId: branchId,
+        branchId: null,
+        policyVersions: [{ policyId: profileId, version: 3 }],
+        matchedRules: ["PRIORITY_1"],
         explanation: "fine",
         evaluatedAt: "2026-08-31T00:00:00.000Z",
         correlationId: "abc",
       }),
-    ).toMatchObject({ outcome: "ALLOW", explanationCode: "OK" });
+    ).toMatchObject({
+      outcome: "ALLOW", explanationCode: "OK", companyId: branchId, branchId: null,
+      selectedValue: { reservedQuantity: "9007199254740993.00000001" },
+      policyVersions: [{ policyId: profileId, version: 3 }], matchedRules: ["PRIORITY_1"],
+    });
   });
 
   it("generates the in-body idempotency token every movement needs and attaches optional tracking fields", () => {

@@ -1,0 +1,178 @@
+{
+  "owner": {
+    "adapterKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+    "schemaVersion": 1,
+    "schemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+    "documentType": "LETTER",
+    "allowedOutputChannels": [
+      "PRINT"
+    ],
+    "allowedLayoutModes": [
+      "FLOW_DOCUMENT",
+      "HYBRID_DOCUMENT",
+      "FIXED_CANVAS"
+    ],
+    "supportedLocales": [
+      "ar-EG",
+      "en-US"
+    ]
+  },
+  "starters": [
+    {
+      "starterKey": "core.letter.classic-hybrid.ar-EG.v1",
+      "displayName": "خطاب أعمال — خطاب هجين",
+      "documentType": "LETTER",
+      "outputChannel": "PRINT",
+      "layoutMode": "HYBRID_DOCUMENT",
+      "dataSourceKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+      "dataSourceSchemaVersion": 1,
+      "dataSourceSchemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+      "locale": "ar-EG",
+      "resolvedDirection": "RTL",
+      "editorSchemaVersion": 1,
+      "nodeRegistryVersion": "mvp-v1",
+      "templateContentChecksum": "4f01b0a4b7d522747fb0aebcdbb3fa0571ed469c017529084f5c6919b112edae",
+      "descriptorChecksum": "fa975fe1095b51838d1808c5cc187401f6a4f9be4d864ad4835e3bd8219ee96e",
+      "defaultPage": {
+        "preset": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "end": 12,
+          "bottom": 12,
+          "start": 12
+        }
+      }
+    },
+    {
+      "starterKey": "core.letter.classic-hybrid.en-US.v1",
+      "displayName": "Business Letter — Classic Hybrid",
+      "documentType": "LETTER",
+      "outputChannel": "PRINT",
+      "layoutMode": "HYBRID_DOCUMENT",
+      "dataSourceKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+      "dataSourceSchemaVersion": 1,
+      "dataSourceSchemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+      "locale": "en-US",
+      "resolvedDirection": "LTR",
+      "editorSchemaVersion": 1,
+      "nodeRegistryVersion": "mvp-v1",
+      "templateContentChecksum": "c9d53a46e66bb125af06f95ab21bb18b488055197f1a3b5324774c83e070ec5d",
+      "descriptorChecksum": "64f88dc0b906c07cd83250324c17935b44da2e2263ae4529d1c909e11281ddb0",
+      "defaultPage": {
+        "preset": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "end": 12,
+          "bottom": 12,
+          "start": 12
+        }
+      }
+    },
+    {
+      "starterKey": "core.letter.editorial-flow.ar-EG.v1",
+      "displayName": "خطاب أعمال — خطاب متدفق",
+      "documentType": "LETTER",
+      "outputChannel": "PRINT",
+      "layoutMode": "FLOW_DOCUMENT",
+      "dataSourceKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+      "dataSourceSchemaVersion": 1,
+      "dataSourceSchemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+      "locale": "ar-EG",
+      "resolvedDirection": "RTL",
+      "editorSchemaVersion": 1,
+      "nodeRegistryVersion": "mvp-v1",
+      "templateContentChecksum": "a9ef693294d97d3b6e7231f6afc19aae6bcb932774c4ae0ccd34d7792c12ec25",
+      "descriptorChecksum": "4fd74e001f77eb737ff1e6f0cd7bc8cee077fc202cef2a0f7fa465164646c955",
+      "defaultPage": {
+        "preset": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "end": 12,
+          "bottom": 12,
+          "start": 12
+        }
+      }
+    },
+    {
+      "starterKey": "core.letter.editorial-flow.en-US.v1",
+      "displayName": "Business Letter — Editorial Flow",
+      "documentType": "LETTER",
+      "outputChannel": "PRINT",
+      "layoutMode": "FLOW_DOCUMENT",
+      "dataSourceKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+      "dataSourceSchemaVersion": 1,
+      "dataSourceSchemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+      "locale": "en-US",
+      "resolvedDirection": "LTR",
+      "editorSchemaVersion": 1,
+      "nodeRegistryVersion": "mvp-v1",
+      "templateContentChecksum": "86bb7ac1b28e42a604fe9a9df5a12d8a18e0ad4b75ea8a841b4ee6caa153075c",
+      "descriptorChecksum": "aa0ebd2c53843a7cb818fd968a85b694bc104bdd43d9770b895345578a53bb4d",
+      "defaultPage": {
+        "preset": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "end": 12,
+          "bottom": 12,
+          "start": 12
+        }
+      }
+    },
+    {
+      "starterKey": "core.letter.stationery-fixed.ar-EG.v1",
+      "displayName": "خطاب أعمال — خطاب ثابت",
+      "documentType": "LETTER",
+      "outputChannel": "PRINT",
+      "layoutMode": "FIXED_CANVAS",
+      "dataSourceKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+      "dataSourceSchemaVersion": 1,
+      "dataSourceSchemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+      "locale": "ar-EG",
+      "resolvedDirection": "RTL",
+      "editorSchemaVersion": 1,
+      "nodeRegistryVersion": "mvp-v1",
+      "templateContentChecksum": "51a32bf553cf03a18d9bd643df378e0ca7c696bbc9277807a62dcfecff28d23e",
+      "descriptorChecksum": "f630f706be417cf9a45214e0ed1f3a04cd248fdefc9fd270b2e6767d04ae70bb",
+      "defaultPage": {
+        "preset": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "end": 12,
+          "bottom": 12,
+          "start": 12
+        }
+      }
+    },
+    {
+      "starterKey": "core.letter.stationery-fixed.en-US.v1",
+      "displayName": "Business Letter — Stationery Fixed",
+      "documentType": "LETTER",
+      "outputChannel": "PRINT",
+      "layoutMode": "FIXED_CANVAS",
+      "dataSourceKey": "CORE_BUSINESS_LETTER_PRINT_V1",
+      "dataSourceSchemaVersion": 1,
+      "dataSourceSchemaChecksum": "d77c0ac4ed3db5540ffd0b286f4e37fabcbc48bf5ba1651bf65cc4d85b962e40",
+      "locale": "en-US",
+      "resolvedDirection": "LTR",
+      "editorSchemaVersion": 1,
+      "nodeRegistryVersion": "mvp-v1",
+      "templateContentChecksum": "e955964cb9559179d1f5b49d2aaf380f544ec30e8cff23453a4028274a984e82",
+      "descriptorChecksum": "1a49042607afa3b919f16f0c1a71e31b41345b4bd7848bee82e605838aa8f661",
+      "defaultPage": {
+        "preset": "A4",
+        "orientation": "PORTRAIT",
+        "marginMm": {
+          "top": 12,
+          "end": 12,
+          "bottom": 12,
+          "start": 12
+        }
+      }
+    }
+  ]
+}

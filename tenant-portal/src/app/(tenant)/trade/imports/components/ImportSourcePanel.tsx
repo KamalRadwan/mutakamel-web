@@ -16,7 +16,7 @@ interface ImportSourcePanelProps {
   mappingId: string;
   onSourceIdChange: (value: string) => void;
   onMappingIdChange: (value: string) => void;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File) => Promise<boolean>;
   onPreview: () => Promise<void>;
   pending: "upload" | "preview" | null;
   disabled: boolean;
@@ -61,12 +61,20 @@ export function ImportSourcePanel({
           const next = added[0];
           if (!next) return;
           setRejected(null);
+          onSourceIdChange("");
           setFile({ id: next.name, file: next, status: "uploading" });
-          void onUpload(next).then(() => setFile({ id: next.name, file: next, status: "ready" }));
+          void onUpload(next).then((success) => {
+            setFile(success ? { id: next.name, file: next, status: "ready" } : null);
+            if (!success) onSourceIdChange("");
+          });
         }}
-        onRemove={() => setFile(null)}
+        onRemove={() => {
+          setFile(null);
+          onSourceIdChange("");
+        }}
         onReject={(messages) => {
           setFile(null);
+          onSourceIdChange("");
           setRejected(messages[0] ?? null);
         }}
         labels={{
@@ -106,7 +114,7 @@ export function ImportSourcePanel({
       <div className="flex justify-end">
         <Button size="sm"
           variant="outline"
-          disabled={disabled || pending !== null}
+          disabled={disabled || pending !== null || !sourceId.trim() || file?.status === "uploading"}
           loading={pending === "preview"}
           onClick={() => void onPreview()}
         >

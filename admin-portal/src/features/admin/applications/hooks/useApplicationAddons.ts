@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll } from "@/lib/auth/rbac";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type { CommercialPage } from "@/shared/api/commercial-contract";
 import { addonsApi } from "../api/addons.api";
@@ -12,8 +12,8 @@ export function useApplicationAddons(applicationKey: string) {
   const canReadTiers = adminCanAll(user, ["admin.catalog.read"]);
   const canCreate = adminCanAll(user, ["admin.applications.create"]);
   const canUpdate = adminCanAll(user, ["admin.applications.update"]);
-  const canCritical = adminCanAll(user, ["admin.applications.update", "admin.applications.critical"]);
-  const canDelete = adminCanAll(user, ["admin.applications.delete", "admin.applications.critical"]);
+  const canCritical = adminCanAll(user, ADMIN_RBAC_CRITICAL.APPLICATIONS_UPDATE);
+  const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.APPLICATIONS_DELETE);
   const [result, setResult] = useState<CommercialPage<AddonRoot> | null>(null);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [isLoading, setLoading] = useState(false);

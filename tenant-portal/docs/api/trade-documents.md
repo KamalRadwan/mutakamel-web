@@ -1,5 +1,121 @@
 # Trade — Commercial Documents
 
+Quotation discounts source-verified **2026-11-15**: create and revision editors
+choose `NONE` (the editor default), `PROMOTIONS`, or `DISCOUNT`. `NONE` uses
+baseline prices without promotional savings or manual discounts. Existing API
+callers that omit pricing continue to use promotions. Manual intent supports
+per-line percent/amount or document percent/amount, plus an optional reason
+(240 characters). Modes are exclusive;
+changing a non-empty mode/scope asks for confirmation. Quantity changes retain
+the intent and request a new calculation. Currency changes clear fixed amounts
+for explicit re-entry and retain percentage intent. Actor/customer/context
+changes quarantine old pricing. The editor and saved detail show a document
+discount as a final negative amount, while the server retains its allocation
+across the real item lines.
+
+`POST /api/tenant/trade/v1/quotations/pricing-preview` is the authoritative,
+read-only calculation. It accepts `partyId`, optional `crmCustomerProfileId`,
+`currencyCode`, `lines` (`clientLineId`, `itemId`, `uomId`, `quantity`, optional
+`discount: { type, value }`) and `pricing`. `pricing` is `{ mode: "NONE" }`,
+`{ mode: "PROMOTIONS" }`, `{ mode: "DISCOUNT", scope: "LINE", reason? }`, or
+`{ mode: "DISCOUNT", scope: "DOCUMENT", type: "PERCENT" | "AMOUNT", value, reason? }`.
+All monetary inputs remain decimal strings. The response supplies per-line
+`subtotal`, `discountTotal`, `lineTotal`, base/source/net unit prices, effective
+maximum discount, safe price-decision details, document totals and a fingerprint.
+The portal validates identities and totals and hides evidence immediately when
+the complete request, actor, permission generation or scope changes. Manual
+pricing waits for the actor's configured policy. The policy payload retains
+`reasonRequired` for historic pricing evidence. A missing reason is accepted
+for both item and quotation discounts.
+
+`GET /quotations/discount-policy` returns `hasApplyPermission`, `canApply`,
+`canManage`, `configured` and a nullable active `limit`. Existing owner permission
+semantics apply, but owners also need an explicitly configured actor limit.
+The limits dialog reads the real Core user directory (`users.user.read`) and
+uses `GET/POST /quotations/discount-limits` and
+`PATCH /quotations/discount-limits/:id`; mutation uses `If-Match` and idempotency.
+It edits maximum percent, free-item allowance and active
+status. No default owner limit is invented. Directory denials, policy denials,
+loading, missing configuration, conflicts and retryable failures are distinct.
+Conflicts require a fresh read while retaining the administrator's edited intent.
+
+Revision writes carry `pricing` and `expectedPricingFingerprint` together with
+the original line quantities and discount intent. `TRADE.QUOTE.PRICING_CHANGED`
+quarantines the old calculation and requires explicit recalculation/review.
+Server floor, maximum, precision and free-item refusals block the old
+preview and show safe maximum values when supplied. Unknown writes retain the
+same idempotency key/body and lock editing until resolved. A new revision of a
+`SENT` offer additionally requires send authority and explicit confirmation that
+the previous offer is withdrawn; the old issued revision remains immutable and
+the successful new revision is a draft under the same official number.
+
+Rollout order for `NONE`: publish the matching Trade Database and Core
+provisioning catalogue packages, deploy Trade and the migration worker on that
+catalogue, and apply Trade tenant release `0.0.18`. Its migration widens the
+revision pricing-mode check while preserving stored amounts and snapshots.
+Rebuild the portal after the target workspace has that release and Trade
+accepts `NONE` in pricing previews and revision writes.
+
+Saved revisions expose `subtotal`, `discountTotal`, `pricingMode` and
+`discountSnapshot`; lines expose saved `discountTotal` and `discountSnapshot`.
+Manual financial totals obey `subtotal - discountTotal = grandTotal`. Promotion
+unit prices already include promotion savings, so financial `discountTotal` is
+zero; separate `baseSubtotal` and `promotionSavings` explain the reduction without
+deducting it again. Net unit price is advisory and never multiplied back into
+the line total. Conversion carries the accepted revision's exact discount
+allocation once and prevents user changes. Existing tax/charge evidence remains
+separate; quotation UI does not invent unsupported VAT calculations. Migrated
+empty snapshots show the stored financial totals without inventing historic
+promotion details. Lead-owned production rebuild and Playwright verification
+follow the source and automated-test reviews.
+
+Quotation list filters reviewed **2026-10-31** (REVIEW-M-5): the live list calls
+Trade's `GET /api/tenant/trade/v1/quotations` with `page` (1..1,000,000),
+`limit` (1..100, portal 25), optional single `status` (string, max 32),
+`partyId` (UUIDv7), `search` (string, max 120) and `currencyCode` (three uppercase
+letters). The advanced status filter sends the selected lifecycle status,
+including `REJECTED`, `CANCELLED` and `EXPIRED`. Search and complete currency codes are
+server filters; changing a filter resets page one. Partial currency input is
+not sent. Search matches document number, draft reference, document ID and the
+first non-blank Party snapshot display name (`displayName`, `name`, `legalName`)
+case-insensitively, treating `%`, `_` and `!` literally. Trade applies all
+filters before pagination and counting, retaining `{ items, total, page, limit }`.
+The Gateway has no pinned list-query schema. Existing `trade.sales`,
+`trade.quotations.read`, branch/company headers and error handling are unchanged;
+invalid filters use the existing validation error. All views show server rows,
+including an Expired board column. Header statistics for Total, Draft, Sent,
+Accepted, Rejected, Cancelled and Expired were removed **2026-11-03**;
+advanced status filtering remains available.
+Regression specs added; execution and the tenant rebuild await lead verification.
+
+Quotation board money reviewed **2026-10-31** (AUDIT29X-TPT-2): each column
+sums the displayed quotations in its first quotation's currency with exact
+fixed-decimal string arithmetic. Other currencies are excluded from that
+column total. The Money formatter uses the currency's default fraction digits,
+including three for KWD, OMR and BHD. Highest-total sorting compares all eight
+decimal places exactly, including amounts beyond JavaScript's safe integer
+range. Regression specs cover exact sums, currency formatting and large totals;
+execution and the tenant production rebuild are pending lead verification.
+
+Quotation composer handoff reviewed **2026-10-30** (AUDIT29V-TP-4): opening
+the standalone composer from Fast Add stores its header draft in this tab's
+session storage under `trade:quotation:composer-handoff:<actorId>`, using the
+authenticated user's ID. The standalone composer reads only that actor's entry,
+validates the complete draft and customer object with strict Zod schemas, and
+removes the entry after the hydration attempt. Invalid JSON, malformed objects,
+and the former unscoped entry are discarded. No handoff is read or written
+without an actor. Local auth cleanup removes all quotation handoff entries,
+including the former unscoped key; unavailable storage falls back to an empty
+draft. Submission still validates business values and the backend remains
+authoritative for customer eligibility. Regression specs added; typecheck/lint
+and the tenant production rebuild are pending lead verification.
+
+Invoice/contract entitlement source reviewed **2026-10-29** (AUDIT29C-TRADE-1):
+all 15 routes, including PDF render/status, require `trade.sales`. Navigation
+requires the same feature plus the document read permission, including owners.
+These are manual commercial pro-forma invoices and agreements, without statutory
+issuance or recurring execution. Runtime verification and portal rebuild pending.
+
 Error contract reviewed **2026-10-18** (SHARED-I18N-DEAD-001): Trade uses
 common's error envelope without an extra `lang` field. HTTP statuses are
 preserved while former mixed-status codes are split. Numbering refusals use
@@ -328,11 +444,11 @@ invoice raised from it.
 
 ---
 
-## Quotations — 15 routes
+## Quotations — 17 routes
 
 Feature gate: **`trade.sales`**. Every route targets **`BRANCH`**, so both
 `x-mutakamel-company-id` and `x-mutakamel-branch-id` are required on all
-fifteen.
+quotation routes, including artifact streaming.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
@@ -340,6 +456,7 @@ fifteen.
 | POST | `/api/tenant/trade/v1/quotations/search` | `trade.quotations.read` | `DocumentListQueryDto` — **200** |
 | POST | `/api/tenant/trade/v1/quotations/counts-by-party` | `trade.quotations.read` | `DocumentPartyCountsDto` — **200**, read-only bulk count |
 | GET | `/api/tenant/trade/v1/quotations/customer-options` | **`trade.quotations.create`** | `QuotationCustomerOptionsQueryDto` |
+| GET | `/api/tenant/trade/v1/quotations/contact-options` | **any of `trade.quotations.create`, `trade.quotations.update`** | `QuotationContactOptionsQueryDto` |
 | GET | `/api/tenant/trade/v1/quotations/:id` | `trade.quotations.read` | — |
 | POST | `/api/tenant/trade/v1/quotations` | `trade.quotations.create` | `CreateQuotationDto` |
 | PATCH | `/api/tenant/trade/v1/quotations/:id` | `trade.quotations.update` | `UpdateQuotationDto` · `If-Match` |
@@ -351,6 +468,7 @@ fifteen.
 | POST | `/api/tenant/trade/v1/quotations/:id/convert-to-sales-order` | `trade.quotations.convert` **and** `trade.sales_orders.create` | `ConvertQuotationDto` · `If-Match` — **201** |
 | POST | `/api/tenant/trade/v1/quotations/:quotationId/render-pdf` | `trade.quotations.read` | `RenderQuotationPdfDto` — **202** |
 | GET | `/api/tenant/trade/v1/quotations/:quotationId/render-jobs/:renderJobId` | `trade.quotations.read` | — |
+| GET | `/api/tenant/trade/v1/quotations/:quotationId/render-jobs/:renderJobId/artifact` | `trade.quotations.read` | raw, verified `application/pdf`, maximum 25 MiB |
 
 > **`customer-options` is gated on `trade.quotations.create`, not `.read`.**
 > A user who may read quotations but not create them gets a 403 from the
@@ -465,9 +583,10 @@ was not confirmed — see [Not verified](#not-verified).
 | `CommercialLineInputDto` | `clientLineId` (UUID v7), `itemId`, `uomId`, `quantity` (**positive** decimal string), `priceBookId?` |
 | `DocumentReasonDto` | `reasonCode` (≤ 80) **required**, `evidenceRef?` (≤ 240) |
 | `ConvertQuotationDto` | `lines[]` (1–1000 `{ clientLineId, financial }`), `totals` (`OrderTotalsEvidenceDto`), `terms` (**required, must exactly reproduce the accepted revision's terms**) |
-| `DocumentListQueryDto` | `page`, `limit` (≤ 100, default 25), `status?` (free string ≤ 32), `partyId?` |
+| `DocumentListQueryDto` | `page`, `limit` (≤ 100, default 25), `status?` (free string ≤ 32), `partyId?`, `search?` (≤ 120), `currencyCode?` (`^[A-Z]{3}$`) |
 | `DocumentPartyCountsDto` | `partyIds[]` — 1–100 unique UUIDv7 values; response has one `{ partyId, count }` row per requested id, including explicit zeroes |
 | `QuotationCustomerOptionsQueryDto` | `search?` (≤ 120), `cursor?` (≤ 512), `limit` (≤ 100, default 25) |
+| `QuotationContactOptionsQueryDto` | `partyId` (UUIDv7) **required**, `search?` (≤ 120), opaque base64url `cursor?` (≤ 2048), `limit` (1–100, default 25) |
 
 Note that **the quotation's lines live on the revision, not the quotation.**
 There is no line-editing route: a change of lines is a new revision.
@@ -477,10 +596,11 @@ Conversion has one additional check beyond the totals identities:
 The comment in the service is explicit that conversion may add tax and charges
 but may not alter the agreed commercial subtotal.
 
-### The one cursor in Trade
+### Quotation customer cursor
 
-`GET /quotations/customer-options` is the **only** cursor-paged endpoint in
-the whole Trade app. Everything else is `page`/`limit`.
+`GET /quotations/customer-options` and `/quotations/contact-options` use
+opaque cursor paging. The customer endpoint has the following contract;
+contact paging is described separately below.
 
 ```json
 { "success": true, "data": { "items": [ … ], "nextCursor": "eyJkaXNwbGF5…" }, … }
@@ -495,7 +615,8 @@ the whole Trade app. Everything else is `page`/`limit`.
   is returned. There is no error. A paging bug will look like a loop, not a
   failure.
 
-Each option carries `partyId`, `displayName`, `commercialAccountStatus`
+Each option carries `partyId`, `displayName`, **required** `partyType`
+(`"PERSON"` or `"ORGANIZATION"`), `commercialAccountStatus`
 (**`ACTIVE`** · **`BLOCKED`**), `eligibilitySource`
 (`"ACTIVE_COMMERCIAL_ACCOUNT"`), `quotationSelectable` (boolean) and, when
 blocked, `denialCode: "TRADE.QUOTE.COMMERCIAL_ACCOUNT_BLOCKED"`. Blocked
@@ -503,6 +624,53 @@ customers are **returned, not filtered out** — render them disabled with the
 reason rather than hiding them.
 
 The response sets `Cache-Control: no-store, private`.
+
+### Quotation company contacts
+
+`GET /quotations/contact-options` requires **any one** of
+`trade.quotations.create` or `trade.quotations.update`, the `trade.sales`
+feature and the exact **BRANCH** context. It resolves contacts for the
+eligible customer identified by `partyId`; it is not a general party search.
+The response data is `{ partyType, items, nextCursor? }`, without a total.
+An eligible person customer returns `partyType: "PERSON"` and an empty list.
+
+Each item has `partyId`, `displayName`, `relationshipType`
+(`CONTACT_PERSON`, `BILLING_CONTACT` or `LEGAL_CONTACT`), nullable
+`relationshipLabel`, `isPrimary`, and nullable `email`, `mobile` and `phone`.
+Only active linked people in the current organization and branch are
+returned, once per person. Results sort primary contacts first, then name
+and person ID. Pass `nextCursor` back unchanged; it is omitted on the last
+page. The response is `no-store, private`.
+
+The portal shows this optional selector only for organization customers and
+displays the returned name, relationship and available contact methods.
+Changing the customer clears the selected contact. A quotation write sends
+only `contactPartyId`; display metadata stays in local UI state. Create and
+an explicit non-null header PATCH validate the selected active relationship
+again. Omitting `contactPartyId` from PATCH preserves an existing reference;
+`null` clears it. An invalid selection returns `400 TRADE.VALIDATION_FAILED`
+on `contactPartyId`; an ineligible parent returns
+`422 TRADE.QUOTE.CUSTOMER_NOT_ELIGIBLE`. The portal distinguishes a 403
+permission boundary, a successful empty list, and a retryable dependency
+failure such as `503 TRADE.DEPENDENCY.TIMEOUT`.
+
+### Quotation currency selection
+
+The portal uses active currencies configured in the workspace. With
+`currencies.currency.read`, it reads the paged Core currency directory
+`GET /api/tenant/core/v1/currencies` filtered to `ACTIVE`. Otherwise, when
+authorized for `trade.pricing.read` and `trade.pricing`, it uses the active
+currency projection from `GET /api/tenant/trade/v1/pricing/reference-data`
+in **COMPANY** context. These are existing read contracts, not a quotation
+currency endpoint.
+
+Currency starts blank until the directory resolves. An untouched form takes
+the returned default currency, or the first active option when no default
+is marked. The picker accepts only returned active codes. Loading, denied,
+failed or unavailable selections block a new header save and preserve local
+entries for recovery; no hardcoded currency is substituted. A restored
+handoff currency must still be available. Once a header is confirmed, its
+saved currency is retained because quotation PATCH cannot change it.
 
 ### Errors
 
@@ -543,7 +711,9 @@ inside the exception rather than named on the throw line:
 
 ---
 
-## Sales orders — 13 routes
+## Sales orders — 11 routes
+
+Confirmation contract source-verified **2026-10-27** (AUD26-TRADE-04).
 
 Feature gate: **`trade.sales`**. Every route targets **`BRANCH`**.
 
@@ -554,9 +724,7 @@ Feature gate: **`trade.sales`**. Every route targets **`BRANCH`**.
 | POST | `/api/tenant/trade/v1/sales-orders` | `trade.sales_orders.create` | `CreateSalesOrderDto` |
 | GET | `/api/tenant/trade/v1/sales-orders/:id` | `trade.sales_orders.read` | — |
 | PATCH | `/api/tenant/trade/v1/sales-orders/:id` | `trade.sales_orders.update` | `UpdateSalesOrderDto` · `If-Match` |
-| POST | `/api/tenant/trade/v1/sales-orders/:id/confirm` | `trade.sales_orders.confirm` | `ConfirmSalesOrderDto` · `If-Match` — **200 or 202** |
-| GET | `/api/tenant/trade/v1/sales-orders/:id/confirmation-attempts/:attemptId` | `trade.sales_orders.read` | — |
-| POST | `/api/tenant/trade/v1/sales-orders/:id/confirmation-attempts/:attemptId/cancel` | `trade.sales_orders.confirm` | `DocumentReasonDto` · `If-Match` — **200** |
+| POST | `/api/tenant/trade/v1/sales-orders/:id/confirm` | `trade.sales_orders.confirm` | `ConfirmSalesOrderDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/sales-orders/:id/hold` | `trade.sales_orders.hold` | `DocumentReasonDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/sales-orders/:id/release-hold` | **`trade.sales_orders.hold`** | `DocumentReasonDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/sales-orders/:id/cancel` | `trade.sales_orders.cancel` | `DocumentReasonDto` · `If-Match` — **200** |
@@ -588,8 +756,9 @@ them separately or it will misrepresent the order.
 > payment-settlement source at all, which is also why an invoice's `amountPaid`
 > must be exactly `"0"`.
 
-The confirmation axis is the exported enum
-`ConfirmationOrchestrationStatus` and matches the literals the service writes.
+The confirmation axis uses the exported enum `ConfirmationOrchestrationStatus`.
+The schema accepts its broader values, but the current synchronous service writes
+`NOT_STARTED`, `COMPLETED` and `CANCELLED`; it creates no pending workflow.
 The lifecycle axis is **not** `DocumentLifecycleStatus` — that exported enum
 has four members (`DRAFT`, `CONFIRMED`, `CANCELLED`, `CLOSED`) and `CLOSED` is
 never assigned to a sales order anywhere in `trade-app/src`. Render all four
@@ -603,47 +772,23 @@ SettlementStatus   UNKNOWN · UNPAID · PARTIALLY_PAID · PAID · REFUNDED
 
 `SettlementStatus.UNKNOWN` is a real first-class value, not a null stand-in.
 
-### Confirmation is async, and the `Location` it gives you is not callable
+### Confirmation completes synchronously
 
-`POST /sales-orders/:id/confirm` has **no `@HttpCode`**. The handler sets the
-status itself from the idempotency record, so it returns:
+`POST /sales-orders/:id/confirm` returns **200** after credit evaluation,
+required inventory reservations and the order confirmation commit together.
+The response contains `statusCode: 200`, `status: "COMPLETED"`, `orderId`
+and `attemptId`. The completed attempt remains internal evidence. There are
+no attempt read/cancel routes, polling headers or asynchronous continuation.
+Stored profile content with `ASYNC` still uses this synchronous runtime.
 
-- **200** when confirmation completed synchronously, or
-- **202** when it was queued. The body carries `statusCode: 202`,
-  `orderId` and `attemptId`, and the response adds `Retry-After: 2`.
+The portal validates the completed receipt and refreshes the order. Failed
+writes use the existing write-error surface; a lost response keeps the original
+idempotency key for recovery. `If-Match` is the order version. The optional
+`requestedDeadline` remains accepted and retained as evidence.
 
-On a 202 the handler also sets:
-
-```text
-Location: /trade/sales-orders/{orderId}/confirmation-attempts/{attemptId}
-```
-
-> **That path is not a Gateway path and cannot be called.** The Gateway only
-> rewrites a `Location` matching `^/api/v1/trade/(.+)$`; this one does not
-> match, so it is forwarded verbatim. The browser must **ignore `Location`**
-> and build the poll URL itself:
-> `/api/tenant/trade/v1/sales-orders/{orderId}/confirmation-attempts/{attemptId}`,
-> taking the ids from the body. Recorded as **Q34**.
-
-Poll `GET /:id/confirmation-attempts/:attemptId` and read the attempt's own
-`status`: **`PENDING`** · **`READY_TO_FINALIZE`** · **`COMPLETED`** ·
-**`REJECTED`** · **`FAILED`** · **`CANCELLED`**. `POST
-/:id/confirmation-attempts/:attemptId/cancel` cancels a pending attempt; it
-requires `If-Match` on the **attempt**, not the order —
-`cancelSalesOrderConfirmationAttempt` runs
-`assertVersion(attempt.version, expectedAttemptVersion)`. The 202 body carries
-no attempt version, so the version has to come from a poll of
-`GET /:id/confirmation-attempts/:attemptId` before a cancel can be sent.
-
-A 202 whose stored status is replayed comes back as 202 again — this is the
-one place in Trade where the idempotency record's `responseStatus` is applied
-to the HTTP response.
-
-**Holding an order is refused while a confirmation attempt is pending** — the
-`hold` branch throws `TRADE.SALES_ORDER.HOLD_TRANSITION_INVALID` rather than
-cancelling the attempt. Only `cancel` cancels a pending attempt
-(`pendingAttempt.status = "CANCELLED"`). The same branch also refuses a hold on
-a `CANCELLED` order.
+Hold/release and order cancellation lock the order directly, without consulting
+pending attempts. Holding a cancelled or already-held order is refused. Order
+cancellation still validates remaining quantities and releases active reservations.
 
 ### Request bodies
 
@@ -680,7 +825,21 @@ throw site.
 
 ---
 
-## Purchase orders — 12 routes
+## Purchase orders — 13 routes
+
+Supplier-delivery retry re-verified against the Gateway route contract and
+`PurchaseDeliveryService.retry` on **2026-10-30** (AUDIT29P-TP-1). The detail
+screen offers **Retry delivery** only with `trade.purchase_orders.confirm`,
+when the order is `CONFIRMED` and its latest `delivery.status` is `FAILED`,
+excluding `TRADE.PURCHASE_ORDER.DELIVERY_EMAIL_FAILED` because the provider may
+already have accepted the email. Missing delivery evidence hides the action.
+Each new retry sends a fresh UUIDv7 `x-idempotency-key`, the current strong
+`If-Match` version, scope headers and an empty body. Pending or ambiguous writes
+block the action; recovery after a lost response reuses the original key and
+version. Success, including successful recovery, reloads the validated detail.
+409 `TRADE.PURCHASE_ORDER.DELIVERY_RETRY_NOT_ALLOWED` and
+`TRADE.CONCURRENCY.STALE_VERSION` show localized errors. A queued retry does
+not prove email delivery; the refreshed dispatch evidence reports progress.
 
 Delivery behavior verified against source on 2026-10-18 (CXTRADE-OPS-115): confirmation commits a durable supplier-delivery intent. Dispatch labels are localized: `NOT_REQUESTED` (not requested), `REQUESTED` (delivery pending), `SENT` (email sent), `FAILED` (delivery failed). Sent means provider acceptance, not proof of mailbox delivery. Detail responses include nullable `delivery` evidence with stage, attempt count, safe last error code and next attempt time. Delivery failures are shown independently of commercial status. No new portal route is introduced. The renderer pins the confirmed PDF revision and Worker attaches its verified bytes; duplicate result events cannot send a second email or reverse terminal status.
 
@@ -706,6 +865,7 @@ Feature gate: **`trade.purchasing`**. Every route targets **`BRANCH`**.
 | POST | `/api/tenant/trade/v1/purchase-orders/:id/approve` | `trade.purchase_orders.approve` | `PurchaseActionDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/purchase-orders/:id/reject` | **`trade.purchase_orders.approve`** | `PurchaseActionDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/purchase-orders/:id/confirm` | `trade.purchase_orders.confirm` | `PurchaseActionDto` · `If-Match` — **200** |
+| POST | `/api/tenant/trade/v1/purchase-orders/:id/delivery/retry` | `trade.purchase_orders.confirm` | empty body · `If-Match` · fresh `x-idempotency-key` — **200** |
 | POST | `/api/tenant/trade/v1/purchase-orders/:id/cancel` | `trade.purchase_orders.cancel` | `PurchaseActionDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/purchase-orders/:documentId/render-pdf` | `trade.purchase_orders.read` | `RenderTradeBusinessPdfDto` — **202** |
 | GET | `/api/tenant/trade/v1/purchase-orders/:documentId/render-jobs/:renderJobId` | `trade.purchase_orders.read` | — |
@@ -791,7 +951,27 @@ any non-CANCELLED ──cancel (reasonCode required)──▶ CANCELLED
 
 ---
 
-## Purchase quotations — 8 routes
+## Purchase quotations — 9 routes
+
+Supplier discovery source-reviewed **2026-10-29** (AUDIT29-TRADE-4):
+`GET /purchase-quotations/supplier-options` accepts `search` (up to 200 characters)
+and `limit` (default 25, maximum 50), returning `{ items: [{ partyId, displayName }] }`
+inside the Trade envelope. Either purchase-quotation Create or Update permission
+in the current Branch authorizes it; commercial-account read is not required.
+The server searches names before limiting, and returns only active, undeleted
+Company SUPPLIER accounts with an active Party/SUPPLIER role in the current Branch
+or shared across branches. The portal displays names in a debounced remote
+combobox, preserves the selected label across searches, and discards stale reads.
+Create/Edit each require their scoped action grant and a successful current-scope
+lookup. A failed lookup shows a permission boundary or retryable read error.
+
+Gateway scope source-reviewed **2026-10-30** (AUDIT29X-TP-1): this supplier lookup
+declares `BRANCH_REQUIRED`. Both Create and Edit pass the resolved company and
+branch headers through `usePurchaseQuotationForm` to `usePurchaseQuotationSuppliers`
+and `tradeGet`. The generated inventory includes it as the 214th scope-carrying
+route; the organization-scope governance spec asserts its path and scope mode.
+
+Numbering contract reviewed **2026-10-29**: new drafts return `documentNumber: null`; list/detail show the localized Draft label. Issue allocates the official company number and resets `businessDate` to the UTC issue day in the finalization transaction. Issued rows require a non-null number; existing numbered drafts keep their number. Invoice and contract numbering is unchanged.
 
 Creation/issue persistence re-verified **2026-10-17**. Creation saves calculated
 header totals after saving lines in the same transaction and returns that saved
@@ -802,13 +982,14 @@ mismatches fail validation. The normal audited issue save retains the correction
 without renumbering or changing finalized documents.
 
 Feature gate: **`trade.purchasing`**. Every route targets **`BRANCH`**, and
-**all eight are Gateway `BRANCH_REQUIRED`** — the header shape is validated
+**all nine are Gateway `BRANCH_REQUIRED`** — the header shape is validated
 twice.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/purchase-quotations` | `trade.purchase_quotations.read` | `DocumentListQueryDto` |
 | POST | `/api/tenant/trade/v1/purchase-quotations/search` | `trade.purchase_quotations.read` | `DocumentListQueryDto` — **200** |
+| GET | `/api/tenant/trade/v1/purchase-quotations/supplier-options` | `trade.purchase_quotations.create` OR `trade.purchase_quotations.update` | `PurchaseQuotationSupplierOptionsQueryDto` — bounded name search |
 | GET | `/api/tenant/trade/v1/purchase-quotations/:id` | `trade.purchase_quotations.read` | — |
 | POST | `/api/tenant/trade/v1/purchase-quotations` | `trade.purchase_quotations.create` | `CreatePurchaseQuotationDto` |
 | PATCH | `/api/tenant/trade/v1/purchase-quotations/:id` | `trade.purchase_quotations.update` | `UpdatePurchaseQuotationDto` · `If-Match` |
@@ -862,10 +1043,10 @@ book on issue.
 
 ## Invoices — 8 routes
 
-> **Invoices are not feature-gated.** `TradeInvoicesController` carries **no**
-> `@RequireTradeFeature` decorator. The only entitlement check is
-> `TRADE.MODULE.DISABLED`. All five non-PDF routes target **`BRANCH`** and are
-> Gateway `BRANCH_REQUIRED`.
+> **Feature gate: `trade.sales`.** `TradeInvoicesController` and
+> `TradeInvoicePdfController` require Sales on all eight routes. Missing Sales
+> returns 403 `TRADE.ENTITLEMENT.FEATURE_REQUIRED`. All routes target **`BRANCH`**
+> and are Gateway `BRANCH_REQUIRED`.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
@@ -950,12 +1131,10 @@ rebuilds missing financial evidence from display columns.
 
 ## Contracts — 7 routes
 
-> **Contracts are not feature-gated either.** MASTER-PLAN task 11.18 says
-> contracts are "feature-gated on `trade.contracts_recurring`". **They are
-> not.** `TradeContractsController` has no `@RequireTradeFeature`, and
-> `trade.contracts_recurring` is referenced **nowhere** in `trade-app/src` —
-> it is a declared feature key with no consumer. Do not build an entitlement
-> gate for it. See [Feature keys that gate nothing](#feature-keys-that-gate-nothing).
+> **Feature gate: `trade.sales`.** `TradeContractsController` and
+> `TradeContractPdfController` require Sales on all seven routes. Missing Sales
+> returns 403 `TRADE.ENTITLEMENT.FEATURE_REQUIRED`. The unseeded future
+> `trade.contracts_recurring` feature does not grant access to manual contracts.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
@@ -1028,7 +1207,15 @@ these paths are source-integrated, with runtime verification pending.
 
 ---
 
-## PDF rendering — 12 routes, and a Gateway contract that does not match
+## PDF rendering and authorized quotation artifacts
+
+PDF artifact URL validation reviewed **2026-10-30** (AUDIT29V-TP-2):
+the portal parses `artifact.downloadUrl` as an absolute URL before exposing
+the download action. HTTPS is accepted; HTTP is accepted only when the portal
+itself is served over HTTP. Other schemes, relative URLs and malformed URLs
+raise the existing invalid Trade response error. Accepted presigned URLs are
+preserved exactly. Regression specs cover both portal protocols and missing
+browser context; execution and the tenant rebuild are pending lead verification.
 
 Six families each expose a `POST …/render-pdf` (**202**) and a
 `GET …/render-jobs/:renderJobId`. All twelve are Gateway `BRANCH_REQUIRED`.
@@ -1058,35 +1245,53 @@ rechecks the exact prepared print revision and the current order's scope and
 lifecycle; cancellation prevents a new render. Existing write `If-Match` and
 idempotency requirements remain unchanged.
 
-### The `Location` mismatch — a live defect
+### Quotation workspace and binary preview
 
-`assertPublicLocationContract` in
-`api-gateway-app/src/routing-proxy/routing-proxy.controller.ts` requires the
-upstream `Location` on these six route keys to start with:
+Source-reviewed **2026-11-04**: Gateway now validates the canonical
+`/api/tenant/trade/v1/{segment}/{documentId}/render-jobs/` Location prefix.
+The portal rebuilds poll paths from validated document/job UUIDs and does not
+follow a response-supplied origin. The historical Q36 mismatch is no longer
+the source contract.
 
-```text
-/api/v1/trade/{segment}/{documentId}/render-jobs/
-```
+`QuotationPdfWorkspace` is shared by the standalone create flow, Fast Add
+receipt and existing quotation detail. Rendering requires a confirmed current
+detail, quotation read authority and a current revision in `SENT`, `ACCEPTED`
+or `REJECTED`; `DRAFT` remains blocked. The request pins revision, purpose,
+locale, time zone and optional published `templateVersionId`.
 
-`trade-app` emits (`quotation-pdf.service.ts:566`,
-`business-document-pdf.service.ts:604`, and asserted by both services' unit
-tests):
+Quotation detail can reopen a completed PDF at
+`/trade/quotations/{quotationId}?pdfJobId={renderJobId}`. The workspace uses the
+existing scoped status GET and requires a matching quotation, current revision,
+job and completed artifact before enabling Preview and Download. Opening the
+link sends no render POST. The job and any pending read are cleared on
+navigation away from the job or a quotation, revision, scope or session change.
+The completed PDF panel links to this same signed-in workspace in a new tab
+using the validated render job ID.
+Source verified **2026-11-14**.
 
-```text
-/api/tenant/trade/v1/{segment}/{documentId}/render-jobs/{jobId}
-```
+The gallery independently requires Core template read authority and verifies
+an ACTIVE QUOTATION/PRINT definition with the Trade quotation adapter plus a
+PUBLISHED immutable version that supports PDF. Library denial does not remove
+the branch-default render option. Optional design preview requires template
+preview authority and uses a discovered synthetic fixture, visibly separated
+from the customer's actual quotation PDF.
 
-The second does not start with the first, so the Gateway raises
-`GW.IDEM.RESPONSE_CONTRACT_BREACH` — **HTTP 502** — releases the idempotency
-reservation, and the 202 never reaches the browser. No Gateway test covers
-this path. **On this reading every Trade PDF render fails at the edge.**
-Recorded as **Q36**; MASTER-PLAN 11.7 assumes the enforcement works.
+Unknown render responses preserve the exact request, immutable scope headers
+and idempotency key for recovery. Bounded polling stops on terminal job state,
+including failure inside HTTP 200, and can resume the same job. A completed
+job's expired signed download link is renewed with GET of that job, never a
+new render. Source-revision or scope changes hide the previous job immediately.
 
-If it is fixed by aligning the app to the Gateway, the emitted `Location`
-becomes `/api/v1/trade/…` and the Gateway rewrites it to
-`/api/tenant/trade/v1/…` on the way out. Either way the browser should build
-the poll URL from `data.statusUrl` in the body — which already carries the
-canonical form — rather than reading the header.
+The quotation-only artifact GET reauthorizes tenant/company/branch and exact
+quotation/job membership. It accepts no URL or storage key from the caller;
+completed metadata, immutable storage ownership, byte size/checksum and PDF
+signature are verified before streaming. It returns raw `application/pdf`,
+`Content-Length`, a safe inline filename, `Cache-Control: no-store, private`
+and `X-Content-Type-Options: nosniff`, with a 25 MiB limit.
+The portal reads it through `axiosClient` using exact scope headers,
+`responseType: "blob"`, no-store and the same byte bound. A MIME/signature
+check precedes `URL.createObjectURL`; the viewer revokes object URLs on close,
+context change or unmount. Signed download URLs are not used as iframe sources.
 
 ### PDF errors
 
@@ -1176,7 +1381,7 @@ they compose". The honest answer is that eight compose and seven are inert.
 Two plan tasks build on the inert ones: **11.18** (contracts gated on
 `trade.contracts_recurring`) and **12.19** (control tower gated on
 `trade.control_tower_advanced`). Both are wrong; the correct gates are
-"none" and "`trade.analytics` plus one domain feature" respectively.
+"`trade.sales`" and "`trade.analytics` plus one domain feature" respectively.
 
 ---
 
@@ -1190,9 +1395,8 @@ Two plan tasks build on the inert ones: **11.18** (contracts gated on
    `TRADE.FINALIZED_DOCUMENT.SNAPSHOT_INCOMPLETE`, with no field. The portal
    cannot say which line was wrong (Q33).
 3. **`roundingTotal` is signed on orders and non-negative on invoices.**
-4. **`Location` on a 202 is unusable** — the confirmation-attempt one is not a
-   Gateway path (Q34), and the PDF one currently trips a Gateway 502 (Q36).
-   Build poll URLs from the body.
+4. **Build poll URLs from validated IDs.** Confirmation-attempt Location has
+   historical Q34 limitations; PDF Locations now use the canonical prefix.
 5. **`POST /sales-orders/:id/confirm` returns 200 *or* 202.** There is no
    `@HttpCode`. Branch on the status, and read `data.statusCode` too.
 6. **A sales order has four status axes.** One badge is a lie.
@@ -1206,8 +1410,8 @@ Two plan tasks build on the inert ones: **11.18** (contracts gated on
     come back in the list with a `denialCode` rather than being filtered out.
 11. **The customer-options cursor is silently ignored when invalid** — a
     broken cursor looks like an infinite first page, not an error.
-12. **Invoices and contracts are not feature-gated**, and
-    `trade.contracts_recurring` gates nothing anywhere.
+12. **Invoices and contracts require `trade.sales`**, including PDF routes and
+    portal navigation. `trade.contracts_recurring` does not grant manual access.
 13. **Eight quotation error codes in the catalogue have no throw site.** Do not
     build UI branches for them.
 14. **A failed PDF render is a 200.** `PDF_INPUT_EXPIRED`,
@@ -1243,9 +1447,9 @@ Two plan tasks build on the inert ones: **11.18** (contracts gated on
   documents request DTOs and the status/id fields that are demonstrably
   written by a service. The complete response body of a document `GET` was not
   enumerated field by field.
-- **Whether the PDF `Location` mismatch (Q36) actually fires in a deployed
-  environment.** It is a source-level reading of two components that were
-  never tested together. Nothing here was executed against a running service.
+- **Historical Q36 deployment evidence.** Current source validates canonical
+  PDF Locations; source alignment alone does not establish a successful live
+  Worker render, storage artifact stream or browser preview.
 - **`fulfillment_status` and `billing_status` transitions.** The enums are
   exhaustive; the code paths that advance them are in projections outside the
   HTTP surface and were not traced. `settlement_status` is not among them —

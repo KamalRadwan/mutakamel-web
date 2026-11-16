@@ -261,7 +261,7 @@
   --color-channel-telegram: #26a5e4;
 
   /* Named CRM Leads v3 steps (docs/design/specs/crm-leads-v3.md Part 2) plus
-     the base 7-step scale. Arabic lift is applied below in html[lang="ar"]. */
+     the base 7-step scale. Both languages share sizes and line-heights. */
   --text-micro: 0.625rem;               /* 10px — inner count chips & avatar initials only */
   --text-micro--line-height: 0.875rem;  /* 14px */
   --text-micro--letter-spacing: 0em;
@@ -340,34 +340,12 @@
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Arabic gets +1px on the small and mid steps, line-heights raised in lockstep
-   and tracking zeroed so Cairo's dots and joined forms never clip or split.
-   text-2xs is Latin-only by convention (no uppercase in Arabic) so it is
-   deliberately not lifted. */
+/* Keep language changes at the same density. Only tracking differs: Cairo's
+   joined forms must not inherit negative Latin letter-spacing. */
 html[lang="ar"] {
-  --text-micro: 0.6875rem;              /* 11px */
-  --text-micro--line-height: 0.9375rem; /* 15px */
-  --text-badge: 0.75rem;                /* 12px */
-  --text-badge--line-height: 1.0625rem; /* 17px */
-  --text-caption: 0.8125rem;            /* 13px */
-  --text-caption--line-height: 1.25rem; /* 20px */
-  --text-label: 0.84375rem;             /* 13.5px */
-  --text-label--line-height: 1.25rem;   /* 20px */
-  --text-tab: 0.90625rem;               /* 14.5px */
-  --text-tab--line-height: 1.375rem;    /* 22px */
   --text-tab--letter-spacing: 0em;
-  --text-card-title: 0.9375rem;         /* 15px */
-  --text-card-title--line-height: 1.375rem; /* 22px */
   --text-card-title--letter-spacing: 0em;
-  --text-column-title: 0.96875rem;      /* 15.5px */
-  --text-column-title--line-height: 1.4375rem; /* 23px */
   --text-column-title--letter-spacing: 0em;
-  --text-xs: 0.875rem;                  /* 14px */
-  --text-xs--line-height: 1.25rem;      /* 20px */
-  --text-sm: 0.9375rem;                 /* 15px */
-  --text-sm--line-height: 1.375rem;     /* 22px */
-  --text-base: 1rem;                    /* 16px */
-  --text-base--line-height: 1.625rem;   /* 26px */
   /* Negative tracking splits Arabic joined forms (seen live on the login
      heading at -0.17px), so every step that tracks tighter in Latin is zeroed. */
   --text-sm--letter-spacing: 0em;
@@ -1425,12 +1403,16 @@ body {
   font-synthesis-weight: none;
 }
 
-/* ---------- 7. Keyframes ----------
-   docs/design/motion.md#the-budget. `bellRing`/`animate-bell-ring` used to
-   live here under a standing instruction to delete it with its consumer;
-   both are gone as of MASTER-PLAN 3.33. An infinitely-ringing bell is
-   outside the motion budget, and the unread state is carried by the dot,
-   the count badge and the live region instead. */
+/* ---------- 7. Keyframes ---------- */
+
+/* Requested unread reminder: shake the whole control once per ten seconds,
+   paused while the inbox is open. The explicit bell cue is an exception to
+   decorative-motion suppression; other animations retain their policy. */
+@keyframes notification-bell-shake {
+  0%, 12%, 100% { transform: rotate(0deg); }
+  1%, 5%, 9% { transform: rotate(18deg); }
+  3%, 7%, 11% { transform: rotate(-18deg); }
+}
 
 @keyframes shimmer {
   100% {
@@ -1858,7 +1840,8 @@ body {
 }
 
 .dossier-stage-cell {
-  padding: 7px 8px;
+  /* 22px block padding: the stage track is 30px taller than the 7px original. */
+  padding: 22px 8px;
   font-size: 11px;
   font-weight: 700;
   text-align: center;

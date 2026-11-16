@@ -2,6 +2,8 @@
 
 import {
   DegradedBanner,
+  PermissionGate,
+  UnavailableState,
   Field,
   FormDrawer,
   Input,
@@ -12,32 +14,39 @@ import {
   SelectValue,
   Textarea,
 } from "@/design-system";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  TEMPLATE_ADAPTER_KEYS,
+  ACCESS_POLICY_BLOCKED_CODE,
+  TEMPLATE_READ_PERMISSION,
   TEMPLATE_CODE_MAX,
   TEMPLATE_DESCRIPTION_MAX,
   TEMPLATE_DIRECTIONS,
-  TEMPLATE_DOCUMENT_TYPES,
-  TEMPLATE_LAYOUT_MODES,
-  TEMPLATE_LOCALES,
   TEMPLATE_NAME_MAX,
-  TEMPLATE_OUTPUT_CHANNELS,
 } from "../templates-contract";
-import { useTemplateCreate, type TemplateCreateValues } from "../hooks/useTemplateCreate";
+import type { useTemplateCreate, TemplateCreateValues } from "../hooks/useTemplateCreate";
+import { templateCreationScopeKey } from "../hooks/useTemplateCreate";
+import { formatStarterPresentation } from "../template-starter-presentation";
+import { TemplateCreatePageSetup } from "./TemplateCreatePageSetup";
+import { DEFAULT_TEMPLATE_PAGE, type TemplateCreatePageValues } from "../template-create-page";
 
 const NO_STARTER = "__blank";
 
 export function CreateTemplateDrawer({
   isOpen,
+  browseStarters,
+  create,
   onClose,
+  onCloseAutoFocus,
 }: {
   isOpen: boolean;
+  browseStarters: boolean;
+  create: ReturnType<typeof useTemplateCreate>;
   onClose: () => void;
+  onCloseAutoFocus: (event: Event) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const copy = t.coreOperations.templates;
-  const create = useTemplateCreate(isOpen);
   const { values, change } = create;
 
   const close = () => {
@@ -45,19 +54,43 @@ export function CreateTemplateDrawer({
     onClose();
   };
 
+  const detail = create.starterPresentation && formatStarterPresentation(create.starterPresentation, lang);
+  const starterHint = detail ? copy.starterHint + " " + detail : copy.starterHint;
+  const starterField = (
+    <Field label={copy.starter} hint={create.isLoadingStarters ? t.common.loading : starterHint}>
+      <Select
+        value={values.starterKey || NO_STARTER}
+        onValueChange={(value) => change({ starterKey: value === NO_STARTER ? "" : value })}
+        disabled={create.isSubmitting || create.isLoadingStarters || (browseStarters && !create.hasCompatibleSource)}
+      >
+        <SelectTrigger size="sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_STARTER}>{copy.starterNone}</SelectItem>
+          {create.starters.map((starter) => (
+            <SelectItem key={starter.starterKey} value={starter.starterKey}>{starter.displayName}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+
   return (
     <FormDrawer
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) close();
       }}
-      title={copy.createTitle}
+      onCloseAutoFocus={onCloseAutoFocus}
+      title={browseStarters ? copy.firstUse.browse : copy.createTitle}
       description={copy.createDescription}
-      isDirty={values.name.length > 0 || values.code.length > 0}
+      isDirty={values.name.length > 0 || values.code.length > 0 ||
+        Object.entries(DEFAULT_TEMPLATE_PAGE).some(([field, value]) => values.page[field as keyof TemplateCreatePageValues] !== value)}
       isSubmitting={create.isSubmitting}
       onSubmit={() => void create.submit()}
       error={create.formError ?? undefined}
-      submitDisabled={create.scope === null}
+      submitDisabled={create.scope === null || !create.hasCompatibleSource}
       labels={{
         submit: t.common.create,
         cancel: t.common.cancel,
@@ -73,18 +106,28 @@ export function CreateTemplateDrawer({
           <DegradedBanner message={copy.noCreationScope} />
         ) : null}
 
+        {create.sourceError?.status === 403 ? (
+          create.sourceError.code === ACCESS_POLICY_BLOCKED_CODE ? <UnavailableState backHref={TENANT_ROUTES.core} /> :
+            <PermissionGate require={TEMPLATE_READ_PERMISSION} denied>{null}</PermissionGate>
+        ) : create.sourceError ? <DegradedBanner message={copy.sourcesUnavailable} /> : null}
+        {!create.isLoadingSources && create.scope && !create.sourceError && !create.hasCompatibleSource ? (
+          <DegradedBanner message={copy.noCompatibleSources} />
+        ) : null}
+        {create.starterError ? <DegradedBanner message={copy.startersUnavailable} /> : null}
+        {browseStarters ? starterField : null}
+
         <Field label={copy.scope} hint={copy.scopeHint} required>
           <Select
-            value={values.scopeIndex}
-            onValueChange={(value) => change({ scopeIndex: value })}
+            value={values.scopeKey}
+            onValueChange={(value) => change({ scopeKey: value })}
             disabled={create.isSubmitting || create.scopes.length === 0}
           >
-            <SelectTrigger size="sm">
+            <SelectTrigger textSize="compact" size="sm">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              {create.scopes.map((scope, index) => (
-                <SelectItem key={`${scope.type}-${scope.companyId ?? "tenant"}`} value={String(index)}>
+            <SelectContent textSize="compact">
+              {create.scopes.map((scope) => (
+                <SelectItem key={templateCreationScopeKey(scope)} value={templateCreationScopeKey(scope)}>
                   {scope.label ?? copy.scopeTenant}
                 </SelectItem>
               ))}
@@ -95,9 +138,9 @@ export function CreateTemplateDrawer({
         <TupleSelect
           label={copy.documentType}
           value={values.documentType}
-          options={TEMPLATE_DOCUMENT_TYPES}
+          options={create.documentTypes}
           labels={copy.documentTypes}
-          disabled={create.isSubmitting}
+          disabled={create.isSubmitting || !create.hasCompatibleSource}
           onChange={(value) =>
             change({ documentType: value as TemplateCreateValues["documentType"], starterKey: "" })
           }
@@ -105,9 +148,9 @@ export function CreateTemplateDrawer({
         <TupleSelect
           label={copy.outputChannel}
           value={values.outputChannel}
-          options={TEMPLATE_OUTPUT_CHANNELS}
+          options={create.outputChannels}
           labels={copy.outputChannels}
-          disabled={create.isSubmitting}
+          disabled={create.isSubmitting || !create.hasCompatibleSource}
           onChange={(value) =>
             change({
               outputChannel: value as TemplateCreateValues["outputChannel"],
@@ -118,9 +161,9 @@ export function CreateTemplateDrawer({
         <TupleSelect
           label={copy.layoutMode}
           value={values.layoutMode}
-          options={TEMPLATE_LAYOUT_MODES}
+          options={create.layoutModes}
           labels={copy.layoutModes}
-          disabled={create.isSubmitting}
+          disabled={create.isSubmitting || !create.hasCompatibleSource}
           onChange={(value) =>
             change({ layoutMode: value as TemplateCreateValues["layoutMode"], starterKey: "" })
           }
@@ -128,9 +171,9 @@ export function CreateTemplateDrawer({
         <TupleSelect
           label={copy.dataSource}
           value={values.dataSourceKey}
-          options={TEMPLATE_ADAPTER_KEYS}
+          options={create.adapterKeys}
           labels={copy.adapterKeys}
-          disabled={create.isSubmitting}
+          disabled={create.isSubmitting || !create.hasCompatibleSource}
           onChange={(value) =>
             change({ dataSourceKey: value as TemplateCreateValues["dataSourceKey"], starterKey: "" })
           }
@@ -138,9 +181,9 @@ export function CreateTemplateDrawer({
         <TupleSelect
           label={copy.locale}
           value={values.locale}
-          options={TEMPLATE_LOCALES}
+          options={create.locales}
           labels={copy.locales}
-          disabled={create.isSubmitting}
+          disabled={create.isSubmitting || !create.hasCompatibleSource}
           onChange={(value) =>
             change({ locale: value as TemplateCreateValues["locale"], starterKey: "" })
           }
@@ -150,36 +193,16 @@ export function CreateTemplateDrawer({
           value={values.direction}
           options={TEMPLATE_DIRECTIONS}
           labels={copy.directions}
-          disabled={create.isSubmitting}
+          disabled={create.isSubmitting || !create.hasCompatibleSource}
           onChange={(value) =>
             change({ direction: value as TemplateCreateValues["direction"], starterKey: "" })
           }
         />
 
-        <Field
-          label={copy.starter}
-          hint={create.isLoadingStarters ? t.common.loading : copy.starterHint}
-        >
-          <Select
-            value={values.starterKey || NO_STARTER}
-            onValueChange={(value) =>
-              change({ starterKey: value === NO_STARTER ? "" : value })
-            }
-            disabled={create.isSubmitting || create.isLoadingStarters}
-          >
-            <SelectTrigger size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_STARTER}>{copy.starterNone}</SelectItem>
-              {create.starters.map((starter) => (
-                <SelectItem key={starter.starterKey} value={starter.starterKey}>
-                  {starter.displayName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        {browseStarters ? null : starterField}
+
+        <TemplateCreatePageSetup values={values.page} outputChannel={values.outputChannel} disabled={create.isSubmitting}
+          onChange={patch => change({ page: { ...values.page, ...patch } })} />
 
         <Field label={copy.code} hint={copy.codeHint} required>
           <Input size="sm" placeholder={copy.code}

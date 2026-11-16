@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { adminCanAll } from "@/lib/auth/rbac";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 import { generateUUIDv7 } from "@/lib/utils/uuid";
 import { uuid7 } from "@/shared/api/commercial-contract";
 import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normalized-api-error";
@@ -25,7 +25,7 @@ export function useCommercialChangeWorkspace({ source, lang, onCommitted }: Comm
   const actor = user?.id ?? "";
   const canRead = Boolean(actor) && adminCanAll(user, ["admin.subscriptions.read"]);
   const canPrepare = Boolean(actor) && adminCanAll(user, ["admin.subscriptions.update"]);
-  const canApply = canPrepare && adminCanAll(user, ["admin.subscriptions.critical"]);
+  const canApply = canPrepare && adminCanAll(user, ADMIN_RBAC_CRITICAL.SUBSCRIPTIONS_UPDATE);
   const canReadApplications = Boolean(actor) && adminCanAll(user, ["admin.applications.read"]);
   const canReadCatalogue = Boolean(actor) && adminCanAll(user, ["admin.catalog.read"]);
   const [baseline, setBaseline] = useState(source);
@@ -73,7 +73,9 @@ export function useCommercialChangeWorkspace({ source, lang, onCommitted }: Comm
   useEffect(() => {
     if (!receipt || lastNotified.current === receipt.previewId) return;
     lastNotified.current = receipt.previewId;
-    void onCommitted();
+    void Promise.resolve(onCommitted()).catch(cause => {
+      if (current.current) setError(normalizeApiError(cause));
+    });
   }, [receipt, onCommitted]);
 
   const save = (value: CommercialJournal) => { saveCommercialJournal(storageKey, value); retained.current = value; if (current.current) setJournal(value); };

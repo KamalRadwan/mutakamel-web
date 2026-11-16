@@ -106,6 +106,8 @@ function buildContentSecurityPolicy(nonce: string): string {
     "img-src 'self' data: blob:",
     "font-src 'self'",
     `connect-src 'self'${developmentConnectSources}`,
+    // Authenticated PDF bytes are verified before a local Blob viewer is opened.
+    "frame-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

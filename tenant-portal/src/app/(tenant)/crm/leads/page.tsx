@@ -26,7 +26,6 @@ import { LeadBulkActionsBar } from "./components/LeadBulkActionsBar";
 import { LeadExecutiveBoardView } from "./components/LeadExecutiveBoardView";
 import { LeadExecutiveCardView } from "./components/LeadExecutiveCardView";
 import { LeadExecutiveTableView } from "./components/LeadExecutiveTableView";
-import { LeadKpiStrip } from "./components/LeadKpiStrip";
 import { LeadQuickEditModal } from "./components/LeadQuickEditModal";
 import { LeadStageFunnelBar } from "./components/LeadStageFunnelBar";
 import { LeadSearchBar } from "./components/LeadSearchBar";
@@ -44,7 +43,6 @@ import {
   useLeads,
 } from "./hooks/useLeads";
 import { useLeadDocumentCounts } from "./hooks/useLeadDocumentCounts";
-import { useLeadKpis } from "./hooks/useLeadKpis";
 import { useLeadBulkDelete } from "./hooks/useLeadCardWrites";
 import { useLeadBulkOwnerOptions } from "./hooks/useLeadMutations";
 
@@ -99,7 +97,6 @@ export default function LeadsPage() {
     bulkUpdateLeads,
     bulkDeleteLeads,
     fetchLeads,
-    dataRevision,
     refreshData,
   } = useLeads();
   const canCreate = canMutate && capabilityCanCreate;
@@ -153,8 +150,6 @@ export default function LeadsPage() {
   }, [activeView, setActiveView, view]);
 
   const documentCounts = useLeadDocumentCounts(items, branchId, view === "card");
-  // Pill counts describe the base search, so changing presets keeps the other counts usable.
-  const kpis = useLeadKpis({ branchId, search: { ...appliedSearch, kpiPreset: "ALL" }, revision: dataRevision, enabled: Boolean(branchId) });
 
   const stageById = useMemo(() => new Map(stages.map((stage) => [stage.id, stage])), [stages]);
 
@@ -200,7 +195,7 @@ export default function LeadsPage() {
   return (
     <PermissionGate require={["crm.leads.read", "crm.lead_stages.read"]} scoped>
       <div className="flex h-full flex-col gap-3">
-        {/* Preserve the accessible heading; actions render in the shell's top action bar alongside KPI pills. */}
+        {/* Preserve the accessible heading; actions render in the shell's top action bar. */}
         <PageHeader
           className="sr-only"
           title={t.crmLeads.title}
@@ -211,16 +206,6 @@ export default function LeadsPage() {
           }
           secondaryActions={
             <div className="flex flex-wrap items-center gap-2">
-              {branchId && (
-                <LeadKpiStrip
-                  kpis={kpis}
-                  activePreset={kpiPreset}
-                  onSelectPreset={(preset) => {
-                    workspace.setPage(1);
-                    setSearch({ ...search, kpiPreset: preset });
-                  }}
-                />
-              )}
               <TenantBranchSelect
                 branchIds={branchIds}
                 branchId={branchId}

@@ -12,6 +12,7 @@ import NotificationDetailPage from "./page";
 
 const state = vi.hoisted(() => ({ hook: {} as Record<string, unknown> }));
 
+vi.mock("../../hooks/useCoreErrorText", () => ({ useCoreErrorText: () => () => undefined }));
 vi.mock("./hooks/useNotificationDetail", () => ({
   useNotificationDetail: () => state.hook,
 }));

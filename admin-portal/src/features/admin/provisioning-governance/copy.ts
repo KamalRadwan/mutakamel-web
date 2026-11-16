@@ -1,3 +1,5 @@
+import { ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
+
 export interface ProvisioningGovernanceCopy {
   title: string;
   subtitle: string;
@@ -191,7 +193,7 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     validationOwnerApp:
       "Use a lowercase application key (letters, digits, underscores, or hyphens; maximum 32 characters).",
     permissionRun:
-      "Starting a run requires admin.provisioning.discovery.run and admin.provisioning.critical.",
+      `Starting a run requires ${ADMIN_RBAC_CRITICAL.PROVISIONING_DISCOVERY_RUN.join(" and ")}.`,
     status: "Status",
     scheduled: "Scheduled",
     scanned: "Scanned",
@@ -311,7 +313,7 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     validationOwnerApp:
       "استخدم مفتاح تطبيق بأحرف إنجليزية صغيرة وأرقام وشرطة سفلية أو واصلة، وبحد أقصى 32 حرفًا.",
     permissionRun:
-      "يتطلب بدء العملية صلاحيتي admin.provisioning.discovery.run وadmin.provisioning.critical.",
+      `يتطلب بدء العملية صلاحيتي ${ADMIN_RBAC_CRITICAL.PROVISIONING_DISCOVERY_RUN.join(" و")}.`,
     status: "الحالة",
     scheduled: "الموعد",
     scanned: "تم فحصه",

@@ -88,6 +88,20 @@ describe.each(["en", "ar"] as const)("role assignment provenance (%s)", (locale)
 });
 
 describe.each(["en", "ar"] as const)("role catalogue reach (%s)", (locale) => {
+  it.each(["searchBranches", "searchRoles"] as const)("prevents Enter in %s from replacing roles but allows Save", async (searchLabel) => {
+    const { copy, user, replaceRoles, onSuccess } = setup(locale);
+    const search = screen.getByRole("searchbox", { name: copy[searchLabel] });
+    fireEvent.change(search, { target: { value: "missing" } });
+    expect(fireEvent.keyDown(search, { key: "Enter", code: "Enter" })).toBe(false);
+    expect(replaceRoles).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: copy.save }));
+    await waitFor(() => expect(replaceRoles).toHaveBeenCalledTimes(1));
+    expect(replaceRoles).toHaveBeenCalledWith(user, { assignments: [{ branchId: BRANCH_ID, roleId: ROLE_ID }] });
+    expect(onSuccess).toHaveBeenCalledWith(copy.branchRolesSaved);
+  });
+
   it("assigns entries beyond page one and keeps their labels after searching", async () => {
     const laterRole = { ...roleFixture, id: "later-role", name: "Payroll" };
     const laterBranch = { ...branchFixture, id: "later-branch", name: "Alexandria" };

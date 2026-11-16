@@ -132,6 +132,7 @@ export interface LeadDetail {
   firstName: string | null;
   lastName: string | null;
   honorificTitle: string | null;
+  jobTitle: string | null;
   companyName: string | null;
   primaryMobile: string | null;
   email: string | null;
@@ -367,6 +368,7 @@ export function parseLeadDetailResponse(payload: unknown): LeadDetail {
     firstName: nullableText(lead.firstName),
     lastName: nullableText(lead.lastName),
     honorificTitle: nullableText(lead.honorificTitle),
+    jobTitle: nullableText(lead.jobTitle),
     companyName: nullableText(lead.companyName),
     primaryMobile: nullableText(lead.primaryMobile),
     email: nullableText(lead.email),

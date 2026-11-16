@@ -14,7 +14,7 @@ import {
   type TradeDocumentHeader,
 } from "../documents/trade-document-contract";
 
-// Purchase orders — 12 routes, feature gate `trade.purchasing`, every route
+// Purchase orders — 13 routes, feature gate `trade.purchasing`, every route
 // targeting `BRANCH`. Verified against purchasing.controller.ts,
 // purchasing.service.ts and dto/purchasing.dto.ts.
 
@@ -69,6 +69,18 @@ export interface PurchaseOrderDetail extends PurchaseOrder {
     attemptCount: number;
     lastErrorCode: string | null;
   } | null;
+}
+
+export function canRetryPurchaseOrderDelivery(
+  order: PurchaseOrderDetail,
+  canWrite: (permission: string) => boolean,
+): boolean {
+  // Mirrors purchasing/purchase-delivery.service.ts: provider failures may
+  // already have sent an email and cannot safely start another delivery.
+  return order.lifecycleStatus === "CONFIRMED" &&
+    order.delivery?.status === "FAILED" &&
+    order.delivery.lastErrorCode !== "TRADE.PURCHASE_ORDER.DELIVERY_EMAIL_FAILED" &&
+    canWrite(PURCHASE_ORDER_PERMISSIONS.confirm);
 }
 
 /** The six ladder steps, in the order `PurchasingService` allows them. */

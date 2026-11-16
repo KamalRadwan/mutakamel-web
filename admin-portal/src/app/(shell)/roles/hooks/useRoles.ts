@@ -270,7 +270,7 @@ function forbiddenError(): NormalizedApiError {
     httpStatus: 403,
     errorCode: "ADMIN_PERMISSION_DENIED",
     errorCategory: "AUTHORIZATION",
-    message: "Both admin.roles.delete and admin.roles.critical are required.",
+    message: `Both ${ADMIN_RBAC_CRITICAL.ROLES_DELETE.join(" and ")} are required.`,
   };
 }
 

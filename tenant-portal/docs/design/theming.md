@@ -6,6 +6,8 @@ Written: **2026-08-27**
 
 Updated: **2026-10-26** — [CRM Leads v3 Ocean Navy & dark surface hierarchy](specs/crm-leads-v3.md).
 
+Language loading updated **2026-10-28** — FE-BUNDLE-001, one dictionary per request.
+
 ## What this replaced (pre-rebuild, for context)
 
 Four separate defects, all in the same seam:
@@ -29,7 +31,7 @@ All four are fixed in the foundation phase, before any screen is converted.
 | Axis | States | Stored as |
 | --- | --- | --- |
 | Theme | `light`, `dark`, `system` | `localStorage["tenant_theme"]` |
-| Language | `ar`, `en` | `localStorage["tenant_lang"]` |
+| Language | `ar`, `en` | `localStorage["tenant_lang"]`, mirrored to the `tenant_lang` cookie |
 | Density | `compact`, `standard`, `comfortable` | `localStorage["tenant_density"]` |
 
 Direction is **derived** from language and never stored separately:
@@ -83,18 +85,21 @@ makes rows and bars taller, not letters bigger.
 
 ## No flash — the mechanism
 
-All three axes must be correct in the **first painted frame**. Since none can
-be resolved on the server without a cookie, and this app does not use one, an
-inline script writes the DOM before React hydrates.
+Language and direction resolve on the server from the `tenant_lang` cookie,
+defaulting to Arabic. The server passes only that language to the provider, which loads its
+dictionary chunk.
+Theme and density still use an inline script before hydration. Existing
+localStorage-only language preferences migrate after their dictionary loads;
+see [the loading contract](i18n.md#loading-and-the-client-bundle-fe-bundle-001-2026-10-28).
 
 ```tsx
 // src/app/layout.tsx
 import { InlineBootstrapScript } from "./InlineBootstrapScript";
+import { I18nProvider } from "@/i18n/I18nContext";
+import { readServerLanguage } from "@/i18n/server";
 
 const BOOTSTRAP = `(function(){try{
   var d=document.documentElement;
-  var l=localStorage.getItem("tenant_lang")==="en"?"en":"ar";
-  d.lang=l; d.dir=l==="ar"?"rtl":"ltr";
   var t=localStorage.getItem("tenant_theme");
   var dark=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
   d.classList.toggle("dark",dark);
@@ -107,9 +112,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Minted per request by src/proxy.ts — see
   // ../architecture/security-headers.md#the-nonce-problem.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const initialLanguage = await readServerLanguage();
+  const directions = { ar: "rtl", en: "ltr" } as const;
 
   return (
-    <html lang="ar" dir="rtl" className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
+    <html lang={initialLanguage} dir={directions[initialLanguage]} className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
       <head>
         <InlineBootstrapScript nonce={nonce} html={BOOTSTRAP} />
       </head>
@@ -117,7 +124,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         suppressHydrationWarning
         className="h-full antialiased"
       >
-        {children}
+        <I18nProvider initialLanguage={initialLanguage}>{children}</I18nProvider>
       </body>
     </html>
   );
@@ -174,8 +181,8 @@ Fast Refresh and client reconciliation.
 
 Notes that matter:
 
-- The server still renders `lang="ar" dir="rtl"` — the Arabic-first default.
-  The script corrects it for English users before first paint.
+- The server renders language, direction and copy from the same snapshot.
+  The script does not change direction before the matching copy is available.
 - `suppressHydrationWarning` on `<html>` is **required**, because the script
   intentionally mutates attributes React rendered.
 - The whole thing is wrapped in `try/catch`. A private window or blocked
@@ -185,22 +192,13 @@ Notes that matter:
 
 ## Providers read the same keys
 
-`I18nProvider`, `ThemeProvider` and `DensityProvider` must read the identical `localStorage` keys
-via `useSyncExternalStore`, so their **first client render already agrees**
-with what the bootstrap script wrote. No `useEffect` correction, no hydration
-mismatch, no flash.
-
-```ts
-// src/i18n/useLanguage.ts
-export function useLanguage() {
-  return useSyncExternalStore(subscribe, getSnapshot, () => "ar" as const);
-}
-```
-
-The server snapshot is `"ar"`, matching the server-rendered `<html lang="ar">`.
-
-**Never write these values from a `useEffect`.** A `useEffect` that sets
-`document.documentElement.*` on mount is precisely the bug being removed.
+`ThemeProvider` and `DensityProvider` read the same storage keys as the
+bootstrap. `I18nProvider` and the provider-free language hooks use the
+request's language and its dictionary for server rendering and hydration, then
+subscribe to the browser language store. Language changes commit only after
+the target dictionary has loaded. `DirectionBridge` updates the document and
+Radix direction together with that committed language; the initial server
+direction already matches the initial copy.
 
 ## Account preferences on a fresh device
 
@@ -211,7 +209,8 @@ missing device key independently with supported account values (`ar`/`en`,
 Null or unsupported values leave the defaults intact. Failed reads leave the
 session and local rendering intact; Profile exposes its normal error/retry UI.
 
-The inline bootstrap still owns first paint (D-4.17). Account loading is
+The server language snapshot and theme/density bootstrap own first paint.
+Account loading is
 asynchronous and may update an empty device after authentication. Stored device
 choices, including choices made while the read is pending, always win.
 Selecting `system` stores the literal `system` rather than deleting the key,

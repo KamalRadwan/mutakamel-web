@@ -39,6 +39,37 @@ it("omits management actions in read-only mode", () => {
   expect(result.current.some(({ id }) => id === "actions")).toBe(false);
 });
 
+it("keeps Arabic and English names in separate direction-isolated columns", () => {
+  const { result } = renderHook(() => usePipelineColumns(options));
+  const ar = result.current.find(({ id }) => id === "nameAr")!;
+  const enColumn = result.current.find(({ id }) => id === "nameEn")!;
+  expect(ar.header).toBe(en.crmPipelines.nameAr);
+  expect(enColumn.header).toBe(en.crmPipelines.nameEn);
+  render(<>{ar.cell?.({ ...pipeline, nameAr: "المبيعات" })}{enColumn.cell?.(pipeline)}</>);
+  expect(screen.getByText("المبيعات")).toHaveAttribute("dir", "rtl");
+  expect(screen.getByText("Sales")).toHaveAttribute("dir", "ltr");
+});
+
+it("opens editing directly for the default row without triggering row navigation", () => {
+  const onEdit = vi.fn();
+  const onNavigate = vi.fn();
+  const { result } = renderHook(() => usePipelineColumns({ ...options, onEdit }));
+  const actions = result.current.find(({ id }) => id === "actions");
+  render(<TooltipProvider><div onClick={onNavigate}>{actions?.cell?.(pipeline)}</div></TooltipProvider>);
+  fireEvent.click(screen.getByRole("button", { name: `${en.crmPipelines.edit}: Sales` }));
+  expect(onEdit).toHaveBeenCalledWith(pipeline);
+  expect(onNavigate).not.toHaveBeenCalled();
+});
+
+it("keeps detail access but hides edit for a read-only actor", () => {
+  access.canMutate = false;
+  const { result } = renderHook(() => usePipelineColumns({ ...options, onView: vi.fn(), onEdit: vi.fn() }));
+  const actions = result.current.find(({ id }) => id === "actions");
+  render(<TooltipProvider>{actions?.cell?.(pipeline)}</TooltipProvider>);
+  expect(screen.getByRole("button", { name: `${en.crmPipelines.review.openPipeline}: Sales` })).toBeEnabled();
+  expect(screen.queryByRole("button", { name: `${en.crmPipelines.edit}: Sales` })).toBeNull();
+});
+
 it.each(["ALL", "RESTRICTED"] as const)("only allows ALL pipelines to become default (%s)", (accessMode) => {
   const { result } = renderHook(() => usePipelineColumns(options));
   const actions = result.current.find(({ id }) => id === "actions");

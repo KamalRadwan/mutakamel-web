@@ -1,18 +1,22 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { createElement } from "react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
+import { TenantApiClientError } from "@/lib/api/axiosClient";
 import { parseAcquisitionSourceResponse } from "../acquisition-source-contract";
 import { useAcquisitionSourceEdit } from "./useAcquisitionSourceEdit";
 
+const state = vi.hoisted(() => ({ lang: "en" as "ar" | "en" }));
 const { patch } = vi.hoisted(() => ({ patch: vi.fn() }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/axiosClient")>();
   return { ...actual, axiosClient: { ...actual.axiosClient, patch } };
 });
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
-afterEach(() => { cleanup(); vi.resetAllMocks(); });
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: { ar, en }[state.lang] }) }));
+afterEach(() => { cleanup(); vi.resetAllMocks(); state.lang = "en"; });
 
 const source = parseAcquisitionSourceResponse({
   id: "01902001-3000-7000-8000-000000000001", nameAr: "الموقع", nameEn: "Website", isActive: true,
@@ -20,6 +24,29 @@ const source = parseAcquisitionSourceResponse({
 });
 
 describe("acquisition-source edit", () => {
+  it.each(["ar", "en"] as const)("renders a localized conflict in %s without backend prose", async (lang) => {
+    state.lang = lang;
+    patch.mockRejectedValue(new TenantApiClientError("Internal backend prose", {
+      status: 409, statusText: "Conflict", headers: new Headers(),
+      data: { message: "Internal backend prose" },
+    }));
+    const reload = vi.fn();
+    function Editor() {
+      const edit = useAcquisitionSourceEdit(true, vi.fn(), reload);
+      return createElement("div", null,
+        createElement("button", { onClick: () => edit.select(source) }, "Select"),
+        createElement("button", { onClick: () => void edit.save() }, "Save"),
+        edit.error && createElement("p", { role: "alert" }, edit.error),
+      );
+    }
+    render(createElement(Editor));
+    fireEvent.click(screen.getByText("Select"));
+    fireEvent.click(screen.getByText("Save"));
+    expect((await screen.findByRole("alert")).textContent).toBe({ ar, en }[lang].crmShared.errorConflict);
+    expect(screen.queryByText("Internal backend prose")).toBeNull();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
   it("renames and deactivates through the canonical non-replayable PATCH", async () => {
     const onSaved = vi.fn();
     const changed = { ...source, nameEn: "Web", isActive: false };

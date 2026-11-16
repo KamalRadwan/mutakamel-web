@@ -29,6 +29,7 @@ import { useStorageServerDetail } from "../hooks/useStorageServerDetail";
 import { useStorageByteLimit } from "../hooks/useStorageByteLimit";
 import { formatStorageBytes } from "../lib/storage-byte-capacity";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import { isSecureStorageEndpoint, probeFreshnessPercent } from "../lib/storage-server-contract";
 import type { StorageCredentialRotationReceipt } from "../lib/rotation-receipt";
 import type {
@@ -54,7 +55,7 @@ import {
 
 type Lang = "ar" | "en";
 interface SafeErrorDetails {
-  message: string;
+  localDescription?: string;
   errorCode?: string;
   correlationId?: string;
 }
@@ -103,9 +104,9 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
       toast.success(copy.actionCompletedTitle, success);
       return true;
     } catch (caught) {
-      const details = readErrorDetails(caught, copy.requestFailedFallback);
+      const details = readErrorDetails(caught);
       setActionError(details);
-      toast.error(copy.actionFailedTitle, details.message);
+      toast.error(copy.actionFailedTitle, getLocalizedApiErrorMessage(details, lang));
       return false;
     }
   };
@@ -123,9 +124,9 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
         );
       }
     } catch (caught) {
-      const details = readErrorDetails(caught, copy.requestFailedFallback);
+      const details = readErrorDetails(caught);
       setActionError(details);
-      toast.error(copy.connectionTestCouldNotRunTitle, details.message);
+      toast.error(copy.connectionTestCouldNotRunTitle, getLocalizedApiErrorMessage(details, lang));
     }
   };
 
@@ -192,7 +193,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
 
       {view.error && (
         <DegradedBanner>
-          <p>{view.error.message}</p>
+          <p>{getLocalizedApiErrorMessage(view.error, lang)}</p>
           {(view.error.errorCode || view.error.correlationId) && (
             <div className="mt-1 flex flex-wrap gap-1.5">
               {view.error.errorCode && <CodeRef value={view.error.errorCode} />}
@@ -208,7 +209,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
           tabIndex={-1}
           className="whitespace-pre-line rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <p>{actionError.message}</p>
+          <p>{getLocalizedApiErrorMessage(actionError, lang)}</p>
           {(actionError.errorCode || actionError.correlationId) && (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {actionError.errorCode && <CodeRef value={actionError.errorCode} />}
@@ -440,10 +441,10 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
               router.push("/storage-servers");
             })
             .catch((caught) => {
-              const details = readErrorDetails(caught, copy.deleteFailedFallback);
+              const details = readErrorDetails(caught);
               setConfirmation(null);
               setActionError(details);
-              toast.error(copy.deleteFailedTitle, details.message);
+              toast.error(copy.deleteFailedTitle, getLocalizedApiErrorMessage(details, lang));
             })
         }
         title={copy.deleteModalTitle}
@@ -545,9 +546,13 @@ function StorageServerEditor({
         await onSubmit({ credentials: { accessKeyId: accessKeyId.trim(), secretAccessKey } });
         return;
       }
-      if (!byteLimit.validate()) throw new Error(byteLimit.copy.invalidLimit);
+      if (!byteLimit.validate()) {
+        setError({ localDescription: byteLimit.copy.invalidLimit });
+        return;
+      }
       if (!connectionEditBlocked && !isSecureStorageEndpoint(endpoint.trim())) {
-        throw new Error(copy.httpsOnlyError);
+        setError({ localDescription: copy.httpsOnlyError });
+        return;
       }
       const dto: UpdateStorageServerDto = {};
       const nextName = name.trim();
@@ -570,7 +575,7 @@ function StorageServerEditor({
       }
       await onSubmit(dto);
     } catch (caught) {
-      setError(readErrorDetails(caught, copy.saveFailedFallback));
+      setError(readErrorDetails(caught));
     }
   };
 
@@ -605,7 +610,7 @@ function StorageServerEditor({
       <form method="post" id="storage-server-editor-form" onSubmit={submit} className="space-y-2.5 py-1 text-xs">
         {error && (
           <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <p>{error.message}</p>
+            <p>{error.localDescription ?? getLocalizedApiErrorMessage(error, lang)}</p>
             {(error.errorCode || error.correlationId) && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {error.errorCode && <CodeRef value={error.errorCode} />}
@@ -678,11 +683,12 @@ function SafeRotationEditor({
     try {
       const hours = Number(graceHours);
       if (!Number.isInteger(hours) || hours < 1 || hours > 24) {
-        throw new Error(copy.graceWindowRangeError);
+        setError({ localDescription: copy.graceWindowRangeError });
+        return;
       }
       await onSubmit({ accessKeyId: accessKeyId.trim(), secretAccessKey }, hours);
     } catch (caught) {
-      setError(readErrorDetails(caught, copy.rotationStartFailedFallback));
+      setError(readErrorDetails(caught));
     }
   };
 
@@ -712,7 +718,7 @@ function SafeRotationEditor({
       <form method="post" id="safe-rotation-form" onSubmit={submit} className="space-y-2.5 py-1 text-xs">
         {error && (
           <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <p>{error.message}</p>
+            <p>{error.localDescription ?? getLocalizedApiErrorMessage(error, lang)}</p>
             {(error.errorCode || error.correlationId) && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {error.errorCode && <CodeRef value={error.errorCode} />}
@@ -934,7 +940,7 @@ function NotAvailableState({ message, lang }: { message: NormalizedApiError | nu
   const copy = dict(lang);
   return (
     <div className="mx-auto max-w-xl rounded-lg border border-border bg-card">
-      <DsErrorState title={copy.unavailableTitle} error={message} />
+      <DsErrorState title={copy.unavailableTitle} error={message ? { ...message, message: getLocalizedApiErrorMessage(message, lang) } : null} />
       <div className="flex justify-center pb-6">
         <Button variant="outline" size="sm" asChild>
           <Link href="/storage-servers">{copy.backLabel}</Link>
@@ -952,11 +958,10 @@ function formatDate(value: string | null, lang: Lang) {
     : new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-US", { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(date);
 }
 
-function readErrorDetails(value: unknown, fallback: string): SafeErrorDetails {
-  if (typeof value !== "object" || value === null) return { message: fallback };
-  const candidate = value as { message?: unknown; errorCode?: unknown; correlationId?: unknown };
+function readErrorDetails(value: unknown): SafeErrorDetails {
+  if (typeof value !== "object" || value === null) return {};
+  const candidate = value as { errorCode?: unknown; correlationId?: unknown };
   return {
-    message: typeof candidate.message === "string" ? candidate.message : fallback,
     ...(typeof candidate.errorCode === "string" ? { errorCode: candidate.errorCode } : {}),
     ...(typeof candidate.correlationId === "string" ? { correlationId: candidate.correlationId } : {}),
   };

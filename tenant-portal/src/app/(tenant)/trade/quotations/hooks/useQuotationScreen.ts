@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { useTradeDocumentDetail } from "../../documents/hooks/useTradeDocumentDetail";
-import { useTradePdfJob, type TradePdfJobState } from "../../documents/hooks/useTradePdfJob";
 import {
   QUOTATIONS_PATH,
   QUOTATION_PERMISSIONS,
@@ -13,6 +14,8 @@ import {
 } from "../quotation-contract";
 import { useQuotationActions, type QuotationActionsState } from "./useQuotationActions";
 import { useQuotationRevision, type QuotationRevisionState } from "./useQuotationRevision";
+import { QUOTATION_REPLACEMENT_PARAM } from "../quotation-composer-draft";
+import { quotationScopedHeaders } from "../quotation-workspace-hydration";
 
 /** The one action that advances the document, computed from its status. */
 type QuotationAdvance = "send" | "accept" | null;
@@ -28,8 +31,6 @@ export interface QuotationScreenState {
   isAwaitingConversion: boolean;
   actions: QuotationActionsState;
   revision: QuotationRevisionState;
-  pdf: TradePdfJobState;
-  renderPdf: () => void;
 }
 
 /**
@@ -42,9 +43,13 @@ export interface QuotationScreenState {
  */
 export function useQuotationScreen(id: string): QuotationScreenState {
   const { t } = useI18n();
+  const router = useRouter();
   const detail = useTradeDocumentDetail<QuotationDetail>(QUOTATIONS_PATH, id, parseQuotationDetail);
   const quotation = detail.document;
-  const { headers } = detail.scope;
+  const headers = useMemo(
+    () => (quotation ? quotationScopedHeaders(quotation) : detail.scope.headers),
+    [detail.scope.headers, quotation],
+  );
 
   const reload = useCallback(async () => {
     await detail.reload();
@@ -61,8 +66,12 @@ export function useQuotationScreen(id: string): QuotationScreenState {
     },
     reload,
   );
-  const revision = useQuotationRevision(quotation, headers, reload);
-  const pdf = useTradePdfJob(QUOTATIONS_PATH, id, headers);
+  const revision = useQuotationRevision(quotation, headers, reload, {
+    canSupersede: detail.scope.canWrite(QUOTATION_PERMISSIONS.update) && detail.scope.canWrite(QUOTATION_PERMISSIONS.send),
+    replacementActorId: detail.scope.canWrite(QUOTATION_PERMISSIONS.create)
+      && detail.scope.canWrite(QUOTATION_PERMISSIONS.update) ? detail.scope.userId : null,
+    onReplacementReady: (quotationId) => router.push(`${TENANT_ROUTES.tradeQuotationCreate}?${QUOTATION_REPLACEMENT_PARAM}=${quotationId}`),
+  });
 
   const currentRevision = useMemo(
     () => quotation?.revisions.find((entry) => entry.id === quotation.currentRevisionId) ?? null,
@@ -82,31 +91,16 @@ export function useQuotationScreen(id: string): QuotationScreenState {
         ? "accept"
         : null;
 
-  const renderPdf = useCallback(() => {
-    if (!currentRevision) return;
-    void pdf.render(
-      {
-        revisionId: currentRevision.id,
-        // `RenderQuotationPdfDto.purpose` is `@IsIn(["CUSTOMER_QUOTATION"])` —
-        // the only value the DTO accepts.
-        purpose: "CUSTOMER_QUOTATION",
-      },
-      t.tradeDocuments.pdf.operation,
-    );
-  }, [currentRevision, pdf, t]);
-
   return {
     detail,
     currentRevision,
     advance,
-    canRevise: status === "DRAFT" && canWrite(QUOTATION_PERMISSIONS.update),
+    canRevise: (status === "DRAFT" || (status === "SENT" && canWrite(QUOTATION_PERMISSIONS.send))) && canWrite(QUOTATION_PERMISSIONS.update),
     canReject: status === "SENT" && canWrite(QUOTATION_PERMISSIONS.reject),
     canCancel:
       (status === "DRAFT" || status === "SENT") && canWrite(QUOTATION_PERMISSIONS.cancel),
     isAwaitingConversion: status === "ACCEPTED",
     actions,
     revision,
-    pdf,
-    renderPdf,
   };
 }

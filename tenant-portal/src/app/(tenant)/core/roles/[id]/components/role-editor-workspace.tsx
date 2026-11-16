@@ -1,43 +1,56 @@
 "use client";
 
+import { Info, Lock, Pencil, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
   Card,
   CardContent,
-  Checkbox,
-  ConfirmActionModal,
+  DateTime,
   DetailHeader,
   ErrorState,
   NotFoundState,
   PermissionGate,
   Skeleton,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from "@/design-system";
-import { useLanguage } from "@/i18n/useLanguage";
 import { localizedValue } from "@/lib/format/localized";
-import { formatNumber } from "@/lib/format/number";
-import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { useCoreErrorText } from "../../../hooks/useCoreErrorText";
-import { RoleFormDrawer } from "../../components/RoleFormDrawer";
+import { resolveRoleBranchErrorText } from "../../hooks/branch-permissions-reconcile";
 import { useRolePermissionEditor } from "../hooks/useRolePermissionEditor";
+import { useRoleBranchModalScopeKey } from "../../hooks/useRoleBranchModalScopeKey";
+import { PermissionCatalogueMatrix } from "./PermissionCatalogueMatrix";
+import { RoleEditorDialogs } from "./RoleEditorDialogs";
 
-export function RoleEditorWorkspace({ id }: { id: string }) {
-  const screen = useRolePermissionEditor(id);
-  const lang = useLanguage();
-  const { t, role } = screen;
+export function RoleEditorWorkspace(props: { id: string; onDeleted?: () => void }) {
+  const scopeKey = useRoleBranchModalScopeKey(props.id, true);
+  return <RoleEditorContent key={scopeKey} {...props} />;
+}
+
+function RoleEditorContent({
+  id,
+  onDeleted,
+}: {
+  id: string;
+  onDeleted?: () => void;
+}) {
+  const screen = useRolePermissionEditor(id, onDeleted);
+  const { t, lang, role } = screen;
   const copy = t.coreIdentity.roles;
+  const branchCopy = t.coreIdentity.roleBranch;
   const describeError = useCoreErrorText();
-  const writeText = describeError(screen.writeError);
+  const writeText = resolveRoleBranchErrorText(screen.writeError, t);
+  const blockerText =
+    describeError(screen.blockedDeleteError) ?? t.coreIdentity.errors.ROLE_IN_USE;
   const isReadOnly = !screen.canUpdate || (role?.isSystem ?? false);
+  const canOpenBranchEditor = screen.canAssignBranchPermissions || screen.canViewBranchPermissions;
+  const branchButtonLabel = screen.canAssignBranchPermissions
+    ? branchCopy.assignAction
+    : branchCopy.viewAction;
 
   if (screen.isMissing || screen.loadError || screen.isLoading || !role) {
     return (
-      <PermissionGate require="roles.role.read">
+      <PermissionGate require="roles.role.read" denied={screen.loadError?.status === 403}>
         {screen.isMissing ? (
           <NotFoundState
             title={copy.notFoundTitle}
@@ -63,104 +76,143 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
   }
 
   const roleName = localizedValue(role.nameAr, role.nameEn, lang);
+  const roleDescription = localizedValue(role.descriptionAr, role.descriptionEn, lang);
 
   return (
     <PermissionGate require="roles.role.read">
       <div className="flex flex-col gap-4">
         <DetailHeader
           title={roleName}
-          subtitle={localizedValue(role.descriptionAr, role.descriptionEn, lang)}
+          subtitle={roleDescription || undefined}
           backLabel={copy.backToList}
           backHref={TENANT_ROUTES.coreRoles}
-          breadcrumbs={[{ label: copy.title, href: TENANT_ROUTES.coreRoles }, { label: roleName }]}
-          status={role.isSystem ? <Badge tone="brand">{copy.systemRole}</Badge> : undefined}
+          breadcrumbs={[
+            { label: copy.title, href: TENANT_ROUTES.coreRoles },
+            { label: roleName },
+          ]}
+          status={
+            role.isSystem ? (
+              <Badge tone="brand">{copy.systemRole}</Badge>
+            ) : (
+              <Badge tone="neutral">{copy.customOnly}</Badge>
+            )
+          }
           primaryAction={
-            isReadOnly
-              ? undefined
-              : {
-                  label: copy.savePermissions,
-                  onClick: screen.openConfirm,
-                  disabled: !screen.isDirty || !screen.canSavePermissions || screen.isSubmitting,
-                  loading: screen.isSubmitting,
-                }
+            screen.isBranchMode
+              ? canOpenBranchEditor
+                ? {
+                    label: branchButtonLabel,
+                    icon: <ShieldCheck className="size-4" aria-hidden="true" />,
+                    onClick: screen.openBranchPermissions,
+                  }
+                : undefined
+              : isReadOnly
+                ? undefined
+                : {
+                    label: copy.savePermissions,
+                    onClick: screen.openConfirm,
+                    disabled:
+                      !screen.isDirty || !screen.canSavePermissions || screen.isSubmitting,
+                    loading: screen.isSubmitting,
+                  }
           }
           secondaryActions={
             <>
+              {!screen.isBranchMode && canOpenBranchEditor ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={screen.openBranchPermissions}
+                  disabled={screen.isSubmitting}
+                >
+                  <ShieldCheck className="size-4" aria-hidden="true" />
+                  {branchButtonLabel}
+                </Button>
+              ) : null}
               {isReadOnly ? null : (
-                <Button size="sm" variant="outline" onClick={screen.openRename} disabled={screen.isSubmitting}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={screen.openRename}
+                  disabled={screen.isSubmitting}
+                >
+                  <Pencil className="size-4" aria-hidden="true" />
                   {copy.rename}
                 </Button>
               )}
-              {screen.isDirty && !isReadOnly ? (
-                <Button size="sm" variant="outline" onClick={screen.resetSelection} disabled={screen.isSubmitting}>
+              {screen.isDirty && screen.canEditPermissions ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={screen.resetSelection}
+                  disabled={screen.isSubmitting}
+                >
+                  <RotateCcw className="size-4" aria-hidden="true" />
                   {t.editDrawer.revert}
+                </Button>
+              ) : null}
+              {!role.isSystem && screen.canDelete ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={screen.openDelete}
+                  disabled={screen.isSubmitting}
+                >
+                  <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                  {t.coreIdentity.actions.delete}
                 </Button>
               ) : null}
             </>
           }
         />
 
-        <RoleFormDrawer
-          key={screen.isRenameOpen ? "rename-open" : "rename-closed"}
-          isOpen={screen.isRenameOpen}
-          initial={{
-            name: role.name,
-            description: role.descriptionEn ?? "",
-          }}
-          title={copy.renameTitle}
-          description={copy.renameDescription}
-          onClose={screen.closeRename}
-          onSubmit={screen.rename}
-          isSubmitting={screen.isSubmitting}
-          error={screen.isRenameOpen ? writeText : undefined}
-        />
+        <Card>
+          <CardContent className="grid gap-3 py-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-2xs text-muted-foreground">{copy.description}</span>
+              <span className="text-xs text-foreground">{roleDescription || t.detail.notRecorded}</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-2xs text-muted-foreground">{t.coreIdentity.detail.createdAt}</span>
+              <DateTime value={role.createdAt} className="text-xs text-foreground" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-2xs text-muted-foreground">{t.coreIdentity.detail.updatedAt}</span>
+              <DateTime value={role.updatedAt} className="text-xs text-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {screen.isBranchMode ? (
+          <div role="status" className="flex flex-col gap-1 rounded-md border border-border bg-info-subtle px-3.5 py-2.5 text-xs text-info-subtle-foreground">
+            <span className="font-medium">{branchCopy.detail.branchModeBannerTitle}</span>
+            <span>{canOpenBranchEditor ? branchCopy.detail.branchModeBannerDescription : branchCopy.detail.nonOwnerBranchModeHint}</span>
+          </div>
+        ) : null}
 
         {role.isSystem ? (
-          <p
-            role="status"
-            className="rounded-sm border border-border bg-muted p-2.5 text-xs text-muted-foreground"
-          >
-            {copy.systemRoleReadOnly}
+          <p role="status" className="flex items-center gap-2 rounded-md border border-border bg-muted/60 px-3 py-2.5 text-xs text-muted-foreground">
+            <Lock className="size-3.5 shrink-0" aria-hidden="true" />
+            <span>{copy.systemRoleReadOnly}</span>
           </p>
         ) : null}
 
-        {screen.hasUngrantablePermissions ? (
-          <p role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
+        {screen.hasUngrantablePermissions && !screen.isBranchMode ? (
+          <p role="alert" className="rounded-sm border border-border bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">
             {copy.outsideGrantAuthority}
           </p>
         ) : null}
 
-        {writeText ? (
-          <p
-            role="alert"
-            className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
-          >
+        {writeText && !screen.isRenameOpen ? (
+          <p role="alert" className="rounded-sm border border-border bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground">
             {writeText}
           </p>
         ) : null}
 
-        <p className="text-xs text-muted-foreground">
-          {formatTemplate(copy.selectedCount, {
-            count: formatNumber(screen.selectedIds.length, lang),
-            max: formatNumber(screen.maxPermissions, lang),
-          })}
-        </p>
-
-        {screen.isOverCap ? (
-          <p
-            role="alert"
-            className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300"
-          >
-            {formatTemplate(copy.overCap, {
-              max: formatNumber(screen.maxPermissions, lang),
-            })}
-          </p>
-        ) : null}
-
-        {screen.catalogueError && screen.catalogueError.status !== 403 ? (
+        {(screen.catalogueError && screen.catalogueError.status !== 403) || screen.isCatalogueTruncated ? (
           <ErrorState
             title={copy.catalogueFailed}
-            description={describeError(screen.catalogueError)}
+            description={screen.catalogueError ? describeError(screen.catalogueError) : undefined}
             onRetry={screen.reload}
             retryLabel={t.common.retry}
           />
@@ -170,64 +222,63 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
           require="roles.permission.read"
           denied={!screen.canReadPermissions || screen.catalogueError?.status === 403}
         >
-          <TooltipProvider>
-            {screen.groups.map((group) => (
-              <Card key={group.key}>
-                <CardContent className="flex flex-col gap-2 py-4">
-                  <h2 className="text-xs font-semibold text-foreground">{group.label}</h2>
-                  <ul className="grid gap-2 sm:grid-cols-2">
-                    {group.permissions.map((permission) => (
-                      <li key={permission.id}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <label
-                              className="flex items-start gap-2"
-                              tabIndex={screen.canGrantPermission(permission.id) ? undefined : 0}
-                            >
-                              <Checkbox
-                                checked={screen.selectedIds.includes(permission.id)}
-                                onCheckedChange={() => screen.toggle(permission.id)}
-                                disabled={!screen.canEditPermissions || !screen.canGrantPermission(permission.id) || screen.isSubmitting}
-                                aria-label={localizedValue(permission.nameAr, permission.nameEn, lang)}
-                              />
-                              <span className="flex flex-col">
-                                {/* The catalogue ships localized labels; never write a
-                                    second description for a permission key here. */}
-                                <span className="text-xs text-foreground">
-                                  {localizedValue(permission.nameAr, permission.nameEn, lang)}
-                                </span>
-                                <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
-                                  {permission.key}
-                                </span>
-                              </span>
-                            </label>
-                          </TooltipTrigger>
-                          {!screen.canGrantPermission(permission.id) ? (
-                            <TooltipContent>{copy.permissionNotGrantable}</TooltipContent>
-                          ) : null}
-                        </Tooltip>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </TooltipProvider>
+          {!screen.catalogueError && !screen.isCatalogueTruncated ? (
+            <PermissionCatalogueMatrix
+              t={t}
+              lang={lang}
+              groups={screen.groups}
+              filteredGroups={screen.filteredGroups}
+              permissionSearch={screen.permissionSearch}
+              onPermissionSearchChange={screen.setPermissionSearch}
+              onClearPermissionSearch={screen.clearPermissionSearch}
+              isCatalogueLoaded={screen.isCatalogueLoaded}
+              selectedCount={screen.selectedIds.length}
+              selectedSet={screen.selectedSet}
+              maxPermissions={screen.maxPermissions}
+              isOverCap={screen.isOverCap}
+              canEditPermissions={screen.canEditPermissions}
+              canGrantPermission={screen.canGrantPermission}
+              isSubmitting={screen.isSubmitting}
+              onToggle={screen.toggle}
+            />
+          ) : null}
         </PermissionGate>
 
-        <ConfirmActionModal
-          open={screen.isConfirmOpen}
-          onOpenChange={(open) => {
-            if (!open) screen.closeConfirm();
-          }}
-          title={copy.savePermissionsTitle}
-          // PUT /roles/:id/permissions bumps authorizationVersion for every
-          // holder in one transaction, so the change is live immediately.
-          description={copy.savePermissionsDescription}
-          confirmLabel={copy.savePermissions}
-          cancelLabel={t.common.cancel}
-          onConfirm={() => void screen.save()}
-          loading={screen.isSubmitting}
+        {!isReadOnly && !screen.isBranchMode ? (
+          <p className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="size-3.5 shrink-0" aria-hidden="true" />
+            <span>{copy.savePermissionsDescription}</span>
+          </p>
+        ) : null}
+
+        <RoleEditorDialogs
+          t={t}
+          role={role}
+          roleName={roleName}
+          roleDescription={roleDescription}
+          diff={screen.diff}
+          formatCount={screen.formatCount}
+          isSubmitting={screen.isSubmitting}
+          writeText={writeText}
+          blockerText={blockerText}
+          canReadUsers={screen.canReadUsers}
+          isRenameOpen={screen.isRenameOpen}
+          onCloseRename={screen.closeRename}
+          onRename={screen.rename}
+          isConfirmOpen={screen.isConfirmOpen}
+          onConfirmOpenChange={screen.handleConfirmOpenChange}
+          onConfirmSave={screen.save}
+          isDeleteOpen={screen.isDeleteOpen}
+          onDeleteOpenChange={screen.handleDeleteOpenChange}
+          onConfirmDelete={screen.confirmDelete}
+          isDeleteBlocked={screen.blockedDeleteError !== null}
+          onDeleteBlockerOpenChange={screen.handleDeleteBlockerOpenChange}
+          branchModalSession={screen.branchModalSession}
+          onCloseBranchModal={screen.closeBranchModal}
+          onBranchSaved={screen.handleBranchSaved}
+          savedBranchReceipt={screen.savedBranchReceipt}
+          onCloseSavedBranchReceipt={screen.closeSavedBranchReceipt}
+          onViewSavedBranchPermissions={screen.viewSavedBranchPermissions}
         />
       </div>
     </PermissionGate>

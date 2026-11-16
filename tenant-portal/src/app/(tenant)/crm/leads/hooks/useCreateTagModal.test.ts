@@ -28,6 +28,15 @@ function renderTagModal(options: Parameters<typeof useCreateTagModal>[0]) {
 }
 
 describe("useCreateTagModal", () => {
+  it("does not save the last valid color while a visible hex draft is invalid", async () => {
+    const success = vi.fn(), close = vi.fn();
+    const { result } = renderTagModal({ open: true, initialName: "Strategic", existingTags: [], onSuccess: success, onClose: close });
+    act(() => result.current.handleColorValidityChange(false));
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(post).not.toHaveBeenCalled();
+    expect(result.current.isSubmitDisabled).toBe(true);
+    expect(result.current.isDirty).toBe(true);
+  });
   const onSuccess = vi.fn();
   const onClose = vi.fn();
 

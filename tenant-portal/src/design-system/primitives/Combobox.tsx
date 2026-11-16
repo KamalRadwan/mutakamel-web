@@ -25,6 +25,8 @@ export interface ComboboxProps extends ControlSizeProps {
    * trigger would otherwise render a bare id.
    */
   selectedLabel?: string;
+  /** Optional supporting text for a selected entity, also when its remote page is absent. */
+  selectedDescription?: string;
   onValueChange: (next: string | undefined) => void;
   options: ComboboxOption[];
   /** Called with the typed query after `debounceMs` of quiet, and once on open. */
@@ -45,10 +47,15 @@ export interface ComboboxProps extends ControlSizeProps {
   invalid?: boolean;
   onBlur?: () => void;
   id?: string;
+  "aria-label"?: string;
   /** Optional leading icon or avatar rendered inside the trigger button before the label. */
   leadingSlot?: React.ReactNode;
   /** When true, renders description inline beside label on the same line rather than below it. */
   inlineDescription?: boolean;
+  /** Compact desktop typography without reducing the control's hit area. */
+  textSize?: "default" | "compact";
+  /** Keep long names readable in the option list. */
+  wrapLabels?: boolean;
   /** Custom class names for the popover panel (e.g. `w-80 min-w-80`). */
   popoverClassName?: string;
   className?: string;
@@ -57,16 +64,13 @@ export interface ComboboxProps extends ControlSizeProps {
 const DEFAULT_DEBOUNCE_MS = 300;
 
 /**
- * Single-select type-ahead over a **remote** list.
- *
- * This is not a `Select` with a filter box bolted on — primitives.md rules that
- * out explicitly. The list is whatever the server last returned for the query,
- * so filtering never happens in the browser and the control has real loading
- * and empty states rather than an empty dropdown.
+ * Single-select type-ahead. The owner supplies searched options, whether from
+ * a remote page or a complete, locally filtered reference directory.
  */
 export function Combobox({
   value,
   selectedLabel,
+  selectedDescription,
   onValueChange,
   options,
   onSearch,
@@ -84,9 +88,12 @@ export function Combobox({
   invalid,
   onBlur,
   id,
+  "aria-label": ariaLabel,
   size = "sm",
   leadingSlot,
   inlineDescription = false,
+  textSize = "default",
+  wrapLabels = false,
   popoverClassName,
   className,
 }: ComboboxProps) {
@@ -192,14 +199,18 @@ export function Combobox({
             variant="outline"
             size={size}
             id={controlId}
+            aria-label={ariaLabel}
             disabled={disabled}
             onBlur={onBlur}
             aria-describedby={field?.describedBy}
             aria-invalid={isInvalid || undefined}
             aria-required={field?.required}
             aria-readonly={isReadOnly || undefined}
+            title={value ? selectedLabel : undefined}
             className={cn(
               "w-full cursor-pointer justify-between gap-1.5 bg-card font-normal",
+              value && selectedDescription && "h-auto min-h-12 py-2",
+              textSize === "compact" && "font-sans font-normal text-caption",
               !value && "text-muted-foreground",
               isInvalid && "border-destructive",
               isReadOnly && "cursor-default bg-muted text-foreground",
@@ -208,7 +219,10 @@ export function Combobox({
           >
             <span className="flex min-w-0 items-center gap-2 truncate">
               {leadingSlot}
-              <span className="truncate">{value ? (selectedLabel ?? value) : placeholder}</span>
+              <span className="flex min-w-0 flex-col items-start text-start">
+                <span className="max-w-full truncate">{value ? (selectedLabel ?? options.find((option) => option.value === value)?.label ?? placeholder) : placeholder}</span>
+                {value && selectedDescription && <> <span className="max-w-full truncate text-xs text-muted-foreground">{selectedDescription}</span></>}
+              </span>
             </span>
             <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Button>
@@ -260,6 +274,7 @@ export function Combobox({
                   onClick={() => commit(option)}
                   className={cn(
                     "flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm",
+                    textSize === "compact" && "font-sans font-normal text-caption",
                     index === activeIndex && "bg-accent text-accent-foreground",
                     option.disabled && "pointer-events-none opacity-50",
                   )}
@@ -274,7 +289,7 @@ export function Combobox({
                       inlineDescription ? "flex-1 items-center gap-2" : "flex-col",
                     )}
                   >
-                    <span className={cn(inlineDescription ? "shrink-0 font-medium" : "truncate")}>
+                    <span className={cn(inlineDescription ? "shrink-0" : wrapLabels ? "whitespace-normal wrap-anywhere" : "truncate", inlineDescription && textSize !== "compact" && "font-medium")}>
                       {option.label}
                     </span>
                     {option.description && (

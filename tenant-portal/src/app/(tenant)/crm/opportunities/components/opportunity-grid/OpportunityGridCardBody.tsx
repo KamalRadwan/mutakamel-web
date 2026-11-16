@@ -17,6 +17,7 @@ import {
   Money,
   StatusBadge,
   TagChip,
+  cn,
   toTagColor,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -26,6 +27,7 @@ import { countryIsoFromName } from "@/lib/geo/country-data";
 import { AcquisitionSourceIcon } from "../../../shared/components/AcquisitionSourceIcon";
 import { CrmPhoneActionsRow } from "../../../shared/components/CrmPhoneActionsRow";
 import type { OpportunityListItem } from "../../hooks/useOpportunitiesList";
+import { opportunityProbabilityClass } from "../opportunity-card/opportunity-card-presentation";
 
 function resolveCountryIso(country: string | null): string {
   const trimmed = (country ?? "").trim();
@@ -108,7 +110,7 @@ export function OpportunityGridCardBody({
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-card bg-surface-subtle px-3 py-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <Banknote
-            className="size-4 shrink-0 text-success-vivid"
+            className="size-4 shrink-0 text-success"
             aria-hidden="true"
           />
           {item.amount ? (
@@ -116,7 +118,7 @@ export function OpportunityGridCardBody({
               value={item.amount}
               currency={item.currencyCode ?? undefined}
               language={lang}
-              className="text-sm font-bold text-foreground"
+              className="text-sm font-bold text-success"
             />
           ) : (
             <span className="text-caption font-medium text-muted-foreground">
@@ -126,8 +128,8 @@ export function OpportunityGridCardBody({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {probabilityLabel && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-count-active-surface px-2 py-0.5 text-badge font-semibold tabular-nums text-count-active-fg">
+          {item.probabilityPercent !== null && (
+            <span className={cn("inline-flex items-center gap-1 rounded-full bg-card px-2 py-0.5 text-badge font-semibold tabular-nums", opportunityProbabilityClass(item.probabilityPercent))}>
               <CirclePercent className="size-3 shrink-0" aria-hidden="true" />
               {probabilityLabel}
             </span>
@@ -254,23 +256,23 @@ export function OpportunityGridCardBody({
             return (
               <TagChip
                 key={tag.id}
-                size="sm"
+                size="compact"
                 label={tag.name}
                 backgroundColor={tag.backgroundColor}
                 textColor={tag.textColor}
-                className="h-6 max-w-28 rounded-md font-semibold"
+                className="max-w-28 font-semibold"
               />
             );
           }
           return (
-            <Badge key={tag.id} size="sm" tone="neutral" className="max-w-28">
+            <Badge key={tag.id} size="compact" tone="neutral" className="max-w-28">
               <bdi className="truncate">{tag.name}</bdi>
             </Badge>
           );
         })}
 
         {overflowCount > 0 && (
-          <Badge size="sm" tone="neutral" className="shrink-0">
+          <Badge size="compact" tone="neutral" className="shrink-0">
             {formatTemplate(cardDict.moreTags, {
               count: formatNumber(overflowCount, lang),
             })}

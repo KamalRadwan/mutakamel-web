@@ -27,7 +27,6 @@ vi.mock("@/i18n/I18nContext", () => ({
 vi.mock("../hooks/useCommercialAccountLookups", () => ({
   useCommercialAccountLookups: () => ({
     lookups: {
-      paymentTerms: [{ id: "11111111-2222-3333-4444-555555555555", source: "existing" }],
       creditPolicies: [
         {
           id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -62,7 +61,6 @@ const SAMPLE_ACCOUNT: CommercialAccount = {
   partyId: "99999999-8888-7777-6666-555555555555",
   accountRole: "CUSTOMER",
   status: "BLOCKED",
-  paymentTermsId: null,
   priceBookId: null,
   creditLimit: "250000",
   creditCurrencyCode: "EGP",
@@ -79,6 +77,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("AccountDrawers UI component suite", () => {
+  it.each(["en", "ar"] as const)("omits payment terms from create and edit in %s", (lang) => {
+    mocks.lang = lang;
+    const { unmount } = render(
+      <CreateAccountDrawer isOpen isSubmitting={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
+    );
+    expect(screen.queryByText(dictionaries[lang].trade.accountPaymentTerms)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(dictionaries[lang].trade.accountPaymentTerms)).not.toBeInTheDocument();
+    unmount();
+    render(
+      <EditAccountDrawer account={SAMPLE_ACCOUNT} isSubmitting={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
+    );
+    expect(screen.queryByText(dictionaries[lang].trade.accountPaymentTerms)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(dictionaries[lang].trade.accountPaymentTerms)).not.toBeInTheDocument();
+  });
+
   it("updates role-filtered suggestions without replacing the entered assignment", () => {
     render(
       <CreateAccountDrawer isOpen isSubmitting={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
@@ -125,7 +138,6 @@ describe("AccountDrawers UI component suite", () => {
     );
 
     expect(screen.getByRole("button", { name: /CP-STRICT-01/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /11111111/i })).toBeInTheDocument();
   });
 
   it("renders AccountInspectModal with block reason banner for BLOCKED accounts", () => {

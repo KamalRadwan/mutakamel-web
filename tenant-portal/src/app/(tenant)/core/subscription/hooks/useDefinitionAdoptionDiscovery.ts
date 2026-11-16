@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { DEFINITION_ADOPTION_PERMISSION } from "../definition-adoption-command";
+import { canAdoptDefinitions } from "../definition-adoption-command";
 import { readDefinitionAdoptionSelections, readDefinitionAdoptionTargets } from "../definition-adoption-api";
 import type { DefinitionAdoptionSelection, DefinitionAdoptionSelections, DefinitionAdoptionTargets } from "../definition-adoption-discovery";
 
@@ -17,7 +17,7 @@ const initial = (key: string): State => ({ key, revision: null, selections: null
 
 export function useDefinitionAdoptionDiscovery() {
   const { user, isAuthenticated, authState, realtimeAuthGeneration } = useTenantAuth();
-  const allowed = isAuthenticated && !!user && (user.isTenantOwner || user.permissions.includes(DEFINITION_ADOPTION_PERMISSION));
+  const allowed = isAuthenticated && canAdoptDefinitions(user);
   const ready = allowed && authState === "AUTHENTICATED" && realtimeAuthGeneration !== null;
   const [reloadToken, setReloadToken] = useState(0);
   const key = JSON.stringify([user?.id, realtimeAuthGeneration, authState, allowed, reloadToken]);

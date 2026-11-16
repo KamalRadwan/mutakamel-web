@@ -470,6 +470,13 @@ verification.
 
 ## Roles
 
+Manage-roles keyboard behavior source review: **2026-10-31** (AUDIT29X-APB-3).
+Enter in either the branch or role search field is canceled so searching cannot
+submit the complete role replacement. The explicit Save button still submits
+the current branch-role assignments. Arabic and English regression specs cover
+both fields and Save; automated checks and the admin rebuild remain pending
+lead verification.
+
 `PATCH /api/admin/core/v1/tenants/:id/users/:userId/roles`
 
 ```ts
@@ -521,6 +528,13 @@ change is needed.
 
 `DELETE /api/admin/core/v1/tenants/:id/users/:userId`
 
+- Confirmation source update **2026-10-31** (AUDIT29X-APW-6): the dialog
+  requires the operator to type the displayed user's email exactly, including
+  case and whitespace. Confirm remains disabled until it matches and while a
+  command is pending. The label is available in Arabic and English; other
+  confirmation actions keep their existing behavior. The typed email is local
+  confirmation state and is not added to the request. Automated checks and
+  the admin production rebuild remain pending lead verification.
 - Owner accounts are protected.
 - The user becomes `DEACTIVATED`, credentials are revoked, and the row is
   soft-deleted.

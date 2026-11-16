@@ -19,6 +19,8 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
+import { getLocalizedApiErrorMessage } from "@/shared/api/localized-api-error";
 import {
   readPreconditionCode,
   type MigrationPreconditionCode,
@@ -893,6 +895,7 @@ export function MigrationMutationNotice({
   mutation: MigrationMutationState;
   copy: MigrationsCopy;
 }) {
+  const { lang } = useI18n();
   if (mutation.phase === "IDLE" || mutation.phase === "PENDING") return null;
 
   const message = {
@@ -924,7 +927,7 @@ export function MigrationMutationNotice({
       {precondition ? (
         <p className="mt-1">{preconditionMessage(precondition, copy)}</p>
       ) : null}
-      {mutation.error ? <p className="mt-1">{mutation.error.message}</p> : null}
+      {mutation.error ? <p className="mt-1">{getLocalizedApiErrorMessage(mutation.error, lang)}</p> : null}
       {precondition && mutation.error?.details ? (
         <ul className="mt-1 list-inside list-disc break-words">
           {Object.entries(mutation.error.details).flatMap(([field, reasons]) =>

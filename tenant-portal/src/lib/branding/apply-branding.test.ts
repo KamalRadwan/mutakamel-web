@@ -11,7 +11,6 @@ function branding(overrides: Partial<PublicBranding> = {}): PublicBranding {
     primaryColor: null,
     secondaryColor: null,
     fontFamily: null,
-    loginHtml: null,
     logoUrl: null,
     iconUrl: null,
     ...overrides,
@@ -94,5 +93,51 @@ describe("applyBrandingTokens — tab icon", () => {
 
     expect(outcome.kind).toBe("rejectedInvalid");
     expect(iconLink()?.getAttribute("href")).toBe(PUBLIC_BRANDING_ICON_PATH);
+  });
+
+  it("restores the captured default icon href and type when iconUrl is cleared to null", () => {
+    document.head.innerHTML =
+      '<link rel="icon" href="/icon.svg?222ae2daa3baf316" type="image/svg+xml" sizes="any">';
+
+    applyBrandingTokens(branding({ iconUrl: `${PUBLIC_BRANDING_ICON_PATH}?v=1` }));
+    applyBrandingTokens(branding({ iconUrl: `${PUBLIC_BRANDING_ICON_PATH}?v=2` }));
+    expect(iconLink()?.getAttribute("href")).toBe(`${PUBLIC_BRANDING_ICON_PATH}?v=2`);
+    expect(iconLink()?.hasAttribute("type")).toBe(false);
+
+    applyBrandingTokens(branding({ iconUrl: null }));
+
+    expect(iconLink()?.getAttribute("href")).toBe("/icon.svg?222ae2daa3baf316");
+    expect(iconLink()?.getAttribute("type")).toBe("image/svg+xml");
+  });
+
+  it("falls back to /favicon.ico when clearing an icon created without an initial link", () => {
+    applyBrandingTokens(branding({ iconUrl: PUBLIC_BRANDING_ICON_PATH }));
+    expect(iconLink()?.getAttribute("href")).toBe(PUBLIC_BRANDING_ICON_PATH);
+
+    applyBrandingTokens(branding({ iconUrl: null }));
+
+    expect(iconLink()?.getAttribute("href")).toBe("/favicon.ico");
+    expect(iconLink()?.hasAttribute("type")).toBe(false);
+  });
+
+  it("restores the captured route or server title when tabTitle is cleared to null", () => {
+    document.title = "الهوية البصرية | بوابة المستأجر";
+
+    applyBrandingTokens(branding({ tabTitle: "Mersany" }));
+    expect(document.title).toBe("Mersany");
+
+    applyBrandingTokens(branding({ tabTitle: "Mersany CRM" }));
+    expect(document.title).toBe("Mersany CRM");
+
+    applyBrandingTokens(branding({ tabTitle: null }));
+    expect(document.title).toBe("الهوية البصرية | بوابة المستأجر");
+  });
+
+  it("leaves the current route title alone when tabTitle was never set", () => {
+    document.title = "Leads | Tenant Portal";
+
+    applyBrandingTokens(branding({ tabTitle: null }));
+
+    expect(document.title).toBe("Leads | Tenant Portal");
   });
 });

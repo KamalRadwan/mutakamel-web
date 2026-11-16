@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -28,11 +29,24 @@ const WRITE_CONFIG = {
 export function useOpportunityStageDetail(stageId: string) {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("crm.pipelines.manage") ?? false;
+  const { canMutate } = useAccessMode();
+  const canRead = user?.permissions.includes("crm.pipelines.manage") ?? false;
+  const [writeDenied, setWriteDenied] = useState(false);
+  const writeDeniedRef = useRef(false);
+  const canManage = canRead && canMutate && !writeDenied;
   const [stage, setStage] = useState<OpportunityStageDefinition | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const writeInFlight = useRef(false);
+  const writeError = (error: unknown): StageWriteResult => {
+    const normalized = normalizeApiError(error);
+    if (normalized.status === 403) {
+      writeDeniedRef.current = true;
+      setWriteDenied(true);
+    }
+    return { ok: false, replayed: false, error: normalized };
+  };
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -43,11 +57,15 @@ export function useOpportunityStageDetail(stageId: string) {
           opportunityStagePath(stageId),
           { ...READ_CONFIG, signal },
         );
+        if (signal?.aborted) return false;
         setStage(parseOpportunityStageDefinitionResponse(response.data));
+        return true;
       } catch (error) {
-        if (isAbortError(error)) return;
-        setStage(null);
-        setQueryError(normalizeApiError(error));
+        if (signal?.aborted || isAbortError(error)) return false;
+        const normalized = normalizeApiError(error);
+        setStage((current) => normalized.status !== 403 && normalized.status !== 404 && current?.id === stageId ? current : null);
+        setQueryError(normalized);
+        return false;
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
@@ -56,17 +74,19 @@ export function useOpportunityStageDetail(stageId: string) {
   );
 
   useEffect(() => {
+    if (!canRead) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) void load(controller.signal);
     });
     return () => controller.abort();
-  }, [load]);
+  }, [load, canRead]);
 
   const save = async (
     input: OpportunityStageFormInput,
   ): Promise<StageWriteResult> => {
-    if (!canManage || !stage) {
+    if (writeInFlight.current) return { ok: false, replayed: false, error: null };
+    if (!canManage || writeDeniedRef.current || !stage) {
       return {
         ok: false,
         replayed: false,
@@ -86,6 +106,7 @@ export function useOpportunityStageDetail(stageId: string) {
         },
       };
     }
+    writeInFlight.current = true;
     setIsSubmitting(true);
     try {
       const response = await axiosClient.patch<unknown>(
@@ -100,20 +121,23 @@ export function useOpportunityStageDetail(stageId: string) {
         error: null,
       };
     } catch (error) {
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
+      return writeError(error);
     } finally {
+      writeInFlight.current = false;
       setIsSubmitting(false);
     }
   };
 
   const remove = async (): Promise<StageWriteResult> => {
-    if (!canManage || !stage) {
+    if (writeInFlight.current) return { ok: false, replayed: false, error: null };
+    if (!canManage || writeDeniedRef.current || !stage) {
       return {
         ok: false,
         replayed: false,
         error: { status: 403, code: "FORBIDDEN" },
       };
     }
+    writeInFlight.current = true;
     setIsSubmitting(true);
     try {
       const response = await axiosClient.delete<unknown>(
@@ -126,9 +150,11 @@ export function useOpportunityStageDetail(stageId: string) {
         error: null,
       };
     } catch (error) {
+      const result = writeError(error);
       await load();
-      return { ok: false, replayed: false, error: normalizeApiError(error) };
+      return result;
     } finally {
+      writeInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -142,6 +168,8 @@ export function useOpportunityStageDetail(stageId: string) {
     queryError,
     notFound: queryError?.status === 404,
     canManage,
+    canRead,
+    readOnly: canRead && (!canMutate || writeDenied),
     save,
     remove,
     reload: () => load(),

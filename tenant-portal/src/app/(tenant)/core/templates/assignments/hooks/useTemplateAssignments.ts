@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useCan, useToast } from "@/design-system";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { can } from "@/lib/auth/permission-scope";
+import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
 import {
   ACCESS_POLICY_BLOCKED_CODE,
   TEMPLATE_ASSIGNMENTS_PERMISSION,
@@ -13,16 +15,21 @@ import {
 import {
   ASSIGNMENT_CONFLICT_CODE,
   ASSIGNMENT_INCOMPATIBLE_CODE,
+  ASSIGNMENT_PRIORITY_MAX,
   ASSIGNMENT_SCOPE_INVALID_CODE,
+  SALES_QUOTATION_SELECTOR,
   createTemplateAssignment,
-  deleteTemplateAssignment,
   fetchTemplateAssignments,
-  resolveTemplateAssignment,
   updateTemplateAssignment,
-  type ResolvedAssignment,
+  type AssignmentScope,
+  type AssignmentUpdate,
   type TemplateAssignment,
 } from "../../template-assignments-contract";
 import { isExpiredCursor, useTemplateCursor } from "../../hooks/useTemplateCursor";
+import { templateRequestFence } from "../../hooks/useTemplateAuthority";
+import { assignmentPermissionTarget } from "./useAssignmentScope";
+import { useAssignmentResolution } from "./useAssignmentResolution";
+import { useAssignmentDeactivation } from "./useAssignmentDeactivation";
 
 export interface AssignmentFormValues {
   versionId: string;
@@ -36,12 +43,12 @@ export interface AssignmentFormValues {
   effectiveTo: string;
 }
 
-export const EMPTY_ASSIGNMENT_FORM: AssignmentFormValues = {
+export type AssignmentVersionPin = Pick<TemplateAssignment, "definitionId" | "versionNumber">;
+
+export const ASSIGNMENT_FORM_DEFAULTS: AssignmentFormValues = {
   versionId: "",
-  adapterKey: "TRADE_QUOTATION_PRINT_V1",
-  documentType: "QUOTATION",
-  outputChannel: "PRINT",
-  locale: "en-US",
+  ...SALES_QUOTATION_SELECTOR,
+  locale: "",
   priority: "100",
   isDefault: false,
   effectiveFrom: "",
@@ -54,13 +61,24 @@ function isoOrThrow(value: string, marker: string): string {
   return date.toISOString();
 }
 
-export function useTemplateAssignments() {
+export function useTemplateAssignments(
+  scope: AssignmentScope,
+  authority: string,
+  readAuthority: () => string | null,
+) {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const permissions = user?.permissions ?? [];
-  const canRead = permissions.includes(TEMPLATE_READ_PERMISSION);
-  const canManage = useCan(TEMPLATE_ASSIGNMENTS_PERMISSION, { tenantWide: true });
+  const { readReadyProfileCommit } = useTenantAuth();
+  const currentScope = useRef(false);
+  const writing = useRef(false);
+  const saveIntent = useRef<{ fingerprint: string; key: string } | null>(null);
+  const hasPermission = useCallback(
+    (permission: string) => readAuthority() === authority &&
+      can(readReadyProfileCommit()?.user, permission, assignmentPermissionTarget(scope)),
+    [scope, authority, readAuthority, readReadyProfileCommit],
+  );
+  const canRead = hasPermission(TEMPLATE_READ_PERMISSION);
+  const canManage = hasPermission(TEMPLATE_ASSIGNMENTS_PERMISSION);
   const copy = t.coreOperations.templates;
 
   const cursor = useTemplateCursor();
@@ -74,34 +92,38 @@ export function useTemplateAssignments() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<TemplateAssignment | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [resolved, setResolved] = useState<ResolvedAssignment | null>(null);
-  const [isResolving, setIsResolving] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
   const activeCursor = cursor.cursor;
   const restart = cursor.restart;
+  const isCurrent = useCallback(() => currentScope.current && hasPermission(TEMPLATE_READ_PERMISSION), [hasPermission]);
+  const canWrite = useCallback(() => isCurrent() && hasPermission(TEMPLATE_ASSIGNMENTS_PERMISSION), [isCurrent, hasPermission]);
+  const { clearResolution, ...resolution } = useAssignmentResolution(scope, assignmentLocale(lang), isCurrent);
+  const deactivation = useAssignmentDeactivation(canWrite, writing, () => {
+    clearResolution();
+    setReloadToken((token) => token + 1);
+  });
 
   const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      if (!canRead) {
-        setIsLoading(false);
-        return;
-      }
+    async (signal: AbortSignal): Promise<void> => {
+      if (!isCurrent()) return;
+      const current = () => !signal.aborted && isCurrent();
       setIsLoading(true);
       setError(null);
       try {
         const page = await fetchTemplateAssignments(
-          { scopeType: "TENANT", ...(activeCursor ? { cursor: activeCursor } : {}) },
-          signal,
+          { scope, cursor: activeCursor }, signal, templateRequestFence(current),
         );
+        if (!current()) return;
         setItems(page.items);
         setHasNextPage(page.hasNextPage);
         setNextCursor(page.nextCursor);
         setIsEntitlementBlocked(false);
       } catch (caught) {
-        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        if (!current() || (caught instanceof DOMException && caught.name === "AbortError")) return;
+        setItems([]);
+        setNextCursor(null);
+        setHasNextPage(false);
         const normalized = normalizeApiError(caught);
         if (normalized.code === ACCESS_POLICY_BLOCKED_CODE) {
           setIsEntitlementBlocked(true);
@@ -113,13 +135,20 @@ export function useTemplateAssignments() {
         }
         setError(normalized);
       } finally {
-        if (!signal?.aborted) setIsLoading(false);
+        if (current()) setIsLoading(false);
       }
     },
-    [canRead, activeCursor, restart],
+    [isCurrent, scope, activeCursor, restart],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    currentScope.current = true;
+    return () => {
+      currentScope.current = false;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) void load(controller.signal);
@@ -155,19 +184,23 @@ export function useTemplateAssignments() {
   );
 
   const submit = useCallback(
-    async (values: AssignmentFormValues): Promise<boolean> => {
-      if (!canManage || isSubmitting) return false;
+    async (values: AssignmentFormValues, selectedPin?: AssignmentVersionPin): Promise<boolean> => {
+      if (!canWrite() || writing.current) return false;
+      writing.current = true;
       setIsSubmitting(true);
       setFormError(null);
       try {
-        const body: Record<string, unknown> = {
-          versionId: values.versionId,
-          adapterKey: values.adapterKey,
-          documentType: values.documentType,
-          outputChannel: values.outputChannel,
-          locale: values.locale || null,
-          scope: { type: "TENANT" },
-          priority: Number(values.priority) || 0,
+        const priority = Number(values.priority);
+        if (!isUUIDv7(values.versionId)) {
+          setFormError(copy.assignmentIncompatible);
+          return false;
+        }
+        if (!/^\d+$/u.test(values.priority) || priority > ASSIGNMENT_PRIORITY_MAX) {
+          setFormError(copy.assignmentPriorityHint);
+          return false;
+        }
+        const update = {
+          priority,
           isDefault: values.isDefault,
           effectiveFrom: isoOrThrow(values.effectiveFrom, "ASSIGNMENT_FORM_FROM"),
           effectiveTo: values.effectiveTo
@@ -175,76 +208,50 @@ export function useTemplateAssignments() {
             : null,
         };
         if (editing) {
-          await updateTemplateAssignment(
-            editing.id,
-            {
-              versionId: body.versionId,
-              priority: body.priority,
-              isDefault: body.isDefault,
-              effectiveFrom: body.effectiveFrom,
-              effectiveTo: body.effectiveTo,
-            },
-            editing.etag,
-          );
-        } else {
-          await createTemplateAssignment(body);
+          if (values.effectiveFrom === assignmentLocalTime(editing.effectiveFrom)) update.effectiveFrom = editing.effectiveFrom;
+          if (values.effectiveTo === assignmentLocalTime(editing.effectiveTo)) update.effectiveTo = editing.effectiveTo;
         }
+        const { versionId, adapterKey, documentType, outputChannel, locale } = values;
+        const patch: AssignmentUpdate = editing && versionId !== editing.versionId ? { ...update, versionId } : update;
+        const create = { ...update, versionId, adapterKey, documentType, outputChannel, locale: locale || null, scope };
+        const fingerprint = JSON.stringify(editing ? [editing.id, editing.etag, patch] : create);
+        if (saveIntent.current?.fingerprint !== fingerprint) {
+          saveIntent.current = { fingerprint, key: generateUUIDv7() };
+        }
+        const { key } = saveIntent.current;
+        const assertCurrent = templateRequestFence(canWrite);
+        const saved = editing
+          ? await updateTemplateAssignment(editing, patch, key, assertCurrent)
+          : await createTemplateAssignment(create, key, assertCurrent);
+        if (!canWrite()) return false;
+        if (selectedPin && (saved.definitionId !== selectedPin.definitionId ||
+            saved.versionNumber !== selectedPin.versionNumber)) {
+          setFormError(copy.assignmentSaveFailed);
+          return false;
+        }
+        saveIntent.current = null;
         setEditing(null);
         setIsCreateOpen(false);
+        clearResolution();
         toast.success(copy.savedTitle, copy.assignmentSaved);
         setReloadToken((token) => token + 1);
         return true;
       } catch (error) {
-        reportWrite(error);
+        if (canWrite()) reportWrite(error);
         return false;
       } finally {
-        setIsSubmitting(false);
+        writing.current = false;
+        if (currentScope.current) setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, editing, toast, copy, reportWrite],
-  );
-
-  const remove = useCallback(async (): Promise<void> => {
-    if (!deleting || !canManage || pendingId) return;
-    setPendingId(deleting.id);
-    try {
-      await deleteTemplateAssignment(deleting.id, deleting.etag);
-      toast.success(copy.savedTitle, copy.assignmentDeactivated);
-      setReloadToken((token) => token + 1);
-    } catch (error) {
-      const normalized = normalizeApiError(error);
-      if (normalized.status !== 403 && !toast.outcomeFromApi(normalized)) {
-        toast.errorFromApi(copy.assignmentDeleteFailed, normalized);
-      }
-    } finally {
-      setPendingId(null);
-      setDeleting(null);
-    }
-  }, [deleting, canManage, pendingId, toast, copy]);
-
-  /** The preview that keeps overlapping windows and priorities from being invisible. */
-  const resolve = useCallback(
-    async (selector: Record<string, unknown>): Promise<void> => {
-      setIsResolving(true);
-      try {
-        setResolved(await resolveTemplateAssignment(selector));
-      } catch (error) {
-        const normalized = normalizeApiError(error);
-        if (normalized.status !== 403 && !toast.outcomeFromApi(normalized)) {
-          toast.errorFromApi(copy.resolveFailed, normalized);
-        }
-      } finally {
-        setIsResolving(false);
-      }
-    },
-    [toast, copy],
+    [canWrite, scope, editing, toast, copy, reportWrite, clearResolution],
   );
 
   return {
     t,
     lang,
-    canRead,
-    canManage,
+    canWrite,
+    canManage: canRead && canManage && !isLoading && !error && !isEntitlementBlocked,
     items,
     isLoading: isLoading && canRead,
     error,
@@ -255,10 +262,8 @@ export function useTemplateAssignments() {
     isCreateOpen,
     isSubmitting,
     formError,
-    deleting,
-    pendingId,
-    resolved,
-    isResolving,
+    ...deactivation,
+    ...resolution,
     goNext: () => cursor.advance(nextCursor),
     goBack: cursor.goBack,
     openCreate: () => {
@@ -277,14 +282,22 @@ export function useTemplateAssignments() {
       if (isSubmitting) return;
       setEditing(null);
     },
-    openDelete: (assignment: TemplateAssignment) => setDeleting(assignment),
-    closeDelete: () => {
-      if (pendingId) return;
-      setDeleting(null);
-    },
     submit,
-    remove,
-    resolve,
-    reload: () => setReloadToken((token) => token + 1),
+    reload: () => {
+      clearResolution();
+      setReloadToken((token) => token + 1);
+    },
   };
+}
+
+export function assignmentLocalTime(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+const assignmentLocales = { ar: "ar-EG", en: "en-US" } as const;
+
+export function assignmentLocale(lang: keyof typeof assignmentLocales) {
+  return assignmentLocales[lang];
 }

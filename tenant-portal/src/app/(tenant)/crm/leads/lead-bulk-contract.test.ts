@@ -4,7 +4,6 @@ import {
   bulkLeadFields,
   leadIdBatches,
   parseLeadDocumentCountsResponse,
-  parseLeadKpisResponse,
 } from "./lead-bulk-contract";
 import { leadEditablePrimaryPhone, leadPrimaryPhonePatch } from "./lead-phone-patch";
 
@@ -22,14 +21,6 @@ describe("lead bulk contract", () => {
   it("sends only the four bulk-update fields", () => {
     const patch = { rating: 3, cardColor: null, displayName: "x" } as unknown as Parameters<typeof bulkLeadFields>[0];
     expect(bulkLeadFields(patch)).toEqual({ rating: 3, cardColor: null });
-  });
-
-  it("parses headline KPI figures without a stage breakdown and refuses a malformed count", () => {
-    const body = {
-      totalLeads: 3, newStageLeads: 1, newTodayLeads: 1, hotLeads: 2, overdueActivityLeads: 0, qualifiedLeads: 1,
-    };
-    expect(parseLeadKpisResponse(body)).toEqual(body);
-    expect(() => parseLeadKpisResponse({ ...body, hotLeads: -1 })).toThrow();
   });
 
   it("asks for a duplicate check only once a probe is worth asking about", () => {

@@ -33,7 +33,7 @@ export interface TenantBranding {
    * `parsePublicBranding` validates the path before a local cache key is added.
    */
   logoUrl: string | null;
-  updateBranding: (branding: Omit<PublicBranding, "loginHtml">) => void;
+  updateBranding: (branding: PublicBranding) => void;
 }
 
 const EMPTY: TenantBranding = { appName: null, logoUrl: null, updateBranding: () => undefined };
@@ -44,13 +44,12 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const [branding, setBranding] = useState<Pick<TenantBranding, "appName" | "logoUrl">>(EMPTY);
   const revision = useRef(0);
 
-  const updateBranding = useCallback((saved: Omit<PublicBranding, "loginHtml">) => {
+  const updateBranding = useCallback((saved: PublicBranding) => {
     revision.current += 1;
     // Public asset routes cache for five minutes; each write needs fresh bytes.
     const version = generateUUIDv7();
     const response: PublicBranding = {
       ...saved,
-      loginHtml: null,
       logoUrl: saved.logoUrl ? `${saved.logoUrl}?v=${version}` : null,
       iconUrl: saved.iconUrl ? `${saved.iconUrl}?v=${version}` : null,
     };

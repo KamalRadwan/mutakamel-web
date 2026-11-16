@@ -19,6 +19,7 @@ const lead = {
   id: "01900100-0000-7000-8000-000000000001", leadProfileType: "INDIVIDUAL",
   updatedAt: "2026-10-26T10:00:00.123Z",
   displayName: "Dina Ali", firstName: "Dina", lastName: "Ali", honorificTitle: null,
+  jobTitle: "Consultant",
   email: "dina@example.test", primaryMobile: "+20105551234", phones: ["+20105551234"], contacts: [],
 } as unknown as LeadDetail;
 
@@ -32,6 +33,90 @@ function setup(canEdit = true) {
 beforeEach(() => vi.clearAllMocks());
 
 describe("useLeadContactsEdit", () => {
+  it.each([
+    { draft: " Senior Consultant ", expected: "Senior Consultant" },
+    { draft: " ", expected: null },
+  ])("saves an individual job title or explicit clear: $draft", async ({ draft, expected }) => {
+    const { result, onSaved } = setup();
+    const saved = { ...lead, jobTitle: expected };
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: saved, replayed: false });
+    act(() => result.current.startEdit());
+    expect(result.current.form?.jobTitle).toBe("Consultant");
+    act(() => result.current.setField("jobTitle", draft));
+    expect(result.current.isDirty).toBe(true);
+    await act(() => result.current.save());
+    expect(runIdempotentWrite).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      body: { jobTitle: expected, expectedUpdatedAt: lead.updatedAt },
+    }));
+    expect(onSaved).toHaveBeenCalledWith(saved);
+  });
+
+  it("rejects individual job titles longer than 120 characters before transport", async () => {
+    const { result } = setup();
+    act(() => result.current.startEdit());
+    act(() => result.current.setField("jobTitle", "x".repeat(121)));
+    await act(() => result.current.save());
+    expect(result.current.errors.jobTitle).toBeTruthy();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+  });
+
+  it("accepts a 120-character job title and omits an unchanged title from other edits", async () => {
+    const { result } = setup();
+    act(() => result.current.startEdit());
+    act(() => result.current.setField("jobTitle", "x".repeat(120)));
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: lead, replayed: false });
+    await act(() => result.current.save());
+    expect(result.current.errors.jobTitle).toBeUndefined();
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({
+      body: { jobTitle: "x".repeat(120), expectedUpdatedAt: lead.updatedAt },
+    }));
+    act(() => result.current.startEdit());
+    act(() => result.current.setField("jobTitle", " Consultant "));
+    expect(result.current.isDirty).toBe(false);
+    act(() => result.current.setField("email", "new@example.test"));
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: lead, replayed: false });
+    await act(() => result.current.save());
+    expect(runIdempotentWrite).toHaveBeenLastCalledWith(expect.objectContaining({
+      body: { email: "new@example.test", expectedUpdatedAt: lead.updatedAt },
+    }));
+  });
+
+  it("derives complete trimmed names and preserves the name when a part is cleared", () => {
+    const { result } = setup();
+    act(() => result.current.startEdit());
+    act(() => result.current.setField("firstName", " Mona "));
+    expect(result.current.form?.displayName).toBe("Mona Ali");
+    act(() => result.current.setField("lastName", " Hassan "));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+    act(() => result.current.setField("honorificTitle", "Dr"));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+    act(() => result.current.setField("firstName", ""));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+    act(() => result.current.setField("lastName", ""));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+  });
+  it.each([
+    { displayName: "Preferred name", firstName: "Dina", lastName: "Ali" },
+    { displayName: "Display name only", firstName: null, lastName: null },
+  ])("preserves $displayName on honorific and name edits", (names) => {
+    const { result, rerender } = setup();
+    rerender({ subject: { ...lead, ...names } });
+    act(() => result.current.startEdit());
+    act(() => result.current.setField("honorificTitle", "Dr"));
+    expect(result.current.form?.displayName).toBe(names.displayName);
+    act(() => result.current.setField("firstName", "Mona"));
+    act(() => result.current.setField("lastName", "Hassan"));
+    expect(result.current.form?.displayName).toBe(names.displayName);
+  });
+  it("fills an empty display name only after both name parts are present", () => {
+    const { result, rerender } = setup();
+    rerender({ subject: { ...lead, displayName: "", firstName: null, lastName: null } });
+    act(() => result.current.startEdit());
+    act(() => result.current.setField("firstName", " Mona "));
+    expect(result.current.form?.displayName).toBe("");
+    act(() => result.current.setField("lastName", " Hassan "));
+    expect(result.current.form?.displayName).toBe("Mona Hassan");
+  });
   it.each([{ status: 409, code: "CRM.LEAD.CONCURRENT_UPDATE" }, { status: 409 }, { status: 422, code: "CRM.LEAD.CONCURRENT_UPDATE" }])("refetches a conflict and saves reapplied edits with the fresh timestamp: %j", async (conflict) => {
     vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "failed", error: conflict });
     const { result, rerender, onReconcile, onSaved } = setup();
@@ -46,14 +131,14 @@ describe("useLeadContactsEdit", () => {
     act(() => result.current.startEdit());
     await act(() => result.current.save());
     expect(runIdempotentWrite).toHaveBeenCalledOnce();
-    const refreshed = { ...lead, firstName: "Dina fresh", updatedAt: "2026-10-26T10:01:00.123Z" };
+    const refreshed = { ...lead, firstName: "Dina fresh", displayName: "Dina fresh Ali", updatedAt: "2026-10-26T10:01:00.123Z" };
     rerender({ subject: refreshed });
     act(() => result.current.startEdit());
     expect(result.current.form?.firstName).toBe("Dina fresh");
     act(() => result.current.setField("firstName", "Dena"));
     vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: { ...refreshed, firstName: "Dena" }, replayed: false });
     await act(() => result.current.save());
-    expect(runIdempotentWrite).toHaveBeenLastCalledWith(expect.objectContaining({ body: { firstName: "Dena", expectedUpdatedAt: refreshed.updatedAt } }));
+    expect(runIdempotentWrite).toHaveBeenLastCalledWith(expect.objectContaining({ body: { firstName: "Dena", displayName: "Dena Ali", expectedUpdatedAt: refreshed.updatedAt } }));
     expect(onSaved).toHaveBeenCalledOnce();
   });
 
@@ -82,7 +167,7 @@ describe("useLeadContactsEdit", () => {
     expect(warning).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
     await act(async () => result.current.save());
-    expect(runIdempotentWrite).toHaveBeenLastCalledWith(expect.objectContaining({ body: { firstName: "Dena", expectedUpdatedAt: lead.updatedAt } }));
+    expect(runIdempotentWrite).toHaveBeenLastCalledWith(expect.objectContaining({ body: { firstName: "Dena", displayName: "Dena Ali", expectedUpdatedAt: lead.updatedAt } }));
     expect(onSaved).toHaveBeenCalledOnce();
     expect(result.current.form).toBeNull();
   });

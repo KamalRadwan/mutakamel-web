@@ -46,11 +46,11 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
   };
 
   const identityField = (
-    field: "displayName" | "firstName" | "lastName" | "email",
+    field: "firstName" | "lastName" | "email",
     label: string,
     maxLength: number,
   ) => (
-    <Field label={label} error={edit.errors[field]} readOnly={!edit.canEditIdentity}>
+    <Field label={label} error={edit.errors[field] ?? (field === "firstName" ? edit.errors.displayName : undefined)} readOnly={!edit.canEditIdentity}>
       <Input
         size="sm"
         placeholder={label}
@@ -141,72 +141,6 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
               <LeadContactFields
                 fields={[
                   {
-                    label: t.crmLeadDetail.honorificTitle,
-                    value: (
-                      <Field
-                        label={t.crmLeadDetail.honorificTitle}
-                        error={edit.errors.honorificTitle}
-                        readOnly={!edit.canEditIdentity}
-                      >
-                        <HonorificSelect
-                          value={form.honorificTitle}
-                          disabled={disabled}
-                          readOnly={!edit.canEditIdentity}
-                          placeholder={t.crmLeadDetail.honorificTitle}
-                          onChange={(value) => edit.setField("honorificTitle", value)}
-                        />
-                      </Field>
-                    ),
-                  },
-                  {
-                    label: t.crmLeadDetail.fullName,
-                    value: identityField(
-                      "displayName",
-                      t.crmLeadDetail.fullName,
-                      CONTACT_MODAL_LIMITS.displayName,
-                    ),
-                  },
-                  {
-                    label: t.crmLeadDetail.firstName,
-                    value: identityField(
-                      "firstName",
-                      t.crmLeadDetail.firstName,
-                      CONTACT_MODAL_LIMITS.name,
-                    ),
-                  },
-                  {
-                    label: t.crmLeadDetail.lastName,
-                    value: identityField(
-                      "lastName",
-                      t.crmLeadDetail.lastName,
-                      CONTACT_MODAL_LIMITS.name,
-                    ),
-                  },
-                  {
-                    label: t.crmLeadConvert.contactJobTitle,
-                    value: (
-                      <Field
-                        label={t.crmLeadConvert.contactJobTitle}
-                        error={edit.errors.jobTitle}
-                      >
-                        <CrmJobTitleField
-                          value={form.jobTitle}
-                          disabled={disabled}
-                          onChange={(value) => edit.setField("jobTitle", value)}
-                          onBlur={() => {}}
-                        />
-                      </Field>
-                    ),
-                  },
-                  {
-                    label: t.crmLeads.email,
-                    value: identityField(
-                      "email",
-                      t.crmLeads.email,
-                      CONTACT_MODAL_LIMITS.value,
-                    ),
-                  },
-                  {
                     label: t.crmLeads.phone,
                     span2: true,
                     value: edit.canEditIdentity ? (
@@ -225,6 +159,67 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
                       </div>
                     ) : (
                       form.phones.map(({ value }) => value).join(" / ")
+                    ),
+                  },
+                  {
+                    label: t.crmLeadDetail.honorificTitle,
+                    third: true,
+                    value: (
+                      <Field
+                        label={t.crmLeadDetail.honorificTitle}
+                        error={edit.errors.honorificTitle}
+                        readOnly={!edit.canEditIdentity}
+                      >
+                        <HonorificSelect
+                          value={form.honorificTitle}
+                          disabled={disabled}
+                          readOnly={!edit.canEditIdentity}
+                          placeholder={t.crmLeadDetail.honorificTitle}
+                          onChange={(value) => edit.setField("honorificTitle", value)}
+                        />
+                      </Field>
+                    ),
+                  },
+                  {
+                    label: t.crmLeadDetail.firstName,
+                    third: true,
+                    value: identityField(
+                      "firstName",
+                      t.crmLeadDetail.firstName,
+                      CONTACT_MODAL_LIMITS.name,
+                    ),
+                  },
+                  {
+                    label: t.crmLeadDetail.lastName,
+                    third: true,
+                    value: identityField(
+                      "lastName",
+                      t.crmLeadDetail.lastName,
+                      CONTACT_MODAL_LIMITS.name,
+                    ),
+                  },
+                  {
+                    label: t.crmLeads.email,
+                    value: identityField(
+                      "email",
+                      t.crmLeads.email,
+                      CONTACT_MODAL_LIMITS.value,
+                    ),
+                  },
+                  {
+                    label: t.crmLeadConvert.contactJobTitle,
+                    value: (
+                      <Field
+                        label={t.crmLeadConvert.contactJobTitle}
+                        error={edit.errors.jobTitle}
+                      >
+                        <CrmJobTitleField
+                          value={form.jobTitle}
+                          disabled={disabled}
+                          onChange={(value) => edit.setField("jobTitle", value)}
+                          onBlur={() => {}}
+                        />
+                      </Field>
                     ),
                   },
                   {

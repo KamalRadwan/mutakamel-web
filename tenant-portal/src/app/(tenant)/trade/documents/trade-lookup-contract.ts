@@ -1,5 +1,6 @@
 import type { TradePath } from "@/lib/api/envelope";
 import { isUUIDv7 } from "@/lib/uuid";
+import { parseItemImageSummary, type ItemImageSummary } from "../items/item-image-contract";
 import {
   TRADE_V1,
   isBoundedString,
@@ -70,6 +71,9 @@ export interface TradeItemOption {
   receiptDescription: string | null;
   deliveryOrderDescription: string | null;
   status: string;
+  /** Catalogue-owned presentation fields, never forwarded in document writes. */
+  itemKind?: "PRODUCT" | "SERVICE" | "COMBO";
+  image?: ItemImageSummary | null;
   eligibility: TradeItemEligibility;
 }
 
@@ -82,20 +86,29 @@ export interface TradeUomOption {
   canPurchase: boolean;
 }
 
+interface TradePriceMatchedPromotion {
+  code: string;
+  discountAmount: string;
+}
+
 /**
- * The pricing decision, of which only `unitPrice` is used.
+ * The pricing decision resolved via `POST /pricing/evaluate`.
  *
- * The rest of the receipt — `checksum`, `matchedEntryId`, `components`,
- * `inputFingerprint` — is deliberately not forwarded as a `priceSnapshot`.
- * The engine itself marks the decision `taxFinal: false`, and nothing in
- * trade-app says a price decision is what a `priceSnapshot` should contain
- * (Q32). Reusing it would be a guess wearing the costume of evidence.
+ * Only `unitPrice` feeds running totals; optional breakdown fields power the
+ * read-only Governed Price Breakdown popover on commercial document lines and
+ * are never forwarded as a `priceSnapshot`.
  */
 export interface TradePriceDecision {
   unitPrice: string;
   currencyCode: string;
   priceBookId: string;
   minimumAllowedPrice: string | null;
+  baselineUnitPrice?: string;
+  priceBookVersion?: number;
+  priceBookVersionId?: string;
+  decisionId?: string;
+  outcome?: string;
+  matchedPromotions?: TradePriceMatchedPromotion[];
 }
 
 export function tradeItemsPath(
@@ -128,7 +141,7 @@ export function parseTradeItems(
   payload: unknown,
   purpose: TradeItemPurpose,
 ): TradeListPage<TradeItemOption> {
-  const page = parseTradeListPage(payload, (item) => {
+  const page = parseTradeListPage(payload, (item): TradeItemOption => {
     const row = record(item);
     const eligibility = record(row?.eligibility);
     if (
@@ -136,6 +149,7 @@ export function parseTradeItems(
       !isUUIDv7(row.id) ||
       !isBoundedString(row.canonicalCode, 80) ||
       !isTradeStatus(row.status) ||
+      (row.itemKind !== undefined && row.itemKind !== "PRODUCT" && row.itemKind !== "SERVICE" && row.itemKind !== "COMBO") ||
       !eligibility ||
       !isUUIDv7(eligibility.companyProfileId) ||
       !isVersion(eligibility.companyProfileVersion) ||
@@ -161,6 +175,9 @@ export function parseTradeItems(
       receiptDescription: nullableBoundedString(row.receiptDescription, 500),
       deliveryOrderDescription: nullableBoundedString(row.deliveryOrderDescription, 500),
       status: row.status,
+      ...(row.itemKind === "PRODUCT" || row.itemKind === "SERVICE" || row.itemKind === "COMBO"
+        ? { itemKind: row.itemKind } : {}),
+      image: parseItemImageSummary(row.image),
       eligibility: {
         companyProfileId: eligibility.companyProfileId,
         companyProfileVersion: eligibility.companyProfileVersion,
@@ -238,6 +255,22 @@ export function parseTradePriceDecision(payload: unknown): TradePriceDecision {
   ) {
     tradeInvalidResponse();
   }
+  const matchedPromotions: TradePriceMatchedPromotion[] | undefined = Array.isArray(
+    decision.matchedPromotions,
+  )
+    ? decision.matchedPromotions.flatMap((entry) => {
+        const promo = record(entry);
+        if (
+          !promo ||
+          !isBoundedString(promo.code, 80) ||
+          !isTradeDecimal(promo.discountAmount)
+        ) {
+          return [];
+        }
+        return [{ code: promo.code, discountAmount: promo.discountAmount }];
+      })
+    : undefined;
+
   return {
     unitPrice: decision.unitPrice,
     currencyCode: decision.currencyCode,
@@ -245,6 +278,18 @@ export function parseTradePriceDecision(payload: unknown): TradePriceDecision {
     minimumAllowedPrice: isTradeDecimal(decision.minimumAllowedPrice)
       ? decision.minimumAllowedPrice
       : null,
+    ...(isTradeDecimal(decision.baselineUnitPrice)
+      ? { baselineUnitPrice: decision.baselineUnitPrice }
+      : {}),
+    ...(isVersion(decision.priceBookVersion)
+      ? { priceBookVersion: decision.priceBookVersion }
+      : {}),
+    ...(isUUIDv7(decision.priceBookVersionId)
+      ? { priceBookVersionId: decision.priceBookVersionId }
+      : {}),
+    ...(isUUIDv7(decision.decisionId) ? { decisionId: decision.decisionId } : {}),
+    ...(isTradeStatus(decision.outcome) ? { outcome: decision.outcome } : {}),
+    ...(matchedPromotions !== undefined ? { matchedPromotions } : {}),
   };
 }
 

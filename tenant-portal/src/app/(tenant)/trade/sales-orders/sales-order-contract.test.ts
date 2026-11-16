@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseSalesOrderAttempt,
   parseSalesOrderConfirmation,
   parseSalesOrderDetail,
 } from "./sales-order-contract";
@@ -115,37 +114,29 @@ describe("the sales order's four axes", () => {
 });
 
 describe("confirmation", () => {
-  it("reads the body's own statusCode, which distinguishes 200 from 202", () => {
-    const queued = parseSalesOrderConfirmation({
-      statusCode: 202,
+  it("accepts only a completed synchronous confirmation receipt", () => {
+    const confirmed = parseSalesOrderConfirmation({
+      statusCode: 200,
       orderId: UUID,
       attemptId: OTHER,
-      status: "PENDING",
+      status: "COMPLETED",
     });
-    expect(queued.statusCode).toBe(202);
-    expect(queued.attemptId).toBe(OTHER);
+    expect(confirmed.statusCode).toBe(200);
+    expect(confirmed.attemptId).toBe(OTHER);
   });
 
-  it("reads the attempt's own version, which is what If-Match must carry", () => {
-    // `cancelSalesOrderConfirmationAttempt` asserts against `attempt.version`,
-    // not the order's — sending the order's is a 409.
-    const attempt = parseSalesOrderAttempt({
-      id: OTHER,
-      version: 2,
-      status: "PENDING",
-      deadlineAt: null,
-      lastErrorCode: null,
-    });
-    expect(attempt.version).toBe(2);
+  it.each([
+    [202, "PENDING"], [200, "PENDING"], [202, "COMPLETED"],
+  ])("rejects the retired or invalid result %s/%s", (statusCode, status) => {
+    expect(() => parseSalesOrderConfirmation({
+      statusCode, status, orderId: UUID, attemptId: OTHER,
+    })).toThrow("Invalid Trade document response.");
   });
 
-  it("surfaces the attempt's last error code", () => {
-    const attempt = parseSalesOrderAttempt({
-      id: OTHER,
-      version: 3,
-      status: "CANCELLED",
-      lastErrorCode: "USER_CANCELLED:CHANGED_MIND",
-    });
-    expect(attempt.lastErrorCode).toBe("USER_CANCELLED:CHANGED_MIND");
+  it.each(["orderId", "attemptId"])("rejects an invalid %s", (field) => {
+    expect(() => parseSalesOrderConfirmation({
+      statusCode: 200, status: "COMPLETED", orderId: UUID, attemptId: OTHER,
+      [field]: "invalid",
+    })).toThrow("Invalid Trade document response.");
   });
 });

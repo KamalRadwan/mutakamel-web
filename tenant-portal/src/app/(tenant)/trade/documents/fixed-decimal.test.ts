@@ -70,6 +70,20 @@ describe("arithmetic", () => {
     expect(compareFixedDecimal("10.5", "10.51")).toBe(-1);
     expect(compareFixedDecimal("-1", "1")).toBe(-1);
   });
+
+  it("orders highest totals exactly beyond 2^53, including eight fractional digits", () => {
+    const totals = [
+      "9007199254740993.00000001",
+      "9007199254740992.99999999",
+      "9007199254740993.00000002",
+    ];
+
+    expect(totals.sort((left, right) => compareFixedDecimal(right, left))).toEqual([
+      "9007199254740993.00000002",
+      "9007199254740993.00000001",
+      "9007199254740992.99999999",
+    ]);
+  });
 });
 
 describe("the DTO patterns", () => {

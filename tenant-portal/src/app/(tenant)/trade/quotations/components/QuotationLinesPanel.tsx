@@ -4,6 +4,8 @@ import { DataTable, DetailSection, Money, type ColumnDef } from "@/design-system
 import { useI18n } from "@/i18n/I18nContext";
 import { useTradeTableLabels } from "../../documents/hooks/useTradeTableLabels";
 import type { QuotationDetail, QuotationLine } from "../quotation-contract";
+import { isTradeDecimal } from "../../documents/trade-document-contract";
+import { QuotationSavedPricing } from "./QuotationSavedPricing";
 
 /**
  * The lines of the **current** revision.
@@ -47,6 +49,16 @@ export function QuotationLinesPanel({ quotation }: { quotation: QuotationDetail 
       ),
     },
     {
+      id: "discountTotal",
+      header: t.quotationDiscount.lineDiscount,
+      numeric: true,
+      cell: (line) => {
+        const revision = quotation.revisions.find((entry) => entry.id === quotation.currentRevisionId);
+        const amount = revision?.pricingMode === "PROMOTIONS" ? line.discountSnapshot.promotionSavings : line.discountTotal;
+        return isTradeDecimal(amount) ? <Money value={amount} currency={quotation.currencyCode} maximumFractionDigits={8} /> : "—";
+      },
+    },
+    {
       id: "lineTotal",
       header: t.tradeDocuments.lineTotal,
       numeric: true,
@@ -77,6 +89,7 @@ export function QuotationLinesPanel({ quotation }: { quotation: QuotationDetail 
         isLoading={false}
         labels={labels}
       />
+      {quotation.revisions.find((entry) => entry.id === quotation.currentRevisionId) ? <div className="mt-4"><QuotationSavedPricing revision={quotation.revisions.find((entry) => entry.id === quotation.currentRevisionId)!} currencyCode={quotation.currencyCode} /></div> : null}
     </DetailSection>
   );
 }

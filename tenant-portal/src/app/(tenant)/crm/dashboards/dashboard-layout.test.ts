@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  adjustPlacement,
   movePlacement,
   orderedBoxes,
   packPlacements,
+  placeAtGeometry,
   type PlacementBox,
 } from "./dashboard-layout";
 
@@ -24,6 +26,35 @@ function overlaps(left: PlacementBox, right: PlacementBox): boolean {
 }
 
 describe("Dashboard layout packing", () => {
+  it("adjusts a tile by one unit and preserves other geometry", () => {
+    const boxes = [box("a", 3, 2), { ...box("b", 3, 2), x: 8 }];
+    const bounds = { minW: 3, maxW: 6, minH: 2, maxH: 4 };
+    expect(adjustPlacement(boxes, [], "a", { property: "x", step: 1 }, bounds)).toEqual([{ ...boxes[0], x: 1 }, boxes[1]]);
+    expect(adjustPlacement(boxes, [], "a", { property: "height", step: 1 }, bounds)).toEqual([{ ...boxes[0], height: 3 }, boxes[1]]);
+    expect(adjustPlacement(boxes, [], "a", { property: "width", step: -1 }, bounds)).toBeNull();
+    expect(adjustPlacement(boxes, [], "a", { property: "x", step: -1 }, bounds)).toBeNull();
+  });
+
+  it("refuses overlap with visible and unavailable placements", () => {
+    const boxes = [box("a", 3, 2), { ...box("b", 3, 2), x: 3 }];
+    const hidden = [{ ...box("hidden", 3, 2), y: 2 }];
+    const bounds = { minW: 3, maxW: 6, minH: 2, maxH: 4 };
+    expect(adjustPlacement(boxes, hidden, "a", { property: "width", step: 1 }, bounds)).toBeNull();
+    expect(adjustPlacement(boxes, hidden, "a", { property: "y", step: 1 }, bounds)).toBeNull();
+  });
+
+  it("validates a snapped move or resize as one geometry change", () => {
+    const original = box("a", 3, 2);
+    const visible = { ...box("b", 3, 2), x: 8 };
+    const hidden = { ...box("hidden", 3, 2), x: 4, y: 3 };
+    const bounds = { minW: 3, maxW: 6, minH: 2, maxH: 4 };
+    expect(placeAtGeometry([original, visible], [hidden], "a", { x: 2, y: 1, width: 4, height: 2 }, bounds))
+      .toEqual([{ id: "a", x: 2, y: 1, width: 4, height: 2 }, visible]);
+    expect(placeAtGeometry([original, visible], [hidden], "a", { x: 2, y: 1, width: 4, height: 3 }, bounds)).toBeNull();
+    expect(placeAtGeometry([original, visible], [hidden], "a", { x: 0.5, y: 0, width: 3, height: 2 }, bounds)).toBeNull();
+    expect(placeAtGeometry([original, visible], [hidden], "a", original, bounds)).toBeNull();
+  });
+
   it("fills a row left to right and wraps at 12 columns", () => {
     const packed = packPlacements([box("a", 6, 4), box("b", 6, 4), box("c", 6, 4)], []);
     expect(packed[0]).toMatchObject({ x: 0, y: 0 });

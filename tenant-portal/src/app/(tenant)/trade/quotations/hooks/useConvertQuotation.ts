@@ -27,7 +27,7 @@ export function useConvertQuotation({ quotation, headers, onOpenChange, onConver
   const [evidence, setEvidence] = useState<QuotationConversionEvidenceDraft[]>(() =>
     quotation.currentLines.map((line) => ({
       clientLineId: line.clientLineId,
-      discountTotal: "0",
+      discountTotal: line.discountTotal,
       chargeTotal: "0",
       taxCode: "",
       category: "",
@@ -50,12 +50,12 @@ export function useConvertQuotation({ quotation, headers, onOpenChange, onConver
   const locked = write.isWriting || write.ambiguous !== null;
   const isDirty = evidence.some((line) =>
     line.taxCode !== "" || line.category !== "" || line.ratePercent !== "" ||
-    line.discountTotal !== "0" || line.chargeTotal !== "0",
+    line.chargeTotal !== "0",
   );
   const acceptedTerms = quotation.revisions.find((r) => r.id === quotation.acceptedRevisionId)?.termsSnapshot ?? {};
 
   function updateEvidence(clientLineId: string, field: keyof Omit<QuotationConversionEvidenceDraft, "clientLineId">, value: string) {
-    if (locked) return;
+    if (locked || field === "discountTotal") return;
     setReviewed(false);
     setEvidence((lines) => lines.map((line) =>
       line.clientLineId === clientLineId ? { ...line, [field]: value } : line,

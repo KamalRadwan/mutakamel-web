@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-10-17**
+Last source verification: **2026-11-11**
 
-Generated at: **2026-10-17T17:51:44.816Z**
+Generated at: **2026-11-11T01:18:23.448Z**
 
-Backend revision: `a51c1d6ccf36+dirty`
+Backend revision: `d98f27966914+dirty`
 
 Owning app: **core-app**
 
-Routes: **236**
+Routes: **245**
 
 ## What this page is
 
@@ -67,6 +67,11 @@ browser code.
 | POST | `/api/tenant/core/v1/auth/logout` | `core.tenant.auth.logout` | PUBLIC | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/auth/logout-all` | `core.tenant.auth.logout-all` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/auth/me` | `core.tenant.auth.me` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/auth/mfa/resend` | `core.tenant.auth.mfa.resend` | PUBLIC | no | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/auth/mfa/settings/challenge` | `core.tenant.auth.mfa.settings.challenge` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/auth/mfa/settings/confirm` | `core.tenant.auth.mfa.settings.confirm` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/auth/mfa/settings/resend` | `core.tenant.auth.mfa.settings.resend` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/auth/mfa/verify` | `core.tenant.auth.mfa.verify` | PUBLIC | no | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/auth/refresh` | `core.tenant.auth.refresh` | PUBLIC | no | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/auth/reset-password` | `core.tenant.auth.reset-password` | PUBLIC | no | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/auth/sessions` | `core.tenant.auth.sessions.list` | AUTHENTICATED | yes | TENANT_PORTAL |
@@ -132,14 +137,14 @@ browser code.
 | PATCH | `/api/tenant/core/v1/email-config` | `core.tenant-email-config.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/email-config/verify` | `core.tenant-email-config.verify` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/email-config/verify-connection` | `core.tenant-email-config.verify-connection` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/email-suppressions/lift` | `core.tenant.email-suppressions.lift` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/email-suppressions/lookup` | `core.tenant.email-suppressions.lookup` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/notifications` | `core.tenant.notifications.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/core/v1/notifications/:id` | `core.tenant.notifications.by.id.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
-| POST | `/api/tenant/core/v1/notifications/:id/ack` | `core.tenant.notifications.by.id.ack.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/notifications/:id` | `core.tenant.notifications.by.id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/notifications/:id/acknowledge` | `core.tenant.notifications.by.id.acknowledge.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
-| POST | `/api/tenant/core/v1/notifications/:id/dismiss` | `core.tenant.notifications.by.id.dismiss.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/notifications/:id/read` | `core.tenant.notifications.by.id.read.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/notifications/config` | `core.tenant.notifications.config.get` | AUTHENTICATED | yes | TENANT_PORTAL |
-| POST | `/api/tenant/core/v1/notifications/mark-all-read` | `core.tenant.notifications.mark-all-read.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/notifications/preferences` | `core.tenant.notifications.preferences.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/notifications/preferences` | `core.tenant.notifications.preferences.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/notifications/read-all` | `core.tenant.notifications.read-all.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
@@ -188,6 +193,8 @@ browser code.
 | DELETE | `/api/tenant/core/v1/roles/:id` | `core.tenant.roles.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/roles/:id` | `core.tenant.roles.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/core/v1/roles/:id` | `core.tenant.roles.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/roles/:id/branch-permissions` | `core.tenant.roles.branch-permissions.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PUT | `/api/tenant/core/v1/roles/:id/branch-permissions` | `core.tenant.roles.branch-permissions.set` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/roles/:id/permissions` | `core.tenant.roles.permissions.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription` | `core.tenant.subscriptions.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription/catalogue` | `core.tenant.subscriptions.catalogue.get` | AUTHENTICATED | yes | TENANT_PORTAL |
@@ -258,6 +265,8 @@ browser code.
 | POST | `/api/tenant/core/v1/users/:id/team-memberships` | `core.tenant.users.team-memberships.add` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/users/:id/team-memberships` | `core.tenant.users.team-memberships.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId` | `core.tenant.users.team-memberships.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId/reporting-scopes` | `core.tenant.users.team-memberships.reporting-scopes.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId/reporting-scopes` | `core.tenant.users.team-memberships.reporting-scopes.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/users/:userId/addon-assignment-options` | `core.tenant.application-access.addon-assignment-options.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/users/:userId/addon-assignments` | `core.tenant.application-access.addon-assignments.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/users/:userId/addon-assignments` | `core.tenant.application-access.addon.assign` | WRITE_SENSITIVE | yes | TENANT_PORTAL |

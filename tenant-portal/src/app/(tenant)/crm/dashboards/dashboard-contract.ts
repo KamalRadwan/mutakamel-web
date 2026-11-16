@@ -46,6 +46,10 @@ export const DASHBOARD_TEMPLATE_KEYS = [
   "CRM_DEFAULT",
   "SALES_PIPELINE",
   "LEAD_PERFORMANCE",
+  "LEAD_ACQUISITION",
+  "LEAD_SOURCE_MIX",
+  "LEAD_ACQUISITION_QUALITY",
+  "LEAD_LIFECYCLE_INVENTORY",
   "KPIS_TARGETS",
   "TRENDS_COMPARISONS",
   "DISTRIBUTION_RELATIONSHIPS",
@@ -122,7 +126,7 @@ export interface DashboardDetail extends DashboardSummary {
  * subset of it: it carries no `description`, `defaultFilters`,
  * `sourceTemplateKey`, `createdAt` or `lastOpenedAt`.
  */
-export interface DashboardNavigationItem {
+interface DashboardNavigationItem {
   id: string;
   name: string;
   isDefault: boolean;
@@ -312,10 +316,15 @@ export function parseDashboardDetailResponse(payload: unknown): DashboardDetail 
     invalidResponse("dashboard");
   }
   const duplication = record(source.duplication);
+  const placements = source.placements.map(parsePlacement);
+  const unavailablePlacements = source.unavailablePlacements.flatMap(parseUnavailablePlacement);
+  const placementIds = [...placements, ...unavailablePlacements].map((placement) => placement.id);
+  if (placementIds.length > DASHBOARD_WIDGET_LIMIT || new Set(placementIds).size !== placementIds.length
+    || placements.some((placement) => placement.dashboardId !== source.id || placement.widget.id !== placement.widgetId)) invalidResponse("dashboard placements");
   return {
     ...parseDashboardSummary(source),
-    placements: source.placements.map(parsePlacement),
-    unavailablePlacements: source.unavailablePlacements.flatMap(parseUnavailablePlacement),
+    placements,
+    unavailablePlacements,
     duplication: duplication
       ? {
           omittedUnavailableWidgetCount: finiteNumber(duplication.omittedUnavailableWidgetCount)
@@ -336,7 +345,7 @@ function parseDashboardSummary(payload: unknown): DashboardSummary {
     !isUUIDv7(source.id) ||
     !isUUIDv7(source.ownerUserId) ||
     !nonEmptyString(source.name) ||
-    !finiteNumber(source.revision) ||
+    !finiteNumber(source.revision) || !Number.isSafeInteger(source.revision) || source.revision < 1 ||
     !timestamp(source.updatedAt)
   ) {
     invalidResponse("dashboard");
@@ -385,7 +394,7 @@ function parsePlacement(payload: unknown): DashboardPlacement {
 function parseUnavailablePlacement(payload: unknown): UnavailablePlacement[] {
   const source = record(payload);
   const box = parseBox(payload);
-  if (!source || !box || !isUUIDv7(source.id) || !isUnavailableReason(source.reason)) return [];
+  if (!source || !box || !isUUIDv7(source.id) || !isUnavailableReason(source.reason)) invalidResponse("unavailable dashboard placement");
   return [{
     id: source.id,
     ...box,

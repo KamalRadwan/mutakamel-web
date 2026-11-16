@@ -6,19 +6,16 @@ import {
   Button,
   cn,
   Field,
-  IdentifierText,
   Input,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   SWATCH_SURFACE_PALETTES,
-  Textarea,
   type SwatchHue,
 } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
 import {
@@ -28,9 +25,9 @@ import {
   NODE_STATUSES,
   NODE_TIMEZONE_MAX_LENGTH,
   NODE_TYPES,
-  parseBranchIdsPreview,
   type NodeFormValues,
 } from "../../inventory-contract";
+import { useNodeBranchOptions } from "../hooks/useNodeBranchOptions";
 
 interface NodeFormFieldsProps {
   values: NodeFormValues;
@@ -38,6 +35,7 @@ interface NodeFormFieldsProps {
   isSubmitting: boolean;
   /** `UpdateNodeDto` has no `code` or `nodeType` — both are fixed at create. */
   isEdit: boolean;
+  errors?: Partial<Record<keyof NodeFormValues, string>>;
 }
 
 const NODE_TYPE_META: Record<
@@ -54,27 +52,17 @@ export function NodeFormFields({
   onChange,
   isSubmitting,
   isEdit,
+  errors,
 }: NodeFormFieldsProps) {
   const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
-  const { branchIds: availableBranchIds } = useTenantBranchSelection(user);
-
-  const branchPreview = parseBranchIdsPreview(values.branchIds);
-
-  const toggleBranchId = (id: string) => {
-    if (isSubmitting) return;
-    const current = branchPreview.validIds;
-    const next = current.includes(id)
-      ? current.filter((item) => item !== id)
-      : [...current, id];
-    onChange({ branchIds: next.join("\n") });
-  };
+  const { preview: branchPreview, options: branchOptions } = useNodeBranchOptions(values.branchIds);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field
+        <Field showLabel
           label={t.tradeInventory.nodeCode}
+          error={errors?.code}
           required
           readOnly={isEdit}
           hint={`${values.code.trim().length}/${NODE_CODE_MAX_LENGTH}`}
@@ -90,8 +78,9 @@ export function NodeFormFields({
           />
         </Field>
 
-        <Field
+        <Field showLabel
           label={t.tradeInventory.nodeName}
+          error={errors?.name}
           required
           hint={`${values.name.trim().length}/${NODE_NAME_MAX_LENGTH}`}
         >
@@ -115,7 +104,7 @@ export function NodeFormFields({
           {isEdit ? (
             <Badge tone="neutral">
               <Lock className="size-3" aria-hidden="true" />
-              {t.tradeInventory.nodeCreateDescription}
+              {t.tradeInventory.nodeImmutableHint}
             </Badge>
           ) : null}
         </div>
@@ -130,6 +119,7 @@ export function NodeFormFields({
                 type="button"
                 variant="ghost"
                 disabled={isSubmitting || isEdit}
+                aria-pressed={active}
                 onClick={() => onChange({ nodeType: typeValue })}
                 className={cn(
                   "flex h-auto items-center justify-start gap-2.5 rounded-lg border p-3 text-start transition-all",
@@ -149,16 +139,13 @@ export function NodeFormFields({
                   <span className="block truncate text-xs font-semibold">
                     {t.tradeStatus[typeValue]}
                   </span>
-                  <span className="block truncate text-2xs text-muted-foreground">
-                    {typeValue}
-                  </span>
                 </div>
               </Button>
             );
           })}
         </div>
 
-        <Field label={t.tradeInventory.nodeType} required readOnly={isEdit} className="sr-only">
+        <Field showLabel label={t.tradeInventory.nodeType} required readOnly={isEdit} className="sr-only">
           <Select
             value={values.nodeType}
             disabled={isSubmitting || isEdit}
@@ -182,8 +169,9 @@ export function NodeFormFields({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Field
+          <Field showLabel
             label={t.tradeInventory.nodeTimezone}
+            error={errors?.timezone}
             required
             hint={t.tradeInventory.nodeTimezoneHint}
           >
@@ -219,7 +207,7 @@ export function NodeFormFields({
         </div>
 
         {isEdit ? (
-          <Field label={t.common.status} required>
+          <Field showLabel label={t.common.status} required>
             <Select
               value={values.status}
               disabled={isSubmitting}
@@ -245,7 +233,7 @@ export function NodeFormFields({
       {/* Branch Assignment Studio */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-foreground">
+              <span className="text-xs font-semibold text-foreground">
             {t.tradeInventory.nodeBranches}
           </span>
           <Badge
@@ -260,46 +248,21 @@ export function NodeFormFields({
           </Badge>
         </div>
 
-        {availableBranchIds.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {availableBranchIds.map((bId) => {
-              const selected = branchPreview.validIds.includes(bId);
-              return (
-                <Button
-                  key={bId}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isSubmitting}
-                  onClick={() => toggleBranchId(bId)}
-                  className={cn(
-                    "inline-flex h-auto items-center gap-1 rounded-full border px-2.5 py-0.5 text-2xs font-semibold transition-colors",
-                    selected
-                      ? SWATCH_SURFACE_PALETTES.green.pillActive
-                      : "border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <IdentifierText className="text-2xs">{bId}</IdentifierText>
-                </Button>
-              );
-            })}
-          </div>
-        ) : null}
-
-        <Field
+        <Field showLabel
           label={t.tradeInventory.nodeBranches}
+          error={errors?.branchIds}
           required
           hint={t.tradeInventory.nodeBranchesHint}
         >
-          <Textarea
-            placeholder={t.tradeInventory.nodeBranches}
-            value={values.branchIds}
-            rows={4}
-            disabled={isSubmitting}
-            onChange={(event) => onChange({ branchIds: event.target.value })}
-          />
+          <MultiSelect textSize="compact" values={branchPreview.validIds} options={branchOptions}
+            onValuesChange={(next) => onChange({ branchIds: next.join("\n") })}
+            placeholder={t.common.selectBranch} disabled={isSubmitting}
+            searchPlaceholder={t.common.searchBranches} emptyLabel={t.common.noMatchingBranches}
+            moreLabel={t.crmLeads.card.moreTags} removeLabel={t.crmPipelines.removeChip}
+            overflowLabel={t.tradeInventory.nodeBranches} />
         </Field>
       </div>
     </div>
   );
 }
+

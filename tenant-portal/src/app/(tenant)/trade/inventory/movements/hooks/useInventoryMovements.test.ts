@@ -10,10 +10,13 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   branchId: null as string | null,
   canRead: false,
+  authKey: "actor-a",
+  authGeneration: 1,
   scope: { isResolved: false, headers: {} as Record<string, string>, permissions: [], isTenantOwner: false },
   toast: { success: vi.fn(), outcomeFromApi: vi.fn(() => false) },
 }));
-vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: null }) }));
+vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: null, realtimeAuthGeneration: mocks.authGeneration }) }));
+vi.mock("@/hooks/useAuthScopeKey", () => ({ useAuthScopeKey: () => mocks.authKey }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en, lang: "en" }) }));
 vi.mock("@/design-system", () => ({ useToast: () => mocks.toast }));
 vi.mock("../../../trade-advanced-scope", () => ({
@@ -47,6 +50,8 @@ beforeEach(() => {
   mocks.get.mockReset();
   mocks.branchId = null;
   mocks.canRead = false;
+  mocks.authKey = "actor-a";
+  mocks.authGeneration = 1;
   mocks.scope = { isResolved: false, headers: {}, permissions: [], isTenantOwner: false };
 });
 afterEach(cleanup);
@@ -141,7 +146,7 @@ describe("movement recovery identity", () => {
 
   it.each([400, 401, 403, 404, 409, 412, 413, 422, 429, 499])(
     "allows a corrected body with fresh identity after HTTP %s", async (status) => {
-      mocks.post.mockRejectedValueOnce(rejection(status)).mockResolvedValue(response({ id, lines: [] }));
+      mocks.post.mockRejectedValueOnce(rejection(status)).mockResolvedValue(response({ id, version: 1, status: "DRAFT", lines: [] }));
       const { result } = renderHook(useInventoryMovements);
       await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
       const first = mocks.post.mock.calls[0];
@@ -157,7 +162,7 @@ describe("movement recovery identity", () => {
   );
 
   it.each(["postReceipt", "postDelivery"] as const)("allows a corrected If-Match after %s is rejected", async (post) => {
-    mocks.post.mockRejectedValueOnce(rejection(412)).mockResolvedValue(response({ version: 3 }));
+    mocks.post.mockRejectedValueOnce(rejection(412)).mockResolvedValue(response({ id, version: 3, status: "POSTED", lines: [] }));
     const { result } = renderHook(useInventoryMovements);
     await act(async () => { expect(await result.current[post](id, 1)).toBe(false); });
     await act(async () => { expect(await result.current[post](id, 2)).toBe(true); });
@@ -169,7 +174,7 @@ describe("movement recovery identity", () => {
 
   it("clears a lost-response fence when the unchanged retry receives a definitive rejection", async () => {
     mocks.post.mockRejectedValueOnce(new Error("response lost"))
-      .mockRejectedValueOnce(rejection(409)).mockResolvedValue(response({ id, lines: [] }));
+      .mockRejectedValueOnce(rejection(409)).mockResolvedValue(response({ id, version: 1, status: "DRAFT", lines: [] }));
     const { result } = renderHook(useInventoryMovements);
     await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
     await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
@@ -182,7 +187,7 @@ describe("movement recovery identity", () => {
   });
 
   it.each([0, 500, 502, 503, 504])("retains the recovery identity after status %s", async (status) => {
-    mocks.post.mockRejectedValueOnce(rejection(status)).mockResolvedValue(response({ id, lines: [] }));
+    mocks.post.mockRejectedValueOnce(rejection(status)).mockResolvedValue(response({ id, version: 1, status: "DRAFT", lines: [] }));
     const { result } = renderHook(useInventoryMovements);
     await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
     await act(async () => {
@@ -195,7 +200,7 @@ describe("movement recovery identity", () => {
   });
 
   it("retains the recovery identity when the accepted movement cannot be parsed", async () => {
-    mocks.post.mockResolvedValueOnce(response({ id })).mockResolvedValue(response({ id, lines: [] }));
+    mocks.post.mockResolvedValueOnce(response({ id })).mockResolvedValue(response({ id, version: 1, status: "DRAFT", lines: [] }));
     const { result } = renderHook(useInventoryMovements);
     await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
     expect(result.current.sessionLedger).toEqual([]);
@@ -211,7 +216,7 @@ describe("movement recovery identity", () => {
 
   it.each(["submitReceipt", "submitDelivery"] as const)("recovers %s after a lost response", async (submit) => {
     mocks.post.mockRejectedValueOnce(new Error("response lost"))
-      .mockResolvedValue(response({ id, version: 1, lines: [{ id: nodeId, quantity: "2", tracking: {} }] }));
+      .mockResolvedValue(response({ id, version: 1, status: "DRAFT", lines: [{ id: nodeId, quantity: "2", tracking: {} }] }));
     const { result } = renderHook(useInventoryMovements);
     await act(async () => { expect(await result.current[submit](values)).toBe(false); });
     const first = mocks.post.mock.calls[0];
@@ -294,8 +299,8 @@ describe("partial movement reversal", () => {
     ["submitReceipt", "reverseReceipt"], ["submitDelivery", "reverseDelivery"],
   ] as const)("preserves returned status and selected serials for %s", async (create, reverse) => {
     const line = { id: nodeId, quantity: "3", tracking: { serialKeys: ["SN001", "SN002", "SN003"] } };
-    mocks.post.mockResolvedValueOnce(response({ id, version: 1, lines: [line] }))
-      .mockResolvedValueOnce(response({ id, version: 3, status: "PARTIALLY_REVERSED" }));
+    mocks.post.mockResolvedValueOnce(response({ id, version: 1, status: "DRAFT", lines: [line] }))
+      .mockResolvedValueOnce(response({ id, version: 3, status: "PARTIALLY_REVERSED", lines: [] }));
     const { result } = renderHook(useInventoryMovements);
     await act(async () => {
       expect(await result.current[create]({
@@ -311,5 +316,123 @@ describe("partial movement reversal", () => {
     });
     expect(mocks.post.mock.calls[1][1]).toMatchObject({ lines: [{ lineId: nodeId, quantity: "2", serialKeys: ["SN002", "SN003"] }] });
     expect(result.current.sessionLedger[0]).toMatchObject({ status: "PARTIALLY_REVERSED", version: 3 });
+  });
+});
+
+describe("authoritative movement handles and explicit recovery", () => {
+  const values = { nodeId, sourceDocumentId: id, sourceDocumentVersion: "1", businessEffectiveAt: "2026-11-03T08:00:00Z",
+    lines: [{ sourceLineId: id, sourceLineVersion: "1", uomId: id, quantity: "2" }] };
+  const draft = { id, version: 1, status: "DRAFT", lines: [] };
+
+  it("keeps the same key for an in-flight request and retries the original payload", async () => {
+    mocks.post.mockRejectedValueOnce(new TenantApiClientError("Still processing", {
+      status: 409, statusText: "", headers: new Headers(), data: { code: "TRADE.IDEMPOTENCY.IN_FLIGHT" },
+    })).mockResolvedValue(response(draft));
+    const { result } = renderHook(useInventoryMovements);
+    await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
+    expect(result.current.hasUnresolvedWrite).toBe(true);
+    await act(async () => { expect(await result.current.retryUnresolved()).toBe(true); });
+    expect(mocks.post.mock.calls[1]).toEqual(mocks.post.mock.calls[0]);
+    expect(result.current.hasUnresolvedWrite).toBe(false);
+    expect(result.current.sessionLedger).toHaveLength(1);
+  });
+
+  it("offers original retry after the displayed form was changed", async () => {
+    mocks.post.mockRejectedValueOnce(new Error("Response lost")).mockResolvedValue(response(draft));
+    const { result } = renderHook(useInventoryMovements);
+    await act(async () => { await result.current.submitReceipt(values); });
+    const first = mocks.post.mock.calls[0];
+    await act(async () => { expect(await result.current.submitReceipt({ ...values, sourceDocumentVersion: "9" })).toBe(false); });
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    await act(async () => { expect(await result.current.retryUnresolved()).toBe(true); });
+    expect(mocks.post.mock.calls[1]).toEqual(first);
+  });
+
+  it("does not invent a version for an incomplete response", async () => {
+    mocks.post.mockResolvedValue(response({ id, status: "DRAFT", lines: [] }));
+    const { result } = renderHook(useInventoryMovements);
+    await act(async () => { expect(await result.current.submitReceipt(values)).toBe(false); });
+    expect(result.current.sessionLedger).toEqual([]);
+    expect(result.current.hasUnresolvedWrite).toBe(true);
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+  });
+
+  it.each(["postReceipt", "postDelivery"] as const)("does not infer POSTED from a successful %s response", async (post) => {
+    mocks.post.mockResolvedValue(response(draft));
+    const { result } = renderHook(useInventoryMovements);
+    await act(async () => { expect(await result.current[post](id, 1)).toBe(false); });
+    expect(result.current.sessionLedger).toEqual([]);
+    expect(result.current.hasUnresolvedWrite).toBe(true);
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+  });
+
+  it("hides previous actor handles even when the selected branch is unchanged", async () => {
+    mocks.post.mockResolvedValue(response(draft));
+    const { result, rerender } = renderHook(useInventoryMovements);
+    await act(async () => { await result.current.submitReceipt(values); });
+    expect(result.current.sessionLedger).toHaveLength(1);
+    mocks.authKey = "actor-b";
+    rerender();
+    expect(result.current.sessionLedger).toEqual([]);
+  });
+
+  it("invalidates a reservation handle consumed by a posted delivery without guessing its new version", async () => {
+    const deliveryId = "01902001-3000-7000-8000-000000000099";
+    mocks.post.mockResolvedValueOnce(response(reservation))
+      .mockResolvedValueOnce(response({ ...draft, id: deliveryId }))
+      .mockResolvedValueOnce(response({ ...draft, id: deliveryId, version: 2, status: "POSTED" }));
+    const { result } = renderHook(useInventoryMovements);
+    await act(async () => { await result.current.submitReservation({
+      nodeId, itemId: id, uomId: id, quantity: "10", sourceDocumentId: id,
+      sourceLineId: id, sourceDocumentVersion: "1", sourceLineVersion: "1",
+    }); });
+    await act(async () => { await result.current.submitDelivery({ ...values,
+      lines: [{ ...values.lines[0], reservationId: id }],
+    }); });
+    await act(async () => { expect(await result.current.postDelivery(deliveryId, 1)).toBe(true); });
+    expect(result.current.sessionLedger.find(entry => entry.id === id)).toMatchObject({
+      stale: true, version: 4, status: "ACTIVE",
+    });
+    expect(result.current.sessionLedger.find(entry => entry.id === deliveryId)).toMatchObject({ status: "POSTED", version: 2 });
+  });
+
+  it("does not revive handles after leaving and returning to the same branch", async () => {
+    mocks.post.mockResolvedValue(response(draft));
+    const { result, rerender } = renderHook(useInventoryMovements);
+    await act(async () => { await result.current.submitReceipt(values); });
+    expect(result.current.sessionLedger).toHaveLength(1);
+    mocks.scope = { ...mocks.scope, headers: { "x-mutakamel-branch-id": nodeId } };
+    rerender();
+    mocks.scope = { ...mocks.scope, headers: {} };
+    rerender();
+    expect(result.current.sessionLedger).toEqual([]);
+  });
+
+  it("discards a late accepted response after an authorization generation changes", async () => {
+    let finish!: (value: ReturnType<typeof response>) => void;
+    mocks.post.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const { result, rerender } = renderHook(useInventoryMovements);
+    let pending!: Promise<boolean>;
+    act(() => { pending = result.current.submitReceipt(values); });
+    mocks.authGeneration = 2;
+    rerender();
+    await act(async () => { finish(response(draft)); expect(await pending).toBe(false); });
+    expect(result.current.sessionLedger).toEqual([]);
+    expect(mocks.toast.success).not.toHaveBeenCalled();
+  });
+
+  it("discards a late response after an A to B to A scope switch", async () => {
+    let finish!: (value: ReturnType<typeof response>) => void;
+    mocks.post.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const { result, rerender } = renderHook(useInventoryMovements);
+    let pending!: Promise<boolean>;
+    act(() => { pending = result.current.submitReceipt(values); });
+    mocks.scope = { ...mocks.scope, headers: { "x-mutakamel-branch-id": nodeId } };
+    rerender();
+    mocks.scope = { ...mocks.scope, headers: {} };
+    rerender();
+    await act(async () => { finish(response(draft)); expect(await pending).toBe(false); });
+    expect(result.current.sessionLedger).toEqual([]);
+    expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 });

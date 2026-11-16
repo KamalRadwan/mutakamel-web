@@ -223,24 +223,24 @@ export function LeadBoardCard({
               return (
                 <TagChip
                   key={tag.id}
-                  size="sm"
+                  size="compact"
                   label={tag.name}
                   backgroundColor={tag.backgroundColor}
                   textColor={tag.textColor}
-                  className="h-6 max-w-28 rounded-md font-semibold"
+                  className="max-w-28 font-semibold"
                 />
               );
             }
             const defaultTone = index === 0 ? "positive" : "neutral";
             return (
-              <Badge key={tag.id} size="sm" tone={defaultTone} className="max-w-28">
+              <Badge key={tag.id} size="compact" tone={defaultTone} className="max-w-28">
                 <bdi className="truncate">{tag.name}</bdi>
               </Badge>
             );
           })}
 
           {overflowCount > 0 && (
-            <Badge size="sm" tone="neutral" className="shrink-0">
+            <Badge size="compact" tone="neutral" className="shrink-0">
               {formatTemplate(cardDict.moreTags, { count: String(overflowCount) })}
             </Badge>
           )}

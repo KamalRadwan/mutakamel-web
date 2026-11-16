@@ -1,287 +1,282 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useCan, useToast } from "@/design-system";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { hasPermission, useCan } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { useAuthScopeKey } from "@/hooks/useAuthScopeKey";
 import { useI18n } from "@/i18n/I18nContext";
-import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { formatTemplate } from "@/lib/format/template";
-import { coreDelete, coreGet, corePatch, corePost } from "../../../core-api";
-import type { ActiveStatus } from "../../../core-validation";
-import { companyLabel } from "../../company-options";
+import { readCorePage } from "@/lib/api/envelope";
+import type { NormalizedApiError } from "@/lib/api/errors";
 import { useCompanyOptions } from "../../hooks/useCompanyOptions";
 import {
-  COMPANY_INVALID_CODE,
   TAXES_PATH,
-  TAX_CODE_TAKEN_CODE,
   TAX_PAGE_SIZE,
-  buildCreateTaxRequest,
-  buildUpdateTaxRequest,
   parseTaxesResponse,
-  taxPath,
-  taxesListPath,
   type Tax,
-  type TaxFormValues,
-  TAX_SORT_FIELDS,
-  type TaxSortField,
 } from "../tax-contract";
+import {
+  formatTaxQueryFailure,
+  isAbortError,
+  normalizeTaxQueryError,
+} from "../tax-errors";
+import { useTaxFormWrites } from "./useTaxFormWrites";
+import { useTaxLifecycleActions } from "./useTaxLifecycleActions";
+import { useTaxListFilters } from "./useTaxListFilters";
 
 const LIST_RESPONSE_LIMIT_BYTES = 400_000;
-const ROW_RESPONSE_LIMIT_BYTES = 20_000;
 
 export function useTaxes() {
   const { t, lang } = useI18n();
-  const toast = useToast();
-  const canManage = useCan("taxes.tax.manage");
-  const { companies, manageableCompanies, tenantWideAllowed, canManageScope, canCreate } =
-    useCompanyOptions("taxes.tax.manage");
+  const { user, realtimeAuthGeneration } = useTenantAuth();
+  const accessMode = useAccessMode();
+  const authScopeKey = useAuthScopeKey(user);
+  const manageScope = user?.permissionScopes?.["taxes.tax.manage"];
+  const manageScopeKey = manageScope
+    ? `${manageScope.tenantWide}:${[...manageScope.companyIds].sort().join(",")}`
+    : "none";
+  const authFenceKey = `${realtimeAuthGeneration ?? "no-gen"}:${authScopeKey}:${manageScopeKey}:${accessMode.mode ?? "unresolved"}`;
 
-  const [items, setItems] = useState<Tax[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<ActiveStatus | undefined>(undefined);
-  const [companyFilter, setCompanyFilter] = useState<string | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [sort, setSortState] = useState<{ id: TaxSortField; direction: "asc" | "desc" }>({
-    id: "code",
-    direction: "asc",
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Tax | null>(null);
-  const [deactivating, setDeactivating] = useState<Tax | null>(null);
+  const canRead = hasPermission(user?.permissions ?? [], "taxes.tax.read");
+  const canReadTaxes = canRead && accessMode.canRead;
+  const rawCanManage = useCan("taxes.tax.manage");
+  const {
+    companies,
+    manageableCompanies,
+    tenantWideAllowed: rawTenantWideAllowed,
+    canManageScope: rawCanManageScope,
+    canCreate: rawCanCreate,
+    loadError: companyLoadError,
+    isTruncated: companiesTruncated,
+    retry: retryCompanies,
+  } = useCompanyOptions("taxes.tax.manage");
 
-  const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      setIsLoading(true);
-      setQueryError(null);
-      try {
-        const result = await coreGet(
-          taxesListPath(
-            page,
-            statusFilter,
-            companyFilter,
-            search.trim(),
-            sort.id,
-            sort.direction === "asc" ? "ASC" : "DESC",
-          ),
-          { signal, maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES },
-        );
-        const parsed = parseTaxesResponse(result.data);
-        setItems(parsed.items);
-        setTotal(parsed.total);
-        setHasLoaded(true);
-      } catch (error) {
-        if (isAbortError(error)) return;
-        setQueryError(normalizeApiError(error));
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
-      }
-    },
-    [page, statusFilter, companyFilter, search, sort],
+  const canManage = accessMode.canMutate && rawCanManage;
+  const tenantWideAllowed = accessMode.canMutate && rawTenantWideAllowed;
+  const canCreate = accessMode.canMutate && rawCanCreate;
+  const canManageScope = useCallback(
+    (companyId: string | null) => accessMode.canMutate && rawCanManageScope(companyId),
+    [accessMode.canMutate, rawCanManageScope],
   );
+
+  const filters = useTaxListFilters();
+  const { page, pageSize, currentQuery, setPage } = filters;
+  const scopedQueryKey = `${authFenceKey}:${currentQuery}`;
+
+  const [trackedAuthKey, setTrackedAuthKey] = useState(authFenceKey);
+  const [trackedQueryKey, setTrackedQueryKey] = useState(scopedQueryKey);
+  const [items, setItems] = useState<Tax[]>([]);
+  const [pageMeta, setPageMeta] = useState({ limit: TAX_PAGE_SIZE, total: 0 });
+  const [isLoading, setIsLoading] = useState(canReadTaxes);
+  const [loadedQuery, setLoadedQuery] = useState<string | null>(null);
+  const [queryErrorState, setQueryErrorState] = useState<{
+    key: string;
+    error: NormalizedApiError;
+  } | null>(null);
+
+  if (trackedAuthKey !== authFenceKey) {
+    setTrackedAuthKey(authFenceKey);
+    setTrackedQueryKey(scopedQueryKey);
+    setItems([]);
+    setPageMeta({ limit: pageSize, total: 0 });
+    setLoadedQuery(null);
+    setQueryErrorState(null);
+    setIsLoading(canReadTaxes);
+  } else if (trackedQueryKey !== scopedQueryKey) {
+    setTrackedQueryKey(scopedQueryKey);
+    setQueryErrorState(null);
+    setIsLoading(canReadTaxes);
+  }
+
+  const activeListRequest = useRef<AbortController | null>(null);
+  const itemsRef = useRef<Tax[]>([]);
+  const loadedQueryRef = useRef<string | null>(null);
+  const mutationInFlightRef = useRef(false);
+  const latestAuthFenceRef = useRef(authFenceKey);
 
   useEffect(() => {
+    latestAuthFenceRef.current = authFenceKey;
+    itemsRef.current = [];
+    loadedQueryRef.current = null;
+  }, [authFenceKey]);
+
+  const load = useCallback(async (): Promise<void> => {
+    activeListRequest.current?.abort();
+    if (!canReadTaxes) {
+      activeListRequest.current = null;
+      itemsRef.current = [];
+      loadedQueryRef.current = null;
+      setItems([]);
+      setLoadedQuery(null);
+      setPageMeta({ limit: pageSize, total: 0 });
+      setQueryErrorState(null);
+      setIsLoading(false);
+      return;
+    }
+
+    const startedFence = authFenceKey;
+    const startedScopedKey = scopedQueryKey;
     const controller = new AbortController();
+    activeListRequest.current = controller;
+    const isCurrent = () =>
+      !controller.signal.aborted &&
+      activeListRequest.current === controller &&
+      latestAuthFenceRef.current === startedFence;
+
+    setIsLoading(true);
+    setQueryErrorState(null);
+
+    try {
+      const envelope = await readCorePage(TAXES_PATH, currentQuery, {
+        signal: controller.signal,
+        cache: "no-store",
+        suppressForbiddenToast: true,
+        maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+      });
+      if (!isCurrent()) return;
+
+      const parsed = parseTaxesResponse(envelope);
+      const maxPage = Math.max(1, parsed.totalPages);
+      if (page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
+
+      itemsRef.current = parsed.items;
+      loadedQueryRef.current = startedScopedKey;
+      setItems(parsed.items);
+      setPageMeta({ limit: parsed.limit, total: parsed.total });
+      setLoadedQuery(startedScopedKey);
+      setIsLoading(false);
+    } catch (error) {
+      if (!isCurrent() || isAbortError(error)) {
+        return;
+      }
+      const normalized = normalizeTaxQueryError(error);
+      const retainLoadedRows =
+        normalized.status !== 403 &&
+        loadedQueryRef.current === startedScopedKey &&
+        itemsRef.current.length > 0;
+      if (!retainLoadedRows) {
+        itemsRef.current = [];
+        loadedQueryRef.current = null;
+        setItems([]);
+        setLoadedQuery(null);
+        setPageMeta({ limit: pageSize, total: 0 });
+      }
+      setQueryErrorState({ key: startedScopedKey, error: normalized });
+      setIsLoading(false);
+    }
+  }, [authFenceKey, canReadTaxes, currentQuery, page, pageSize, scopedQueryKey, setPage]);
+
+  useEffect(() => {
+    let cancelled = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!cancelled) void load();
     });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      activeListRequest.current?.abort();
+    };
   }, [load]);
 
-  const reportWriteError = useCallback(
-    (error: unknown, failureTitle: string, scopeCompanyId: string | null): boolean => {
-      const normalized = normalizeApiError(error);
-      // The transport already toasts a 403 — a second would double-fire.
-      if (normalized.status === 403) return false;
-      if (toast.outcomeFromApi(normalized)) return false;
-      if (normalized.code === TAX_CODE_TAKEN_CODE) {
-        // A tax code is unique WITHIN its scope, so "code already exists" is
-        // only meaningful once it names the scope it collided in.
-        toast.error(
-          failureTitle,
-          formatTemplate(t.coreSettings.taxCodeTaken, {
-            company: companyLabel(companies, scopeCompanyId, t.coreSettings.taxTenantWide),
-          }),
-        );
-        return false;
-      }
-      if (normalized.code === COMPANY_INVALID_CODE) {
-        toast.error(failureTitle, t.coreSettings.taxCompanyInvalid);
-        return false;
-      }
-      toast.errorFromApi(failureTitle, normalized);
-      return false;
-    },
-    [toast, t, companies],
-  );
+  const dismissFormModalsRef = useRef<() => void>(() => {});
+  const lifecycle = useTaxLifecycleActions({
+    t,
+    authFenceKey,
+    latestAuthFenceRef,
+    mutationInFlightRef,
+    canMutate: accessMode.canMutate,
+    canManageScope,
+    onBeforeOpenDeactivate: () => dismissFormModalsRef.current(),
+    reloadList: load,
+  });
 
-  const create = useCallback(
-    async (values: TaxFormValues): Promise<boolean> => {
-      if (!canManageScope(values.companyId) || isSubmitting) return false;
-      setIsSubmitting(true);
-      setFormError(null);
-      try {
-        const request = buildCreateTaxRequest(values);
-        await corePost(TAXES_PATH, request, { maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES });
-        setCreateOpen(false);
-        toast.success(t.coreSettings.savedTitle, t.coreSettings.taxCreated);
-        await load();
-        return true;
-      } catch (error) {
-        const formMessageText = formMessage(error, t);
-        if (formMessageText) {
-          setFormError(formMessageText);
-          return false;
-        }
-        return reportWriteError(error, t.coreSettings.taxCreateFailed, values.companyId);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [canManageScope, isSubmitting, reportWriteError, toast, t, load],
-  );
+  const formWrites = useTaxFormWrites({
+    t,
+    authFenceKey,
+    latestAuthFenceRef,
+    mutationInFlightRef,
+    isPeerBusy: lifecycle.pendingId !== null,
+    canMutate: accessMode.canMutate,
+    canCreate,
+    canManageScope,
+    companies,
+    onBeforeOpenModal: lifecycle.dismissDeactivate,
+    reloadList: load,
+  });
 
-  const update = useCallback(
-    async (values: TaxFormValues): Promise<boolean> => {
-      if (!editing || !canManageScope(editing.companyId) || isSubmitting) return false;
-      setIsSubmitting(true);
-      setFormError(null);
-      try {
-        const request = buildUpdateTaxRequest(editing, values);
-        if (Object.keys(request).length === 0) {
-          setEditing(null);
-          return true;
-        }
-        await corePatch(taxPath(editing.id), request, {
-          maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES,
-        });
-        setEditing(null);
-        toast.success(t.coreSettings.savedTitle, t.coreSettings.taxUpdated);
-        await load();
-        return true;
-      } catch (error) {
-        const formMessageText = formMessage(error, t);
-        if (formMessageText) {
-          setFormError(formMessageText);
-          return false;
-        }
-        return reportWriteError(error, t.coreSettings.taxUpdateFailed, editing.companyId);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [canManageScope, editing, isSubmitting, reportWriteError, toast, t, load],
-  );
+  useEffect(() => {
+    dismissFormModalsRef.current = formWrites.dismissFormModals;
+  }, [formWrites.dismissFormModals]);
 
-  const deactivate = useCallback(async (): Promise<void> => {
-    if (!deactivating || !canManageScope(deactivating.companyId) || pendingId) return;
-    setPendingId(deactivating.id);
-    try {
-      await coreDelete(taxPath(deactivating.id), { maxResponseBytes: 10_000 });
-      toast.success(t.coreSettings.savedTitle, t.coreSettings.taxDeactivated);
-    } catch (error) {
-      reportWriteError(error, t.coreSettings.taxDeactivateFailed, deactivating.companyId);
-    } finally {
-      setPendingId(null);
-      setDeactivating(null);
-      await load();
-    }
-  }, [canManageScope, deactivating, pendingId, reportWriteError, toast, t, load]);
-
-  const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
-    const field = TAX_SORT_FIELDS.find((allowed) => allowed === next.id);
-    if (!field) return;
-    setSortState({ id: field, direction: next.direction });
-    setPage(1);
-  }, []);
+  const queryError = queryErrorState?.key === scopedQueryKey ? queryErrorState.error : null;
+  const isQueryForbidden = queryError?.status === 403;
+  const queryFailure = queryError && !isQueryForbidden ? formatTaxQueryFailure(queryError, t) : null;
+  const isCurrentQueryLoaded = loadedQuery === scopedQueryKey;
+  const visibleItems = isCurrentQueryLoaded ? items : [];
+  const hasRetainedRows = isCurrentQueryLoaded && items.length > 0;
+  const isTableLoading = isLoading && !hasRetainedRows;
+  const isBusy = formWrites.isSubmitting || lifecycle.pendingId !== null;
 
   return {
-    sort,
-    setSort,
     t,
     lang,
+    accessMode: accessMode.mode,
+    isPermissionReadOnly: canRead && !isQueryForbidden && accessMode.canMutate && !rawCanManage,
     canManage,
     canCreate,
     canManageScope,
     tenantWideAllowed,
     manageableCompanies,
     companies,
-    items,
-    pageInfo: { page, limit: TAX_PAGE_SIZE, total },
-    statusFilter,
-    companyFilter,
-    search,
-    isLoading: isLoading && !hasLoaded,
+    companyLoadError,
+    companiesTruncated,
+    retryCompanies,
+    items: visibleItems,
+    pageInfo: {
+      page,
+      limit: isCurrentQueryLoaded ? pageMeta.limit : pageSize,
+      total: isCurrentQueryLoaded ? pageMeta.total : 0,
+    },
+    statusFilter: filters.statusFilter,
+    companyFilter: filters.companyFilter,
+    isScopeSelectOpen: filters.isScopeSelectOpen,
+    setIsScopeSelectOpen: filters.setIsScopeSelectOpen,
+    inclusiveFilter: filters.inclusiveFilter,
+    search: filters.search,
+    hasActiveFilters: filters.hasActiveFilters,
+    sort: filters.sort,
+    setSort: filters.setSort,
+    isLoading: isTableLoading,
     isRefreshing: isLoading,
-    isSubmitting,
-    pendingId,
-    queryError,
-    formError,
-    createOpen,
-    editing,
-    deactivating,
-    setPage,
-    setStatusFilter: (next: ActiveStatus | undefined) => {
-      setPage(1);
-      setStatusFilter(next);
-    },
-    setCompanyFilter: (next: string | undefined) => {
-      setPage(1);
-      setCompanyFilter(next);
-    },
-    setSearch: (next: string) => {
-      setPage(1);
-      setSearch(next);
-    },
-    openCreate: () => {
-      if (!canCreate) return;
-      setFormError(null);
-      setCreateOpen(true);
-    },
-    closeCreate: () => {
-      if (isSubmitting) return;
-      setFormError(null);
-      setCreateOpen(false);
-    },
-    openEdit: (tax: Tax) => {
-      if (!canManageScope(tax.companyId)) return;
-      setFormError(null);
-      setEditing(tax);
-    },
-    closeEdit: () => {
-      if (isSubmitting) return;
-      setFormError(null);
-      setEditing(null);
-    },
-    openDeactivate: (tax: Tax) => canManageScope(tax.companyId) && setDeactivating(tax),
-    closeDeactivate: () => {
-      if (pendingId) return;
-      setDeactivating(null);
-    },
-    create,
-    update,
-    deactivate,
+    hasRetainedRows,
+    isQueryForbidden,
+    queryFailure,
+    isSubmitting: formWrites.isSubmitting,
+    pendingId: lifecycle.pendingId,
+    isBusy,
+    formError: formWrites.formError,
+    createOpen: formWrites.createOpen,
+    editing: formWrites.editing,
+    deactivating: lifecycle.deactivating,
+    openCreate: formWrites.openCreate,
+    closeCreate: formWrites.closeCreate,
+    openEdit: formWrites.openEdit,
+    closeEdit: formWrites.closeEdit,
+    openDeactivate: lifecycle.openDeactivate,
+    closeDeactivate: lifecycle.closeDeactivate,
+    create: formWrites.create,
+    update: formWrites.update,
+    deactivate: lifecycle.deactivate,
+    reactivate: lifecycle.reactivate,
+    setPage: filters.setPage,
+    setPageSize: filters.setPageSize,
+    setStatusFilter: filters.setStatusFilter,
+    setCompanyFilter: filters.setCompanyFilter,
+    setInclusiveFilter: filters.setInclusiveFilter,
+    setSearch: filters.setSearch,
+    clearAllFilters: filters.clearAllFilters,
     reload: () => load(),
   };
-}
-
-type Dictionary = ReturnType<typeof useI18n>["t"];
-
-/** Client-side form stops, raised before any request leaves. */
-function formMessage(error: unknown, t: Dictionary): string | null {
-  const reason = error instanceof Error ? error.message : "";
-  if (reason === "TAX_FORM_CODE") return t.coreSettings.taxFormCode;
-  if (reason === "TAX_FORM_NAME") return t.coreSettings.taxFormName;
-  if (reason === "TAX_FORM_RATE") return t.coreSettings.taxFormRate;
-  if (reason === "TAX_FORM_COMPANY") return t.coreSettings.taxFormCompany;
-  return null;
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
 }

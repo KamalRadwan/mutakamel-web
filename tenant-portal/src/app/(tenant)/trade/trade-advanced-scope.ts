@@ -50,12 +50,16 @@ export function tradeScopeHeaders(
  * `TRADE.CONTEXT.*` — a setup gap is an empty state, not an error
  * (docs/design/states.md).
  */
-export function useTradeScope(target: TradeScopeTarget, branchId: string | null) {
+export function useTradeScope(
+  target: TradeScopeTarget,
+  branchId: string | null,
+  { autoSelectCompany = true }: { autoSelectCompany?: boolean } = {},
+) {
   const { user } = useTenantAuth();
   const { context, companyIds } = useSharedTradeScope();
   return useMemo(() => {
     const headers = tradeScopeHeaders({
-      companyId: context.companyId ?? (companyIds.length === 1 ? companyIds[0] : null),
+      companyId: context.companyId ?? (autoSelectCompany && companyIds.length === 1 ? companyIds[0] : null),
       branchId,
       channelId: context.channelId,
     }, target);
@@ -75,7 +79,7 @@ export function useTradeScope(target: TradeScopeTarget, branchId: string | null)
         },
       )) : [],
     };
-  }, [user, branchId, target, companyIds, context.companyId, context.channelId]);
+  }, [user, branchId, target, companyIds, context.companyId, context.channelId, autoSelectCompany]);
 }
 
 /** The selection is owned by the route-group provider, including after navigation. */

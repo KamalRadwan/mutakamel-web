@@ -1,11 +1,10 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppWindow, ArrowLeft, Database, FileCheck, Loader2, Pencil, Settings, Shield, Trash2 } from "lucide-react";
-import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { StatusBadge, PageHeader, Card, Button } from "@/design-system";
+import { StatusBadge, PageHeader, Card, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Field, Input, Textarea } from "@/design-system";
 import { useAuth } from "@/context/AuthContext";
 import { ApplicationCatalogueWorkspace } from "@/features/admin/applications/components/ApplicationCatalogueWorkspace";
 import { ApplicationAddonsWorkspace } from "@/features/admin/applications/components/ApplicationAddonsWorkspace";
@@ -19,9 +18,10 @@ import { ApplicationTechnicalProvisioningPanel } from "@/features/admin/applicat
 import { useApplication } from "@/features/admin/applications/hooks/useApplication";
 import { useApplicationTechnicalProvisioning } from "@/features/admin/applications/hooks/useApplicationTechnicalProvisioning";
 import { getActivationReadinessState } from "@/features/admin/applications/lib/technical-provisioning-state";
+import { localizeApplicationError } from "@/features/admin/applications/lib/application-error-copy";
 import type { ApplicationServerSummaryView } from "@/features/admin/applications/types";
 import { useI18n } from "@/i18n/I18nContext";
-import { adminCanAll } from "@/lib/auth/rbac";
+import { adminCanAll, ADMIN_RBAC_CRITICAL } from "@/lib/auth/rbac";
 
 export default function ApplicationDetailPage({ params }: { params: Promise<{ applicationKey: string }> }) {
   const { applicationKey } = use(params);
@@ -50,11 +50,11 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   }, [applicationKey]);
 
   const canEditMetadata = adminCanAll(user, ["admin.applications.update"]);
-  const canLifecycle = adminCanAll(user, ["admin.applications.update", "admin.applications.critical"]);
-  const canDelete = adminCanAll(user, ["admin.applications.delete", "admin.applications.critical"]);
+  const canLifecycle = adminCanAll(user, ADMIN_RBAC_CRITICAL.APPLICATIONS_UPDATE);
+  const canDelete = adminCanAll(user, ADMIN_RBAC_CRITICAL.APPLICATIONS_DELETE);
   const canReadCatalogue = adminCanAll(user, ["admin.catalog.read"]);
   const canCreateCatalogue = adminCanAll(user, ["admin.catalog.manage"]);
-  const canMutateCatalogue = adminCanAll(user, ["admin.catalog.manage", "admin.catalog.critical"]);
+  const canMutateCatalogue = adminCanAll(user, ADMIN_RBAC_CRITICAL.CATALOG_MANAGE);
 
   if (detail.isLoading) return <PageFrame><div role="status" className="flex min-h-96 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />{t.applications.detail.loading}</div></PageFrame>;
   if (detail.error || !detail.application) return <PageFrame><div role="alert" className="mx-auto mt-16 max-w-lg rounded-lg border border-destructive/30 bg-destructive-subtle p-6 text-center text-sm text-destructive-subtle-foreground"><p>{detail.error || t.applications.detail.notFound}</p><Button type="button" variant="destructive" size="sm" className="mt-4" onClick={() => void detail.fetchApplication()}>{t.applications.detail.retry}</Button></div></PageFrame>;
@@ -85,7 +85,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         ? t.applications.detail.activationBlocked
         : null;
   const lifecycleOptions: ApplicationLifecycleAction[] = application.lifecycleStatus === "DRAFT"
-    ? ["activate", "disable"]
+    ? ["activate"]
     : application.lifecycleStatus === "ACTIVE"
       ? ["deprecate", "disable"]
       : application.lifecycleStatus === "DEPRECATED"
@@ -147,7 +147,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
                 (activationReadiness !== "ALLOWED" ||
                   requiredFleetCoverageBlocked);
               const blockedTitle = activationReadiness === "UNAVAILABLE" ? t.applications.detail.activationUnavailable : t.applications.detail.activationBlocked;
-              return <Button key={action} type="button" variant="secondary" size="sm" disabled={blocked} title={blocked ? blockedTitle : undefined} onClick={() => setLifecycleAction(action)}>{t.applications.detail.lifecycle[action]}</Button>;
+              return <Button key={action} type="button" variant={action === "disable" ? "destructive" : "secondary"} size="sm" disabled={blocked} title={blocked ? blockedTitle : undefined} onClick={() => setLifecycleAction(action)}>{t.applications.detail.lifecycle[action]}</Button>;
             })}
             {canDelete && application.lifecycleStatus === "DRAFT" && <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2 className="size-3.5" aria-hidden="true" />{t.applications.detail.delete}</Button>}
           </div>
@@ -202,7 +202,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
     </div>
 
     <ApplicationConfigurationDialog mode={configurationMode} application={application} isSubmitting={detail.isMutating} onClose={() => setConfigurationMode(null)} onUpdateMetadata={detail.updateApplication} onUpdatePolicy={detail.updateDatabasePolicy} />
-    <ApplicationLifecycleDialog action={lifecycleAction} currentStatus={application.lifecycleStatus} isSubmitting={detail.isMutating} onClose={() => setLifecycleAction(null)} onConfirm={runLifecycle} />
+    <ApplicationLifecycleDialog action={lifecycleAction} applicationKey={application.key} currentStatus={application.lifecycleStatus} isSubmitting={detail.isMutating} onClose={() => setLifecycleAction(null)} onConfirm={runLifecycle} />
     <ApplicationPublishActivateDialog
       isOpen={releaseStep === "PUBLISH_ACTIVATE"}
       application={application}
@@ -249,8 +249,66 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
       onRetryExactIntent={technical.retryPendingIntent}
       onClearCommandError={technical.clearCommandError}
     />
-    <DestructiveActionModal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => { void detail.deleteApplication(application.catalogueRevision, t.applications.detail.deleteReason).then(() => router.push("/applications-catalogue")); }} title={t.applications.detail.deleteTitle} description={t.applications.detail.deleteDescription} targetName={application.name} actionType="delete" requireNameTyping isSubmitting={detail.isMutating} />
+    {deleteOpen && <ApplicationDeleteDialog key={application.key} targetName={application.name} isSubmitting={detail.isMutating} onClose={() => setDeleteOpen(false)} onConfirm={async (reason) => {
+      await detail.deleteApplication(application.catalogueRevision, reason);
+      router.push("/applications-catalogue");
+    }} />}
   </PageFrame>;
+}
+
+function ApplicationDeleteDialog({ targetName, isSubmitting, onClose, onConfirm }: {
+  targetName: string;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [reason, setReason] = useState("");
+  const [confirmationName, setConfirmationName] = useState("");
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const confirmingRef = useRef(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const busy = isSubmitting || isConfirming;
+  const canConfirm = confirmationName === targetName && reason.trim().length >= 8 && reason.trim().length <= 256;
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (busy || confirmingRef.current || !canConfirm) return;
+    confirmingRef.current = true;
+    setIsConfirming(true);
+    setSubmissionError(null);
+    // Include synchronous context-guard failures in the same rejection handler.
+    void Promise.resolve().then(() => onConfirm(reason.trim())).then(onClose).catch((error: unknown) => {
+      setSubmissionError(localizeApplicationError(error, t));
+      queueMicrotask(() => errorRef.current?.focus());
+    }).finally(() => {
+      confirmingRef.current = false;
+      setIsConfirming(false);
+    });
+  };
+
+  return <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+    <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto p-3 sm:p-3.5" aria-busy={busy || undefined}>
+      <DialogHeader>
+        <DialogTitle className="text-sm">{t.applications.detail.deleteTitle}</DialogTitle>
+        <DialogDescription>{t.applications.detail.deleteDescription}</DialogDescription>
+      </DialogHeader>
+      <form onSubmit={submit} noValidate className="space-y-3">
+        <Field label={t.applications.detail.deleteConfirmName} hint={targetName} required>
+          {(fp) => <Input {...fp} required autoComplete="off" spellCheck={false} disabled={busy} value={confirmationName} onChange={(event) => setConfirmationName(event.target.value)} />}
+        </Field>
+        <Field label={t.applications.detail.deleteReasonLabel} hint={t.applications.detail.deleteReasonMinimum} required>
+          {(fp) => <Textarea {...fp} required minLength={8} maxLength={256} rows={2} disabled={busy} value={reason} onChange={(event) => setReason(event.target.value)} />}
+        </Field>
+        {submissionError && <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">{submissionError}</div>}
+        <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onClose}>{t.applications.cancel}</Button>
+          <Button type="submit" variant="destructive" size="sm" loading={busy} disabled={busy || !canConfirm}>{t.applications.detail.delete}</Button>
+        </footer>
+      </form>
+    </DialogContent>
+  </Dialog>;
 }
 
 function PageFrame({ children, isBusy = false }: { children: React.ReactNode; isBusy?: boolean }) { return <div className="w-full space-y-3" aria-busy={isBusy || undefined}>{children}</div>; }

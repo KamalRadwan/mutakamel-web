@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CoreSnapshot,
   ProvisioningRelease,
@@ -19,6 +20,7 @@ const {
   publishDraftMock,
   getReleaseMock,
   retireReleaseMock,
+  languageMock,
 } = vi.hoisted(() => ({
   authMock: {
     user: {
@@ -40,9 +42,14 @@ const {
   publishDraftMock: vi.fn(),
   getReleaseMock: vi.fn(),
   retireReleaseMock: vi.fn(),
+  languageMock: { lang: "en" as "ar" | "en", dir: "ltr" as "rtl" | "ltr" },
 }));
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => languageMock }));
+vi.mock("../model/release-signing", () => ({
+  buildVerifiedSigningPayload: vi.fn().mockResolvedValue({ matchesCoreDigest: true, payloadBase64: "e30=" }),
+}));
 vi.mock("../api/provisioning-releases-api", () => ({
   provisioningReleasesApi: {
     listDrafts: listDraftsMock,
@@ -59,6 +66,9 @@ vi.mock("../api/provisioning-releases-api", () => ({
 import { useReleaseDraftDetail } from "./use-release-draft-detail";
 import { useReleaseDetail } from "./use-release-detail";
 import { useReleaseIndex } from "./use-release-index";
+import { ReleaseDraftDetailScreen } from "../components/release-draft-detail-screen";
+import { ReleaseDetailScreen } from "../components/release-detail-screen";
+import { RELEASE_COPY } from "../components/release-shared";
 
 const DRAFT_ID = "019f0000-0000-7000-8000-000000000001";
 const RELEASE_ID = "019f0000-0000-7000-8000-000000000002";
@@ -135,7 +145,11 @@ function release(status: ProvisioningRelease["status"] = "PUBLISHED"): Provision
 }
 
 describe("release-governance hooks", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
+    languageMock.lang = "en";
+    languageMock.dir = "ltr";
     authMock.user = {
       isSuperAdmin: false,
       permissions: [
@@ -206,14 +220,26 @@ describe("release-governance hooks", () => {
 
     act(() => {
       result.current.updatePublishDraft("signatureBase64", SIGNATURE);
-      result.current.updatePublishDraft("confirmed", true);
     });
     await act(async () => {
-      await result.current.publish();
+      await result.current.publish("2.0.0");
+    });
+    expect(result.current.publishErrors.confirmed).toBe("CONFIRMATION_REQUIRED");
+    expect(publishDraftMock).not.toHaveBeenCalled();
+    act(() => result.current.requestPublishConfirmation());
+    for (const text of ["", "2.0.1", "2.0.0 "]) {
+      await act(async () => { await result.current.publish(text); });
+      expect(result.current.publishErrors.confirmed).toBe("CONFIRMATION_REQUIRED");
+    }
+    expect(publishDraftMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.publish("2.0.0");
     });
     await waitFor(() => expect(result.current.mutation.phase).toBe("UNAVAILABLE"));
+    expect(result.current.publishConfirmationVersion).toBeNull();
+    act(() => result.current.requestPublishConfirmation());
     await act(async () => {
-      await result.current.publish();
+      await Promise.all([result.current.publish("2.0.0"), result.current.publish("2.0.0")]);
     });
     await waitFor(() => expect(result.current.published?.data.releaseId).toBe(RELEASE_ID));
 
@@ -281,20 +307,85 @@ describe("release-governance hooks", () => {
     await waitFor(() => expect(result.current.state).toBe("READY"));
     act(() => {
       result.current.updateRetireDraft("reasonCode", "SUPERSEDED_RELEASE");
-      result.current.updateRetireDraft("confirmed", true);
     });
     await act(async () => {
-      await result.current.retire();
+      await result.current.retire("2.0.0");
+    });
+    expect(result.current.retireErrors.confirmed).toBe("CONFIRMATION_REQUIRED");
+    expect(retireReleaseMock).not.toHaveBeenCalled();
+    act(() => result.current.requestRetireConfirmation());
+    for (const text of ["", "2.0.1", "2.0.0 "]) {
+      await act(async () => { await result.current.retire(text); });
+      expect(result.current.retireErrors.confirmed).toBe("CONFIRMATION_REQUIRED");
+    }
+    expect(retireReleaseMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await result.current.retire("2.0.0");
     });
     await waitFor(() => expect(result.current.mutation.phase).toBe("UNAVAILABLE"));
+    expect(result.current.retireConfirmationVersion).toBeNull();
+    act(() => result.current.requestRetireConfirmation());
     await act(async () => {
-      await result.current.retire();
+      await Promise.all([result.current.retire("2.0.0"), result.current.retire("2.0.0")]);
     });
+    expect(retireReleaseMock).toHaveBeenCalledTimes(2);
     expect(retireReleaseMock.mock.calls[0][1]).toEqual({
       expectedManifestChecksum: SHA,
       reasonCode: "SUPERSEDED_RELEASE",
     });
     expect(retireReleaseMock.mock.calls[1][2]).toBe(retireReleaseMock.mock.calls[0][2]);
     await waitFor(() => expect(result.current.snapshot?.data.status).toBe("RETIRED"));
+  });
+
+  describe.each(["en", "ar"] as const)("typed confirmation in %s", (lang) => {
+    it.each(["publish", "retire"] as const)("gates %s on the exact version and resets after cancellation", async (action) => {
+      languageMock.lang = lang;
+      languageMock.dir = lang === "ar" ? "rtl" : "ltr";
+      const copy = RELEASE_COPY[lang];
+      getDraftMock.mockResolvedValue(snapshot(releaseDraft("VALIDATED")));
+      publishDraftMock.mockResolvedValue(snapshot(release()));
+      retireReleaseMock.mockResolvedValue(snapshot(release("RETIRED")));
+      const apiMock = action === "publish" ? publishDraftMock : retireReleaseMock;
+      const title = action === "publish" ? copy.publishTitle : copy.retireTitle;
+      const label = action === "publish" ? copy.publish : copy.retire;
+      const { container } = render(action === "publish"
+        ? createElement(ReleaseDraftDetailScreen, { draftId: DRAFT_ID })
+        : createElement(ReleaseDetailScreen, { releaseId: RELEASE_ID }));
+      expect(container.firstElementChild).toHaveAttribute("dir", languageMock.dir);
+      const form = await screen.findByRole("form", { name: title });
+      fireEvent.change(within(form).getByLabelText(action === "publish" ? copy.signatureBase64 : copy.retirementReason), {
+        target: { value: action === "publish" ? SIGNATURE : "SUPERSEDED_RELEASE" },
+      });
+      const open = within(form).getByRole("button", { name: label });
+      await waitFor(() => expect(open).toBeEnabled());
+      fireEvent.click(open);
+
+      let dialog = await screen.findByRole("alertdialog", { name: title });
+      let confirm = within(dialog).getByRole("button", { name: label });
+      let input = within(dialog).getByRole("textbox");
+      expect(confirm).toBeDisabled();
+      expect(apiMock).not.toHaveBeenCalled();
+      for (const text of ["2.0.1", "2.0.0 ", " 2.0.0"]) {
+        fireEvent.change(input, { target: { value: text } });
+        expect(confirm).toBeDisabled();
+        fireEvent.click(confirm);
+        expect(apiMock).not.toHaveBeenCalled();
+      }
+      fireEvent.change(input, { target: { value: "2.0.0" } });
+      expect(confirm).toBeEnabled();
+      fireEvent.click(within(dialog).getByRole("button", { name: lang === "ar" ? "إلغاء" : "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      expect(apiMock).not.toHaveBeenCalled();
+      fireEvent.click(open);
+      dialog = await screen.findByRole("alertdialog", { name: title });
+      confirm = within(dialog).getByRole("button", { name: label });
+      input = within(dialog).getByRole("textbox");
+      await waitFor(() => expect(input).toHaveValue(""));
+      expect(confirm).toBeDisabled();
+      fireEvent.change(input, { target: { value: "2.0.0" } });
+      fireEvent.click(confirm);
+      await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    });
   });
 });

@@ -16,9 +16,12 @@ export function useInitialCommercialEntry(props: InitialCommercialWorkspaceProps
 }
 export function useInitialCommercialWorkspace({ context, initialTerms, onSeeded }: InitialCommercialWorkspaceProps) {
   const { lang, dir } = useI18n(); const copy = initialCommercialCopy(lang);
-  const [terms, setTerms] = useState(initialTerms);
+  const [terms, updateTerms] = useState(initialTerms);
   const input = useMemo(() => ({ ...terms, purpose: context.purpose, ...(context.purpose === "INITIAL_SEED" ? { targetTenantId: context.targetTenantId } : {}) }), [terms, context]);
   const state = useInitialCommercial(context, input);
+  const [reviewedQuote, setReviewedQuote] = useState<typeof state.quote>(null);
+  const reviewed = Boolean(state.quote && reviewedQuote === state.quote);
+  const setTerms = (value: InitialCommercialTerms) => { setReviewedQuote(null); updateTerms(value); };
   const refreshedReceipt = useRef<string | null>(null);
   useEffect(() => {
     if (!state.receipt || refreshedReceipt.current === state.receipt.commandId) return;
@@ -37,7 +40,10 @@ export function useInitialCommercialWorkspace({ context, initialTerms, onSeeded 
   const invalidTrial = terms.trialDays !== undefined && (!Number.isInteger(terms.trialDays) || terms.trialDays < 1 || terms.trialDays > 365);
   if (invalidTrial) invalidFields.push({ id: "initial-trial-days", label: copy.trial });
   if (!terms.applications.length) invalidFields.push({ id: "initial-selected-terms", label: copy.application });
-  return { state, terms, copy, dir, errorRef, errorMessage, invalidTrial, invalidFields, setTerms,
+  return { state, terms, copy, dir, errorRef, errorMessage, invalidTrial, invalidFields, setTerms, reviewed,
+    setReviewed: (value: boolean) => setReviewedQuote(value ? state.quote : null),
+    requestQuote: () => { setReviewedQuote(null); void state.requestQuote(); },
+    seed: () => { if (reviewed) void state.seed(); },
     restore: () => setTerms(initialTerms),
     setCycle: (billingCycle: string) => { if (billingCycle === "MONTHLY" || billingCycle === "ANNUAL") setTerms({ ...terms, billingCycle }); },
     setTrial: (value: string) => setTerms({ ...terms, trialDays: value === "" ? undefined : Number(value) }) };

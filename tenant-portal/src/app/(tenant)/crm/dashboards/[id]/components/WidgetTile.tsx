@@ -1,150 +1,109 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  BarChart3,
-  Briefcase,
-  Filter,
-  Layers,
-  PieChart,
-  Table2,
-  Target,
-  Trash2,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { useRef } from "react";
+import { useWidgetTilePresentation } from "../hooks/useWidgetTilePresentation";
+import { AlertTriangle, Archive, Ellipsis, GitBranch, Table2, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
   Card,
   DegradedBanner,
-  Progress,
-  StatCard,
-  swatchSurfacePalette,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  TargetGaugeChart,
+
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import { formatNumber } from "@/lib/format/number";
 import type { WidgetResult } from "../../dashboard-run-contract";
-import { displayWarnings } from "../../dashboard-run-contract";
-import type { CrmVisualization, WidgetDefinition } from "../../widget-contract";
-import {
-  formatMetricValue,
-  isInverseMetricKey,
-  primarySeries,
-  scalarDelta,
-  widgetAccentHue,
-  widgetRenderMode,
-  widgetTableModel,
-} from "../../widget-view";
+
+import type { WidgetDefinition } from "../../widget-contract";
+import type { DashboardCatalog } from "../../dashboard-catalog-contract";
+import { hasPointComparison, plotsPointComparison } from "../../widget-view";
+import { conversionSampleCaption, formatWidgetValue, widgetColor, widgetDisplayTitle, widgetDisplaySubtitle, widgetOption } from "../../widget-presentation";
+import { WidgetPresentationNotice } from "./WidgetPresentationNotice";
 import { WidgetChart } from "./WidgetChart";
+import { GovernedTargetWidgetView } from "./GovernedTargetWidgetView";
 import { WidgetDataTable } from "./WidgetDataTable";
+import { WidgetHeaderIcon } from "./WidgetHeaderIcon";
+import { WidgetScalarSeries } from "./WidgetScalarSeries";
+import { WidgetCohortObservation } from "./WidgetCohortObservation";
+import { WidgetCohortMaturitySummary } from "./WidgetCohortMaturitySummary";
+import { WidgetDatasetComparisonSummary } from "./WidgetDatasetComparisonSummary";
+import { WidgetSourceGrowthSummary } from "./WidgetSourceGrowthSummary";
+import { WidgetSourceMixSummary } from "./WidgetSourceMixSummary";
+import { WidgetAcquisitionQualitySummary } from "./WidgetAcquisitionQuality";
+import { readSourceMix } from "../../widget-source-mix";
+import { WidgetPeriodNote } from "./WidgetPeriodNote";
+import { WidgetMonthlyIntakeSummary } from "./WidgetMonthlyIntakeSummary";
+import { readMonthlyIntake } from "../../widget-monthly-intake";
+import { WidgetLeadLifecycleNote } from "./WidgetLeadLifecycle";
+import { isLifecycleWidget } from "../../widget-lead-lifecycle";
 
 interface WidgetTileProps {
   widget: WidgetDefinition;
   result: WidgetResult | undefined;
+  catalog?: DashboardCatalog | null;
+  effectiveCurrencyCode?: string | null;
   onDrilldown: (widget: WidgetDefinition, pointKey: string, label: string) => void;
   onRemove?: (placementId: string) => void;
+  onArchive?: (anchor: HTMLButtonElement | null) => boolean;
+  onVersion?: (name: string, anchor: HTMLButtonElement | null) => boolean;
   placementId: string;
   isRemoving: boolean;
 }
 
-function WidgetHeaderIcon({
-  visualizationType,
-  metricKey,
-}: {
-  visualizationType: CrmVisualization;
-  metricKey: string | null;
-}) {
-  const key = metricKey ?? "";
-  if (visualizationType === "ALERT_LIST" || key.includes(".overdue") || key.includes(".stale")) {
-    return <AlertTriangle className="size-4" aria-hidden="true" />;
-  }
-  if (visualizationType === "ACTIVITY_FEED" || key.includes("activities") || key.includes("calendar")) {
-    return <Activity className="size-4" aria-hidden="true" />;
-  }
-  if (
-    visualizationType === "SEMI_CIRCLE_GAUGE" ||
-    visualizationType === "THREE_QUARTER_GAUGE" ||
-    visualizationType === "CIRCULAR_PROGRESS_GAUGE" ||
-    visualizationType === "DETAILED_SPEEDOMETER" ||
-    visualizationType === "PROGRESS_CARD" ||
-    visualizationType === "BULLET"
-  ) {
-    return <Target className="size-4" aria-hidden="true" />;
-  }
-  if (visualizationType === "FUNNEL") return <Filter className="size-4" aria-hidden="true" />;
-  if (visualizationType === "DONUT" || visualizationType === "PIE") {
-    return <PieChart className="size-4" aria-hidden="true" />;
-  }
-  if (visualizationType === "LINE" || visualizationType === "AREA" || visualizationType === "LINE_AREA") {
-    return <TrendingUp className="size-4" aria-hidden="true" />;
-  }
-  if (visualizationType === "STACKED_BAR" || visualizationType === "STACKED_BAR_100") {
-    return <Layers className="size-4" aria-hidden="true" />;
-  }
-  if (key.includes("leads") || key.includes("customer_profiles")) {
-    return <Users className="size-4" aria-hidden="true" />;
-  }
-  if (key.includes("opportunities")) {
-    return <Briefcase className="size-4" aria-hidden="true" />;
-  }
-  return <BarChart3 className="size-4" aria-hidden="true" />;
-}
-
 export function WidgetTile({
   widget,
-  result,
+  result: rawResult,
+  catalog,
+  effectiveCurrencyCode,
   onDrilldown,
   onRemove,
+  onArchive,
+  onVersion,
   placementId,
   isRemoving,
 }: WidgetTileProps) {
   const { t, lang } = useI18n();
-  const [isTableOpen, setIsTableOpen] = useState(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const transferringFocus = useRef(false);
+  const { result, mode, model, warnings, primaryMetricKey, palette, canDrilldown, drillNeedsCurrency, showTableToggle, isTableOpen, delta, toggleTable } = useWidgetTilePresentation(widget, rawResult, {
+    label: t.crmDashboards.pointLabel, value: t.crmDashboards.pointValue,
+    previousValue: t.crmDashboards.pointPreviousValue, previousKey: t.crmDashboards.pointPreviousKey,
+    target: t.crmWidgets.target, currentValue: t.crmDashboards.currentValue,
+    governedTarget: t.crmDashboardReports.wonTarget,
+    cohortConverted: t.crmDashboards.cohortConverted, cohortEligible: t.crmDashboards.cohortEligible,
+    maturity: t.crmDashboards.maturity,
+    datasets: t.crmDashboards.datasets,
+    sourceGrowth: t.crmDashboards.sourceGrowth,
+    monthlyIntake: t.crmDashboards.monthlyIntake,
+    sourceMix: t.crmDashboards.sourceMix,
+    acquisitionQuality: t.crmDashboards.acquisitionQuality,
+    leadLifecycle: t.crmDashboardReports.leadLifecycle,
+    probability: `${t.crmDashboards.winProbability} (%)`, amount: t.crmDashboards.dealValue, ageDays: t.crmDashboards.dealAgeDays, typed: t.crmDashboards.typedTable,
+  }, { catalog, lang, explicitCurrency: effectiveCurrencyCode });
 
-  const mode = result ? widgetRenderMode(widget.visualizationType, result) : "TABLE";
-  const model = result
-    ? widgetTableModel(result, {
-        label: t.crmDashboards.pointLabel,
-        value: t.crmDashboards.pointValue,
-      })
-    : { columns: [], rows: [] };
-  const warnings = result ? displayWarnings(result.warnings) : [];
-
-  const primaryMetricKey = widget.querySpec.series[0]?.metricKey ?? null;
-  const accentHue = widgetAccentHue(widget.visualizationType, primaryMetricKey);
-  const palette = swatchSurfacePalette(accentHue);
-
-  const inverseDelta =
-    Boolean((widget.displaySpec.options as Record<string, unknown> | undefined)?.inverseDelta) ||
-    isInverseMetricKey(primaryMetricKey);
-  const delta = result ? scalarDelta(result, inverseDelta) : null;
-
-  const canDrilldown =
-    result !== undefined &&
-    result.state !== "RETIRED" &&
-    result.errorCode === null &&
-    result.typedResult === null &&
-    widget.querySpec.series.length === 1;
-
-  const showTableToggle =
-    result !== undefined &&
-    result.state !== "RETIRED" &&
-    result.errorCode === null &&
-    mode !== "TABLE" &&
-    mode !== "SCALAR" &&
-    mode !== "MULTI_KPI" &&
-    mode !== "GAUGE" &&
-    mode !== "ALERT_LIST" &&
-    mode !== "ACTIVITY_FEED" &&
-    model.rows.length > 0;
-
+  const title = widgetDisplayTitle(widget.name, widget.displaySpec);
+  const monthlyIntake = readMonthlyIntake(result);
+  const sourceMix = readSourceMix(result);
+  const table = showTableToggle && isTableOpen ? <WidgetDataTable model={model} caption={title}
+    onDrilldown={canDrilldown ? (pointKey, label) => onDrilldown(widget, pointKey, label) : undefined}
+    drilldownLabel={t.crmDashboards.drilldown} /> : null;
+  const tableBesideChart = Boolean((monthlyIntake || sourceMix) && table && mode !== "TABLE");
+  const chartTableLayout = monthlyIntake
+    ? "grid min-w-0 gap-3 @3xl:grid-cols-[minmax(0,2fr)_minmax(14rem,1fr)]"
+    : "grid min-w-0 gap-3 @3xl:grid-cols-2";
+  const subtitle = widgetDisplaySubtitle(widget.displaySpec);
+  const showDelta = widgetOption(widget.displaySpec, "showDelta", true);
+  const sampleCaption = result && mode !== "MULTI_KPI" && !result.errorCode && (result.state === "READY" || result.state === "EMPTY")
+    ? conversionSampleCaption(result.details, t.crmDashboards.conversionSample, lang) : undefined;
   return (
     <Card className="flex h-full flex-col overflow-hidden p-0">
-      <div className={`h-1 w-full ${palette.dot}`} aria-hidden="true" />
+      <div className={`h-1 w-full ${palette.dot}`} style={{ backgroundColor: widgetColor(widget.displaySpec.color) }} aria-hidden="true" />
       <div className="flex flex-1 flex-col gap-2.5 p-3.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -156,7 +115,7 @@ export function WidgetTile({
                 metricKey={primaryMetricKey}
               />
             </span>
-            <h3 className="truncate text-sm font-semibold text-foreground">{widget.name}</h3>
+            <div className="min-w-0"><h3 className="truncate text-sm font-semibold text-foreground">{title}</h3>{subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}</div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {showTableToggle ? (
@@ -167,7 +126,7 @@ export function WidgetTile({
                   isTableOpen ? t.crmDashboards.hideDataTable : t.crmDashboards.showDataTable
                 }
                 aria-pressed={isTableOpen}
-                onClick={() => setIsTableOpen((prev) => !prev)}
+                onClick={toggleTable}
               >
                 <Table2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
               </Button>
@@ -183,14 +142,47 @@ export function WidgetTile({
                 <Trash2 className="size-4 text-destructive" aria-hidden="true" />
               </Button>
             ) : null}
+            {(onVersion || onArchive) && <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild><Button ref={menuTrigger} variant="ghost" size="sm" aria-label={formatTemplate(t.crmWidgets.governance.actions, { name: title })}>
+                <Ellipsis className="size-4 text-muted-foreground" aria-hidden="true" />
+              </Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onCloseAutoFocus={(event) => {
+                if (transferringFocus.current) event.preventDefault();
+                transferringFocus.current = false;
+              }}>
+              {onVersion && <DropdownMenuItem onSelect={() => { transferringFocus.current = onVersion(title, menuTrigger.current); }}>
+                <GitBranch className="size-4" aria-hidden="true" />{t.crmDashboards.placementVersion.title}
+              </DropdownMenuItem>}
+              {onArchive && <DropdownMenuItem onSelect={() => { transferringFocus.current = onArchive(menuTrigger.current); }}>
+                <Archive className="size-4" aria-hidden="true" />{t.crmWidgets.governance.archive}
+              </DropdownMenuItem>}
+              </DropdownMenuContent>
+            </DropdownMenu>}
           </div>
         </div>
 
+        <WidgetPresentationNotice visualizationType={mode === "TABLE" ? "TABLE" : widget.visualizationType} displaySpec={widget.displaySpec} querySpec={widget.querySpec} unit={result?.unit} />
+        <WidgetPeriodNote query={widget.querySpec} result={result} />
+        {monthlyIntake && <WidgetMonthlyIntakeSummary data={monthlyIntake} />}
+        {result?.partialAccess && <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.partialAccessNotice}</p>}
+        {!!result?.ignoredFilters?.length && <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.ignoredFiltersNotice}</p>}
+        {result && !result.errorCode && !result.governedTarget && mode === "TABLE" && widget.visualizationType !== "TABLE" && <p role="note" className="text-xs text-muted-foreground">{t.crmWidgets.review.tableFallback}</p>}
+        {result && !result.errorCode && showTableToggle && hasPointComparison(result) && !plotsPointComparison(mode) && <p role="note" className="text-xs text-muted-foreground">{t.crmWidgets.review.comparisonTable}</p>}
+        {result && !result.errorCode && result.state === "READY" && <WidgetCohortMaturitySummary details={result.details} />}
+        {result && !result.errorCode && (result.state === "READY" || result.state === "EMPTY") && <WidgetDatasetComparisonSummary details={result.details} />}
+        {result && !result.errorCode && (result.state === "READY" || result.state === "EMPTY") && <WidgetSourceGrowthSummary result={result} />}
+        {result && <WidgetSourceMixSummary result={result} />}
+        {result && <WidgetAcquisitionQualitySummary result={result} />}
+        {result && <WidgetLeadLifecycleNote result={result} />}
         {result === undefined ? (
           <p className="text-xs text-muted-foreground">{t.crmDashboards.widgetNotExecuted}</p>
         ) : result.state === "RETIRED" ? (
           <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.metricRetired}</p>
-        ) : result.errorCode !== null ? (
+        ) : result.governedTarget ? (
+          <GovernedTargetWidgetView visualizationType={widget.visualizationType} result={result} label={title} displaySpec={widget.displaySpec} />
+        ) : result.state === "UNAVAILABLE" ? (
+          <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.errors[result.errorCode ?? ""] ?? t.crmDashboards.widgetDataUnavailable}</p>
+        ) : result.errorCode !== null || result.state === "FAILED" || result.state === "DEADLINE_EXCEEDED" ? (
           <div
             role="note"
             className="flex flex-col gap-1 rounded-sm border border-border bg-muted p-2.5"
@@ -200,85 +192,80 @@ export function WidgetTile({
               {t.crmDashboards.widgetFailed}
             </p>
             <p className="text-2xs text-muted-foreground">
-              {t.crmDashboards.widgetErrors[result.errorCode] ?? t.crmDashboards.widgetFailedGeneric}
+              {t.crmDashboards.widgetErrors[result.errorCode ?? ""] ?? t.crmDashboards.widgetFailedGeneric}
             </p>
           </div>
+        ) : result.state === "EMPTY" && isLifecycleWidget(result) ? (
+          <p className="text-xs text-muted-foreground">{t.crmDashboardReports.leadLifecycle.empty}</p>
         ) : mode === "SCALAR" && result.value !== null ? (
           <div className="flex flex-1 flex-col justify-between gap-2 pt-1">
             <div className="flex flex-wrap items-baseline gap-2">
-              <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">
-                {formatMetricValue(result.value, result.unit, result.currency, lang)}
+              <p className="text-2xl font-semibold tracking-tight text-foreground tabular-nums" style={{ color: widgetColor(widget.displaySpec.color) }}>
+                {formatWidgetValue(result.value, result.unit, result.currency, lang, widget.displaySpec)}
               </p>
-              {delta ? (
+              {showDelta && delta ? (
                 <Badge tone={delta.tone} className="tabular-nums">
                   {`${delta.sign === "up" ? "+" : ""}${formatNumber(delta.deltaPercent, lang, {
                     style: "unit",
                     unit: "percent",
                     maximumFractionDigits: 1,
-                  })} (${formatMetricValue(result.previousValue ?? 0, result.unit, result.currency, lang)})`}
+                  })} ${t.crmDashboards.relativeChange} (${formatWidgetValue(result.previousValue ?? 0, result.unit, result.currency, lang, widget.displaySpec)})`}
                 </Badge>
-              ) : result.previousValue !== null ? (
+              ) : showDelta && result.previousValue !== null ? (
                 <span className="text-2xs text-muted-foreground tabular-nums">
                   {formatTemplate(t.crmDashboards.previousValue, {
-                    value: formatMetricValue(result.previousValue, result.unit, result.currency, lang),
+                    value: formatWidgetValue(result.previousValue, result.unit, result.currency, lang, widget.displaySpec),
                   })}
                 </span>
               ) : null}
             </div>
-            {result.target !== null ? (
-              <Progress
+            {result.target !== null && result.target > 0 ? (
+              <div className="space-y-1"><p className="text-xs" style={{ color: widgetColor(widget.displaySpec.targetColor) }}>{formatTemplate(t.crmDashboards.targetOf, { target: formatWidgetValue(result.target, result.unit, result.currency, lang, widget.displaySpec) })}</p><TargetGaugeChart variant="progress" compact
                 value={result.value}
-                max={result.target}
+                target={result.target}
                 label={t.crmDashboards.targetProgress}
-                valueText={formatTemplate(t.crmDashboards.targetOf, {
-                  target: formatNumber(result.target, lang, { maximumFractionDigits: 2 }),
+                summary={t.crmDashboards.chartExactTable}
+                valueLabel={formatWidgetValue(result.value, result.unit, result.currency, lang, widget.displaySpec)}
+                targetLabel={formatTemplate(t.crmDashboards.targetOf, {
+                  target: formatWidgetValue(result.target, result.unit, result.currency, lang, widget.displaySpec),
                 })}
-              />
+                formatAxis={(value) => formatWidgetValue(value, result.unit, result.currency, lang, widget.displaySpec)}
+                valueColor={widgetColor(widget.displaySpec.color)} targetColor={widgetColor(widget.displaySpec.targetColor)}
+              /></div>
             ) : null}
           </div>
         ) : mode === "MULTI_KPI" ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {primarySeries(result).map((seriesEntry) => {
-              const pointVal = seriesEntry.points[0]?.value ?? 0;
-              return (
-                <StatCard
-                  key={seriesEntry.key}
-                  label={seriesEntry.label}
-                  value={formatMetricValue(
-                    pointVal,
-                    seriesEntry.unit,
-                    seriesEntry.currency ?? result.currency,
-                    lang,
-                  )}
-                />
-              );
-            })}
-          </div>
+          <WidgetScalarSeries result={result} displaySpec={widget.displaySpec} />
         ) : mode === "TABLE" || mode === "SCALAR" ? (
-          <WidgetDataTable
+          <div className="flex flex-col gap-2">
+            {result.value !== null && <p className="text-xl font-semibold text-foreground tabular-nums">{formatWidgetValue(result.value, result.unit, result.currency, lang, {})}</p>}
+            {result.target !== null && <p className="text-xs text-muted-foreground" style={{ color: widgetColor(widget.displaySpec.targetColor) }}>{formatTemplate(t.crmDashboards.targetOf, { target: formatWidgetValue(result.target, result.unit, result.currency, lang, {}) })}</p>}
+            {result.previousValue !== null && <p className="text-xs text-muted-foreground">{formatTemplate(t.crmDashboards.previousValue, { value: formatWidgetValue(result.previousValue, result.unit, result.currency, lang, {}) })}</p>}
+            {(model.rows.length > 0 || result.value === null) && <WidgetDataTable
             model={model}
-            caption={widget.name}
+            caption={title}
             onDrilldown={
               canDrilldown
                 ? (pointKey, label) => onDrilldown(widget, pointKey, label)
                 : undefined
             }
             drilldownLabel={t.crmDashboards.drilldown}
-          />
+            />}
+          </div>
         ) : (
-          <WidgetChart
-            mode={mode}
-            visualizationType={widget.visualizationType}
-            result={result}
-            label={widget.name}
-            onDrilldown={
-              canDrilldown
-                ? (pointKey, pointLabel) => onDrilldown(widget, pointKey, pointLabel)
-                : undefined
-            }
-          />
+          <div className={tableBesideChart ? "@container" : "contents"}>
+            <div className={tableBesideChart ? chartTableLayout : "contents"}>
+              <WidgetChart mode={mode} visualizationType={widget.visualizationType} result={result} label={title}
+                displaySpec={widget.displaySpec} querySpec={widget.querySpec}
+                onDrilldown={canDrilldown ? (pointKey, pointLabel) => onDrilldown(widget, pointKey, pointLabel) : undefined} />
+              {tableBesideChart && table}
+            </div>
+          </div>
         )}
 
+        {sampleCaption && <p className="text-xs text-muted-foreground">{sampleCaption}</p>}
+        <WidgetCohortObservation result={result} />
+        {drillNeedsCurrency && <p role="note" className="text-2xs text-muted-foreground">{t.crmDashboards.drillCurrencyRequired}</p>}
         {warnings.length > 0 ? (
           <DegradedBanner
             message={warnings
@@ -287,20 +274,7 @@ export function WidgetTile({
           />
         ) : null}
 
-        {showTableToggle ? (
-          <div className={isTableOpen ? "mt-2 border-t border-border pt-2" : "sr-only"}>
-            <WidgetDataTable
-              model={model}
-              caption={widget.name}
-              onDrilldown={
-                canDrilldown
-                  ? (pointKey, label) => onDrilldown(widget, pointKey, label)
-                  : undefined
-              }
-              drilldownLabel={t.crmDashboards.drilldown}
-            />
-          </div>
-        ) : null}
+        {table && !tableBesideChart && <div className="mt-2 border-t border-border pt-2">{table}</div>}
       </div>
     </Card>
   );

@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "../primitives/DropdownMenu";
 import type { NavItem, NavSection } from "./nav-config";
+import { crmSettingsDestination } from "./crm-settings-navigation";
 
 export interface NavMenuProps {
   section: NavSection;
@@ -65,6 +66,19 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
   const { t } = useI18n();
   const label = (item: NavItem) => t.nav[item.labelKey as keyof typeof t.nav] as string;
   const isActive = section.items.some((item) => item.id === activeItemId);
+
+  if (section.globalNavDisplay === "settings") {
+    const destination = crmSettingsDestination(section.items);
+    const Icon = section.icon ?? destination?.icon;
+    if (!destination) return null;
+    return (
+      <Link href={destination.href} aria-current={isActive ? "page" : undefined}
+        className={navTabClass(isActive)}>
+        {Icon && <span className={navTabIconBoxClass(isActive)}><Icon className="size-3.5 shrink-0" aria-hidden="true" /></span>}
+        <span className="whitespace-nowrap text-tab">{t.nav[section.menuLabelKey as keyof typeof t.nav]}</span>
+      </Link>
+    );
+  }
 
   if (section.globalNavDisplay === "items") {
     return (

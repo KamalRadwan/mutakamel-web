@@ -56,14 +56,12 @@ vi.mock("./hooks/useLeads", () => ({
 }));
 vi.mock("./hooks/useLeadMutations", () => ({ useLeadBulkOwnerOptions: () => ({ owners: [], isLoading: false, failed: false }) }));
 vi.mock("./hooks/useLeadDocumentCounts", () => ({ useLeadDocumentCounts: () => ({ countsByParty: new Map() }) }));
-vi.mock("./hooks/useLeadKpis", () => ({ useLeadKpis: () => ({}) }));
 vi.mock("./hooks/useLeadCardWrites", () => ({ useLeadBulkDelete: () => ({ eligibleCount: 0 }) }));
 vi.mock("@/components/activities/ActivitiesWorkspaceLink", () => ({ ActivitiesWorkspaceLink: () => null }));
 vi.mock("@/components/activities/ActivityModal", () => ({ ActivityModal: () => null }));
 vi.mock("./components/CreateLeadsModal", () => ({ CreateLeadsModal: () => null }));
 vi.mock("./components/DeleteLeadsConfirmModal", () => ({ DeleteLeadsConfirmModal: () => null }));
 vi.mock("./components/LeadBulkActionsBar", () => ({ LeadBulkActionsBar: () => <p>Bulk writes</p> }));
-vi.mock("./components/LeadKpiStrip", () => ({ LeadKpiStrip: () => null }));
 vi.mock("./components/LeadQuickEditModal", () => ({ LeadQuickEditModal: () => null }));
 vi.mock("./components/LeadStageFunnelBar", () => ({ LeadStageFunnelBar: () => null }));
 vi.mock("./components/LeadSearchBar", () => ({ LeadSearchBar: () => null }));

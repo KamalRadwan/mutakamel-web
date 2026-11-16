@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { ar } from "@/i18n/dictionaries/ar";
+import { loadServerLanguage } from "@/i18n/server";
+import { TradeLayoutChrome } from "./TradeLayoutChrome";
 import { TradeScopeProvider } from "./useTradeScope";
-import { TradeScopeBar } from "./TradeScopeBar";
 
 
-// Segment-level title. It flows through the root layout's
-// `title.template`, so the brand stays the suffix. Arabic for the same
-// reason the root default is — see src/app/layout.tsx.
-export const metadata: Metadata = { title: ar.nav.appTrade };
+export async function generateMetadata(): Promise<Metadata> {
+  const { dictionary: t } = await loadServerLanguage();
+  return { title: t.nav.appTrade };
+}
 
 // The operating context is mounted for the whole route group, not per screen:
 // Trade resolves a route's scope target — and therefore which permission is
@@ -17,10 +17,7 @@ export const metadata: Metadata = { title: ar.nav.appTrade };
 export default function TradeLayout({ children }: { children: React.ReactNode }) {
   return (
     <TradeScopeProvider>
-      <div className="space-y-3">
-        <TradeScopeBar />
-        {children}
-      </div>
+      <TradeLayoutChrome>{children}</TradeLayoutChrome>
     </TradeScopeProvider>
   );
 }

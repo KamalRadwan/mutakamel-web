@@ -102,7 +102,8 @@ export function buildShareRequest(input: {
   const expiresAt = input.expiresAt.trim();
   if (expiresAt.length > 0) {
     const parsed = new Date(expiresAt);
-    if (!Number.isFinite(parsed.getTime())) throw new Error("CRM_SHARE_EXPIRY_INVALID");
+    // DashboardSharesService.share rejects an expiry at or before the current instant.
+    if (!Number.isFinite(parsed.getTime()) || parsed.getTime() <= Date.now()) throw new Error("CRM_SHARE_EXPIRY_INVALID");
     body.expiresAt = parsed.toISOString();
   }
   return body;
@@ -121,6 +122,7 @@ function parseShareRecord(payload: unknown): ShareRecord {
     !isSubjectType(source.subjectType) ||
     !isUUIDv7(source.subjectId) ||
     !isAccessLevel(source.accessLevel) ||
+    (source.expiresAt !== undefined && source.expiresAt !== null && !timestamp(source.expiresAt)) ||
     !timestamp(source.createdAt)
   ) {
     invalidResponse("share");

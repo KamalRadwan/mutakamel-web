@@ -1,14 +1,14 @@
 # Security Headers
 
-Status: **App half built** (MASTER-PLAN 13.1) · **Nginx half still to configure**
+Status: **CSP and portal-edge static headers implemented** · live verification pending
 
 Written: **2026-08-28** · CSP built and verified: **2026-08-31**
 
 Trusted-device cookie source verification: **2026-10-17**
 
-Cookie and ingress policy source verification: **2026-10-17** (D-041).
+Cookie and ingress policy source verification: **2026-10-30** (D-041, AUDIT29V-TP-6).
 
-Ingress: **Nginx Proxy Manager**
+Ingress: **portal-edge**, versioned in `backend/mutakamel-apps/portal-edge/nginx.conf`.
 
 Resolves [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) Q1.
 
@@ -16,11 +16,10 @@ Resolves [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) Q1.
 
 | Header | Owner | Why |
 | --- | --- | --- |
-| `Strict-Transport-Security` | **NPM, required in staging/production** | Emit on HTTPS responses, including errors; omit for development/test HTTP use |
-| `X-Content-Type-Options` | **NPM** | Static, transport-level |
-| `X-Frame-Options` | **NPM** | Static, transport-level |
-| `Referrer-Policy` | **NPM** | Static, transport-level |
-| `Permissions-Policy` | **NPM** | Static, transport-level |
+| `Strict-Transport-Security` | **portal-edge, HTTPS profile only** | `max-age=31536000`, including errors; omitted on HTTP |
+| `X-Content-Type-Options` | **portal-edge tenant server** | `nosniff`, including errors |
+| `Referrer-Policy` | **portal-edge tenant server** | `same-origin`, including errors |
+| `Permissions-Policy` | **portal-edge tenant server** | `camera=(), microphone=(), geolocation=(), payment=()`, including errors |
 | **`Content-Security-Policy`** | **the app** | **Requires a per-request nonce. nginx cannot generate one** |
 
 That last row is the whole reason this is a split and not a one-line nginx
@@ -42,68 +41,32 @@ Inline scripts need one of:
 A static nginx `add_header` cannot produce a fresh nonce per request. So CSP is
 generated in `src/proxy.ts`, where a nonce can be minted and handed to Next.
 
-**Do not also set CSP in NPM.** Two `Content-Security-Policy` headers are
+**Do not also set CSP in portal-edge or another ingress.** Two `Content-Security-Policy` headers are
 intersected by the browser, and the strictest wins — you get a policy nobody
 wrote, and the app breaks in ways that look random.
 
-## Nginx Proxy Manager configuration
+## Versioned portal-edge configuration
 
-Per proxy host, **Advanced → Custom Nginx Configuration**:
+The tenant `server` block (`listen 5002`) owns the static headers above with
+`add_header ... always`. Every tenant location inherits them, including
+`/__edge/health`, `/api/`, realtime and portal routes; edge-generated and
+upstream errors receive them too. The admin server has its own header policy
+in Next and is outside this tenant configuration.
 
-```nginx
-# Transport-level headers. CSP is deliberately absent — the app sets it,
-# because it needs a per-request nonce.
-#
-# `always` is required: without it nginx drops the header on 4xx/5xx
-# responses, so an error page ships unprotected.
+The HTTP profile emits no HSTS: the `http`-level `$scheme` map returns an empty
+`$tenant_hsts`, which nginx omits. A TLS listener using this tenant server's
+headers gets `max-age=31536000`. This uses nginx's actual transport, never a
+caller-controlled `X-Forwarded-Proto`. The checked-in local listener is HTTP;
+staging/production must configure TLS certificates and HTTP-to-HTTPS redirects
+(D-041). If TLS terminates at a separate public ingress, that HTTPS profile
+must emit HSTS there; an HTTP hop to portal-edge cannot establish TLS itself.
+Do not emit duplicate HSTS or CSP at another hop.
 
-# In the HTTPS proxy host; HTTP-to-HTTPS redirect is configured separately.
-add_header Strict-Transport-Security "max-age=31536000" always;
-add_header X-Content-Type-Options    "nosniff" always;
-add_header X-Frame-Options           "DENY" always;
-add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
-add_header Permissions-Policy        "camera=(), microphone=(), geolocation=(), payment=()" always;
-
-# The original Host must survive. Tenant host admission reads it server-side
-# and fails closed on a host it cannot verify — see architecture/routing.md.
-proxy_set_header Host              $host;
-proxy_set_header X-Real-IP         $remote_addr;
-proxy_set_header X-Forwarded-For   $remote_addr;
-proxy_set_header X-Forwarded-Proto $scheme;
-```
-
-### Three NPM-specific traps
-
-1. **`add_header` does not merge — it replaces.** If any `location` block in
-   your config adds a header, every header inherited from the server block is
-   dropped inside that block. NPM generates `location` blocks for you. If a
-   header goes missing, this is why: re-declare the full set inside that
-   location.
-
-2. **Enable HSTS for staging/production HTTPS.** Use either NPM's toggle or
-   the explicit header above, with one effective policy. Preload is a separate
-   operational choice. Omit HSTS only for development/test HTTP use; cached
-   policies can upgrade a local URL before it reaches the application.
-
-3. **NPM's "Block Common Exploits" toggle is fine to leave on**, but it is not
-   a substitute for any header above. It filters a small set of known-bad
-   request patterns.
-
-### SSL tab
-
-- **SSL certificate** — configure a valid certificate for every public host.
-- **Force SSL** — on in staging/production (D-041).
-- **HTTP/2 Support** — available on the TLS listener.
-- **HSTS Enabled** — on in staging/production, unless the explicit header above
-  owns the policy. Do not emit duplicate HSTS headers.
-
-At the public ingress overwrite incoming forwarding headers with the scheme
-and client address nginx actually sees, as above. Preserve the tenant Host,
-cookies, Origin and CSRF headers. Set Gateway `TRUST_PROXY` to only nginx's
-actual peer IPs or narrow CIDRs, and restrict direct Gateway access to ingress.
-Gateway passes this allowlist to Express `trust proxy`, which ignores
-`X-Forwarded-Proto`/`X-Forwarded-For` from untrusted peers. Additional proxy hops
-must sanitize headers and be explicitly represented in that allowlist.
+Do not add a location-level `add_header` without repeating the full static
+header set: nginx otherwise drops server-level header inheritance there.
+Preserve the existing Host and forwarding-header sanitization in the config;
+tenant admission uses the original public Host. See the
+[portal runtime runbook](../../../docs/operations/portal-runtime.md) for rollout.
 
 ## The app's CSP — built
 
@@ -169,11 +132,16 @@ Six values are deliberate and worth not "simplifying":
   through `element.style.setProperty`, a CSSOM mutation `style-src` never sees.
 - **`img-src 'self'`** — the branding logo and icon are same-origin paths
   (`PUBLIC_BRANDING_LOGO_PATH`, `PUBLIC_BRANDING_ICON_PATH`), never a CDN URL.
-- **`frame-ancestors 'none'`** — this is the modern `X-Frame-Options`.
-  Both are set; `frame-ancestors` wins where supported.
+- **`frame-ancestors 'none'`** — the app's CSP prevents framing; portal-edge
+  does not add a separate `X-Frame-Options` policy.
+- **`frame-src 'self' blob:`** — quotation sample HTML is sandboxed and actual
+  PDF previews use bounded, authenticated same-origin artifact reads followed
+  by revocable Blob URLs. Storage-signed HTTP(S) URLs are download actions,
+  never iframe origins. No generic HTTP(S) frame origin is admitted and
+  `object-src 'none'` remains in force (quotation suite, 2026-11-04).
 
-`upgrade-insecure-requests` is deliberately **absent**: NPM forces SSL and sets
-HSTS, the app loads no external subresource, and including it would break a
+`upgrade-insecure-requests` is deliberately **absent**: the HTTPS ingress profile
+owns TLS redirects and HSTS, the app loads no external subresource, and including it would break a
 plain-HTTP `next start` used to verify the policy.
 
 ### Where the nonce goes, and the one way to get it wrong
@@ -219,7 +187,7 @@ passed through untouched and carries the header.
 
 CSP breaks things silently. The soak is a **flag**, not a code edit:
 
-1. Ship the NPM headers first. They are low-risk and independently useful.
+1. Ship and reload the portal-edge tenant headers first.
 2. Set `TENANT_CSP_REPORT_ONLY=1`. The app then sends
    `Content-Security-Policy-Report-Only` and nothing else — while still
    stamping nonces exactly as it would when enforcing, so flipping the flag
@@ -233,12 +201,16 @@ CSP breaks things silently. The soak is a **flag**, not a code edit:
 ## Verification
 
 ```bash
-curl -sI https://<tenant-host>/ | grep -iE "strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy|content-security"
+curl -sI http://<tenant-host>:5002/login
+curl -sI http://<tenant-host>:5002/__header-check-not-found
+curl -sI http://<tenant-host>:5002/__edge/health
+# Repeat against https://<tenant-host>/login for the HTTPS profile.
 ```
 
-- [ ] All five NPM headers present on a **200**
-- [ ] All five still present on a **404** (proves `always` is working)
-- [ ] Exactly **one** `Content-Security-Policy` header, from the app
+- [ ] Lead runs `nginx -t` in portal-edge, then reloads the edge
+- [ ] `nosniff`, `Referrer-Policy: same-origin` and the documented Permissions-Policy present on portal responses, **404**, and edge **204**
+- [ ] HSTS absent on HTTP; `max-age=31536000` present on HTTPS, including errors
+- [ ] Exactly **one** `Content-Security-Policy` header on documents, from `src/proxy.ts` (health/API/static paths do not require a document CSP)
 - [ ] `Host` reaches the app unmodified — host admission still succeeds
 - [ ] No CSP violations in the console across both themes and both languages
 

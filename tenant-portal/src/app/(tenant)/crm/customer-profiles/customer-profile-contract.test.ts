@@ -63,6 +63,35 @@ describe("customer profile detail contract", () => {
     expect(parsed.displayName).toBe("Acme Retail");
   });
 
+  it("retains the individual person's name parts and honorific from the detail response", () => {
+    const parsed = parseCustomerProfileDetailResponse({
+      ...profile,
+      profileType: "INDIVIDUAL",
+      displayName: "Dr Mona Nour Al Saleh",
+      firstName: "Mona Nour",
+      lastName: "Al Saleh",
+      honorificTitle: "Dr",
+      jobTitle: "Consultant",
+    });
+    expect(parsed).toMatchObject({
+      firstName: "Mona Nour",
+      lastName: "Al Saleh",
+      honorificTitle: "Dr",
+      jobTitle: "Consultant",
+    });
+  });
+
+  it.each([undefined, null, "", 42])("normalizes absent or non-text person fields (%j) to null", (value) => {
+    const parsed = parseCustomerProfileDetailResponse({
+      ...profile, firstName: value, lastName: value, honorificTitle: value, jobTitle: value,
+    });
+    expect(parsed).toMatchObject({ firstName: null, lastName: null, honorificTitle: null, jobTitle: null });
+  });
+
+  it("accepts a response from before individual job titles were released", () => {
+    expect(parseCustomerProfileDetailResponse(profile).jobTitle).toBeNull();
+  });
+
   it("rejects an unknown status and a missing display name", () => {
     expect(() =>
       parseCustomerProfileDetailResponse({ ...profile, status: "ARCHIVED" }),

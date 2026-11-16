@@ -44,6 +44,74 @@ describe("commercial document scoped lists", () => {
   });
   afterEach(cleanup);
 
+  it.each(["REJECTED", "CANCELLED", "EXPIRED"])(
+    "requests %s from page one and keeps the server's filtered total", async (status) => {
+      vi.mocked(tradeGet).mockResolvedValue(response("initial"));
+      const { result } = renderHook(() => useTradeDocumentList("/quotations", parseItem));
+      await flushLoad();
+      act(() => result.current.setPage(3));
+      await flushLoad();
+      vi.mocked(tradeGet).mockResolvedValueOnce({
+        ...response("server match"),
+        data: { items: ["server match"], total: 26, page: 1, limit: 25 },
+      });
+      act(() => result.current.setStatus(status));
+      expect(result.current.items).toEqual([]);
+      await flushLoad();
+      const path = vi.mocked(tradeGet).mock.calls.at(-1)![0];
+      const query = new URL(path, "https://tenant.example").searchParams;
+      expect(query.get("status")).toBe(status);
+      expect(query.get("page")).toBe("1");
+      expect(result.current.items).toEqual(["server match"]);
+      expect(result.current.pageInfo).toEqual({ page: 1, limit: 25, total: 26 });
+    },
+  );
+
+  it("searches on the server and combines currency, status and party on every page", async () => {
+    vi.mocked(tradeGet).mockResolvedValue(response("server search match"));
+    const { result } = renderHook(() => useTradeDocumentList("/quotations", parseItem));
+    await flushLoad();
+    act(() => {
+      result.current.setStatus("EXPIRED");
+      result.current.setPartyId("01900100-0000-7000-8000-000000000001");
+      result.current.setSearch("  Acme & 10%  ");
+      result.current.setCurrencyCode("egp");
+    });
+    await flushLoad();
+    act(() => result.current.setPage(2));
+    await flushLoad();
+    const path = vi.mocked(tradeGet).mock.calls.at(-1)![0];
+    expect(Object.fromEntries(new URL(path, "https://tenant.example").searchParams)).toEqual({
+      page: "2", limit: "25", status: "EXPIRED",
+      partyId: "01900100-0000-7000-8000-000000000001",
+      search: "Acme & 10%", currencyCode: "EGP",
+    });
+    expect(result.current.items).toEqual(["server search match"]);
+    act(() => result.current.setCurrencyCode("E"));
+    await flushLoad();
+    expect(vi.mocked(tradeGet).mock.calls.at(-1)![0]).not.toContain("currencyCode=");
+    expect(result.current.pageInfo.page).toBe(1);
+    act(() => { result.current.setSearch(""); result.current.setCurrencyCode(""); });
+    await flushLoad();
+    expect(vi.mocked(tradeGet).mock.calls.at(-1)![0]).not.toContain("search=");
+  });
+
+  it("aborts obsolete searches and ignores their late results", async () => {
+    const older = deferred();
+    vi.mocked(tradeGet).mockResolvedValueOnce(response("initial"))
+      .mockReturnValueOnce(older.promise).mockResolvedValueOnce(response("new search"));
+    const { result } = renderHook(() => useTradeDocumentList("/quotations", parseItem));
+    await flushLoad();
+    act(() => result.current.setSearch("old"));
+    await flushLoad();
+    const signal = vi.mocked(tradeGet).mock.calls[1]?.[1]?.signal;
+    act(() => result.current.setSearch("new"));
+    await flushLoad();
+    expect(signal?.aborted).toBe(true);
+    await act(async () => older.resolve(response("late old search")));
+    expect(result.current.items).toEqual(["new search"]);
+  });
+
   it.each([{ status: 403 }, new Error("Network unavailable")])(
     "hides A synchronously and never restores it after B fails (%s)", async (error) => {
       const b = deferred();

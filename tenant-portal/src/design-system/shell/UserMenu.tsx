@@ -29,7 +29,7 @@ export function UserMenu() {
   const { t } = useI18n();
   const { user, logout } = useTenantAuth();
   const { isLoggingOut, isMenuOpen, setIsMenuOpen, handleLogoutSelect } = useUserMenuLogout(logout);
-  const avatarSrc = useProfileAvatarImage(user?.id);
+  const avatarSrc = useProfileAvatarImage(user?.id, user?.hasAvatar);
   const { density, setDensity } = useDensity();
 
   // A lookup, not a ternary chain: the zero-ternary rule exists because a
