@@ -12,7 +12,7 @@ import {
 } from "./registration-state";
 
 describe("database server registration state", () => {
-  it("uses Core's non-TLS default instead of forcing SSL", () => {
+  it("defaults to unencrypted PostgreSQL in development and tests", () => {
     expect(createDatabaseServerInitialValues().sslMode).toBe("disable");
   });
 

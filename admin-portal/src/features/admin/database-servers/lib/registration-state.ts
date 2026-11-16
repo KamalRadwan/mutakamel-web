@@ -84,7 +84,7 @@ export function createDatabaseServerInitialValues(): CreateDatabaseServerDto {
     port: 5432,
     maxTenants: 100,
     securityAdminCredentials: { username: "", password: "" },
-    sslMode: "disable",
+    sslMode: process.env.NODE_ENV === "production" ? "verify-full" : "disable",
     sslRejectUnauthorized: true,
     maintenanceDatabase: "postgres",
   };

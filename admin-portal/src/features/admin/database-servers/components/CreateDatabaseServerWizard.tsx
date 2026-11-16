@@ -65,11 +65,6 @@ const DATABASE_SERVER_REGISTRATION_COPY = {
     securityAdminPassword: "كلمة مرور مسؤول الأمان",
     username: "اسم المستخدم",
     password: "كلمة المرور",
-    localSslNoteStart: "يمكن للتطوير المحلي استخدام وضع SSL",
-    localSslNoteEnd:
-      "أما في الإنتاج، فيرفض Core الفحص قبل فتح اتصال بقاعدة البيانات ما لم يكن وضع SSL هو",
-    localSslNoteTail:
-      "مع تفعيل التحقق من الشهادة وتوفير شهادة CA صريحة.",
     generatedTitle: "يُنشأ تلقائيًا بعد التسجيل",
     applicationRoles: "أدوار التطبيقات",
     backupAccess: "وصول النسخ الاحتياطي",
@@ -165,11 +160,6 @@ const DATABASE_SERVER_REGISTRATION_COPY = {
     securityAdminPassword: "Security Admin Password",
     username: "Username",
     password: "Password",
-    localSslNoteStart: "Local development may use SSL mode",
-    localSslNoteEnd:
-      "In production, Core rejects the check before opening a database connection unless SSL mode is",
-    localSslNoteTail:
-      "certificate verification is enabled, and an explicit CA certificate is provided.",
     generatedTitle: "Generated automatically after registration",
     applicationRoles: "Application roles",
     backupAccess: "backup access",
@@ -804,11 +794,6 @@ export function CreateDatabaseServerWizard({
             }
           />
 
-          <p className="rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2 text-xs leading-5 text-warning-subtle-foreground">
-            {copy.localSslNoteStart} <strong>disable</strong>.{" "}
-            {copy.localSslNoteEnd} <strong>verify-full</strong>,{" "}
-            {copy.localSslNoteTail}
-          </p>
 
           <div className="rounded-lg border border-info/30 bg-info-subtle p-4 text-xs text-info-subtle-foreground">
             <p className="font-semibold">{copy.generatedTitle}</p>

@@ -196,7 +196,12 @@ export function DatabaseSslConfigurationFields({
       </div>
 
       <div className="space-y-3 p-3">
-        <Field id={`${idPrefix}-mode`} label={copy.sslMode} required>
+        <Field
+          id={`${idPrefix}-mode`}
+          label={copy.sslMode}
+          hint={process.env.NODE_ENV === "production" ? copy.productionModeHint : undefined}
+          required
+        >
           {({ required, ...fieldProps }) => (
             <Select value={mode} onValueChange={(value) => handleModeChange(value as DatabaseServerSslMode)} disabled={disabled} dir={dir}>
               <SelectTrigger {...fieldProps} size="sm" aria-required={required}>
@@ -319,13 +324,15 @@ const DATABASE_SSL_COPY = {
     description:
       "تبقى محتويات الشهادات داخل هذا النموذج النشط فقط، وتُرسل إلى Core كحقول كتابة فقط.",
     sslMode: "وضع SSL",
+    productionModeHint:
+      "يقبل الإنتاج تعطيل SSL أو التحقق من جهة الإصدار واسم المضيف باستخدام شهادة CA مع رفض الشهادات غير الموثوقة.",
     disable: "تعطيل SSL",
     require: "اشتراط التشفير",
     verifyCa: "التحقق من جهة إصدار الشهادة",
     verifyFull: "التحقق من الجهة واسم المضيف",
     modeHelp: {
       disable:
-        "اتصال PostgreSQL بلا تشفير. استخدمه فقط داخل شبكة تطوير محلية موثوقة.",
+        "اتصال PostgreSQL بلا تشفير. يجب أن يسمح الخادم باتصالات غير مشفّرة من Core.",
       require:
         "يشفّر الاتصال؛ وتكون شهادة CA المخصصة أو شهادة العميل لـmTLS اختيارية.",
       "verify-ca":
@@ -361,13 +368,15 @@ const DATABASE_SSL_COPY = {
     description:
       "Certificate contents stay only in this active form and are sent to Core as write-only DTO fields.",
     sslMode: "SSL mode",
+    productionModeHint:
+      "Production accepts Disable or Verify authority and hostname. Verification requires a CA certificate and rejection of untrusted certificates.",
     disable: "Disable",
     require: "Require encryption",
     verifyCa: "Verify certificate authority",
     verifyFull: "Verify authority and hostname",
     modeHelp: {
       disable:
-        "Plain PostgreSQL transport. Use only on a trusted local development network.",
+        "Unencrypted PostgreSQL connection. The server must allow unencrypted connections from Core.",
       require:
         "Encrypts transport. A custom CA or mutual-TLS client certificate is optional.",
       "verify-ca":

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateDatabaseServerWizard } from "./CreateDatabaseServerWizard";
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +14,18 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastWarning: vi.fn(),
 }));
+const scrollDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+beforeAll(() => {
+  if (!scrollDescriptor) {
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: () => {},
+    });
+  }
+});
+afterAll(() => {
+  if (!scrollDescriptor) Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+});
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
@@ -56,6 +68,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 function enterValidConnectionAndCredentials(password = "secret") {
@@ -75,6 +88,36 @@ function enterValidConnectionAndCredentials(password = "secret") {
 }
 
 describe("CreateDatabaseServerWizard", () => {
+  it("submits explicit Disable for a production diagnostic and registration", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    mocks.createServer.mockResolvedValue({
+      id: "db-server",
+      credentialBootstrap: { status: "READY" },
+    });
+    render(<CreateDatabaseServerWizard />);
+    enterValidConnectionAndCredentials();
+
+    const mode = screen.getByRole("combobox", { name: "SSL mode" });
+    expect(mode).toHaveTextContent("Verify authority and hostname");
+    fireEvent.keyDown(mode, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("option", { name: "Disable" }));
+    expect(mode).toHaveTextContent("Disable");
+
+    fireEvent.click(screen.getByRole("button", { name: "Test (Optional)" }));
+    await screen.findByText(
+      "Optional connectivity diagnostic passed. Register still performs the authoritative validation.",
+    );
+    expect(mocks.checkConnectivity.mock.calls[0][0]).toMatchObject({
+      sslMode: "disable",
+    });
+    expect(mocks.checkConnectivity.mock.calls[0][0].sslConfig).toBeUndefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Register Server" }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalled());
+    expect(mocks.createServer.mock.calls[0][0]).toMatchObject({ sslMode: "disable" });
+    expect(mocks.createServer.mock.calls[0][0].sslConfig).toBeUndefined();
+  });
+
   it("wires Core DTO bounds into the create inputs and eligibility flow", async () => {
     render(<CreateDatabaseServerWizard />);
 
