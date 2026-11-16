@@ -11,7 +11,6 @@ tenant-portal/**
 !tenant-portal/Dockerfile.dockerignore
 !tenant-portal/package.json
 !tenant-portal/next.config.ts
-!tenant-portal/next-env.d.ts
 !tenant-portal/tsconfig.json
 !tenant-portal/postcss.config.mjs
 !tenant-portal/src/

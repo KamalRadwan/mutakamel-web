@@ -11,7 +11,6 @@ admin-portal/**
 !admin-portal/Dockerfile.dockerignore
 !admin-portal/package.json
 !admin-portal/next.config.ts
-!admin-portal/next-env.d.ts
 !admin-portal/tsconfig.json
 !admin-portal/postcss.config.mjs
 !admin-portal/src/

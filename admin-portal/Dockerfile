@@ -26,7 +26,7 @@ COPY packages/webphone/package.json ./packages/webphone/package.json
 RUN --mount=type=cache,id=mutakamel-pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm --filter admin-portal... install --frozen-lockfile --store-dir=/pnpm/store
 
-COPY admin-portal/next.config.ts admin-portal/next-env.d.ts admin-portal/tsconfig.json admin-portal/postcss.config.mjs ./admin-portal/
+COPY admin-portal/next.config.ts admin-portal/tsconfig.json admin-portal/postcss.config.mjs ./admin-portal/
 COPY admin-portal/src ./admin-portal/src
 COPY packages/identifiers/src ./packages/identifiers/src
 COPY packages/webphone/src ./packages/webphone/src
@@ -36,7 +36,7 @@ FROM deps AS dev
 ENV NODE_ENV=development
 
 # Next dev creates .next and may update its generated types and TS config.
-RUN chown node:node /app /app/admin-portal /app/admin-portal/next-env.d.ts /app/admin-portal/tsconfig.json
+RUN chown node:node /app /app/admin-portal /app/admin-portal/tsconfig.json
 
 USER node
 WORKDIR /app/admin-portal

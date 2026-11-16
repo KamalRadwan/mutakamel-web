@@ -36,7 +36,7 @@ RUN --mount=type=secret,id=npm_token,target=/run/secrets/npm_token \
     && pnpm --filter tenant-portal... install --frozen-lockfile --store-dir=/pnpm/store \
     && rm -f /root/.npmrc
 
-COPY tenant-portal/next.config.ts tenant-portal/next-env.d.ts tenant-portal/tsconfig.json tenant-portal/postcss.config.mjs ./tenant-portal/
+COPY tenant-portal/next.config.ts tenant-portal/tsconfig.json tenant-portal/postcss.config.mjs ./tenant-portal/
 COPY tenant-portal/src ./tenant-portal/src
 COPY packages/identifiers/src ./packages/identifiers/src
 
@@ -45,7 +45,7 @@ FROM deps AS dev
 ENV NODE_ENV=development
 
 # Next dev creates .next and may update its generated types and TS config.
-RUN chown node:node /app /app/tenant-portal /app/tenant-portal/next-env.d.ts /app/tenant-portal/tsconfig.json
+RUN chown node:node /app /app/tenant-portal /app/tenant-portal/tsconfig.json
 
 USER node
 WORKDIR /app/tenant-portal
