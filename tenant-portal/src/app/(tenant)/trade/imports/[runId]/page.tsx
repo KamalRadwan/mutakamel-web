@@ -42,6 +42,7 @@ export default function ImportRunPage({
   const {
     lang,
     canExecute,
+    canExecuteRun,
     isScopeResolved,
     run,
     rows,
@@ -119,7 +120,7 @@ export default function ImportRunPage({
               </Button>
               <Button size="sm"
                 variant="outline"
-                disabled={!canExecute || isExecuting}
+                disabled={!canExecuteRun || isExecuting}
                 loading={isExecuting}
                 onClick={() => void execute()}
               >

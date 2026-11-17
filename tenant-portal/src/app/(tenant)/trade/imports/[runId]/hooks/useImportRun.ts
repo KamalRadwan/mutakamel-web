@@ -50,6 +50,11 @@ export function useImportRun(runId: string) {
     scope.isTenantOwner,
     IMPORT_EXECUTE_PERMISSION,
   );
+  const canExecuteRun =
+    canExecute &&
+    run?.status === "PREVIEWED" &&
+    run.validCount > 0 &&
+    run.invalidCount === 0;
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -117,7 +122,7 @@ export function useImportRun(runId: string) {
   }, [load]);
 
   const execute = useCallback(async (): Promise<void> => {
-    if (!canExecute || !run || isExecuting) return;
+    if (!canExecuteRun || !run || isExecuting) return;
     setIsExecuting(true);
     setActionError(null);
     try {
@@ -137,12 +142,13 @@ export function useImportRun(runId: string) {
       setIsExecuting(false);
       await load();
     }
-  }, [canExecute, run, isExecuting, scope.headers, toast, t, load]);
+  }, [canExecuteRun, run, isExecuting, scope.headers, toast, t, load]);
 
   return {
     t,
     lang,
     canExecute,
+    canExecuteRun,
     isScopeResolved: scope.isResolved,
     run,
     rows,
