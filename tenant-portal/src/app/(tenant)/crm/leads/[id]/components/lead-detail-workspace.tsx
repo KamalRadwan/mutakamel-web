@@ -321,9 +321,11 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                       }
                       aria-label={formatTemplate(t.crmLeads.card.rateStars, {
                         count: starIndex,
+                        max: 3,
                       })}
                       title={formatTemplate(t.crmLeads.card.rateStars, {
                         count: starIndex,
+                        max: 3,
                       })}
                       className="h-auto rounded p-0.5 transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100"
                     >
