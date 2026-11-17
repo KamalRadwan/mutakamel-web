@@ -37,8 +37,10 @@ All four are fixed in the foundation phase, before any screen is converted.
 Direction is **derived** from language and never stored separately:
 `ar → rtl`, `en → ltr`.
 
-Defaults for a first-ever visitor: **Arabic, RTL, system theme, standard
-density.** Arabic is a product decision, not a fallback. Standard is the
+Defaults for a first-ever visitor (updated **2026-11-17**): **English, LTR, light theme, standard
+density.** Saved language and theme choices still take precedence, including an
+explicit system theme. Defaults are not persisted as choices, so account
+preference hydration remains available. Standard is the
 decision the admin-portal token port made — `--ui-scale` moved from 0.9 to 1,
 so the shipped default is no longer compact. See
 [DECISIONS.md](../build/DECISIONS.md).
@@ -86,7 +88,7 @@ makes rows and bars taller, not letters bigger.
 ## No flash — the mechanism
 
 Language and direction resolve on the server from the `tenant_lang` cookie,
-defaulting to Arabic. The server passes only that language to the provider, which loads its
+defaulting to English. The server passes only that language to the provider, which loads its
 dictionary chunk.
 Theme and density still use an inline script before hydration. Existing
 localStorage-only language preferences migrate after their dictionary loads;
@@ -101,7 +103,7 @@ import { readServerLanguage } from "@/i18n/server";
 const BOOTSTRAP = `(function(){try{
   var d=document.documentElement;
   var t=localStorage.getItem("tenant_theme");
-  var dark=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  var dark=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);
   d.classList.toggle("dark",dark);
   var s=localStorage.getItem("tenant_density");
   if(s==="compact")d.style.setProperty("--ui-scale","0.9");

@@ -15,7 +15,8 @@ let active: LanguageSnapshot | null = null;
 let selection = 0;
 
 export function languageOrDefault(value: string | null | undefined): Language {
-  return value === "en" ? "en" : "ar";
+  if (value === "ar") return "ar";
+  return "en";
 }
 
 export function readLanguage(): Language {
@@ -28,10 +29,10 @@ export function readLanguage(): Language {
       return languageOrDefault(cookie?.split("=")[1]);
     } catch {
       // Restricted browser contexts may deny cookies as well as storage.
-      return "ar";
+      return "en";
     }
   }
-  return "ar";
+  return "en";
 }
 
 // Each literal import is a separate async entry. Never import either value

@@ -58,11 +58,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 }
 
 function defaultLanguage(): Language {
-  return "ar";
+  return "en";
 }
 
 function readStoredLanguage(): Language {
-  return safeStorage.getItem(LANGUAGE_STORAGE_KEY) === "en" ? "en" : "ar";
+  return safeStorage.getItem(LANGUAGE_STORAGE_KEY) === "ar" ? "ar" : "en";
 }
 
 function subscribeToLanguage(onStoreChange: () => void): () => void {

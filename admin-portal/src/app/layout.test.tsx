@@ -29,6 +29,7 @@ describe("Root layout CSP nonce", () => {
       const layout = await RootLayout({ children: null });
       const [bootstrap, theme] = layout.props.children.props.children;
 
+      expect(layout.props).toMatchObject({ lang: "en", dir: "ltr" });
       expect(bootstrap.type).toBe(Script);
       expect(bootstrap.props).toMatchObject({
         id: "lang-dir-bootstrap",
@@ -37,7 +38,7 @@ describe("Root layout CSP nonce", () => {
       });
       expect(bootstrap.props.children).toContain('localStorage.getItem("app_lang")');
       expect(theme.type).toBe(ThemeProvider);
-      expect(theme.props).toMatchObject({ nonce, attribute: "class", defaultTheme: "dark" });
+      expect(theme.props).toMatchObject({ nonce, attribute: "class", defaultTheme: "light" });
     },
   );
 });

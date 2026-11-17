@@ -4,6 +4,20 @@ Status: **[Verified]**
 
 Last source verification: **2026-08-26**
 
+Edit credential fields reverified: **2026-11-17**. The Edit Database Server
+dialog accepts an optional Security Admin username/password pair through the
+existing `PATCH /api/admin/core/v1/database-servers/:id` contract (update +
+critical permissions). Both inputs start empty; leaving or clearing both
+omits `securityAdminCredentials` and preserves the stored credentials. If
+either input is provided, both must pass the registration credential rules.
+Only the username is trimmed; password whitespace is preserved. The dialog
+never loads the saved credentials and clears entered values when closed.
+These are credentials for an existing PostgreSQL account: saving them does
+not create a role, change its PostgreSQL password, or transfer its grants.
+Core still verifies connectivity and Security Admin posture before saving.
+Source integration is separate from deployment and authenticated runtime
+verification.
+
 This is the browser-facing Database Servers V1 contract. API Gateway is the
 browser authority; Core owns registration, PostgreSQL role administration,
 credential encryption, activation readiness, reconciliation, and audit.

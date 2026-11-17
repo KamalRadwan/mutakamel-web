@@ -981,7 +981,7 @@ function waitForOperation<T>(
 function createRequestHeaders(init?: HeadersInit): Headers {
   const headers = new Headers(init);
   if (!headers.has("Accept-Language")) {
-    // Match useLanguage's stored selection and Arabic default, not the browser locale.
+    // Match useLanguage's stored selection and English default, not the browser locale.
     headers.set("Accept-Language", readLanguage());
   }
   return headers;

@@ -15,6 +15,7 @@ import {
 import { DatabaseSslConfigurationFields } from "./DatabaseSslConfigurationFields";
 import { useEditDatabaseServerModal } from "../hooks/useEditDatabaseServerModal";
 import { useI18n } from "@/i18n/I18nContext";
+import { DATABASE_SERVER_CREATE_CONSTRAINTS } from "../lib/registration-state";
 
 interface EditDatabaseServerModalProps {
   isOpen: boolean;
@@ -60,6 +61,15 @@ function EditDatabaseServerModalContent({
     setMaxTenants,
     countryName,
     setCountryName,
+    securityAdminUsername,
+    setSecurityAdminUsername,
+    securityAdminPassword,
+    setSecurityAdminPassword,
+    showSecurityAdminPassword,
+    setShowSecurityAdminPassword,
+    credentialsRequested,
+    usernameError,
+    passwordError,
     sslMode,
     sslRejectUnauthorized,
     setSslRejectUnauthorized,
@@ -130,6 +140,73 @@ function EditDatabaseServerModalContent({
               )}
             </Field>
           </div>
+
+          <fieldset
+            disabled={isSubmitting}
+            aria-describedby="edit-database-server-credentials-hint"
+            className="space-y-2.5 rounded-lg border border-border p-3"
+          >
+            <legend className="px-1 text-xs font-semibold">{copy.securityAdminCredentials}</legend>
+            <p id="edit-database-server-credentials-hint" className="text-xs text-muted-foreground">
+              {copy.credentialsHint}
+            </p>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Field
+                id="edit-database-server-security-admin-username"
+                label={copy.securityAdminUsername}
+                required={credentialsRequested}
+                error={usernameError}
+              >
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    size="sm"
+                    dir="ltr"
+                    type="text"
+                    maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.securityAdminUsername.maxLength}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    autoComplete="off"
+                    value={securityAdminUsername}
+                    onChange={(event) => setSecurityAdminUsername(event.target.value)}
+                    className="font-mono"
+                  />
+                )}
+              </Field>
+              <Field
+                id="edit-database-server-security-admin-password"
+                label={copy.securityAdminPassword}
+                required={credentialsRequested}
+                error={passwordError}
+                labelAction={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-controls="edit-database-server-security-admin-password"
+                    aria-pressed={showSecurityAdminPassword}
+                    onClick={() => setShowSecurityAdminPassword(!showSecurityAdminPassword)}
+                  >
+                    {showSecurityAdminPassword ? copy.hidePassword : copy.showPassword}
+                  </Button>
+                }
+              >
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    size="sm"
+                    dir="ltr"
+                    type={showSecurityAdminPassword ? "text" : "password"}
+                    maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.securityAdminPassword.maxLength}
+                    autoComplete="new-password"
+                    spellCheck={false}
+                    value={securityAdminPassword}
+                    onChange={(event) => setSecurityAdminPassword(event.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+          </fieldset>
 
           <DatabaseSslConfigurationFields
             idPrefix="edit-database-server-ssl"

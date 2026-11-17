@@ -2591,7 +2591,7 @@ function normalizeApiError(
   const body = record(payload) ?? {};
   const unavailable = response.status === 503 && endpoint !== undefined &&
     /^\/api\/admin\/core\/v1\/auth\/(login|forgot-password|reset-password|accept-invite)\/?$/u.test(endpoint);
-  const copy = safeStorage.getItem("app_lang") === "en" ? en : ar;
+  const copy = safeStorage.getItem("app_lang") === "ar" ? ar : en;
   const message = unavailable ? copy.login.temporarilyUnavailable : firstString(
     body.message,
     body.title,

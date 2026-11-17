@@ -14,7 +14,7 @@ const LOCAL_CHANGE_EVENT = "tenant-theme-change";
 
 function readTheme(): Theme {
   const stored = safeStorage.getItem(STORAGE_KEY);
-  return stored === "dark" || stored === "light" ? stored : "system";
+  return stored === "dark" || stored === "system" ? stored : "light";
 }
 
 function setTheme(next: Theme): void {
@@ -51,7 +51,7 @@ function subscribe(callback: () => void): () => void {
 // Matches src/app/layout.tsx's bootstrap script default when no explicit
 // choice is stored — see docs/design/theming.md#no-flash--the-mechanism.
 function getServerSnapshot(): Theme {
-  return "system";
+  return "light";
 }
 
 interface ThemeContextValue {

@@ -61,8 +61,8 @@ describe("authenticated preference hydration", () => {
   it("keeps local first paint then adopts English/dark on an empty device", async () => {
     const resolve = deferProfile();
     const { result } = mountPreferences();
-    expect(result.current.language).toBe("ar");
-    expect(result.current.theme).toBe("system");
+    expect(result.current.language).toBe("en");
+    expect(result.current.theme).toBe("light");
     await act(async () => resolve(profile));
     expect(result.current.language).toBe("en");
     expect(result.current.theme).toBe("dark");
@@ -112,8 +112,8 @@ describe("authenticated preference hydration", () => {
     vi.mocked(fetchMyProfile).mockResolvedValue(response);
     const { result } = mountPreferences();
     await act(async () => {});
-    expect(result.current.language).toBe("ar");
-    expect(result.current.theme).toBe("system");
+    expect(result.current.language).toBe("en");
+    expect(result.current.theme).toBe("light");
     expect(window.localStorage.getItem("tenant_lang")).toBeNull();
     expect(window.localStorage.getItem("tenant_theme")).toBeNull();
   });
@@ -130,15 +130,15 @@ describe("authenticated preference hydration", () => {
     rerender();
     expect(signal?.aborted).toBe(true);
     await act(async () => resolve(profile));
-    expect(result.current.language).toBe("ar");
-    expect(result.current.theme).toBe("system");
+    expect(result.current.language).toBe("en");
+    expect(result.current.theme).toBe("light");
   });
 
   it("keeps defaults when the profile read fails", async () => {
     vi.mocked(fetchMyProfile).mockRejectedValue(new Error("offline"));
     const { result } = mountPreferences();
     await act(async () => {});
-    expect(result.current.language).toBe("ar");
-    expect(result.current.theme).toBe("system");
+    expect(result.current.language).toBe("en");
+    expect(result.current.theme).toBe("light");
   });
 });

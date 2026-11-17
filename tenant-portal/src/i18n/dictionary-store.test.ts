@@ -24,6 +24,20 @@ function delayEnglish() {
 }
 
 describe("dictionary loading", () => {
+  it("defaults to English without persisting a choice and preserves saved Arabic", async () => {
+    const store = await import("./dictionary-store");
+    expect(store.readLanguage()).toBe("en");
+    expect(store.languageOrDefault(undefined)).toBe("en");
+    expect(store.languageOrDefault("invalid")).toBe("en");
+    expect(localStorage.getItem("tenant_lang")).toBeNull();
+    document.cookie = "tenant_lang=ar; Path=/";
+    expect(store.readLanguage()).toBe("ar");
+    localStorage.setItem("tenant_lang", "en");
+    expect(store.readLanguage()).toBe("en");
+    localStorage.setItem("tenant_lang", "ar");
+    expect(store.readLanguage()).toBe("ar");
+  });
+
   it("uses the server copy without importing either dictionary", async () => {
     const loadAr = vi.fn(() => ({ ar }));
     const loadEn = vi.fn(() => ({ en }));

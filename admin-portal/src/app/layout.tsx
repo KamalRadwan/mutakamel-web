@@ -18,12 +18,12 @@ export const metadata: Metadata = {
 };
 
 // Runs before hydration (next/script beforeInteractive is injected into the
-// initial HTML and executes before any page code) so an English or
-// LTR-preferring user never sees a wrong-direction first frame — the same
+// initial HTML and executes before any page code) so an Arabic or
+// RTL-preferring user never sees a wrong-direction first frame — the same
 // technique next-themes uses internally, just below, for the dark class.
 // Reads the same localStorage key I18nContext does (app_lang); no cookie
 // plumbing needed since this only has to beat first paint, not SSR.
-const LANG_DIR_BOOTSTRAP = `(function(){try{var l=window.localStorage.getItem("app_lang")==="en"?"en":"ar";document.documentElement.lang=l;document.documentElement.dir=l==="ar"?"rtl":"ltr";}catch(e){}})();`;
+const LANG_DIR_BOOTSTRAP = `(function(){try{var l=window.localStorage.getItem("app_lang")==="ar"?"ar":"en";document.documentElement.lang=l;document.documentElement.dir=l==="ar"?"rtl":"ltr";}catch(e){}})();`;
 
 export default async function RootLayout({
   children,
@@ -36,8 +36,8 @@ export default async function RootLayout({
 
   return (
     <html
-      lang="ar"
-      dir="rtl"
+      lang="en"
+      dir="ltr"
       className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable}`}
       suppressHydrationWarning
     >
@@ -48,7 +48,7 @@ export default async function RootLayout({
         <ThemeProvider
           nonce={nonce}
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="light"
           enableSystem={false}
           disableTransitionOnChange
         >

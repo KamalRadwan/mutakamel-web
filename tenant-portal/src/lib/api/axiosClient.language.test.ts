@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe("API request language", () => {
-  it("uses the Arabic default and follows language switches for server errors", async () => {
+  it("uses the English default and follows language switches for server errors", async () => {
     const messages: Record<string, string> = {
       ar: "رسالة التحقق من الخادم",
       en: "Server validation message",
@@ -29,8 +29,8 @@ describe("API request language", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    for (const language of ["ar", "en", "ar"] as const) {
-      if (fetchMock.mock.calls.length > 0) setLanguage(language);
+    for (const language of ["en", "ar", "en"] as const) {
+      if (fetchMock.mock.calls.length > 0) await setLanguage(language);
       await expect(axiosClient.get("/api/tenant/core/v1/auth/me"))
         .rejects.toMatchObject({
           message: messages[language],

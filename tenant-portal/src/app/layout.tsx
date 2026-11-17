@@ -42,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const BOOTSTRAP = `(function(){try{
   var d=document.documentElement;
   var t=localStorage.getItem("tenant_theme");
-  var dark=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
+  var dark=t==="dark"||(t==="system"&&matchMedia("(prefers-color-scheme: dark)").matches);
   d.classList.toggle("dark",dark);
   var s=localStorage.getItem("tenant_density");
   if(s==="compact")d.style.setProperty("--ui-scale","0.9");

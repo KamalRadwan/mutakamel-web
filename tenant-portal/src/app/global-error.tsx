@@ -17,7 +17,7 @@ import "./globals.css";
 //
 // Two honest consequences of losing the bootstrap script: the language and
 // theme are resolved by React rather than before the first paint, so a dark
-// or English user sees one light/RTL frame here. On a crash screen that is
+// or Arabic user sees one light/LTR frame here. On a crash screen that is
 // the right trade against re-injecting an inline script that the planned CSP
 // would then have to allow a second nonce for.
 function GlobalErrorScreen({ digest, onRetry }: { digest?: string; onRetry: () => void }) {

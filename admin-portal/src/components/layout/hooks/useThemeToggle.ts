@@ -14,9 +14,9 @@ export function useThemeToggle() {
   }, []);
 
   // Before mount, resolvedTheme is unknown to next-themes on the client —
-  // fall back to the layout's defaultTheme ("dark") so the icon matches
+  // fall back to the layout's defaultTheme ("light") so the icon matches
   // what was actually painted rather than flashing once mounted flips.
-  const isDark = mounted ? resolvedTheme === "dark" : true;
+  const isDark = mounted ? resolvedTheme === "dark" : false;
 
   const toggleTheme = () => {
     setTheme(isDark ? "light" : "dark");
