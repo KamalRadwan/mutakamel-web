@@ -4,6 +4,7 @@ import { Building2, UserRound } from "lucide-react";
 import { Button, TagChip, cardColorBorder, cardColorFill, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
+import { formatTemplate } from "@/lib/format/template";
 import { CrmCardExpandButton } from "../../../shared/components/board/CrmCardIconButton";
 import { CrmCardStartBar } from "../../../shared/components/board/CrmCardStartBar";
 import { crmBoardCardClass } from "../../../shared/components/board/board-classes";
@@ -47,7 +48,7 @@ export function OpportunityBoardCard(props: OpportunityBoardCardProps) {
               onColorChange={props.canUpdate ? (cardColor) => props.onCardChange({ cardColor }) : undefined}
               moveTargets={props.canUpdate && props.moveTargets.length > 0 ? props.moveTargets : undefined}
               onMove={props.canUpdate ? props.onMove : undefined}
-              labels={{ trigger: t.crmLeads.card.more, open: t.crmLeads.card.open, moveTo: t.views.moveTo,
+              labels={{ trigger: formatTemplate(t.crmLeads.card.more, { name: item.title }), open: t.crmLeads.card.open, moveTo: t.views.moveTo,
                 delete: t.common.delete, cardColor: t.crmLeads.card.cardColor, colorNone: t.crmLeads.card.colorNone,
                 colorNames: t.crmLeads.card.colors, selected: t.crmLeads.card.colorSelected }} />
           </div>

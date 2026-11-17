@@ -5311,7 +5311,7 @@ export const ar = {
     userNameUnavailable: "الاسم غير متاح",
     currentUserSuggested: "المستخدم الحالي مقترح؛ احفظ لإسناد العميل المحتمل إليه.",
     notes: "ملاحظات",
-    contactsEmpty: "لا توجد جهات اتصال مسجّلة لهذا العميل المحتمل.",
+    contactsEmpty: "لا توجد جهات اتصال مسجّلة لهذا السجل.",
     callNumber: "الاتصال بـ {value}",
     callAction: "اتصال",
     whatsappNumber: "مراسلة {value} عبر واتساب",

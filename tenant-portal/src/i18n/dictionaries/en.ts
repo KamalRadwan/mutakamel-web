@@ -5300,7 +5300,7 @@ export const en: Dictionary = {
     userNameUnavailable: "Name unavailable",
     currentUserSuggested: "Current user is suggested; save to assign this lead.",
     notes: "Notes",
-    contactsEmpty: "No contacts recorded for this lead.",
+    contactsEmpty: "No contacts recorded for this record.",
     callNumber: "Call {value}",
     callAction: "Call",
     whatsappNumber: "Message {value} on WhatsApp",

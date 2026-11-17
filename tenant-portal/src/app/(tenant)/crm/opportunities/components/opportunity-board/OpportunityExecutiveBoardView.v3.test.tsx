@@ -162,7 +162,7 @@ describe.each(["en", "ar"] as const)("OpportunityExecutiveBoardView v3 (%s)", (l
   it("keeps dossier access in the card menu without duplicating the expand action", () => {
     locale.lang = lang;
     const { props } = renderBoard(); const t = dictionaries[lang];
-    fireEvent.keyDown(screen.getByRole("button", { name: t.crmLeads.card.more }), { key: "Enter" });
+    fireEvent.keyDown(screen.getByRole("button", { name: formatTemplate(t.crmLeads.card.more, { name: boardItem.title }) }), { key: "Enter" });
     const menu = screen.getByRole("menu");
     expect(within(menu).queryByText(t.crmOpportunities.expandCard)).toBeNull();
     fireEvent.click(within(menu).getByRole("menuitem", { name: t.crmLeads.card.open }));
