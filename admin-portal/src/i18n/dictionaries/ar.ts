@@ -3199,9 +3199,8 @@ export const ar = {
     editModal: {
       title: "تعديل خادم قاعدة البيانات",
       securityAdminCredentials: "بيانات حساب إدارة الأمان (اختياري)",
-      securityAdminUsername: "اسم مستخدم إدارة الأمان",
-      securityAdminPassword: "كلمة مرور إدارة الأمان",
-      credentialsHint: "اترك الحقلين فارغين للاحتفاظ ببيانات الدخول الحالية. لاستبدالهما، أدخل القيمتين لحساب إدارة أمان موجود بالفعل في PostgreSQL. يحفظ هذا الإجراء بيانات الاتصال؛ ولا ينشئ حسابًا أو يغيّر كلمة مروره في PostgreSQL.",
+      securityAdminUsername: "اسم المستخدم",
+      securityAdminPassword: "كلمة المرور",
       credentialsError: "راجع اسم مستخدم إدارة الأمان وكلمة المرور. يجب إدخال القيمتين عند استبدال بيانات الدخول.",
       invalidSecurityAdminUsername: "استخدم من 1 إلى 63 حرفًا إنجليزيًا صغيرًا أو رقمًا أو شرطة سفلية. ابدأ بحرف أو شرطة سفلية؛ والبادئة pg_ محجوزة.",
       invalidSecurityAdminPassword: "أدخل كلمة مرور من 1 إلى 1024 حرفًا. يتم الاحتفاظ بالمسافات كما هي.",

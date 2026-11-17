@@ -133,7 +133,6 @@ export function DatabaseSslConfigurationFields({
   const fileField = (
     field: CertificateField,
     label: string,
-    description: string,
     accept: string,
     required = false,
   ) => (
@@ -141,7 +140,6 @@ export function DatabaseSslConfigurationFields({
       <Field
         id={`${idPrefix}-${field}`}
         label={label}
-        hint={description}
         error={fileError?.field === field ? fileError.message : undefined}
         required={required}
         labelAction={config[field] ? (
@@ -189,9 +187,6 @@ export function DatabaseSslConfigurationFields({
           <h3 className="text-xs font-semibold text-foreground">
             {copy.title}
           </h3>
-          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            {copy.description}
-          </p>
         </div>
       </div>
 
@@ -199,7 +194,6 @@ export function DatabaseSslConfigurationFields({
         <Field
           id={`${idPrefix}-mode`}
           label={copy.sslMode}
-          hint={process.env.NODE_ENV === "production" ? copy.productionModeHint : undefined}
           required
         >
           {({ required, ...fieldProps }) => (
@@ -217,9 +211,11 @@ export function DatabaseSslConfigurationFields({
           )}
         </Field>
 
-        <p className={`rounded-lg px-3 py-2 text-xs leading-5 ${mode === "disable" ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-info-subtle text-info-subtle-foreground"}`}>
-          {copy.modeHelp[mode]}
-        </p>
+        {mode !== "verify-full" && (
+          <p className={`rounded-lg px-3 py-2 text-xs leading-5 ${mode === "disable" ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-info-subtle text-info-subtle-foreground"}`}>
+            {copy.modeHelp[mode]}
+          </p>
+        )}
 
         {mode !== "disable" && (
           <>
@@ -249,9 +245,6 @@ export function DatabaseSslConfigurationFields({
                     <p className="text-xs font-semibold">
                       {copy.storedBundle}
                     </p>
-                    <p className="mt-1 text-xs leading-4">
-                      {copy.storedBundleHelp}
-                    </p>
                     {onRemoveStoredConfigChange && (
                       <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-destructive-subtle-foreground">
                         <Checkbox
@@ -272,24 +265,21 @@ export function DatabaseSslConfigurationFields({
               {fileField(
                 "ca",
                 copy.caCertificate,
-                copy.caCertificateHelp,
                 ".pem,.crt,.cer,application/x-pem-file,application/pkix-cert,text/plain",
                 mode === "verify-ca" || mode === "verify-full",
               )}
               {fileField(
                 "cert",
                 copy.clientCertificate,
-                copy.clientCertificateHelp,
                 ".pem,.crt,.cer,application/x-pem-file,application/pkix-cert,text/plain",
               )}
               {fileField(
                 "key",
                 copy.clientPrivateKey,
-                copy.clientPrivateKeyHelp,
                 ".pem,.key,application/x-pem-file,text/plain",
               )}
               <div className="rounded-lg border border-border bg-card p-3">
-                <Field id={`${idPrefix}-passphrase`} label={copy.privateKeyPassphrase} hideLabel hint={copy.privateKeyPassphraseHelp}>
+                <Field id={`${idPrefix}-passphrase`} label={copy.privateKeyPassphrase} hideLabel>
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
@@ -321,11 +311,7 @@ export function DatabaseSslConfigurationFields({
 const DATABASE_SSL_COPY = {
   ar: {
     title: "أمان نقل البيانات",
-    description:
-      "تبقى محتويات الشهادات داخل هذا النموذج النشط فقط، وتُرسل إلى Core كحقول كتابة فقط.",
     sslMode: "وضع SSL",
-    productionModeHint:
-      "يقبل الإنتاج تعطيل SSL أو التحقق من جهة الإصدار واسم المضيف باستخدام شهادة CA مع رفض الشهادات غير الموثوقة.",
     disable: "تعطيل SSL",
     require: "اشتراط التشفير",
     verifyCa: "التحقق من جهة إصدار الشهادة",
@@ -337,25 +323,16 @@ const DATABASE_SSL_COPY = {
         "يشفّر الاتصال؛ وتكون شهادة CA المخصصة أو شهادة العميل لـmTLS اختيارية.",
       "verify-ca":
         "يشفّر الاتصال ويتحقق من شهادة الخادم باستخدام شهادة CA المرفوعة.",
-      "verify-full":
-        "يتحقق من جهة إصدار الشهادة ومن تطابق اسم مضيف قاعدة البيانات.",
-    } satisfies Record<DatabaseServerSslMode, string>,
+    } satisfies Record<Exclude<DatabaseServerSslMode, "verify-full">, string>,
     rejectUnauthorized: "رفض الشهادات غير الموثوقة",
     rejectUnauthorizedHelp:
       "اتركه مفعّلًا ما لم تتطلب بيئة تطوير مضبوطة خلاف ذلك صراحةً.",
     storedBundle: "توجد حزمة شهادات مشفّرة مُعدّة بالفعل",
-    storedBundleHelp:
-      "لا يعيد Core محتوياتها مطلقًا. رفع أي مادة جديدة يستبدل الحزمة المخزنة كاملةً.",
     removeStoredBundle: "إزالة حزمة الشهادات المخزنة",
     caCertificate: "شهادة CA",
-    caCertificateHelp: "شهادة الجذر الموثوقة أو سلسلة الشهادات بصيغة PEM.",
     clientCertificate: "شهادة العميل",
-    clientCertificateHelp: "هوية عميل اختيارية لاتصال mTLS.",
     clientPrivateKey: "المفتاح الخاص للعميل",
-    clientPrivateKeyHelp: "يلزم رفعه مع شهادة العميل.",
     privateKeyPassphrase: "عبارة مرور المفتاح الخاص",
-    privateKeyPassphraseHelp:
-      "اختيارية، ولا تكون صالحة إلا مع المفتاح الخاص المرفوع.",
     readyToSend: "جاهز للإرسال الآمن",
     clearSelected: (label: string) => `مسح ${label} المحددة`,
     fileEmpty: (label: string) => `ملف ${label} فارغ.`,
@@ -365,11 +342,7 @@ const DATABASE_SSL_COPY = {
   },
   en: {
     title: "Transport security",
-    description:
-      "Certificate contents stay only in this active form and are sent to Core as write-only DTO fields.",
     sslMode: "SSL mode",
-    productionModeHint:
-      "Production accepts Disable or Verify authority and hostname. Verification requires a CA certificate and rejection of untrusted certificates.",
     disable: "Disable",
     require: "Require encryption",
     verifyCa: "Verify certificate authority",
@@ -381,25 +354,16 @@ const DATABASE_SSL_COPY = {
         "Encrypts transport. A custom CA or mutual-TLS client certificate is optional.",
       "verify-ca":
         "Encrypts transport and verifies the server certificate against the uploaded CA.",
-      "verify-full":
-        "Verifies both the certificate authority and the database hostname.",
-    } satisfies Record<DatabaseServerSslMode, string>,
+    } satisfies Record<Exclude<DatabaseServerSslMode, "verify-full">, string>,
     rejectUnauthorized: "Reject unauthorized certificates",
     rejectUnauthorizedHelp:
       "Keep enabled unless a controlled development environment explicitly requires otherwise.",
     storedBundle: "An encrypted certificate bundle is already configured",
-    storedBundleHelp:
-      "Core never returns its contents. Uploading any new material replaces the entire stored bundle.",
     removeStoredBundle: "Remove the stored certificate bundle",
     caCertificate: "CA certificate",
-    caCertificateHelp: "Trusted root or certificate chain in PEM format.",
     clientCertificate: "Client certificate",
-    clientCertificateHelp: "Optional client identity for mutual TLS.",
     clientPrivateKey: "Client private key",
-    clientPrivateKeyHelp: "Required together with a client certificate.",
     privateKeyPassphrase: "Private-key passphrase",
-    privateKeyPassphraseHelp:
-      "Optional, and valid only with the uploaded private key.",
     readyToSend: "Ready to send securely",
     clearSelected: (label: string) => `Clear selected ${label.toLowerCase()}`,
     fileEmpty: (label: string) => `${label} file is empty.`,

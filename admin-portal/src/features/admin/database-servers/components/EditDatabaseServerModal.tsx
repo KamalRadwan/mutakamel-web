@@ -143,13 +143,9 @@ function EditDatabaseServerModalContent({
 
           <fieldset
             disabled={isSubmitting}
-            aria-describedby="edit-database-server-credentials-hint"
             className="space-y-2.5 rounded-lg border border-border p-3"
           >
             <legend className="px-1 text-xs font-semibold">{copy.securityAdminCredentials}</legend>
-            <p id="edit-database-server-credentials-hint" className="text-xs text-muted-foreground">
-              {copy.credentialsHint}
-            </p>
             <div className="grid gap-2.5 sm:grid-cols-2">
               <Field
                 id="edit-database-server-security-admin-username"
