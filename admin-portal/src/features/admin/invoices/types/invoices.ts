@@ -226,3 +226,8 @@ export type InvoiceValidationCode =
   | "CONFIRMATION_REQUIRED";
 
 export type InvoiceValidationErrors = Record<string, InvoiceValidationCode>;
+
+export interface VoidInvoiceDto {
+  reasonCode: "ISSUED_IN_ERROR" | "DUPLICATE" | "PRICING_ERROR" | "CUSTOMER_DISPUTE" | "OTHER";
+  note?: string;
+}

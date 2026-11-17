@@ -362,11 +362,12 @@ export function useInvoiceDetail(invoiceId: string) {
     const errors = validateCriticalInvoiceDraft(voidDraft, false);
     setValidationErrors(errors);
     if (Object.keys(errors).length) return null;
+    const dto = { reasonCode: "OTHER" as const, note: voidDraft.reason.trim() };
     return runMutation(
       "VOID",
       `invoice:void:${invoice.id}`,
-      { invoiceId: invoice.id, operatorReason: voidDraft.reason.trim() },
-      (key) => invoicesApi.void(invoice.id, key),
+      { invoiceId: invoice.id, dto },
+      (key) => invoicesApi.void(invoice.id, dto, key),
     );
   }, [canVoid, invoice, runMutation, voidDraft]);
 

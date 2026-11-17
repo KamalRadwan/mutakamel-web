@@ -6,6 +6,7 @@ import type {
   InvoiceListQuery,
   IssueInvoiceDto,
   UpdateInvoiceDto,
+  VoidInvoiceDto,
 } from "../types/invoices";
 
 const BASE_URL = "/api/admin/core/v1/invoices";
@@ -66,10 +67,10 @@ export const invoicesApi = {
     return readInvoiceForId(response.data, id);
   },
 
-  void: async (id: string, idempotencyKey: string) => {
+  void: async (id: string, dto: VoidInvoiceDto, idempotencyKey: string) => {
     const response = await axiosClient.post<unknown>(
       `${invoiceUrl(id)}/void`,
-      undefined,
+      dto,
       commandConfig(idempotencyKey),
     );
     return readInvoiceForId(response.data, id);

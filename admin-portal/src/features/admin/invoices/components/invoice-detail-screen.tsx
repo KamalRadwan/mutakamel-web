@@ -313,7 +313,7 @@ function CriticalInvoiceDialog({ kind, detail, copy }: { kind: "ISSUE" | "VOID";
         {kind === "ISSUE" ? (
           <EditDateInput label={copy.dueAt} value={draft.dueAt} error={detail.validationErrors.dueAt} copy={copy} onChange={(value) => update("dueAt", value)} />
         ) : null}
-        <Field label={copy.reviewReason} hideLabel hint={copy.reviewReasonHint} error={detail.validationErrors.reason ? invoiceValidationMessage(detail.validationErrors.reason, copy) : undefined}>
+        <Field label={copy.reviewReason} hideLabel hint={kind === "VOID" ? copy.voidReasonHint : copy.reviewReasonHint} error={detail.validationErrors.reason ? invoiceValidationMessage(detail.validationErrors.reason, copy) : undefined}>
           {(fp) => (
             <Textarea
               {...fp}
