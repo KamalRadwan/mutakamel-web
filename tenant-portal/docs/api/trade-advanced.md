@@ -886,6 +886,13 @@ context. The service still requires a company and a resolved `COMPANY` or
 `BRANCH` target; its scope-mismatch validation is unchanged. Browser verification
 is tracked separately.
 
+The same resolved-scope boundary applies to the branch-context Control Tower,
+webhook subscription/delivery, extension profile and policy-receipt read owners.
+They wait for their declared scope before requesting data and discard aborted
+success/error results when the selected context changes. This prevents initial
+empty-header reads from becoming false record-not-found states. Server scope
+validation and legitimate not-found responses remain unchanged.
+
 | Method | Canonical path | Permission |
 | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/import-mappings` | `trade.import.manage` |

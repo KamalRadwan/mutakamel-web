@@ -43,6 +43,15 @@ export function useControlTower() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setItems([]);
+        setTotal(0);
+        setHasLoaded(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       if (!canRead || signal?.aborted) return;
       setIsLoading(true);
       setQueryError(null);
@@ -70,7 +79,7 @@ export function useControlTower() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [canRead, page, status, severity, category, scope.headers],
+    [canRead, page, status, severity, category, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {

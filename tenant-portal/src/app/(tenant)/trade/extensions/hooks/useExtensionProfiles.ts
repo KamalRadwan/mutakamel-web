@@ -65,6 +65,15 @@ export function useExtensionProfiles() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setItems([]);
+        setTotal(0);
+        setHasLoaded(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       // allSettled, not all: the targets catalogue and the profile list are two
@@ -81,6 +90,7 @@ export function useExtensionProfiles() {
           maxResponseBytes: TARGETS_RESPONSE_LIMIT_BYTES,
         }),
       ]);
+      if (signal?.aborted) return;
 
       if (listResult.status === "fulfilled") {
         try {
@@ -108,7 +118,7 @@ export function useExtensionProfiles() {
 
       if (!signal?.aborted) setIsLoading(false);
     },
-    [page, targetCode, status, scope.headers],
+    [page, targetCode, status, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {

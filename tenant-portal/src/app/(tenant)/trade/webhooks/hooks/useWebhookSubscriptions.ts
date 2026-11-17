@@ -57,6 +57,15 @@ export function useWebhookSubscriptions() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setItems([]);
+        setTotal(0);
+        setHasLoaded(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       // The event catalogue is a second source and the create form cannot be
@@ -73,6 +82,7 @@ export function useWebhookSubscriptions() {
           maxResponseBytes: EVENTS_RESPONSE_LIMIT_BYTES,
         }),
       ]);
+      if (signal?.aborted) return;
 
       if (listResult.status === "fulfilled") {
         try {
@@ -100,7 +110,7 @@ export function useWebhookSubscriptions() {
 
       if (!signal?.aborted) setIsLoading(false);
     },
-    [page, status, scope.headers],
+    [page, status, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {

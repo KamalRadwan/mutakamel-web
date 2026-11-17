@@ -44,6 +44,15 @@ export function useWebhookDeliveries() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setItems([]);
+        setTotal(0);
+        setHasLoaded(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -52,18 +61,20 @@ export function useWebhookDeliveries() {
           headers: scope.headers,
           maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
         });
+        if (signal?.aborted) return;
         const parsed = parseWebhookDeliveriesResponse(response.data);
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
       } catch (error) {
+        if (signal?.aborted) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, status, scope.headers],
+    [page, status, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {

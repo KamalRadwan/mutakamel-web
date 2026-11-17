@@ -46,6 +46,13 @@ export function useDecisionReceipt(id: string) {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setReceipt(null);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -54,15 +61,17 @@ export function useDecisionReceipt(id: string) {
           headers: scope.headers,
           maxResponseBytes: RECEIPT_RESPONSE_LIMIT_BYTES,
         });
+        if (signal?.aborted) return;
         setReceipt(parseDecisionReceipt(response.data));
       } catch (error) {
+        if (signal?.aborted) return;
         if (isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [id, scope.headers],
+    [id, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {

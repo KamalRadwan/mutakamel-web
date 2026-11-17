@@ -46,6 +46,13 @@ export function useWebhookSubscription(id: string) {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setSubscription(null);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -54,15 +61,17 @@ export function useWebhookSubscription(id: string) {
           headers: scope.headers,
           maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
         });
+        if (signal?.aborted) return;
         setSubscription(parseWebhookSubscriptionDetail(response.data));
       } catch (error) {
+        if (signal?.aborted) return;
         if (error instanceof DOMException && error.name === "AbortError") return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [id, scope.headers],
+    [id, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {

@@ -67,6 +67,15 @@ export function useExtensionProfile(id: string) {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+      if (!scope.isResolved) {
+        setProfile(null);
+        setFields([]);
+        setVersions([]);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       const [detailResult, versionsResult] = await Promise.allSettled([
@@ -81,6 +90,7 @@ export function useExtensionProfile(id: string) {
           maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
         }),
       ]);
+      if (signal?.aborted) return;
 
       if (detailResult.status === "fulfilled") {
         try {
@@ -119,7 +129,7 @@ export function useExtensionProfile(id: string) {
 
       if (!signal?.aborted) setIsLoading(false);
     },
-    [id, scope.headers],
+    [id, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {
