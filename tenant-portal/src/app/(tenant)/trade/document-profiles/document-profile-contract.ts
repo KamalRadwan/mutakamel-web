@@ -57,8 +57,8 @@ export const FILTERABLE_DOCUMENT_TYPES = [
 
 export type CreatableDocumentType = (typeof CREATABLE_DOCUMENT_TYPES)[number];
 
-export const DOCUMENT_PROFILE_SCOPE_TARGETS = ["TENANT", "COMPANY", "BRANCH"] as const;
-type DocumentProfileScopeTarget = (typeof DOCUMENT_PROFILE_SCOPE_TARGETS)[number];
+export const DOCUMENT_PROFILE_SCOPE_TARGETS = ["TENANT", "COMPANY"] as const;
+export type DocumentProfileScopeTarget = (typeof DOCUMENT_PROFILE_SCOPE_TARGETS)[number];
 
 export const SERVER_OWNED_FIELDS = ["status", "totals", "version", "audit", "taxes"] as const;
 export const MANDATORY_COMPILED_CASE_CODES = [

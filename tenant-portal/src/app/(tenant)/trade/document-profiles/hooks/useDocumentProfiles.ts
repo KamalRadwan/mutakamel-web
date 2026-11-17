@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTradeBranchSelection } from "../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isTradeReplay, tradeGet, tradeIfMatch, tradePost } from "../../trade-api";
 import { hasTradePermission, useTradeScope } from "../../trade-advanced-scope";
@@ -26,6 +24,7 @@ import {
   parseDocumentProfilesResponse,
   type DocumentProfile,
   type DocumentProfileFormValues,
+  type DocumentProfileScopeTarget,
   type DocumentProfileVersion,
   type DocumentProfileVersionFormValues,
 } from "../document-profile-contract";
@@ -38,9 +37,11 @@ export type DocumentProfileViewMode = "bento" | "table" | "split";
 export function useDocumentProfiles() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
-  const scope = useTradeScope("BRANCH", branchId);
+  const [scopeTarget, setScopeTarget] = useState<DocumentProfileScopeTarget>("TENANT");
+  // Profiles belong to TENANT or COMPANY; a selected parent branch never owns them.
+  const scope = useTradeScope(scopeTarget, null, { autoSelectCompany: false });
+  const scopeKey = JSON.stringify([scopeTarget, scope.headers]);
+  const [loadedScopeKey, setLoadedScopeKey] = useState<string | null>(null);
 
   const [items, setItems] = useState<DocumentProfile[]>([]);
   const [total, setTotal] = useState(0);
@@ -84,7 +85,21 @@ export function useDocumentProfiles() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (!scope.isResolved) {
+        setItems([]);
+        setTotal(0);
+        setSelectedId(null);
+        setHasLoaded(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
+      setItems([]);
+      setTotal(0);
+      setSelectedId(null);
+      setHasLoaded(false);
+      setLoadedScopeKey(null);
       setQueryError(null);
       try {
         const response = await tradeGet(documentProfilesListPath(page, documentType), {
@@ -92,23 +107,25 @@ export function useDocumentProfiles() {
           headers: scope.headers,
           maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
         });
+        if (signal?.aborted) return;
         const parsed = parseDocumentProfilesResponse(response.data);
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
+        setLoadedScopeKey(scopeKey);
         if (parsed.items.length > 0) {
           setSelectedId((prev) =>
             prev && parsed.items.some((p) => p.id === prev) ? prev : parsed.items[0].id,
           );
         }
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, documentType, scope.headers],
+    [page, documentType, scope.headers, scope.isResolved, scopeKey],
   );
 
   useEffect(() => {
@@ -146,7 +163,7 @@ export function useDocumentProfiles() {
       setIsSubmitting(true);
       const done = await submit(
         () =>
-          tradePost(DOCUMENT_PROFILES_PATH, buildCreateDocumentProfileRequest(values), {
+          tradePost(DOCUMENT_PROFILES_PATH, buildCreateDocumentProfileRequest({ ...values, scopeTarget }), {
             headers: scope.headers,
             maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES,
           }),
@@ -159,12 +176,13 @@ export function useDocumentProfiles() {
       }
       return done;
     },
-    [canManage, isSubmitting, submit, scope.headers, t, load],
+    [canManage, isSubmitting, submit, scope.headers, scopeTarget, t, load],
   );
 
   const createVersion = useCallback(
     async (values: DocumentProfileVersionFormValues): Promise<boolean> => {
-      if (!canManage || !versionFor || isSubmitting) return false;
+      if (!canManage || !versionFor || isSubmitting || loadedScopeKey !== scopeKey
+        || !items.some((profile) => profile.id === versionFor.id)) return false;
       setIsSubmitting(true);
       const done = await submit(
         () =>
@@ -185,12 +203,13 @@ export function useDocumentProfiles() {
       }
       return done;
     },
-    [canManage, versionFor, isSubmitting, submit, scope.headers, t, load],
+    [canManage, versionFor, isSubmitting, submit, scope.headers, t, load, loadedScopeKey, scopeKey, items],
   );
 
   const validateVersion = useCallback(
     async (version: DocumentProfileVersion): Promise<void> => {
-      if (!canValidate || pendingId) return;
+      if (!canValidate || pendingId || loadedScopeKey !== scopeKey
+        || !items.some((profile) => profile.versions.some((entry) => entry.id === version.id))) return;
       setPendingId(version.id);
       await submit(
         () =>
@@ -203,12 +222,13 @@ export function useDocumentProfiles() {
       setPendingId(null);
       await load();
     },
-    [canValidate, pendingId, submit, scope.headers, t, load],
+    [canValidate, pendingId, submit, scope.headers, t, load, loadedScopeKey, scopeKey, items],
   );
 
   const publishVersion = useCallback(
     async (pointerVersion: string): Promise<boolean> => {
-      if (!canPublish || !publishFor || pendingId) return false;
+      if (!canPublish || !publishFor || pendingId || loadedScopeKey !== scopeKey
+        || !items.some((profile) => profile.versions.some((entry) => entry.id === publishFor.id))) return false;
       setPendingId(publishFor.id);
       const done = await submit(
         () =>
@@ -230,10 +250,11 @@ export function useDocumentProfiles() {
       await load();
       return done;
     },
-    [canPublish, publishFor, pendingId, submit, scope.headers, t, load],
+    [canPublish, publishFor, pendingId, submit, scope.headers, t, load, loadedScopeKey, scopeKey, items],
   );
 
   const filteredItems = useMemo(() => {
+    if (loadedScopeKey !== scopeKey) return [];
     const q = search.trim().toLowerCase();
     if (!q) return items;
     return items.filter(
@@ -242,7 +263,7 @@ export function useDocumentProfiles() {
         p.documentType.toLowerCase().includes(q) ||
         p.scopeTarget.toLowerCase().includes(q),
     );
-  }, [items, search]);
+  }, [items, search, loadedScopeKey, scopeKey]);
 
   const selectedProfile = useMemo(
     () => filteredItems.find((p) => p.id === selectedId) ?? filteredItems[0] ?? null,
@@ -254,13 +275,23 @@ export function useDocumentProfiles() {
     lang,
     canRead,
     canManage,
+    isScopeResolved: scope.isResolved,
     canValidate,
     canPublish,
-    branchIds,
-    branchId,
-    selectBranch,
+    scopeTarget,
+    selectScopeTarget: (next: string) => {
+      if ((next !== "TENANT" && next !== "COMPANY") || isSubmitting || pendingId) return;
+      setScopeTarget(next);
+      setPage(1);
+      setSelectedId(null);
+      setCreateOpen(false);
+      setVersionFor(null);
+      setPublishFor(null);
+      setPublishProfile(null);
+      setFormError(null);
+    },
     items: filteredItems,
-    allItems: items,
+    allItems: loadedScopeKey === scopeKey ? items : [],
     selectedProfile,
     selectedId,
     setSelectedId,
@@ -268,7 +299,7 @@ export function useDocumentProfiles() {
     setViewMode,
     search,
     setSearch,
-    pageInfo: { page, limit: DOCUMENT_PROFILE_PAGE_SIZE, total },
+    pageInfo: { page, limit: DOCUMENT_PROFILE_PAGE_SIZE, total: loadedScopeKey === scopeKey ? total : 0 },
     documentType,
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,

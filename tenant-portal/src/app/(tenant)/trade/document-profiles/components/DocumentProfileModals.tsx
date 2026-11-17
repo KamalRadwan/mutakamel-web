@@ -41,6 +41,7 @@ import {
   serializeVisualProfileContent,
   type CreatableDocumentType,
   type DocumentProfileFormValues,
+  type DocumentProfileScopeTarget,
   type DocumentProfileVersionFormValues,
   type DocumentProfileVisualConfig,
 } from "../document-profile-contract";
@@ -68,16 +69,19 @@ export function CreateDocumentProfileModal({
   onSubmit,
   isSubmitting,
   error,
+  scopeTarget = EMPTY_DOCUMENT_PROFILE_FORM.scopeTarget,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (values: DocumentProfileFormValues) => Promise<boolean>;
   isSubmitting: boolean;
   error: string | null;
+  scopeTarget?: DocumentProfileScopeTarget;
 }) {
   const { t } = useI18n();
-  const [values, setValues] = useState<DocumentProfileFormValues>(EMPTY_DOCUMENT_PROFILE_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_DOCUMENT_PROFILE_FORM);
+  const initialValues = { ...EMPTY_DOCUMENT_PROFILE_FORM, scopeTarget };
+  const [values, setValues] = useState<DocumentProfileFormValues>(initialValues);
+  const isDirty = JSON.stringify(values) !== JSON.stringify(initialValues);
 
   const activePalette = SWATCH_SURFACE_PALETTES[DOC_TYPE_HUES[values.documentType] ?? "indigo"];
   const registry = DOCUMENT_PROFILE_REGISTRIES[values.documentType];
@@ -87,7 +91,7 @@ export function CreateDocumentProfileModal({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          setValues(EMPTY_DOCUMENT_PROFILE_FORM);
+          setValues(initialValues);
           onClose();
         }
       }}
@@ -260,13 +264,7 @@ export function CreateDocumentProfileModal({
         >
           <Select
             value={values.scopeTarget}
-            disabled={isSubmitting}
-            onValueChange={(next) =>
-              setValues((current) => ({
-                ...current,
-                scopeTarget: next as DocumentProfileFormValues["scopeTarget"],
-              }))
-            }
+            disabled
           >
             <SelectTrigger size="sm" aria-label={t.tradeGovernance.scopeTarget}>
               <SelectValue />

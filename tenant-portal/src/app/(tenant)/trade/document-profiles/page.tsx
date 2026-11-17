@@ -18,23 +18,29 @@ import {
   Button,
   DataTable,
   DegradedBanner,
+  EmptyState,
   FilterBar,
   IdentifierText,
   PageHeader,
   PermissionGate,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SWATCH_SURFACE_PALETTES,
   cn,
   type ColumnDef,
   type FilterValues,
   type SwatchHue,
 } from "@/design-system";
-import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { tradeStatusLabel } from "../trade-advanced-validation";
 import {
   CREATABLE_DOCUMENT_TYPES,
   DOCUMENT_PROFILE_READ_PERMISSION,
+  DOCUMENT_PROFILE_SCOPE_TARGETS,
   FILTERABLE_DOCUMENT_TYPES,
   type DocumentProfile,
 } from "./document-profile-contract";
@@ -63,11 +69,11 @@ export default function DocumentProfilesPage() {
     lang,
     canRead,
     canManage,
+    isScopeResolved,
     canValidate,
     canPublish,
-    branchIds,
-    branchId,
-    selectBranch,
+    scopeTarget,
+    selectScopeTarget,
     items,
     allItems,
     selectedProfile,
@@ -406,12 +412,12 @@ export default function DocumentProfilesPage() {
         }
         secondaryActions={
           <>
-            <TenantBranchSelect
-              branchIds={branchIds}
-              branchId={branchId}
-              onChange={selectBranch}
-              disabled={isRefreshing}
-            />
+            <Select value={scopeTarget} onValueChange={selectScopeTarget} disabled={isSubmitting || pendingId !== null}>
+              <SelectTrigger size="sm" aria-label={t.tradeGovernance.scopeTarget}><SelectValue /></SelectTrigger>
+              <SelectContent>{DOCUMENT_PROFILE_SCOPE_TARGETS.map((target) =>
+                <SelectItem key={target} value={target}>{tradeStatusLabel(t.tradeStatus, target, t.common.unknownCode)}</SelectItem>,
+              )}</SelectContent>
+            </Select>
             <Button
               size="sm"
               variant="outline"
@@ -428,6 +434,7 @@ export default function DocumentProfilesPage() {
         }
       />
 
+      {isScopeResolved ? <>
       <DegradedBanner message={t.tradeGovernance.profilesNoDetailRoute} />
 
       {/* Colorful 4-Card KPI Strip */}
@@ -745,8 +752,11 @@ export default function DocumentProfilesPage() {
         />
       )}
 
+      </> : <EmptyState title={t.tradeInventory.selectCompanyFirst} />}
+
       <CreateDocumentProfileModal
-        key={createOpen ? "create-prof-open" : "create-prof-closed"}
+        key={`${scopeTarget}:${createOpen ? "create-prof-open" : "create-prof-closed"}`}
+        scopeTarget={scopeTarget}
         isOpen={createOpen}
         onClose={closeCreate}
         onSubmit={createProfile}
@@ -780,7 +790,7 @@ export default function DocumentProfilesPage() {
     </div>
   );
 
-  return canRead ? (
+  return !isScopeResolved || canRead ? (
     content
   ) : (
     <PermissionGate require={DOCUMENT_PROFILE_READ_PERMISSION}>{content}</PermissionGate>

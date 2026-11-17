@@ -749,6 +749,15 @@ unvalidated `@IsObject()` at the pipe and is checked by
 
 ## Document profiles — 5 routes
 
+Scope handling updated in source **2026-11-17**: profiles support `TENANT` and
+`COMPANY`, never `BRANCH`. The page starts with tenant defaults and offers an
+explicit scope selector. Company reads and writes use the already-selected
+parent company without its branch header; tenant requests omit scope headers.
+The selector does not change the shared Trade operating context. Creation is
+pinned to this scope, and version actions require a record loaded in the current
+scope. Unresolved company reads wait; aborted and previous-scope results cannot
+remain visible in the cards, inspector or table. Backend validation is unchanged.
+
 Feature gate: `@RequireAnyTradeFeature(trade.sales, trade.purchasing)`.
 All target `OPERATING_CONTEXT`.
 
