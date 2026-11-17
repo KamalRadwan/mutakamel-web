@@ -7,6 +7,7 @@ import {
   Button,
   DataTable,
   DetailSection,
+  EmptyState,
   FilterBar,
   PageHeader,
   PermissionGate,
@@ -32,6 +33,7 @@ export default function ImportRunsPage() {
     t,
     lang,
     canExecute,
+    isScopeResolved,
     branchIds,
     branchId,
     selectBranch,
@@ -206,6 +208,8 @@ export default function ImportRunsPage() {
       />
     </div>
   );
+
+  if (!isScopeResolved) return <EmptyState title={t.tradeInventory.selectBranchFirst} description={t.tradeInventory.selectBranchFirstDescription} />;
 
   return canExecute ? (
     content

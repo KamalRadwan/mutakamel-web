@@ -8,6 +8,7 @@ import {
   DegradedBanner,
   DetailHeader,
   DetailSection,
+  EmptyState,
   ErrorState,
   NotFoundState,
   PermissionGate,
@@ -67,6 +68,13 @@ export default function ImportMappingPage({
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (!scope.isResolved) {
+        setMapping(null);
+        setFields([]);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -75,18 +83,19 @@ export default function ImportMappingPage({
           headers: scope.headers,
           maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
         });
+        if (signal?.aborted) return;
         const parsed = parseImportMappingDetail(response.data);
         setMapping(parsed);
         // The newest version's fields are what a PATCH replaces.
         setFields(toMappingFieldDrafts(parsed.versions[0]?.fields ?? []));
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [id, scope.headers],
+    [id, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {
@@ -191,6 +200,8 @@ export default function ImportMappingPage({
       ) : null}
     </div>
   );
+
+  if (!scope.isResolved) return <EmptyState title={t.tradeInventory.selectBranchFirst} description={t.tradeInventory.selectBranchFirstDescription} />;
 
   return canManage ? (
     content

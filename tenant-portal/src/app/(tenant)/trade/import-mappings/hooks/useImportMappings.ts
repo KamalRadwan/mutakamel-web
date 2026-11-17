@@ -54,6 +54,14 @@ export function useImportMappings() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (!scope.isResolved) {
+        setItems([]);
+        setTotal(0);
+        setHasLoaded(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -62,18 +70,19 @@ export function useImportMappings() {
           headers: scope.headers,
           maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
         });
+        if (signal?.aborted) return;
         const parsed = parseImportMappingsResponse(response.data);
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [page, status, scope.headers],
+    [page, status, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {
@@ -121,6 +130,7 @@ export function useImportMappings() {
     t,
     lang,
     canManage,
+    isScopeResolved: scope.isResolved,
     branchIds,
     branchId,
     selectBranch,

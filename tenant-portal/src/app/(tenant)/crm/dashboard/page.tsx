@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
+  Button,
+  EmptyState,
   ErrorState,
   hasPermission,
   PermissionGate,
@@ -9,17 +11,9 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantAuth } from "@/context/AuthContext";
-import { axiosClient } from "@/lib/api/axiosClient";
-import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import {
-  DASHBOARDS_DEFAULT_PATH,
-  DASHBOARDS_NAVIGATION_PATH,
-  parseDashboardDetailResponse,
-  parseNavigationResponse,
-} from "../dashboards/dashboard-contract";
+import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { DashboardWorkspace } from "../dashboards/[id]/components/dashboard-workspace";
-
-const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 } as const;
+import { useDefaultDashboard } from "./hooks/useDefaultDashboard";
 
 export default function CrmDefaultDashboardPage() {
   const { user } = useTenantAuth();
@@ -35,53 +29,8 @@ export default function CrmDefaultDashboardPage() {
 
 function DefaultDashboardContent({ enabled }: { enabled: boolean }) {
   const { t } = useI18n();
-  const [dashboardId, setDashboardId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<NormalizedApiError | null>(null);
-
-  const loadDefaultDashboard = useCallback(async (signal?: AbortSignal) => {
-    if (!enabled) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const navigationResponse = await axiosClient.get<unknown>(DASHBOARDS_NAVIGATION_PATH, {
-        ...READ_CONFIG,
-        signal,
-      });
-      if (signal?.aborted) return;
-      const navigation = parseNavigationResponse(navigationResponse.data);
-      if (navigation.activeDashboardId) {
-        setDashboardId(navigation.activeDashboardId);
-        return;
-      }
-
-      const response = await axiosClient.get<unknown>(DASHBOARDS_DEFAULT_PATH, {
-        ...READ_CONFIG,
-        signal,
-      });
-      if (signal?.aborted) return;
-      const detail = parseDashboardDetailResponse(response.data);
-      setDashboardId(detail.id);
-    } catch (caught) {
-      if (signal?.aborted) return;
-      setError(normalizeApiError(caught));
-    } finally {
-      if (!signal?.aborted) {
-        setIsLoading(false);
-      }
-    }
-  }, [enabled]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) {
-        void loadDefaultDashboard(controller.signal);
-      }
-    });
-    return () => controller.abort();
-  }, [enabled, loadDefaultDashboard]);
+  const { dashboardId, setDashboardId, isLoading, isEmpty, error, loadDefaultDashboard } =
+    useDefaultDashboard(enabled);
 
   return (
       <div className="flex flex-col gap-4">
@@ -95,6 +44,13 @@ function DefaultDashboardContent({ enabled }: { enabled: boolean }) {
               <Skeleton className="h-32 w-full" />
             </div>
             <Skeleton className="h-64 w-full" />
+          </div>
+        ) : isEmpty ? (
+          <div className="flex flex-col items-center gap-2">
+            <EmptyState title={t.crmDashboards.empty} description={t.crmDashboards.subtitle} />
+            <Button asChild variant="outline">
+              <Link href={TENANT_ROUTES.crmDashboards}>{t.crmDashboards.backToList}</Link>
+            </Button>
           </div>
         ) : error ? (
           <ErrorState

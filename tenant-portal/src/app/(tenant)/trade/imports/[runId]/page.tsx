@@ -9,6 +9,7 @@ import {
   DegradedBanner,
   DetailHeader,
   DetailSection,
+  EmptyState,
   ErrorState,
   FilterBar,
   NotFoundState,
@@ -41,6 +42,7 @@ export default function ImportRunPage({
   const {
     lang,
     canExecute,
+    isScopeResolved,
     run,
     rows,
     rowsUnavailable,
@@ -238,6 +240,8 @@ export default function ImportRunPage({
       ) : null}
     </div>
   );
+
+  if (!isScopeResolved) return <EmptyState title={t.tradeInventory.selectBranchFirst} description={t.tradeInventory.selectBranchFirstDescription} />;
 
   return canExecute ? (
     content

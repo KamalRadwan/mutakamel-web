@@ -867,6 +867,16 @@ Feature gate: `allOf: [trade.automation, trade.catalog]` on all eleven,
 `allOf: [trade.automation]` + `anyOf: [catalog, sales, purchasing, inventory]`.
 All target `OPERATING_CONTEXT`.
 
+Import scope initialization reviewed in source **2026-11-17**: the current
+branch-scoped mapping/run screens wait for `useTradeScope().isResolved` before
+starting list, detail or result reads. They send the canonical
+`x-mutakamel-company-id` and `x-mutakamel-branch-id` headers, show the existing
+branch-selection state while unresolved, and discard aborted responses after a
+scope change. No empty-header startup request is substituted for the selected
+context. The service still requires a company and a resolved `COMPANY` or
+`BRANCH` target; its scope-mismatch validation is unchanged. Browser verification
+is tracked separately.
+
 | Method | Canonical path | Permission |
 | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/import-mappings` | `trade.import.manage` |

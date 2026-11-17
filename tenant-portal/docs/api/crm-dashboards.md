@@ -1124,7 +1124,12 @@ reapplying the intended changes.
    `.update` hides them from every user who has only `.read`.
 10. **`GET /dashboards/default` is read-only.** It selects an existing visible
     dashboard and returns 404 when none exists. Setup is the explicit
-    `PUT /dashboards/from-template/CRM_DEFAULT`.
+    `PUT /dashboards/from-template/CRM_DEFAULT`. The `/crm/dashboard` landing
+    treats only this read's `404 CRM_DASHBOARD_NOT_FOUND` as an empty workspace
+    and links to the dashboard library's existing setup controls; it does not
+    create records or retry the absence as a service failure. Specific dashboard
+    detail 404s and other read errors retain their normal error handling.
+    Source behavior updated **2026-11-17**; browser verification is tracked separately.
 11. **The layout write needs the complete visible set**, and its overlap check
     includes placements the caller cannot see.
 12. **`share-targets` needs the `.share` permission**, so a screen that offers

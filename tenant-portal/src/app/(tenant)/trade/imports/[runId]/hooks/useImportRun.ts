@@ -53,6 +53,15 @@ export function useImportRun(runId: string) {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      if (!scope.isResolved) {
+        setRun(null);
+        setRows([]);
+        setRowsTotal(0);
+        setRowsUnavailable(false);
+        setQueryError(null);
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setQueryError(null);
       // Two sources: the run header and its rows. A rows failure degrades that
@@ -69,6 +78,7 @@ export function useImportRun(runId: string) {
           maxResponseBytes: RESULTS_RESPONSE_LIMIT_BYTES,
         }),
       ]);
+      if (signal?.aborted) return;
 
       if (runResult.status === "fulfilled") {
         try {
@@ -95,7 +105,7 @@ export function useImportRun(runId: string) {
 
       if (!signal?.aborted) setIsLoading(false);
     },
-    [runId, page, rowStatus, scope.headers],
+    [runId, page, rowStatus, scope.headers, scope.isResolved],
   );
 
   useEffect(() => {
@@ -133,6 +143,7 @@ export function useImportRun(runId: string) {
     t,
     lang,
     canExecute,
+    isScopeResolved: scope.isResolved,
     run,
     rows,
     rowsUnavailable,

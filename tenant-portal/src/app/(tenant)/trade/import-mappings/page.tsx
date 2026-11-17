@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   DataTable,
+  EmptyState,
   FilterBar,
   IdentifierText,
   PageHeader,
@@ -32,6 +33,7 @@ export default function ImportMappingsPage() {
     t,
     lang,
     canManage,
+    isScopeResolved,
     branchIds,
     branchId,
     selectBranch,
@@ -196,6 +198,8 @@ export default function ImportMappingsPage() {
       />
     </div>
   );
+
+  if (!isScopeResolved) return <EmptyState title={t.tradeInventory.selectBranchFirst} description={t.tradeInventory.selectBranchFirstDescription} />;
 
   return canManage ? (
     content
