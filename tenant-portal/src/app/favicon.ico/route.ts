@@ -17,7 +17,14 @@
  * `src/proxy.ts` excludes `favicon.ico` from its matcher, so this handler
  * answers directly and carries no CSP — correct, since a redirect with an empty
  * body has nothing for a policy to protect.
+ *
+ * `force-dynamic` keeps `next build` from prerendering the handler. A
+ * prerendered empty body is a zero-size entry in the server's LRU cache, which
+ * rejects it on every refresh ("calculateSize returned 0", logged as an error).
+ * The browser still caches the redirect through `Cache-Control`.
  */
+export const dynamic = 'force-dynamic';
+
 export function GET(): Response {
   return new Response(null, {
     status: 308,
