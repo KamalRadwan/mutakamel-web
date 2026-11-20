@@ -16,6 +16,8 @@ Use the [repo tool and skill inventory](docs/agent-tooling.md) on demand for the
 
 ## Production server
 
+Ask the user and wait for explicit approval before any critical production decision or change. Follow the [production approval policy](../backend/PRODUCTION.md).
+
 The Mutakamel production server is `12.0.0.88`. Connect from Windows PowerShell with the following command.
 
 ```powershell

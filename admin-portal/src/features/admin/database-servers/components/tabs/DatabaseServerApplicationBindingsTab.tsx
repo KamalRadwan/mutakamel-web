@@ -182,7 +182,7 @@ export function DatabaseServerApplicationBindingsTab({
                 )}
               </Field>
 
-              {canBootstrapExisting && ["DRAFT", "ACTIVE", "DRAINING"].includes(server.status) && (
+              {canBootstrapExisting && ["DRAFT", "ACTIVE", "DRAINING", "OFFLINE"].includes(server.status) && (
                 <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={Boolean(credentialActionPending)} onClick={onAddApplicationOpen}>
                   <Plus className="size-3.5" aria-hidden="true" />
                   {d.addApplication}

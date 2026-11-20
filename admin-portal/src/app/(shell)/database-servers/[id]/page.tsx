@@ -214,7 +214,9 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
       />
       <AddDatabaseApplicationDialog
         isOpen={page.isAddApplicationOpen}
-        boundApplicationKeys={page.bindings.map((b) => b.applicationKey)}
+        boundApplicationKeys={page.bindings
+          .filter((binding) => binding.status !== "PENDING" || binding.hasStagedCandidate)
+          .map((binding) => binding.applicationKey)}
         isSubmitting={Boolean(page.credentialActionPending)}
         bindingReady={page.canBootstrapApplication}
         bindingRefreshError={page.refreshError ?? page.bindingsError}
