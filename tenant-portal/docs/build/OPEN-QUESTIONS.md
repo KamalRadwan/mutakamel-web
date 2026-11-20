@@ -2601,7 +2601,7 @@ match their containers. Targeted Core tests: 181 passed (including the related
 organization filter fixes). The authenticated endpoint now returns 18 choices
 and three labels; the actual Grant and Edit scoped roles dialogs load, and a
 valid selection enables Grant. No real access was granted during QA.
-Evidence: `C:/mutakamel.ai/designs/organization-tenant-study-v1/implementation/verification/visual-v2-live/assignment-options-after.json`
+Evidence: `Z:/mutakamel-memory/design-assets/core/2026-11-01/organization-tenant-study-v1/implementation/verification/visual-v2-live/assignment-options-after.json`
 and `role-grant-ready-fixed-en-light.jpg`. The updated PostgreSQL fixture remains
 **PG pending release gate**, per the repository's once-per-release rule.
 
@@ -2654,9 +2654,9 @@ deleted through their UI (204), then read back as 404. The original default
 pipeline remained active with ALL access and six stages.
 
 Evidence and screenshots:
-`C:/mutakamel.ai/designs/crm-pipeline-access-fix-2026-11-04/`.
+`Z:/mutakamel-memory/design-assets/crm/2026-11-04/crm-pipeline-access-fix-2026-11-04/`.
 Historical diagnosis:
-`C:/mutakamel.ai/designs/crm-settings-suite-2026-11-03/implementation/live-contract-investigation.md`.
+`Z:/mutakamel-memory/design-assets/crm/2026-11-03/crm-settings-suite-2026-11-03/implementation/live-contract-investigation.md`.
 
 
 ## Q145 — CRM service repeatedly exhausts its Node heap during live reads
@@ -2673,7 +2673,7 @@ Tags and all 12 icon reads returned 200. A temporary source also passed create,
 icon upload/replacement and cleanup after the separate multipart-boundary fix;
 the original 12 source IDs/order were restored. Preserve the UI's existing
 failure/retry and uncertain-write boundaries. Repair and runtime evidence:
-`C:/mutakamel.ai/designs/crm-reliability-fixes-2026-11-04/RESULT.md`.
+`Z:/mutakamel-memory/design-assets/crm/2026-11-04/crm-reliability-fixes-2026-11-04/RESULT.md`.
 
 Historical observations before this repair:
 
@@ -2689,7 +2689,7 @@ failure and retry boundaries; do not present service failure as an empty list.
 Settle through a backend memory investigation and a sustained authenticated
 read check. Timing of concurrent icon requests alone does not establish a
 memory-leak cause. Evidence:
-`C:/mutakamel.ai/designs/crm-settings-suite-2026-11-03/implementation/live-contract-investigation.md`.
+`Z:/mutakamel-memory/design-assets/crm/2026-11-03/crm-settings-suite-2026-11-03/implementation/live-contract-investigation.md`.
 
 Reconfirmed 2026-11-04 during Acquisition Sources implementation: fatal heap
 exhaustion at 18:03:29, 18:05:13 and 18:08:55 Cairo preceded reorder and follow-up
@@ -2698,7 +2698,7 @@ catalogue read failures. Gateway logs identify `ECONNREFUSED` and
 An earlier full-catalogue reorder (including an inactive source) returned 200.
 Do not infer that an unknown write failed to commit or enable another write
 until a validated catalogue read succeeds. Evidence:
-`C:/mutakamel.ai/designs/settings-bilingual-sources-2026-11-04/implementation/crm-runtime-diagnostic.md`.
+`Z:/mutakamel-memory/design-assets/core/2026-11-04/settings-bilingual-sources-2026-11-04/implementation/crm-runtime-diagnostic.md`.
 
 ## Q146 — Separate Arabic and English columns need stored names on five settings catalogues
 
@@ -2730,5 +2730,5 @@ because they are reachable from Settings. No application change is applied
 by this study. Scope ownership leaves Pipelines, Tags and Custom Fields to
 their dedicated chats and Static Data to its separately assigned design.
 Design and exact source ledger:
-`C:/mutakamel.ai/designs/settings-bilingual-sources-2026-11-04/PLAN.md` and
-`C:/mutakamel.ai/designs/settings-bilingual-sources-2026-11-04/source-ledger.json`.
+`Z:/mutakamel-memory/design-assets/core/2026-11-04/settings-bilingual-sources-2026-11-04/PLAN.md` and
+`Z:/mutakamel-memory/design-assets/core/2026-11-04/settings-bilingual-sources-2026-11-04/source-ledger.json`.

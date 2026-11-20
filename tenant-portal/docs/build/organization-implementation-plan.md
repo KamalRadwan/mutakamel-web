@@ -8,7 +8,7 @@ QA scope amendment: Codex may make the narrow `SubNav` presentation/controller r
 
 ## Scope and immutable requirements
 
-Implement the approved `C:/mutakamel.ai/designs/organization-tenant-study-v1/` design suite against the existing backend. References: `index.html`, `STUDY.html`, `api-inventory.json`, `dto-inventory.json`, `error-inventory.json`, the individual PNGs and the editable rendering sources. These files contain illustrative data: no example rows, counters, identifiers, successful writes or API results may be copied into the application.
+Implement the approved `Z:/mutakamel-memory/design-assets/core/2026-11-01/organization-tenant-study-v1/` design suite against the existing backend. References: `index.html`, `STUDY.html`, `api-inventory.json`, `dto-inventory.json`, `error-inventory.json`, the individual PNGs and the editable rendering sources. These files contain illustrative data: no example rows, counters, identifiers, successful writes or API results may be copied into the application.
 
 - Seven primary pages: organization, companies, branches, departments, teams, users, roles. Keep existing detail deep links.
 - Full-width main pages. No Aside, drawer, split inspector or side navigation within these workspaces. Use the existing `FormModal` at `size="wide"` or `size="card"`, with no `sections`, `asideSlot`, `sidebarHeader` or `headerAside`. Use ordinary centered Dialog for read-only previews. Do not alter global shell behavior.
@@ -26,7 +26,7 @@ Work directly on `main`, as required by AGENTS.md. Do not create branches/worktr
 
 Each lane owns only its listed files. Other lanes may read them. Request a change from the owning lane through a checkpoint note instead of editing outside ownership. Shared source interface names below are fixed before parallel work. The lead alone edits this plan/ledger, runs final repository gates, rebuilds the production portal and accepts work. Subtasks are parts of one implementation run, so they must not independently rebuild or alter the running container.
 
-Execution records, briefs and verification evidence live under `C:/mutakamel.ai/designs/organization-tenant-study-v1/implementation/`.
+Execution records, briefs and verification evidence live under `Z:/mutakamel-memory/design-assets/core/2026-11-01/organization-tenant-study-v1/implementation/`.
 
 ## Executor permission profile
 
