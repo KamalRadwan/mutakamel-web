@@ -15,7 +15,6 @@ const AUTH_CHANNEL = 'mutakamel-auth';
 const REFRESH_LOCK = 'mutakamel-tenant-refresh';
 const PENDING_LOGOUT = 'mutakamel-tenant-logout-pending';
 const AUTH_ROUTE_PREFIXES = ['/login', '/verify', '/reset-password', '/tenant/reset-password', '/tenant/accept-invite'] as const;
-const UNKNOWN_ACCESS_DELAY_MS = 5_000;
 const REFRESH_RETRY_DELAY_MS = 30_000;
 const ACTIVITY_INTERVAL_MS = 60_000;
 
@@ -103,7 +102,6 @@ export class AuthSession {
   private fallbackLock: Promise<unknown> | null = null;
   private pendingLogout = false;
   private timing: AccessTiming | null = null;
-  private unknownAccessRefreshAt = 0;
   private retryAt = 0;
   private meNeedsRefresh = false;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -262,7 +260,6 @@ export class AuthSession {
     this.loadInFlight = null;
     this.refreshInFlight = null;
     this.timing = null;
-    this.unknownAccessRefreshAt = 0;
     this.retryAt = 0;
     this.meNeedsRefresh = false;
     this.lastActivityAt = Number.NEGATIVE_INFINITY;
@@ -393,7 +390,6 @@ export class AuthSession {
     this.revision += 1;
     this.meNeedsRefresh = false;
     this.retryAt = 0;
-    this.unknownAccessRefreshAt = Date.now() + UNKNOWN_ACCESS_DELAY_MS;
     this.sessionEndedNotified = false;
     this._status.set('signed-in');
     this.scheduleRefresh();
@@ -480,9 +476,8 @@ export class AuthSession {
   private refreshDeadline(): number | null {
     if (this._status() !== 'signed-in' || this.window?.navigator.onLine === false) return null;
     if (this.meNeedsRefresh) return this.retryAt;
-    if (!this.leader.isLeader()) return null;
-    const deadline = this.timing?.refreshAt ?? (this.api.hasCsrfCookie() ? this.unknownAccessRefreshAt : null);
-    return deadline === null ? null : Math.max(deadline, this.retryAt);
+    if (!this.leader.isLeader() || !this.timing) return null;
+    return Math.max(this.timing.refreshAt, this.retryAt);
   }
 
   private refreshIsDue(): boolean {

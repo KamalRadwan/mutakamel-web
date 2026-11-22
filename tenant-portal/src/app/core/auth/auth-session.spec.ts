@@ -142,7 +142,7 @@ describe('AuthSession', () => {
     vi.useRealTimers();
   });
 
-  it('bootstraps /me, populates CurrentUser, and caches subsequent calls', async () => {
+  it('restores valid access through /me after reload without refreshing', async () => {
     const session = TestBed.inject(AuthSession);
     const currentUser = TestBed.inject(CurrentUser);
 
@@ -156,7 +156,8 @@ describe('AuthSession', () => {
     expect(fakeSessionCallCounts().me).toBe(1);
 
     expect(await settle(session.ensureLoaded())).toBe('signed-in');
-    expect(fakeSessionCallCounts().me).toBe(1);
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(fakeSessionCallCounts()).toEqual({ me: 1, refresh: 0, logout: 0 });
   });
 
   it('refreshes once on 401 COMMON.AUTH.TOKEN_EXPIRED and succeeds', async () => {
@@ -165,6 +166,7 @@ describe('AuthSession', () => {
 
     expect(await settle(session.ensureLoaded())).toBe('signed-in');
     expect(session.status()).toBe('signed-in');
+    await vi.advanceTimersByTimeAsync(6_000);
     expect(fakeSessionCallCounts()).toEqual({ me: 2, refresh: 1, logout: 0 });
   });
 
