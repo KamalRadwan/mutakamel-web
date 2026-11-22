@@ -112,20 +112,13 @@ export class GlobalPermissionsModal {
   protected readonly isBranchRole = computed(() => this.role()?.permissionMode === 'BRANCH');
 
   protected readonly disabledPermissionIds = computed<readonly string[]>(() => {
-    const me = this.session.me();
-    if (!me || me.isTenantOwner) return [];
-    const disabled: string[] = [];
-    for (const entry of this.entries()) {
-      if (!me.permissionScopes[entry.key]?.tenantWide) {
-        disabled.push(entry.id);
-      }
-    }
-    return disabled;
+    return this.entries().filter((entry) => !this.session.isTenantWide(entry.key)).map((entry) => entry.id);
   });
 
   protected readonly isReadonly = computed(() => {
     const current = this.role();
-    return this.forceReadonly() || Boolean(current?.isSystem) || current?.permissionMode === 'BRANCH';
+    return this.forceReadonly() || Boolean(current?.isSystem) || current?.permissionMode === 'BRANCH' ||
+      !this.session.canReadRolePermissions() || !this.session.isTenantWide('roles.role.update');
   });
 
   protected readonly dirty = computed(() => {
@@ -145,6 +138,7 @@ export class GlobalPermissionsModal {
   });
 
   open(roleId: string, options?: { readonly?: boolean; roleName?: string }): void {
+    if (!this.session.canReadRolePermissions()) return;
     this.allowClose = false;
     this.currentRoleId = roleId;
     this.forceReadonly.set(Boolean(options?.readonly));
@@ -186,6 +180,8 @@ export class GlobalPermissionsModal {
     }
 
     const permissionIds = [...this.selected()];
+    const permittedIds = new Set(this.entries().filter((entry) => this.session.isTenantWide(entry.key)).map((entry) => entry.id));
+    if (permissionIds.some((id) => !permittedIds.has(id))) return;
     const key = confirmAddonCascade
       ? newIdempotencyKey()
       : this.idempotencyKeyFor(current.id, permissionIds);
@@ -284,11 +280,9 @@ export class GlobalPermissionsModal {
     this.seatBlocked.set(false);
 
     try {
-      if (!this.session.me()) {
-        await this.session.load().catch(() => undefined);
-      }
+      if (!this.session.canReadRolePermissions()) return;
       const [roleDetail, permissions] = await Promise.all([getRole(roleId), this.fetchAllPermissions()]);
-      if (seq !== this.loadSeq) return;
+      if (seq !== this.loadSeq || !this.session.canReadRolePermissions()) return;
       this.role.set(roleDetail);
       this.entries.set(fromPermissions(permissions));
       this.initialSelected.set([...roleDetail.permissionIds]);

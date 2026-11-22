@@ -151,7 +151,7 @@ export class UserPhoneTab {
   protected readonly isOwner = computed(() => this.session.isOwner());
   protected readonly isReadonly = computed(() => {
     this.session.me();
-    return !this.session.can('webphone.extensions.manage');
+    return !this.session.isTenantWide('webphone.extensions.manage');
   });
 
   protected readonly userDisplayPlaceholder = computed(() => userFullName(this.user()));

@@ -94,6 +94,8 @@ export interface OrgViewTreeResult {
 export interface BuildOrgTreeOptions {
   showInactive: boolean;
   search: string;
+  canReadCompany?: (companyId: string) => boolean;
+  canReadBranch?: (companyId: string, branchId: string) => boolean;
   canReadDepartments: (companyId: string, branchId: string) => boolean;
   canReadTeams: (companyId: string, branchId: string) => boolean;
 }
@@ -114,6 +116,8 @@ export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgT
     departmentId: string | null,
     ancestorMatched: boolean,
   ): OrgViewNode | null => {
+    if (depth === 0 && options.canReadCompany?.(node.id) === false) return null;
+    if (depth === 1 && options.canReadBranch?.(companyId, node.id) === false) return null;
     if (!options.showInactive && node.status === 'INACTIVE') {
       return null;
     }
@@ -123,12 +127,16 @@ export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgT
     const nextBranchId = depth === 1 ? node.id : branchId;
     const nextDepartmentId = depth === 2 ? node.id : departmentId;
     const nextTeamId = depth === 3 ? node.id : null;
+    const hiddenByPermission =
+      (level === 'branch' && !options.canReadDepartments(nextCompanyId, node.id)) ||
+      (level === 'department' &&
+        (nextBranchId === null || !options.canReadTeams(nextCompanyId, nextBranchId)));
 
     const isMatch =
       term.length > 0 && (node.name.toLowerCase().includes(term) || node.code.toLowerCase().includes(term));
 
     const children: OrgViewNode[] = [];
-    if (depth < 3) {
+    if (depth < 3 && !hiddenByPermission) {
       const nextDepth = (depth + 1) as 0 | 1 | 2 | 3;
       for (const child of node.children) {
         const mapped = visit(
@@ -151,13 +159,6 @@ export function buildOrgViewTree(raw: readonly OrgTreeNode[], options: BuildOrgT
     if (term.length > 0 && !isMatch && !hasMatchingDescendant && !ancestorMatched) {
       return null;
     }
-
-    const hiddenByPermission =
-      (level === 'branch' && node.children.length === 0 && !options.canReadDepartments(nextCompanyId, node.id)) ||
-      (level === 'department' &&
-        node.children.length === 0 &&
-        nextBranchId !== null &&
-        !options.canReadTeams(nextCompanyId, nextBranchId));
 
     if (isMatch) matchCount++;
     if (level === 'company') counts.c++;
@@ -208,6 +209,8 @@ export function buildNodeActions(
   translate: (key: string) => string,
 ): ActionItem[] {
   const scopeReason = translate('staff.protected.scope');
+  const scope = { companyId: node.companyId, branchId: node.branchId };
+  const canOpen = session.can(`org.${node.level}.read`, scope);
 
   const canEdit =
     node.level === 'company'
@@ -229,7 +232,9 @@ export function buildNodeActions(
       id: 'open',
       title: translate('org.actions.open'),
       icon: 'tablerEye',
-      tile: 'bg-icon-blue',
+      tile: canOpen ? 'bg-icon-blue' : 'bg-icon-gray',
+      disabled: !canOpen,
+      reason: canOpen ? undefined : scopeReason,
     },
     {
       id: 'edit',
@@ -251,7 +256,7 @@ export function buildNodeActions(
 
     const canAddChild =
       node.level === 'company'
-        ? session.can('org.branch.manage', { companyId: node.id })
+        ? session.canCreateBranch(node.id)
         : node.level === 'branch'
           ? session.can('org.department.manage', { companyId: node.companyId, branchId: node.id })
           : session.can('org.team.manage', {
@@ -270,8 +275,8 @@ export function buildNodeActions(
   }
 
   const canViewUsers = session.can('users.user.read', {
-    companyId: node.companyId,
-    branchId: node.branchId ?? undefined,
+    companyId: node.level === 'company' ? node.id : node.companyId,
+    branchId: node.level === 'branch' ? node.id : node.branchId ?? undefined,
   });
 
   items.push({

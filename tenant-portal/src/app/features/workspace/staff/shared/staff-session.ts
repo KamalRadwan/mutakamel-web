@@ -1,66 +1,94 @@
-import { Service, signal } from '@angular/core';
-import { getMe } from './staff.api';
-import { FAKE_ACTOR, FakeActor, buildActorMeSync, setFakeActor } from './staff.fake';
-import { Me } from './staff.model';
-
-export { FAKE_ACTOR, setFakeActor };
-export type { FakeActor };
+import { computed, inject, Service } from '@angular/core';
+import { AuthSession } from '../../../../core/auth/auth-session';
+import { TenantScopeState, type TenantResourceScope } from '../../../../core/scope/tenant-scope';
 
 @Service()
 export class StaffSession {
-  readonly me = signal<Me | null>(buildActorMeSync());
-  /** Load state of the session: pages show a retry state when it is 'failed' and no session is held. */
-  readonly state = signal<'pending' | 'ready' | 'failed'>(this.me() ? 'ready' : 'pending');
+  private readonly auth = inject(AuthSession);
+  private readonly scope = inject(TenantScopeState);
 
-  get actor(): FakeActor {
-    return FAKE_ACTOR;
-  }
+  readonly me = this.scope.me;
+  readonly scopeRevision = computed(() => {
+    const me = this.me();
+    // /me has no revision. Keep the same key when a silent refresh returns identical scope.
+    return me ? JSON.stringify([
+      me.id, me.permissions, me.permissionScopes,
+      me.accessibleCompanies, me.accessibleBranches, me.accessibleBranchCompanies, me.accessScope,
+    ]) : null;
+  });
+  readonly state = computed(() => {
+    if (this.me()) return 'ready';
+    const status = this.auth.status();
+    return status === 'unknown' || status === 'loading' ? 'pending' : 'failed';
+  });
 
-  setActor(actor: FakeActor): void {
-    setFakeActor(actor);
-    this.me.set(buildActorMeSync(actor));
-  }
-
-  async load(): Promise<Me> {
-    this.state.set('pending');
-    try {
-      const loaded = await getMe();
-      this.me.set(loaded);
-      this.state.set('ready');
-      return loaded;
-    } catch (error) {
-      this.state.set('failed');
-      throw error;
-    }
+  async load() {
+    await this.auth.ensureLoaded();
+    return this.me();
   }
 
   isOwner(): boolean {
-    return Boolean(this.me()?.isTenantOwner);
+    return this.me()?.isTenantOwner === true;
   }
 
   isTenantWide(permission: string): boolean {
-    const current = this.me();
-    if (!current) return false;
-    if (current.isTenantOwner) return true;
-    return Boolean(current.permissionScopes[permission]?.tenantWide);
+    return this.grant(permission)?.tenantWide === true;
   }
 
-  can(permission: string, scope?: { branchId?: string | null; companyId?: string | null }): boolean {
-    const current = this.me();
-    if (!current) return false;
-    if (current.isTenantOwner) return true;
-    const entry = current.permissionScopes[permission];
-    if (!entry) return false;
-    if (entry.tenantWide) return true;
-    if (!scope || (!scope.branchId && !scope.companyId)) {
-      return entry.branchIds.length > 0 || entry.companyIds.length > 0 || current.permissions.includes(permission);
+  canReadRolePermissions(): boolean {
+    return this.can('roles.role.read') && this.can('roles.permission.read');
+  }
+
+  canReadBranchPermissions(): boolean {
+    return this.isOwner() && this.canReadRolePermissions();
+  }
+
+  canUpdateBranchPermissions(): boolean {
+    return this.canReadBranchPermissions() && this.isTenantWide('roles.role.update');
+  }
+
+  canCreateBranch(companyId: string): boolean {
+    const grant = this.grant('org.branch.manage');
+    // Ordinary branch creation uses Core's GLOBAL-mode company authority projection.
+    return Boolean(grant && this.scope.companies().has(companyId) &&
+      (grant.tenantWide === true || grant.companyIds.includes(companyId)));
+  }
+
+  can(permission: string, target?: TenantResourceScope): boolean {
+    const grant = this.grant(permission);
+    if (!grant) return false;
+
+    const companies = this.scope.companies();
+    const branchCompanies = this.scope.branchCompanies();
+    const read = permission.endsWith('.read');
+    if (!target) {
+      // An unscoped decision only determines whether an indexed read route can open.
+      const accessScope = this.me()?.accessScope;
+      return read && (grant.tenantWide === true ||
+        (accessScope?.companiesTruncated === true && grant.companyIds.length > 0) ||
+        (accessScope?.branchesTruncated === true && grant.branchIds.length > 0) ||
+        grant.companyIds.some((id) => companies.has(id)) ||
+        grant.branchIds.some((id) => branchCompanies.has(id)));
     }
-    if (scope.branchId) {
-      return entry.branchIds.includes(scope.branchId);
+
+    if (target.branchId != null) {
+      const company = branchCompanies.get(target.branchId);
+      return Boolean(company && (target.companyId == null || company === target.companyId) &&
+        (grant.tenantWide === true || grant.branchIds.includes(target.branchId)));
     }
-    if (scope.companyId) {
-      return entry.companyIds.includes(scope.companyId);
-    }
-    return false;
+
+    const companyId = target.companyId;
+    if (!companyId || !companies.has(companyId)) return false;
+    // Core projects parent companies into companyIds. It cannot prove company
+    // write authority from this payload; use exact branches or a tenant grant.
+    return grant.tenantWide === true || (read && grant.companyIds.includes(companyId)) ||
+      (permission === 'org.company.read' &&
+        grant.branchIds.some((branchId) => branchCompanies.get(branchId) === companyId));
+  }
+
+  private grant(permission: string) {
+    const me = this.me();
+    if (!me?.permissions.includes(permission)) return undefined;
+    return me.permissionScopes[permission];
   }
 }

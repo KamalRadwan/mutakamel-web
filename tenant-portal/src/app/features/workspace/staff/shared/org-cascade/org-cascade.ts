@@ -28,6 +28,7 @@ export class OrgCascade {
   readonly readonly = input(false);
   readonly disabledLevels = input<OrgCascadeLevel[]>([]);
   readonly activeOnly = input(true);
+  readonly allowCompany = input<((company: Company) => boolean) | null>(null);
   readonly errors = input<Partial<Record<OrgCascadeLevel, string>>>({});
   readonly hints = input<Partial<Record<OrgCascadeLevel, string>>>({});
 
@@ -125,7 +126,8 @@ export class OrgCascade {
   }
 
   protected readonly companyOptions = computed(() =>
-    this.buildOptions('company', this.companies(), this.value().companyId),
+    this.buildOptions('company', this.companies().filter((company) => this.allowCompany()?.(company) ?? true),
+      this.value().companyId),
   );
   protected readonly branchOptions = computed(() =>
     this.buildOptions('branch', this.branches(), this.value().branchId),

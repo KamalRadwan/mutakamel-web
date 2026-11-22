@@ -1,0 +1,83 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OrganizationReadApi } from './organization-read.api';
+import { StaffSession } from './staff-session';
+
+const path = '/api/tenant/core/v1/organization';
+const companyId = '019f0000-0000-7000-8000-000000000012';
+const branchId = '019f0000-0000-7000-8000-000000000013';
+const company = { id: companyId, code: 'C', name: 'Company', status: 'ACTIVE' };
+const branch = { id: branchId, companyId, code: 'B', name: 'Branch', status: 'INACTIVE' };
+const meta = { page: 2, limit: 20, total: 21, totalPages: 2, hasNext: false, hasPrev: true };
+
+describe('OrganizationReadApi', () => {
+  const can = vi.fn<(permission: string) => boolean>();
+  let api: OrganizationReadApi;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    can.mockReset().mockReturnValue(true);
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: StaffSession, useValue: { can, scopeRevision: () => 'tenant-actor-access' } },
+      ],
+    });
+    api = TestBed.inject(OrganizationReadApi);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  it('reads the company directory from Core and retains server pagination metadata', async () => {
+    const pending = api.listCompanies({ page: 2, limit: 20, sortBy: 'name', sortDir: 'ASC' });
+    const request = http.expectOne((req) => req.method === 'GET' && req.url === `${path}/companies`);
+    expect(request.request.params.get('page')).toBe('2');
+    request.flush({ success: true, data: [company], meta });
+    await expect(pending).resolves.toEqual({ data: [company], meta });
+    expect(can).toHaveBeenCalledWith('org.company.read');
+  });
+
+  it('sends the chosen real company ID with branch search and status filters', async () => {
+    const pending = api.listBranches({ companyId, search: 'Branch', status: 'INACTIVE' });
+    const request = http.expectOne((req) => req.method === 'GET' && req.url === `${path}/branches`);
+    expect(request.request.params.get('companyId')).toBe(companyId);
+    expect(request.request.params.get('search')).toBe('Branch');
+    expect(request.request.params.get('status')).toBe('INACTIVE');
+    request.flush({ success: true, data: [branch], meta });
+    await expect(pending).resolves.toEqual({ data: [branch], meta });
+    expect(can).toHaveBeenCalledWith('org.branch.read');
+  });
+
+  it('reads company and branch details through their scoped GET endpoints', async () => {
+    const pendingCompany = api.getCompany(companyId);
+    const pendingBranch = api.getBranch(branchId);
+    http.expectOne({ method: 'GET', url: `${path}/companies/${companyId}` }).flush({ success: true, data: company });
+    http.expectOne({ method: 'GET', url: `${path}/branches/${branchId}` }).flush({ success: true, data: branch });
+    await expect(pendingCompany).resolves.toEqual(company);
+    await expect(pendingBranch).resolves.toEqual(branch);
+  });
+
+  it('preserves an empty page separately from access denied by the server', async () => {
+    const pendingEmpty = api.listCompanies();
+    const empty = { data: [], meta: { ...meta, total: 0, page: 1, totalPages: 0, hasPrev: false } };
+    http.expectOne(`${path}/companies`).flush({ success: true, ...empty });
+    await expect(pendingEmpty).resolves.toEqual(empty);
+
+    const pendingDenied = api.listBranches();
+    http.expectOne(`${path}/branches`).flush(
+      { code: 'GW.AUTH.FORBIDDEN' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await expect(pendingDenied).rejects.toMatchObject({ status: 403, code: 'GW.AUTH.FORBIDDEN' });
+  });
+
+  it('skips directory requests when the matching Staff read permission is absent', async () => {
+    can.mockImplementation((permission) => permission === 'org.branch.read');
+    await expect(api.listCompanies()).rejects.toMatchObject({ status: 403 });
+    http.expectNone(`${path}/companies`);
+  });
+});

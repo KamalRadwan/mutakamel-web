@@ -58,6 +58,7 @@ import {
   fakeUpdateRole,
   fakeUpdateTeam,
   fakeUpdateUser,
+  type StaffFixtureReadScope,
 } from './staff.fake';
 import {
   AssignmentOptions,
@@ -227,9 +228,9 @@ export function getOrgTree(): Promise<OrgTreeNode[]> {
   return fakeGetOrgTree();
 }
 
-export function listCompanies(q: ListQuery = {}): Promise<CorePage<Company>> {
+export function listCompanies(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<Company>> {
   // GET /api/tenant/core/v1/organization/companies (sortBy: name|code|createdAt)
-  return fakeListCompanies(q);
+  return fakeListCompanies(q, canRead);
 }
 
 export function getCompany(id: string): Promise<Company> {
@@ -266,9 +267,9 @@ export function deleteCompany(id: string, key: string, opts?: ConfirmAddonCascad
   return fakeDeleteCompany(id, key, opts);
 }
 
-export function listBranches(q: ListQuery = {}): Promise<CorePage<Branch>> {
+export function listBranches(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<Branch>> {
   // GET /api/tenant/core/v1/organization/branches
-  return fakeListBranches(q);
+  return fakeListBranches(q, canRead);
 }
 
 export function getBranch(id: string): Promise<Branch> {
@@ -306,9 +307,9 @@ export function deleteBranch(id: string, key: string, opts?: ConfirmAddonCascade
   return fakeDeleteBranch(id, key, opts);
 }
 
-export function listDepartments(q: ListQuery = {}): Promise<CorePage<Department>> {
+export function listDepartments(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<Department>> {
   // GET /api/tenant/core/v1/organization/departments
-  return fakeListDepartments(q);
+  return fakeListDepartments(q, canRead);
 }
 
 export function getDepartment(id: string): Promise<Department> {
@@ -338,9 +339,9 @@ export function deleteDepartment(id: string, key: string): Promise<void> {
   return fakeDeleteDepartment(id, key);
 }
 
-export function listTeams(q: ListQuery = {}): Promise<CorePage<Team>> {
+export function listTeams(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<Team>> {
   // GET /api/tenant/core/v1/organization/teams
-  return fakeListTeams(q);
+  return fakeListTeams(q, canRead);
 }
 
 export function getTeam(id: string): Promise<Team> {
@@ -370,9 +371,9 @@ export function deleteTeam(id: string, key: string): Promise<void> {
   return fakeDeleteTeam(id, key);
 }
 
-export function listUsers(q: ListQuery = {}): Promise<CorePage<TenantUser>> {
+export function listUsers(q: ListQuery = {}, canRead?: StaffFixtureReadScope): Promise<CorePage<TenantUser>> {
   // GET /api/tenant/core/v1/users (sortBy: email|firstName|lastName|employeeCode|createdAt)
-  return fakeListUsers(q);
+  return fakeListUsers(q, canRead);
 }
 
 export function getUser(id: string): Promise<TenantUser> {

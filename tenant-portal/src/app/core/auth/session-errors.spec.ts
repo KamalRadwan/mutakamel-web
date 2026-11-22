@@ -23,6 +23,25 @@ describe('session-errors allow-lists', () => {
     expect(isRefreshable(new Error('COMMON.AUTH.TOKEN_EXPIRED'))).toBe(false);
   });
 
+  it.each(['COMMON.AUTH.INVALID_ACCESS_TOKEN', 'COMMON.AUTH.MISSING_BEARER_TOKEN', 'GW.AUTH.MISSING_SESSION'])(
+    'refreshes %s with CSRF proof',
+    (code) => {
+      expect(isRefreshable(new ApiError(401, code), true)).toBe(true);
+      expect(isRefreshable(new ApiError(401, code), false)).toBe(false);
+      expect(isRefreshable(new ApiError(403, code), true)).toBe(false);
+    },
+  );
+
+  it('renews stale authorization on 401 and leaves an ordinary permission denial on screen', () => {
+    const stale = new ApiError(401, 'AUTH_AUTHORIZATION_STALE');
+    expect(isRefreshable(stale)).toBe(true);
+    expect(isSessionEnded(stale)).toBe(false);
+
+    const forbidden = new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
+    expect(isRefreshable(forbidden)).toBe(false);
+    expect(isSessionEnded(forbidden)).toBe(false);
+  });
+
   it.each([...SESSION_ENDED_CODES])('treats terminal code %s on 401 or 403 as session-ended', (code) => {
     expect(isSessionEnded(new ApiError(401, code))).toBe(true);
     expect(isSessionEnded(new ApiError(403, code))).toBe(true);

@@ -1,6 +1,10 @@
 {
   "brand": "Mutakamel",
   "login": {
+    "headline": "From the first sale",
+    "headlineAccent": "to the final invoice.",
+    "description": "Sales, customers, and accounting in one workspace.",
+    "copyright": "© Mutakamel {{year}}",
     "title": "Sign in",
     "email": "Email",
     "emailHint": "The email your invitation was sent to",

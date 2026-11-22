@@ -17,7 +17,7 @@
   }
 
   @if (actionLabel()) {
-    <button type="button" uiButton variant="primary" (click)="action.emit()">
+    <button type="button" uiButton variant="primary" [loading]="busy()" (click)="action.emit()">
       {{ actionLabel() }}
     </button>
   }

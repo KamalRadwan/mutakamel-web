@@ -130,7 +130,10 @@ export class AssignPermissionsWizard {
 
   protected readonly isOpen = signal(false);
   protected readonly roleId = signal<string | null>(null);
-  protected readonly readonly = signal(false);
+  private readonly readonlyRequested = signal(false);
+  protected readonly readonly = computed(() =>
+    this.readonlyRequested() || !this.session.canUpdateBranchPermissions(),
+  );
   protected readonly step = signal<WizardStepId>('scope');
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
@@ -359,11 +362,12 @@ export class AssignPermissionsWizard {
   }
 
   open(roleId: string, options?: { readonly?: boolean }): void {
+    if (!this.session.canReadBranchPermissions()) return;
     this.allowClose = false;
     this.guardBusy.set(false);
     this.conflictOpen.set(false);
     this.roleId.set(roleId);
-    this.readonly.set(Boolean(options?.readonly));
+    this.readonlyRequested.set(Boolean(options?.readonly));
     this.step.set('scope');
     this.step1Attempted.set(false);
     this.invalidBranchIds.set(new Set());
@@ -797,6 +801,7 @@ export class AssignPermissionsWizard {
   }
 
   private async load(roleId: string): Promise<void> {
+    if (!this.session.canReadBranchPermissions()) return;
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
@@ -808,7 +813,7 @@ export class AssignPermissionsWizard {
         this.fetchAllPages((q) => listBranches(q)),
         roleHolderCount(roleId).catch(() => 0),
       ]);
-      if (seq !== this.loadSeq) return;
+      if (seq !== this.loadSeq || !this.session.canReadBranchPermissions()) return;
 
       const { companies, branches } = this.mergeMissingEntities(
         companiesRaw,

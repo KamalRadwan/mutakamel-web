@@ -40,6 +40,7 @@ interface RowView {
 
 let fixture: ComponentFixture<SeatMigrationPage>;
 let c: Internals;
+let fixtureOwner: boolean;
 let cascadeConfirm: ReturnType<typeof vi.fn>;
 
 async function flush(ms = 2000): Promise<void> {
@@ -82,7 +83,7 @@ function toasts(type: string): string[] {
 }
 
 async function render(owner = true): Promise<void> {
-  TestBed.inject(StaffSession).setActor(owner ? 'owner' : 'tenantAdmin');
+  fixtureOwner = owner;
   fixture = TestBed.createComponent(SeatMigrationPage);
   c = fixture.componentInstance as unknown as Internals;
   await flush();
@@ -100,6 +101,7 @@ beforeEach(() => {
   cascadeConfirm = vi.fn(async () => true);
   TestBed.configureTestingModule({
     providers: [
+      { provide: StaffSession, useValue: { isOwner: () => fixtureOwner } },
       provideRouter([]),
       provideTransloco({
         config: { availableLangs: ['en', 'ar'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
@@ -112,7 +114,6 @@ beforeEach(() => {
 
 afterEach(() => {
   fixture?.destroy();
-  TestBed.inject(StaffSession).setActor('owner');
   TestBed.resetTestingModule();
   setFakeSeatMode('DERIVED');
   setFakeMigrationShort(false);

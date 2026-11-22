@@ -4,8 +4,10 @@ import { type ActivatedRouteSnapshot, Router, type RouterStateSnapshot, UrlTree,
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../api/api-errors';
 import { AuthSession } from './auth-session';
-import { fakeSessionCallCounts, resetFakeSession, setFakeSessionNext } from './auth-session.fake';
+import { AuthSessionApi } from './auth-session.api';
+import { fakeGetMe, fakeRefreshSession, fakeSessionCallCounts, resetFakeSession, setFakeSessionNext } from './auth-session.fake';
 import { authGuard, guestGuard } from './auth.guards';
 
 @Injectable()
@@ -20,18 +22,24 @@ async function settle<T>(promise: Promise<T>): Promise<T> {
     (value) => ({ ok: true as const, value }),
     (error: unknown) => ({ ok: false as const, error }),
   );
-  await vi.runAllTimersAsync();
+  await vi.advanceTimersByTimeAsync(2_000);
   const result = await guarded;
   if (!result.ok) throw result.error;
   return result.value;
 }
 
 describe('authGuard & guestGuard', () => {
+  const getMe = vi.fn(fakeGetMe);
+  const refresh = vi.fn(fakeRefreshSession);
+
   beforeEach(() => {
     vi.useFakeTimers();
     resetFakeSession();
+    getMe.mockReset();
+    refresh.mockReset();
     TestBed.configureTestingModule({
       providers: [
+        { provide: AuthSessionApi, useValue: { getMe, refreshSession: refresh, hasCsrfCookie: () => true } },
         provideRouter([]),
         provideTransloco({
           config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
@@ -81,6 +89,29 @@ describe('authGuard & guestGuard', () => {
     setFakeSessionNext('SERVER_ERROR');
     expect(await runAuthGuard('/workspace')).toBe(true);
     expect(TestBed.inject(AuthSession).status()).toBe('failed');
+  });
+
+  it.each([
+    'GW.AUTH.MISSING_SESSION',
+    'COMMON.AUTH.MISSING_BEARER_TOKEN',
+    'COMMON.AUTH.INVALID_ACCESS_TOKEN',
+  ])('refreshes once on direct navigation after %s', async code => {
+    getMe.mockRejectedValueOnce(new ApiError(401, code));
+    expect(await runAuthGuard('/crm/leads')).toBe(true);
+    expect(TestBed.inject(AuthSession).status()).toBe('signed-in');
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(getMe).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses the protected destination as returnUrl when terminal refresh fails on direct navigation', async () => {
+    getMe.mockRejectedValueOnce(new ApiError(401, 'COMMON.AUTH.INVALID_ACCESS_TOKEN'));
+    refresh.mockRejectedValueOnce(new ApiError(401, 'INVALID_REFRESH_TOKEN'));
+    const result = await runAuthGuard('/crm/leads?page=2');
+
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/login?returnUrl=%2Fcrm%2Fleads%3Fpage%3D2');
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(getMe).toHaveBeenCalledTimes(1);
   });
 
   it('guestGuard makes no network call when not signed in', () => {

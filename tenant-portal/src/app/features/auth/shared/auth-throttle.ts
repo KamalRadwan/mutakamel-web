@@ -3,7 +3,7 @@ import { ApiError } from '../../../core/api/api-errors';
 
 /**
  * Seconds to wait from a 429: details.retryAfterSeconds[0] (AUTH_MFA_THROTTLED, AUTH_LOGIN_THROTTLED),
- * else `fallback` (COMMON.GENERIC.RATE_LIMITED and GW.RATE.LIMIT_EXCEEDED carry only a Retry-After header).
+ * including delays normalized from Retry-After in the auth transport, else `fallback`.
  */
 export function retryAfterSeconds(error: unknown, fallback = 60): number {
   if (!(error instanceof ApiError)) return fallback;

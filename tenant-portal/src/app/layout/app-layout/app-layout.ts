@@ -1,6 +1,6 @@
 import { Component, ElementRef, computed, effect, inject, linkedSignal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { NavigationEnd, PRIMARY_OUTLET, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -117,12 +117,15 @@ import { SeatNoticeHost } from '../../features/workspace/seats/over-capacity/sea
 import { PhoneState } from '../../core/phone/phone';
 import { PhoneHost } from '../phone/phone-host/phone-host';
 import { APP_MAP, APPS, AppId, CRM_FEATURE_MODULE, FEATURE_ICONS, NAV_GROUPS, PAGES } from '../navigation';
+import { StaffAccessPage } from '../../features/workspace/staff/staff-access-page';
+import { STAFF_PAGES } from '../../features/workspace/staff/staff-navigation';
+import { StaffReadAccess, staffScopeQuery } from '../../features/workspace/staff/staff-read-access';
 
 const BULK_JOB_APPS = new Set<BulkJobApp>(['core', 'crm', 'trading', 'accounting']);
 
 @Component({
   selector: 'app-layout',
-  imports: [RouterLink, RouterOutlet, TranslocoPipe, NgIcon, FullState, Menu, Preferences, BulkJobsIndicator, NotificationBell, ScopeSwitcher, SeatNoticeHost, PhoneHost],
+  imports: [RouterLink, RouterOutlet, TranslocoPipe, NgIcon, FullState, Menu, Preferences, BulkJobsIndicator, NotificationBell, ScopeSwitcher, SeatNoticeHost, PhoneHost, StaffAccessPage],
   providers: [
     provideIcons({
       tablerWorld,
@@ -231,9 +234,11 @@ export class AppLayout {
   private readonly viewScale = inject(ViewScale);
   private readonly bulkJobs = inject(BulkJobsTracker);
   private readonly crmModules = inject(CrmModules);
+  private readonly staffRead = inject(StaffReadAccess);
   protected readonly phone = inject(PhoneState);
   protected readonly authSession = inject(AuthSession);
   protected readonly currentUser = inject(CurrentUser);
+  protected readonly identityReady = computed(() => this.authSession.status() === 'signed-in' && this.authSession.me() !== null);
   private readonly skipReportOnce = new Set<string>();
 
   private readonly translation = toSignal(this.transloco.selectTranslation());
@@ -246,6 +251,30 @@ export class AppLayout {
   );
 
   private readonly segments = computed(() => this.url().split(/[?#]/)[0].split('/').filter(Boolean));
+
+  private readonly staffLocation = computed(() => {
+    const tree = this.router.parseUrl(this.url());
+    const [app, feature, page] = tree.root.children[PRIMARY_OUTLET]?.segments ?? [];
+    return app?.path === 'workspace' && feature?.path === 'staff'
+      ? { page: page?.path, query: tree.queryParamMap }
+      : null;
+  });
+
+  private readonly staffEntryPages = computed(() => this.staffRead.availablePages());
+
+  protected readonly staffPageQuery = computed(() => {
+    const location = this.staffLocation();
+    return location ? staffScopeQuery(location.query) : null;
+  });
+
+  protected readonly staffOutlet = computed(() => {
+    const location = this.staffLocation();
+    if (!location) return 'open';
+    if (!this.staffRead.ready()) return 'pending';
+    const page = location.page;
+    return page && STAFF_PAGES.some(({ id }) => id === page) && !this.staffRead.allows(page, location.query)
+      ? 'denied' : 'open';
+  });
 
   private readonly subNav = viewChild<ElementRef<HTMLElement>>('subNav');
 
@@ -312,6 +341,9 @@ export class AppLayout {
   protected readonly features = computed(() => {
     const app = this.navApp();
     const list = APP_MAP.get(app)?.features ?? [];
+    if (app === 'workspace' && this.staffEntryPages().length === 0) {
+      return list.filter((feature) => feature !== 'staff');
+    }
     if (app !== 'crm') return list;
     const leadsOn = this.crmModules.leadsEnabled();
     const oppsOn = this.crmModules.opportunitiesEnabled();
@@ -336,6 +368,10 @@ export class AppLayout {
 
   /** A group section opens its first page; its pages are in the level-2 bar (owner 2026-11-21: no dropdowns). */
   protected featureLink(feature: string): string[] {
+    if (this.navApp() === 'workspace' && feature === 'staff') {
+      const first = this.staffEntryPages()[0]?.id;
+      return first ? ['/', 'workspace', 'staff', first] : ['/', 'workspace', 'staff'];
+    }
     const first = this.isGroupFeature(feature) ? PAGES[`${this.navApp()}/${feature}`]?.[0]?.id : undefined;
     return first ? ['/', this.navApp(), feature, first] : ['/', this.navApp(), feature];
   }
@@ -371,6 +407,7 @@ export class AppLayout {
 
   protected readonly pages = computed(() => {
     const key = `${this.currentApp()}/${this.currentFeature()}`;
+    if (key === 'workspace/staff') return this.staffRead.availablePages(this.staffLocation()?.query);
     const list = PAGES[key] ?? [];
     if (key !== 'crm/settings') return list;
     const leadsOn = this.crmModules.leadsAnywhere();
@@ -409,7 +446,9 @@ export class AppLayout {
 
   protected selectSubPage(pageId: string) {
     this.navApp.set(this.currentApp());
-    void this.router.navigate(['/', this.currentApp(), this.currentFeature(), pageId]);
+    void this.router.navigate(['/', this.currentApp(), this.currentFeature(), pageId], {
+      queryParams: this.staffPageQuery(),
+    });
   }
 
   protected iconOf(feature: string) {
@@ -454,6 +493,8 @@ export class AppLayout {
   }
 
   protected selectUserAction(actionId: string) {
+    if (!this.identityReady()) return;
+
     if (actionId === 'preferences') {
       this.navApp.set(this.currentApp());
       void this.router.navigate(['/workspace/account/preferences']);
@@ -470,6 +511,7 @@ export class AppLayout {
 
   /** Retry after a failed bootstrap; a retry that finds the session over goes to /login?returnUrl. */
   protected async retrySession(): Promise<void> {
+    if (this.authSession.status() !== 'failed') return;
     const status = await this.authSession.ensureLoaded();
     if (status === 'signed-out') await this.authSession.sessionEnded(this.router.url);
   }

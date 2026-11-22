@@ -1,20 +1,26 @@
-import { Component, inject, signal } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormField, email, form, maxLength, required, submit } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerEye, tablerEyeOff } from '@ng-icons/tabler-icons';
+import { tablerArrowRight, tablerEye, tablerEyeOff } from '@ng-icons/tabler-icons';
 import { map } from 'rxjs';
-import { fieldErrorsOf, isValidationError } from '../../../../core/api/api-errors';
+import { ApiError, fieldErrorsOf, isValidationError } from '../../../../core/api/api-errors';
 import { AuthSession, safeReturnUrl } from '../../../../core/auth/auth-session';
 import { isMfaStep } from '../../../../core/auth/auth-session.model';
+import { AuthTransport, TenantProvisioningError } from '../../../../core/auth/auth-transport';
+import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
+import { ThemeState } from '../../../../core/theme/theme';
+import { TenantProvisioningPage } from '../../../../layout/tenant-provisioning/tenant-provisioning-page';
 import { Button } from '../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../shared/ui/checkbox/checkbox';
 import { Field } from '../../../../shared/ui/field/field';
+import { Preferences } from '../../../../shared/ui/preferences/preferences';
 import { SettingsNotice } from '../../../../shared/ui/settings-notice/settings-notice';
-import { AuthCard } from '../../shared/auth-card/auth-card';
+import { retryAfterSeconds } from '../../shared/auth-throttle';
 import { MfaPending } from '../../shared/mfa-pending';
 import { login } from '../login.api';
 import { LOGIN_LIMITS, LoginBody, LoginForm, loginErrorKey, retryAfterMinutes } from '../login.model';
@@ -29,9 +35,13 @@ interface ServerFieldErrors {
 
 @Component({
   selector: 'app-login-page',
-  imports: [FormField, RouterLink, TranslocoPipe, NgIcon, Button, Checkbox, Field, SettingsNotice, AuthCard],
-  providers: [provideIcons({ tablerEye, tablerEyeOff })],
+  imports: [
+    NgOptimizedImage, FormField, RouterLink, TranslocoPipe, NgIcon, Button, Checkbox, Field,
+    Preferences, SettingsNotice, TenantProvisioningPage,
+  ],
+  providers: [provideIcons({ tablerArrowRight, tablerEye, tablerEyeOff })],
   templateUrl: './login-page.html',
+  styleUrl: './login-page.css',
 })
 export class LoginPage {
   private readonly route = inject(ActivatedRoute);
@@ -39,7 +49,18 @@ export class LoginPage {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly authSession = inject(AuthSession);
+  private readonly authTransport = inject(AuthTransport);
   private readonly mfaPending = inject(MfaPending);
+  private readonly language = inject(LanguageState);
+  protected readonly theme = inject(ThemeState);
+  protected readonly tenantProvisioning = signal(false);
+  protected readonly checkingTenant = signal(false);
+
+  protected readonly ribbon = computed(() => `assets/auth/login-ribbon-${this.theme.current()}.webp`);
+  protected readonly copyrightYear = computed(() =>
+    new Intl.NumberFormat(this.language.current() === 'ar' ? 'ar-EG' : 'en', { useGrouping: false })
+      .format(new Date().getFullYear()),
+  );
 
   protected readonly credentials = signal<LoginForm>({ email: '', password: '', remember: false });
   protected readonly form = form(this.credentials, (path) => {
@@ -57,6 +78,29 @@ export class LoginPage {
   );
   private readonly serverErrors = signal<ServerFieldErrors | null>(null);
 
+  constructor() {
+    void this.checkTenantReadiness();
+  }
+
+  protected async checkTenantReadiness(): Promise<void> {
+    if (this.checkingTenant()) return;
+    const retrying = this.tenantProvisioning();
+    this.checkingTenant.set(true);
+    try {
+      await this.authTransport.checkTenantReadiness();
+      this.tenantProvisioning.set(false);
+    } catch (error) {
+      if (error instanceof TenantProvisioningError) {
+        this.showTenantProvisioning();
+      } else {
+        this.tenantProvisioning.set(false);
+        if (retrying) this.showError(error);
+      }
+    } finally {
+      this.checkingTenant.set(false);
+    }
+  }
+
   protected errorOf(field: LoginField) {
     const state = this.form[field]();
     const error = state.touched() ? state.errors()[0] : undefined;
@@ -71,24 +115,42 @@ export class LoginPage {
 
   protected signIn(event: Event) {
     event.preventDefault();
+    if (this.checkingTenant() || this.tenantProvisioning()) return;
     submit(this.form, async () => {
       const { remember, ...body } = this.credentials();
       this.serverErrors.set(null);
       try {
-        const result = await login(body, remember);
+        const result = await login(body, remember, this.authTransport);
         const returnUrl = safeReturnUrl(this.route.snapshot.queryParams['returnUrl']) ?? '/';
         if (isMfaStep(result)) {
           this.mfaPending.set(result, { returnUrl, origin: 'login' });
           await this.router.navigateByUrl('/verify');
         } else {
-          await this.authSession.signedIn(result);
+          const outcome = await this.authSession.signedIn(result);
+          if (outcome === 'signed-out') {
+            this.notify.error(
+              this.transloco.translate('session.ended.title'),
+              this.transloco.translate('session.ended.text'),
+            );
+            return undefined;
+          }
           await this.router.navigateByUrl(returnUrl);
         }
       } catch (error) {
-        if (!this.showFieldErrors(error, body)) this.showError(error);
+        if (error instanceof TenantProvisioningError) {
+          this.showTenantProvisioning();
+        } else if (!this.showFieldErrors(error, body)) {
+          this.showError(error);
+        }
       }
       return undefined;
     });
+  }
+
+  private showTenantProvisioning(): void {
+    this.tenantProvisioning.set(true);
+    this.credentials.update((value) => ({ ...value, password: '' }));
+    this.showPassword.set(false);
   }
 
   /** A 400 CORE_VALIDATION_FAILED keyed by email or password shows on the fields instead of a toast. */
@@ -105,9 +167,24 @@ export class LoginPage {
 
   private showError(error: unknown) {
     const key = loginErrorKey(error);
+    const title = this.transloco.translate(`auth.errors.${key}.title`);
+    const seconds = retryAfterSeconds(error, 0);
+    if (key === 'RATE_LIMITED' && seconds > 0) {
+      this.notify.error(title, this.transloco.translate('auth.shared.throttle', { s: seconds }));
+      return;
+    }
     this.notify.error(
-      this.transloco.translate(`auth.errors.${key}.title`),
-      this.transloco.translate(`auth.errors.${key}.text`, { minutes: retryAfterMinutes(error) }),
+      title,
+      this.transloco.translate(loginErrorTextKey(key, error), { minutes: retryAfterMinutes(error) }),
     );
   }
+}
+
+function loginErrorTextKey(key: ReturnType<typeof loginErrorKey>, error: unknown): string {
+  if (key === 'UNKNOWN' && error instanceof ApiError) {
+    if (error.status === 0) return 'auth.shared.errors.network';
+    if (error.status === 403) return 'apiErrors.permission';
+    if (error.status >= 500) return 'auth.shared.errors.unavailable';
+  }
+  return `auth.errors.${key}.text`;
 }

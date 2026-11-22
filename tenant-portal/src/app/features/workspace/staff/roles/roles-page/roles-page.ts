@@ -179,9 +179,9 @@ export class RolesPage {
   });
 
   protected readonly isOwner = computed(() => this.session.isOwner());
-  protected readonly canCreate = computed(() => this.isOwner() || this.session.isTenantWide('roles.role.create'));
-  protected readonly canUpdate = computed(() => this.isOwner() || this.session.isTenantWide('roles.role.update'));
-  protected readonly canDelete = computed(() => this.isOwner() || this.session.isTenantWide('roles.role.delete'));
+  protected readonly canCreate = computed(() => this.session.isTenantWide('roles.role.create'));
+  protected readonly canUpdate = computed(() => this.session.isTenantWide('roles.role.update'));
+  protected readonly canDelete = computed(() => this.session.isTenantWide('roles.role.delete'));
 
   protected readonly filters = computed(() => {
     this.i18n();
@@ -353,12 +353,14 @@ export class RolesPage {
         ? t('roles.reason.tenantWide')
         : undefined;
 
-    const assignDisabled = role.isSystem || !this.isOwner();
+    const assignDisabled = role.isSystem || !this.session.canUpdateBranchPermissions();
     const assignReason = role.isSystem
       ? t('roles.reason.system')
       : !this.isOwner()
         ? t('roles.reason.ownerOnly')
-        : undefined;
+        : assignDisabled
+          ? t('roles.reason.branchPermissions')
+          : undefined;
 
     const duplicateDisabled =
       role.isSystem || role.permissionMode === 'BRANCH' || !this.canCreate() || this.duplicating();
@@ -403,11 +405,11 @@ export class RolesPage {
     ];
 
     if (role.permissionMode === 'GLOBAL') {
-      const workspaceDisabled = role.isSystem || !this.canUpdate();
+      const workspaceDisabled = role.isSystem || !this.canUpdate() || !this.session.canReadRolePermissions();
       const workspaceReason = role.isSystem
         ? t('roles.reason.system')
-        : !this.canUpdate()
-          ? t('roles.reason.tenantWide')
+        : workspaceDisabled
+          ? t('roles.reason.rolePermissions')
           : undefined;
       items.push({
         id: 'workspace',
@@ -419,12 +421,17 @@ export class RolesPage {
       });
     }
 
+    const canView = role.permissionMode === 'BRANCH'
+      ? this.session.canReadBranchPermissions()
+      : this.session.canReadRolePermissions();
     items.push(
       {
         id: 'view',
         title: t('roles.actions.view'),
         icon: 'tablerEye',
-        tile: 'bg-icon-navy',
+        tile: canView ? 'bg-icon-navy' : 'bg-icon-gray',
+        disabled: !canView,
+        reason: canView ? undefined : t('roles.reason.rolePermissions'),
       },
       {
         id: 'duplicate',
@@ -474,7 +481,7 @@ export class RolesPage {
 
   protected onRoleCreated(created: RoleDetail): void {
     void this.load();
-    if (this.isOwner()) {
+    if (this.session.canUpdateBranchPermissions()) {
       this.pendingModeRole.set(created);
       this.modeChoiceModal().open();
       return;
@@ -500,10 +507,10 @@ export class RolesPage {
       return;
     }
     if (role.permissionMode === 'BRANCH') {
-      if (this.isOwner()) {
+      if (this.session.canUpdateBranchPermissions()) {
         this.assignWizard().open(role.id);
       } else {
-        this.openGlobalPermissions(role, true);
+        this.viewPermissions(role);
       }
       return;
     }
@@ -516,7 +523,7 @@ export class RolesPage {
     if (!role) return;
     this.pendingModeRole.set(null);
     if (mode === 'BRANCH') {
-      this.assignWizard().open(role.id);
+      if (this.session.canUpdateBranchPermissions()) this.assignWizard().open(role.id);
       return;
     }
     this.globalPermissionsModal().open(role.id, { roleName: this.roleName(role) });
@@ -613,14 +620,14 @@ export class RolesPage {
   }
 
   private async openAssignPermissions(role: Role): Promise<void> {
-    if (role.isSystem || !this.isOwner()) return;
+    if (role.isSystem || !this.session.canUpdateBranchPermissions()) return;
     if (role.permissionMode === 'GLOBAL' && role.permissionCount > 0) {
       this.pendingConvertRole.set(role);
       const confirmed = await this.convertDialog().open();
       this.pendingConvertRole.set(null);
       if (!confirmed) return;
     }
-    this.assignWizard().open(role.id);
+    if (this.session.canUpdateBranchPermissions()) this.assignWizard().open(role.id);
   }
 
   private openGlobalPermissions(role: Role, readonlyMode: boolean): void {
@@ -631,8 +638,8 @@ export class RolesPage {
   }
 
   private viewPermissions(role: Role): void {
-    if (role.permissionMode === 'BRANCH' && this.isOwner()) {
-      this.assignWizard().open(role.id, { readonly: true });
+    if (role.permissionMode === 'BRANCH') {
+      if (this.session.canReadBranchPermissions()) this.assignWizard().open(role.id, { readonly: true });
       return;
     }
     this.openGlobalPermissions(role, true);

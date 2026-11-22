@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { PluralKeyPipe, pluralKey } from '../../../../../core/i18n/plural';
@@ -11,7 +11,7 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import { listBranches, listCompanies, listRoles, newIdempotencyKey } from '../../shared/staff.api';
+import { newIdempotencyKey } from '../../shared/staff.api';
 import { DryRunReport } from '../../../seats/dry-run-report/dry-run-report';
 import { seatErrorMessage } from '../../../seats/seat-errors';
 import { bulkAssignRole } from '../../../seats/seats.api';
@@ -66,11 +66,6 @@ export class BulkRoleModal {
   protected readonly assigning = signal(false);
   protected readonly dryRunResult = signal<SeatPreview | null>(null);
 
-  private readonly loadedRoles = signal<Role[] | null>(null);
-  private readonly loadedCompanies = signal<Company[] | null>(null);
-  private readonly loadedBranches = signal<Branch[] | null>(null);
-
-  private openSeq = 0;
   private lastFingerprint: string | null = null;
   private lastIdempotencyKey: string | null = null;
 
@@ -78,18 +73,15 @@ export class BulkRoleModal {
   protected readonly isOwner = computed(() => this.session.isOwner());
 
   protected readonly availableRoles = computed<Role[]>(() => {
-    const list = this.loadedRoles() ?? this.roles();
-    return list.filter(isAssignableRole);
+    return this.roles().filter(isAssignableRole);
   });
 
   protected readonly activeCompanies = computed<Company[]>(() => {
-    const list = this.loadedCompanies() ?? this.companies();
-    return list.filter((c) => c.status === 'ACTIVE');
+    return this.companies().filter((company) => company.status === 'ACTIVE');
   });
 
   protected readonly activeBranches = computed<Branch[]>(() => {
-    const list = this.loadedBranches() ?? this.branches();
-    return list.filter((b) => b.status === 'ACTIVE');
+    return this.branches().filter((branch) => branch.status === 'ACTIVE');
   });
 
   protected readonly roleOptions = computed<DropdownOption<string>[]>(() => {
@@ -139,16 +131,23 @@ export class BulkRoleModal {
     () => this.hasValidSelection() && !this.busy() && this.dryRunResult()?.ok === true,
   );
 
+  constructor() {
+    effect(() => {
+      this.roles();
+      this.companies();
+      this.branches();
+      if (this.userIds().length) untracked(() => this.syncDefaultSelections());
+    });
+  }
+
   open(userIds: string[]): void {
     if (!userIds.length) return;
-    const seq = ++this.openSeq;
     this.userIds.set([...userIds]);
     this.scopeTarget.set('BRANCH');
     this.dryRunResult.set(null);
     this.clearIdempotency();
     this.syncDefaultSelections();
     this.modal().open();
-    void this.loadLookups(seq);
   }
 
   protected close(): void {
@@ -157,7 +156,6 @@ export class BulkRoleModal {
   }
 
   protected onClosed(): void {
-    this.openSeq++;
     this.userIds.set([]);
     this.dryRunResult.set(null);
     this.clearIdempotency();
@@ -250,19 +248,6 @@ export class BulkRoleModal {
       userIds: [...this.userIds()],
       dryRun,
     };
-  }
-
-  private async loadLookups(seq: number): Promise<void> {
-    const [rolesRes, companiesRes, branchesRes] = await Promise.allSettled([
-      listRoles({ limit: 100 }),
-      listCompanies({ status: 'ACTIVE', limit: 100 }),
-      listBranches({ status: 'ACTIVE', limit: 100 }),
-    ]);
-    if (seq !== this.openSeq) return;
-    if (rolesRes.status === 'fulfilled') this.loadedRoles.set(rolesRes.value.data);
-    if (companiesRes.status === 'fulfilled') this.loadedCompanies.set(companiesRes.value.data);
-    if (branchesRes.status === 'fulfilled') this.loadedBranches.set(branchesRes.value.data);
-    this.syncDefaultSelections();
   }
 
   private syncDefaultSelections(): void {

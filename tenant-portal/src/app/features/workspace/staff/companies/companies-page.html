@@ -22,10 +22,12 @@
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
         <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
       </span>
-      <p class="text-12 text-danger-text">{{ 'companies.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'companies.retry' | transloco }}
-      </button>
+      <p class="text-12 text-danger-text">{{ (loadForbidden() ? 'apiErrors.permission' : 'companies.loadFailed') | transloco }}</p>
+      @if (!loadForbidden()) {
+        <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+          {{ 'companies.retry' | transloco }}
+        </button>
+      }
     </div>
   } @else {
     <div class="overflow-x-auto pb-4">
@@ -180,7 +182,6 @@
 
 <app-company-modal
   [canManage]="canManage()"
-  [currencies]="currencies()"
   (saved)="onModalSaved($event)"
   (deleteRequested)="requestDelete($event)"
   (deactivateBlocked)="onDeactivateBlocked($event)"

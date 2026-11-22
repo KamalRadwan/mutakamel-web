@@ -56,17 +56,19 @@
 
       <app-notification-bell />
 
-      <ui-menu
-        [items]="userItems()"
-        [label]="'nav.userMenu' | transloco"
-        align="end"
-        (selected)="selectUserAction($event)"
-      >
-        <span class="inline-flex size-avatar-nav shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon">
-          {{ currentUser.initials() }}
-        </span>
-        <span class="hidden desktop:inline">{{ currentUser.user().displayName }}</span>
-      </ui-menu>
+      @if (identityReady()) {
+        <ui-menu
+          [items]="userItems()"
+          [label]="'nav.userMenu' | transloco"
+          align="end"
+          (selected)="selectUserAction($event)"
+        >
+          <span class="inline-flex size-avatar-nav shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon">
+            {{ currentUser.initials() }}
+          </span>
+          <span class="hidden desktop:inline">{{ currentUser.user().displayName }}</span>
+        </ui-menu>
+      }
     </div>
   </header>
 
@@ -83,6 +85,7 @@
             <a
               data-fit-item
               [routerLink]="['/', currentApp(), currentFeature(), page.id]"
+              [queryParams]="staffPageQuery()"
               class="my-4 inline-flex shrink-0 items-center gap-6 rounded-8 px-10 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
               [class]="page.id === currentPage() ? 'bg-brand font-medium text-on-brand' : 'text-text-muted hover:bg-row-hover hover:text-text'"
               [attr.aria-current]="page.id === currentPage() ? 'page' : null"
@@ -118,7 +121,13 @@
         [class.pb-phone-reserve]="phone.visible()"
         [class]="phone.visible() && phone.panelOpen() ? 'lg:pe-phone-panel-reserve' : ''"
       >
-        @if (authSession.status() === 'failed') {
+        @if (identityReady()) {
+          @if (staffOutlet() === 'denied') {
+            <app-staff-access-page />
+          } @else if (staffOutlet() === 'open') {
+            <router-outlet />
+          }
+        } @else if (authSession.status() === 'failed' || authSession.status() === 'loading') {
           <ui-full-state
             kind="load-failure"
             [title]="'session.loadFailed.title' | transloco"
@@ -126,8 +135,6 @@
             [actionLabel]="'session.loadFailed.retry' | transloco"
             (action)="retrySession()"
           />
-        } @else {
-          <router-outlet />
         }
       </main>
     </div>

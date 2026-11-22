@@ -1,4 +1,5 @@
-import { Component, computed, inject, input, output } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -38,7 +39,6 @@ import {
   tablerUsersGroup,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
-import { Button } from '../../../../../shared/ui/button/button';
 import { appDescriptionKey, appIcon, appRoute, appTile } from '../../app-presentation';
 import { AppsOverviewItem, appName } from '../../modules.model';
 
@@ -80,7 +80,7 @@ const ICONS = {
 
 @Component({
   selector: 'app-app-card',
-  imports: [RouterLink, TranslocoPipe, NgIcon, Button],
+  imports: [RouterLink, NgTemplateOutlet, TranslocoPipe, NgIcon],
   providers: [provideIcons(ICONS)],
   templateUrl: './app-card.html',
   host: { class: 'block h-full' },
@@ -89,7 +89,6 @@ export class AppCard {
   protected readonly language = inject(LanguageState).current;
 
   readonly app = input.required<AppsOverviewItem>();
-  readonly request = output<AppsOverviewItem>();
 
   protected readonly name = computed(() => appName(this.app(), this.language()));
   protected readonly descriptionKey = computed(() => appDescriptionKey(this.app().moduleKey));

@@ -173,7 +173,14 @@ export const routes: Routes = [
         loadChildren: () => import('./features/trade/settings/settings.routes').then((m) => m.tradeSettingsRoutes),
       },
       {
+        path: 'forbidden',
+        title: 'errors.forbidden.title',
+        data: { kind: 'forbidden' },
+        loadComponent: () => import('./shared/ui/route-error/route-error').then((m) => m.RouteError),
+      },
+      {
         path: 'not-found',
+        title: 'errors.notFound.title',
         loadComponent: () => import('./layout/not-found/not-found-page').then((m) => m.NotFoundPage),
       },
       {
@@ -183,6 +190,7 @@ export const routes: Routes = [
       },
       {
         path: '**',
+        title: 'errors.notFound.title',
         loadComponent: () => import('./layout/not-found/not-found-page').then((m) => m.NotFoundPage),
       },
     ],

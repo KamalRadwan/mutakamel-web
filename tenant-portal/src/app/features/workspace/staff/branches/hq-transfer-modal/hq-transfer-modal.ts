@@ -44,7 +44,17 @@ export class HqTransferModal {
 
   protected readonly canAddBranch = computed(() => {
     const branch = this.sourceBranch();
-    return branch ? this.session.can('org.branch.manage', { companyId: branch.companyId }) : false;
+    return branch ? this.session.canCreateBranch(branch.companyId) : false;
+  });
+
+  protected readonly canTransfer = computed(() => {
+    const source = this.sourceBranch();
+    const target = this.candidates().find(({ id }) => id === this.selectedBranchId());
+    return Boolean(source && target && target.companyId === source.companyId &&
+      target.status === 'ACTIVE' &&
+      this.session.can('org.branch.manage', { companyId: source.companyId }) &&
+      this.session.can('org.branch.manage', { companyId: source.companyId, branchId: source.id }) &&
+      this.session.can('org.branch.manage', { companyId: target.companyId, branchId: target.id }));
   });
 
   private pendingRetry: (() => Promise<void>) | null = null;
@@ -59,6 +69,8 @@ export class HqTransferModal {
   );
 
   open(request: HqTransferRequest): void {
+    if (!this.session.can('org.branch.manage', { companyId: request.branch.companyId }) ||
+        !this.session.can('org.branch.manage', { companyId: request.branch.companyId, branchId: request.branch.id })) return;
     this.sourceBranch.set(request.branch);
     this.companyName.set(request.companyName);
     this.candidates.set(request.candidateBranches);
@@ -72,7 +84,7 @@ export class HqTransferModal {
 
   protected async confirmTransfer(): Promise<void> {
     const targetId = this.selectedBranchId();
-    if (!targetId || this.submitting()) return;
+    if (!this.canTransfer() || this.submitting()) return;
 
     const retry = this.pendingRetry;
     this.submitting.set(true);
@@ -92,7 +104,7 @@ export class HqTransferModal {
 
   protected requestAddBranch(): void {
     const branch = this.sourceBranch();
-    if (!branch || this.submitting()) return;
+    if (!branch || !this.canAddBranch() || this.submitting()) return;
     this.modal().close();
     this.addBranchRequested.emit(branch.companyId);
   }

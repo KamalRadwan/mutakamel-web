@@ -43,7 +43,12 @@ describe('verify.model', () => {
     });
   });
 
-  it('maps 503 without domain code to unavailable and status 0 to ambiguous', () => {
+  it('maps service failures to unavailable and status 0 to ambiguous', () => {
+    expect(verifyErrorKey(new ApiError(500, 'COMMON.GENERIC.INTERNAL_ERROR'))).toEqual({
+      key: 'auth.shared.errors.unavailable',
+      kind: 'notice',
+      tone: 'danger',
+    });
     expect(verifyErrorKey(new ApiError(503, ''))).toEqual({
       key: 'auth.shared.errors.unavailable',
       kind: 'notice',
@@ -62,11 +67,6 @@ describe('verify.model', () => {
   });
 
   it('maps unknown errors and non-ApiError values to generic', () => {
-    expect(verifyErrorKey(new ApiError(500, 'COMMON.GENERIC.INTERNAL_ERROR'))).toEqual({
-      key: 'auth.shared.errors.generic',
-      kind: 'notice',
-      tone: 'danger',
-    });
     expect(verifyErrorKey(new ApiError(418, 'UNKNOWN_DOMAIN_CODE'))).toEqual({
       key: 'auth.shared.errors.generic',
       kind: 'notice',

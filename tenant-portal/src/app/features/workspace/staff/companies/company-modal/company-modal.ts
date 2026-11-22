@@ -109,6 +109,10 @@ export class CompanyModal {
   protected readonly currencyOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
     const active = this.currencies().filter((c) => c.status === 'ACTIVE');
+    const code = this.currencyCode();
+    if (!this.canManage() && code && !active.some((currency) => currency.code === code)) {
+      return [{ value: code, label: code }];
+    }
     return [
       { value: '', label: this.transloco.translate('companies.fields.currencyDefault') },
       ...active.map((currency) => ({

@@ -1,7 +1,7 @@
 import { fakeDelay } from '../../../core/fake/fake-utils';
 import type { Me } from '../staff/shared/staff.model';
 import { buildActorMeSync } from '../staff/shared/staff.fake';
-import { AppsOverviewItem, AppsOverviewResponse } from './modules.model';
+import { AppsOverviewItem, AppsOverviewResponse, COMING_SOON_APPS } from './modules.model';
 
 // Fake for GET /api/tenant/core/v1/apps/overview, following the landed Core endpoint:
 // - order is catalogue rank, then moduleKey;
@@ -45,36 +45,11 @@ const CATALOGUE: readonly CatalogueEntry[] = [
     myAccessState: 'OVER_CAPACITY',
     seats: { used: 6, total: 5 },
   },
-  {
-    rank: 40,
-    moduleKey: 'pos',
-    nameI18n: { en: 'Point of Sale', ar: 'نقاط البيع' },
-    iconKey: null,
+  ...COMING_SOON_APPS.map((app, index): CatalogueEntry => ({
+    ...app,
+    rank: 40 + index * 10,
     group: 'AVAILABLE',
-    isAddon: false,
-    myAccessState: null,
-    seats: null,
-  },
-  {
-    rank: 50,
-    moduleKey: 'projects',
-    nameI18n: { en: 'Projects', ar: 'المشاريع' },
-    iconKey: null,
-    group: 'AVAILABLE',
-    isAddon: false,
-    myAccessState: null,
-    seats: null,
-  },
-  {
-    rank: 60,
-    moduleKey: 'helpdesk',
-    nameI18n: { en: 'Helpdesk', ar: 'مكتب المساعدة' },
-    iconKey: null,
-    group: 'AVAILABLE',
-    isAddon: false,
-    myAccessState: null,
-    seats: null,
-  },
+  })),
   {
     rank: 70,
     moduleKey: 'hr',

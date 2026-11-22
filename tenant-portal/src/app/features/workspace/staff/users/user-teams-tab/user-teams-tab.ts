@@ -34,6 +34,7 @@ import {
   setMemberships,
 } from '../../shared/staff.api';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
+import { StaffSession } from '../../shared/staff-session';
 import {
   Branch,
   Department,
@@ -103,6 +104,7 @@ export class UserTeamsTab {
   protected readonly uid = `user-teams-tab-${++UserTeamsTab.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly session = inject(StaffSession);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -164,7 +166,8 @@ export class UserTeamsTab {
   });
 
   protected readonly canManageReporting = computed(
-    () => !this.readonly() && (this.reportingScopes()?.capabilities.canManage ?? false),
+    () => this.canManageMembership(this.reportingMembership()) &&
+      (this.reportingScopes()?.capabilities.canManage ?? false),
   );
 
   protected readonly visibleExistingReporting = computed(() => {
@@ -250,14 +253,14 @@ export class UserTeamsTab {
 
   protected actionsFor(membership: TeamMembership): ActionItem[] {
     this.i18n();
-    const items: ActionItem[] = [
+    const items: ActionItem[] = this.canManageMembership(membership) && this.canReplaceMemberships() ? [
       {
         id: 'changeRole',
         title: this.transloco.translate('access.teams.changeRole'),
         icon: 'tablerAdjustmentsHorizontal',
         tile: 'bg-icon-blue',
       },
-    ];
+    ] : [];
 
     if (this.hasReportingAccess(membership.role)) {
       items.push({
@@ -268,7 +271,7 @@ export class UserTeamsTab {
       });
     }
 
-    if (!membership.isPrimary) {
+    if (!membership.isPrimary && this.canManageMembership(membership)) {
       items.push({
         id: 'remove',
         title: this.transloco.translate('access.teams.remove'),
@@ -322,6 +325,7 @@ export class UserTeamsTab {
     if (!cascade.teamId) errors.team = requiredMsg;
     this.cascadeErrors.set(errors);
     if (Object.keys(errors).length) return;
+    if (!this.canManageMembership(cascade)) return;
 
     const payload = { teamId: cascade.teamId!, role: this.addRole() };
     const body = JSON.stringify(payload);
@@ -348,7 +352,7 @@ export class UserTeamsTab {
   }
 
   protected openChangeRoleModal(membership: TeamMembership): void {
-    if (this.readonly()) return;
+    if (!this.canManageMembership(membership) || !this.canReplaceMemberships()) return;
     this.editingMembership.set(membership);
     this.nextRole.set(membership.role);
     this.roleKeyCache = null;
@@ -362,16 +366,18 @@ export class UserTeamsTab {
   }
 
   protected async saveRoleChange(): Promise<void> {
-    const target = this.editingMembership();
-    if (!target || this.savingRole() || this.readonly()) return;
+    const targetId = this.editingMembership()?.id;
+    const current = this.memberships().find(({ id }) => id === targetId);
+    if (!current || this.savingRole() ||
+        !this.canManageMembership(current) || !this.canReplaceMemberships()) return;
     const role = this.nextRole();
-    if (role === target.role) {
+    if (role === current.role) {
       this.changeRoleModal().close();
       return;
     }
 
     const updated = this.memberships().map((item) =>
-      item.id === target.id ? { ...item, role } : item,
+      item.id === current.id ? { ...item, role } : item,
     );
     const body = JSON.stringify(updated.map((item) => ({ id: item.id, role: item.role })));
     const key = this.roleKeyCache?.body === body ? this.roleKeyCache.key : newIdempotencyKey();
@@ -393,10 +399,11 @@ export class UserTeamsTab {
   }
 
   protected async requestRemove(membership: TeamMembership): Promise<void> {
-    if (this.readonly() || this.removing() || membership.isPrimary) return;
+    if (!this.canManageMembership(membership) || this.removing() || membership.isPrimary) return;
     this.pendingRemoveMembership.set(membership);
     const confirmed = await this.removeTeamConfirm().open();
-    if (!confirmed) {
+    const current = this.memberships().find(({ id }) => id === membership.id);
+    if (!confirmed || !current || current.isPrimary || !this.canManageMembership(current)) {
       this.pendingRemoveMembership.set(null);
       return;
     }
@@ -463,6 +470,9 @@ export class UserTeamsTab {
 
     const addBranchIds = this.pendingAddBranchIds();
     const removeBranchIds = this.pendingRemoveBranchIds();
+    if ([...addBranchIds, ...removeBranchIds].some((branchId) =>
+      !this.session.can('users.user.manage_memberships', { branchId }),
+    )) return;
     const patch = {
       expectedRevision: scopes.revision,
       ...(addBranchIds.length ? { addBranchIds } : {}),
@@ -607,6 +617,16 @@ export class UserTeamsTab {
         this.reportingLoading.set(false);
       }
     }
+  }
+
+  private canManageMembership(target: Pick<CascadeValue, 'companyId' | 'branchId'> | null): boolean {
+    return !this.readonly() && !!target?.branchId &&
+      this.session.can('users.user.manage_memberships', target);
+  }
+
+  private canReplaceMemberships(): boolean {
+    return this.session.isTenantWide('users.user.manage_memberships') &&
+      this.memberships().every((membership) => this.canManageMembership(membership));
   }
 
   private requiredText(): string {

@@ -22,6 +22,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { TenantScopeState, type TenantResourceScope } from '../../../../../core/scope/tenant-scope';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Checkbox } from '../../../../../shared/ui/checkbox/checkbox';
@@ -32,7 +33,6 @@ import {
   ApiError,
   deleteUser,
   errorCodeOf,
-  getBranch,
   getDepartment,
   getTeam,
   getUser,
@@ -141,6 +141,7 @@ export class UsersPage {
   private readonly seatsTranslation = toSignal(this.transloco.selectTranslation('seats'));
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
+  private readonly scope = inject(TenantScopeState);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
@@ -163,17 +164,36 @@ export class UsersPage {
   protected readonly sort = signal<string>('createdAt');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  protected readonly rows = signal<TenantUser[]>([]);
-  protected readonly total = signal(0);
+  private readonly loadedRows = signal<TenantUser[]>([]);
+  protected readonly rows = computed(() => this.loadedRows().filter((user) => this.canReadUser(user)));
+  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
+  protected readonly total = computed(() => {
+    const result = this.loadedTotal();
+    return result && result.revision === this.session.scopeRevision() &&
+      this.rows().length === this.loadedRows().length ? result.count : this.rows().length;
+  });
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
 
-  protected readonly companies = signal<Company[]>([]);
-  protected readonly branches = signal<Branch[]>([]);
-  protected readonly departments = signal<Department[]>([]);
-  protected readonly teams = signal<Team[]>([]);
-  protected readonly knownUsers = signal<TenantUser[]>([]);
-  protected readonly roles = signal<Role[]>([]);
+  private readonly loadedLookups = signal<{
+    revision: string;
+    companies: Company[];
+    branches: Branch[];
+    departments: Department[];
+    teams: Team[];
+    users: TenantUser[];
+    roles: Role[];
+  } | null>(null);
+  private readonly lookups = computed(() => {
+    const result = this.loadedLookups();
+    return result?.revision === this.session.scopeRevision() ? result : null;
+  });
+  protected readonly companies = computed(() => this.lookups()?.companies ?? []);
+  protected readonly branches = computed(() => this.lookups()?.branches ?? []);
+  protected readonly departments = computed(() => this.lookups()?.departments ?? []);
+  protected readonly teams = computed(() => this.lookups()?.teams ?? []);
+  protected readonly knownUsers = computed(() => this.lookups()?.users ?? []);
+  protected readonly roles = computed(() => this.lookups()?.roles ?? []);
   protected readonly seatModules = signal<ModuleUsage[]>([]);
   protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
 
@@ -215,8 +235,6 @@ export class UsersPage {
 
   protected readonly canInvite = computed(
     () =>
-      this.session.isTenantWide('users.user.invite') ||
-      this.session.can('users.user.invite') ||
       this.branches().some((b) =>
         this.session.can('users.user.invite', { companyId: b.companyId, branchId: b.id }),
       ),
@@ -225,7 +243,6 @@ export class UsersPage {
   protected readonly canAssignRoles = computed(
     () =>
       this.session.isTenantWide('users.user.assign_roles') ||
-      this.session.can('users.user.assign_roles') ||
       this.branches().some((b) =>
         this.session.can('users.user.assign_roles', { companyId: b.companyId, branchId: b.id }),
       ),
@@ -251,7 +268,7 @@ export class UsersPage {
     const companyId = vals['companyId'] ?? null;
     const branchId = vals['branchId'] ?? null;
     const departmentId = vals['departmentId'] ?? null;
-    const branchMap = this.branchMap();
+    const branchCompanies = this.scope.branchCompanies();
     const deptMap = this.departmentMap();
 
     const branchOptions = this.branches()
@@ -261,7 +278,7 @@ export class UsersPage {
     const departmentOptions = this.departments()
       .filter((dept) => {
         if (branchId) return dept.branchId === branchId;
-        if (companyId) return branchMap.get(dept.branchId)?.companyId === companyId;
+        if (companyId) return branchCompanies.get(dept.branchId) === companyId;
         return true;
       })
       .map((dept) => ({ value: dept.id, label: dept.name }));
@@ -270,9 +287,9 @@ export class UsersPage {
       .filter((team) => {
         if (departmentId) return team.departmentId === departmentId;
         const dept = deptMap.get(team.departmentId);
-        if (!dept) return false;
-        if (branchId) return dept.branchId === branchId;
-        if (companyId) return branchMap.get(dept.branchId)?.companyId === companyId;
+        const teamBranchId = dept?.branchId ?? this.knownUsers().find((user) => user.teamId === team.id)?.branchId;
+        if (branchId) return teamBranchId === branchId;
+        if (companyId) return !!teamBranchId && branchCompanies.get(teamBranchId) === companyId;
         return true;
       })
       .map((team) => ({ value: team.id, label: team.name }));
@@ -395,6 +412,7 @@ export class UsersPage {
 
   private loadSeq = 0;
   private prevCompanyFilter: string | null = null;
+  private lookupSeq = 0;
   private prevBranchFilter: string | null = null;
   private prevDepartmentFilter: string | null = null;
   private prevCriteriaSignature: string | null = null;
@@ -409,7 +427,10 @@ export class UsersPage {
     if (!this.session.me()) {
       void this.session.load();
     }
-    void this.loadLookups();
+    effect(() => {
+      const revision = this.session.scopeRevision();
+      if (revision) void untracked(() => this.loadLookups());
+    });
     void this.loadSeatModules();
 
     effect(() => {
@@ -535,7 +556,7 @@ export class UsersPage {
       const page = this.page();
       const pageSize = this.pageSize();
 
-      const criteriaSignature = `${search}|${sort}|${status ?? ''}|${seat ?? ''}|${companyId ?? ''}|${branchId ?? ''}|${departmentId ?? ''}|${teamId ?? ''}`;
+      const criteriaSignature = `${this.session.scopeRevision()}|${search}|${sort}|${status ?? ''}|${seat ?? ''}|${companyId ?? ''}|${branchId ?? ''}|${departmentId ?? ''}|${teamId ?? ''}`;
       const criteriaChanged =
         this.prevCriteriaSignature !== null && this.prevCriteriaSignature !== criteriaSignature;
       this.prevCriteriaSignature = criteriaSignature;
@@ -802,18 +823,19 @@ export class UsersPage {
   }
 
   protected openUser(user: TenantUser, tab: UserModalTab = 'profile'): void {
+    if (!this.canReadUser(user)) return;
     this.userModal().open(user, tab);
   }
 
   protected onUserInvited(created: TenantUser): void {
-    this.knownUsers.update((list) => [created, ...list.filter((u) => u.id !== created.id)]);
+    this.updateKnownUsers((list) => [created, ...list.filter((u) => u.id !== created.id)]);
     this.reload();
-    this.userModal().open(created, 'profile');
+    if (this.session.can('users.user.read', created)) this.userModal().open(created, 'profile');
   }
 
   protected onUserUpdated(updated: TenantUser): void {
-    this.rows.update((list) => list.map((u) => (u.id === updated.id ? updated : u)));
-    this.knownUsers.update((list) => list.map((u) => (u.id === updated.id ? updated : u)));
+    this.loadedRows.update((list) => list.map((u) => (u.id === updated.id ? updated : u)));
+    this.updateKnownUsers((list) => list.map((u) => (u.id === updated.id ? updated : u)));
     this.reload();
   }
 
@@ -924,6 +946,10 @@ export class UsersPage {
     return null;
   }
 
+  private canReadUser(user: TenantUser): boolean {
+    return this.session.can('users.user.read', { companyId: user.companyId, branchId: user.branchId });
+  }
+
   private async handleStatusAction(user: TenantUser, actionId: string): Promise<void> {
     if (this.busyIds().has(user.id)) return;
 
@@ -938,7 +964,7 @@ export class UsersPage {
       this.pendingStatusAction.set({ kind: actionId, user });
       const confirmed = await this.statusConfirm().open();
       this.pendingStatusAction.set(null);
-      if (!confirmed) return;
+      if (!confirmed || this.protectionReason(user, 'users.user.deactivate')) return;
       await this.executeStatusChange(actionId, user);
       return;
     }
@@ -948,7 +974,7 @@ export class UsersPage {
       this.pendingReleaseUser.set(user);
       const confirmed = await this.openReleaseConfirm();
       this.pendingReleaseUser.set(null);
-      if (!confirmed) return;
+      if (!confirmed || this.protectionReason(user, 'users.user.assign_roles')) return;
       await this.executeReleaseSeats(user);
       return;
     }
@@ -958,7 +984,7 @@ export class UsersPage {
       this.pendingDeleteUser.set(user);
       const confirmed = await this.openDeleteConfirm();
       this.pendingDeleteUser.set(null);
-      if (!confirmed) return;
+      if (!confirmed || this.protectionReason(user, 'users.user.delete')) return;
       await this.executeDelete(user);
     }
   }
@@ -1076,7 +1102,7 @@ export class UsersPage {
         next.delete(user.id);
         return next;
       });
-      this.knownUsers.update((list) => list.filter((u) => u.id !== user.id));
+      this.updateKnownUsers((list) => list.filter((u) => u.id !== user.id));
       this.notify.success(this.transloco.translate('users.toast.deleted'));
       this.reload();
     } catch (error) {
@@ -1169,24 +1195,34 @@ export class UsersPage {
     let branchId = input.branchId || null;
     let companyId = input.companyId || null;
 
+    const placement = this.knownUsers().find((user) =>
+      input.teamId ? user.teamId === input.teamId : !!departmentId && user.departmentId === departmentId,
+    );
     if (!departmentId && input.teamId) {
-      departmentId = this.teamMap().get(input.teamId)?.departmentId ?? null;
+      departmentId = this.teamMap().get(input.teamId)?.departmentId ?? placement?.departmentId ?? null;
     }
     if (!branchId && departmentId) {
-      branchId = this.departmentMap().get(departmentId)?.branchId ?? null;
+      branchId = this.departmentMap().get(departmentId)?.branchId ?? placement?.branchId ?? null;
     }
     if (!companyId && branchId) {
-      companyId = this.branchMap().get(branchId)?.companyId ?? null;
+      companyId = this.scope.branchCompanies().get(branchId) ?? null;
     }
 
     return { companyId, branchId, departmentId };
   }
 
-  private async fetchAllPages<T>(fetcher: (q: ListQuery) => Promise<{ data: T[]; meta: { hasNext: boolean } }>): Promise<T[]> {
+  private async fetchAllPages<T>(
+    permission: string,
+    fetcher: (
+      query: ListQuery,
+      canRead: (scope: TenantResourceScope) => boolean,
+    ) => Promise<{ data: T[]; meta: { hasNext: boolean } }>,
+  ): Promise<T[]> {
+    if (!this.session.can(permission)) return [];
     const all: T[] = [];
     let page = 1;
     while (page <= 20) {
-      const res = await fetcher({ page, limit: 100 });
+      const res = await fetcher({ page, limit: 100 }, (scope) => this.session.can(permission, scope));
       all.push(...res.data);
       if (!res.meta.hasNext) break;
       page += 1;
@@ -1204,22 +1240,28 @@ export class UsersPage {
     }
   }
 
-  private async loadLookups(): Promise<void> {
-    const [companiesRes, branchesRes, deptsRes, teamsRes, usersRes, rolesRes] = await Promise.allSettled([
-      this.fetchAllPages((q) => listCompanies(q)),
-      this.fetchAllPages((q) => listBranches(q)),
-      this.fetchAllPages((q) => listDepartments(q)),
-      this.fetchAllPages((q) => listTeams(q)),
-      this.fetchAllPages((q) => listUsers(q)),
-      this.fetchAllPages((q) => listRoles(q)),
-    ]);
+  private updateKnownUsers(update: (users: TenantUser[]) => TenantUser[]): void {
+    this.loadedLookups.update((result) =>
+      result && result.revision === this.session.scopeRevision()
+        ? { ...result, users: update(result.users).filter((user) => this.session.can('users.user.read', user)) }
+        : result,
+    );
+  }
 
-    if (companiesRes.status === 'fulfilled') this.companies.set(companiesRes.value);
-    if (branchesRes.status === 'fulfilled') this.branches.set(branchesRes.value);
-    if (deptsRes.status === 'fulfilled') this.departments.set(deptsRes.value);
-    if (teamsRes.status === 'fulfilled') this.teams.set(teamsRes.value);
-    if (usersRes.status === 'fulfilled') this.knownUsers.set(usersRes.value);
-    if (rolesRes.status === 'fulfilled') this.roles.set(rolesRes.value);
+  private async loadLookups(): Promise<void> {
+    const revision = this.session.scopeRevision();
+    if (!revision) return;
+    const seq = ++this.lookupSeq;
+    const [companies, branches, departments, teams, users, roles] = await Promise.all([
+      this.fetchAllPages('org.company.read', listCompanies).catch(() => []),
+      this.fetchAllPages('org.branch.read', listBranches).catch(() => []),
+      this.fetchAllPages('org.department.read', listDepartments).catch(() => []),
+      this.fetchAllPages('org.team.read', listTeams).catch(() => []),
+      this.fetchAllPages('users.user.read', listUsers).catch(() => []),
+      this.fetchAllPages('roles.role.read', listRoles).catch(() => []),
+    ]);
+    if (seq !== this.lookupSeq || revision !== this.session.scopeRevision()) return;
+    this.loadedLookups.set({ revision, companies, branches, departments, teams, users, roles });
 
     const vals = this.filterValues();
     let resolved = this.resolveParentIds({
@@ -1229,32 +1271,18 @@ export class UsersPage {
       teamId: vals['teamId'] ?? null,
     });
 
-    if (vals['teamId'] && !resolved.departmentId) {
+    if (!resolved.branchId && (vals['teamId'] || vals['departmentId'])) {
       try {
-        const team = await getTeam(vals['teamId']);
-        const dept = await getDepartment(team.departmentId);
-        const branch = await getBranch(dept.branchId);
-        resolved = { companyId: branch.companyId, branchId: dept.branchId, departmentId: team.departmentId };
-      } catch {
-        // Ignore if lookup fallback fails.
-      }
-    } else if (vals['departmentId'] && !resolved.branchId) {
-      try {
-        const dept = await getDepartment(vals['departmentId']);
-        const branch = await getBranch(dept.branchId);
-        resolved = { companyId: branch.companyId, branchId: dept.branchId, departmentId: vals['departmentId'] };
-      } catch {
-        // Ignore if lookup fallback fails.
-      }
-    } else if (vals['branchId'] && !resolved.companyId) {
-      try {
-        const branch = await getBranch(vals['branchId']);
-        resolved = { ...resolved, companyId: branch.companyId };
+        const departmentId = resolved.departmentId ?? (await getTeam(vals['teamId']!)).departmentId;
+        const { branchId } = await getDepartment(departmentId);
+        resolved = this.resolveParentIds({ companyId: resolved.companyId, branchId, departmentId });
       } catch {
         // Ignore if lookup fallback fails.
       }
     }
 
+    if (seq !== this.lookupSeq || revision !== this.session.scopeRevision()) return;
+    if (resolved.branchId && !this.session.can('users.user.read', resolved)) return;
     if (
       (resolved.departmentId && !vals['departmentId']) ||
       (resolved.branchId && !vals['branchId']) ||
@@ -1285,6 +1313,7 @@ export class UsersPage {
     pageSize: number;
   }): Promise<void> {
     const seq = ++this.loadSeq;
+    const revision = this.session.scopeRevision();
     this.loading.set(true);
     this.loadFailed.set(false);
 
@@ -1307,15 +1336,15 @@ export class UsersPage {
     if (params.teamId) query.teamId = params.teamId;
 
     try {
-      const result = await listUsers(query);
-      if (seq !== this.loadSeq) return;
-      this.rows.set(result.data);
-      this.total.set(result.meta.total);
+      const result = await listUsers(query, (scope) => this.session.can('users.user.read', scope));
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+      this.loadedRows.set(result.data);
+      this.loadedTotal.set({ revision, count: result.meta.total });
     } catch {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
-      this.rows.set([]);
-      this.total.set(0);
+      this.loadedRows.set([]);
+      this.loadedTotal.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

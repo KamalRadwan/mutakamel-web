@@ -5,6 +5,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCircleX } from '@ng-icons/tabler-icons';
 import { errorCodeOf } from '../../../../core/api/api-errors';
 import { AuthSession } from '../../../../core/auth/auth-session';
+import { AuthTransport } from '../../../../core/auth/auth-transport';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
@@ -36,6 +37,7 @@ export class VerifyPage {
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly authSession = inject(AuthSession);
+  private readonly authTransport = inject(AuthTransport);
   private readonly notify = inject(Notify);
   private readonly mfaPending = inject(MfaPending);
   private readonly i18n = translationEvents(this.transloco);
@@ -180,21 +182,26 @@ export class VerifyPage {
     this.verifying.set(true);
 
     try {
-      const session = await verifyCode(state.step.challengeId, submittedCode);
+      const session = await verifyCode(state.step.challengeId, submittedCode, this.authTransport);
       if (this.destroyed) return;
-      await this.authSession.signedIn(session);
+      const outcome = await this.authSession.signedIn(session);
       if (this.destroyed) return;
 
-      this.completed.set(true);
+      this.completed.set(outcome !== 'signed-out');
       this.stopTimer();
-      const url = state.returnUrl;
-      const origin = state.origin;
       this.mfaPending.clear();
+      if (outcome === 'signed-out') {
+        this.notify.error(
+          this.transloco.translate('session.ended.title'),
+          this.transloco.translate('session.ended.text'),
+        );
+        return;
+      }
 
-      if (origin === 'invitation') {
+      if (state.origin === 'invitation') {
         this.notify.success(this.transloco.translate('authVerify.toast.welcome'));
       }
-      await this.router.navigateByUrl(url || '/', { replaceUrl: true });
+      await this.router.navigateByUrl(state.returnUrl || '/', { replaceUrl: true });
     } catch (error) {
       if (this.destroyed) return;
       this.handleVerifyError(error);
@@ -215,7 +222,7 @@ export class VerifyPage {
     this.resending.set(true);
 
     try {
-      const step = await resendCode(state.step.challengeId);
+      const step = await resendCode(state.step.challengeId, this.authTransport);
       if (this.destroyed) return;
       this.mfaPending.update(step);
       this.now.set(Date.now());

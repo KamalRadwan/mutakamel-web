@@ -13,7 +13,7 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { FileDrop } from '../../../../../shared/ui/file-drop/file-drop';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import { listBranches, listCompanies, listDepartments, listRoles, listTeams, newIdempotencyKey } from '../../shared/staff.api';
+import { newIdempotencyKey } from '../../shared/staff.api';
 import { DryRunReport } from '../../../seats/dry-run-report/dry-run-report';
 import { seatErrorMessage } from '../../../seats/seat-errors';
 import { importUsers } from '../../../seats/seats.api';
@@ -154,13 +154,7 @@ export class ImportModal {
   protected readonly dryRunResult = signal<ImportResult | null>(null);
   protected readonly finalResult = signal<ImportResult | null>(null);
 
-  private readonly loadedCompanies = signal<Company[] | null>(null);
-  private readonly loadedBranches = signal<Branch[] | null>(null);
-  private readonly loadedDepartments = signal<Department[] | null>(null);
-  private readonly loadedTeams = signal<Team[] | null>(null);
-  private readonly loadedRoles = signal<Role[] | null>(null);
 
-  private openSeq = 0;
   private lastFingerprint: string | null = null;
   private lastIdempotencyKey: string | null = null;
 
@@ -196,7 +190,7 @@ export class ImportModal {
 
   protected readonly roleLabels = computed<Record<string, string>>(() => {
     const lang = this.language();
-    const list = this.loadedRoles() ?? this.roles();
+    const list = this.roles();
     const map: Record<string, string> = {};
     for (const role of list) {
       map[role.id] = role.nameI18n?.[lang] || role.name;
@@ -207,10 +201,8 @@ export class ImportModal {
   protected readonly activeReport = computed(() => this.finalResult() ?? this.dryRunResult());
 
   open(): void {
-    const seq = ++this.openSeq;
     this.resetState();
     this.modal().open();
-    void this.loadLookups(seq);
   }
 
   protected close(): void {
@@ -219,7 +211,6 @@ export class ImportModal {
   }
 
   protected onClosed(): void {
-    this.openSeq++;
     this.resetState();
   }
 
@@ -335,11 +326,11 @@ export class ImportModal {
       return;
     }
 
-    const companyList = this.loadedCompanies() ?? this.companies();
-    const branchList = this.loadedBranches() ?? this.branches();
-    const departmentList = this.loadedDepartments() ?? this.departments();
-    const teamList = this.loadedTeams() ?? this.teams();
-    const roleList = this.loadedRoles() ?? this.roles();
+    const companyList = this.companies();
+    const branchList = this.branches();
+    const departmentList = this.departments();
+    const teamList = this.teams();
+    const roleList = this.roles();
 
     const errors: string[] = [];
     const rows: ParsedImportRow[] = [];
@@ -516,22 +507,6 @@ export class ImportModal {
 
     this.parseErrors.set(errors);
     this.parsedRows.set(errors.length === 0 ? rows : []);
-  }
-
-  private async loadLookups(seq: number): Promise<void> {
-    const [companiesRes, branchesRes, deptsRes, teamsRes, rolesRes] = await Promise.allSettled([
-      listCompanies({ limit: 100 }),
-      listBranches({ limit: 100 }),
-      listDepartments({ limit: 100 }),
-      listTeams({ limit: 100 }),
-      listRoles({ limit: 100 }),
-    ]);
-    if (seq !== this.openSeq) return;
-    if (companiesRes.status === 'fulfilled') this.loadedCompanies.set(companiesRes.value.data);
-    if (branchesRes.status === 'fulfilled') this.loadedBranches.set(branchesRes.value.data);
-    if (deptsRes.status === 'fulfilled') this.loadedDepartments.set(deptsRes.value.data);
-    if (teamsRes.status === 'fulfilled') this.loadedTeams.set(teamsRes.value.data);
-    if (rolesRes.status === 'fulfilled') this.loadedRoles.set(rolesRes.value.data);
   }
 
   private resetState(): void {

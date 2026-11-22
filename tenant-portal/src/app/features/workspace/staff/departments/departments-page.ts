@@ -112,8 +112,16 @@ export class DepartmentsPage {
   protected readonly sort = signal<string>('name');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  protected readonly rows = signal<Department[]>([]);
-  protected readonly total = signal(0);
+  private readonly loadedRows = signal<Department[]>([]);
+  protected readonly rows = computed(() => this.loadedRows().filter((row) =>
+    this.session.can('org.department.read', { branchId: row.branchId }),
+  ));
+  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
+  protected readonly total = computed(() => {
+    const result = this.loadedTotal();
+    return result && result.revision === this.session.scopeRevision() &&
+      this.rows().length === this.loadedRows().length ? result.count : this.rows().length;
+  });
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly companies = signal<Company[]>([]);
@@ -129,8 +137,6 @@ export class DepartmentsPage {
 
   protected readonly canAddDepartment = computed(
     () =>
-      this.session.isTenantWide('org.department.manage') ||
-      this.session.can('org.department.manage') ||
       this.branches().some((b) =>
         this.session.can('org.department.manage', { companyId: b.companyId, branchId: b.id }),
       ),
@@ -242,7 +248,7 @@ export class DepartmentsPage {
       const page = this.page();
       const pageSize = this.pageSize();
 
-      const criteriaSignature = `${search}|${sort}|${companyId ?? ''}|${branchId ?? ''}|${status ?? ''}`;
+      const criteriaSignature = `${this.session.scopeRevision()}|${search}|${sort}|${companyId ?? ''}|${branchId ?? ''}|${status ?? ''}`;
       const criteriaChanged = this.prevCriteriaSignature !== null && this.prevCriteriaSignature !== criteriaSignature;
       this.prevCriteriaSignature = criteriaSignature;
 
@@ -342,6 +348,9 @@ export class DepartmentsPage {
   }
 
   protected teamCountText(departmentId: string): string {
+    if (this.loadedTotal()?.revision !== this.session.scopeRevision()) return '—';
+    const department = this.rows().find(({ id }) => id === departmentId);
+    if (!department || !this.session.can('org.team.read', { branchId: department.branchId })) return '—';
     const count = this.teamCounts()[departmentId];
     return typeof count === 'number' ? String(count) : '—';
   }
@@ -369,6 +378,7 @@ export class DepartmentsPage {
   }
 
   protected openEdit(department: Department): void {
+    if (!this.session.can('org.department.read', { branchId: department.branchId })) return;
     this.modalDepartment.set(department);
     const companyId = this.branchMap().get(department.branchId)?.companyId ?? null;
     this.departmentModal().openEdit(department, companyId);
@@ -418,7 +428,7 @@ export class DepartmentsPage {
       });
     }
 
-    items.push({
+    if (this.session.can('users.user.read', { branchId: department.branchId })) items.push({
       id: 'viewUsers',
       title: t('departments.actions.viewUsers'),
       icon: 'tablerUsers',
@@ -462,9 +472,9 @@ export class DepartmentsPage {
         }
         break;
       case 'viewUsers':
-        void this.router.navigate(['/workspace/staff/users'], {
-          queryParams: { departmentId: department.id },
-        });
+        if (this.session.can('users.user.read', { branchId: department.branchId })) {
+          void this.router.navigate(['/workspace/staff/users'], { queryParams: { departmentId: department.id } });
+        }
         break;
       case 'toggleStatus':
         if (this.canManageDepartment(department)) {
@@ -623,6 +633,7 @@ export class DepartmentsPage {
     pageSize: number;
   }): Promise<void> {
     const seq = ++this.loadSeq;
+    const revision = this.session.scopeRevision();
     this.loading.set(true);
     this.loadFailed.set(false);
 
@@ -638,16 +649,16 @@ export class DepartmentsPage {
     if (params.status) query.status = params.status;
 
     try {
-      const result = await listDepartments(query);
-      if (seq !== this.loadSeq) return;
-      this.rows.set(result.data);
-      this.total.set(result.meta.total);
+      const result = await listDepartments(query, (scope) => this.session.can('org.department.read', scope));
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+      this.loadedRows.set(result.data);
+      this.loadedTotal.set({ revision, count: result.meta.total });
       void this.loadTeamCounts(result.data);
     } catch {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
-      this.rows.set([]);
-      this.total.set(0);
+      this.loadedRows.set([]);
+      this.loadedTotal.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -657,10 +668,17 @@ export class DepartmentsPage {
 
   private async loadTeamCounts(items: Department[]): Promise<void> {
     const seq = ++this.countsSeq;
+    const revision = this.session.scopeRevision();
+    this.teamCounts.set({});
     const results = await Promise.allSettled(
-      items.map(async (dept) => [dept.id, (await listTeams({ departmentId: dept.id, limit: 1 })).meta.total] as const),
+      items.map(async (dept) => {
+        const page = await listTeams({ departmentId: dept.id, limit: 1 }, (scope) =>
+          this.session.can('org.team.read', scope),
+        );
+        return [dept.id, page.meta.total] as const;
+      }),
     );
-    if (seq !== this.countsSeq) return;
+    if (seq !== this.countsSeq || revision !== this.session.scopeRevision()) return;
     const next: Record<string, number> = {};
     for (const res of results) {
       if (res.status === 'fulfilled') {

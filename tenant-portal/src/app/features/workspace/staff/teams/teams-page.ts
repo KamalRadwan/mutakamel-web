@@ -114,8 +114,16 @@ export class TeamsPage {
   protected readonly sort = signal<string>('name');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  protected readonly rows = signal<Team[]>([]);
-  protected readonly total = signal(0);
+  private readonly loadedRows = signal<Team[]>([]);
+  protected readonly rows = computed(() => this.loadedRows().filter((row) =>
+    this.canOnTeam('org.team.read', row),
+  ));
+  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
+  protected readonly total = computed(() => {
+    const result = this.loadedTotal();
+    return result && result.revision === this.session.scopeRevision() &&
+      this.rows().length === this.loadedRows().length ? result.count : this.rows().length;
+  });
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly companies = signal<Company[]>([]);
@@ -134,8 +142,6 @@ export class TeamsPage {
 
   protected readonly canAddTeam = computed(
     () =>
-      this.session.isTenantWide('org.team.manage') ||
-      this.session.can('org.team.manage') ||
       this.branches().some((b) =>
         this.session.can('org.team.manage', { companyId: b.companyId, branchId: b.id }),
       ),
@@ -295,7 +301,7 @@ export class TeamsPage {
       const page = this.page();
       const pageSize = this.pageSize();
 
-      const criteriaSignature = `${search}|${sort}|${companyId ?? ''}|${branchId ?? ''}|${departmentId ?? ''}|${status ?? ''}`;
+      const criteriaSignature = `${this.session.scopeRevision()}|${search}|${sort}|${companyId ?? ''}|${branchId ?? ''}|${departmentId ?? ''}|${status ?? ''}`;
       const criteriaChanged = this.prevCriteriaSignature !== null && this.prevCriteriaSignature !== criteriaSignature;
       this.prevCriteriaSignature = criteriaSignature;
 
@@ -384,9 +390,13 @@ export class TeamsPage {
   }
 
   protected canManageTeam(team: Team): boolean {
-    const branchId = this.departmentMap().get(team.departmentId)?.branchId ?? null;
-    const companyId = branchId ? (this.branchMap().get(branchId)?.companyId ?? null) : null;
-    return this.session.can('org.team.manage', { companyId, branchId });
+    return this.canOnTeam('org.team.manage', team);
+  }
+
+  private canOnTeam(permission: string, team: Team): boolean {
+    const branchId = this.departmentMap().get(team.departmentId)?.branchId;
+    if (!branchId) return false;
+    return this.session.can(permission, { branchId, companyId: this.branchMap().get(branchId)?.companyId });
   }
 
   protected departmentName(departmentId: string): string {
@@ -413,6 +423,9 @@ export class TeamsPage {
   }
 
   protected memberCountText(teamId: string): string {
+    if (this.loadedTotal()?.revision !== this.session.scopeRevision()) return '—';
+    const team = this.rows().find(({ id }) => id === teamId);
+    if (!team || !this.canOnTeam('users.user.read', team)) return '—';
     const count = this.memberCounts()[teamId];
     return typeof count === 'number' ? String(count) : '—';
   }
@@ -445,6 +458,7 @@ export class TeamsPage {
   }
 
   protected openEdit(team: Team): void {
+    if (!this.canOnTeam('org.team.read', team)) return;
     this.modalTeam.set(team);
     const resolved = this.resolveParentIds({ departmentId: team.departmentId });
     this.teamModal().openEdit(team, resolved);
@@ -483,7 +497,7 @@ export class TeamsPage {
       });
     }
 
-    items.push({
+    if (this.canOnTeam('users.user.read', team)) items.push({
       id: 'viewMembers',
       title: t('teams.actions.viewMembers'),
       icon: 'tablerUsers',
@@ -520,9 +534,9 @@ export class TeamsPage {
         this.openEdit(team);
         break;
       case 'viewMembers':
-        void this.router.navigate(['/workspace/staff/users'], {
-          queryParams: { teamId: team.id },
-        });
+        if (this.canOnTeam('users.user.read', team)) {
+          void this.router.navigate(['/workspace/staff/users'], { queryParams: { teamId: team.id } });
+        }
         break;
       case 'toggleStatus':
         if (this.canManageTeam(team)) {
@@ -706,6 +720,7 @@ export class TeamsPage {
     pageSize: number;
   }): Promise<void> {
     const seq = ++this.loadSeq;
+    const revision = this.session.scopeRevision();
     this.loading.set(true);
     this.loadFailed.set(false);
 
@@ -722,16 +737,16 @@ export class TeamsPage {
     if (params.status) query.status = params.status;
 
     try {
-      const result = await listTeams(query);
-      if (seq !== this.loadSeq) return;
-      this.rows.set(result.data);
-      this.total.set(result.meta.total);
+      const result = await listTeams(query, (scope) => this.session.can('org.team.read', scope));
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+      this.loadedRows.set(result.data);
+      this.loadedTotal.set({ revision, count: result.meta.total });
       void this.loadMemberCounts(result.data);
     } catch {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
-      this.rows.set([]);
-      this.total.set(0);
+      this.loadedRows.set([]);
+      this.loadedTotal.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -741,10 +756,17 @@ export class TeamsPage {
 
   private async loadMemberCounts(items: Team[]): Promise<void> {
     const seq = ++this.countsSeq;
+    const revision = this.session.scopeRevision();
+    this.memberCounts.set({});
     const results = await Promise.allSettled(
-      items.map(async (team) => [team.id, (await listUsers({ teamId: team.id, limit: 1 })).meta.total] as const),
+      items.map(async (team) => {
+        const page = await listUsers({ teamId: team.id, limit: 1 }, (scope) =>
+          this.session.can('users.user.read', scope),
+        );
+        return [team.id, page.meta.total] as const;
+      }),
     );
-    if (seq !== this.countsSeq) return;
+    if (seq !== this.countsSeq || revision !== this.session.scopeRevision()) return;
     const next: Record<string, number> = {};
     for (const res of results) {
       if (res.status === 'fulfilled') {

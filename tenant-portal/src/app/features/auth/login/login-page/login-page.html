@@ -1,73 +1,114 @@
-<app-auth-card [title]="'auth.login.title' | transloco">
-  <div role="status" [class]="verifyExpired() ? '' : 'sr-only'">
-    @if (verifyExpired()) {
-      <app-settings-notice tone="warning">{{ 'auth.login.verifyExpired' | transloco }}</app-settings-notice>
+@if (tenantProvisioning()) {
+  <main class="login-provisioning relative grid place-items-center">
+    <ui-preferences class="login-preferences absolute z-2" />
+    <app-tenant-provisioning-page
+      [checking]="checkingTenant()"
+      (retryRequested)="checkTenantReadiness()"
+    />
+  </main>
+} @else {
+<main class="login relative isolate grid items-center">
+  <ui-preferences class="login-preferences absolute z-2" />
+
+  <section class="login-card grid bg-surface" aria-labelledby="login-title">
+    @if (theme.current() === 'dark') {
+      <img class="login-logo w-auto max-w-full justify-self-center object-contain" ngSrc="assets/brand/logo-horizontal-light.png" width="775" height="239"
+        [alt]="'auth.brand' | transloco" priority />
+    } @else {
+      <img class="login-logo w-auto max-w-full justify-self-center object-contain" ngSrc="assets/brand/logo-horizontal-dark.png" width="780" height="258"
+        [alt]="'auth.brand' | transloco" priority />
     }
+
+    <h1 id="login-title" class="login-title text-center font-medium text-text">{{ 'auth.login.title' | transloco }}</h1>
+
+    <div role="status" [class]="verifyExpired() ? '' : 'sr-only'">
+      @if (verifyExpired()) {
+        <app-settings-notice tone="warning">{{ 'auth.login.verifyExpired' | transloco }}</app-settings-notice>
+      }
+    </div>
+
+    <form class="login-form grid" novalidate (submit)="signIn($event)">
+      <ui-field
+        for="login-email"
+        [label]="'auth.login.email' | transloco"
+        [hint]="'auth.login.emailHint' | transloco"
+        size="large"
+        [required]="true"
+        [error]="errorOf('email')"
+      >
+        <input
+          id="login-email"
+          type="email"
+          dir="ltr"
+          autocomplete="username"
+          placeholder="name@company.com"
+          class="min-w-0 flex-1 bg-transparent text-start outline-none placeholder:text-text-muted"
+          [formField]="form.email"
+          [attr.aria-describedby]="'login-email-hint' + (errorOf('email') ? ' login-email-error' : '')"
+        />
+      </ui-field>
+
+      <ui-field
+        class="mt-4"
+        for="login-password"
+        [label]="'auth.login.password' | transloco"
+        [hint]="'auth.login.passwordHint' | transloco"
+        size="large"
+        [required]="true"
+        [error]="errorOf('password')"
+      >
+        <input
+          id="login-password"
+          dir="ltr"
+          autocomplete="current-password"
+          class="min-w-0 flex-1 bg-transparent text-start outline-none"
+          [type]="showPassword() ? 'text' : 'password'"
+          [formField]="form.password"
+          [attr.aria-describedby]="'login-password-hint' + (errorOf('password') ? ' login-password-error' : '')"
+        />
+        <button
+          type="button"
+          class="password-toggle grid shrink-0 cursor-pointer place-items-center self-stretch rounded-6 text-text-muted hover:text-text focus-visible:ring-2 focus-visible:ring-focus-ring"
+          [attr.aria-label]="(showPassword() ? 'auth.login.hidePassword' : 'auth.login.showPassword') | transloco"
+          [attr.aria-pressed]="showPassword()"
+          (click)="showPassword.set(!showPassword())"
+        >
+          <ng-icon [name]="showPassword() ? 'tablerEyeOff' : 'tablerEye'" size="18" aria-hidden="true" />
+        </button>
+      </ui-field>
+
+      <div class="login-options flex min-h-btn flex-wrap items-center justify-between gap-x-12 gap-y-6">
+        <ui-checkbox [formField]="form.remember" [title]="'auth.login.rememberHint' | transloco">
+          {{ 'auth.login.remember' | transloco }}
+        </ui-checkbox>
+        <a routerLink="/reset-password" class="rounded-4 text-14 text-brand-text outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus-ring">
+          {{ 'auth.login.forgot' | transloco }}
+        </a>
+      </div>
+
+      <button uiButton type="submit" size="large" class="login-submit w-full" [disabled]="checkingTenant()" [loading]="form().submitting()">
+        {{ 'auth.login.submit' | transloco }}
+        @if (!form().submitting()) {
+          <ng-icon name="tablerArrowRight" class="login-arrow" size="18" aria-hidden="true" />
+        }
+      </button>
+    </form>
+  </section>
+
+  <div class="login-intro self-start">
+    <p class="login-headline">
+      <span class="block">{{ 'auth.login.headline' | transloco }}</span>
+      <span class="block">{{ 'auth.login.headlineAccent' | transloco }}</span>
+    </p>
+    <p class="login-description">{{ 'auth.login.description' | transloco }}</p>
   </div>
 
-  <form class="flex flex-col gap-16" novalidate (submit)="signIn($event)">
-    <ui-field
-      for="login-email"
-      [label]="'auth.login.email' | transloco"
-      [hint]="'auth.login.emailHint' | transloco"
-      size="large"
-      [required]="true"
-      [error]="errorOf('email')"
-    >
-      <input
-        id="login-email"
-        type="email"
-        dir="ltr"
-        autocomplete="username"
-        class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-text-placeholder"
-        [formField]="form.email"
-        [attr.aria-describedby]="'login-email-hint' + (errorOf('email') ? ' login-email-error' : '')"
-      />
-    </ui-field>
+  <div class="login-artwork pointer-events-none relative -z-10 self-stretch overflow-clip" aria-hidden="true">
+    <div class="login-ribbon">
+      <img [ngSrc]="ribbon()" alt="" fill priority />
+    </div>
+  </div>
 
-    <ui-field
-      for="login-password"
-      [label]="'auth.login.password' | transloco"
-      [hint]="'auth.login.passwordHint' | transloco"
-      size="large"
-      [required]="true"
-      [error]="errorOf('password')"
-    >
-      <input
-        id="login-password"
-        dir="ltr"
-        autocomplete="current-password"
-        class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-text-placeholder"
-        [type]="showPassword() ? 'text' : 'password'"
-        [formField]="form.password"
-        [attr.aria-describedby]="'login-password-hint' + (errorOf('password') ? ' login-password-error' : '')"
-      />
-      <button
-        type="button"
-        class="flex shrink-0 cursor-pointer items-center text-text-muted outline-none hover:text-text focus-visible:text-accent"
-        [attr.aria-label]="(showPassword() ? 'auth.login.hidePassword' : 'auth.login.showPassword') | transloco"
-        [attr.aria-pressed]="showPassword()"
-        (click)="showPassword.set(!showPassword())"
-      >
-        <ng-icon [name]="showPassword() ? 'tablerEyeOff' : 'tablerEye'" size="16" aria-hidden="true" />
-      </button>
-    </ui-field>
-
-    <ui-field
-      for="login-remember"
-      size="bare"
-      [label]="'auth.login.session' | transloco"
-      [hint]="'auth.login.rememberHint' | transloco"
-    >
-      <ui-checkbox [formField]="form.remember">{{ 'auth.login.remember' | transloco }}</ui-checkbox>
-    </ui-field>
-
-    <button uiButton type="submit" size="large" class="w-full" [loading]="form().submitting()">
-      {{ 'auth.login.submit' | transloco }}
-    </button>
-  </form>
-
-  <a routerLink="/reset-password" class="block text-center text-12 text-brand-text outline-none hover:underline focus-visible:underline">
-    {{ 'auth.login.forgot' | transloco }}
-  </a>
-</app-auth-card>
+  <footer class="login-footer absolute text-12 text-text-muted">{{ 'auth.login.copyright' | transloco: { year: copyrightYear() } }}</footer>
+</main>
+}

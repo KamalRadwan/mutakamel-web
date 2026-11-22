@@ -1,8 +1,8 @@
 @let item = app();
-<!-- A subscribed app without a seat for this user (myAccessState null) is not a link: opening it would end in a 403. -->
-@if (item.group === 'SUBSCRIBED' && item.myAccessState) {
+@let launchRoute = route();
+@if (item.group === 'SUBSCRIBED' && item.myAccessState && launchRoute) {
   <a
-    [routerLink]="route()"
+    [routerLink]="launchRoute"
     class="group flex h-full flex-col items-center gap-8 rounded-10 border border-border bg-surface p-12 text-center shadow-app-card outline-none transition-all duration-fast hover:-translate-y-2 hover:border-brand hover:shadow-app-card-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong motion-reduce:transition-none motion-reduce:hover:translate-y-0"
   >
     <span
@@ -26,27 +26,7 @@
     }
 
     <div class="mt-auto flex w-full flex-col items-center gap-6 pt-4">
-      <div class="flex flex-wrap items-center justify-center gap-6">
-        @if (item.myAccessState === 'OVER_CAPACITY') {
-          <span
-            class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning"
-            [title]="'home.badges.overCapacityHint' | transloco"
-          >
-            <ng-icon name="tablerLock" size="11" aria-hidden="true" />
-            {{ 'home.badges.overCapacity' | transloco }}
-            <span class="sr-only">{{ 'home.badges.overCapacityHint' | transloco }}</span>
-          </span>
-        } @else if (item.myAccessState === 'ACTIVE') {
-          <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-success px-8 text-12 font-medium text-on-success">
-            {{ 'home.badges.active' | transloco }}
-          </span>
-        }
-        @if (item.seats; as seats) {
-          <span class="text-12 leading-18 text-text-muted">
-            {{ 'home.card.seats' | transloco: { used: seats.used, total: seats.total } }}
-          </span>
-        }
-      </div>
+      <ng-container [ngTemplateOutlet]="subscriptionStatus" />
       <span
         class="inline-flex h-btn-h-sm w-full items-center justify-center rounded-6 bg-brand px-8 text-11 font-medium whitespace-nowrap text-on-brand transition-colors duration-fast group-hover:bg-brand-hover"
       >
@@ -84,33 +64,8 @@
         <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
           {{ 'home.badges.available' | transloco }}
         </span>
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          size="small"
-          class="w-full"
-          [attr.aria-label]="('home.card.request' | transloco) + ' ' + name()"
-          (click)="request.emit(item)"
-        >
-          {{ 'home.card.request' | transloco }}
-        </button>
       } @else if (item.group === 'SUBSCRIBED') {
-        <div class="flex flex-wrap items-center justify-center gap-6">
-          <span
-            class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
-            [title]="'home.badges.noAccessHint' | transloco"
-          >
-            <ng-icon name="tablerLock" size="11" aria-hidden="true" />
-            {{ 'home.badges.noAccess' | transloco }}
-            <span class="sr-only">{{ 'home.badges.noAccessHint' | transloco }}</span>
-          </span>
-          @if (item.seats; as seats) {
-            <span class="text-12 leading-18 text-text-muted">
-              {{ 'home.card.seats' | transloco: { used: seats.used, total: seats.total } }}
-            </span>
-          }
-        </div>
+        <ng-container [ngTemplateOutlet]="subscriptionStatus" />
       } @else {
         <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
           {{ 'home.badges.comingSoon' | transloco }}
@@ -119,3 +74,36 @@
     </div>
   </article>
 }
+
+<ng-template #subscriptionStatus>
+  <div class="flex flex-wrap items-center justify-center gap-6">
+    @if (item.myAccessState === 'OVER_CAPACITY') {
+      <span
+        class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning"
+        [title]="'home.badges.overCapacityHint' | transloco"
+      >
+        <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+        {{ 'home.badges.overCapacity' | transloco }}
+        <span class="sr-only">{{ 'home.badges.overCapacityHint' | transloco }}</span>
+      </span>
+    } @else if (item.myAccessState === 'ACTIVE') {
+      <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-success px-8 text-12 font-medium text-on-success">
+        {{ 'home.badges.active' | transloco }}
+      </span>
+    } @else {
+      <span
+        class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
+        [title]="'home.badges.noAccessHint' | transloco"
+      >
+        <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+        {{ 'home.badges.noAccess' | transloco }}
+        <span class="sr-only">{{ 'home.badges.noAccessHint' | transloco }}</span>
+      </span>
+    }
+    @if (item.seats; as seats) {
+      <span class="text-12 leading-18 text-text-muted">
+        {{ 'home.card.seats' | transloco: { used: seats.used, total: seats.total } }}
+      </span>
+    }
+  </div>
+</ng-template>

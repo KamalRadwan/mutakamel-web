@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Me } from '../staff/shared/staff.model';
 import { appIcon, FALLBACK_ICON } from './app-presentation';
-import { getAppsOverview, listModules } from './modules.api';
+import { listModules } from './modules.api';
 import { CatalogueEntry, fakeGetAppsOverview, setFakeCatalogue } from './modules.fake';
-import { AppsOverviewItem, groupAppsOverview } from './modules.model';
+import { AppsOverviewItem, groupWorkspaceApps } from './modules.model';
 
 const ITEM_KEYS = ['group', 'iconKey', 'isAddon', 'moduleKey', 'myAccessState', 'nameI18n', 'seats'];
 
@@ -37,7 +37,7 @@ function item(moduleKey: string, group: AppsOverviewItem['group']): AppsOverview
 
 describe('apps overview fake (GET /api/tenant/core/v1/apps/overview)', () => {
   it('returns { items } with exactly the agreed item shape', async () => {
-    const response = await getAppsOverview();
+    const response = await fakeGetAppsOverview();
     expect(Object.keys(response)).toEqual(['items']);
     expect(response.items.length).toBeGreaterThan(0);
     for (const app of response.items) {
@@ -54,8 +54,8 @@ describe('apps overview fake (GET /api/tenant/core/v1/apps/overview)', () => {
     }
   });
 
-  it('seeds the apps the home page shows, with an over-capacity app and iconKey null everywhere', async () => {
-    const { items } = await getAppsOverview();
+  it('seeds the route-guard fixture, with an over-capacity app and iconKey null everywhere', async () => {
+    const { items } = await fakeGetAppsOverview();
     const keys = items.map((app) => app.moduleKey);
     expect(keys.slice(0, 3)).toEqual(['crm', 'trade', 'accounting']);
     expect(items.some((app) => app.myAccessState === 'OVER_CAPACITY')).toBe(true);
@@ -117,27 +117,27 @@ describe('apps overview fake rules on a custom catalogue', () => {
   it('can return an empty FUTURE group', async () => {
     setFakeCatalogue([entry('crm', 1), { ...item('pos', 'AVAILABLE'), rank: 2 }]);
     const { items } = await fakeGetAppsOverview(ADMIN);
-    expect(groupAppsOverview(items).FUTURE).toEqual([]);
+    expect(items.some((app) => app.group === 'FUTURE')).toBe(false);
   });
 });
 
-describe('groupAppsOverview', () => {
-  it('splits by group and keeps catalogue order inside each group', () => {
-    const groups = groupAppsOverview([
-      item('a', 'FUTURE'),
-      item('b', 'SUBSCRIBED'),
-      item('c', 'AVAILABLE'),
-      item('d', 'SUBSCRIBED'),
-      item('e', 'FUTURE'),
+describe('groupWorkspaceApps', () => {
+  it('keeps Core catalogue order and only includes each live app once, preferring subscriptions', () => {
+    const groups = groupWorkspaceApps([
+      item('crm', 'AVAILABLE'),
+      item('trade', 'SUBSCRIBED'),
+      item('accounting', 'AVAILABLE'),
+      item('crm', 'SUBSCRIBED'),
+      item('accounting', 'AVAILABLE'),
+      item('web-phone', 'AVAILABLE'),
+      item('crm', 'SUBSCRIBED'),
+      item('unpublished', 'FUTURE'),
+      item('pos', 'AVAILABLE'),
+      item('projects', 'SUBSCRIBED'),
+      item('helpdesk', 'FUTURE'),
     ]);
-    expect(groups.SUBSCRIBED.map((app) => app.moduleKey)).toEqual(['b', 'd']);
-    expect(groups.AVAILABLE.map((app) => app.moduleKey)).toEqual(['c']);
-    expect(groups.FUTURE.map((app) => app.moduleKey)).toEqual(['a', 'e']);
-  });
-
-  it('returns an empty FUTURE group when the catalogue has none', () => {
-    const groups = groupAppsOverview([item('a', 'SUBSCRIBED'), item('b', 'AVAILABLE')]);
-    expect(groups.FUTURE).toEqual([]);
+    expect(groups.subscribed.map((app) => app.moduleKey)).toEqual(['trade', 'crm']);
+    expect(groups.available.map((app) => app.moduleKey)).toEqual(['accounting', 'web-phone']);
   });
 });
 

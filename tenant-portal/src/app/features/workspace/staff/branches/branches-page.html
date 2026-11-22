@@ -22,10 +22,12 @@
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
         <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
       </span>
-      <p class="text-12 text-danger-text">{{ 'branches.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'branches.retry' | transloco }}
-      </button>
+      <p class="text-12 text-danger-text">{{ (loadForbidden() ? 'apiErrors.permission' : 'branches.loadFailed') | transloco }}</p>
+      @if (!loadForbidden()) {
+        <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+          {{ 'branches.retry' | transloco }}
+        </button>
+      }
     </div>
   } @else {
     <div class="overflow-x-auto pb-4">

@@ -145,8 +145,17 @@ export class BranchModal {
   });
 
   protected readonly hqSwitchDisabled = computed(
-    () => !this.canManage() || this.saving() || this.mode() === 'edit' || this.currentCompanyHq() !== null,
+    () => !this.canManage() || this.saving() || this.mode() === 'edit' || this.currentCompanyHq() !== null ||
+      !this.session.can('org.branch.manage', { companyId: this.selectedCompanyId() }),
   );
+
+  protected readonly allowCompany = (company: Company): boolean => this.session.canCreateBranch(company.id);
+
+  protected readonly canChangeLifecycle = computed(() => {
+    const branch = this.baseBranch();
+    return this.canManage() && Boolean(branch && (!branch.isHeadquarters ||
+      this.session.can('org.branch.manage', { companyId: branch.companyId })));
+  });
 
   protected readonly hqHintText = computed(() => {
     this.i18n();
@@ -336,6 +345,7 @@ export class BranchModal {
   }
 
   protected onHqChange(next: boolean): void {
+    if (next && this.hqSwitchDisabled()) return;
     this.isHeadquarters.set(next);
     this.hqServerError.set(null);
   }
@@ -371,7 +381,8 @@ export class BranchModal {
 
     if (this.mode() === 'create') {
       const companyId = this.cascadeValue().companyId;
-      if (!companyId) return;
+      if (!companyId || !this.session.canCreateBranch(companyId)) return;
+      if (this.isHeadquarters() && !this.session.can('org.branch.manage', { companyId })) return;
 
       const body: {
         companyId: string;
@@ -404,7 +415,7 @@ export class BranchModal {
     }
 
     const base = this.baseBranch();
-    if (!base) return;
+    if (!base || !this.session.can('org.branch.manage', { companyId: base.companyId, branchId: base.id })) return;
 
     const patch: BranchPatch = {};
     if (trimmedName !== base.name) patch.name = trimmedName;
@@ -414,7 +425,10 @@ export class BranchModal {
     if (nextAddress !== base.address) patch.address = nextAddress;
     const nextStatus: OrgStatus = this.isActive() ? 'ACTIVE' : 'INACTIVE';
     const isDeactivating = base.status === 'ACTIVE' && nextStatus === 'INACTIVE';
-    if (nextStatus !== base.status) patch.status = nextStatus;
+    if (nextStatus !== base.status) {
+      if (!this.canChangeLifecycle()) return;
+      patch.status = nextStatus;
+    }
 
     if (Object.keys(patch).length === 0) return;
 
@@ -428,7 +442,8 @@ export class BranchModal {
         if (!cascade) throw error;
         this.saving.set(false);
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed) return;
+        if (!confirmed || !this.canChangeLifecycle() ||
+            !this.session.can('org.branch.manage', { companyId: base.companyId, branchId: base.id })) return;
         this.saving.set(true);
         updated = await updateBranch(base.id, patch, this.idempotencyKeyFor(base.id, patch), {
           confirmAddonCascade: true,
@@ -452,7 +467,8 @@ export class BranchModal {
 
   protected requestDelete(): void {
     const base = this.baseBranch();
-    if (!base || !this.canManage() || this.saving()) return;
+    if (!base || !this.canChangeLifecycle() || this.saving() ||
+        !this.session.can('org.branch.manage', { companyId: base.companyId, branchId: base.id })) return;
     this.deleteRequested.emit(base);
   }
 
@@ -504,7 +520,7 @@ export class BranchModal {
     }
     if (code === 'ORG_HQ_TRANSFER_REQUIRED' && isDeactivating && base) {
       this.isActive.set(true);
-      this.hqTransferRequired.emit({ branch: base, action: 'deactivate' });
+      if (this.canChangeLifecycle()) this.hqTransferRequired.emit({ branch: base, action: 'deactivate' });
       return;
     }
     if (code === 'ORG_NODE_NOT_EMPTY' && isDeactivating && base) {

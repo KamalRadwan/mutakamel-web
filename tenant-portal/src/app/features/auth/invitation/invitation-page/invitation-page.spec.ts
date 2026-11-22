@@ -6,7 +6,8 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/api/api-errors';
 import { AuthSession } from '../../../../core/auth/auth-session';
-import { resetFakeSession } from '../../../../core/auth/auth-session.fake';
+import { AuthSessionApi } from '../../../../core/auth/auth-session.api';
+import { fakeGetMe, resetFakeSession } from '../../../../core/auth/auth-session.fake';
 import { Notify } from '../../../../core/notify/notify';
 import { resetFakeChallenges } from '../../shared/mfa-challenge.fake';
 import { MfaPending } from '../../shared/mfa-pending';
@@ -57,7 +58,7 @@ async function submitForm(root: HTMLElement, advanceMs?: number): Promise<void> 
   if (advanceMs !== undefined) {
     await vi.advanceTimersByTimeAsync(advanceMs);
   } else {
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(2_000);
   }
   fixture?.detectChanges();
 }
@@ -72,6 +73,7 @@ beforeEach(() => {
 
   TestBed.configureTestingModule({
     providers: [
+      { provide: AuthSessionApi, useValue: { getMe: fakeGetMe, hasCsrfCookie: () => true } },
       provideRouter([]),
       provideTransloco({
         config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },

@@ -1,18 +1,16 @@
-import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerAdjustmentsHorizontal,
   tablerBuildingSkyscraper,
   tablerCheck,
   tablerCircleOff,
   tablerCloudOff,
   tablerEdit,
   tablerEye,
-  tablerPlus,
   tablerTrash,
   tablerUsers,
 } from '@ng-icons/tabler-icons';
@@ -28,6 +26,7 @@ import { SeatImpact } from '../../seats/seat-impact/seat-impact';
 import { SeatChange } from '../../seats/seats.model';
 import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
 import { StaffSession } from '../shared/staff-session';
+import { OrganizationReadApi } from '../shared/organization-read.api';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StatusBadge as StaffStatusBadge } from '../shared/status-badge/status-badge';
 import {
@@ -35,13 +34,10 @@ import {
   deleteCompany,
   errorCodeOf,
   errorMessage,
-  getCompany,
-  listCompanies,
-  listCurrencies,
   newIdempotencyKey,
   updateCompany,
 } from '../shared/staff.api';
-import { Company, Currency, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
+import { Company, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
 import { CompanyModal } from './company-modal/company-modal';
 
 type CompanySort = 'name' | 'code' | 'createdAt';
@@ -76,9 +72,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-company-row-actions';
       tablerCloudOff,
       tablerEye,
       tablerEdit,
-      tablerPlus,
       tablerUsers,
-      tablerAdjustmentsHorizontal,
       tablerCheck,
       tablerCircleOff,
       tablerTrash,
@@ -95,6 +89,8 @@ export class CompaniesPage {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly organization = inject(OrganizationReadApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
@@ -112,11 +108,18 @@ export class CompaniesPage {
   protected readonly sort = signal<string>('name');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  protected readonly rows = signal<Company[]>([]);
-  protected readonly total = signal(0);
+  private readonly loadedRows = signal<Company[]>([]);
+  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
+  protected readonly rows = computed(() =>
+    this.loadedTotal()?.revision === this.session.scopeRevision() ? this.loadedRows() : [],
+  );
+  protected readonly total = computed(() => {
+    const result = this.loadedTotal();
+    return result && result.revision === this.session.scopeRevision() ? result.count : 0;
+  });
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
-  protected readonly currencies = signal<Currency[]>([]);
+  protected readonly loadForbidden = signal(false);
   protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
 
   protected readonly pendingDeleteCompany = signal<Company | null>(null);
@@ -132,7 +135,8 @@ export class CompaniesPage {
     () => this.pendingStatusChange()?.nextStatus === 'ACTIVE' && this.statusSeatBlocked(),
   );
 
-  protected readonly canManage = computed(() => this.session.isTenantWide('org.company.manage'));
+  // Records are served by Core while organization mutations still use fixtures.
+  protected readonly canManage = () => false;
 
   protected readonly hasActiveFiltersOrSearch = computed(
     () => Boolean(this.search().trim()) || Boolean(this.filterValues()['status']),
@@ -163,6 +167,8 @@ export class CompaniesPage {
   });
 
   private loadSeq = 0;
+  private detailSeq = 0;
+  private detailRevision: string | null = null;
   private prevCriteriaSignature: string | null = null;
   private handledDeepLinkKey = '';
   private statusConfirmResolver: ((confirmed: boolean) => void) | null = null;
@@ -171,7 +177,6 @@ export class CompaniesPage {
     if (!this.session.me()) {
       void this.session.load();
     }
-    void this.loadCurrencies();
 
     effect(() => {
       const search = this.search().trim();
@@ -180,7 +185,12 @@ export class CompaniesPage {
       const page = this.page();
       const pageSize = this.pageSize();
 
-      const criteriaSignature = `${search}|${sort}|${status ?? ''}`;
+      const revision = this.session.scopeRevision();
+      if (this.detailRevision && this.detailRevision !== revision) {
+        this.detailRevision = null;
+        untracked(() => this.companyModal().closeImmediate());
+      }
+      const criteriaSignature = `${revision}|${search}|${sort}|${status ?? ''}`;
       const criteriaChanged = this.prevCriteriaSignature !== null && this.prevCriteriaSignature !== criteriaSignature;
       this.prevCriteriaSignature = criteriaSignature;
 
@@ -220,7 +230,6 @@ export class CompaniesPage {
   }
 
   protected reload(): void {
-    void this.loadCurrencies();
     void this.loadList({
       search: this.search().trim(),
       sort: this.sort() as CompanySort,
@@ -236,7 +245,7 @@ export class CompaniesPage {
   }
 
   protected openEdit(company: Company): void {
-    this.companyModal().openEdit(company);
+    void this.openCompanyById(company.id);
   }
 
   protected onModalSaved(event: { company: Company; isNew: boolean }): void {
@@ -273,39 +282,22 @@ export class CompaniesPage {
     ];
 
     if (manage) {
-      items.push(
-        {
+      items.push({
           id: 'edit',
           title: t('companies.actions.edit'),
           icon: 'tablerEdit',
           tile: 'bg-icon-orange',
-        },
-        {
-          id: 'addBranch',
-          title: t('companies.actions.addBranch'),
-          icon: 'tablerPlus',
-          tile: isActive ? 'bg-icon-green' : 'bg-icon-gray',
-          disabled: !isActive,
-          reason: !isActive ? t('companies.actions.inactiveCompanyReason') : undefined,
-        },
-      );
+      });
     }
 
-    items.push(
-      {
+    if (this.session.can('users.user.read', { companyId: company.id })) {
+      items.push({
         id: 'viewUsers',
         title: t('companies.actions.viewUsers'),
         icon: 'tablerUsers',
         tile: 'bg-icon-blue',
-      },
-      {
-        id: 'activation',
-        title: t('companies.actions.activation'),
-        icon: 'tablerAdjustmentsHorizontal',
-        tile: 'bg-icon-violet',
-      },
-    );
-
+      });
+    }
     if (manage) {
       items.push(
         {
@@ -335,22 +327,10 @@ export class CompaniesPage {
       case 'edit':
         this.openEdit(company);
         break;
-      case 'addBranch':
-        if (this.canManage() && company.status === 'ACTIVE') {
-          void this.router.navigate(['/workspace/staff/branches'], {
-            queryParams: { new: 1, companyId: company.id },
-          });
-        }
-        break;
       case 'viewUsers':
-        void this.router.navigate(['/workspace/staff/users'], {
-          queryParams: { companyId: company.id },
-        });
-        break;
-      case 'activation':
-        void this.router.navigate(['/workspace/operations/application-activation'], {
-          queryParams: { companyId: company.id },
-        });
+        if (this.session.can('users.user.read', { companyId: company.id })) {
+          void this.router.navigate(['/workspace/staff/users'], { queryParams: { companyId: company.id } });
+        }
         break;
       case 'toggleStatus':
         if (this.canManage()) {
@@ -380,7 +360,7 @@ export class CompaniesPage {
       } catch (error) {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
-        if (!(await this.cascadeConfirm.confirm(cascade.addons))) return;
+        if (!(await this.cascadeConfirm.confirm(cascade.addons)) || !this.canManage()) return;
         await deleteCompany(company.id, newIdempotencyKey(), { confirmAddonCascade: true });
       }
       if (this.companyModal().editingId() === company.id) {
@@ -430,10 +410,10 @@ export class CompaniesPage {
   }
 
   private async requestToggleStatus(company: Company): Promise<void> {
-    if (this.busyIds().has(company.id)) return;
+    if (!this.canManage() || this.busyIds().has(company.id)) return;
     const nextStatus: OrgStatus = company.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     this.pendingStatusChange.set({ company, nextStatus });
-    if (!(await this.openStatusConfirm())) {
+    if (!(await this.openStatusConfirm()) || !this.canManage()) {
       this.pendingStatusChange.set(null);
       return;
     }
@@ -447,7 +427,7 @@ export class CompaniesPage {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed) return;
+        if (!confirmed || !this.canManage()) return;
         updated = await updateCompany(company.id, { status: nextStatus }, newIdempotencyKey(), {
           confirmAddonCascade: true,
         });
@@ -493,25 +473,18 @@ export class CompaniesPage {
   }
 
   private async openCompanyById(id: string): Promise<void> {
-    const existing = this.rows().find((c) => c.id === id);
-    if (existing) {
-      this.openEdit(existing);
-      return;
-    }
+    const seq = ++this.detailSeq;
+    const revision = this.session.scopeRevision();
     try {
-      const company = await getCompany(id);
-      this.openEdit(company);
+      const company = await this.organization.getCompany(id);
+      if (!this.destroyRef.destroyed && seq === this.detailSeq && revision === this.session.scopeRevision()) {
+        this.detailRevision = revision;
+        this.companyModal().openEdit(company);
+      }
     } catch (error) {
-      this.notify.error(this.resolveError(error));
-    }
-  }
-
-  private async loadCurrencies(): Promise<void> {
-    try {
-      const list = await listCurrencies();
-      this.currencies.set(list);
-    } catch {
-      // Non-blocking lookup for company currency dropdown
+      if (!this.destroyRef.destroyed && seq === this.detailSeq && revision === this.session.scopeRevision()) {
+        this.notify.error(this.resolveError(error));
+      }
     }
   }
 
@@ -523,8 +496,10 @@ export class CompaniesPage {
     pageSize: number;
   }): Promise<void> {
     const seq = ++this.loadSeq;
+    const revision = this.session.scopeRevision();
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadForbidden.set(false);
 
     const query: ListQuery = {
       page: params.page,
@@ -536,15 +511,16 @@ export class CompaniesPage {
     if (params.status) query.status = params.status;
 
     try {
-      const result = await listCompanies(query);
-      if (seq !== this.loadSeq) return;
-      this.rows.set(result.data);
-      this.total.set(result.meta.total);
-    } catch {
-      if (seq !== this.loadSeq) return;
+      const result = await this.organization.listCompanies(query);
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+      this.loadedRows.set(result.data);
+      this.loadedTotal.set({ revision, count: result.meta.total });
+    } catch (error) {
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
       this.loadFailed.set(true);
-      this.rows.set([]);
-      this.total.set(0);
+      this.loadForbidden.set(error instanceof ApiError && error.status === 403);
+      this.loadedRows.set([]);
+      this.loadedTotal.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

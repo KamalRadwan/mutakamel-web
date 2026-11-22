@@ -28,8 +28,6 @@ import {
   getDepartment,
   getTeam,
   inviteUser,
-  listBranches,
-  listRoles,
   newIdempotencyKey,
 } from '../../shared/staff.api';
 import { seatErrorMessage } from '../../../seats/seat-errors';
@@ -189,8 +187,6 @@ export class InviteModal {
     ];
   });
 
-  private readonly loadedBranches = signal<Branch[] | null>(null);
-  private readonly loadedRoles = signal<Role[] | null>(null);
 
   private readonly emailServerError = signal<{ message: string; value: string } | null>(null);
   private readonly codeServerError = signal<{ message: string; value: string } | null>(null);
@@ -241,8 +237,7 @@ export class InviteModal {
 
   protected readonly assignableBranches = computed<Branch[]>(() => {
     this.session.me();
-    const list = this.loadedBranches() ?? this.branches();
-    return list.filter(
+    return this.branches().filter(
       (b) =>
         b.status === 'ACTIVE' &&
         this.session.can('users.user.assign_roles', { companyId: b.companyId, branchId: b.id }),
@@ -250,8 +245,7 @@ export class InviteModal {
   });
 
   protected readonly assignableRoles = computed<Role[]>(() => {
-    const list = this.loadedRoles() ?? this.roles();
-    return list.filter(isAssignableRole);
+    return this.roles().filter(isAssignableRole);
   });
 
   protected readonly branchOptions = computed<DropdownOption<string>[]>(() =>
@@ -415,7 +409,6 @@ export class InviteModal {
       { injector: this.injector },
     );
 
-    void this.loadRoleLookups(seq);
     if (initialCascade.teamId && (!initialCascade.departmentId || !initialCascade.branchId || !initialCascade.companyId)) {
       void this.resolveChainFromTeam(initialCascade.teamId, seq);
     } else if (initialCascade.departmentId && (!initialCascade.branchId || !initialCascade.companyId)) {
@@ -514,6 +507,9 @@ export class InviteModal {
       if (!cascade.companyId || !cascade.branchId || !cascade.departmentId) {
         return undefined;
       }
+      if (!this.session.can('users.user.invite', { companyId: cascade.companyId, branchId: cascade.branchId })) {
+        return undefined;
+      }
 
       const d = this.draft();
       const email = d.email.trim().toLowerCase();
@@ -527,6 +523,9 @@ export class InviteModal {
       const roleAssignments: { branchId: string; roleId: string }[] = [];
       for (const row of this.roleRows()) {
         if (!row.branchId || !row.roleId) continue;
+        if (!this.session.isOwner() || !this.session.can('users.user.assign_roles', { branchId: row.branchId })) {
+          return undefined;
+        }
         const pairKey = `${row.branchId}:${row.roleId}`;
         if (seenPairs.has(pairKey)) continue;
         seenPairs.add(pairKey);
@@ -622,34 +621,6 @@ export class InviteModal {
     this.submitAttempted.set(false);
     this.clearServerErrors();
     this.clearIdempotency();
-  }
-
-  private async fetchAllPages<T>(
-    fetcher: (q: { page: number; limit: number }) => Promise<{ data: T[]; meta: { hasNext: boolean } }>,
-  ): Promise<T[]> {
-    const all: T[] = [];
-    let page = 1;
-    while (page <= 20) {
-      const res = await fetcher({ page, limit: 100 });
-      all.push(...res.data);
-      if (!res.meta.hasNext) break;
-      page += 1;
-    }
-    return all;
-  }
-
-  private async loadRoleLookups(seq: number): Promise<void> {
-    const [branchesRes, rolesRes] = await Promise.allSettled([
-      this.fetchAllPages((q) => listBranches({ ...q, status: 'ACTIVE' })),
-      this.fetchAllPages((q) => listRoles(q)),
-    ]);
-    if (seq !== this.openSeq) return;
-    if (branchesRes.status === 'fulfilled') {
-      this.loadedBranches.set(branchesRes.value);
-    }
-    if (rolesRes.status === 'fulfilled') {
-      this.loadedRoles.set(rolesRes.value);
-    }
   }
 
   private async resolveChainFromTeam(teamId: string, seq: number): Promise<void> {

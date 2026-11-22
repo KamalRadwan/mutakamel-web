@@ -41,6 +41,7 @@ import { Pagination } from '../../../../../shared/ui/pagination/pagination';
 import { getSeatUsage } from '../../../seats/seats.api';
 import { ModuleUsage, moduleNameIn, moduleTileOf, seatInitials } from '../../../seats/seats.model';
 import { StaffSession } from '../../../staff/shared/staff-session';
+import { StaffReadAccess } from '../../../staff/staff-read-access';
 import { SessionFailedState } from '../../shared/session-failed-state/session-failed-state';
 import { getUser, listUsers } from '../../../staff/shared/staff.api';
 import { TenantUser } from '../../../staff/shared/staff.model';
@@ -156,6 +157,7 @@ export class AddonSeatsPage {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
+  private readonly staffRead = inject(StaffReadAccess);
 
   protected readonly sessionFailed = computed(() => !this.session.me() && this.session.state() === 'failed');
   private readonly queryParams = toSignal(this.route.queryParamMap);
@@ -395,6 +397,13 @@ export class AddonSeatsPage {
       return;
     }
     this.closePicker();
+  }
+
+  protected staffUserScope(userId: string): { companyId: string; branchId: string } | null {
+    const selected = this.selectedUser();
+    if (selected?.id !== userId) return null;
+    const target = { companyId: selected.companyId, branchId: selected.branchId };
+    return this.staffRead.allows('users', undefined, target) ? target : null;
   }
 
   protected onHostEscape(event: Event): void {

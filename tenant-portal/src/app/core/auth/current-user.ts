@@ -1,6 +1,6 @@
 import { Service, computed, signal } from '@angular/core';
 import { type AuthMe, userFromMe } from './auth-me';
-import { FAKE_TIME_ZONE, FAKE_USER, FAKE_USER_ID } from './current-user.fake';
+import { FAKE_TIME_ZONE, FAKE_USER_ID } from './current-user.fake';
 
 export interface User {
   id?: string;
@@ -9,9 +9,11 @@ export interface User {
   timeZone?: string;
 }
 
+const UNVERIFIED_USER: User = { displayName: '', email: '' };
+
 @Service()
 export class CurrentUser {
-  readonly user = signal<User>(FAKE_USER);
+  readonly user = signal<User>(UNVERIFIED_USER);
   readonly userId = computed(() => this.user().id ?? FAKE_USER_ID);
   readonly timeZone = computed(() => this.user().timeZone ?? FAKE_TIME_ZONE);
   readonly initials = computed(() =>
@@ -28,6 +30,6 @@ export class CurrentUser {
   }
 
   reset(): void {
-    this.user.set(FAKE_USER);
+    this.user.set(UNVERIFIED_USER);
   }
 }

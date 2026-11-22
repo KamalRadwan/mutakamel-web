@@ -414,14 +414,14 @@
           </p>
         }
 
-        @if (canReadPhoneSettings || canReadPhoneExtensions) {
+        @if (canReadPhoneSettings || (canReadPhoneExtensions && canOpenStaffUsers())) {
           <div class="flex flex-wrap items-center gap-8">
             @if (canReadPhoneSettings) {
               <a routerLink="/workspace/settings/phone" uiButton variant="secondary" size="small">
                 {{ 'general.telephony.manageServers' | transloco }}
               </a>
             }
-            @if (canReadPhoneExtensions) {
+            @if (canReadPhoneExtensions && canOpenStaffUsers()) {
               <a routerLink="/workspace/staff/users" uiButton variant="secondary" size="small">
                 {{ 'general.telephony.giveUsersPhone' | transloco }}
               </a>

@@ -1,4 +1,4 @@
-import { ApiError } from '../../../core/api/api-errors';
+import { ApiError, isValidationError } from '../../../core/api/api-errors';
 import type { LoginSession, MfaStep } from '../../../core/auth/auth-session.model';
 
 /** POST /tenant/auth/login body (LoginDto). The backend trims and lower-cases the email. */
@@ -36,6 +36,7 @@ const ERROR_KEYS: Readonly<Record<string, LoginErrorKey>> = {
   AUTH_LOGIN_THROTTLED: 'AUTH_LOGIN_THROTTLED',
   AUTH_MFA_THROTTLED: 'AUTH_MFA_THROTTLED',
   'COMMON.GENERIC.RATE_LIMITED': 'RATE_LIMITED',
+  'GW.RATE.LIMIT_EXCEEDED': 'RATE_LIMITED',
   AUTH_SESSION_LIMIT_REACHED: 'AUTH_SESSION_LIMIT_REACHED',
   SUBSCRIPTION_PAST_DUE: 'SUBSCRIPTION_PAST_DUE',
   PLATFORM_MAINTENANCE: 'PLATFORM_MAINTENANCE',
@@ -45,7 +46,11 @@ const ERROR_KEYS: Readonly<Record<string, LoginErrorKey>> = {
 };
 
 export function loginErrorKey(error: unknown): LoginErrorKey {
-  return (error instanceof ApiError && ERROR_KEYS[error.code]) || 'UNKNOWN';
+  if (!(error instanceof ApiError)) return 'UNKNOWN';
+  const known = Object.hasOwn(ERROR_KEYS, error.code) ? ERROR_KEYS[error.code] : undefined;
+  if (known) return known;
+  if (error.status === 429) return 'RATE_LIMITED';
+  return isValidationError(error) ? 'CORE_VALIDATION_FAILED' : 'UNKNOWN';
 }
 
 /** Minutes from `details.retryAfterSeconds: ['900']` (AUTH_LOGIN_THROTTLED, AUTH_MFA_THROTTLED); 0 when absent. */

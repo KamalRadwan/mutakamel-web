@@ -106,7 +106,7 @@ export class UserModal {
     this.session.me();
     return (
       this.session.can('webphone.extensions.read') ||
-      this.session.can('webphone.extensions.manage')
+      this.session.isTenantWide('webphone.extensions.manage')
     );
   });
   protected readonly canViewCalls = computed(() => {
@@ -194,7 +194,7 @@ export class UserModal {
   protected readonly appsReadonly = computed(() => {
     const u = this.user();
     if (!u) return true;
-    return u.isTenantOwner || !this.session.can('users.user.manage_modules');
+    return u.isTenantOwner || !this.session.isTenantWide('users.user.manage_modules');
   });
 
   protected readonly appsReadonlyReason = computed<string | null>(() => {
@@ -202,7 +202,7 @@ export class UserModal {
     const u = this.user();
     if (!u) return null;
     if (u.isTenantOwner) return this.transloco.translate('staff.protected.owner');
-    if (!this.session.can('users.user.manage_modules')) {
+    if (!this.session.isTenantWide('users.user.manage_modules')) {
       return this.transloco.translate('staff.protected.scope');
     }
     return null;

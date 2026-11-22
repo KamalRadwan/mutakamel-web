@@ -44,6 +44,8 @@
   },
   "reason": {
     "ownerOnly": "Only the workspace owner can set per-branch permissions.",
+    "branchPermissions": "Editing per-branch permissions requires role update and permissions catalogue access.",
+    "rolePermissions": "You don't have the permissions required for this action.",
     "tenantWide": "This needs workspace-wide role permissions.",
     "system": "Built-in roles can't be changed.",
     "noDuplicateBranch": "Per-branch roles can't be duplicated yet."

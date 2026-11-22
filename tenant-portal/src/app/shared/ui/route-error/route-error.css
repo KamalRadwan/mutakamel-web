@@ -1,0 +1,4 @@
+.route-error-mark {
+  background-color: var(--danger-text);
+  mask: url('/assets/brand/mark.png') center / contain no-repeat;
+}

@@ -14,15 +14,17 @@
   "sections": {
     "subscribed": {
       "title": "Your apps",
-      "description": "The apps your workspace subscribes to, ready to open."
+      "description": "The apps your workspace subscribes to.",
+      "empty": "Your workspace has no subscribed apps yet."
     },
     "available": {
       "title": "Add to your workspace",
-      "description": "Apps you can add now. Request one and the workspace owner is notified."
+      "description": "Apps available to add to your workspace.",
+      "empty": "No additional apps are available to add."
     },
     "future": {
       "title": "Coming soon",
-      "description": "More ERP apps and industry add-ons on the way.",
+      "description": "New apps coming to your workspace.",
       "collapse": "Collapse coming soon",
       "expand": "Expand coming soon"
     }
@@ -39,10 +41,8 @@
   },
   "card": {
     "seats": "{{used}} / {{total}} users",
-    "open": "Open",
-    "request": "Request"
+    "open": "Open"
   },
-  "requestToast": "Your request was sent to the workspace owner.",
   "error": {
     "text": "Could not load workspace apps.",
     "retry": "Retry"

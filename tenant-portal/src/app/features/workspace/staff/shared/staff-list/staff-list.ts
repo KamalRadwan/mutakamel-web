@@ -39,6 +39,7 @@ export class StaffList {
   readonly loading = input(false);
   readonly total = input(0);
   readonly filters = input<StaffListFilter[]>([]);
+  readonly hideUnlabelledFilters = input(false);
   readonly sortOptions = input<StaffListSortOption[]>([]);
 
   readonly search = model('');
@@ -63,6 +64,7 @@ export class StaffList {
       const current = filter.id in values ? values[filter.id] : filter.value;
       if (!current) continue;
       const option = filter.options.find((o) => o.value === current);
+      if (!option && this.hideUnlabelledFilters()) continue;
       chips.push({
         id: filter.id,
         filterLabel: filter.label,

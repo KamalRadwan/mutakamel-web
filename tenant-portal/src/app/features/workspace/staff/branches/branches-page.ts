@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -34,16 +34,14 @@ import { SeatChange } from '../../seats/seats.model';
 import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StaffSession } from '../shared/staff-session';
+import { OrganizationReadApi } from '../shared/organization-read.api';
 import { StatusBadge as StaffStatusBadge } from '../shared/status-badge/status-badge';
 import {
   ApiError,
   deleteBranch,
   errorCodeOf,
   errorMessage,
-  getBranch,
   listAllPages,
-  listBranches,
-  listCompanies,
   newIdempotencyKey,
   updateBranch,
 } from '../shared/staff.api';
@@ -105,6 +103,8 @@ export class BranchesPage {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly organization = inject(OrganizationReadApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
@@ -124,11 +124,23 @@ export class BranchesPage {
   protected readonly sort = signal<string>('name');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  protected readonly rows = signal<Branch[]>([]);
-  protected readonly total = signal(0);
+  private readonly loadedRows = signal<Branch[]>([]);
+  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
+  protected readonly rows = computed(() =>
+    this.loadedTotal()?.revision === this.session.scopeRevision() ? this.loadedRows() : [],
+  );
+  protected readonly total = computed(() => {
+    const result = this.loadedTotal();
+    return result && result.revision === this.session.scopeRevision() ? result.count : 0;
+  });
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
-  protected readonly companies = signal<Company[]>([]);
+  protected readonly loadForbidden = signal(false);
+  private readonly companyLookup = signal<{ revision: string | null; rows: Company[] } | null>(null);
+  protected readonly companies = computed(() => {
+    const lookup = this.companyLookup();
+    return lookup && lookup.revision === this.session.scopeRevision() ? lookup.rows : [];
+  });
   protected readonly allBranches = signal<Branch[]>([]);
   protected readonly countries = signal<GeoCountry[]>([]);
   protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
@@ -150,11 +162,8 @@ export class BranchesPage {
 
   private readonly companyMap = computed(() => new Map(this.companies().map((c) => [c.id, c])));
 
-  protected readonly canAddBranch = computed(
-    () =>
-      this.session.isTenantWide('org.branch.manage') ||
-      this.companies().some((c) => this.session.can('org.branch.manage', { companyId: c.id })),
-  );
+  // Keep fixture mutations unavailable for records loaded from Core.
+  protected readonly canAddBranch = () => false;
 
   protected readonly modalCanManage = computed(() => {
     const editing = this.modalBranch();
@@ -203,6 +212,8 @@ export class BranchesPage {
   });
 
   private loadSeq = 0;
+  private detailSeq = 0;
+  private detailRevision: string | null = null;
   private prevCriteriaSignature: string | null = null;
   private handledDeepLinkKey = '';
   private appliedCompanyFilterKey = '';
@@ -212,7 +223,10 @@ export class BranchesPage {
     if (!this.session.me()) {
       void this.session.load();
     }
-    void this.loadLookups();
+    effect(() => {
+      this.session.scopeRevision();
+      void untracked(() => this.loadLookups());
+    });
 
     const initialCompanyId = this.route.snapshot.queryParamMap.get('companyId');
     if (initialCompanyId) {
@@ -229,7 +243,12 @@ export class BranchesPage {
       const page = this.page();
       const pageSize = this.pageSize();
 
-      const criteriaSignature = `${search}|${sort}|${companyId ?? ''}|${status ?? ''}`;
+      const revision = this.session.scopeRevision();
+      if (this.detailRevision && this.detailRevision !== revision) {
+        this.detailRevision = null;
+        untracked(() => this.branchModal().closeImmediate());
+      }
+      const criteriaSignature = `${revision}|${search}|${sort}|${companyId ?? ''}|${status ?? ''}`;
       const criteriaChanged = this.prevCriteriaSignature !== null && this.prevCriteriaSignature !== criteriaSignature;
       this.prevCriteriaSignature = criteriaSignature;
 
@@ -292,11 +311,25 @@ export class BranchesPage {
   }
 
   protected canManageBranch(branch: Branch): boolean {
-    return this.session.can('org.branch.manage', { branchId: branch.id });
+    return this.canAddBranch() &&
+      this.session.can('org.branch.manage', { companyId: branch.companyId, branchId: branch.id });
+  }
+
+  private canReadBranch(branch: Branch): boolean {
+    return this.rows().some((row) => row.id === branch.id);
+  }
+
+  private canChangeHeadquarters(branch: Branch): boolean {
+    return this.canManageBranch(branch) && this.session.can('org.branch.manage', { companyId: branch.companyId });
+  }
+
+  private canChangeLifecycle(branch: Branch): boolean {
+    return branch.isHeadquarters ? this.canChangeHeadquarters(branch) : this.canManageBranch(branch);
   }
 
   protected canAddDepartmentTo(branch: Branch): boolean {
-    return this.session.can('org.department.manage', { companyId: branch.companyId, branchId: branch.id });
+    return this.canAddBranch() &&
+      this.session.can('org.department.manage', { companyId: branch.companyId, branchId: branch.id });
   }
 
   protected companyName(companyId: string): string {
@@ -319,14 +352,15 @@ export class BranchesPage {
 
   protected openCreate(presetCompanyId?: string | null): void {
     if (!this.canAddBranch()) return;
-    this.modalBranch.set(null);
     const companyId = presetCompanyId ?? this.filterValues()['companyId'] ?? null;
+    if (companyId && !this.session.canCreateBranch(companyId)) return;
+    this.modalBranch.set(null);
     this.branchModal().openCreate(companyId);
   }
 
   protected openEdit(branch: Branch): void {
-    this.modalBranch.set(branch);
-    this.branchModal().openEdit(branch);
+    if (!this.canReadBranch(branch)) return;
+    void this.openBranchById(branch.id);
   }
 
   protected onModalSaved(event: { branch: Branch; isNew: boolean }): void {
@@ -351,7 +385,7 @@ export class BranchesPage {
     const busy = this.busyIds().has(branch.id);
     const isActive = branch.status === 'ACTIVE';
 
-    const items: ActionItem[] = [
+    const items: ActionItem[] = !this.canReadBranch(branch) ? [] : [
       {
         id: 'open',
         title: t('branches.actions.open'),
@@ -368,7 +402,7 @@ export class BranchesPage {
         tile: 'bg-icon-orange',
       });
 
-      if (!branch.isHeadquarters) {
+      if (!branch.isHeadquarters && this.canChangeHeadquarters(branch)) {
         items.push({
           id: 'makeHq',
           title: t('branches.actions.makeHq'),
@@ -391,14 +425,14 @@ export class BranchesPage {
       });
     }
 
-    items.push({
+    if (this.session.can('users.user.read', { companyId: branch.companyId, branchId: branch.id })) items.push({
       id: 'viewUsers',
       title: t('branches.actions.viewUsers'),
       icon: 'tablerUsers',
       tile: 'bg-icon-blue',
     });
 
-    if (manage) {
+    if (this.canChangeLifecycle(branch)) {
       items.push(
         {
           id: 'toggleStatus',
@@ -428,7 +462,7 @@ export class BranchesPage {
         this.openEdit(branch);
         break;
       case 'makeHq':
-        if (this.canManageBranch(branch) && branch.status === 'ACTIVE' && !branch.isHeadquarters) {
+        if (this.canChangeHeadquarters(branch) && branch.status === 'ACTIVE' && !branch.isHeadquarters) {
           void this.requestMakeHq(branch);
         }
         break;
@@ -440,17 +474,17 @@ export class BranchesPage {
         }
         break;
       case 'viewUsers':
-        void this.router.navigate(['/workspace/staff/users'], {
-          queryParams: { branchId: branch.id },
-        });
+        if (this.session.can('users.user.read', { companyId: branch.companyId, branchId: branch.id })) {
+          void this.router.navigate(['/workspace/staff/users'], { queryParams: { branchId: branch.id } });
+        }
         break;
       case 'toggleStatus':
-        if (this.canManageBranch(branch)) {
+        if (this.canChangeLifecycle(branch)) {
           void this.requestToggleStatus(branch);
         }
         break;
       case 'delete':
-        if (this.canManageBranch(branch)) {
+        if (this.canChangeLifecycle(branch)) {
           void this.requestDelete(branch);
         }
         break;
@@ -458,7 +492,7 @@ export class BranchesPage {
   }
 
   protected async requestDelete(branch: Branch): Promise<void> {
-    if (!this.canManageBranch(branch) || this.busyIds().has(branch.id)) return;
+    if (!this.canChangeLifecycle(branch) || this.busyIds().has(branch.id)) return;
     this.pendingDeleteBranch.set(branch);
     if (!(await this.deleteConfirm().open())) {
       this.pendingDeleteBranch.set(null);
@@ -476,7 +510,7 @@ export class BranchesPage {
   }
 
   private async requestMakeHq(branch: Branch): Promise<void> {
-    if (this.busyIds().has(branch.id)) return;
+    if (!this.canChangeHeadquarters(branch) || this.busyIds().has(branch.id)) return;
     const oldHq = this.allBranches().find(
       (b) => b.companyId === branch.companyId && b.isHeadquarters && b.id !== branch.id,
     );
@@ -486,7 +520,7 @@ export class BranchesPage {
       oldHqName: oldHq?.name ?? '—',
     });
 
-    if (!(await this.hqConfirm().open())) {
+    if (!(await this.hqConfirm().open()) || !this.canChangeHeadquarters(branch)) {
       this.pendingHqBranch.set(null);
       return;
     }
@@ -531,7 +565,7 @@ export class BranchesPage {
   }
 
   private async requestToggleStatus(branch: Branch): Promise<void> {
-    if (this.busyIds().has(branch.id)) return;
+    if (!this.canChangeLifecycle(branch) || this.busyIds().has(branch.id)) return;
     const nextStatus: OrgStatus = branch.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     this.pendingStatusChange.set({ branch, nextStatus });
     if (!(await this.openStatusConfirm())) {
@@ -547,6 +581,7 @@ export class BranchesPage {
   }
 
   private async performActivate(branch: Branch): Promise<void> {
+    if (!this.canChangeLifecycle(branch)) { this.pendingStatusChange.set(null); return; }
     this.setBusy(branch.id, true);
     try {
       let updated: Branch;
@@ -556,7 +591,7 @@ export class BranchesPage {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed) return;
+        if (!confirmed || !this.canChangeLifecycle(branch)) return;
         updated = await updateBranch(branch.id, { status: 'ACTIVE' }, newIdempotencyKey(), {
           confirmAddonCascade: true,
         });
@@ -573,6 +608,7 @@ export class BranchesPage {
   }
 
   private async performDeactivate(branch: Branch): Promise<void> {
+    if (!this.canChangeLifecycle(branch)) { this.pendingStatusChange.set(null); return; }
     this.setBusy(branch.id, true);
     try {
       let updated: Branch;
@@ -582,7 +618,7 @@ export class BranchesPage {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         const confirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!confirmed) return;
+        if (!confirmed || !this.canChangeLifecycle(branch)) return;
         updated = await updateBranch(branch.id, { status: 'INACTIVE' }, newIdempotencyKey(), {
           confirmAddonCascade: true,
         });
@@ -608,6 +644,7 @@ export class BranchesPage {
   }
 
   private async performDelete(branch: Branch): Promise<void> {
+    if (!this.canChangeLifecycle(branch)) { this.pendingDeleteBranch.set(null); return; }
     this.setBusy(branch.id, true);
     try {
       try {
@@ -615,7 +652,7 @@ export class BranchesPage {
       } catch (error) {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
-        if (!(await this.cascadeConfirm.confirm(cascade.addons))) return;
+        if (!(await this.cascadeConfirm.confirm(cascade.addons)) || !this.canChangeLifecycle(branch)) return;
         await deleteBranch(branch.id, newIdempotencyKey(), { confirmAddonCascade: true });
       }
       if (this.branchModal().editingId() === branch.id) {
@@ -641,9 +678,13 @@ export class BranchesPage {
   }
 
   private async openHqTransfer(branch: Branch, action: 'deactivate' | 'delete'): Promise<void> {
+    if (!this.canChangeHeadquarters(branch)) return;
     let candidates: Branch[];
     try {
-      const list = await listAllPages(listBranches, { companyId: branch.companyId, status: 'ACTIVE', limit: 100 });
+      const list = await listAllPages(
+        (query) => this.organization.listBranches(query),
+        { companyId: branch.companyId, status: 'ACTIVE', limit: 100 },
+      );
       candidates = list.filter((b) => b.id !== branch.id && b.status === 'ACTIVE');
     } catch {
       candidates = this.allBranches().filter(
@@ -651,10 +692,13 @@ export class BranchesPage {
       );
     }
 
+    if (!this.canChangeHeadquarters(branch)) return;
     this.hqTransferModal().open({
       branch,
       companyName: this.companyName(branch.companyId),
-      candidateBranches: candidates,
+      candidateBranches: candidates.filter((candidate) =>
+        candidate.companyId === branch.companyId && this.canChangeHeadquarters(candidate),
+      ),
       retryAction: () => (action === 'delete' ? this.performDelete(branch) : this.performDeactivate(branch)),
     });
   }
@@ -692,7 +736,7 @@ export class BranchesPage {
         'branch has team memberships': usersLink,
       },
       primaryAction:
-        hasDeactivateSuggestion && branch.status === 'ACTIVE' && this.canManageBranch(branch)
+        hasDeactivateSuggestion && branch.status === 'ACTIVE' && this.canChangeLifecycle(branch)
           ? {
               label: t('branches.blockers.deactivateInstead'),
               run: () => this.performDeactivate(branch),
@@ -702,31 +746,32 @@ export class BranchesPage {
   }
 
   private async openBranchById(id: string): Promise<void> {
-    const existing = this.rows().find((b) => b.id === id);
-    if (existing) {
-      this.openEdit(existing);
-      return;
-    }
+    const seq = ++this.detailSeq;
+    const revision = this.session.scopeRevision();
     try {
-      const branch = await getBranch(id);
-      this.openEdit(branch);
+      const branch = await this.organization.getBranch(id);
+      if (!this.destroyRef.destroyed && seq === this.detailSeq && revision === this.session.scopeRevision()) {
+        this.detailRevision = revision;
+        this.modalBranch.set(branch);
+        this.branchModal().openEdit(branch);
+      }
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      if (!this.destroyRef.destroyed && seq === this.detailSeq && revision === this.session.scopeRevision()) {
+        this.notify.error(this.resolveError(error));
+      }
     }
   }
 
   private async loadLookups(): Promise<void> {
-    const [companiesRes, branchesRes, countriesRes] = await Promise.allSettled([
-      listAllPages(listCompanies, { limit: 100 }),
-      listAllPages(listBranches, { limit: 100 }),
+    const revision = this.session.scopeRevision();
+    const [companiesRes, countriesRes] = await Promise.allSettled([
+      this.session.can('org.company.read')
+        ? listAllPages((query) => this.organization.listCompanies(query), { limit: 100 })
+        : Promise.resolve([]),
       listCountries(),
     ]);
-    if (companiesRes.status === 'fulfilled') {
-      this.companies.set(companiesRes.value);
-    }
-    if (branchesRes.status === 'fulfilled') {
-      this.allBranches.set(branchesRes.value);
-    }
+    if (revision !== this.session.scopeRevision()) return;
+    this.companyLookup.set({ revision, rows: companiesRes.status === 'fulfilled' ? companiesRes.value : [] });
     if (countriesRes.status === 'fulfilled') {
       this.countries.set(countriesRes.value);
     }
@@ -741,8 +786,10 @@ export class BranchesPage {
     pageSize: number;
   }): Promise<void> {
     const seq = ++this.loadSeq;
+    const revision = this.session.scopeRevision();
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadForbidden.set(false);
 
     const query: ListQuery = {
       page: params.page,
@@ -755,15 +802,16 @@ export class BranchesPage {
     if (params.status) query.status = params.status;
 
     try {
-      const result = await listBranches(query);
-      if (seq !== this.loadSeq) return;
-      this.rows.set(result.data);
-      this.total.set(result.meta.total);
-    } catch {
-      if (seq !== this.loadSeq) return;
+      const result = await this.organization.listBranches(query);
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+      this.loadedRows.set(result.data);
+      this.loadedTotal.set({ revision, count: result.meta.total });
+    } catch (error) {
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
       this.loadFailed.set(true);
-      this.rows.set([]);
-      this.total.set(0);
+      this.loadForbidden.set(error instanceof ApiError && error.status === 403);
+      this.loadedRows.set([]);
+      this.loadedTotal.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

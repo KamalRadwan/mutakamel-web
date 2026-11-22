@@ -189,7 +189,10 @@ export class UserRolesTab {
   protected readonly isOwnerActor = computed(() => this.session.isOwner());
   protected readonly isSelf = computed(() => this.session.me()?.id === this.user().id);
   protected readonly hasAssignRoles = computed(
-    () => this.isOwnerActor() || this.session.can('users.user.assign_roles'),
+    () => this.session.can('users.user.assign_roles', {
+      companyId: this.user().companyId,
+      branchId: this.user().branchId,
+    }),
   );
   protected readonly canViewBranchRoles = computed(() => !this.isSelf() && this.hasAssignRoles());
   protected readonly isNotActive = computed(() => this.user().status !== 'ACTIVE');
@@ -199,7 +202,9 @@ export class UserRolesTab {
       this.user().isTenantOwner ||
       this.isSelf() ||
       this.isNotActive() ||
-      !this.hasAssignRoles(),
+      !this.hasAssignRoles() ||
+      // The current role choices are fixture data and cannot prove delegated coverage.
+      !this.isOwnerActor(),
   );
   protected readonly effectiveReadonlyReason = computed(() => {
     this.i18n();
@@ -422,6 +427,8 @@ export class UserRolesTab {
   }
 
   protected toggleChoice(choice: AssignmentChoice, checked: boolean): void {
+    if (checked && (this.effectiveReadonly() ||
+        !this.session.can('users.user.assign_roles', { branchId: choice.branchId }))) return;
     const id = choiceKey(choice);
     this.selectedChoices.update((current) => {
       if (checked) {
@@ -446,6 +453,7 @@ export class UserRolesTab {
 
     try {
       for (const choice of queue) {
+        if (this.effectiveReadonly() || !this.session.can('users.user.assign_roles', { branchId: choice.branchId })) break;
         const keyId = choiceKey(choice);
         const idempotencyKey = this.addKeys.get(keyId) ?? newIdempotencyKey();
         this.addKeys.set(keyId, idempotencyKey);
@@ -500,10 +508,12 @@ export class UserRolesTab {
   }
 
   protected async requestRemoveBranch(row: BranchRoleAssignment): Promise<void> {
-    if (this.effectiveReadonly() || this.removingBranchId()) return;
+    const allowed = () => !this.effectiveReadonly() &&
+      this.session.can('users.user.assign_roles', { branchId: row.branchId });
+    if (!allowed() || this.removingBranchId()) return;
     this.pendingRemoveBranch.set(row);
     const confirmed = await this.openRemoveBranchConfirm();
-    if (!confirmed) {
+    if (!confirmed || !allowed()) {
       this.pendingRemoveBranch.set(null);
       return;
     }
@@ -519,7 +529,7 @@ export class UserRolesTab {
         const cascade = isCascadeRequired(error);
         if (!cascade) throw error;
         const cascadeConfirmed = await this.cascadeConfirm.confirm(cascade.addons);
-        if (!cascadeConfirmed) return;
+        if (!cascadeConfirmed || !allowed()) return;
         await (
           removeBranchRole as (
             userId: string,
@@ -632,6 +642,10 @@ export class UserRolesTab {
     assignments: { scopeTarget: ScopeTarget; roleId: string; companyId?: string; branchId?: string }[],
     confirmAddonCascade = false,
   ): Promise<boolean> {
+    if (this.effectiveReadonly() || !this.session.isTenantWide('users.user.assign_roles')) return false;
+    if (assignments.some(({ scopeTarget, companyId, branchId }) =>
+      scopeTarget !== 'TENANT' && !this.session.can('users.user.assign_roles', { companyId, branchId }),
+    )) return false;
     const body = JSON.stringify(assignments);
     const key = confirmAddonCascade
       ? newIdempotencyKey()
@@ -718,7 +732,7 @@ export class UserRolesTab {
 
     try {
       const [branchRoles, branches, companies, roles, scopeRoles] = await Promise.all([
-        !this.isSelf() && (this.isOwnerActor() || this.session.can('users.user.assign_roles'))
+        this.canViewBranchRoles()
           ? listBranchRoles(userId)
           : Promise.resolve<BranchRoleAssignment[]>([]),
         this.fetchAllPages((q) => listBranches(q)),
@@ -818,6 +832,8 @@ export class UserRolesTab {
       const heldKeys = new Set(this.branchRoles().map((row) => `${row.branchId}:${row.roleId}`));
       const filtered = result.choices.filter(
         (choice) =>
+          !this.effectiveReadonly() &&
+          this.session.can('users.user.assign_roles', { branchId: choice.branchId }) &&
           !isExcludedRoleName(choice.roleName, choice.roleNameI18n) &&
           !heldKeys.has(choiceKey(choice)),
       );

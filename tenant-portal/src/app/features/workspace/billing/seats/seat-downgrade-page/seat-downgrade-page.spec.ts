@@ -33,6 +33,7 @@ type Internals = Record<string, any>;
 
 let fixture: ComponentFixture<SeatDowngradePage>;
 let c: Internals;
+let fixtureOwner: boolean;
 let cascadeConfirm: ReturnType<typeof vi.fn<(addons: readonly CascadeAddonItem[]) => Promise<boolean>>>;
 
 async function flush(ms = 2000): Promise<void> {
@@ -84,7 +85,7 @@ function toasts(type: string): string[] {
 }
 
 async function render(opts: { owner?: boolean; url?: string } = {}): Promise<void> {
-  TestBed.inject(StaffSession).setActor(opts.owner === false ? 'tenantAdmin' : 'owner');
+  fixtureOwner = opts.owner !== false;
   if (opts.url) {
     const navigating = TestBed.inject(Router).navigateByUrl(opts.url);
     await vi.advanceTimersByTimeAsync(0);
@@ -135,6 +136,7 @@ beforeEach(() => {
   cascadeConfirm = vi.fn(async () => true);
   TestBed.configureTestingModule({
     providers: [
+      { provide: StaffSession, useValue: { isOwner: () => fixtureOwner } },
       provideRouter([]),
       provideTransloco({
         config: { availableLangs: ['en', 'ar'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
@@ -147,7 +149,6 @@ beforeEach(() => {
 
 afterEach(() => {
   fixture?.destroy();
-  TestBed.inject(StaffSession).setActor('owner');
   TestBed.resetTestingModule();
   dialogProto['showModal'] = originalDialog.showModal;
   dialogProto['close'] = originalDialog.close;

@@ -6,7 +6,10 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "test:index": "node tests/unit/index.mjs list",
+    "test:unit": "node tests/unit/index.mjs run",
+    "test:mutation": "node tests/stryker/run.mjs"
   },
   "private": true,
   "packageManager": "pnpm@11.21.0",
@@ -25,6 +28,7 @@
     "@ng-icons/core": "^36.1.0",
     "@ng-icons/simple-icons": "36.1.0",
     "@ng-icons/tabler-icons": "^36.1.0",
+    "@tanstack/angular-query": "5.108.2",
     "@tanstack/angular-table": "9.3.1",
     "@tanstack/angular-virtual": "6.1.12",
     "date-fns": "4.4.0",
@@ -41,6 +45,7 @@
     "@angular/build": "^22.3.0",
     "@angular/cli": "^22.3.0",
     "@angular/compiler-cli": "^22.3.0",
+    "@stryker-mutator/core": "10.1.1",
     "@tailwindcss/postcss": "^4.1.12",
     "jsdom": "^31.0.0",
     "postcss": "^8.5.3",

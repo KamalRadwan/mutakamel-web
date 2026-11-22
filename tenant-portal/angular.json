@@ -53,6 +53,9 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "mutation-test": {
+              "styles": []
             }
           },
           "defaultConfiguration": "production"

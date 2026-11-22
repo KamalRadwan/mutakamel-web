@@ -3,8 +3,7 @@ import { ApiError } from '../../../core/api/api-errors';
 import { resetFakeSession } from '../../../core/auth/auth-session.fake';
 import { isMfaStep } from '../../../core/auth/auth-session.model';
 import { resetFakeChallenges } from '../shared/mfa-challenge.fake';
-import { login } from './login.api';
-import { FAKE_ACCOUNTS, FAKE_LOCKOUT_SECONDS } from './login.fake';
+import { FAKE_ACCOUNTS, FAKE_LOCKOUT_SECONDS, fakeLogin as login } from './login.fake';
 import { LoginResult, loginErrorKey, retryAfterMinutes } from './login.model';
 
 async function settle<T>(promise: Promise<T>): Promise<T> {

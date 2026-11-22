@@ -111,7 +111,7 @@ export function verifyErrorKey(error: unknown): VerifyErrorInfo {
     return { key: 'auth.shared.errors.generic', kind: 'notice', tone: 'danger' };
   }
 
-  const mapped = VERIFY_ERROR_KEYS[error.code];
+  const mapped = Object.hasOwn(VERIFY_ERROR_KEYS, error.code) ? VERIFY_ERROR_KEYS[error.code] : undefined;
   if (mapped) {
     return mapped;
   }
@@ -120,9 +120,12 @@ export function verifyErrorKey(error: unknown): VerifyErrorInfo {
     return { key: 'auth.shared.throttle', kind: 'throttle', tone: 'warning' };
   }
 
-  // A bare 503 (fail-closed rate-limit store) carries no domain code.
-  if (error.status === 503) {
+  if (error.status >= 500) {
     return { key: 'auth.shared.errors.unavailable', kind: 'notice', tone: 'danger' };
+  }
+
+  if (error.status === 403) {
+    return { key: 'apiErrors.permission', kind: 'notice', tone: 'danger' };
   }
 
   return { key: 'auth.shared.errors.generic', kind: 'notice', tone: 'danger' };

@@ -1,0 +1,18 @@
+@let errorKey = 'errors.' + kind();
+@let forbidden = kind() === 'forbidden';
+
+<span
+  class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8"
+  [class]="forbidden ? 'bg-danger-soft' : 'bg-neutral-soft'"
+  aria-hidden="true"
+>
+  @if (forbidden) {
+    <span class="route-error-mark size-icon-tile"></span>
+  } @else {
+    <img ngSrc="assets/brand/mark.png" alt="" width="403" height="244" class="h-auto w-icon-tile" />
+  }
+</span>
+
+<h1 class="text-16 leading-24 font-medium text-text">{{ (errorKey + '.title') | transloco }}</h1>
+<p class="text-12 leading-18 text-text-muted">{{ (errorKey + '.text') | transloco }}</p>
+<a uiButton routerLink="/">{{ 'errors.notFound.action' | transloco }}</a>

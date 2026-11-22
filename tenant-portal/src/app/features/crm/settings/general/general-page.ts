@@ -25,6 +25,7 @@ import { Modal } from '../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../shared/ui/overlay/zoom';
 import { Switch } from '../../../../shared/ui/switch/switch';
 import { CrmCallSettings } from '../../../../shared/widgets/phone-actions/crm-call-settings';
+import { StaffReadAccess } from '../../../workspace/staff/staff-read-access';
 import { CrmModules } from '../../shared/crm-modules/crm-modules';
 import { updateCompanyModules } from '../../shared/crm-modules/crm-modules.api';
 import { CrmModule, CrmModuleCompany, CrmModuleOverride } from '../../shared/crm-modules/crm-modules.model';
@@ -91,6 +92,7 @@ export class GeneralPage {
   protected readonly language = inject(LanguageState).current;
   protected readonly crmModules = inject(CrmModules);
   private readonly crmCallSettings = inject(CrmCallSettings);
+  private readonly staffRead = inject(StaffReadAccess);
 
   private readonly retentionConflictModal = viewChild.required<Modal>('retentionConflictModal');
   private readonly modulesConflictModal = viewChild.required<Modal>('modulesConflictModal');
@@ -99,6 +101,7 @@ export class GeneralPage {
   protected readonly canManage = CAN_MANAGE;
   protected readonly canReadPhoneSettings = CAN_READ_WEBPHONE_SETTINGS;
   protected readonly canReadPhoneExtensions = CAN_READ_WEBPHONE_EXTENSIONS;
+  protected readonly canOpenStaffUsers = computed(() => this.staffRead.allows('users'));
   protected readonly limits = GENERAL_LIMITS;
 
   private readonly settingsResource = resource({

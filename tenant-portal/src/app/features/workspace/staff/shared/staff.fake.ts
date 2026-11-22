@@ -1,6 +1,7 @@
 import { ApiError } from '../../../../core/api/api-errors';
 import { toCorePage, type CorePage } from '../../../../core/api/core-page';
 import { fakeDelay, fakeId } from '../../../../core/fake/fake-utils';
+import type { TenantResourceScope } from '../../../../core/scope/tenant-scope';
 import {
   CATALOGUE_BY_KEY,
   CORE_KEYS,
@@ -1396,7 +1397,9 @@ export function buildActorMeSync(actor: FakeActor = FAKE_ACTOR): Me {
   };
 }
 
-function actorCan(permission: string, scope?: { companyId?: string | null; branchId?: string | null }): boolean {
+export type StaffFixtureReadScope = (scope: TenantResourceScope) => boolean;
+
+function actorCan(permission: string, scope?: TenantResourceScope): boolean {
   const me = buildActorMeSync();
   if (me.isTenantOwner) return true;
   const entry = me.permissionScopes[permission];
@@ -1694,9 +1697,12 @@ export async function fakeGetOrgTree(): Promise<OrgTreeNode[]> {
 // COMPANIES
 // =========================================================================
 
-export async function fakeListCompanies(q: ListQuery = {}): Promise<CorePage<Company>> {
+export async function fakeListCompanies(
+  q: ListQuery = {},
+  canRead: StaffFixtureReadScope = (scope) => actorCan('org.company.read', scope),
+): Promise<CorePage<Company>> {
   await fakeDelay();
-  let items = store.companies.filter((c) => actorCan('org.company.read', { companyId: c.id }));
+  let items = store.companies.filter((c) => canRead({ companyId: c.id }));
   if (q.status) {
     items = items.filter((c) => c.status === q.status);
   }
@@ -1848,9 +1854,12 @@ export async function fakeDeleteCompany(id: string, key: string, opts?: ConfirmA
 // BRANCHES
 // =========================================================================
 
-export async function fakeListBranches(q: ListQuery = {}): Promise<CorePage<Branch>> {
+export async function fakeListBranches(
+  q: ListQuery = {},
+  canRead: StaffFixtureReadScope = (scope) => actorCan('org.branch.read', scope),
+): Promise<CorePage<Branch>> {
   await fakeDelay();
-  let items = store.branches.filter((b) => actorCan('org.branch.read', { companyId: b.companyId, branchId: b.id }));
+  let items = store.branches.filter((b) => canRead({ companyId: b.companyId, branchId: b.id }));
   if (q.companyId) items = items.filter((b) => b.companyId === q.companyId);
   if (q.status) items = items.filter((b) => b.status === q.status);
   if (q.search?.trim()) {
@@ -2026,11 +2035,14 @@ export async function fakeDeleteBranch(id: string, key: string, opts?: ConfirmAd
 // DEPARTMENTS
 // =========================================================================
 
-export async function fakeListDepartments(q: ListQuery = {}): Promise<CorePage<Department>> {
+export async function fakeListDepartments(
+  q: ListQuery = {},
+  canRead: StaffFixtureReadScope = (scope) => actorCan('org.department.read', scope),
+): Promise<CorePage<Department>> {
   await fakeDelay();
   let items = store.departments.filter((d) => {
     const companyId = findBranchCompanyId(d.branchId);
-    return actorCan('org.department.read', { companyId, branchId: d.branchId });
+    return canRead({ companyId, branchId: d.branchId });
   });
   if (q.companyId) {
     const branchIds = new Set(store.branches.filter((b) => b.companyId === q.companyId).map((b) => b.id));
@@ -2165,11 +2177,14 @@ export async function fakeDeleteDepartment(id: string, key: string): Promise<voi
 // TEAMS
 // =========================================================================
 
-export async function fakeListTeams(q: ListQuery = {}): Promise<CorePage<Team>> {
+export async function fakeListTeams(
+  q: ListQuery = {},
+  canRead: StaffFixtureReadScope = (scope) => actorCan('org.team.read', scope),
+): Promise<CorePage<Team>> {
   await fakeDelay();
   let items = store.teams.filter((t) => {
     const branchId = findDepartmentBranchId(t.departmentId);
-    return branchId ? actorCan('org.team.read', { branchId }) : false;
+    return branchId ? canRead({ branchId }) : false;
   });
   if (q.companyId) {
     const branchIds = new Set(store.branches.filter((b) => b.companyId === q.companyId).map((b) => b.id));
@@ -2335,10 +2350,13 @@ export async function fakeDeleteTeam(id: string, key: string): Promise<void> {
 // USERS
 // =========================================================================
 
-export async function fakeListUsers(q: ListQuery = {}): Promise<CorePage<TenantUser>> {
+export async function fakeListUsers(
+  q: ListQuery = {},
+  canRead: StaffFixtureReadScope = (scope) => actorCan('users.user.read', scope),
+): Promise<CorePage<TenantUser>> {
   await fakeDelay();
   let items = liveUsers()
-    .filter((u) => actorCan('users.user.read', { companyId: u.companyId, branchId: u.branchId }))
+    .filter((u) => canRead({ companyId: u.companyId, branchId: u.branchId }))
     .map(hydrateUser);
   if (q.status) items = items.filter((u) => u.status === q.status);
   if (q.companyId) items = items.filter((u) => u.companyId === q.companyId);

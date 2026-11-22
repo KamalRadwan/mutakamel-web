@@ -113,14 +113,15 @@ export class OrganizationPage {
   protected readonly isSearching = computed(() => this.search().trim().length > 0);
 
   protected readonly treeState = computed(() => {
-    const meLoaded = this.session.me() !== null;
     return buildOrgViewTree(this.rawTree(), {
       showInactive: this.showInactive(),
       search: this.search(),
+      canReadCompany: (companyId) => this.session.can('org.company.read', { companyId }),
+      canReadBranch: (companyId, branchId) => this.session.can('org.branch.read', { companyId, branchId }),
       canReadDepartments: (companyId, branchId) =>
-        !meLoaded || this.session.can('org.department.read', { companyId, branchId }),
+        this.session.can('org.department.read', { companyId, branchId }),
       canReadTeams: (companyId, branchId) =>
-        !meLoaded || this.session.can('org.team.read', { companyId, branchId }),
+        this.session.can('org.team.read', { companyId, branchId }),
     });
   });
 
@@ -220,11 +221,14 @@ export class OrganizationPage {
   }
 
   protected openCompanies(): void {
+    if (!this.session.can('org.company.read')) return;
     void this.router.navigate(['/workspace/staff/companies']);
   }
 
   protected onNodeAction(event: OrgActionEvent): void {
     const { node, action } = event;
+    const item = this.actionsForNode()(node).find(({ id }) => id === action);
+    if (!item || item.disabled) return;
     if (action === 'open' || action === 'edit') {
       void this.router.navigate([ORG_LEVEL_META[node.level].listRoute], {
         queryParams: { open: node.id },

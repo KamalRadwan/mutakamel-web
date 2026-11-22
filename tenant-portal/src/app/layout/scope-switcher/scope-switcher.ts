@@ -4,16 +4,22 @@ import {
   ElementRef,
   Injector,
   afterNextRender,
+  computed,
+  effect,
   inject,
   signal,
   viewChild,
   viewChildren,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBuilding, tablerCheck, tablerChevronDown, tablerMapPin } from '@ng-icons/tabler-icons';
+import { filter, map } from 'rxjs';
 import { LanguageState } from '../../core/i18n/language';
 import { ScopeBranch, ScopeCompany, ScopeState } from '../../core/scope/scope';
+import { TenantScopeState } from '../../core/scope/tenant-scope';
 import { rectInPage, viewport } from '../../shared/ui/overlay/zoom';
 
 interface Place {
@@ -30,7 +36,7 @@ const VIEWPORT_GAP = 4;
   templateUrl: './scope-switcher.html',
   host: {
     class: 'relative me-8 inline-flex shrink-0',
-    '[class.hidden]': '!scope.hasChoice()',
+    '[class.hidden]': '!visible()',
     '(document:click)': 'closeIfOutside($event)',
     '(document:keydown.escape)': 'onEscape($event)',
     '(window:resize)': 'open.set(false)',
@@ -41,7 +47,22 @@ export class ScopeSwitcher {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly language = inject(LanguageState);
-  protected readonly scope = inject(ScopeState);
+  private readonly router = inject(Router);
+  private readonly tenantScope = inject(TenantScopeState);
+  protected get scope(): ScopeState {
+    return this.injector.get(ScopeState);
+  }
+  private readonly routeUrl = toSignal(
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map((event) => event.urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
+  protected readonly staffRoute = computed(() => /^\/workspace\/staff(?:[/?#;]|$)/u.test(this.routeUrl()));
+  protected readonly visible = computed(() =>
+    this.staffRoute() ? this.tenantScope.selectorCompanyIds().length > 0 : this.scope.hasChoice(),
+  );
 
   private readonly triggerBtn = viewChild<ElementRef<HTMLButtonElement>>('triggerBtn');
   private readonly menuEl = viewChild<ElementRef<HTMLElement>>('menuEl');
@@ -52,6 +73,9 @@ export class ScopeSwitcher {
   protected readonly place = signal<Place>({ top: 0, end: 0 });
 
   constructor() {
+    effect(() => {
+      if (this.staffRoute()) this.open.set(false);
+    });
     const close = () => this.open.set(false);
     document.addEventListener('scroll', close, { capture: true, passive: true });
     inject(DestroyRef).onDestroy(() => document.removeEventListener('scroll', close, { capture: true }));
@@ -62,6 +86,7 @@ export class ScopeSwitcher {
   }
 
   protected toggle() {
+    if (this.staffRoute()) return;
     if (this.open()) {
       this.open.set(false);
       return;
@@ -77,6 +102,7 @@ export class ScopeSwitcher {
   }
 
   protected chooseCompany(id: string) {
+    if (this.staffRoute()) return;
     this.scope.selectCompany(id);
     queueMicrotask(() => {
       this.branchRows()[0]?.nativeElement.focus();
@@ -91,6 +117,7 @@ export class ScopeSwitcher {
   }
 
   protected chooseBranch(id: string) {
+    if (this.staffRoute()) return;
     this.scope.selectBranch(id);
     this.open.set(false);
   }

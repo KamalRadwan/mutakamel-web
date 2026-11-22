@@ -17,6 +17,7 @@
           [readonly]="!canManage()"
           [disabledLevels]="saving() ? ['company'] : []"
           [activeOnly]="true"
+          [allowCompany]="allowCompany"
           [errors]="companyError() ? { company: companyError()! } : {}"
           [hints]="{ company: ('branches.fields.companyHint' | transloco) }"
           [value]="cascadeValue()"
@@ -179,7 +180,7 @@
             <ui-switch
               [id]="uid + '-active'"
               [(checked)]="isActive"
-              [disabled]="!canManage() || saving()"
+              [disabled]="!canChangeLifecycle() || saving()"
               [label]="'branches.fields.active' | transloco"
               [describedBy]="uid + '-active-hint'"
             />
@@ -223,7 +224,7 @@
         {{ (mode() === 'create' ? 'branches.cancel' : 'branches.close') | transloco }}
       </button>
 
-      @if (mode() === 'edit') {
+      @if (mode() === 'edit' && canChangeLifecycle()) {
         <button
           type="button"
           uiButton

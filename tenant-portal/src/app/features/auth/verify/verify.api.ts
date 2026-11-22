@@ -1,21 +1,14 @@
+import { inject } from '@angular/core';
 import type { LoginSession, MfaStep } from '../../../core/auth/auth-session.model';
-import { fakeResendCode, fakeVerifyCode } from './verify.fake';
+import { AuthTransport } from '../../../core/auth/auth-transport';
+import type { MfaResendBody, MfaVerifyBody } from './verify.model';
 
-/**
- * POST /api/tenant/core/v1/auth/mfa/verify → `data` (`LoginSession`).
- * - Gateway row `core.tenant.auth.mfa.verify`: PUBLIC, idempotencyMode NONE, transportRetryMode NEVER.
- * - Sends `{ challengeId, code }` with `credentials: 'include'` (HttpOnly MFA cookie); no `x-idempotency-key`,
- *   no `x-auth-remember`, never retry automatically, never log `code`.
- */
-export function verifyCode(challengeId: string, code: string): Promise<LoginSession> {
-  return fakeVerifyCode(challengeId, code);
+export function verifyCode(challengeId: string, code: string, transport = inject(AuthTransport)): Promise<LoginSession> {
+  const body: MfaVerifyBody = { challengeId, code };
+  return transport.requestData('mfa/verify', body);
 }
 
-/**
- * POST /api/tenant/core/v1/auth/mfa/resend → `data` (`MfaStep` keeping the original deadline).
- * - Gateway row `core.tenant.auth.mfa.resend`: PUBLIC, idempotencyMode NONE, transportRetryMode NEVER.
- * - Sends `{ challengeId }` with `credentials: 'include'`; no `x-idempotency-key`, never retry automatically.
- */
-export function resendCode(challengeId: string): Promise<MfaStep> {
-  return fakeResendCode(challengeId);
+export function resendCode(challengeId: string, transport = inject(AuthTransport)): Promise<MfaStep> {
+  const body: MfaResendBody = { challengeId };
+  return transport.requestData('mfa/resend', body);
 }

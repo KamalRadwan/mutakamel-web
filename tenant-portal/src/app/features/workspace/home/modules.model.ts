@@ -25,15 +25,37 @@ export interface AppsOverviewResponse {
   items: AppsOverviewItem[];
 }
 
-export type AppsOverviewGroups = Record<AppGroup, AppsOverviewItem[]>;
+export const COMING_SOON_APPS: readonly AppsOverviewItem[] = [
+  { moduleKey: 'pos', nameI18n: { en: 'Point of Sale', ar: 'نقاط البيع' } },
+  { moduleKey: 'projects', nameI18n: { en: 'Projects', ar: 'المشاريع' } },
+  { moduleKey: 'helpdesk', nameI18n: { en: 'Helpdesk', ar: 'مكتب المساعدة' } },
+].map((app) => ({
+  ...app,
+  iconKey: null,
+  group: 'FUTURE',
+  isAddon: false,
+  myAccessState: null,
+  seats: null,
+}));
 
-/** Splits the items by group; each group keeps the response order (catalogue rank, then moduleKey). FUTURE may be empty. */
-export function groupAppsOverview(items: readonly AppsOverviewItem[]): AppsOverviewGroups {
-  const groups: AppsOverviewGroups = { SUBSCRIBED: [], AVAILABLE: [], FUTURE: [] };
+const comingSoonKeys = new Set(COMING_SOON_APPS.map((app) => app.moduleKey));
+
+export function groupWorkspaceApps(items: readonly AppsOverviewItem[]) {
+  const subscribed = new Map<string, AppsOverviewItem>();
+  const available = new Map<string, AppsOverviewItem>();
   for (const item of items) {
-    groups[item.group].push(item);
+    if (comingSoonKeys.has(item.moduleKey)) continue;
+    if (item.group === 'SUBSCRIBED' && !subscribed.has(item.moduleKey)) {
+      subscribed.set(item.moduleKey, item);
+    }
+    if (item.group === 'AVAILABLE' && !available.has(item.moduleKey)) {
+      available.set(item.moduleKey, item);
+    }
   }
-  return groups;
+  return {
+    subscribed: [...subscribed.values()],
+    available: [...available.values()].filter((item) => !subscribed.has(item.moduleKey)),
+  };
 }
 
 export function appName(item: AppsOverviewItem, language: Language): string {

@@ -3,6 +3,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TitleStrategy, provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 import { acceptLanguageInterceptor } from './core/api/accept-language.interceptor';
+import { sessionRecoveryInterceptor } from './core/auth/session-recovery.interceptor';
 import { LanguageState } from './core/i18n/language';
 import { TranslationLoader } from './core/i18n/translation-loader';
 import { ThemeState } from './core/theme/theme';
@@ -45,7 +46,7 @@ registerFakeBulkModuleLoader(
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    provideHttpClient(withInterceptors([acceptLanguageInterceptor])),
+    provideHttpClient(withInterceptors([acceptLanguageInterceptor, sessionRecoveryInterceptor])),
     provideRouter(routes, withComponentInputBinding()),
     { provide: TitleStrategy, useClass: AppTitleStrategy },
     provideTransloco({

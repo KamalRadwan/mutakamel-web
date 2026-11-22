@@ -336,13 +336,15 @@
                           <span class="truncate text-12 leading-16 text-text-muted">
                             {{ 'wsAddonSeats.options.noAppSeat' | transloco: { app: appName } }}
                           </span>
-                          <a
-                            class="truncate text-11 leading-16 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                            [routerLink]="['/workspace/staff/users']"
-                            [queryParams]="{ open: option.userId, tab: 'apps' }"
-                          >
-                            {{ 'wsAddonSeats.options.openUserApps' | transloco: { user: selectedUserDisplayName() } }}
-                          </a>
+                          @if (staffUserScope(option.userId); as target) {
+                            <a
+                              class="truncate text-11 leading-16 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [routerLink]="['/workspace/staff/users']"
+                              [queryParams]="{ open: option.userId, tab: 'apps', companyId: target.companyId, branchId: target.branchId }"
+                            >
+                              {{ 'wsAddonSeats.options.openUserApps' | transloco: { user: selectedUserDisplayName() } }}
+                            </a>
+                          }
                         </span>
                       }
                     </span>

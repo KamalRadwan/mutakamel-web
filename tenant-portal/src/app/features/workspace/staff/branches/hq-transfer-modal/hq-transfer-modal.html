@@ -44,7 +44,7 @@
         type="button"
         uiButton
         [loading]="submitting()"
-        [disabled]="submitting() || !selectedBranchId()"
+        [disabled]="submitting() || !canTransfer()"
         (click)="confirmTransfer()"
       >
         {{ 'branches.transfer.go' | transloco }}

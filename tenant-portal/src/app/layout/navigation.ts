@@ -1,3 +1,5 @@
+import { STAFF_PAGES } from '../features/workspace/staff/staff-navigation';
+
 export type AppId = 'workspace' | 'crm' | 'trade' | 'accounting';
 
 interface AppDefinition {
@@ -89,15 +91,7 @@ export const CRM_FEATURE_MODULE: Readonly<Partial<Record<string, 'leads' | 'oppo
 };
 
 export const PAGES: Readonly<Record<string, readonly { id: string; icon: string; color: string; module?: 'leads' | 'opportunities' }[]>> = {
-  'workspace/staff': [
-    { id: 'organization', icon: 'tablerHierarchy2', color: 'text-icon-blue' },
-    { id: 'companies', icon: 'tablerBuildingSkyscraper', color: 'text-icon-navy' },
-    { id: 'branches', icon: 'tablerBuildingStore', color: 'text-icon-teal' },
-    { id: 'departments', icon: 'tablerSitemap', color: 'text-icon-orange' },
-    { id: 'teams', icon: 'tablerUsersGroup', color: 'text-icon-green' },
-    { id: 'users', icon: 'tablerUser', color: 'text-icon-blue' },
-    { id: 'roles', icon: 'tablerShieldLock', color: 'text-icon-violet' },
-  ],
+  'workspace/staff': STAFF_PAGES,
   'workspace/operations': [
     { id: 'party-directory', icon: 'tablerAddressBook', color: 'text-icon-green' },
     { id: 'directory-settings', icon: 'tablerAdjustmentsHorizontal', color: 'text-icon-navy' },

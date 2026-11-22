@@ -7,8 +7,7 @@ import {
   resetFakeChallenges,
   setFakeMfaNext,
 } from '../shared/mfa-challenge.fake';
-import { resendCode, verifyCode } from './verify.api';
-import { resetFakeVerify } from './verify.fake';
+import { fakeResendCode as resendCode, fakeVerifyCode as verifyCode, resetFakeVerify } from './verify.fake';
 
 async function settle<T>(promise: Promise<T>): Promise<T> {
   const guarded = promise.then(

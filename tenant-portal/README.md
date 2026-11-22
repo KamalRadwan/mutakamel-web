@@ -8,3 +8,6 @@ Before changing anything, read `CLAUDE.md` (same content as `AGENTS.md` and `GEM
 pnpm install
 pnpm start    # http://localhost:5002
 ```
+
+See [Unit and mutation tests](tests/README.md) for the test folder layout, module
+index, and commands.

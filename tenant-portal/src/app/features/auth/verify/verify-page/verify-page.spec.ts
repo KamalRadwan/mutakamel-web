@@ -6,7 +6,9 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../core/api/api-errors';
 import { AuthSession } from '../../../../core/auth/auth-session';
-import { resetFakeSession } from '../../../../core/auth/auth-session.fake';
+import { AuthSessionApi } from '../../../../core/auth/auth-session.api';
+import { fakeGetMe, resetFakeSession } from '../../../../core/auth/auth-session.fake';
+import { AuthTransport } from '../../../../core/auth/auth-transport';
 import { Notify } from '../../../../core/notify/notify';
 import {
   FAKE_MFA_CODE,
@@ -16,7 +18,8 @@ import {
 } from '../../shared/mfa-challenge.fake';
 import { MfaPending, type MfaPendingOrigin } from '../../shared/mfa-pending';
 import { verifyPendingGuard } from '../verify-pending.guard';
-import { fakeVerifyCallCounts, resetFakeVerify, setFakeVerifyError } from '../verify.fake';
+import { fakeResendCode, fakeVerifyCallCounts, fakeVerifyCode, resetFakeVerify, setFakeVerifyError } from '../verify.fake';
+import type { MfaVerifyBody, MfaResendBody } from '../verify.model';
 import { verifyRoutes } from '../verify.routes';
 import { VerifyPage } from './verify-page';
 
@@ -30,6 +33,7 @@ class EmptyLoader implements TranslocoLoader {
 let fixture: ComponentFixture<VerifyPage> | null = null;
 let navigate: ReturnType<typeof vi.spyOn>;
 let notifySuccess: ReturnType<typeof vi.spyOn>;
+const getMe = vi.fn(fakeGetMe);
 
 async function advance(ms: number): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms);
@@ -139,8 +143,17 @@ describe('VerifyPage', () => {
     resetFakeSession();
     resetFakeChallenges();
     resetFakeVerify();
+    getMe.mockReset();
     TestBed.configureTestingModule({
       providers: [
+        {
+          provide: AuthTransport,
+          useValue: {
+            requestData: (route: 'mfa/verify' | 'mfa/resend', body: MfaVerifyBody | MfaResendBody) =>
+              route === 'mfa/verify' && 'code' in body ? fakeVerifyCode(body.challengeId, body.code) : fakeResendCode(body.challengeId),
+          },
+        },
+        { provide: AuthSessionApi, useValue: { getMe, hasCsrfCookie: () => true } },
         provideRouter([]),
         provideTransloco({
           config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
@@ -196,6 +209,18 @@ describe('VerifyPage', () => {
 
     expect(notifySuccess).toHaveBeenCalledWith('authVerify.toast.welcome');
     expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+  });
+
+  it('does not enter the requested feature after an accepted code if /me denies the identity', async () => {
+    getMe.mockRejectedValueOnce(new ApiError(403, 'SESSION_IDENTITY_INACTIVE'));
+    mountPage({ returnUrl: '/crm/leads' });
+    enterCode(FAKE_MFA_CODE);
+    submitButton()?.click();
+    await advance(1_000);
+    expect(getMe).toHaveBeenCalledOnce();
+    expect(TestBed.inject(AuthSession).status()).toBe('signed-out');
+    expect(navigate.mock.calls.map((call: unknown[]) => call[0])).not.toContain('/crm/leads');
+    expect(notifySuccess).not.toHaveBeenCalled();
   });
 
   it('stays on screen on 401 AUTH_MFA_INVALID_CHALLENGE, shows field error, clears boxes, and never calls sessionEnded', async () => {
