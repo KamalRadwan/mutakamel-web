@@ -16,11 +16,11 @@ export const authGuard: CanActivateFn = async (_route, state) => {
     : router.createUrlTree(['/login']);
 };
 
-/** Keeps already signed-in users out of /login using in-memory state only (no network call). */
-export const guestGuard: CanActivateFn = (route) => {
+/** Checks for existing access before showing /login in a fresh tab. */
+export const guestGuard: CanActivateFn = async (route) => {
   const session = inject(AuthSession);
   const router = inject(Router);
-  if (session.status() !== 'signed-in') {
+  if (await session.ensureLoaded('access-only') !== 'signed-in') {
     return true;
   }
   const target = safeReturnUrl(route.queryParams['returnUrl']) ?? '/';

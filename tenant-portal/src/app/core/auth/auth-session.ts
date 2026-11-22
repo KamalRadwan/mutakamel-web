@@ -162,12 +162,19 @@ export class AuthSession {
   }
 
   /** Shared bootstrap. Its failed state renders the existing retry view in the shell. */
-  ensureLoaded(): Promise<SessionStatus> {
+  ensureLoaded(mode: 'protected' | 'access-only' = 'protected'): Promise<SessionStatus> {
     const status = this._status();
     if (status === 'signed-in' || status === 'signed-out') return Promise.resolve(status);
-    if (this.loadInFlight) return this.loadInFlight;
+    if (this.loadInFlight) {
+      return mode === 'access-only' ? this.loadInFlight : this.loadInFlight.then((result) =>
+        result === 'unknown' ? this.ensureLoaded() : result,
+      );
+    }
+    if (mode === 'access-only' && (status !== 'unknown' || !this.api.hasCsrfCookie())) {
+      return Promise.resolve(status);
+    }
 
-    const task = this.runLoad().finally(() => {
+    const task = this.runLoad(mode).finally(() => {
       if (this.loadInFlight === task) this.loadInFlight = null;
     });
     this.loadInFlight = task;
@@ -265,7 +272,7 @@ export class AuthSession {
     this.currentUser.reset();
   }
 
-  private async runLoad(): Promise<SessionStatus> {
+  private async runLoad(mode: 'protected' | 'access-only'): Promise<SessionStatus> {
     if (this.hasPendingLogout()) {
       this.clearLocal();
       this.retryPendingLogout();
@@ -278,7 +285,10 @@ export class AuthSession {
       await this.loadMe(generation);
     } catch (error) {
       if (generation !== this.generation) return this._status();
-      if (isRefreshable(error, this.api.hasCsrfCookie())) {
+      if (mode === 'access-only') {
+        // Let the login page handle readiness and keep protected-route renewal available.
+        this._status.set('unknown');
+      } else if (isRefreshable(error, this.api.hasCsrfCookie())) {
         try {
           await this.refresh();
         } catch {

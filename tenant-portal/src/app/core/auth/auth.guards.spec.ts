@@ -4,6 +4,7 @@ import { type ActivatedRouteSnapshot, Router, type RouterStateSnapshot, UrlTree,
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { routes } from '../../app.routes';
 import { ApiError } from '../api/api-errors';
 import { AuthSession } from './auth-session';
 import { AuthSessionApi } from './auth-session.api';
@@ -22,7 +23,7 @@ async function settle<T>(promise: Promise<T>): Promise<T> {
     (value) => ({ ok: true as const, value }),
     (error: unknown) => ({ ok: false as const, error }),
   );
-  await vi.advanceTimersByTimeAsync(2_000);
+  await vi.advanceTimersByTimeAsync(500);
   const result = await guarded;
   if (!result.ok) throw result.error;
   return result.value;
@@ -31,15 +32,17 @@ async function settle<T>(promise: Promise<T>): Promise<T> {
 describe('authGuard & guestGuard', () => {
   const getMe = vi.fn(fakeGetMe);
   const refresh = vi.fn(fakeRefreshSession);
+  const hasCsrfCookie = vi.fn(() => true);
 
   beforeEach(() => {
     vi.useFakeTimers();
     resetFakeSession();
     getMe.mockReset();
     refresh.mockReset();
+    hasCsrfCookie.mockReset();
     TestBed.configureTestingModule({
       providers: [
-        { provide: AuthSessionApi, useValue: { getMe, refreshSession: refresh, hasCsrfCookie: () => true } },
+        { provide: AuthSessionApi, useValue: { getMe, refreshSession: refresh, hasCsrfCookie } },
         provideRouter([]),
         provideTransloco({
           config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
@@ -66,12 +69,13 @@ describe('authGuard & guestGuard', () => {
   }
 
   function runGuestGuard(queryParams: Record<string, string> = {}) {
-    return TestBed.runInInjectionContext(() =>
+    const result = TestBed.runInInjectionContext(() =>
       guestGuard(
         { queryParams } as unknown as ActivatedRouteSnapshot,
         { url: '/login' } as RouterStateSnapshot,
       ),
     );
+    return settle(Promise.resolve(result));
   }
 
   it('allows signed-in users and redirects signed-out users to /login?returnUrl=…', async () => {
@@ -90,6 +94,24 @@ describe('authGuard & guestGuard', () => {
     expect(await runAuthGuard('/workspace')).toBe(true);
     expect(TestBed.inject(AuthSession).status()).toBe('failed');
   });
+
+  it.each(['/workspace/home', '/crm/leads', '/trade/foundation/items'])(
+    'redirects a direct anonymous visit to %s through the application router',
+    async (destination) => {
+      const router = TestBed.inject(Router);
+      router.resetConfig(routes);
+      hasCsrfCookie.mockReturnValue(false);
+      getMe.mockRejectedValueOnce(new ApiError(401, 'GW.AUTH.MISSING_SESSION'));
+
+      await router.navigateByUrl(destination);
+
+      const redirected = router.parseUrl(router.url);
+      expect(redirected.root.children['primary'].segments.map(segment => segment.path)).toEqual(['login']);
+      expect(redirected.queryParams['returnUrl']).toBe(destination);
+      expect(getMe).toHaveBeenCalledTimes(1);
+      expect(refresh).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     'GW.AUTH.MISSING_SESSION',
@@ -114,9 +136,55 @@ describe('authGuard & guestGuard', () => {
     expect(getMe).toHaveBeenCalledTimes(1);
   });
 
-  it('guestGuard makes no network call when not signed in', () => {
-    expect(runGuestGuard()).toBe(true);
+  it('guestGuard makes no network call for an anonymous visit without a session cookie hint', async () => {
+    hasCsrfCookie.mockReturnValue(false);
+    expect(await runGuestGuard()).toBe(true);
     expect(fakeSessionCallCounts()).toEqual({ me: 0, refresh: 0, logout: 0 });
+  });
+
+  it('redirects a signed-in browser opening /login before Angular has loaded its session', async () => {
+    const session = TestBed.inject(AuthSession);
+    const router = TestBed.inject(Router);
+    expect(session.status()).toBe('unknown');
+
+    const result = await runGuestGuard({ returnUrl: '/crm/leads?view=cards' });
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(router.serializeUrl(result as UrlTree)).toBe('/crm/leads?view=cards');
+    expect(session.status()).toBe('signed-in');
+    expect(getMe).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('leaves renewal to a protected route when the login probe finds expired access', async () => {
+    const expired = new ApiError(401, 'COMMON.AUTH.TOKEN_EXPIRED');
+    getMe.mockRejectedValueOnce(expired).mockRejectedValueOnce(expired);
+
+    expect(await runGuestGuard()).toBe(true);
+    expect(getMe).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(await runAuthGuard('/workspace')).toBe(true);
+    expect(TestBed.inject(AuthSession).status()).toBe('signed-in');
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows the login page to handle tenant provisioning when the session probe is unavailable', async () => {
+    getMe.mockRejectedValueOnce(new ApiError(503, 'TENANT_INACTIVE'));
+    expect(await runGuestGuard()).toBe(true);
+    expect(getMe).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(TestBed.inject(AuthSession).status()).toBe('unknown');
+  });
+
+  it('lets protected bootstrap continue when it joins a cancelled login probe', async () => {
+    const session = TestBed.inject(AuthSession);
+    const expired = new ApiError(401, 'COMMON.AUTH.TOKEN_EXPIRED');
+    getMe.mockRejectedValueOnce(expired).mockRejectedValueOnce(expired);
+
+    const accessOnly = session.ensureLoaded('access-only');
+    const protectedLoad = session.ensureLoaded();
+
+    expect(await settle(Promise.all([accessOnly, protectedLoad]))).toEqual(['unknown', 'signed-in']);
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it('guestGuard redirects signed-in users to a safe returnUrl and rejects unsafe ones', async () => {
@@ -124,14 +192,15 @@ describe('authGuard & guestGuard', () => {
     const router = TestBed.inject(Router);
     await settle(session.ensureLoaded());
 
-    const safe = runGuestGuard({ returnUrl: '/crm/leads?view=cards' });
+    const safe = await runGuestGuard({ returnUrl: '/crm/leads?view=cards' });
     expect(safe).toBeInstanceOf(UrlTree);
     expect(router.serializeUrl(safe as UrlTree)).toBe('/crm/leads?view=cards');
 
     for (const bad of ['//evil.com', 'https://evil.com/steal', '/login', '/verify', '/tenant/accept-invite']) {
-      const redirected = runGuestGuard({ returnUrl: bad });
+      const redirected = await runGuestGuard({ returnUrl: bad });
       expect(redirected, bad).toBeInstanceOf(UrlTree);
       expect(router.serializeUrl(redirected as UrlTree), bad).toBe('/');
     }
+    expect(getMe).toHaveBeenCalledTimes(1);
   });
 });
