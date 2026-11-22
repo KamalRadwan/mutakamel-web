@@ -9,7 +9,7 @@ import { AuthSessionApi } from './auth-session.api';
 import type { LoginSession, SessionStatus, TenantMe } from './auth-session.model';
 import { CurrentUser } from './current-user';
 import { MfaPending } from './mfa-pending';
-import { isRefreshable, isSessionEnded, refreshExpiresCookies } from './session-errors';
+import { isCsrfRejection, isRefreshable, isSessionEnded, refreshExpiresCookies, refreshFailureKind } from './session-errors';
 
 const AUTH_CHANNEL = 'mutakamel-auth';
 const REFRESH_LOCK = 'mutakamel-tenant-refresh';
@@ -20,6 +20,7 @@ const ACTIVITY_INTERVAL_MS = 60_000;
 
 type Renewal = 'ok' | 'ended';
 type RenewalTrigger = 'manual' | 'request' | 'background';
+export type RenewalState = 'ok' | 'retrying';
 export type SignInOutcome = 'signed-in' | 'signed-out' | 'failed';
 
 interface AccessTiming {
@@ -32,6 +33,8 @@ interface RequestVersion {
   generation: number;
   revision: number;
 }
+
+export const DEFAULT_SIGNED_IN_URL = '/workspace/home';
 
 /** Validates that a returnUrl is a relative same-app path outside auth routes. */
 export function safeReturnUrl(raw: unknown): string | null {
@@ -89,9 +92,11 @@ export class AuthSession {
 
   private readonly _status = signal<SessionStatus>('unknown');
   private readonly _me = signal<TenantMe | null>(null);
+  private readonly _renewal = signal<RenewalState>('ok');
 
   readonly status = this._status.asReadonly();
   readonly me = this._me.asReadonly();
+  readonly renewal = this._renewal.asReadonly();
 
   private generation = 0;
   private revision = 0;
@@ -110,6 +115,7 @@ export class AuthSession {
   private channel: BroadcastChannel | null = null;
 
   private readonly checkDeadline = (): void => {
+    if (this._renewal() === 'retrying') this.retryAt = 0;
     this.scheduleRefresh();
   };
 
@@ -117,6 +123,7 @@ export class AuthSession {
     this.retryPendingLogout();
     this.retryAt = 0;
     this.scheduleRefresh();
+    if (this._status() === 'failed') void this.ensureLoaded();
   };
 
   private readonly onHumanActivity = (event: Event): void => {
@@ -160,15 +167,15 @@ export class AuthSession {
   }
 
   /** Shared bootstrap. Its failed state renders the existing retry view in the shell. */
-  ensureLoaded(mode: 'protected' | 'access-only' = 'protected'): Promise<SessionStatus> {
+  ensureLoaded(mode: 'protected' | 'guest' = 'protected'): Promise<SessionStatus> {
     const status = this._status();
     if (status === 'signed-in' || status === 'signed-out') return Promise.resolve(status);
     if (this.loadInFlight) {
-      return mode === 'access-only' ? this.loadInFlight : this.loadInFlight.then((result) =>
+      return mode === 'guest' ? this.loadInFlight : this.loadInFlight.then((result) =>
         result === 'unknown' ? this.ensureLoaded() : result,
       );
     }
-    if (mode === 'access-only' && (status !== 'unknown' || !this.api.hasCsrfCookie())) {
+    if (mode === 'guest' && (status !== 'unknown' || !this.api.hasCsrfCookie())) {
       return Promise.resolve(status);
     }
 
@@ -209,7 +216,8 @@ export class AuthSession {
     if (version.generation !== this.generation || this._status() !== 'signed-in') return false;
     if (error.status !== 401 && !(error.status === 403 && error.code === 'SESSION_IDENTITY_INACTIVE')) return false;
 
-    if (isRefreshable(error, this.api.hasCsrfCookie())) {
+    const hasCsrf = this.api.hasCsrfCookie();
+    if (isRefreshable(error, hasCsrf) || (hasCsrf && error.status === 401 && error.code === 'GW.AUTH.SESSION_REVOKED')) {
       const result = await this.renew('request', version);
       return result === 'ok' && version.generation === this.generation;
     }
@@ -270,6 +278,7 @@ export class AuthSession {
     this.timing = null;
     this.retryAt = 0;
     this.meNeedsRefresh = false;
+    this._renewal.set('ok');
     this.lastActivityAt = Number.NEGATIVE_INFINITY;
     this.stopRefreshTimer();
     this._me.set(null);
@@ -277,7 +286,7 @@ export class AuthSession {
     this.currentUser.reset();
   }
 
-  private async runLoad(mode: 'protected' | 'access-only'): Promise<SessionStatus> {
+  private async runLoad(mode: 'protected' | 'guest'): Promise<SessionStatus> {
     if (this.hasPendingLogout()) {
       this.clearLocal();
       this.retryPendingLogout();
@@ -290,9 +299,16 @@ export class AuthSession {
       await this.loadMe(generation);
     } catch (error) {
       if (generation !== this.generation) return this._status();
-      if (mode === 'access-only') {
-        // Let the login page handle readiness and keep protected-route renewal available.
-        this._status.set('unknown');
+      if (mode === 'guest') {
+        if (isRefreshable(error, this.api.hasCsrfCookie())) {
+          try {
+            await this.refresh();
+          } catch {
+            if (generation === this.generation) this._status.set('unknown');
+          }
+        } else {
+          this._status.set('unknown');
+        }
       } else if (isRefreshable(error, this.api.hasCsrfCookie())) {
         try {
           await this.refresh();
@@ -321,6 +337,7 @@ export class AuthSession {
           this.retryAt = Date.now() + (Number.isFinite(retrySeconds) && retrySeconds > 0
             ? retrySeconds * 1_000
             : REFRESH_RETRY_DELAY_MS);
+          this._renewal.set('retrying');
         }
         throw error;
       })
@@ -347,7 +364,7 @@ export class AuthSession {
         if (version.generation !== this.generation) return 'ended';
         if (!isRefreshable(error, this.api.hasCsrfCookie())) {
           if (isSessionEnded(error)) return this.endRenewal(false, true);
-          throw error;
+          if (!(error instanceof ApiError && error.status === 401)) throw error;
         }
       }
     }
@@ -364,7 +381,15 @@ export class AuthSession {
       return 'ok';
     } catch (error) {
       if (version.generation !== this.generation) return 'ended';
-      return this.endRenewal(refreshed || !refreshExpiresCookies(error), isSessionEnded(error));
+      if (refreshed) {
+        if (error instanceof ApiError && refreshFailureKind(error) === 'transient') {
+          this.meNeedsRefresh = true;
+          throw error;
+        }
+        return this.endRenewal(true, isSessionEnded(error));
+      }
+      if (refreshFailureKind(error) === 'transient') throw error;
+      return this.endRenewal(!refreshExpiresCookies(error) && !isCsrfRejection(error), true);
     }
   }
 
@@ -400,6 +425,7 @@ export class AuthSession {
     this.retryAt = 0;
     this.sessionEndedNotified = false;
     this._status.set('signed-in');
+    this._renewal.set('ok');
     this.scheduleRefresh();
     return true;
   }
@@ -483,7 +509,7 @@ export class AuthSession {
 
   private refreshDeadline(): number | null {
     if (this._status() !== 'signed-in' || this.window?.navigator.onLine === false) return null;
-    if (this.meNeedsRefresh) return this.retryAt;
+    if (this.meNeedsRefresh || this._renewal() === 'retrying') return this.retryAt;
     if (!this.leader.isLeader() || !this.timing) return null;
     return Math.max(this.timing.refreshAt, this.retryAt);
   }
@@ -540,6 +566,7 @@ export class AuthSession {
           if (!timing || timing.issuedAt <= (this.timing?.issuedAt ?? 0)) return;
           this.timing = timing;
           if (this._status() === 'signed-in') this.meNeedsRefresh = true;
+          if (this._renewal() === 'retrying') this.retryAt = 0;
           this.scheduleRefresh();
         }
       };

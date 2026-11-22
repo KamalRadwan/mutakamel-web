@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCircleX, tablerEye, tablerEyeOff } from '@ng-icons/tabler-icons';
-import { AuthSession } from '../../../../core/auth/auth-session';
+import { AuthSession, DEFAULT_SIGNED_IN_URL } from '../../../../core/auth/auth-session';
 import { isMfaStep } from '../../../../core/auth/auth-session.model';
 import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
@@ -137,14 +137,14 @@ export class InvitationPage implements OnInit {
         if (isMfaStep(result)) {
           this.values.set({ newPassword: '', confirmPassword: '' });
           this.token.set(null);
-          this.mfaPending.set(result, { returnUrl: '/', origin: 'invitation' });
+          this.mfaPending.set(result, { returnUrl: DEFAULT_SIGNED_IN_URL, origin: 'invitation' });
           await this.router.navigateByUrl('/verify', { replaceUrl: true });
         } else {
           await this.authSession.signedIn(result);
           this.values.set({ newPassword: '', confirmPassword: '' });
           this.token.set(null);
           this.notify.success(this.transloco.translate('authInvite.toast.welcome'));
-          await this.router.navigateByUrl('/', { replaceUrl: true });
+          await this.router.navigateByUrl(DEFAULT_SIGNED_IN_URL, { replaceUrl: true });
         }
       } catch (error) {
         this.handleError(error, newPassword);

@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { TRANSLOCO_LOADER, provideTransloco } from '@jsverse/transloco';
+import { NgIcon } from '@ng-icons/core';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Notify } from '../../../core/notify/notify';
@@ -65,6 +67,68 @@ function setup() {
 }
 
 describe('ToastHost', () => {
+  it('renders the pinned wifi-off danger icon without a close button or any bar', () => {
+    const { fixture, notify, toasts, flush } = setup();
+    notify.connectionLost('Lost', 'Retrying');
+    flush();
+    const toast = toasts()[0];
+    const icon = toast.querySelector('ng-icon') as HTMLElement;
+    const component = fixture.debugElement.query(By.directive(NgIcon)).componentInstance as NgIcon;
+    expect(component.name()).toBe('tablerWifiOff');
+    expect(icon.parentElement?.classList.contains('bg-danger')).toBe(true);
+    expect(icon.parentElement?.classList.contains('text-on-danger')).toBe(true);
+    expect(toast.querySelector('button')).toBeNull();
+    expect(toast.querySelector('i')).toBeNull();
+  });
+
+  it('announces the pinned toast politely once, without announcing in-place updates or retries', () => {
+    const { notify, el, toasts, flush } = setup();
+    const polite = () => el.querySelector('[role="status"]')?.textContent;
+    const assertive = () => el.querySelector('[role="alert"]')?.textContent;
+    notify.connectionLost('Lost', 'Retrying');
+    flush();
+    vi.advanceTimersByTime(60);
+    flush();
+    expect(polite()).toBe('Lost. Retrying');
+    expect(assertive()).toBe('');
+
+    notify.connectionLost('Offline', 'Still retrying');
+    flush();
+    expect(polite()).toBe('Lost. Retrying');
+    vi.advanceTimersByTime(60_000);
+    flush();
+    expect(toasts()[0].textContent).toContain('Offline');
+    expect(polite()).toBe('Lost. Retrying');
+    expect(assertive()).toBe('');
+
+    notify.connectionLost('Offline', 'Still retrying');
+    flush();
+    vi.advanceTimersByTime(60);
+    flush();
+    expect(polite()).toBe('Lost. Retrying');
+
+    notify.error('Save failed');
+    flush();
+    vi.advanceTimersByTime(60);
+    flush();
+    expect(assertive()).toBe('Save failed');
+    expect(polite()).toBe('Lost. Retrying');
+  });
+
+  it('does not pause or resume the pinned toast on pointer or focus events', () => {
+    const { fixture, notify, toasts, flush } = setup();
+    const pause = vi.spyOn(notify, 'pause');
+    const resume = vi.spyOn(notify, 'resume');
+    notify.connectionLost('Lost', 'Retrying');
+    flush();
+    expect(fixture.debugElement.query(By.css('.toast')).listeners).toEqual([]);
+    for (const type of ['mouseenter', 'mouseleave', 'focusin', 'focusout']) {
+      toasts()[0].dispatchEvent(new Event(type));
+    }
+    expect(pause).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+  });
+
   it('renders a manual popover region', () => {
     const { region } = setup();
     expect(region().getAttribute('popover')).toBe('manual');

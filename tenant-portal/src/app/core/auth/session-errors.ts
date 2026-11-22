@@ -47,3 +47,19 @@ export function refreshExpiresCookies(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 401 || error.status === 403) &&
     TERMINAL_REFRESH_CODES.has(error.code);
 }
+
+export type RefreshFailureKind = 'ended' | 'transient';
+
+/** 403 CSRF proof that can never match. A logout call would fail the same check. */
+export function isCsrfRejection(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 403 && [
+    'AUTH_CSRF_INVALID', 'GW.AUTH.CSRF_INVALID', 'GW.AUTH.FORBIDDEN',
+  ].includes(error.code);
+}
+
+export function refreshFailureKind(error: unknown): RefreshFailureKind {
+  if (refreshExpiresCookies(error) || isCsrfRejection(error)) return 'ended';
+  if (error instanceof ApiError && (error.status === 401 ||
+      (error.status === 403 && error.code === 'SUBSCRIPTION_PAST_DUE'))) return 'ended';
+  return 'transient';
+}

@@ -11,6 +11,7 @@ export const authRoutes: Routes = [
   },
   {
     path: 'verify',
+    canActivate: [guestGuard],
     providers: [provideTranslocoScope('auth', { scope: 'auth-verify', alias: 'authVerify' })],
     loadChildren: () => import('./verify/verify.routes').then((m) => m.verifyRoutes),
   },

@@ -1,18 +1,22 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
-import { listModules } from '../../features/workspace/home/modules.api';
+import { type CanActivateFn, Router } from '@angular/router';
+import { AuthSession } from '../auth/auth-session';
 
-// App subscription check from the same fake source the home page uses.
-// TODO(Phase 5): replace with the core entitlement API.
 export function requireApp(appId: string): CanActivateFn {
   return async () => {
+    const session = inject(AuthSession);
     const router = inject(Router);
-    try {
-      const modules = await listModules();
-      const subscribed = modules.some((item) => item.id === appId && item.group === 'subscribed');
-      return subscribed ? true : router.createUrlTree(['/workspace']);
-    } catch {
-      return router.createUrlTree(['/workspace']);
-    }
+    const status = await session.ensureLoaded();
+    // The parent guard owns sign-in redirects and the shell's load-failure view.
+    if (status !== 'signed-in') return true;
+
+    const subscribed = session
+      .me()
+      ?.seats.some(
+        (seat) =>
+          seat.moduleKey === appId &&
+          (seat.accessState === 'ACTIVE' || seat.accessState === 'OVER_CAPACITY'),
+      );
+    return subscribed ? true : router.createUrlTree(['/workspace']);
   };
 }

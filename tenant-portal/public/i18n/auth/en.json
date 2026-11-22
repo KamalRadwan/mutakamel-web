@@ -50,6 +50,10 @@
       "title": "Under maintenance",
       "text": "Try again shortly"
     },
+    "TENANT_MAINTENANCE": {
+      "title": "Workspace under maintenance",
+      "text": "Try again later"
+    },
     "AUTH_MFA_UNAVAILABLE": {
       "title": "Verification unavailable",
       "text": "Try again shortly"

@@ -8,16 +8,24 @@
   class="fixed top-auto end-auto bottom-toast-edge start-toast-edge z-toast flex flex-col gap-8"
   [attr.aria-label]="'toast.region' | transloco"
 >
+  @let cardClass = 'toast relative flex w-toast items-start gap-8 overflow-hidden rounded-10 border border-border bg-surface px-10 py-8 shadow-popover';
   @for (toast of notify.toasts(); track toast.id) {
-    <div
-      class="toast relative flex w-toast items-start gap-8 overflow-hidden rounded-10 border border-border bg-surface px-10 py-8 shadow-popover"
-      (mouseenter)="notify.pause(toast.id)"
-      (mouseleave)="notify.resume(toast.id)"
-      (focusin)="notify.pause(toast.id)"
-      (focusout)="notify.resume(toast.id)"
-    >
+    @if (toast.pinned) {
+      <div [class]="cardClass"><ng-container [ngTemplateOutlet]="content" /></div>
+    } @else {
+      <div
+        [class]="cardClass"
+        (mouseenter)="notify.pause(toast.id)"
+        (mouseleave)="notify.resume(toast.id)"
+        (focusin)="notify.pause(toast.id)"
+        (focusout)="notify.resume(toast.id)"
+      >
+        <ng-container [ngTemplateOutlet]="content" />
+      </div>
+    }
+    <ng-template #content>
       <span class="flex size-icon-tile-sm shrink-0 items-center justify-center rounded-full" [class]="look[toast.type].circle">
-        <ng-icon [name]="look[toast.type].icon" size="14" aria-hidden="true" />
+        <ng-icon [name]="toast.pinned ? 'tablerWifiOff' : look[toast.type].icon" size="14" aria-hidden="true" />
       </span>
 
       <div class="min-w-0 flex-1">
@@ -34,20 +42,22 @@
         }
       </div>
 
-      <button
-        type="button"
-        class="flex size-icon-tile-sm shrink-0 items-center justify-center rounded-6 text-text-muted hover:bg-neutral-soft cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-        [attr.aria-label]="'toast.close' | transloco"
-        (click)="notify.close(toast.id)"
-      >
-        <ng-icon name="tablerX" size="14" aria-hidden="true" />
-      </button>
+      @if (!toast.pinned) {
+        <button
+          type="button"
+          class="flex size-icon-tile-sm shrink-0 items-center justify-center rounded-6 text-text-muted hover:bg-neutral-soft cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'toast.close' | transloco"
+          (click)="notify.close(toast.id)"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
 
-      @if (notify.durationOf(toast); as duration) {
-        <i class="countdown absolute bottom-0 start-0 h-countdown w-full" [class]="look[toast.type].bar" [style.animation-duration.ms]="duration"></i>
-      } @else {
-        <i class="absolute bottom-0 start-0 h-countdown w-full" [class]="look[toast.type].bar"></i>
+        @if (notify.durationOf(toast); as duration) {
+          <i class="countdown absolute bottom-0 start-0 h-countdown w-full" [class]="look[toast.type].bar" [style.animation-duration.ms]="duration"></i>
+        } @else {
+          <i class="absolute bottom-0 start-0 h-countdown w-full" [class]="look[toast.type].bar"></i>
+        }
       }
-    </div>
+    </ng-template>
   }
 </section>

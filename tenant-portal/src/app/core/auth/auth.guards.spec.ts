@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { routes } from '../../app.routes';
 import { ApiError } from '../api/api-errors';
+import { Notify } from '../notify/notify';
 import { AuthSession } from './auth-session';
 import { AuthSessionApi } from './auth-session.api';
 import { fakeGetMe, fakeRefreshSession, fakeSessionCallCounts, resetFakeSession, setFakeSessionNext } from './auth-session.fake';
@@ -155,16 +156,39 @@ describe('authGuard & guestGuard', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
-  it('leaves renewal to a protected route when the login probe finds expired access', async () => {
+  it.each(['/workspace/home', '/crm/leads?view=cards'])(
+    'refreshes expired guest access and redirects to %s', async destination => {
     const expired = new ApiError(401, 'COMMON.AUTH.TOKEN_EXPIRED');
-    getMe.mockRejectedValueOnce(expired).mockRejectedValueOnce(expired);
+    getMe.mockRejectedValueOnce(expired);
 
-    expect(await runGuestGuard()).toBe(true);
-    expect(getMe).toHaveBeenCalledTimes(1);
-    expect(refresh).not.toHaveBeenCalled();
-    expect(await runAuthGuard('/workspace')).toBe(true);
+    const result = await runGuestGuard(destination === '/workspace/home' ? {} : { returnUrl: destination });
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe(destination);
+    expect(getMe).toHaveBeenCalledTimes(2);
     expect(TestBed.inject(AuthSession).status()).toBe('signed-in');
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([0, 503])('shows the login page when guest refresh fails with %s', async status => {
+    getMe.mockRejectedValueOnce(new ApiError(401, 'COMMON.AUTH.TOKEN_EXPIRED'));
+    refresh.mockRejectedValueOnce(new ApiError(status, 'UNAVAILABLE'));
+
+    expect(await runGuestGuard()).toBe(true);
+    expect(TestBed.inject(AuthSession).status()).toBe('unknown');
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(getMe).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the login page without a toast or navigation when guest refresh ends the session', async () => {
+    getMe.mockRejectedValueOnce(new ApiError(401, 'COMMON.AUTH.TOKEN_EXPIRED'));
+    refresh.mockRejectedValueOnce(new ApiError(401, 'INVALID_REFRESH_TOKEN'));
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');
+    const info = vi.spyOn(TestBed.inject(Notify), 'info');
+
+    expect(await runGuestGuard()).toBe(true);
+    expect(TestBed.inject(AuthSession).status()).toBe('signed-out');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
   });
 
   it('allows the login page to handle tenant provisioning when the session probe is unavailable', async () => {
@@ -180,11 +204,12 @@ describe('authGuard & guestGuard', () => {
     const expired = new ApiError(401, 'COMMON.AUTH.TOKEN_EXPIRED');
     getMe.mockRejectedValueOnce(expired).mockRejectedValueOnce(expired);
 
-    const accessOnly = session.ensureLoaded('access-only');
+    refresh.mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR'));
+    const guest = session.ensureLoaded('guest');
     const protectedLoad = session.ensureLoaded();
 
-    expect(await settle(Promise.all([accessOnly, protectedLoad]))).toEqual(['unknown', 'signed-in']);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(await settle(Promise.all([guest, protectedLoad]))).toEqual(['unknown', 'signed-in']);
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 
   it('guestGuard redirects signed-in users to a safe returnUrl and rejects unsafe ones', async () => {

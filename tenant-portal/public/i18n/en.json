@@ -281,6 +281,10 @@
       "title": "Session ended",
       "text": "Sign in again to continue."
     },
+    "connectionLost": {
+      "title": "Can't reach the server",
+      "text": "Retrying automatically"
+    },
     "loadFailed": {
       "title": "Could not load your workspace",
       "text": "Check your connection and try again.",

@@ -165,7 +165,7 @@ describe('invitation page', () => {
     expect(submitBtn.disabled).toBe(false);
   });
 
-  it('activates a non-MFA invitation, calls AuthSession.signedIn, shows welcome toast, clears fields, and navigates to /', async () => {
+  it('activates a non-MFA invitation, calls AuthSession.signedIn, shows welcome toast, clears fields, and navigates to /workspace/home', async () => {
     const root = mountWithFragment(`token=${FAKE_INVITE_TOKENS.valid}`);
     setField(root, 'invite-password', STRONG_PASSWORD);
     setField(root, 'invite-confirm', STRONG_PASSWORD);
@@ -175,7 +175,7 @@ describe('invitation page', () => {
     expect(TestBed.inject(AuthSession).status()).toBe('signed-in');
     expect(notifySuccess).toHaveBeenCalledWith('authInvite.toast.welcome');
     expect(notifyError).not.toHaveBeenCalled();
-    expect(navigateByUrl).toHaveBeenCalledWith('/', { replaceUrl: true });
+    expect(navigateByUrl).toHaveBeenCalledWith('/workspace/home', { replaceUrl: true });
     expect(root.querySelector<HTMLInputElement>('#invite-password')?.value).toBe('');
     expect(root.querySelector<HTMLInputElement>('#invite-confirm')?.value).toBe('');
   });
@@ -190,7 +190,7 @@ describe('invitation page', () => {
     const pending = TestBed.inject(MfaPending).current();
     expect(pending).toMatchObject({
       origin: 'invitation',
-      returnUrl: '/',
+      returnUrl: '/workspace/home',
       step: { mfaRequired: true },
     });
     expect(navigateByUrl).toHaveBeenCalledWith('/verify', { replaceUrl: true });

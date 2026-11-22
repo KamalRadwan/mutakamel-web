@@ -105,11 +105,11 @@ describe('login page', () => {
     await signIn(FAKE_ACCOUNTS.valid.email, FAKE_ACCOUNTS.valid.password);
 
     expect(TestBed.inject(AuthSession).status()).toBe('signed-in');
-    expect(navigate).toHaveBeenCalledWith('/');
+    expect(navigate).toHaveBeenCalledWith('/workspace/home');
     expect(notifyError).not.toHaveBeenCalled();
   });
 
-  it('honors a safe returnUrl query param and falls back to / for an unsafe one', async () => {
+  it('honors a safe returnUrl query param and falls back to /workspace/home for an unsafe one', async () => {
     const route = TestBed.inject(ActivatedRoute);
     route.snapshot.queryParams = { returnUrl: '/crm/leads' };
     await signIn(FAKE_ACCOUNTS.valid.email, FAKE_ACCOUNTS.valid.password);
@@ -117,7 +117,7 @@ describe('login page', () => {
 
     route.snapshot.queryParams = { returnUrl: '//evil.com' };
     await signIn(FAKE_ACCOUNTS.valid.email, FAKE_ACCOUNTS.valid.password);
-    expect(navigate).toHaveBeenLastCalledWith('/');
+    expect(navigate).toHaveBeenLastCalledWith('/workspace/home');
   });
 
   it('shows no verify notice by default and a status notice after ?verify=expired', async () => {
@@ -139,7 +139,15 @@ describe('login page', () => {
     await signIn(FAKE_ACCOUNTS.mfa.email, FAKE_ACCOUNTS.mfa.password);
 
     const pending = TestBed.inject(MfaPending).current();
-    expect(pending).toMatchObject({ origin: 'login', returnUrl: '/', step: { mfaRequired: true } });
+    expect(pending).toMatchObject({ origin: 'login', returnUrl: '/workspace/home', step: { mfaRequired: true } });
+    expect(navigate).toHaveBeenCalledWith('/verify');
+  });
+
+  it('keeps a safe returnUrl through the MFA step', async () => {
+    TestBed.inject(ActivatedRoute).snapshot.queryParams = { returnUrl: '/crm/leads' };
+    await signIn(FAKE_ACCOUNTS.mfa.email, FAKE_ACCOUNTS.mfa.password);
+
+    expect(TestBed.inject(MfaPending).current()?.returnUrl).toBe('/crm/leads');
     expect(navigate).toHaveBeenCalledWith('/verify');
   });
 
@@ -151,7 +159,25 @@ describe('login page', () => {
     expect(notifyError).toHaveBeenCalledWith('auth.errors.AUTH_LOGIN_THROTTLED.title', 'auth.errors.AUTH_LOGIN_THROTTLED.text');
   });
 
+  it.each(['TENANT_MAINTENANCE_ACTIVE', 'TENANT_MAINTENANCE_RELEASE_REQUIRED'])(
+    'keeps the form and shows the maintenance toast for 403 %s',
+    async (code) => {
+      vi.spyOn(TestBed.inject(AuthTransport), 'requestData').mockRejectedValueOnce(
+        ApiError.fromResponse(403, { errorCode: code }),
+      );
+      await signIn(FAKE_ACCOUNTS.valid.email, FAKE_ACCOUNTS.valid.password);
+
+      expect(notifyError).toHaveBeenCalledWith(
+        'auth.errors.TENANT_MAINTENANCE.title',
+        'auth.errors.TENANT_MAINTENANCE.text',
+      );
+      expect(navigate).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
+    },
+  );
+
   it.each([
+    [403, 'FORBIDDEN', 'apiErrors.permission'],
     [404, 'TENANT_NOT_RESOLVABLE', 'auth.errors.TENANT_NOT_RESOLVABLE.text'],
     [503, 'SERVICE_UNAVAILABLE', 'auth.shared.errors.unavailable'],
     [503, 'TENANT_INACTIVE', 'auth.shared.errors.unavailable'],
@@ -200,6 +226,27 @@ describe('login page', () => {
     await signIn(FAKE_ACCOUNTS.valid.email, 'wrong');
     expect(notifyError).toHaveBeenCalledWith(auth.errors.INVALID_CREDENTIALS.title, auth.errors.INVALID_CREDENTIALS.text);
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it.each([['ar', ar], ['en', en]] as const)('shows the translated maintenance message in %s', async (lang, auth) => {
+    const i18n = TestBed.inject(TranslocoService);
+    i18n.setTranslation({ auth }, lang);
+    i18n.setActiveLang(lang);
+    vi.spyOn(TestBed.inject(AuthTransport), 'requestData').mockRejectedValueOnce(
+      ApiError.fromResponse(403, { errorCode: 'TENANT_MAINTENANCE_ACTIVE' }),
+    );
+    await signIn(FAKE_ACCOUNTS.valid.email, FAKE_ACCOUNTS.valid.password);
+    expect(notifyError).toHaveBeenCalledWith(auth.errors.TENANT_MAINTENANCE.title, auth.errors.TENANT_MAINTENANCE.text);
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the same translation keys in English and Arabic', () => {
+    function keys(value: object): string[] {
+      return Object.entries(value).flatMap(([key, entry]) =>
+        entry && typeof entry === 'object' ? keys(entry).map((child) => `${key}.${child}`) : [key],
+      );
+    }
+    expect(keys(en).sort()).toEqual(keys(ar).sort());
   });
 
   it('puts 400 CORE_VALIDATION_FAILED on the field until the value changes', () => {

@@ -1,4 +1,5 @@
 import { Service, Signal, signal } from '@angular/core';
+import { DEFAULT_SIGNED_IN_URL } from './auth-session';
 import type { MfaStep } from './auth-session.model';
 
 export type MfaPendingOrigin = 'login' | 'invitation';
@@ -23,7 +24,7 @@ export class MfaPending {
   set(step: MfaStep, opts: { returnUrl?: string; origin: MfaPendingOrigin }): void {
     this._current.set({
       step,
-      returnUrl: opts.returnUrl ?? '/',
+      returnUrl: opts.returnUrl ?? DEFAULT_SIGNED_IN_URL,
       origin: opts.origin,
       receivedAt: Date.now(),
     });

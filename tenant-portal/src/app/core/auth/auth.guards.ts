@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
-import { AuthSession, safeReturnUrl } from './auth-session';
+import { AuthSession, DEFAULT_SIGNED_IN_URL, safeReturnUrl } from './auth-session';
 
 /** Ensures the session is bootstrapped before entering the authenticated app layout. */
 export const authGuard: CanActivateFn = async (_route, state) => {
@@ -20,9 +20,9 @@ export const authGuard: CanActivateFn = async (_route, state) => {
 export const guestGuard: CanActivateFn = async (route) => {
   const session = inject(AuthSession);
   const router = inject(Router);
-  if (await session.ensureLoaded('access-only') !== 'signed-in') {
+  if (await session.ensureLoaded('guest') !== 'signed-in') {
     return true;
   }
-  const target = safeReturnUrl(route.queryParams['returnUrl']) ?? '/workspace/home';
+  const target = safeReturnUrl(route.queryParams['returnUrl']) ?? DEFAULT_SIGNED_IN_URL;
   return router.parseUrl(target);
 };

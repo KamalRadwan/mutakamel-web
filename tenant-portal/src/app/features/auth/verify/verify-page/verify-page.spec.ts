@@ -44,7 +44,7 @@ async function advance(ms: number): Promise<void> {
 function seedPending(opts: { returnUrl?: string; origin?: MfaPendingOrigin } = {}): void {
   const step = registerFakeChallenge({ remember: false });
   TestBed.inject(MfaPending).set(step, {
-    returnUrl: opts.returnUrl ?? '/',
+    returnUrl: opts.returnUrl,
     origin: opts.origin ?? 'login',
   });
 }
@@ -200,7 +200,7 @@ describe('VerifyPage', () => {
   });
 
   it('shows the welcome toast when verifying from an invitation', async () => {
-    mountPage({ returnUrl: '/', origin: 'invitation' });
+    mountPage({ origin: 'invitation' });
     enterCode(FAKE_MFA_CODE);
 
     submitButton()?.click();
@@ -208,7 +208,16 @@ describe('VerifyPage', () => {
     await advance(1000);
 
     expect(notifySuccess).toHaveBeenCalledWith('authVerify.toast.welcome');
-    expect(navigate).toHaveBeenCalledWith('/', { replaceUrl: true });
+    expect(navigate).toHaveBeenCalledWith('/workspace/home', { replaceUrl: true });
+  });
+
+  it('opens workspace home when the pending returnUrl is empty', async () => {
+    mountPage({ returnUrl: '' });
+    enterCode(FAKE_MFA_CODE);
+    submitButton()?.click();
+    await advance(1000);
+
+    expect(navigate).toHaveBeenCalledWith('/workspace/home', { replaceUrl: true });
   });
 
   it('does not enter the requested feature after an accepted code if /me denies the identity', async () => {

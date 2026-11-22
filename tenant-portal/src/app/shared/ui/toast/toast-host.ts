@@ -1,6 +1,7 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerCircleCheck, tablerCircleX, tablerInfoCircle, tablerX } from '@ng-icons/tabler-icons';
+import { tablerAlertTriangle, tablerCircleCheck, tablerCircleX, tablerInfoCircle, tablerWifiOff, tablerX } from '@ng-icons/tabler-icons';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Notify, ToastType } from '../../../core/notify/notify';
 
@@ -13,8 +14,8 @@ const LOOK: Record<ToastType, { icon: string; circle: string; bar: string }> = {
 
 @Component({
   selector: 'ui-toast-host',
-  imports: [NgIcon, TranslocoPipe],
-  providers: [provideIcons({ tablerCircleCheck, tablerCircleX, tablerAlertTriangle, tablerInfoCircle, tablerX })],
+  imports: [NgIcon, TranslocoPipe, NgTemplateOutlet],
+  providers: [provideIcons({ tablerCircleCheck, tablerCircleX, tablerAlertTriangle, tablerInfoCircle, tablerWifiOff, tablerX })],
   templateUrl: './toast-host.html',
   styleUrl: './toast-host.css',
 })
@@ -40,8 +41,8 @@ export class ToastHost {
         setTimeout(() => target.set(text), 50);
       };
       const text = (toasts: typeof fresh) => toasts.map((toast) => [toast.title, toast.text].filter(Boolean).join('. ')).join('. ');
-      const errors = fresh.filter((toast) => toast.type === 'error');
-      const others = fresh.filter((toast) => toast.type !== 'error');
+      const errors = fresh.filter((toast) => toast.type === 'error' && !toast.pinned);
+      const others = fresh.filter((toast) => toast.type !== 'error' || toast.pinned);
       if (errors.length) say('assertive', text(errors));
       if (others.length) say('polite', text(others));
     });

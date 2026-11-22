@@ -8,6 +8,7 @@ export interface Toast {
   title: string;
   text: string;
   count: number;
+  pinned: boolean;
 }
 
 const MAX_VISIBLE = 3;
@@ -38,6 +39,20 @@ export class Notify {
     this.show('info', title, text);
   }
 
+  connectionLost(title: string, text: string) {
+    const pinned = this.toasts().find((toast) => toast.pinned);
+    if (pinned) {
+      this.toasts.update((toasts) => toasts.map((toast) => toast.id === pinned.id ? { ...toast, title, text } : toast));
+      return;
+    }
+    this.add({ id: this.nextId++, type: 'error', title, text, count: 1, pinned: true });
+  }
+
+  connectionRestored() {
+    if (!this.toasts().some((toast) => toast.pinned)) return;
+    this.toasts.update((toasts) => toasts.filter((toast) => !toast.pinned));
+  }
+
   durationOf(toast: Toast) {
     return DURATION_MS[toast.type];
   }
@@ -59,6 +74,7 @@ export class Notify {
   }
 
   close(id: number) {
+    if (this.toasts().some((toast) => toast.id === id && toast.pinned)) return;
     clearTimeout(this.timers.get(id));
     this.timers.delete(id);
     this.deadlines.delete(id);
@@ -67,14 +83,22 @@ export class Notify {
   }
 
   private show(type: ToastType, title: string, text: string) {
-    const repeat = this.toasts().find((toast) => toast.type === type && toast.title === title && toast.text === text);
+    const repeat = this.toasts().find((toast) => !toast.pinned && toast.type === type && toast.title === title && toast.text === text);
     if (repeat) this.close(repeat.id);
 
-    const toast: Toast = { id: this.nextId++, type, title, text, count: (repeat?.count ?? 0) + 1 };
-    this.toasts.update((toasts) => [...toasts, toast].slice(-MAX_VISIBLE));
+    const toast: Toast = { id: this.nextId++, type, title, text, count: (repeat?.count ?? 0) + 1, pinned: false };
+    this.add(toast);
 
     const duration = DURATION_MS[type];
     if (duration !== null) this.schedule(toast.id, duration);
+  }
+
+  private add(toast: Toast) {
+    if (this.toasts().length >= MAX_VISIBLE) {
+      const oldest = this.toasts().find((item) => !item.pinned);
+      if (oldest) this.close(oldest.id);
+    }
+    this.toasts.update((toasts) => [...toasts, toast]);
   }
 
   private schedule(id: number, ms: number) {

@@ -8,7 +8,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowRight, tablerEye, tablerEyeOff } from '@ng-icons/tabler-icons';
 import { map } from 'rxjs';
 import { ApiError, fieldErrorsOf, isValidationError } from '../../../../core/api/api-errors';
-import { AuthSession, safeReturnUrl } from '../../../../core/auth/auth-session';
+import { AuthSession, DEFAULT_SIGNED_IN_URL, safeReturnUrl } from '../../../../core/auth/auth-session';
 import { isMfaStep } from '../../../../core/auth/auth-session.model';
 import { AuthTransport, TenantProvisioningError } from '../../../../core/auth/auth-transport';
 import { LanguageState } from '../../../../core/i18n/language';
@@ -121,7 +121,7 @@ export class LoginPage {
       this.serverErrors.set(null);
       try {
         const result = await login(body, remember, this.authTransport);
-        const returnUrl = safeReturnUrl(this.route.snapshot.queryParams['returnUrl']) ?? '/';
+        const returnUrl = safeReturnUrl(this.route.snapshot.queryParams['returnUrl']) ?? DEFAULT_SIGNED_IN_URL;
         if (isMfaStep(result)) {
           this.mfaPending.set(result, { returnUrl, origin: 'login' });
           await this.router.navigateByUrl('/verify');

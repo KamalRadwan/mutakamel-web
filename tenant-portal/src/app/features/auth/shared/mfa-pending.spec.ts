@@ -46,6 +46,6 @@ describe('MfaPending', () => {
     expect(pending.current()).toBeNull();
 
     pending.set(step1, { origin: 'invitation' });
-    expect(pending.current()?.returnUrl).toBe('/');
+    expect(pending.current()?.returnUrl).toBe('/workspace/home');
   });
 });

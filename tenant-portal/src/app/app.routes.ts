@@ -1,6 +1,7 @@
 import { Routes, UrlSegment } from '@angular/router';
 import { provideTranslocoScope } from '@jsverse/transloco';
 import { authGuard } from './core/auth/auth.guards';
+import { requirePermission } from './core/auth/permission.guard';
 import { requireApp } from './core/guards/app-entitlement.guard';
 import { requireCrmModule } from './features/crm/shared/crm-modules/crm-module.guard';
 import { isKnownPath } from './layout/navigation';
@@ -64,9 +65,8 @@ export const routes: Routes = [
           import('./features/crm/opportunities/opportunities.routes').then((m) => m.opportunitiesRoutes),
       },
       {
-        // TODO(Phase 5): crm.customer_profiles.read guard
         path: 'crm/customers',
-        canActivate: [requireApp('crm')],
+        canActivate: [requireApp('crm'), requirePermission('crm.customer_profiles.read', { scoped: true })],
         loadChildren: () => import('./features/crm/customers/customers.routes').then((m) => m.customersRoutes),
       },
       {

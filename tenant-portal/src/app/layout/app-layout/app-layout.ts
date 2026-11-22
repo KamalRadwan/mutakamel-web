@@ -102,6 +102,8 @@ import {
 import { filter, map } from 'rxjs';
 import { AuthSession } from '../../core/auth/auth-session';
 import { CurrentUser } from '../../core/auth/current-user';
+import { translationEvents } from '../../core/i18n/translation-events';
+import { Notify } from '../../core/notify/notify';
 import { ViewScale } from '../../core/view/view-scale';
 import { FullState } from '../../shared/ui/full-state/full-state';
 import { Menu, MenuItem } from '../../shared/ui/menu/menu';
@@ -281,6 +283,23 @@ export class AppLayout {
   constructor() {
     inject(OverCapacityNotice).start();
     void this.crmModules.ensureLoaded();
+
+    const notify = inject(Notify);
+    const languageEvents = translationEvents(this.transloco);
+    effect(() => {
+      languageEvents();
+      const lost = this.authSession.status() === 'signed-in' && this.authSession.renewal() === 'retrying';
+      untracked(() => {
+        if (lost) {
+          notify.connectionLost(
+            this.transloco.translate('session.connectionLost.title'),
+            this.transloco.translate('session.connectionLost.text'),
+          );
+        } else {
+          notify.connectionRestored();
+        }
+      });
+    });
 
     effect(() => {
       const url = this.url();

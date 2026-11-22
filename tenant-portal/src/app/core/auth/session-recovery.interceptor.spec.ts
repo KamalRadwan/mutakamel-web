@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -6,6 +6,7 @@ import { Router, provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../api/api-errors';
 import { Notify } from '../notify/notify';
 import { TabLeader } from '../tabs/tab-leader';
 import { AuthSession } from './auth-session';
@@ -72,6 +73,74 @@ describe('session recovery on protected Tenant requests', () => {
     await vi.waitFor(() => requests.expectOne(auth + '/me').flush({ success: true, data: FAKE_TENANT_ME }));
     await rejected;
     requests.expectNone(records);
+  });
+
+  it.each([
+    ['GET', 0], ['GET', 503], ['POST', 0], ['POST', 503],
+  ] as const)('returns the transient renewal failure for %s after refresh status %s without replay', async (method, status) => {
+    const response = firstValueFrom(http.request(method, records, {
+      body: method === 'POST' ? { name: 'sample' } : null,
+    })).catch((error: unknown) => error);
+    requests.expectOne({ method, url: records }).flush(
+      { errorCode: 'COMMON.AUTH.TOKEN_EXPIRED' }, { status: 401, statusText: 'Unauthorized' },
+    );
+    const refresh = requests.expectOne({ method: 'POST', url: auth + '/refresh' });
+    const body = status === 0
+      ? { errorCode: 'NETWORK_ERROR' }
+      : { errorCode: 'PLATFORM_MAINTENANCE', correlationId: 'maintenance-review' };
+    if (status === 0) refresh.error(new ProgressEvent('error'));
+    else refresh.flush(body, { status, statusText: 'Service Unavailable' });
+
+    const failure = await response;
+    expect(failure).toBeInstanceOf(HttpErrorResponse);
+    expect(failure).toMatchObject({ status, url: records });
+    expect(failure).toHaveProperty('error', body);
+    expect(session.status()).toBe('signed-in');
+    expect(session.renewal()).toBe('retrying');
+    expect(notify.info).not.toHaveBeenCalled();
+    requests.expectNone(records);
+    requests.expectNone(auth + '/me');
+    requests.expectNone(auth + '/refresh');
+  });
+
+  it('keeps defined renewal details and correlationId for the original request', async () => {
+    const details = { retryAfterSeconds: ['90'] };
+    vi.spyOn(session, 'recoverRequest').mockRejectedValueOnce(
+      new ApiError(429, 'GW.RATE.LIMIT_EXCEEDED', details, { correlationId: 'limited-review' }),
+    );
+    const response = firstValueFrom(http.get(records)).catch((error: unknown) => error);
+    requests.expectOne(records).flush({ code: 'COMMON.AUTH.TOKEN_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
+    const failure = await response;
+    expect(failure).toMatchObject({ status: 429, url: records });
+    expect(failure).toHaveProperty('error', { errorCode: 'GW.RATE.LIMIT_EXCEEDED', details, correlationId: 'limited-review' });
+    requests.expectNone(records);
+  });
+
+  it('converts a transient rejection that is not an ApiError to a generic 502', async () => {
+    vi.spyOn(session, 'recoverRequest').mockRejectedValueOnce(new Error('offline'));
+    const response = firstValueFrom(http.get(records)).catch((error: unknown) => error);
+    requests.expectOne(records).flush({ code: 'COMMON.AUTH.TOKEN_EXPIRED' }, { status: 401, statusText: 'Unauthorized' });
+    const failure = await response;
+    expect(failure).toBeInstanceOf(HttpErrorResponse);
+    expect(failure).toMatchObject({ status: 502, url: records });
+    expect(failure).toHaveProperty('error', { errorCode: 'COMMON.GENERIC.INTERNAL_ERROR' });
+    requests.expectNone(records);
+  });
+
+  it('returns the original 401 when refresh ends the session', async () => {
+    const body = { errorCode: 'COMMON.AUTH.TOKEN_EXPIRED' };
+    const response = firstValueFrom(http.get(records)).catch((error: unknown) => error);
+    requests.expectOne(records).flush(body, { status: 401, statusText: 'Unauthorized' });
+    requests.expectOne(auth + '/refresh').flush(
+      { errorCode: 'INVALID_REFRESH_TOKEN' }, { status: 401, statusText: 'Unauthorized' },
+    );
+    const failure = await response;
+    expect(failure).toMatchObject({ status: 401, url: records });
+    expect(failure).toHaveProperty('error', body);
+    expect(session.status()).toBe('signed-out');
+    expect(notify.info).toHaveBeenCalledOnce();
+    requests.expectNone(records);
+    requests.expectNone(auth + '/me');
   });
 
   it.each([

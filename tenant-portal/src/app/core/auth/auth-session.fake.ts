@@ -17,7 +17,7 @@ export const FAKE_TENANT_ME: TenantMe = {
   permissions: [
     'notifications.notification.read',
     'crm.customer_profiles.status.manage',
-    'crm.customer_profiles.read',
+    'crm.customer_profiles.read.all',
     'crm.leads.read',
     'crm.leads.write',
     'crm.opportunities.read',

@@ -4,7 +4,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCircleX } from '@ng-icons/tabler-icons';
 import { errorCodeOf } from '../../../../core/api/api-errors';
-import { AuthSession } from '../../../../core/auth/auth-session';
+import { AuthSession, DEFAULT_SIGNED_IN_URL } from '../../../../core/auth/auth-session';
 import { AuthTransport } from '../../../../core/auth/auth-transport';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Notify } from '../../../../core/notify/notify';
@@ -201,7 +201,7 @@ export class VerifyPage {
       if (state.origin === 'invitation') {
         this.notify.success(this.transloco.translate('authVerify.toast.welcome'));
       }
-      await this.router.navigateByUrl(state.returnUrl || '/', { replaceUrl: true });
+      await this.router.navigateByUrl(state.returnUrl || DEFAULT_SIGNED_IN_URL, { replaceUrl: true });
     } catch (error) {
       if (this.destroyed) return;
       this.handleVerifyError(error);

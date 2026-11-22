@@ -4,6 +4,7 @@ import { inject } from '@angular/core';
 import { catchError, defer, from, lastValueFrom, of, switchMap, throwError } from 'rxjs';
 import { ApiError } from '../api/api-errors';
 import { AuthSession } from './auth-session';
+import { refreshFailureKind } from './session-errors';
 
 const TENANT_API = /^\/api\/tenant\/[a-z][a-z0-9-]*\/v\d+(?:\/|$)/u;
 const AUTH_API = /^\/api\/tenant\/core\/v\d+\/auth(?:\/|$)/u;
@@ -46,7 +47,21 @@ export const sessionRecoveryInterceptor: HttpInterceptorFn = (request, next) => 
     if (!(failure instanceof ApiError) || (failure.status !== 401 && failure.status !== 403)) return original();
 
     return from(session.recoverRequest(failure, version)).pipe(
-      catchError(() => of(false)),
+      catchError((rejection: unknown) => {
+        if (refreshFailureKind(rejection) !== 'transient') return of(false);
+        const renewalFailure = rejection instanceof ApiError
+          ? rejection
+          : new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+        return throwError(() => new HttpErrorResponse({
+          status: renewalFailure.status,
+          error: {
+            errorCode: renewalFailure.code,
+            ...(renewalFailure.details !== undefined ? { details: renewalFailure.details } : {}),
+            ...(renewalFailure.correlationId !== undefined ? { correlationId: renewalFailure.correlationId } : {}),
+          },
+          url: request.url,
+        }));
+      }),
       // Only a safe read is replayed. A write still returns its original failure.
       switchMap((recovered) => recovered && safeRead ? next(request) : original()),
     );
