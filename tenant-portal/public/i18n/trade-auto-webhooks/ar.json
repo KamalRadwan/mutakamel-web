@@ -1,0 +1,304 @@
+{
+  "common": {
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "retry": "حاول مرة أخرى",
+    "reload": "إعادة التحميل",
+    "copy": "نسخ",
+    "clearSearch": "مسح البحث",
+    "clearFilters": "مسح عوامل التصفية",
+    "clearDateRange": "مسح النطاق الزمني",
+    "none": "—",
+    "versionPrefix": "إصدار "
+  },
+  "view": {
+    "label": "عرض خطافات الويب",
+    "subscriptions": "الاشتراكات",
+    "deliveries": "عمليات الإرسال",
+    "hint": "بدّل بين قائمة الاشتراكات وسجل عمليات الإرسال."
+  },
+  "branchNotice": "تُدار اشتراكات خطافات الويب على مستوى الشركة أو المستأجر.",
+  "toolbar": {
+    "newSubscription": "اشتراك جديد",
+    "searchSubscriptions": "ابحث بالرمز أو رابط الاستقبال",
+    "searchDeliveries": "ابحث بالاشتراك أو الحدث",
+    "reload": "إعادة التحميل"
+  },
+  "states": {
+    "loadFailed": "تعذّر تحميل بيانات خطافات الويب.",
+    "noMatches": "لا توجد اشتراكات مطابقة.",
+    "notFound": "لم يعد سجل خطاف الويب هذا موجودًا."
+  },
+  "conflict": {
+    "title": "تغيّر هذا السجل",
+    "text": "حفظ مستخدم آخر تغييرات أحدث؛ فأعد تحميل البيانات الحالية أو احتفظ بتغييراتك واحفظ مجددًا.",
+    "reload": "إعادة التحميل",
+    "keep": "الاحتفاظ بتغييراتي"
+  },
+  "subscriptions": {
+    "title": "اشتراكات خطافات الويب",
+    "pagination": "ترقيم صفحات الاشتراكات",
+    "empty": "لا توجد اشتراكات خطافات ويب بعد.",
+    "actions": "إجراءات الاشتراك",
+    "pendingSpinner": "عملية سر التوقيع قيد التنفيذ",
+    "columns": {
+      "code": "الرمز",
+      "endpoint": "رابط الاستقبال",
+      "scope": "المستوى",
+      "status": "الحالة",
+      "secret": "السر",
+      "version": "الإصدار",
+      "updated": "آخر تحديث",
+      "actions": "الإجراءات"
+    },
+    "menu": {
+      "open": "فتح",
+      "edit": "تعديل",
+      "sendTest": "إرسال تجربة",
+      "disable": "تعطيل",
+      "enable": "تفعيل",
+      "rotateSecret": "تدوير السر"
+    }
+  },
+  "subscription": {
+    "newTitle": "اشتراك خطاف ويب جديد",
+    "fields": {
+      "code": {
+        "label": "الرمز",
+        "hint": "رمز فريد بأحرف إنجليزية كبيرة يبدأ بحرف (حروف وأرقام وشرطة سفلية، من 2 إلى 80 حرفًا).",
+        "placeholder": "ERP_SYNC"
+      },
+      "endpointUrl": {
+        "label": "رابط الاستقبال",
+        "hint": "رابط HTTPS يستقبل عليه نظامك إرسالات خطافات الويب الموقّعة (المنفذ 443 أو 8443 فقط). يظهر الاشتراك المحفوظ بالعنوان والمسار فقط، فأدخل الرابط كاملًا مرة أخرى لتغييره.",
+        "placeholder": "https://erp.example.com/hooks/trade"
+      },
+      "retryPolicy": {
+        "label": "سياسة إعادة المحاولة",
+        "hint": "ينتظر {{t1}}، ثم {{t2}}، {{t3}}، {{t4}}… حتى 6 ساعات بين المحاولات.",
+        "standard": "قياسية",
+        "conservative": "متحفظة"
+      },
+      "maxAttempts": {
+        "label": "أقصى عدد للمحاولات",
+        "hint": "الحد الأقصى لمحاولات الإرسال قبل اعتبار التسليم متعذرًا (من 1 إلى 10)."
+      },
+      "branches": {
+        "label": "الفروع",
+        "hint": "اقصر الإرسال على فروع محددة، أو اتركه فارغًا لتشمل كل الفروع.",
+        "allHint": "فارغ = كل الفروع"
+      }
+    },
+    "validation": {
+      "required": "هذا الحقل مطلوب.",
+      "codePattern": "استخدم من 2 إلى 80 حرفًا إنجليزيًا كبيرًا أو رقمًا أو شرطة سفلية تبدأ بحرف.",
+      "maxAttemptsRange": "أدخل عددًا صحيحًا بين 1 و10.",
+      "eventsRequired": "اختر من 1 إلى 30 حدثًا.",
+      "atLeastOneField": "أبقِ حقلًا واحدًا على الأقل محددًا لكل حدث."
+    },
+    "endpointProblems": {
+      "HTTPS_REQUIRED": "استخدم بروتوكول https",
+      "NOT_HTTPS": "استخدم بروتوكول https",
+      "USERINFO_FORBIDDEN": "أزل بيانات الاعتماد من الرابط",
+      "NO_USERINFO": "أزل بيانات الاعتماد من الرابط",
+      "FRAGMENT_FORBIDDEN": "أزل جزء # من الرابط",
+      "NO_FRAGMENT": "أزل جزء # من الرابط",
+      "LOCALHOST_FORBIDDEN": "لا يُسمح بعناوين localhost أو .local",
+      "NO_LOCALHOST": "لا يُسمح بعناوين localhost أو .local",
+      "PORT_FORBIDDEN": "يجب أن يكون المنفذ 443 أو 8443",
+      "INVALID_PORT": "يجب أن يكون المنفذ 443 أو 8443",
+      "SECRET_QUERY_KEY": "أزل الكلمات الشبيهة بالأسرار من معاملات الاستعلام",
+      "SECRET_IN_QUERY": "أزل الكلمات الشبيهة بالأسرار من معاملات الاستعلام",
+      "INVALID_URL": "أدخل رابطًا صالحًا"
+    },
+    "footer": {
+      "save": "حفظ",
+      "sendTest": "إرسال تجربة",
+      "openDelivery": "فتح الإرسال",
+      "undo": "تراجع عن التغييرات",
+      "unsaved": "تغييرات غير محفوظة",
+      "disable": "تعطيل",
+      "enable": "تفعيل"
+    },
+    "unsaved": {
+      "title": "تجاهل التغييرات؟",
+      "text": "لديك تغييرات غير محفوظة في هذا الاشتراك.",
+      "save": "حفظ",
+      "discard": "تجاهل",
+      "cancel": "إلغاء"
+    }
+  },
+  "eventsSection": {
+    "title": "الأحداث",
+    "caption": "تُرسل الحقول المحددة فقط",
+    "empty": "لا توجد أحداث متاحة لخطافات الويب.",
+    "keepOneField": "يجب إبقاء حقل واحد على الأقل محددًا.",
+    "maxReached": "يمكنك اختيار ما يصل إلى 30 حدثًا.",
+    "listLabel": "الأحداث المطلوب إرسالها",
+    "listHint": "اختر الأحداث التي يرسلها هذا الاشتراك، ثم حدّد حقول البيانات التي يتضمنها كل حدث."
+  },
+  "events": {
+    "trading.catalog.item_changed.v1": "تعديل صنف",
+    "trading.catalog.item_changed": "تعديل صنف",
+    "trading.commercial_account.changed.v1": "تعديل حساب تجاري",
+    "trading.commercial_account.changed": "تعديل حساب تجاري",
+    "trading.quotation.sent.v1": "إرسال عرض سعر",
+    "trading.quotation.sent": "إرسال عرض سعر",
+    "trading.quotation.accepted.v1": "قبول عرض سعر",
+    "trading.quotation.accepted": "قبول عرض سعر",
+    "trading.sales_order.confirmed.v1": "تأكيد أمر بيع",
+    "trading.sales_order.confirmed": "تأكيد أمر بيع",
+    "trading.purchase_order.confirmed.v1": "تأكيد أمر شراء",
+    "trading.purchase_order.confirmed": "تأكيد أمر شراء",
+    "inventory.receipt.completed.v1": "اكتمال استلام بضاعة",
+    "inventory.receipt.completed": "اكتمال استلام بضاعة",
+    "inventory.delivery.completed.v1": "اكتمال تسليم",
+    "inventory.delivery.completed": "اكتمال تسليم",
+    "trading.webhook.synthetic_test.v1": "إرسال تجريبي"
+  },
+  "secret": {
+    "title": "سر التوقيع",
+    "algorithm": "الخوارزمية",
+    "activeFrom": "نشط منذ",
+    "overlapUntil": "التداخل حتى",
+    "revokedAt": "أُبطل في",
+    "reveal": "إظهار السر (مرة واحدة)",
+    "availableUntil": "متاح حتى {{time}}",
+    "rotate": "تدوير",
+    "revoke": "إبطال",
+    "preparing": "جارٍ إعداد سر التوقيع…",
+    "caption": "يعمل الإظهار مرة واحدة خلال 15 دقيقة من التفعيل.",
+    "failedFallback": "تعذّر إتمام عملية سر التوقيع.",
+    "rotateModal": {
+      "title": "تدوير سر التوقيع",
+      "overlapLabel": "ساعات التداخل",
+      "overlapHint": "يستمر السر القديم في العمل طوال هذه المدة.",
+      "overlapRange": "أدخل عددًا صحيحًا بين 30 و168.",
+      "confirm": "تدوير"
+    },
+    "revokeConfirm": {
+      "title": "إبطال سر التوقيع؟",
+      "text": "ستتوقف عمليات الإرسال حتى إنشاء سر جديد.",
+      "confirm": "إبطال"
+    }
+  },
+  "reveal": {
+    "title": "سر التوقيع",
+    "fieldLabel": "سر التوقيع",
+    "fieldHint": "احفظ مفتاح توقيع HMAC هذا في نظام الاستقبال للتحقق من توقيعات الطلبات.",
+    "warning": "يُعرض هذا السر مرة واحدة فقط. احفظه في نظام الاستقبال لديك الآن.",
+    "storedCheck": "لقد حفظت السر",
+    "alreadyShown": "لم يعد بالإمكان إظهار هذا السر. قم بتدويره للحصول على سر جديد.",
+    "loading": "جارٍ تحميل سر التوقيع…",
+    "loadError": "تعذّر تحميل سر التوقيع.",
+    "storedLabel": "التأكيد",
+    "storedHint": "يُعرض المفتاح السري مرة واحدة فقط. أكّد أنك حفظته قبل إغلاق هذه النافذة."
+  },
+  "deliveries": {
+    "title": "عمليات إرسال خطافات الويب",
+    "pagination": "ترقيم صفحات عمليات الإرسال",
+    "empty": "لا توجد عمليات إرسال بعد.",
+    "emptyFiltered": "لا توجد عمليات إرسال تطابق عوامل التصفية المحددة.",
+    "steps": {
+      "label": "تصفية عمليات الإرسال حسب الحالة",
+      "hint": "صفِّ عمليات الإرسال حسب الحالة",
+      "all": "الكل",
+      "PENDING": "قيد الانتظار",
+      "RETRY_PENDING": "بانتظار إعادة المحاولة",
+      "DELIVERED": "تم التسليم",
+      "FAILED": "فشل",
+      "EXHAUSTED": "توقفت المحاولات",
+      "DISABLED": "معطّل"
+    },
+    "filters": {
+      "subscription": "الاشتراك",
+      "allSubscriptions": "كل الاشتراكات",
+      "event": "الحدث",
+      "allEvents": "كل الأحداث",
+      "dateRange": "النطاق الزمني",
+      "dateRangePlaceholder": "كل التواريخ"
+    },
+    "columns": {
+      "status": "الحالة",
+      "event": "الحدث",
+      "subscription": "الاشتراك",
+      "attempts": "المحاولات",
+      "nextOrEnded": "المحاولة التالية / وقت الانتهاء",
+      "size": "الحجم",
+      "created": "تاريخ الإنشاء"
+    }
+  },
+  "delivery": {
+    "title": "عملية إرسال خطاف الويب",
+    "fields": {
+      "event": "الحدث",
+      "subscription": "الاشتراك",
+      "endpoint": "رابط الاستقبال",
+      "sourceEventId": "معرّف الحدث المصدري",
+      "payloadHash": "تجزئة الحمولة",
+      "size": "الحجم",
+      "created": "تاريخ الإنشاء"
+    },
+    "attemptsTitle": "المحاولات",
+    "noAttempts": "لم تُسجّل أي محاولات إرسال بعد.",
+    "attemptNumber": "#{{number}}",
+    "httpStatus": "HTTP {{status}}",
+    "durationMs": "{{ms}} مللي ثانية",
+    "retryAction": "إعادة المحاولة",
+    "retryModal": {
+      "title": "إعادة محاولة الإرسال",
+      "confirm": "إعادة المحاولة",
+      "emptyReasonsHint": "أضف أسبابًا في إعدادات التجارة."
+    }
+  },
+  "retryClass": {
+    "TIMEOUT": "انتهاء المهلة",
+    "RATE_LIMIT": "تجاوز حد الطلبات",
+    "SERVER_ERROR": "خطأ في الخادم",
+    "CLIENT_ERROR": "مرفوض من رابط الاستقبال",
+    "DESTINATION_FORBIDDEN": "الوجهة غير مسموحة",
+    "REDIRECT_FORBIDDEN": "إعادة التوجيه غير مسموحة",
+    "SECRET_UNAVAILABLE": "السر غير متاح",
+    "NETWORK_ERROR": "خطأ في الشبكة",
+    "RESPONSE_TOO_LARGE": "الاستجابة أكبر من المسموح",
+    "INTEGRITY_ERROR": "فشل التحقق من السلامة"
+  },
+  "toast": {
+    "created": "تم إنشاء الاشتراك",
+    "savedVersion": "تم الحفظ كإصدار {{version}}",
+    "disabled": "تم تعطيل الاشتراك",
+    "enabled": "تم تفعيل الاشتراك",
+    "testSent": "تم إرسال التجربة",
+    "secretRotated": "بدأ تدوير سر التوقيع",
+    "secretRevoked": "تم إبطال سر التوقيع",
+    "copied": "تم النسخ",
+    "retryScheduled": "تمت جدولة إعادة المحاولة عند {{time}}"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما، فحاول مرة أخرى.",
+    "ENDPOINT_FORBIDDEN": "رابط الاستقبال هذا غير مسموح به.",
+    "PAYLOAD_INVALID": "تحقق من الأحداث والحقول المحددة ثم حاول مجددًا.",
+    "SUBSCRIPTION_CODE_CONFLICT": "رمز الاشتراك هذا مستخدم بالفعل.",
+    "SECRET_VERSION_INVALID": "انتظر حتى يصبح السر جاهزًا ثم حاول مجددًا.",
+    "DELIVERY_NOT_RETRYABLE": "لم يعد بالإمكان إعادة محاولة هذا الإرسال.",
+    "TRADE.WEBHOOK.ENDPOINT_FORBIDDEN": "رابط الاستقبال هذا غير مسموح به.",
+    "TRADE.WEBHOOK.PAYLOAD_INVALID": "تحقق من الأحداث والحقول المحددة ثم حاول مجددًا.",
+    "TRADE.WEBHOOK.SUBSCRIPTION_CODE_CONFLICT": "رمز الاشتراك هذا مستخدم بالفعل.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID": "انتظر حتى يصبح السر جاهزًا ثم حاول مجددًا.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE": "لم يعد بالإمكان إعادة محاولة هذا الإرسال.",
+    "TRADE.CONCURRENCY.STALE_VERSION": "حدّث مستخدم آخر هذا الاشتراك، فأعد التحميل قبل الحفظ مجددًا.",
+    "TRADE.WEBHOOK.SUBSCRIPTION_NOT_FOUND": "لم يعد اشتراك خطاف الويب هذا موجودًا.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_FOUND": "لم يعد إرسال خطاف الويب هذا موجودًا.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.operation_pending": "ما زالت عملية على السر قيد التنفيذ، فانتظر حتى تنتهي ثم حاول مجددًا.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.not_active": "يتطلب هذا اشتراكًا مفعّلًا وسر توقيع نشطًا.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.not_current_reference": "تغيّر سر التوقيع، فأعد تحميل الاشتراك ثم حاول مجددًا.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.already_revealed": "سبق عرض السر، فدوّره للحصول على سر جديد.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.reveal_expired": "انتهت مهلة الدقائق الخمس عشرة لعرض السر، فدوّره للحصول على سر جديد.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.not_exhausted": "لا تُعاد محاولة إلا الإرسالات التي توقفت محاولاتها.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.subscription_not_active": "فعّل الاشتراك قبل إعادة محاولة إرسالاته.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.payload_purged": "حُذف محتوى هذا الإرسال، فلا يمكن إرساله مرة أخرى.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.not_retryable_class": "فشلت المحاولة الأخيرة لسبب لا تعالجه إعادة المحاولة.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.secret_unavailable": "لم يعد سر التوقيع المستخدم في هذا الإرسال متاحًا."
+  }
+}

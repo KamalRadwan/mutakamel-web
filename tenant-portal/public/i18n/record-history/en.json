@@ -1,0 +1,219 @@
+{
+  "filter": {
+    "label": "Show changes for",
+    "hint": "Limit the history to one kind of change",
+    "all": "All",
+    "details": "Details",
+    "contact": "Contacts",
+    "activity": "Activities"
+  },
+  "list": "Change history",
+  "system": "System",
+  "day": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
+  "s": {
+    "created": {
+      "ok": "{{actor}} created the record",
+      "failed": "{{actor}} tried to create the record"
+    },
+    "updated": {
+      "ok": "{{actor}} updated the record",
+      "failed": "{{actor}} tried to update the record"
+    },
+    "deleted": {
+      "ok": "{{actor}} deleted the record",
+      "failed": "{{actor}} tried to delete the record"
+    },
+    "leadCreated": {
+      "ok": "{{actor}} created the lead",
+      "failed": "{{actor}} tried to create the lead"
+    },
+    "leadStage": {
+      "ok": "{{actor}} moved the lead to another stage",
+      "failed": "{{actor}} tried to move the lead to another stage"
+    },
+    "leadConverted": {
+      "ok": "{{actor}} converted the lead",
+      "failed": "{{actor}} tried to convert the lead"
+    },
+    "leadDeleted": {
+      "ok": "{{actor}} deleted the lead",
+      "failed": "{{actor}} tried to delete the lead"
+    },
+    "leadUpdated": {
+      "ok": "{{actor}} updated the lead",
+      "failed": "{{actor}} tried to update the lead"
+    },
+    "customerCreated": {
+      "ok": "{{actor}} created the customer",
+      "failed": "{{actor}} tried to create the customer"
+    },
+    "customerStatus": {
+      "ok": "{{actor}} changed the customer status",
+      "failed": "{{actor}} tried to change the customer status"
+    },
+    "customerUpdated": {
+      "ok": "{{actor}} updated the customer",
+      "failed": "{{actor}} tried to update the customer"
+    },
+    "customerDeleted": {
+      "ok": "{{actor}} deleted the customer",
+      "failed": "{{actor}} tried to delete the customer"
+    },
+    "opportunityCreated": {
+      "ok": "{{actor}} created the opportunity",
+      "failed": "{{actor}} tried to create the opportunity"
+    },
+    "opportunityStage": {
+      "ok": "{{actor}} moved the opportunity to another stage",
+      "failed": "{{actor}} tried to move the opportunity to another stage"
+    },
+    "opportunityWon": {
+      "ok": "{{actor}} marked the opportunity as won",
+      "failed": "{{actor}} tried to mark the opportunity as won"
+    },
+    "opportunityLost": {
+      "ok": "{{actor}} marked the opportunity as lost",
+      "failed": "{{actor}} tried to mark the opportunity as lost"
+    },
+    "opportunityUpdated": {
+      "ok": "{{actor}} updated the opportunity",
+      "failed": "{{actor}} tried to update the opportunity"
+    },
+    "opportunityDeleted": {
+      "ok": "{{actor}} deleted the opportunity",
+      "failed": "{{actor}} tried to delete the opportunity"
+    },
+    "contactAdded": {
+      "ok": "{{actor}} added the contact {{name}}",
+      "failed": "{{actor}} tried to add the contact {{name}}"
+    },
+    "contactRemoved": {
+      "ok": "{{actor}} removed the contact {{name}}",
+      "failed": "{{actor}} tried to remove the contact {{name}}"
+    },
+    "contactUpdated": {
+      "ok": "{{actor}} updated the contact {{name}}",
+      "failed": "{{actor}} tried to update the contact {{name}}"
+    },
+    "noteAdded": {
+      "ok": "{{actor}} added a note",
+      "failed": "{{actor}} tried to add a note"
+    },
+    "noteEdited": {
+      "ok": "{{actor}} edited a note",
+      "failed": "{{actor}} tried to edit a note"
+    },
+    "noteDeleted": {
+      "ok": "{{actor}} deleted a note",
+      "failed": "{{actor}} tried to delete a note"
+    },
+    "fileAdded": {
+      "ok": "{{actor}} uploaded {{name}}",
+      "failed": "{{actor}} tried to upload {{name}}"
+    },
+    "fileDeleted": {
+      "ok": "{{actor}} deleted the file {{name}}",
+      "failed": "{{actor}} tried to delete the file {{name}}"
+    },
+    "activityPlanned": {
+      "ok": "{{actor}} planned the activity {{name}}",
+      "failed": "{{actor}} tried to plan the activity {{name}}"
+    },
+    "activityCompleted": {
+      "ok": "{{actor}} completed the activity {{name}}",
+      "failed": "{{actor}} tried to complete the activity {{name}}"
+    },
+    "activityCancelled": {
+      "ok": "{{actor}} cancelled the activity {{name}}",
+      "failed": "{{actor}} tried to cancel the activity {{name}}"
+    },
+    "activityUpdated": {
+      "ok": "{{actor}} updated the activity {{name}}",
+      "failed": "{{actor}} tried to update the activity {{name}}"
+    },
+    "quotation": {
+      "ok": "{{actor}} updated the quotation {{name}}",
+      "failed": "{{actor}} tried to update the quotation {{name}}"
+    },
+    "salesOrder": {
+      "ok": "{{actor}} updated the sales order {{name}}",
+      "failed": "{{actor}} tried to update the sales order {{name}}"
+    },
+    "invoice": {
+      "ok": "{{actor}} updated the invoice {{name}}",
+      "failed": "{{actor}} tried to update the invoice {{name}}"
+    },
+    "other": {
+      "ok": "{{actor}} made a change",
+      "failed": "{{actor}} tried to make a change"
+    }
+  },
+  "failed": "Failed: {{reason}}",
+  "showAll": "Show all {{n}} changes",
+  "showLess": "Show fewer",
+  "older": "Show older",
+  "none": "—",
+  "ratingOf": "{{n}} of 3",
+  "yes": "Yes",
+  "no": "No",
+  "from": "From",
+  "to": "To",
+  "status": {
+    "OPEN": "Open",
+    "ON_HOLD": "On hold",
+    "DISQUALIFIED": "Disqualified",
+    "CONVERTED": "Converted",
+    "PROSPECT": "Prospect",
+    "ACTIVE_CUSTOMER": "Active customer",
+    "INACTIVE": "Inactive",
+    "BLACKLISTED": "Blacklisted"
+  },
+  "field": {
+    "stageId": "Stage",
+    "ownerUserId": "Owner",
+    "status": "Status",
+    "rating": "Rating",
+    "cardColor": "Card colour",
+    "profileType": "Type",
+    "sourceLeadId": "Source lead",
+    "expectedValue": "Expected value",
+    "currencyCode": "Currency",
+    "acquisitionSourceId": "Source",
+    "tagIds": "Tags",
+    "description": "Notes",
+    "interestSummary": "Interest summary",
+    "expectedNeed": "Expected need",
+    "displayName": "Name",
+    "companyName": "Company name",
+    "companyEmail": "Company email",
+    "companyWebsite": "Company website",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "honorificTitle": "Title",
+    "jobTitle": "Job title",
+    "phone": "Phone",
+    "email": "Email",
+    "website": "Website",
+    "legalName": "Legal name",
+    "taxNumber": "Tax number",
+    "commercialRegistrationNumber": "Commercial registration no.",
+    "address": "Address",
+    "isPrimary": "Primary contact",
+    "branchId": "Branch",
+    "subject": "Subject",
+    "dueAt": "Due",
+    "type": "Activity type",
+    "priority": "Priority",
+    "direction": "Direction"
+  },
+  "empty": "No changes recorded yet.",
+  "denied": {
+    "title": "History is not available",
+    "text": "Your role cannot view the change history. Ask an administrator for audit access."
+  },
+  "loadFailed": "Could not load the history.",
+  "retry": "Try again"
+}

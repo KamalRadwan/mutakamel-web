@@ -1,0 +1,78 @@
+{
+  "settings": {
+    "title": "Email settings"
+  },
+  "subject": {
+    "label": "Subject",
+    "hint": "The subject line. Fields are filled from the record when the email is sent.",
+    "required": "Enter a subject"
+  },
+  "preheader": {
+    "label": "Preheader",
+    "hint": "The short preview text shown after the subject in most inboxes."
+  },
+  "width": {
+    "label": "Email width",
+    "hint": "The widest the email body can be. Phones show it narrower.",
+    "range": "Enter a width from 320 to 800 px.",
+    "unit": "px"
+  },
+  "background": {
+    "label": "Background colour",
+    "hint": "The colour around the email body.",
+    "invalid": "Use a colour like #F5F7FA"
+  },
+  "plainText": "A plain-text version is created automatically.",
+  "chars": "{{n}} / {{max}}",
+  "charsHint": "Fields are not counted.",
+  "charsMax": "Use at most {{max}} characters.",
+  "segmentsMax": "At most {{max}} parts are allowed.",
+  "addField": "+ Field",
+  "removeField": "Remove field {{name}}",
+  "segmentPart": "{{label}}, part {{n}}",
+  "link": {
+    "title": "Link"
+  },
+  "button": {
+    "title": "Button"
+  },
+  "label": {
+    "label": "Label",
+    "hint": "The text people click.",
+    "required": "Enter the label"
+  },
+  "target": {
+    "label": "Link to",
+    "hint": "A fixed web address, or a web address from the record.",
+    "web": "Web address",
+    "field": "Field"
+  },
+  "href": {
+    "label": "Web address",
+    "hint": "Must start with https://.",
+    "invalid": "Enter a secure web address that starts with https://"
+  },
+  "fieldUrl": {
+    "label": "Field",
+    "hint": "A web address field from the record.",
+    "choose": "Choose a field",
+    "required": "Choose a web address field"
+  },
+  "open": {
+    "label": "Open in",
+    "hint": "Where the link opens.",
+    "SAME_WINDOW": "Same window",
+    "NEW_WINDOW": "New window"
+  },
+  "fullWidth": {
+    "label": "Full width on phones",
+    "hint": "The button fills the screen width on small screens."
+  },
+  "apply": "Apply",
+  "insert": "Insert",
+  "cancel": "Cancel",
+  "close": "Close",
+  "toast": {
+    "addSubject": "Add a subject before you validate this email."
+  }
+}

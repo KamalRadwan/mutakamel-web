@@ -1,0 +1,30 @@
+<dialog
+  #dialog
+  class="z-modal m-auto w-modal-confirm rounded-14 border border-border bg-surface p-0 text-text shadow-modal backdrop:bg-overlay"
+  [attr.aria-labelledby]="titleId"
+  [attr.aria-describedby]="textId"
+  (cancel)="onEscape($event)"
+  (keydown.escape)="onEscape($event)"
+  (close)="onNativeClose()"
+>
+  <header class="flex items-center gap-8 border-b border-border px-10 py-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="15" aria-hidden="true" />
+    </span>
+    <h2 [id]="titleId" class="text-15 leading-22 font-medium text-text">{{ title() }}</h2>
+  </header>
+
+  <p [id]="textId" class="p-10 text-12 leading-18 text-text-muted">{{ text() }}</p>
+
+  <footer class="flex items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+    <button type="button" uiButton variant="primary" (click)="close('save')">
+      {{ saveLabel() }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="close('discard')">
+      {{ discardLabel() }}
+    </button>
+    <button #cancelBtn type="button" uiButton variant="ghost" autofocus (click)="close('cancel')">
+      {{ cancelLabel() }}
+    </button>
+  </footer>
+</dialog>

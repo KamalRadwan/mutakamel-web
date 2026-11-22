@@ -1,0 +1,250 @@
+<ui-modal
+  size="form"
+  icon="tablerCurrencyDollar"
+  tile="bg-icon-teal"
+  [title]="modalTitleKey() | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="flex flex-col gap-10" novalidate (submit)="save($event)">
+    @if (mode() === 'reactivate') {
+      <app-settings-notice tone="info">
+        {{ 'wsCurrencies.modal.reactivateNote' | transloco }}
+      </app-settings-notice>
+    }
+
+    @if (topWarningError(); as warningMsg) {
+      <app-settings-notice tone="warning">
+        {{ warningMsg }}
+      </app-settings-notice>
+    }
+
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-code'"
+          [label]="'wsCurrencies.fields.code' | transloco"
+          [hint]="'wsCurrencies.fields.codeHint' | transloco"
+          [required]="isCreate() && !isReadOnly()"
+          [error]="codeError()"
+        >
+          <input
+            #codeInput
+            [id]="uid + '-code'"
+            type="text"
+            dir="ltr"
+            [maxLength]="limits.code"
+            autocomplete="off"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="isCreate() && !isReadOnly() ? ('wsCurrencies.fields.codePlaceholder' | transloco) : ''"
+            [value]="codeDraft()"
+            [readOnly]="!isCreate() || isReadOnly()"
+            [disabled]="saving()"
+            [attr.aria-readonly]="!isCreate() || isReadOnly() ? 'true' : null"
+            [attr.aria-invalid]="codeError() ? 'true' : null"
+            (input)="onCodeInput($event)"
+            (blur)="markTouched('code')"
+          />
+          @if (!isCreate()) {
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          }
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-decimals'"
+          [label]="'wsCurrencies.fields.decimals' | transloco"
+          [hint]="'wsCurrencies.fields.decimalsHint' | transloco"
+        >
+          <input
+            [id]="uid + '-decimals'"
+            type="text"
+            dir="ltr"
+            readonly
+            aria-readonly="true"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="decimalsDisplay()"
+          />
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          [for]="uid + '-name'"
+          [label]="'wsCurrencies.fields.name' | transloco"
+          [hint]="'wsCurrencies.fields.nameHint' | transloco"
+          [required]="!isReadOnly()"
+          [count]="!isReadOnly() ? nameDraft().length : null"
+          [max]="!isReadOnly() ? limits.name : null"
+          [error]="nameError()"
+        >
+          <input
+            #nameInput
+            [id]="uid + '-name'"
+            type="text"
+            dir="auto"
+            [maxLength]="limits.name"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="nameDraft()"
+            [readOnly]="isReadOnly()"
+            [disabled]="saving()"
+            [attr.aria-readonly]="isReadOnly() ? 'true' : null"
+            [attr.aria-invalid]="nameError() ? 'true' : null"
+            (input)="onNameInput($event)"
+            (blur)="markTouched('name')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-symbol'"
+          [label]="'wsCurrencies.fields.symbol' | transloco"
+          [hint]="'wsCurrencies.fields.symbolHint' | transloco"
+          [count]="!isReadOnly() ? symbolDraft().length : null"
+          [max]="!isReadOnly() ? limits.symbol : null"
+          [error]="symbolError()"
+        >
+          <input
+            [id]="uid + '-symbol'"
+            type="text"
+            dir="ltr"
+            [maxLength]="limits.symbol"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="symbolDraft()"
+            [readOnly]="isReadOnly()"
+            [disabled]="saving()"
+            [attr.aria-readonly]="isReadOnly() ? 'true' : null"
+            [attr.aria-invalid]="symbolError() ? 'true' : null"
+            (input)="onSymbolInput($event)"
+            (blur)="markTouched('symbol')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-rate'"
+          [label]="'wsCurrencies.fields.rate' | transloco"
+          [hint]="(isEditingDefault() ? 'wsCurrencies.fields.rateLocked' : 'wsCurrencies.fields.rateHint') | transloco"
+          [required]="!isReadOnly() && !isRateLocked()"
+          [error]="rateError()"
+        >
+          <input
+            #rateInput
+            [id]="uid + '-rate'"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            autocomplete="off"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-muted"
+            [value]="rateDisplayValue()"
+            [readOnly]="isReadOnly() || isEditingDefault()"
+            [disabled]="saving() || isRateDisabledOnCreate()"
+            [attr.aria-readonly]="isReadOnly() || isEditingDefault() ? 'true' : null"
+            [attr.aria-invalid]="rateError() ? 'true' : null"
+            (input)="onRateInput($event)"
+            (blur)="markTouched('rate')"
+          />
+          @if (isEditingDefault()) {
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          }
+        </ui-field>
+
+        @if (rateEquation(); as eq) {
+          <p dir="ltr" class="mt-2 text-11 leading-16 tabular-nums text-text-muted">
+            1 {{ eq.baseCode }} = {{ eq.rate }} {{ eq.targetCode }}
+          </p>
+        }
+      </div>
+
+      @if (isCreate()) {
+        <div class="col-span-2">
+          <ui-field
+            size="bare"
+            [for]="uid + '-make-default'"
+            [label]="'wsCurrencies.fields.makeDefault' | transloco"
+            [hint]="(hasCurrencies() ? 'wsCurrencies.fields.makeDefaultHint' : 'wsCurrencies.fields.firstCurrency') | transloco"
+          >
+            <div class="flex min-h-field items-center gap-8">
+              <ui-switch
+                [id]="uid + '-make-default'"
+                [describedBy]="uid + '-make-default-hint'"
+                [label]="'wsCurrencies.fields.makeDefault' | transloco"
+                [checked]="isMakeDefaultChecked()"
+                [disabled]="isReadOnly() || !hasCurrencies() || saving()"
+                (checkedChange)="onMakeDefaultChange($event)"
+              />
+              @if (!hasCurrencies()) {
+                <span class="text-11 leading-16 text-text-muted">
+                  {{ 'wsCurrencies.fields.firstCurrency' | transloco }}
+                </span>
+              }
+            </div>
+          </ui-field>
+        </div>
+
+        @if (hasCurrencies() && makeDefaultDraft()) {
+          <div class="col-span-2">
+            <app-settings-notice tone="warning">
+              {{ 'wsCurrencies.fields.rebaseWarning' | transloco }}
+            </app-settings-notice>
+          </div>
+        }
+      }
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || !dirty() || !isValid()"
+      >
+        {{ (mode() === 'reactivate' ? 'wsCurrencies.modal.reactivate' : 'settings.common.save') | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  [title]="'wsCurrencies.unsaved.title' | transloco"
+  [text]="'wsCurrencies.unsaved.text' | transloco"
+  [saveLabel]="'wsCurrencies.unsaved.save' | transloco"
+  [discardLabel]="'wsCurrencies.unsaved.discard' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

@@ -1,0 +1,271 @@
+import { Injectable } from '@angular/core';
+import { type ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
+import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
+import { map, timer } from 'rxjs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { Notify } from '../../../../../core/notify/notify';
+import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
+import { fakeGetSeatUsage, setFakeMigrationShort, setFakeSeatMode } from '../../../seats/seats.fake';
+import { SeatUsage } from '../../../seats/seats.model';
+import { StaffSession } from '../../../staff/shared/staff-session';
+import { setFakeOverCapacity } from '../../../staff/shared/staff.fake';
+import { SeatMigrationPage } from './seat-migration-page';
+
+/*
+ * Runs on the real seats fake (vi.mock of relative modules is not supported by the Angular unit-test
+ * builder): MANUAL mode plus setFakeMigrationShort(true) makes POST /seats/switch-to-derived answer
+ * 409 SEAT_MIGRATION_NOT_READY with the parallel string-array details {moduleKey, needed, free, capacity,
+ * userModuleKey, userIds, userNames, used, usedAfter, shortfall}.
+ */
+
+@Injectable()
+class EmptyLoader implements TranslocoLoader {
+  /** Async like the HTTP loader: a synchronous loader emits during a render and throws NG0600. */
+  getTranslation() {
+    return timer(0).pipe(map(() => ({})));
+  }
+}
+
+// Protected members are reached through this view on purpose: the spec reads the page state directly.
+type Internals = Record<string, any>;
+
+interface RowView {
+  module: string;
+  holders: string;
+  seats: string;
+  short: string;
+}
+
+let fixture: ComponentFixture<SeatMigrationPage>;
+let c: Internals;
+let cascadeConfirm: ReturnType<typeof vi.fn>;
+
+async function flush(ms = 2000): Promise<void> {
+  fixture.detectChanges();
+  await vi.advanceTimersByTimeAsync(ms);
+  fixture.detectChanges();
+}
+
+async function usageNow(): Promise<SeatUsage> {
+  const pending = fakeGetSeatUsage();
+  await vi.advanceTimersByTimeAsync(400);
+  return pending;
+}
+
+function root(): HTMLElement {
+  return fixture.nativeElement as HTMLElement;
+}
+
+function bodyRows(): RowView[] {
+  const table = root().querySelector('[role="table"]')!;
+  return Array.from(table.querySelectorAll('[role="row"]:not([aria-hidden="true"])'))
+    .slice(1)
+    .map((row) => {
+      const cells = Array.from(row.querySelectorAll('[role="cell"]')).map((cell) => cell.textContent?.trim() ?? '');
+      return { module: cells[0], holders: cells[1], seats: cells[2], short: cells[3] };
+    });
+}
+
+function button(label: string): HTMLButtonElement | undefined {
+  return Array.from(root().querySelectorAll<HTMLButtonElement>('button')).find(
+    (b) => b.textContent?.trim() === label,
+  );
+}
+
+function toasts(type: string): string[] {
+  return TestBed.inject(Notify)
+    .toasts()
+    .filter((t) => t.type === type)
+    .map((t) => t.title);
+}
+
+async function render(owner = true): Promise<void> {
+  TestBed.inject(StaffSession).setActor(owner ? 'owner' : 'tenantAdmin');
+  fixture = TestBed.createComponent(SeatMigrationPage);
+  c = fixture.componentInstance as unknown as Internals;
+  await flush();
+}
+
+async function clickSwitch(): Promise<void> {
+  button('sb.mig.go')!.click();
+  await flush();
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  setFakeSeatMode('MANUAL');
+  setFakeMigrationShort(true);
+  cascadeConfirm = vi.fn(async () => true);
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      provideTransloco({
+        config: { availableLangs: ['en', 'ar'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
+        loader: EmptyLoader,
+      }),
+      { provide: SeatCascadeConfirm, useValue: { confirm: cascadeConfirm } },
+    ],
+  });
+});
+
+afterEach(() => {
+  fixture?.destroy();
+  TestBed.inject(StaffSession).setActor('owner');
+  TestBed.resetTestingModule();
+  setFakeSeatMode('DERIVED');
+  setFakeMigrationShort(false);
+  setFakeOverCapacity(false);
+  vi.useRealTimers();
+});
+
+describe('SeatMigrationPage', () => {
+  it('lists every module from the usage read: holders = used, seats = capacity, short = used - capacity', async () => {
+    await render();
+    const usage = await usageNow();
+
+    expect(bodyRows()).toEqual(
+      usage.modules.map((mod) => ({
+        module: mod.nameI18n.en,
+        holders: String(mod.used),
+        seats: String(mod.capacity),
+        short: String(Math.max(0, mod.used - mod.capacity)),
+      })),
+    );
+    expect(c['hasShortfall']()).toBe(false);
+    expect(root().textContent).not.toContain('sb.mig.short');
+  });
+
+  it('builds the shortfall rows from the parallel string-array details {moduleKey, needed, free}', async () => {
+    // Over capacity drops CRM to 3 seats in the fake, so CRM is really short.
+    setFakeOverCapacity(true);
+    await render();
+    const usage = await usageNow();
+    const short = usage.modules
+      .map((mod) => ({ mod, needed: Math.max(0, mod.used - mod.capacity), free: Math.max(0, mod.capacity - mod.used) }))
+      .filter((m) => m.needed > 0);
+    // The fake falls back to the first module when nothing is short; the spec relies on a real shortfall.
+    expect(short.length).toBeGreaterThan(0);
+
+    await clickSwitch();
+
+    expect(c['hasShortfall']()).toBe(true);
+    expect(root().textContent).toContain('sb.mig.short');
+    expect(bodyRows()).toEqual(
+      short.map(({ mod, needed, free }) => ({
+        module: mod.nameI18n.en,
+        holders: String(mod.capacity + (needed - free)),
+        seats: String(mod.capacity),
+        short: String(needed - free),
+      })),
+    );
+    // Untranslated in the spec, seatErrorMessage falls back to the code itself.
+    expect(toasts('error')).toEqual(['SEAT_MIGRATION_NOT_READY']);
+    expect(c['usage']().mode).toBe('MANUAL');
+  });
+
+  it('reads the detail arrays by index, ignores empty module keys and treats bad counts as 0', async () => {
+    await render();
+    const usage = await usageNow();
+    const [first, second] = usage.modules;
+    const error = new ApiError(409, 'SEAT_MIGRATION_NOT_READY', {
+      moduleKey: [second.moduleKey, '', first.moduleKey, 'hr'],
+      needed: ['5', '9', 'x'],
+      free: ['2', '0', '0', '1'],
+    });
+
+    const rows = c['rowsFromDetails'](error);
+
+    expect(rows).toEqual([
+      { moduleKey: second.moduleKey, nameI18n: second.nameI18n, holders: second.capacity + 3, seats: second.capacity, shortBy: 3 },
+      { moduleKey: first.moduleKey, nameI18n: first.nameI18n, holders: first.capacity, seats: first.capacity, shortBy: 0 },
+      // A module the usage read does not know: no name, no seats.
+      { moduleKey: 'hr', nameI18n: null, holders: 0, seats: 0, shortBy: 0 },
+    ]);
+  });
+
+  it('prefers the migration capacity, usedAfter and shortfall arrays over the usage read', async () => {
+    await render();
+    const usage = await usageNow();
+    const [first] = usage.modules;
+    const error = new ApiError(409, 'SEAT_MIGRATION_NOT_READY', {
+      moduleKey: [first.moduleKey],
+      needed: ['3'],
+      free: ['1'],
+      capacity: ['5'],
+      userModuleKey: [],
+      userIds: [],
+      userNames: [],
+      used: ['4'],
+      usedAfter: ['7'],
+      shortfall: ['2'],
+    });
+
+    expect(c['rowsFromDetails'](error)).toEqual([
+      { moduleKey: first.moduleKey, nameI18n: first.nameI18n, holders: 7, seats: 5, shortBy: 2 },
+    ]);
+  });
+
+  it('falls back to the usage-read rows when SEAT_MIGRATION_NOT_READY carries no details', async () => {
+    await render();
+    const before = bodyRows();
+
+    // The fake always sends details, so the details-less error is passed through the page's own mapper.
+    const rows = c['rowsFromDetails'](new ApiError(409, 'SEAT_MIGRATION_NOT_READY'));
+    expect(rows).toEqual([]);
+    c['migrationNotReady'].set(true);
+    c['shortfallRows'].set(rows);
+    await flush(0);
+
+    expect(c['hasShortfall']()).toBe(true);
+    expect(root().textContent).toContain('sb.mig.short');
+    expect(bodyRows()).toEqual(before);
+  });
+
+  it('switches to role-based seats when nothing is short, then goes to the subscription page', async () => {
+    setFakeMigrationShort(false);
+    await render();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    await clickSwitch();
+
+    expect(toasts('success')).toEqual(['sb.mig.done']);
+    expect(navigate).toHaveBeenCalledWith(['/workspace/billing/subscription']);
+    expect(c['usage']().mode).toBe('DERIVED');
+    expect(c['hasShortfall']()).toBe(false);
+  });
+
+  it('retry clears an earlier shortfall and shows the usage read again', async () => {
+    await render();
+    const before = bodyRows();
+    await clickSwitch();
+    expect(c['hasShortfall']()).toBe(true);
+
+    const reloading = c['load']() as Promise<void>;
+    await flush();
+    await reloading;
+    fixture.detectChanges();
+
+    expect(c['hasShortfall']()).toBe(false);
+    expect(bodyRows()).toEqual(before);
+  });
+
+  it('hides the switch button and the actions column from a non-owner', async () => {
+    await render(false);
+
+    expect(button('sb.mig.go')).toBeUndefined();
+    expect(root().textContent).not.toContain('sb.mig.cols.actions');
+    expect(bodyRows().length).toBeGreaterThan(0);
+  });
+
+  it('links each owner row to the change page with the add-seats query of its subscription item', async () => {
+    await render();
+
+    const links = Array.from(root().querySelectorAll<HTMLAnchorElement>('a[href*="/workspace/billing/subscription/change"]'));
+    expect(links.map((a) => decodeURIComponent(a.getAttribute('href') ?? ''))).toEqual([
+      '/workspace/billing/subscription/change?add=seats:base-crm',
+      '/workspace/billing/subscription/change?add=seats:base-trade',
+    ]);
+  });
+});

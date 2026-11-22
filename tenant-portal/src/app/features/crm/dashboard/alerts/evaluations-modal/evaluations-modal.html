@@ -1,0 +1,109 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerHistory"
+  tile="bg-icon-navy"
+  [title]="'alerts.evaluations.title' | transloco"
+  [subtitle]="rule()?.name ?? ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <div class="grid grid-cols-3 gap-x-10">
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'alerts.evaluations.period' | transloco"
+          [for]="uid + '-period'"
+          [hint]="'alerts.evaluations.periodHint' | transloco"
+          [error]="rangeError()"
+        >
+          <ui-date-range
+            [id]="uid + '-period'"
+            [describedBy]="periodDescribedBy()"
+            [ariaLabel]="'alerts.evaluations.period' | transloco"
+            [months]="1"
+            [withTime]="false"
+            [today]="fakeNow"
+            [invalid]="!!rangeError()"
+            [value]="dateRange()"
+            (valueChange)="onRangeChange($event)"
+          />
+        </ui-field>
+      </div>
+    </div>
+
+    @if (loadError()) {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'analytics.common.loadFailed' | transloco"
+        [actionLabel]="'analytics.common.retry' | transloco"
+        (action)="retry()"
+      />
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <ui-data-table
+          class="min-w-doc-table-min"
+          [columns]="columns()"
+          [rows]="rows()"
+          [rowKey]="rowKey"
+          [loading]="loading()"
+          [emptyText]="'alerts.evaluations.empty' | transloco"
+          [label]="'alerts.evaluations.tableLabel' | transloco"
+        >
+          <ng-template uiCell="scheduledFor" let-row>
+            <bdi dir="ltr" class="truncate text-12 tabular-nums text-text-muted">
+              {{ formatTimestamp(row.scheduledFor) }}
+            </bdi>
+          </ng-template>
+
+          <ng-template uiCell="evaluatedAt" let-row>
+            <bdi dir="ltr" class="truncate text-12 tabular-nums text-text-muted">
+              {{ formatTimestamp(row.evaluatedAt) }}
+            </bdi>
+          </ng-template>
+
+          <ng-template uiCell="outcome" let-row>
+            <ui-badge [tone]="outcomeTone(row.outcome)">
+              {{ 'alerts.outcomes.' + row.outcome | transloco }}
+            </ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="observedValue" let-row>
+            {{ formatObserved(row) }}
+          </ng-template>
+
+          <ng-template uiCell="cohort" let-row>
+            {{ formatCohort(row) }}
+          </ng-template>
+
+          <ng-template uiCell="reason" let-row>
+            @let reasonText = formatReason(row);
+            <span class="truncate text-12 text-text-muted" [title]="reasonText">{{ reasonText }}</span>
+          </ng-template>
+        </ui-data-table>
+      </div>
+
+      @if (hasMore()) {
+        <div class="flex justify-center">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [loading]="loadingMore()"
+            (click)="loadMore()"
+          >
+            {{ 'alerts.loadMore' | transloco }}
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'analytics.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

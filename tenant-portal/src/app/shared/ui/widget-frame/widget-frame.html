@@ -1,0 +1,78 @@
+<section
+  class="flex size-full min-h-0 min-w-0 flex-col gap-6 rounded-10 border border-border bg-surface p-8"
+  [class]="frameStateClasses()"
+  [attr.aria-labelledby]="titleId"
+  [attr.aria-describedby]="hasHint() ? hintId : null"
+>
+  <header #headerRow class="flex h-btn-h-sm min-w-0 shrink-0 items-center gap-6">
+    @if (editing()) {
+      <button
+        type="button"
+        class="gs-drag-handle inline-flex size-btn-h-sm shrink-0 cursor-grab items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:cursor-grabbing focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="gripLabel() || null"
+        [title]="gripLabel()"
+      >
+        <ng-icon name="tablerGripVertical" size="14" aria-hidden="true" />
+      </button>
+    }
+
+    <h3 [id]="titleId" class="min-w-0 truncate text-13 leading-18 font-medium text-text" [title]="title()">
+      {{ title() }}
+    </h3>
+
+    @if (hasHint()) {
+      <span
+        #hintTrigger
+        class="group relative inline-flex shrink-0 items-center text-accent"
+        (mouseenter)="placeTooltip(hintTrigger)"
+        (mouseleave)="hideTooltip()"
+      >
+        <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+        <span
+          #tooltip
+          [id]="hintId"
+          role="tooltip"
+          class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+          [class]="tipPlaced() ? 'invisible group-hover:visible' : 'invisible'"
+          [style.top.px]="tooltipPlace().top"
+          [style.inset-inline-start.px]="tooltipPlace().start"
+        >
+          {{ hint() }}
+        </span>
+      </span>
+    }
+
+    <ng-content select="[frameBadge]" />
+
+    @if (tag(); as tagText) {
+      <ui-badge tone="tag" class="shrink-0">{{ tagText }}</ui-badge>
+    }
+
+    <span class="min-w-0 flex-1" aria-hidden="true"></span>
+
+    @if (menuItems().length) {
+      <ui-actions-menu
+        class="shrink-0"
+        [items]="menuItems()"
+        [label]="menuLabel()"
+        (selected)="onMenuSelected($event)"
+      />
+    }
+
+    @if (editing()) {
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="removeLabel() || null"
+        [title]="removeLabel()"
+        (click)="onRemove($event)"
+      >
+        <ng-icon name="tablerX" size="14" aria-hidden="true" />
+      </button>
+    }
+  </header>
+
+  <div class="relative min-h-0 flex-1">
+    <ng-content />
+  </div>
+</section>

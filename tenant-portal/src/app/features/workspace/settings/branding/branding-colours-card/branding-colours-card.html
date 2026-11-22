@@ -1,0 +1,78 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-12 shadow-card">
+  <div class="flex items-center gap-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerPalette" size="15" aria-hidden="true" />
+    </span>
+    <h2 class="min-w-0 truncate text-13 leading-18 font-medium text-text">
+      {{ 'wsBranding.colours.title' | transloco }}
+    </h2>
+  </div>
+
+  <div class="flex flex-col gap-8">
+    <ui-field
+      size="bare"
+      [for]="uid + '-primary'"
+      [label]="'wsBranding.fields.primary' | transloco"
+      [hint]="'wsBranding.fields.primaryHint' | transloco"
+      [error]="errors().primary"
+    >
+      <div class="flex items-center gap-8">
+        <span
+          aria-hidden="true"
+          [class]="primarySwatchClass()"
+          [style.background-color]="primaryHex()"
+        ></span>
+        <input
+          #primaryInput
+          [id]="uid + '-primary'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="#2563eb"
+          [attr.maxlength]="colourMax"
+          [class]="primaryInputClass()"
+          [value]="primary()"
+          [readonly]="readOnly()"
+          [attr.aria-invalid]="errors().primary ? 'true' : null"
+          [attr.aria-describedby]="uid + '-primary-hint' + (errors().primary ? ' ' + uid + '-primary-error' : '')"
+          (input)="onPrimaryInput($event)"
+          (blur)="fieldBlur.emit('primary')"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-secondary'"
+      [label]="'wsBranding.fields.secondary' | transloco"
+      [hint]="'wsBranding.fields.secondaryHint' | transloco"
+      [error]="errors().secondary"
+    >
+      <div class="flex items-center gap-8">
+        <span
+          aria-hidden="true"
+          [class]="secondarySwatchClass()"
+          [style.background-color]="secondaryHex()"
+        ></span>
+        <input
+          #secondaryInput
+          [id]="uid + '-secondary'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="#0f172a"
+          [attr.maxlength]="colourMax"
+          [class]="secondaryInputClass()"
+          [value]="secondary()"
+          [readonly]="readOnly()"
+          [attr.aria-invalid]="errors().secondary ? 'true' : null"
+          [attr.aria-describedby]="uid + '-secondary-hint' + (errors().secondary ? ' ' + uid + '-secondary-error' : '')"
+          (input)="onSecondaryInput($event)"
+          (blur)="fieldBlur.emit('secondary')"
+        />
+      </div>
+    </ui-field>
+  </div>
+</section>

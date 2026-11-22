@@ -1,0 +1,320 @@
+<ui-modal
+  size="wide"
+  icon="tablerMail"
+  tile="bg-icon-blue"
+  [title]="'outboundEmails.detail.title' | transloco"
+  [subtitle]="subtitle()"
+  [closeLabel]="'settings.common.close' | transloco"
+  (closed)="onClosed()"
+>
+  @if (detail(); as current) {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+      [class]="statusClass(current.status)"
+    >
+      {{ 'outboundEmails.statuses.' + current.status | transloco }}
+    </span>
+  }
+
+  @if (loading() && !detail()) {
+    <div class="flex flex-col gap-10 p-8" aria-busy="true">
+      <div class="h-skeleton-line w-modal-form max-w-full rounded-4 bg-neutral-soft"></div>
+      <div class="h-skeleton-line w-modal-confirm max-w-full rounded-4 bg-neutral-soft"></div>
+      <div class="h-textarea rounded-10 bg-neutral-soft"></div>
+      <span class="sr-only">{{ 'outboundEmails.loadingDetail' | transloco }}</span>
+    </div>
+  } @else if (detail(); as current) {
+    <div
+      role="tablist"
+      class="mb-10 flex h-tab items-stretch border-b border-border text-12 leading-18"
+      [attr.aria-label]="'outboundEmails.detail.title' | transloco"
+      (keydown)="onTabKeydown($event)"
+    >
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-message'"
+        [attr.aria-selected]="activeTab() === 'message'"
+        [attr.aria-controls]="uid + '-panel-message'"
+        [tabIndex]="activeTab() === 'message' ? 0 : -1"
+        class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="activeTab() === 'message' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+        (click)="setTab('message')"
+      >
+        <ng-icon name="tablerMail" size="14" aria-hidden="true" />
+        <span>{{ 'outboundEmails.detail.tabs.message' | transloco }}</span>
+      </button>
+
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-details'"
+        [attr.aria-selected]="activeTab() === 'details'"
+        [attr.aria-controls]="uid + '-panel-details'"
+        [tabIndex]="activeTab() === 'details' ? 0 : -1"
+        class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="activeTab() === 'details' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+        (click)="setTab('details')"
+      >
+        <ng-icon name="tablerInfoCircle" size="14" aria-hidden="true" />
+        <span>{{ 'outboundEmails.detail.tabs.details' | transloco }}</span>
+      </button>
+
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-timeline'"
+        [attr.aria-selected]="activeTab() === 'timeline'"
+        [attr.aria-controls]="uid + '-panel-timeline'"
+        [tabIndex]="activeTab() === 'timeline' ? 0 : -1"
+        class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="activeTab() === 'timeline' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+        (click)="setTab('timeline')"
+      >
+        <ng-icon name="tablerHistory" size="14" aria-hidden="true" />
+        <span>{{ 'outboundEmails.detail.tabs.timeline' | transloco }}</span>
+      </button>
+    </div>
+
+    @switch (activeTab()) {
+      @case ('message') {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-message'"
+          [attr.aria-labelledby]="uid + '-tab-message'"
+          class="flex flex-col gap-10"
+        >
+          @if (current.content.state === 'AVAILABLE') {
+            <div class="flex flex-col gap-4">
+              <h3 dir="auto" class="text-start text-15 leading-22 font-medium text-text">{{ current.content.subject }}</h3>
+              @if (current.content.preheader) {
+                <p dir="auto" class="text-start text-12 leading-18 text-text-muted">{{ current.content.preheader }}</p>
+              }
+            </div>
+
+            <ui-field
+              size="bare"
+              [label]="'outboundEmails.detail.format.label' | transloco"
+              [hint]="'outboundEmails.detail.format.hint' | transloco"
+            >
+              <div>
+                <ui-segmented
+                  [options]="formatOptions()"
+                  [label]="'outboundEmails.detail.format.label' | transloco"
+                  [value]="bodyFormat()"
+                  (valueChange)="setFormat($event)"
+                />
+              </div>
+            </ui-field>
+
+            @if (bodyFormat() === 'html') {
+              <iframe
+                class="h-email-body w-full rounded-10 border border-border bg-surface"
+                sandbox=""
+                [srcdoc]="safeHtml()"
+                [title]="'outboundEmails.detail.htmlPreview' | transloco"
+              ></iframe>
+            } @else {
+              <pre
+                class="m-0 max-h-notif-list-max overflow-y-auto rounded-10 border border-border bg-surface-muted p-10 font-sans text-12 leading-18 whitespace-pre-wrap text-text"
+              >{{ current.content.text || ('outboundEmails.detail.noTextBody' | transloco) }}</pre>
+            }
+          } @else {
+            <app-settings-notice tone="info">
+              {{ 'outboundEmails.detail.redactedNotice' | transloco: { days: current.contentRetentionDays } }}
+            </app-settings-notice>
+          }
+        </div>
+      }
+
+      @case ('details') {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-details'"
+          [attr.aria-labelledby]="uid + '-tab-details'"
+          class="grid grid-cols-2 gap-x-10 gap-y-8"
+        >
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.recipient' | transloco }}</span>
+            <span dir="auto" class="text-start text-12 leading-18 font-medium text-text">{{ current.recipient.displayName }}</span>
+            <span dir="ltr" class="text-start text-12 leading-18 text-text-muted">{{ current.recipient.maskedAddress }}</span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.sender' | transloco }}</span>
+            <span dir="auto" class="text-start text-12 leading-18 font-medium text-text">{{ current.sender.displayName }}</span>
+            <span dir="ltr" class="text-start text-12 leading-18 text-text-muted">{{ current.sender.maskedAddress }}</span>
+            @if (current.sender.maskedReplyTo; as replyTo) {
+              <span class="text-start text-12 leading-18 text-text-muted">
+                {{ 'outboundEmails.detail.fields.replyTo' | transloco }} <span dir="ltr">{{ replyTo }}</span>
+              </span>
+            }
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.record' | transloco }}</span>
+            <div class="flex items-center gap-6 text-12 leading-18 text-text">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="sourceLook[current.sourceType].tile"
+              >
+                <ng-icon [name]="sourceLook[current.sourceType].icon" size="14" aria-hidden="true" />
+              </span>
+              <span class="min-w-0 truncate text-start font-medium" [title]="current.sourceId">{{ recordLabel() }}</span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.template' | transloco }}</span>
+            <span class="text-start text-12 leading-18 text-text">
+              {{ 'outboundEmails.table.version' | transloco: { version: current.template.versionNumber } }}
+              · {{ 'outboundEmails.detail.direction.' + current.template.direction | transloco }}
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.provider' | transloco }}</span>
+            <span class="text-12 leading-18 text-text">{{ providerLabel() }}</span>
+            @if (current.provider?.submissionReference; as reference) {
+              <span class="text-start text-12 leading-18 text-text-muted">
+                {{ 'outboundEmails.detail.fields.providerReference' | transloco }}
+                <span dir="ltr" class="break-all">{{ reference }}</span>
+              </span>
+            }
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.requestedAt' | transloco }}</span>
+            <span class="text-12 leading-18 text-text">{{ formatDateTime(current.requestedAt) }}</span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">
+              {{ (current.failedAt && !current.sentAt ? 'outboundEmails.detail.fields.failedAt' : 'outboundEmails.detail.fields.sentAt') | transloco }}
+            </span>
+            <span class="text-12 leading-18 text-text">
+              {{ current.sentAt ? formatDateTime(current.sentAt) : (current.failedAt ? formatDateTime(current.failedAt) : ('outboundEmails.detail.fields.notAvailable' | transloco)) }}
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.retention' | transloco }}</span>
+            <span class="text-12 leading-18 text-text">
+              {{ 'outboundEmails.detail.fields.retentionUntil' | transloco: { date: formatDateTime(current.contentRetentionUntil), days: current.contentRetentionDays } }}
+            </span>
+          </div>
+
+          @if (current.retryOfId) {
+            <div class="flex flex-col gap-2">
+              <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.retryOf' | transloco }}</span>
+              <button
+                type="button"
+                class="inline-flex cursor-pointer items-center gap-4 self-start rounded-4 text-12 leading-18 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="open(current.retryOfId!)"
+              >
+                <ng-icon name="tablerLink" size="14" aria-hidden="true" />
+                <span>{{ 'outboundEmails.detail.openEmailLink' | transloco }}</span>
+              </button>
+            </div>
+          }
+
+          @if (current.retriedById) {
+            <div class="flex flex-col gap-2">
+              <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.retriedAs' | transloco }}</span>
+              <button
+                type="button"
+                class="inline-flex cursor-pointer items-center gap-4 self-start rounded-4 text-12 leading-18 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="open(current.retriedById!)"
+              >
+                <ng-icon name="tablerLink" size="14" aria-hidden="true" />
+                <span>{{ 'outboundEmails.detail.openEmailLink' | transloco }}</span>
+              </button>
+            </div>
+          }
+
+          @if (current.failure; as failure) {
+            <div class="col-span-2 flex flex-col gap-4 rounded-10 border border-danger-border bg-danger-soft p-8">
+              <span class="text-11 leading-16 font-medium text-danger-text">{{ 'outboundEmails.detail.fields.failure' | transloco }}</span>
+              <div class="flex flex-col gap-2 text-12 leading-18 text-danger-text">
+                <span dir="ltr" class="text-start font-medium">{{ failure.code }}</span>
+                @if (failure.automaticRetryExhausted) {
+                  <span>{{ 'outboundEmails.detail.fields.retriesExhausted' | transloco }}</span>
+                }
+              </div>
+            </div>
+          }
+
+          @if (current.feedback.length) {
+            <div class="col-span-2 flex flex-col gap-6">
+              <span class="text-11 leading-16 text-text-muted">{{ 'outboundEmails.detail.fields.feedback' | transloco }}</span>
+              <div class="flex flex-col gap-6">
+                @for (item of current.feedback; track item.occurredAt + item.type) {
+                  <div class="flex flex-col gap-4 rounded-10 border border-border bg-surface-muted p-8">
+                    <div class="flex items-center justify-between gap-8">
+                      <span class="inline-flex h-badge items-center rounded-8 bg-danger-soft px-8 text-12 font-medium text-on-danger-soft">
+                        {{ 'outboundEmails.badges.' + item.type | transloco }}
+                      </span>
+                      <span class="text-11 leading-16 text-text-muted">{{ formatDateTime(item.occurredAt) }}</span>
+                    </div>
+                    <p class="text-12 leading-18 text-text">
+                      {{ 'outboundEmails.detail.feedbackReasons.' + feedbackReason(item.reasonCode) | transloco }}
+                    </p>
+                    @if (item.suppressionApplied) {
+                      <p class="text-12 leading-18 text-text-muted">{{ 'outboundEmails.detail.feedbackSuppressed' | transloco }}</p>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @case ('timeline') {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-timeline'"
+          [attr.aria-labelledby]="uid + '-tab-timeline'"
+          class="flex flex-col gap-8"
+        >
+          <ol class="flex flex-col">
+            @for (event of sortedTimeline(); track event.state + event.occurredAt; let last = $last) {
+              <li class="flex items-stretch gap-10">
+                <div class="flex flex-col items-center">
+                  <span
+                    class="mt-3 size-timeline-dot shrink-0 rounded-full"
+                    [class]="timelineDot[event.state]"
+                    aria-hidden="true"
+                  ></span>
+                  @if (!last) {
+                    <span class="my-2 w-border flex-1 bg-border" aria-hidden="true"></span>
+                  }
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-2 pb-10">
+                  <span class="text-12 leading-18 font-medium text-text">
+                    {{ 'outboundEmails.detail.timeline.' + event.state | transloco }}
+                  </span>
+                  <span class="text-11 leading-16 text-text-muted">{{ formatDateTime(event.occurredAt) }}</span>
+                </div>
+              </li>
+            }
+          </ol>
+        </div>
+      }
+    }
+  }
+
+  @if (canRetry()) {
+    <button modal-footer type="button" uiButton (click)="requestRetry()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'outboundEmails.actions.retry' | transloco }}
+    </button>
+  }
+  <button modal-footer type="button" uiButton variant="secondary" (click)="close()">
+    {{ 'settings.common.close' | transloco }}
+  </button>
+</ui-modal>

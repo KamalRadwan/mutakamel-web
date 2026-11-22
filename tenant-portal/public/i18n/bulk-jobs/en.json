@@ -1,0 +1,115 @@
+{
+  "indicator": {
+    "label": "Batch operations, {{n}} running",
+    "idleLabel": "Batch operations",
+    "title": "Batch operations",
+    "recent": "Recent batch operations",
+    "empty": "No batch operations yet."
+  },
+  "genericTitle": "Batch operation",
+  "status": {
+    "QUEUED": "Waiting",
+    "RUNNING": "Running",
+    "CANCELLING": "Stopping…",
+    "COMPLETED": "Done",
+    "COMPLETED_WITH_ERRORS": "Done with errors",
+    "CANCELLED": "Stopped",
+    "FAILED": "Failed"
+  },
+  "item": {
+    "SUCCEEDED": "Done",
+    "UNCHANGED": "Unchanged",
+    "SKIPPED": "Skipped",
+    "FAILED": "Failed",
+    "CANCELLED": "Cancelled",
+    "PENDING": "Waiting",
+    "DISPATCHED": "In progress"
+  },
+  "progress": "{{processed}} of {{total}}",
+  "stop": "Stop",
+  "stopConfirm": {
+    "title": "Stop this batch operation?",
+    "text": "Items already changed stay changed."
+  },
+  "stopping": "Stopping…",
+  "viewReport": "View report",
+  "count": {
+    "succeeded": "Done {{n}}",
+    "succeededPlural": {
+      "one": "{{n}} item done",
+      "other": "{{n}} items done"
+    },
+    "unchanged": "Unchanged {{n}}",
+    "unchangedPlural": {
+      "one": "{{n}} item unchanged",
+      "other": "{{n}} items unchanged"
+    },
+    "skipped": "Skipped {{n}}",
+    "skippedPlural": {
+      "one": "{{n}} item skipped",
+      "other": "{{n}} items skipped"
+    },
+    "failed": "Failed {{n}}",
+    "failedPlural": {
+      "one": "{{n}} item failed",
+      "other": "{{n}} items failed"
+    },
+    "cancelled": "Cancelled {{n}}",
+    "cancelledPlural": {
+      "one": "{{n}} item cancelled",
+      "other": "{{n}} items cancelled"
+    }
+  },
+  "report": {
+    "started": "Started {{time}} · took {{duration}}",
+    "issues": "Issues",
+    "filter": {
+      "label": "Show items",
+      "hint": "Items are listed by result.",
+      "FAILED": "Failed ({{n}})",
+      "SKIPPED": "Skipped ({{n}})",
+      "CANCELLED": "Cancelled ({{n}})"
+    },
+    "noIssues": "No issues.",
+    "loadMore": "Load more",
+    "retry": "Retry failed",
+    "retryStart": "New start",
+    "retryStartHint": "The failed items are rescheduled from this time.",
+    "retryStartPast": "Choose a time in the future.",
+    "today": "Today",
+    "hour": "Hour",
+    "minute": "Minutes",
+    "selectFailed": "Select failed items",
+    "close": "Close",
+    "cancel": "Cancel"
+  },
+  "toast": {
+    "started": "Batch operation started. You can keep working.",
+    "partial": "{{ok}} done, {{failed}} failed.",
+    "stopped": "Batch operation stopped.",
+    "failed": "The batch operation failed: {{reason}}",
+    "active": "You already have a batch operation running here.",
+    "view": "View",
+    "completedGeneric": "{{n}} done.",
+    "completedGenericPlural": {
+      "one": "{{n}} item done.",
+      "other": "{{n}} items done."
+    }
+  },
+  "codes": {
+    "BULK_JOB_ACTIVE": "You already have a batch operation running here. Wait for it to finish or stop it.",
+    "BULK_JOB_NOT_FOUND": "Batch operation not found.",
+    "BULK_JOB_ACTOR_ACCESS_REVOKED": "Your access changed while the batch was running.",
+    "BULK_JOB_CHUNK_STALLED": "The batch stopped responding and was ended.",
+    "BULK_JOB_NOTHING_TO_RETRY": "There are no failed items to retry.",
+    "BULK_JOB_FINISHED": "This batch operation has already finished.",
+    "BULK_SELECTION_TOO_LARGE": "Too many items are selected. Narrow the selection to {{max}} or fewer.",
+    "BULK_JOB_PARAMS_INVALID": "The batch settings are not valid.",
+    "BULK_JOB_MODULE_UNKNOWN": "This batch operation is not supported.",
+    "generic": "Something went wrong."
+  },
+  "notify": {
+    "title": "Batch operation finished",
+    "text": "{{ok}} done, {{failed}} failed"
+  }
+}

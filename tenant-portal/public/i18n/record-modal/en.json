@@ -1,0 +1,31 @@
+{
+  "close": "Close",
+  "nav": {
+    "prev": "Previous record",
+    "next": "Next record",
+    "position": "{{index}} of {{total}}"
+  },
+  "footer": {
+    "create": "Create",
+    "save": "Save",
+    "saveAndNew": "Save and add another",
+    "fullPage": "Continue in full page",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete"
+  },
+  "unsaved": {
+    "title": "Save changes?",
+    "text": "You have changes that are not saved yet.",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
+  "saved": "Changes saved.",
+  "retry": "Try again",
+  "instant": {
+    "failed": "Could not save this change."
+  }
+}

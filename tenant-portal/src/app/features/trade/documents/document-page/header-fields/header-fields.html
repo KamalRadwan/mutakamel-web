@@ -1,0 +1,721 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card">
+  <div class="grid grid-cols-2 gap-x-10 gap-y-6 desktop:grid-cols-4">
+    <!-- Customer (quotation, sales-order) -->
+    @if (isQuotation() || isSalesOrder()) {
+      <div class="col-span-2 min-w-0">
+        @if (customerEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-partyId'"
+            [label]="'tdpg.fields.customer' | transloco"
+            [hint]="'tdpg.fields.customerHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['partyId'] ?? null"
+          >
+            <button
+              #customerTrigger
+              type="button"
+              [id]="uid + '-partyId'"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="openMenu() === 'customer'"
+              [attr.aria-invalid]="fieldErrors()['partyId'] ? 'true' : null"
+              class="cursor-pointer justify-between text-start outline-none"
+              [class]="controlBoxClasses(!!(fieldErrors()['partyId']))"
+              (click)="openSearchMenu('customer')"
+            >
+              <span class="min-w-0 flex-1 truncate" [class]="customerDisplay() ? 'text-text' : 'text-text-placeholder'">
+                {{ customerDisplay() || ('tdpg.fields.customerPlaceholder' | transloco) }}
+              </span>
+              <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </button>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.customer' | transloco"
+            [hint]="'tdpg.fields.customerHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['partyId'] ?? null"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span class="min-w-0 flex-1 truncate">{{ customerDisplay() || '—' }}</span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        }
+      </div>
+
+      <!-- Contact person (quotation, sales-order) -->
+      <div class="min-w-0">
+        @if (contactEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-contactPartyId'"
+            [label]="'tdpg.fields.contact' | transloco"
+            [hint]="contactHintLabel()"
+            [error]="contactsError() ? ('tdpg.fields.contactsLoadFailed' | transloco) : null"
+          >
+            @if (isPersonCustomer()) {
+              <div class="flex h-field cursor-not-allowed items-center rounded-8 border border-border-field bg-neutral-soft px-8 text-12 text-text-placeholder">
+                <span class="truncate">{{ 'tdpg.fields.contactNotNeeded' | transloco }}</span>
+              </div>
+            } @else if (contactsError()) {
+              <div class="flex items-center gap-4">
+                <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-danger-border bg-surface-field px-8 text-12 text-text-placeholder ring-2 ring-danger-halo">
+                  <span class="truncate">{{ 'tdpg.fields.contactPlaceholder' | transloco }}</span>
+                </div>
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  class="size-btn-h-sm shrink-0 px-0"
+                  [attr.aria-label]="'td.common.retry' | transloco"
+                  [title]="'td.common.retry' | transloco"
+                  (click)="retryContacts()"
+                >
+                  <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+                </button>
+              </div>
+            } @else {
+              <div class="flex items-center gap-4">
+                <ui-dropdown
+                  class="min-w-0 flex-1"
+                  size="field"
+                  [id]="uid + '-contactPartyId'"
+                  [label]="'tdpg.fields.contact' | transloco"
+                  [disabled]="!partyId() || contactsLoading()"
+                  [options]="contactOptions()"
+                  [value]="contactPartyId()"
+                  (valueChange)="onContactChange($event)"
+                />
+                @if (contactPartyId()) {
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [attr.aria-label]="'tdpg.fields.clear' | transloco"
+                    [title]="'tdpg.fields.clear' | transloco"
+                    (click)="clearContact($event)"
+                  >
+                    <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                  </button>
+                }
+              </div>
+            }
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.contact' | transloco"
+            [hint]="contactHintLabel()"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span class="min-w-0 flex-1 truncate">
+                {{ isPersonCustomer() ? ('tdpg.fields.contactNotNeeded' | transloco) : (contactDisplay() || '—') }}
+              </span>
+              @if (mode() === 'readonly') {
+                <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+    }
+
+    <!-- Supplier (purchase-order, purchase-quotation) -->
+    @if (isPurchaseOrder() || isPurchaseQuotation()) {
+      <div class="col-span-2 min-w-0">
+        @if (supplierEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-supplierPartyId'"
+            [label]="'tdpg.fields.supplier' | transloco"
+            [hint]="'tdpg.fields.supplierHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['supplierPartyId'] ?? null"
+          >
+            <button
+              #supplierTrigger
+              type="button"
+              [id]="uid + '-supplierPartyId'"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="openMenu() === 'supplier'"
+              [attr.aria-invalid]="fieldErrors()['supplierPartyId'] ? 'true' : null"
+              class="cursor-pointer justify-between text-start outline-none"
+              [class]="controlBoxClasses(!!(fieldErrors()['supplierPartyId']))"
+              (click)="openSearchMenu('supplier')"
+            >
+              <span class="min-w-0 flex-1 truncate" [class]="supplierDisplay() ? 'text-text' : 'text-text-placeholder'">
+                {{ supplierDisplay() || ('tdpg.fields.supplierPlaceholder' | transloco) }}
+              </span>
+              <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </button>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.supplier' | transloco"
+            [hint]="'tdpg.fields.supplierHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['supplierPartyId'] ?? null"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span class="min-w-0 flex-1 truncate">{{ supplierDisplay() || '—' }}</span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        }
+      </div>
+    }
+
+    <!-- Supplier account (purchase-order only) -->
+    @if (isPurchaseOrder()) {
+      <div class="min-w-0">
+        @if (poFieldsEditable() && !supplierAccountSingle()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-supplierAccountId'"
+            [label]="'tdpg.fields.supplierAccount' | transloco"
+            [hint]="'tdpg.fields.supplierAccountHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['supplierAccountId'] ?? null"
+          >
+            @if (!supplierPartyId()) {
+              <div class="flex h-field cursor-not-allowed items-center rounded-8 border border-border-field bg-neutral-soft px-8 text-12 text-text-placeholder">
+                <span class="truncate">{{ 'tdpg.fields.supplierAccountPickSupplierFirst' | transloco }}</span>
+              </div>
+            } @else {
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-supplierAccountId'"
+                [label]="'tdpg.fields.supplierAccount' | transloco"
+                [options]="supplierAccountOptions()"
+                [value]="supplierAccountId()"
+                (valueChange)="onSupplierAccountChange($event)"
+              />
+            }
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.supplierAccount' | transloco"
+            [hint]="'tdpg.fields.supplierAccountHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['supplierAccountId'] ?? null"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <bdi class="min-w-0 flex-1 truncate">{{ supplierAccountDisplay() || '—' }}</bdi>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        }
+      </div>
+    }
+
+    <!-- Currency (all kinds) -->
+    <div class="min-w-0">
+      @if (currencyEditable()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-currencyCode'"
+          [label]="'tdpg.fields.currency' | transloco"
+          [hint]="'tdpg.fields.currencyHint' | transloco"
+          [required]="true"
+          [error]="fieldErrors()['currencyCode'] ?? null"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-currencyCode'"
+            [label]="'tdpg.fields.currency' | transloco"
+            [options]="currencyOptions()"
+            [value]="currencyCode()"
+            (valueChange)="onCurrencyChange($event)"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [label]="'tdpg.fields.currency' | transloco"
+          [hint]="'tdpg.fields.currencyHint' | transloco"
+          [required]="true"
+          [error]="fieldErrors()['currencyCode'] ?? null"
+        >
+          <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <bdi dir="ltr" class="min-w-0 flex-1 truncate">{{ currencyCode() || '—' }}</bdi>
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      }
+    </div>
+
+    <!-- Valid until (quotation, purchase-quotation) -->
+    @if (isQuotation() || isPurchaseQuotation()) {
+      <div class="min-w-0">
+        @if (validUntilEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-validUntil'"
+            [label]="'tdpg.fields.validUntil' | transloco"
+            [hint]="'tdpg.fields.validUntilHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['validUntil'] ?? null"
+          >
+            <ui-date-field
+              [id]="uid + '-validUntil'"
+              [min]="todayIso"
+              [value]="draft().validUntil"
+              [ariaLabel]="'tdpg.fields.validUntil' | transloco"
+              [placeholder]="'tdpg.fields.validUntilPlaceholder' | transloco"
+              [todayLabel]="'tdpg.fields.today' | transloco"
+              [prevMonthLabel]="'tdpg.fields.prevMonth' | transloco"
+              [nextMonthLabel]="'tdpg.fields.nextMonth' | transloco"
+              [invalid]="!!(fieldErrors()['validUntil'])"
+              (valueChange)="onValidUntilChange($event)"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.validUntil' | transloco"
+            [hint]="'tdpg.fields.validUntilHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['validUntil'] ?? null"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <bdi dir="ltr" class="min-w-0 flex-1 truncate tabular-nums">{{ validUntilDisplay() }}</bdi>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        }
+      </div>
+    }
+
+    <!-- Business date (quotation) -->
+    @if (isQuotation()) {
+      <div class="min-w-0">
+        <ui-field
+          size="bare"
+          [label]="'tdpg.fields.businessDate' | transloco"
+          [hint]="'tdpg.fields.businessDateHint' | transloco"
+        >
+          <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <bdi dir="ltr" class="min-w-0 flex-1 truncate tabular-nums">{{ businessDateDisplay() }}</bdi>
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      </div>
+    }
+
+    <!-- Receiving warehouse (purchase-order) -->
+    @if (isPurchaseOrder()) {
+      <div class="col-span-2 min-w-0">
+        @if (poFieldsEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-receivingNodeId'"
+            [label]="'tdpg.fields.receivingWarehouse' | transloco"
+            [hint]="'tdpg.fields.receivingWarehouseHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['receivingNodeId'] ?? null"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-receivingNodeId'"
+              [label]="'tdpg.fields.receivingWarehouse' | transloco"
+              [options]="receivingNodeOptions()"
+              [value]="receivingNodeId()"
+              (valueChange)="onReceivingNodeChange($event)"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.receivingWarehouse' | transloco"
+            [hint]="'tdpg.fields.receivingWarehouseHint' | transloco"
+            [required]="true"
+            [error]="fieldErrors()['receivingNodeId'] ?? null"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span class="min-w-0 flex-1 truncate">{{ receivingWarehouseDisplay() || '—' }}</span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        }
+      </div>
+    }
+
+    <!-- Your reference / Reference -->
+    <div class="min-w-0">
+      @if (isPurchaseQuotation()) {
+        @if (referenceEditable()) {
+          <ui-field
+            [for]="uid + '-reference'"
+            [label]="'tdpg.fields.reference' | transloco"
+            [hint]="'tdpg.fields.referenceHint' | transloco"
+            [count]="pqReference().length"
+            [max]="120"
+          >
+            <input
+              [id]="uid + '-reference'"
+              type="text"
+              maxlength="120"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="'tdpg.fields.referencePlaceholder' | transloco"
+              [value]="pqReference()"
+              (input)="onPqReferenceInput($event)"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.reference' | transloco"
+            [hint]="'tdpg.fields.referenceHint' | transloco"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span class="min-w-0 flex-1 truncate">{{ pqReference() || '—' }}</span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        }
+      } @else {
+        @if (referenceEditable()) {
+          <ui-field
+            [for]="uid + '-draftReference'"
+            [label]="'tdpg.fields.yourReference' | transloco"
+            [hint]="'tdpg.fields.yourReferenceHint' | transloco"
+            [count]="draftReference().length"
+            [max]="80"
+          >
+            <input
+              [id]="uid + '-draftReference'"
+              type="text"
+              maxlength="80"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="'tdpg.fields.yourReferencePlaceholder' | transloco"
+              [value]="draftReference()"
+              (input)="onDraftReferenceInput($event)"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.yourReference' | transloco"
+            [hint]="'tdpg.fields.yourReferenceHint' | transloco"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span class="min-w-0 flex-1 truncate">{{ draftReference() || '—' }}</span>
+              @if (mode() === 'readonly') {
+                <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              }
+            </div>
+          </ui-field>
+        }
+      }
+    </div>
+
+    <!-- Opportunity (quotation only, after Your reference) -->
+    @if (isQuotation()) {
+      <div class="min-w-0">
+        @if (opportunityEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-sourceCrmOpportunityId'"
+            [label]="'tdpg.fields.opportunity' | transloco"
+            [hint]="'tdpg.fields.opportunityHint' | transloco"
+          >
+            <div class="flex items-center gap-4">
+              <button
+                #opportunityTrigger
+                type="button"
+                [id]="uid + '-sourceCrmOpportunityId'"
+                aria-haspopup="listbox"
+                [attr.aria-expanded]="openMenu() === 'opportunity'"
+                [disabled]="!partyId()"
+                class="min-w-0 flex-1 cursor-pointer justify-between text-start outline-none"
+                [class]="controlBoxClasses(false, !partyId())"
+                (click)="openSearchMenu('opportunity')"
+              >
+                <span
+                  class="min-w-0 flex-1 truncate"
+                  [class]="
+                    !partyId() || (!selectedOpportunity() && !opportunityUnavailable())
+                      ? 'text-text-placeholder'
+                      : opportunityUnavailable()
+                        ? 'text-text-muted'
+                        : 'text-text'
+                  "
+                >
+                  @if (!partyId()) {
+                    {{ 'tdpg.fields.opportunityPickCustomerFirst' | transloco }}
+                  } @else if (selectedOpportunity(); as opp) {
+                    {{ opp.name }}
+                  } @else if (opportunityUnavailable()) {
+                    {{ 'tdpg.fields.opportunityNotAvailable' | transloco }}
+                  } @else if (opportunityResolving()) {
+                    {{ 'tdpg.fields.loading' | transloco }}
+                  } @else {
+                    {{ 'tdpg.fields.opportunityPlaceholder' | transloco }}
+                  }
+                </span>
+                <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              </button>
+              @if (sourceCrmOpportunityId()) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'tdpg.fields.clear' | transloco"
+                  [title]="'tdpg.fields.clear' | transloco"
+                  (click)="clearOpportunity($event)"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.fields.opportunity' | transloco"
+            [hint]="'tdpg.fields.opportunityHint' | transloco"
+          >
+            <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <span
+                class="min-w-0 flex-1 truncate"
+                [class.text-text-muted]="opportunityUnavailable()"
+              >
+                @if (selectedOpportunity(); as opp) {
+                  {{ opp.name }}
+                } @else if (opportunityUnavailable()) {
+                  {{ 'tdpg.fields.opportunityNotAvailable' | transloco }}
+                } @else if (opportunityResolving()) {
+                  {{ 'tdpg.fields.loading' | transloco }}
+                } @else {
+                  —
+                }
+              </span>
+              @if (mode() === 'readonly') {
+                <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+    }
+
+    <!-- Delivery to supplier (purchase-order only) -->
+    @if (isPurchaseOrder()) {
+      <div class="min-w-0">
+        <ui-field
+          size="bare"
+          [label]="'tdpg.fields.deliveryToSupplier' | transloco"
+          [hint]="'tdpg.fields.deliveryToSupplierHint' | transloco"
+        >
+          <div class="flex h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <span class="min-w-0 flex-1 truncate">{{ 'tdpg.fields.deliveryToSupplierValue' | transloco }}</span>
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <!-- Pricing (quotation only) -->
+  @if (isQuotation()) {
+    <div class="border-t border-border pt-8">
+      <app-pricing-panel
+        [intent]="draft().pricing ?? { mode: 'NONE' }"
+        (intentChange)="onPricingChange($event)"
+        [policy]="discountPolicy()"
+        [disabled]="!pricingEditable()"
+      />
+      @if (pricingErrors(); as errMsg) {
+        <p class="mt-4 text-11 leading-16 text-danger-text">{{ errMsg }}</p>
+      }
+    </div>
+  }
+</section>
+
+<!-- Shared searchable popover for Customer, Supplier, Opportunity -->
+@if (openMenu(); as menuKind) {
+  <div
+    #searchMenu
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+    [class.invisible]="!popoverPlaced()"
+    [style.top.px]="popoverPlace().top"
+    [style.inset-inline-start.px]="popoverPlace().start"
+    [style.min-width.px]="popoverPlace().width"
+    [style.max-height.px]="popoverPlace().maxHeight"
+  >
+    <div class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8">
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #searchInput
+        type="text"
+        autocomplete="off"
+        class="min-w-0 flex-1 rounded-4 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="searchLabelKey() | transloco"
+        [attr.aria-controls]="uid + '-search-list'"
+        [attr.aria-activedescendant]="activeOptionId()"
+        aria-autocomplete="list"
+        (keydown.arrowdown)="onSearchArrow($event, 1)"
+        (keydown.arrowup)="onSearchArrow($event, -1)"
+        [placeholder]="
+          (menuKind === 'customer'
+            ? 'tdpg.fields.customerSearchPlaceholder'
+            : menuKind === 'supplier'
+              ? 'tdpg.fields.supplierSearchPlaceholder'
+              : 'tdpg.fields.opportunitySearchPlaceholder') | transloco
+        "
+        [value]="searchQuery()"
+        (input)="onSearchInput($event)"
+      />
+    </div>
+
+    <ul
+      role="listbox"
+      [id]="uid + '-search-list'"
+      (keydown.arrowdown)="onSearchArrow($event, 1)"
+      (keydown.arrowup)="onSearchArrow($event, -1)"
+      class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scrollbar-thin">
+      @if (
+        (menuKind === 'customer' && customersLoading() && customers().length === 0) ||
+        (menuKind === 'supplier' && suppliersLoading()) ||
+        (menuKind === 'opportunity' && (opportunitiesLoading() || opportunityResolving()))
+      ) {
+        <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
+          <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+          <span>{{ 'tdpg.fields.loading' | transloco }}</span>
+        </li>
+      } @else if (
+        (menuKind === 'customer' && customersError()) ||
+        (menuKind === 'supplier' && suppliersError()) ||
+        (menuKind === 'opportunity' && opportunitiesError())
+      ) {
+        <li role="presentation" class="flex items-center justify-between gap-8 px-8 py-6 text-12">
+          <span class="text-danger-text">{{ 'tdpg.fields.loadFailed' | transloco }}</span>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retryMenuLoad()">
+            <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+            {{ 'td.common.retry' | transloco }}
+          </button>
+        </li>
+      } @else if (menuKind === 'customer') {
+        @if (customers().length === 0) {
+          <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+            {{ 'tdpg.fields.noMatches' | transloco }}
+          </li>
+        } @else {
+          @for (opt of customers(); track opt.partyId; let i = $index) {
+            @let blocked = isCustomerBlocked(opt);
+            @let selected = partyId() === opt.partyId;
+            <li role="option" [id]="uid + '-opt-' + i" [attr.aria-selected]="selected" [attr.aria-disabled]="blocked ? 'true' : null">
+              <button
+                type="button"
+                class="flex min-h-menu-item w-full items-center justify-between gap-8 rounded-6 px-8 py-4 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  blocked
+                    ? 'cursor-not-allowed text-text-placeholder'
+                    : selected
+                      ? 'cursor-pointer bg-brand-soft text-on-brand-soft'
+                      : 'cursor-pointer text-text hover:bg-row-hover'
+                "
+                [disabled]="blocked"
+                (click)="chooseCustomer(opt)"
+              >
+                <span class="flex min-w-0 flex-1 flex-col">
+                  <span class="truncate">{{ opt.displayName }}</span>
+                  @if (blocked) {
+                    <span class="text-11 leading-16 text-danger-text">{{ 'tdpg.fields.accountBlocked' | transloco }}</span>
+                  }
+                </span>
+                @if (selected && !blocked) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          }
+          @if (customersNextCursor()) {
+            <li role="presentation" class="pt-2">
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                class="w-full"
+                [loading]="customersLoading()"
+                (click)="loadMoreCustomers()"
+              >
+                {{ 'tdpg.fields.loadMore' | transloco }}
+              </button>
+            </li>
+          }
+        }
+      } @else if (menuKind === 'supplier') {
+        @if (suppliers().length === 0) {
+          <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+            {{ 'tdpg.fields.noMatches' | transloco }}
+          </li>
+        } @else {
+          @for (sup of suppliers(); track sup.partyId; let i = $index) {
+            @let selected = supplierPartyId() === sup.partyId;
+            <li role="option" [id]="uid + '-opt-' + i" [attr.aria-selected]="selected">
+              <button
+                type="button"
+                class="flex h-menu-item w-full items-center justify-between gap-8 rounded-6 px-8 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="selected ? 'cursor-pointer bg-brand-soft text-on-brand-soft' : 'cursor-pointer text-text hover:bg-row-hover'"
+                (click)="chooseSupplier(sup)"
+              >
+                <span class="min-w-0 flex-1 truncate">{{ sup.displayName }}</span>
+                @if (selected) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          }
+        }
+      } @else {
+        @if (filteredOpportunities().length === 0 && !showUnavailableOpportunityOption()) {
+          <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+            {{ 'tdpg.fields.noMatches' | transloco }}
+          </li>
+        } @else {
+          @if (showUnavailableOpportunityOption()) {
+            <li role="option" [id]="uid + '-opt-unavailable'" [attr.aria-selected]="true">
+              <button
+                type="button"
+                class="flex min-h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 bg-brand-soft px-8 py-4 text-start text-12 text-on-brand-soft outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="closeSearchMenu(true)"
+              >
+                <span class="min-w-0 flex-1 truncate">{{ 'tdpg.fields.opportunityNotAvailable' | transloco }}</span>
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              </button>
+            </li>
+          }
+          @for (opp of filteredOpportunities(); track opp.id; let i = $index) {
+            @let selected = sourceCrmOpportunityId() === opp.id;
+            <li role="option" [id]="uid + '-opt-' + i" [attr.aria-selected]="selected">
+              <button
+                type="button"
+                class="flex min-h-menu-item w-full items-center justify-between gap-8 rounded-6 px-8 py-4 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="selected ? 'cursor-pointer bg-brand-soft text-on-brand-soft' : 'cursor-pointer text-text hover:bg-row-hover'"
+                (click)="chooseOpportunity(opp)"
+              >
+                <span class="flex min-w-0 flex-1 flex-col">
+                  <span class="truncate">{{ opp.name }}</span>
+                  @if (opp.stageName) {
+                    <span class="truncate text-11 leading-16 text-text-muted">{{ opp.stageName }}</span>
+                  }
+                </span>
+                @if (selected) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          }
+        }
+      }
+    </ul>
+  </div>
+}

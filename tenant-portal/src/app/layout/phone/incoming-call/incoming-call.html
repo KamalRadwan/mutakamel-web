@@ -1,0 +1,196 @@
+@if (ringing(); as incoming) {
+  @if (floating()) {
+    <div
+      role="region"
+      [attr.aria-label]="'webPhone.incoming.title' | transloco"
+      class="flex w-full flex-col overflow-hidden rounded-12 border border-border bg-surface text-text shadow-popover"
+    >
+      <div class="flex items-start gap-8 bg-nav-gradient p-10 text-on-nav">
+        <span class="inline-flex size-icon-tile shrink-0 self-center items-center justify-center rounded-8 bg-icon-green text-on-icon">
+          <ng-icon name="tablerPhoneIncoming" size="15" aria-hidden="true" />
+        </span>
+
+        <div class="min-w-0 flex-1 self-center">
+          <p class="truncate text-13 leading-18 font-medium text-on-nav">
+            @if (incoming.displayName) {
+              {{ incoming.displayName }}
+            } @else {
+              <bdi dir="ltr">{{ incoming.number }}</bdi>
+            }
+          </p>
+          @if (incoming.displayName) {
+            <p dir="ltr" class="truncate text-start text-12 leading-16 text-on-nav-muted">{{ incoming.number }}</p>
+          }
+        </div>
+
+        @if (incoming.source; as source) {
+          <a
+            [routerLink]="sourceRoute(source)"
+            class="inline-flex h-badge max-w-preset shrink-0 self-center items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [title]="source.label"
+          >
+            <ng-icon [name]="sourceIcon(source.type)" size="12" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ ('webPhone.source.' + source.type) | transloco }}</span>
+          </a>
+        }
+
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 self-start cursor-pointer items-center justify-center rounded-6 text-on-nav-muted outline-none transition-colors duration-fast hover:bg-nav-glass hover:text-on-nav focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+          [disabled]="phone.ringSilenced()"
+          [attr.aria-label]="'webPhone.incoming.silence' | transloco"
+          [title]="'webPhone.incoming.silence' | transloco"
+          (click)="onSilence($event)"
+        >
+          <ng-icon name="tablerBellOff" size="14" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div class="flex items-center gap-6 p-10">
+        @if (phone.canAnswerHere()) {
+          <button
+            type="button"
+            data-phone-answer
+            class="inline-flex h-table-head min-w-0 flex-1 cursor-pointer items-center justify-center gap-4 rounded-10 bg-success px-8 text-12 leading-18 font-medium text-on-success outline-none transition-colors duration-fast hover:bg-success-hover active:bg-success-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="onAnswer($event)"
+          >
+            <ng-icon name="tablerPhone" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'webPhone.incoming.answer' | transloco }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex h-table-head min-w-0 flex-1 cursor-pointer items-center justify-center gap-4 rounded-10 bg-danger px-8 text-12 leading-18 font-medium text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="onDecline($event)"
+          >
+            <ng-icon name="tablerPhoneOff" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'webPhone.incoming.decline' | transloco }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex h-table-head min-w-0 flex-1 cursor-pointer items-center justify-center gap-4 rounded-10 bg-icon-violet px-8 text-12 leading-18 font-medium text-on-icon outline-none transition-colors duration-fast hover:bg-icon-violet-hover active:bg-icon-violet-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="onAnswerAndTransfer($event)"
+          >
+            <ng-icon name="tablerArrowsExchange" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'webPhone.inCall.transfer' | transloco }}</span>
+          </button>
+        } @else {
+          <span
+            class="inline-flex h-table-head min-w-0 flex-1 items-center px-4 text-12 leading-18 text-text-muted"
+            [title]="'webPhone.incoming.answerInPhoneTabHint' | transloco"
+          >
+            <span class="truncate">{{ 'webPhone.incoming.answerInPhoneTab' | transloco }}</span>
+          </span>
+
+          <button
+            type="button"
+            class="inline-flex h-table-head shrink-0 cursor-pointer items-center justify-center gap-4 rounded-10 bg-danger px-12 text-12 leading-18 font-medium text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="onDecline($event)"
+          >
+            <ng-icon name="tablerPhoneOff" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'webPhone.incoming.decline' | transloco }}</span>
+          </button>
+        }
+      </div>
+    </div>
+  } @else {
+    <div class="flex shrink-0 flex-col gap-10 rounded-10 border border-border bg-surface-muted p-10">
+      <div class="flex items-center gap-10">
+        <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+          <ng-icon name="tablerPhoneIncoming" size="18" aria-hidden="true" />
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <p class="text-11 leading-16 font-medium text-text-muted">{{ 'webPhone.incoming.title' | transloco }}</p>
+          <p class="truncate text-15 leading-22 font-medium text-text">
+            @if (incoming.displayName) {
+              {{ incoming.displayName }}
+            } @else {
+              <bdi dir="ltr">{{ incoming.number }}</bdi>
+            }
+          </p>
+          @if (incoming.displayName) {
+            <p dir="ltr" class="truncate text-start text-12 leading-18 text-text-muted">{{ incoming.number }}</p>
+          }
+        </div>
+
+        @if (incoming.source; as source) {
+          <a
+            [routerLink]="sourceRoute(source)"
+            class="inline-flex h-badge max-w-preset shrink-0 items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [title]="source.label"
+          >
+            <ng-icon [name]="sourceIcon(source.type)" size="12" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ ('webPhone.source.' + source.type) | transloco }}</span>
+          </a>
+        }
+      </div>
+
+      <div class="flex items-center justify-end">
+        <button
+          type="button"
+          class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center gap-4 rounded-6 border border-border-field bg-surface px-8 text-11 leading-16 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+          [disabled]="phone.ringSilenced()"
+          (click)="onSilence($event)"
+        >
+          <ng-icon name="tablerBellOff" size="14" aria-hidden="true" />
+          <span>{{ 'webPhone.incoming.silence' | transloco }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="flex shrink-0 items-center gap-6">
+      @if (phone.canAnswerHere()) {
+        <button
+          type="button"
+          data-call-control
+          data-phone-answer
+          class="inline-flex h-table-head min-w-0 flex-1 cursor-pointer items-center justify-center gap-6 rounded-10 bg-success px-6 text-12 leading-18 font-medium text-on-success outline-none transition-colors duration-fast hover:bg-success-hover active:bg-success-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="onAnswer($event)"
+        >
+          <ng-icon name="tablerPhone" size="15" class="shrink-0" aria-hidden="true" />
+          <span class="truncate">{{ 'webPhone.incoming.answer' | transloco }}</span>
+        </button>
+      } @else {
+        <span
+          class="inline-flex h-table-head min-w-0 flex-1 items-center justify-center px-6 text-12 leading-18 text-text-muted"
+          [title]="'webPhone.incoming.answerInPhoneTabHint' | transloco"
+        >
+          <span class="truncate">{{ 'webPhone.incoming.answerInPhoneTab' | transloco }}</span>
+        </span>
+      }
+
+      <button
+        type="button"
+        data-call-control
+        class="inline-flex h-table-head min-w-0 flex-1 cursor-pointer items-center justify-center gap-6 rounded-10 bg-danger px-6 text-12 leading-18 font-medium text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="onDecline($event)"
+      >
+        <ng-icon name="tablerPhoneOff" size="15" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ 'webPhone.incoming.decline' | transloco }}</span>
+      </button>
+
+      @if (phone.canAnswerHere()) {
+        <button
+          type="button"
+          class="inline-flex h-table-head min-w-0 flex-1 cursor-pointer items-center justify-center gap-6 rounded-10 bg-icon-violet px-6 text-12 leading-18 font-medium text-on-icon outline-none transition-colors duration-fast hover:bg-icon-violet-hover active:bg-icon-violet-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="onAnswerAndTransfer($event)"
+        >
+          <ng-icon name="tablerArrowsExchange" size="15" class="shrink-0" aria-hidden="true" />
+          <span class="truncate">{{ 'webPhone.inCall.transfer' | transloco }}</span>
+        </button>
+      }
+    </div>
+
+    @if (!embedded()) {
+      <div class="mt-auto flex shrink-0 flex-col gap-8">
+        <div class="flex flex-col gap-6">
+          <app-audio-row kind="speaker" />
+          <app-audio-row kind="mic" />
+        </div>
+        <app-status-line />
+      </div>
+    }
+  }
+}

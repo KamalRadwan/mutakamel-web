@@ -1,0 +1,298 @@
+@if (layout() === 'page') {
+  <div class="flex flex-col gap-10">
+    @if (showLegal()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="text-12 leading-18 font-medium text-text">{{ 'customerForm.more.legal' | transloco }}</h3>
+        <div [class]="pageGrid">
+          @let legalNameErr = errorFor('legalName', limits.legalName);
+          <ui-field
+            [label]="'customerForm.more.legalName' | transloco"
+            [for]="uid + '-legal-name'"
+            [hint]="'customerForm.more.legalNameHint' | transloco"
+            [count]="legalNameCount()"
+            [max]="limits.legalName"
+            [error]="legalNameErr ? (legalNameErr.key | transloco: legalNameErr.params) : null"
+          >
+            <input
+              [id]="uid + '-legal-name'"
+              type="text"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().legalName"
+              [attr.aria-invalid]="legalNameErr ? 'true' : null"
+              (input)="onTextFieldInput('legalName', $event)"
+            />
+          </ui-field>
+
+          @let taxErr = errorFor('taxNumber', limits.taxNumber);
+          <ui-field
+            [label]="'customerForm.more.taxNumber' | transloco"
+            [for]="uid + '-tax-number'"
+            [hint]="'customerForm.more.taxNumberHint' | transloco"
+            [count]="taxNumberCount()"
+            [max]="limits.taxNumber"
+            [error]="taxErr ? (taxErr.key | transloco: taxErr.params) : null"
+          >
+            <input
+              [id]="uid + '-tax-number'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().taxNumber"
+              [attr.aria-invalid]="taxErr ? 'true' : null"
+              (input)="onTextFieldInput('taxNumber', $event)"
+            />
+          </ui-field>
+
+          @let crErr = errorFor('commercialRegistrationNumber', limits.commercialRegistrationNumber);
+          <ui-field
+            [label]="'customerForm.more.crNumber' | transloco"
+            [for]="uid + '-cr-number'"
+            [hint]="'customerForm.more.crNumberHint' | transloco"
+            [count]="crNumberCount()"
+            [max]="limits.commercialRegistrationNumber"
+            [error]="crErr ? (crErr.key | transloco: crErr.params) : null"
+          >
+            <input
+              [id]="uid + '-cr-number'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().commercialRegistrationNumber"
+              [attr.aria-invalid]="crErr ? 'true' : null"
+              (input)="onTextFieldInput('commercialRegistrationNumber', $event)"
+            />
+          </ui-field>
+        </div>
+      </section>
+
+      <div class="h-border bg-border" aria-hidden="true"></div>
+    }
+
+    <section class="flex flex-col gap-8">
+      <ui-field
+        size="bare"
+        [label]="'customerForm.more.address' | transloco"
+        [for]="uid + '-address'"
+        [hint]="'customerForm.more.addressHint' | transloco"
+      >
+        <div
+          [id]="uid + '-address'"
+          role="group"
+          class="flex flex-col gap-6"
+          [attr.aria-label]="'customerForm.more.address' | transloco"
+          [attr.aria-describedby]="uid + '-address-hint'"
+        >
+          <app-address-fields
+            class="page-address-grid"
+            [canAddPlaces]="canAddPlaces"
+            [readonly]="readonly()"
+            [errors]="addressErrors()"
+            [value]="draft().address"
+            (valueChange)="onAddressChange($event)"
+          />
+          @if (hasAddressSelection() && !readonly()) {
+            <div class="flex">
+              <button type="button" uiButton variant="ghost" size="small" (click)="clearAddress()">
+                {{ 'customerForm.more.clearAddress' | transloco }}
+              </button>
+            </div>
+          }
+        </div>
+      </ui-field>
+
+      @if (showLegacyAddress()) {
+        <ui-field
+          [label]="'customerForm.more.previousAddress' | transloco"
+          [for]="uid + '-legacy-address'"
+          [hint]="'customerForm.more.previousAddressHint' | transloco"
+        >
+          <input
+            [id]="uid + '-legacy-address'"
+            type="text"
+            dir="auto"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="resolvedLegacyAddress()"
+          />
+        </ui-field>
+      }
+    </section>
+
+    <div class="h-border bg-border" aria-hidden="true"></div>
+
+    <div [class]="pageGrid">
+      @let descErr = errorFor('description', limits.description);
+      <div class="col-span-2">
+        <ui-field
+          size="multiline"
+          [label]="'customerForm.more.description' | transloco"
+          [for]="uid + '-description'"
+          [hint]="'customerForm.more.descriptionHint' | transloco"
+          [count]="descriptionCount()"
+          [max]="limits.description"
+          [error]="descErr ? (descErr.key | transloco: descErr.params) : null"
+        >
+          <textarea
+            [id]="uid + '-description'"
+            rows="3"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [readonly]="readonly()"
+            [value]="draft().description"
+            [attr.aria-invalid]="descErr ? 'true' : null"
+            (input)="onTextFieldInput('description', $event)"
+          ></textarea>
+        </ui-field>
+      </div>
+    </div>
+  </div>
+} @else {
+  <div class="flex flex-col gap-10">
+    @if (showLegal()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="text-12 leading-18 font-medium text-text">{{ 'customerForm.more.legal' | transloco }}</h3>
+        <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+          @let legalNameErr = errorFor('legalName', limits.legalName);
+          <div class="desktop:col-span-2">
+            <ui-field
+              [label]="'customerForm.more.legalName' | transloco"
+              [for]="uid + '-legal-name'"
+              [hint]="'customerForm.more.legalNameHint' | transloco"
+              [count]="legalNameCount()"
+              [max]="limits.legalName"
+              [error]="legalNameErr ? (legalNameErr.key | transloco: legalNameErr.params) : null"
+            >
+              <input
+                [id]="uid + '-legal-name'"
+                type="text"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().legalName"
+                [attr.aria-invalid]="legalNameErr ? 'true' : null"
+                (input)="onTextFieldInput('legalName', $event)"
+              />
+            </ui-field>
+          </div>
+
+          @let taxErr = errorFor('taxNumber', limits.taxNumber);
+          <ui-field
+            [label]="'customerForm.more.taxNumber' | transloco"
+            [for]="uid + '-tax-number'"
+            [hint]="'customerForm.more.taxNumberHint' | transloco"
+            [count]="taxNumberCount()"
+            [max]="limits.taxNumber"
+            [error]="taxErr ? (taxErr.key | transloco: taxErr.params) : null"
+          >
+            <input
+              [id]="uid + '-tax-number'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().taxNumber"
+              [attr.aria-invalid]="taxErr ? 'true' : null"
+              (input)="onTextFieldInput('taxNumber', $event)"
+            />
+          </ui-field>
+
+          @let crErr = errorFor('commercialRegistrationNumber', limits.commercialRegistrationNumber);
+          <ui-field
+            [label]="'customerForm.more.crNumber' | transloco"
+            [for]="uid + '-cr-number'"
+            [hint]="'customerForm.more.crNumberHint' | transloco"
+            [count]="crNumberCount()"
+            [max]="limits.commercialRegistrationNumber"
+            [error]="crErr ? (crErr.key | transloco: crErr.params) : null"
+          >
+            <input
+              [id]="uid + '-cr-number'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().commercialRegistrationNumber"
+              [attr.aria-invalid]="crErr ? 'true' : null"
+              (input)="onTextFieldInput('commercialRegistrationNumber', $event)"
+            />
+          </ui-field>
+        </div>
+      </section>
+
+      <div class="h-border bg-border" aria-hidden="true"></div>
+    }
+
+    <section class="flex flex-col gap-8">
+      <ui-field
+        size="bare"
+        [label]="'customerForm.more.address' | transloco"
+        [for]="uid + '-address'"
+        [hint]="'customerForm.more.addressHint' | transloco"
+      >
+        <div
+          [id]="uid + '-address'"
+          role="group"
+          class="flex flex-col gap-6"
+          [attr.aria-label]="'customerForm.more.address' | transloco"
+          [attr.aria-describedby]="uid + '-address-hint'"
+        >
+          <app-address-fields
+            [canAddPlaces]="canAddPlaces"
+            [readonly]="readonly()"
+            [errors]="addressErrors()"
+            [value]="draft().address"
+            (valueChange)="onAddressChange($event)"
+          />
+          @if (hasAddressSelection() && !readonly()) {
+            <div class="flex">
+              <button type="button" uiButton variant="ghost" size="small" (click)="clearAddress()">
+                {{ 'customerForm.more.clearAddress' | transloco }}
+              </button>
+            </div>
+          }
+        </div>
+      </ui-field>
+
+      @if (showLegacyAddress()) {
+        <ui-field
+          [label]="'customerForm.more.previousAddress' | transloco"
+          [for]="uid + '-legacy-address'"
+          [hint]="'customerForm.more.previousAddressHint' | transloco"
+        >
+          <input
+            [id]="uid + '-legacy-address'"
+            type="text"
+            dir="auto"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="resolvedLegacyAddress()"
+          />
+        </ui-field>
+      }
+    </section>
+
+    <div class="h-border bg-border" aria-hidden="true"></div>
+
+    @let descErr = errorFor('description', limits.description);
+    <ui-field
+      size="multiline"
+      [label]="'customerForm.more.description' | transloco"
+      [for]="uid + '-description'"
+      [hint]="'customerForm.more.descriptionHint' | transloco"
+      [count]="descriptionCount()"
+      [max]="limits.description"
+      [error]="descErr ? (descErr.key | transloco: descErr.params) : null"
+    >
+      <textarea
+        [id]="uid + '-description'"
+        rows="3"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [value]="draft().description"
+        [attr.aria-invalid]="descErr ? 'true' : null"
+        (input)="onTextFieldInput('description', $event)"
+      ></textarea>
+    </ui-field>
+  </div>
+}

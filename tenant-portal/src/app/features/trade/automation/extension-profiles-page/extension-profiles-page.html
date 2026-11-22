@@ -1,0 +1,290 @@
+<div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canManage) {
+    <button type="button" uiButton class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'extensions.list.newProfile' | transloco }}
+    </button>
+  }
+
+  <div
+    class="flex h-field min-w-preset flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      #searchInput
+      type="text"
+      autocomplete="off"
+      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'extensions.list.searchPlaceholder' | transloco"
+      [attr.aria-label]="'extensions.list.searchPlaceholder' | transloco"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+      (keydown.escape)="clearSearch()"
+    />
+    @if (search()) {
+      <button
+        type="button"
+        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'extensions.list.clearSearch' | transloco"
+        (click)="clearSearch(); searchInput.focus()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <div
+    role="group"
+    class="flex shrink-0 items-center gap-6"
+    [attr.aria-label]="'extensions.list.statusFilterLabel' | transloco"
+  >
+    <button
+      type="button"
+      class="inline-flex h-filter-chip cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        statusFilter() === 'DRAFT'
+          ? 'bg-brand text-on-brand'
+          : 'bg-brand-soft text-on-brand-soft hover:bg-brand hover:text-on-brand'
+      "
+      [attr.aria-pressed]="statusFilter() === 'DRAFT'"
+      (click)="toggleStatus('DRAFT')"
+    >
+      {{ 'extensions.list.statusDraft' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex h-filter-chip cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        statusFilter() === 'ACTIVE'
+          ? 'bg-brand text-on-brand'
+          : 'bg-brand-soft text-on-brand-soft hover:bg-brand hover:text-on-brand'
+      "
+      [attr.aria-pressed]="statusFilter() === 'ACTIVE'"
+      (click)="toggleStatus('ACTIVE')"
+    >
+      {{ 'extensions.list.statusActive' | transloco }}
+    </button>
+  </div>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="listLoading()"
+    [attr.aria-label]="'extensions.list.reload' | transloco"
+    [title]="'extensions.list.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="listLoading()" aria-hidden="true" />
+  </button>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <app-scope-chip class="shrink-0" [scope]="scopeTarget()" />
+</div>
+
+<ui-step-filter
+  class="shrink-0"
+  [steps]="targetSteps()"
+  [label]="'extensions.list.steps.label' | transloco"
+  [hint]="'extensions.list.steps.hint' | transloco"
+  [value]="selectedTarget()"
+  (valueChange)="setTarget($event)"
+/>
+
+@if (listFailed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 text-text-muted">{{ 'extensions.list.error.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'extensions.list.error.retry' | transloco }}
+    </button>
+  </div>
+} @else if (!listLoading() && items().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerPuzzle" size="18" aria-hidden="true" />
+    </span>
+    @if (hasFilters()) {
+      <p class="text-13 leading-18 font-medium text-text">{{ 'extensions.list.empty.filtered' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="clearFilters()">
+        {{ 'extensions.list.empty.clearFilters' | transloco }}
+      </button>
+    } @else {
+      <p class="text-13 leading-18 font-medium text-text">{{ 'extensions.list.empty.title' | transloco }}</p>
+      @if (canManage) {
+        <button type="button" uiButton variant="primary" (click)="openCreate()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          {{ 'extensions.list.newProfile' | transloco }}
+        </button>
+      }
+    }
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'extensions.list.table.label' | transloco"
+      [attr.aria-busy]="listLoading()"
+    >
+      <div
+        role="row"
+        class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav grid-cols-auto-ext-profile-row-actions"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'extensions.list.table.code' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'extensions.list.table.target' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'extensions.list.table.status' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'extensions.list.table.liveVersion' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'extensions.list.table.draft' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'extensions.list.table.updated' | transloco }}
+        </span>
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'extensions.list.table.actions' | transloco }}</span>
+        </span>
+      </div>
+
+      @if (listLoading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card grid-cols-auto-ext-profile-row-actions"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (row of items(); track row.id) {
+          <div
+            role="row"
+            tabindex="0"
+            class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong grid-cols-auto-ext-profile-row-actions"
+            (click)="openProfile(row)"
+            (keydown)="onRowKeydown($event, row)"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+                <ng-icon name="tablerPuzzle" size="14" aria-hidden="true" />
+              </span>
+              <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums">
+                {{ row.code }}
+              </bdi>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-13 leading-18 text-text">
+                {{ 'extensions.targets.' + row.targetCode | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <app-automation-badge kind="profile" [value]="row.status" />
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10 text-13 leading-18">
+              @if (row.currentPublishedVersion; as live) {
+                <bdi dir="ltr" class="shrink-0 font-medium text-text tabular-nums">
+                  {{ 'extensions.list.table.versionTag' | transloco: { version: live.versionNumber } }}
+                </bdi>
+                <span class="text-text-muted" aria-hidden="true">·</span>
+                <bdi class="truncate text-text-muted tabular-nums">
+                  {{ dateText(live.publishedAt ?? row.updatedAt) }}
+                </bdi>
+              } @else {
+                <span class="text-text-muted">{{ 'extensions.list.table.none' | transloco }}</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              @if (row.editableDraftVersion; as draft) {
+                <app-automation-badge kind="profileVersion" [value]="draft.status" />
+                <bdi dir="ltr" class="shrink-0 text-12 leading-16 text-text-muted tabular-nums">
+                  {{ 'extensions.list.table.versionTag' | transloco: { version: draft.versionNumber } }}
+                </bdi>
+              } @else {
+                <span class="text-13 leading-18 text-text-muted">{{ 'extensions.list.table.none' | transloco }}</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <bdi class="truncate text-13 leading-18 text-text-muted tabular-nums">
+                {{ dateText(row.updatedAt) }}
+              </bdi>
+            </span>
+
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border"
+              (click)="$event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+            >
+              <ui-actions-menu
+                [items]="actionsFor(row)"
+                [label]="menuLabelFor(row)"
+                (selected)="onRowAction(row, $event)"
+              />
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (!listFailed() && !listLoading() && totalItems() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="totalItems()"
+      [pageSizes]="pageSizes"
+      [label]="'extensions.list.paginationLabel' | transloco"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  </footer>
+}
+
+<app-extension-profile-modal
+  [scopeTarget]="scopeTarget()"
+  (created)="onProfileCreated($event)"
+/>

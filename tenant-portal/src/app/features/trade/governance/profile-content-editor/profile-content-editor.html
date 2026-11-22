@@ -1,0 +1,314 @@
+@if (tab() === null) {
+  <div class="mb-10 rounded-10 border border-border bg-surface px-10 shadow-card">
+    <ui-tabs
+      [tabs]="tabs()"
+      [label]="'profiles.version.tabsLabel' | transloco"
+      [active]="activeTab()"
+      (activeChange)="onInternalTabChange($event)"
+    />
+  </div>
+}
+
+@switch (activeTab()) {
+  @case ('fields') {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'profiles.fields.tableLabel' | transloco"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="fieldsTableTrack"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'profiles.fields.columns.field' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.fields.columns.kind' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.fields.columns.visible' | transloco }}
+            <span [id]="uid + '-field-visible-hint'" class="sr-only">{{ 'profiles.fields.columns.visibleHint' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.fields.columns.required' | transloco }}
+            <span [id]="uid + '-field-required-hint'" class="sr-only">{{ 'profiles.fields.columns.requiredHint' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.fields.columns.note' | transloco }}
+          </span>
+        </div>
+
+        @for (row of fieldRows(); track row.def.code) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+            [class]="fieldsTableTrack"
+          >
+            <span role="cell" class="flex min-w-0 items-center px-10">
+              <span class="truncate font-medium">
+                {{ 'profiles.registry.fields.' + row.def.code | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <ui-badge [tone]="row.def.serverOwned ? 'brand' : 'tag'">
+                {{ (row.def.serverOwned ? 'profiles.fields.kind.serverOwned' : 'profiles.fields.kind.editable') | transloco }}
+              </ui-badge>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              <ui-switch
+                [checked]="row.config.visible"
+                [disabled]="readonly() || row.def.familyRequired"
+                [label]="fieldVisibleAria(row.def.code)"
+                [describedBy]="uid + '-field-visible-hint'"
+                (checkedChange)="setFieldVisible(row.def, $event)"
+              />
+              @if (row.def.familyRequired) {
+                <ng-icon name="tablerLock" size="12" class="shrink-0 text-text-muted" aria-hidden="true" />
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              <ui-switch
+                [checked]="row.config.required"
+                [disabled]="readonly() || row.def.familyRequired || row.def.serverOwned"
+                [label]="fieldRequiredAria(row.def.code)"
+                [describedBy]="uid + '-field-required-hint'"
+                (checkedChange)="setFieldRequired(row.def, $event)"
+              />
+              @if (row.def.familyRequired || row.def.serverOwned) {
+                <ng-icon name="tablerLock" size="12" class="shrink-0 text-text-muted" aria-hidden="true" />
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (row.def.familyRequired) {
+                <span class="truncate text-12 text-text-muted">
+                  {{ 'profiles.fields.alwaysRequired.' + family().documentType | transloco }}
+                </span>
+              } @else if (row.def.serverOwned) {
+                <span class="truncate text-12 text-text-muted">
+                  {{ 'profiles.fields.serverOwnedNote' | transloco }}
+                </span>
+              }
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @case ('layout') {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'profiles.layout.tableLabel' | transloco"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="layoutTableTrack()"
+        >
+          <span role="columnheader" class="flex items-center justify-center">
+            <span class="sr-only">{{ 'profiles.layout.columns.drag' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.layout.columns.order' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.layout.columns.component' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.layout.columns.visible' | transloco }}
+            <span [id]="uid + '-component-visible-hint'" class="sr-only">{{ 'profiles.layout.columns.visibleHint' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.layout.columns.note' | transloco }}
+          </span>
+          @if (!readonly()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'profiles.layout.columns.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        <div
+          cdkDropList
+          [cdkDropListDisabled]="readonly()"
+          (cdkDropListDropped)="onComponentDrop($event)"
+        >
+          @for (row of componentRows(); track row.def.code; let index = $index; let count = $count) {
+            <div
+              role="row"
+              cdkDrag
+              [cdkDragDisabled]="readonly()"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+              [class]="layoutTableTrack()"
+            >
+              <div
+                *cdkDragPlaceholder
+                class="mt-6 h-table-row rounded-10 border-2 border-dashed border-brand bg-brand-soft"
+              ></div>
+
+              <span role="cell" class="flex items-center justify-center text-text-muted">
+                @if (readonly()) {
+                  <ng-icon name="tablerGripVertical" size="14" class="text-text-placeholder" aria-hidden="true" />
+                } @else {
+                  <span
+                    cdkDragHandle
+                    class="inline-flex cursor-grab items-center justify-center text-text-muted hover:text-text"
+                    [title]="'profiles.layout.dragHandle' | transloco"
+                    [attr.aria-label]="'profiles.layout.dragHandle' | transloco"
+                  >
+                    <ng-icon name="tablerGripVertical" size="14" aria-hidden="true" />
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="text-12 tabular-nums text-text-muted">
+                  <bdi dir="ltr">{{ row.config.order }}</bdi>
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate font-medium">
+                  {{ 'profiles.registry.components.' + row.def.code | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                <ui-switch
+                  [checked]="row.config.visible"
+                  [disabled]="readonly() || row.def.mandatory"
+                  [label]="componentVisibleAria(row.def.code)"
+                  [describedBy]="uid + '-component-visible-hint'"
+                  (checkedChange)="setComponentVisible(row.def, $event)"
+                />
+                @if (row.def.mandatory) {
+                  <ng-icon name="tablerLock" size="12" class="shrink-0 text-text-muted" aria-hidden="true" />
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (row.def.mandatory) {
+                  <span class="truncate text-12 text-text-muted">
+                    {{ 'profiles.layout.alwaysVisible' | transloco }}
+                  </span>
+                }
+              </span>
+
+              @if (!readonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <ui-actions-menu
+                    [items]="componentRowActions(index, count)"
+                    [label]="'profiles.layout.actions.menuLabel' | transloco"
+                    (selected)="onComponentAction(index, $event)"
+                  />
+                </span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @case ('behaviour') {
+    <section
+      class="rounded-10 border border-border bg-surface p-12 shadow-card"
+      [attr.aria-label]="'profiles.behaviour.sectionLabel' | transloco"
+    >
+      <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+        @for (mode of family().modes; track mode.key) {
+          <ui-field
+            size="bare"
+            [label]="'profiles.registry.modes.' + mode.key + '.label' | transloco"
+            [for]="uid + '-mode-' + mode.key"
+            [hint]="'profiles.registry.modes.' + mode.key + '.hint' | transloco"
+            [hintText]="modeNote(mode)"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-mode-' + mode.key"
+              [describedBy]="uid + '-mode-' + mode.key + '-hint'"
+              [label]="'profiles.registry.modes.' + mode.key + '.label' | transloco"
+              [options]="modeOptions(mode)"
+              [disabled]="readonly() || mode.locked"
+              [value]="modeValueAsString(mode)"
+              (valueChange)="onModeChange(mode, $event)"
+            />
+          </ui-field>
+        }
+      </div>
+    </section>
+  }
+
+  @case ('evidence') {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'profiles.evidence.tableLabel' | transloco"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="evidenceTableTrack"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'profiles.evidence.columns.evidence' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.evidence.columns.include' | transloco }}
+            <span [id]="uid + '-evidence-include-hint'" class="sr-only">{{ 'profiles.evidence.columns.includeHint' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.evidence.columns.required' | transloco }}
+            <span [id]="uid + '-evidence-required-hint'" class="sr-only">{{ 'profiles.evidence.columns.requiredHint' | transloco }}</span>
+          </span>
+        </div>
+
+        @for (row of evidenceRows(); track row.def.code) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+            [class]="evidenceTableTrack"
+          >
+            <span role="cell" class="flex min-w-0 items-center px-10">
+              <span class="truncate font-medium">
+                {{ 'profiles.registry.evidence.' + row.def.code | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <ui-switch
+                [checked]="!!row.config.include"
+                [disabled]="readonly()"
+                [label]="evidenceIncludeAria(row.def.code)"
+                [describedBy]="uid + '-evidence-include-hint'"
+                (checkedChange)="setEvidenceInclude(row.def, $event)"
+              />
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <ui-switch
+                [checked]="row.config.required"
+                [disabled]="readonly() || !row.config.include"
+                [label]="evidenceRequiredAria(row.def.code)"
+                [describedBy]="uid + '-evidence-required-hint'"
+                (checkedChange)="setEvidenceRequired(row.def, $event)"
+              />
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+}

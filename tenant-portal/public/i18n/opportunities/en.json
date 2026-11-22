@@ -1,0 +1,474 @@
+{
+  "title": "Opportunities",
+  "record": "Opportunity",
+  "new": "New opportunity",
+  "ref": "Reference",
+  "noCurrency": "No currency",
+  "placeholder": "This page is being built.",
+  "loading": "Loading opportunity…",
+  "pipelineFallback": "The pipeline you used is not available. Showing {{name}}.",
+  "status": {
+    "IN_PROGRESS": "In progress",
+    "ON_HOLD": "On hold",
+    "WON": "Won",
+    "LOST": "Lost"
+  },
+  "closing": {
+    "OVERDUE": "Overdue",
+    "NEXT_7_DAYS": "Next 7 days",
+    "NEXT_30_DAYS": "Next 30 days",
+    "NO_DATE": "No close date"
+  },
+  "searchField": {
+    "opportunity": "Opportunity",
+    "customer": "Customer",
+    "email": "Email",
+    "phone": "Phone"
+  },
+  "errors": {
+    "OPPORTUNITY_NOT_FOUND": "This opportunity no longer exists.",
+    "CRM.OPPORTUNITY.CONCURRENT_UPDATE": "Someone else updated this opportunity. Reload to see their changes.",
+    "CRM.OPPORTUNITY.STALE_MOVE": "This opportunity changed since it was opened. Reload and try moving it again.",
+    "OPPORTUNITY_LOST_REASON_REQUIRED": "Select a loss reason or enter a note before marking this opportunity as lost.",
+    "CRM_REASON_REQUIRED": "A reason is required for this stage change.",
+    "CRM_REASON_KIND_MISMATCH": "The selected reason does not match the outcome of this stage.",
+    "CRM_REASON_UNAVAILABLE": "This reason is no longer active. Choose another one.",
+    "CUSTOMER_PROFILE_BLACKLISTED": "This customer is blacklisted. You cannot win or reopen its opportunities.",
+    "CUSTOMER_PROFILE_NOT_FOUND": "The selected customer no longer exists.",
+    "OPPORTUNITY_OWNER_INELIGIBLE": "This user cannot own opportunities in this branch.",
+    "PIPELINE_STAGE_NOT_FOUND": "This pipeline or stage is no longer available.",
+    "OPPORTUNITY_CREATE_STAGE_TERMINAL": "A new opportunity cannot start in a won or lost stage.",
+    "OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED": "Choose a currency for the entered amount.",
+    "OPPORTUNITY_CONTACT_CUSTOMER_MISMATCH": "The selected contact does not belong to this customer.",
+    "OPPORTUNITY_LEAD_CUSTOMER_MISMATCH": "The linked lead belongs to a different customer.",
+    "OPPORTUNITY_PIPELINE_UNCHANGED": "Choose a different pipeline to transfer this opportunity.",
+    "OPPORTUNITY_BOARD_CURSOR_INVALID": "The board page position is no longer valid. Reload the board.",
+    "OPPORTUNITY_CREATE_IDEMPOTENCY_MISMATCH": "The same request key was reused with different opportunity details. Try again.",
+    "CRM_OPPORTUNITIES_DISABLED": "The Opportunities module is turned off for this company.",
+    "CRM_BRANCH_MISMATCH": "This record belongs to a different branch.",
+    "CRM_VALIDATION_FAILED": "Some of the entered data is not valid. Check the fields and try again.",
+    "CRM_SCOPED_PERMISSION_DENIED": "You do not have permission to access or modify this opportunity in this branch.",
+    "OPPORTUNITY_FILTER_TAGS_CONFLICT": "The selected tags conflict with the tag condition in the filter. Remove one of them and try again.",
+    "OPPORTUNITY_PIPELINE_MISMATCH": "This opportunity was skipped because it belongs to a different pipeline.",
+    "OPPORTUNITY_CREATE_IDEMPOTENCY_INVALID": "The request could not be sent safely. Reload the page and try again.",
+    "OPPORTUNITY_SELECTION_TOO_LARGE": "Too many opportunities match this selection. Narrow the filter and try again.",
+    "OPPORTUNITY_HISTORY_CURSOR_INVALID": "The history page position is no longer valid. Reload the history.",
+    "CRM_TAG_UNKNOWN": "One or more of the selected tags no longer exist. Reload the tags and try again.",
+    "CRM_RECORD_TAG_ALREADY_ATTACHED": "One or more of these tags are already on this opportunity. Reload to see the current tags.",
+    "CRM_RECORD_TAG_NOT_FOUND": "This tag is no longer on this opportunity. Reload to see the current tags.",
+    "PIPELINE_NOT_FOUND": "This pipeline is no longer available. Reload and choose another pipeline.",
+    "INVALID_FILTER_TREE": "The filter conditions are not valid. Review the filter and try again.",
+    "LEAD_NOT_FOUND": "The linked lead no longer exists.",
+    "PARTY_NOT_FOUND": "The selected contact no longer exists.",
+    "generic": "Could not load or save the opportunity. Try again."
+  },
+  "card": {
+    "actions": "Opportunity actions",
+    "view": "View opportunity",
+    "amount": "Amount",
+    "expectedClose": "Expected close date",
+    "overdue": "Overdue",
+    "probability": "Probability",
+    "phone": "Phone",
+    "noOwner": "No owner",
+    "rateFailed": "The rating could not be saved.",
+    "colorFailed": "The colour could not be saved.",
+    "menu": {
+      "open": "Open",
+      "edit": "Edit",
+      "move": "Move to",
+      "transfer": "Move to pipeline",
+      "color": "Change colour",
+      "activities": "Log activity",
+      "delete": "Delete"
+    },
+    "color": {
+      "none": "No colour",
+      "RED": "Red",
+      "ORANGE": "Orange",
+      "AMBER": "Amber",
+      "YELLOW": "Yellow",
+      "GREEN": "Green",
+      "TEAL": "Teal",
+      "BLUE": "Blue",
+      "INDIGO": "Indigo",
+      "PURPLE": "Purple",
+      "PINK": "Pink",
+      "SLATE": "Slate"
+    }
+  },
+  "board": {
+    "openFailed": "This opportunity could not be opened.",
+    "add": "Add opportunity in {{stage}}",
+    "expand": "Expand {{stage}}",
+    "collapse": "Collapse {{stage}}",
+    "loadMore": "Load more ({{shown}} of {{total}})",
+    "inactive": "This stage is inactive",
+    "total": "Total {{amount}}",
+    "refreshed": "This opportunity was changed by someone else. The board was refreshed.",
+    "empty": "No opportunities in this stage",
+    "emptyHelp": "Drag an opportunity here or add a new one.",
+    "allShown": "All opportunities are shown",
+    "noMatch": "No opportunities match."
+  },
+  "table": {
+    "title": "Title",
+    "customer": "Customer",
+    "stage": "Stage",
+    "amount": "Amount",
+    "probability": "Probability",
+    "expectedClose": "Expected close",
+    "owner": "Owner",
+    "nextActivity": "Next activity",
+    "phone": "Phone",
+    "rating": "Rating",
+    "actions": "Actions",
+    "selectPage": "Select all opportunities on this page",
+    "selectRow": "Select {{name}}",
+    "sortBy": "Sort by {{column}}",
+    "sortHint": "Starred opportunities always come first.",
+    "showInTable": "Show in table"
+  },
+  "list": {
+    "retry": "Retry",
+    "invalidSearch": "The search could not run. Check the conditions.",
+    "loadFailed": "Opportunities could not be loaded.",
+    "noResults": "No opportunities match this search.",
+    "pagination": "Opportunities pagination",
+    "deleteTitle": "Delete this opportunity?",
+    "deleteBody": "Its notes, attachments and tags are deleted too.",
+    "deleted": "Opportunity deleted.",
+    "deleteFailed": "The opportunity could not be deleted.",
+    "refreshed": "This opportunity was changed by someone else. The list was refreshed."
+  },
+  "page": {
+    "newTitle": "Create a new opportunity",
+    "noCreatePermission": "You do not have permission to create opportunities.",
+    "pipelineLabel": "Pipeline",
+    "pipelineTitle": "Choose the pipeline to show",
+    "pipelineDefault": "Default",
+    "allPipelines": "All pipelines",
+    "searchPlaceholder": "Search opportunities",
+    "lockedByDraft": "Apply or clear the advanced search first",
+    "advancedSearch": "Advanced search",
+    "viewSwitcher": "Opportunities view",
+    "views": {
+      "board": "Board",
+      "cards": "Cards",
+      "table": "Table"
+    },
+    "boardDisabledAllPipelines": "Choose a pipeline to use the Board",
+    "stageFilter": {
+      "label": "Filter by stage",
+      "hint": "Show only the opportunities in the chosen stage",
+      "all": "All"
+    },
+    "statusFilter": {
+      "label": "Filter by status",
+      "hint": "Show only the opportunities in the chosen status",
+      "all": "All",
+      "OPEN": "Open",
+      "WON": "Won",
+      "LOST": "Lost"
+    },
+    "customerChip": "Customer",
+    "noPipeline": {
+      "title": "No pipeline is available to you",
+      "text": "Ask an administrator to give you access to a pipeline.",
+      "openSettings": "Open pipeline settings"
+    },
+    "pipelinesLoading": "Loading pipelines…",
+    "pipelinesFailed": "Pipelines could not be loaded.",
+    "loadFailed": "Opportunities could not be loaded.",
+    "boardRefreshed": "The board was refreshed."
+  },
+  "search": {
+    "advanced": "Advanced",
+    "advancedCount": "{{n}} conditions",
+    "me": "Me",
+    "textReplaces": "Replaces the current text search.",
+    "groups": {
+      "text": "Opportunity and text",
+      "stage": "Stage and status",
+      "people": "People and customer",
+      "value": "Value and classification",
+      "datesAndActivities": "Dates and activities"
+    },
+    "presets": {
+      "mine": "My opportunities",
+      "open": "Open",
+      "closingThisMonth": "Closing this month"
+    },
+    "rejected": {
+      "oneTextFacet": "Only one text search is used at a time.",
+      "CONTRADICTION": "This conflicts with an existing {{field}} condition.",
+      "ROOT_ONLY": "{{field}} applies to all results and cannot be placed inside an OR group.",
+      "EXCLUSIVE": "Only one text search is used at a time.",
+      "SINGLETON": "{{field}} can be used only once.",
+      "UNSUPPORTED": "The {{field}} condition could not be applied.",
+      "invalidField": "One of the search fields is not valid.",
+      "operatorNotAllowed": "This operator is not allowed for the selected field.",
+      "invalidValue": "One of the search values is not valid.",
+      "tagsConflict": "The selected tags conflict with the tag condition in the filter. Remove one of them and try again."
+    },
+    "options": {
+      "stageCategory": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "POSITIVE": "Positive",
+        "NEGATIVE": "Negative"
+      },
+      "status": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "ON_HOLD": "On hold",
+        "WON": "Won",
+        "LOST": "Lost"
+      },
+      "customerType": {
+        "INDIVIDUAL": "Individual",
+        "CORPORATE": "Company"
+      },
+      "customerStatus": {
+        "PROSPECT": "Prospect",
+        "ACTIVE_CUSTOMER": "Active customer",
+        "INACTIVE": "Inactive",
+        "BLACKLISTED": "Blacklisted"
+      },
+      "activityState": {
+        "NO_OPEN": "None open",
+        "OVERDUE": "Overdue",
+        "TODAY": "Today",
+        "FUTURE": "Upcoming"
+      }
+    },
+    "nullLabels": {
+      "description": {
+        "isNull": "No description",
+        "isNotNull": "Has a description"
+      },
+      "owner": {
+        "isNull": "Unassigned",
+        "isNotNull": "Assigned"
+      },
+      "ownerTeam": {
+        "isNull": "No team",
+        "isNotNull": "Has a team"
+      },
+      "createdBy": {
+        "isNull": "Unknown",
+        "isNotNull": "Known"
+      },
+      "customerType": {
+        "isNull": "Unspecified",
+        "isNotNull": "Specified"
+      },
+      "contact": {
+        "isNull": "No contact",
+        "isNotNull": "Has contact"
+      },
+      "fromLead": {
+        "isNull": "Not from a lead",
+        "isNotNull": "From a lead"
+      },
+      "leadSource": {
+        "isNull": "No source",
+        "isNotNull": "Has a source"
+      },
+      "amount": {
+        "isNull": "No amount",
+        "isNotNull": "Has an amount"
+      },
+      "currency": {
+        "isNull": "No currency",
+        "isNotNull": "Has a currency"
+      },
+      "probability": {
+        "isNull": "No probability",
+        "isNotNull": "Has a probability"
+      },
+      "color": {
+        "isNull": "No colour",
+        "isNotNull": "Has a colour"
+      },
+      "tags": {
+        "isNull": "No tags",
+        "isNotNull": "Has tags"
+      },
+      "closing": {
+        "isNull": "No close date",
+        "isNotNull": "Has close date"
+      },
+      "nextActivity": {
+        "isNull": "No open activity",
+        "isNotNull": "Has open activity"
+      },
+      "lostReason": {
+        "isNull": "No loss reason",
+        "isNotNull": "Has loss reason"
+      },
+      "winReason": {
+        "isNull": "No win reason",
+        "isNotNull": "Has win reason"
+      },
+      "lostNote": {
+        "isNull": "No loss note",
+        "isNotNull": "Has loss note"
+      },
+      "wonAt": {
+        "isNull": "Not won",
+        "isNotNull": "Won"
+      },
+      "lostAt": {
+        "isNull": "Not lost",
+        "isNotNull": "Lost"
+      }
+    },
+    "fields": {
+      "q": {
+        "label": "Opportunity",
+        "hint": "Matches the opportunity title, description and OP- reference."
+      },
+      "customer": {
+        "label": "Customer",
+        "hint": "Matches the customer name, company name and primary contact."
+      },
+      "email": {
+        "label": "Email",
+        "hint": "Matches the email of the customer or primary contact."
+      },
+      "phone": {
+        "label": "Phone",
+        "hint": "Matches mobile and phone numbers, digits only."
+      },
+      "title": {
+        "label": "Title",
+        "hint": "Matches the opportunity title."
+      },
+      "description": {
+        "label": "Description",
+        "hint": "Text search inside the opportunity description."
+      },
+      "stage": {
+        "label": "Stage",
+        "hint": "The opportunity's current stage in the pipeline."
+      },
+      "stageCategory": {
+        "label": "Stage group",
+        "hint": "Open, in progress, positive or negative stage group."
+      },
+      "status": {
+        "label": "Status",
+        "hint": "Open, in progress, on hold, won or lost."
+      },
+      "owner": {
+        "label": "Owner",
+        "hint": "The person responsible for this opportunity."
+      },
+      "ownerTeam": {
+        "label": "Owner team",
+        "hint": "The team that the owner belongs to."
+      },
+      "createdBy": {
+        "label": "Created by",
+        "hint": "The person who created this opportunity."
+      },
+      "customerRecord": {
+        "label": "Customer record",
+        "hint": "Matches a specific customer record."
+      },
+      "customerType": {
+        "label": "Customer type",
+        "hint": "Individual or company."
+      },
+      "customerStatus": {
+        "label": "Customer status",
+        "hint": "Prospect, active customer, inactive or blacklisted."
+      },
+      "contact": {
+        "label": "Has contact",
+        "hint": "Whether a contact person is linked to this opportunity."
+      },
+      "fromLead": {
+        "label": "From a lead",
+        "hint": "Whether this opportunity was converted from a lead."
+      },
+      "leadSource": {
+        "label": "Lead source",
+        "hint": "Where the customer or lead came from."
+      },
+      "amount": {
+        "label": "Amount",
+        "hint": "Expected opportunity value."
+      },
+      "currency": {
+        "label": "Currency",
+        "hint": "Three-letter ISO currency code."
+      },
+      "probability": {
+        "label": "Probability",
+        "hint": "Win probability from 0 to 100."
+      },
+      "importance": {
+        "label": "Rating",
+        "hint": "From 0 to 3 stars."
+      },
+      "color": {
+        "label": "Colour",
+        "hint": "The colour marked on the opportunity card."
+      },
+      "tags": {
+        "label": "Tags",
+        "hint": "Opportunities with at least one of the chosen tags."
+      },
+      "closing": {
+        "label": "Expected close",
+        "hint": "Expected closing date (calendar date)."
+      },
+      "activityState": {
+        "label": "Next activity",
+        "hint": "Due status of the next open activity."
+      },
+      "nextActivity": {
+        "label": "Next activity date",
+        "hint": "Date of the next open activity in the workspace time zone."
+      },
+      "openActivities": {
+        "label": "Open activities",
+        "hint": "Number of open activities on this opportunity."
+      },
+      "daysInStage": {
+        "label": "Days in stage",
+        "hint": "Days elapsed since entering the current stage."
+      },
+      "lostReason": {
+        "label": "Loss reason",
+        "hint": "Governed reason selected when marking as lost."
+      },
+      "winReason": {
+        "label": "Win reason",
+        "hint": "Governed reason selected when marking as won."
+      },
+      "lostNote": {
+        "label": "Loss note",
+        "hint": "Text note entered when marking as lost."
+      },
+      "created": {
+        "label": "Created",
+        "hint": "Dates use the workspace time zone."
+      },
+      "updated": {
+        "label": "Last updated",
+        "hint": "Dates use the workspace time zone."
+      },
+      "wonAt": {
+        "label": "Won on",
+        "hint": "Dates use the workspace time zone."
+      },
+      "lostAt": {
+        "label": "Lost on",
+        "hint": "Dates use the workspace time zone."
+      }
+    }
+  }
+}

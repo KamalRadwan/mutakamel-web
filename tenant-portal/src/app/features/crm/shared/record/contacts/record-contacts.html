@@ -1,0 +1,337 @@
+<div class="flex flex-col gap-8">
+  @if (viewContacts().length > 0) {
+    <div
+      role="radiogroup"
+      class="sr-only"
+      [attr.aria-label]="'recordForm.contacts.primary' | transloco"
+      [attr.aria-owns]="radioIds()"
+      [attr.aria-invalid]="isPrimarySectionError() ? 'true' : null"
+    ></div>
+  }
+  <div [class]="layout() === 'page' ? 'grid grid-cols-1 wide:grid-cols-2 gap-8' : 'flex flex-col gap-8'">
+    @for (contact of viewContacts(); track contact.key; let idx = $index) {
+      @if (!isCardEditing(contact)) {
+        <app-record-contact-read
+          [class]="layout() === 'page' ? 'min-w-0 w-full' : null"
+          [contact]="contact"
+          [index]="idx"
+          [uid]="uid"
+          [readonly]="isReadOnly()"
+          [disabled]="savingContact()"
+          [canDelete]="contacts().length > 1"
+          [radioTabStop]="isRadioTabStop(idx)"
+          [crm]="crm()"
+          [source]="source()"
+          (makePrimary)="setPrimary(idx)"
+          (primaryKeydown)="onPrimaryKeydown($event, idx)"
+          (edit)="startEditContact(idx)"
+          (remove)="removeContact(idx)"
+        />
+      } @else {
+        @let phones = contactPhones(contact);
+        @let lockedIdentity = identityReadonly(contact);
+        @let showDelete =
+          !isReadOnly() &&
+          (mode() === 'create' ? contacts().length > 1 : !editing()?.isNew && contacts().length > 1);
+        @let titleErr = fieldError(contact, 'honorificTitle');
+        @let jobErr = fieldError(contact, 'jobTitle');
+        @let firstErr = fieldError(contact, 'firstName');
+        @let lastErr = fieldError(contact, 'lastName');
+        @let mailErr = emailError(contact);
+
+        <article
+          [id]="uid + '-card-' + idx"
+          [class]="
+            layout() === 'page'
+              ? 'wide:col-span-2 flex flex-col gap-8 rounded-10 border border-border bg-surface p-8'
+              : 'flex flex-col gap-8 rounded-10 border border-border bg-surface p-8'
+          "
+        >
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-12 leading-18 font-medium text-text">
+              {{ 'recordForm.contacts.n' | transloco: { n: idx + 1 } }}
+            </span>
+
+            <div class="flex items-center gap-6">
+              <button
+                [id]="uid + '-primary-' + idx"
+                type="button"
+                role="radio"
+                class="inline-flex h-btn-h-sm cursor-pointer items-center gap-4 rounded-6 px-8 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                [class]="
+                  contact.isPrimary
+                    ? 'bg-brand-soft text-on-brand-soft'
+                    : 'text-text-muted hover:bg-neutral-soft hover:text-text'
+                "
+                [attr.tabindex]="isRadioTabStop(idx) ? 0 : -1"
+                [attr.aria-checked]="contact.isPrimary"
+                [attr.aria-label]="
+                  (contact.isPrimary ? 'recordForm.contacts.primary' : 'recordForm.contacts.makePrimaryFor')
+                    | transloco: { name: contactDisplayName(contact, idx) }
+                "
+                [title]="(contact.isPrimary ? 'recordForm.contacts.primary' : 'recordForm.contacts.makePrimary') | transloco"
+                [disabled]="isReadOnly() || savingContact()"
+                (keydown)="onPrimaryKeydown($event, idx)"
+                (click)="setPrimary(idx)"
+              >
+                <ng-icon
+                  [name]="contact.isPrimary ? 'tablerStarFill' : 'tablerStar'"
+                  size="14"
+                  [class]="contact.isPrimary ? 'text-warning-text' : ''"
+                  aria-hidden="true"
+                />
+                <span>{{ (contact.isPrimary ? 'recordForm.contacts.primary' : 'recordForm.contacts.makePrimary') | transloco }}</span>
+              </button>
+
+              @if (mode() === 'edit' && !isReadOnly()) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="primary"
+                  size="small"
+                  [loading]="savingContact()"
+                  [disabled]="savingContact()"
+                  (click)="saveCurrentEdit()"
+                >
+                  <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                  {{ 'recordForm.contacts.save' | transloco }}
+                </button>
+
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                  [attr.aria-label]="'recordForm.contacts.cancel' | transloco"
+                  [title]="'recordForm.contacts.cancel' | transloco"
+                  [disabled]="savingContact()"
+                  (click)="cancelEditContact()"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+
+              @if (showDelete) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                  [attr.aria-label]="'recordForm.contacts.remove' | transloco: { n: idx + 1 }"
+                  [title]="'recordForm.contacts.remove' | transloco: { n: idx + 1 }"
+                  [disabled]="savingContact()"
+                  (click)="removeContact(idx)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </div>
+
+          @if (isLinkedContact(contact)) {
+            <div class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-8 py-4">
+              <span class="min-w-0 truncate text-12 text-text">{{ contact.firstName }}</span>
+              @if (!isReadOnly()) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="ghost"
+                  size="small"
+                  (click)="clearPickedContact(idx)"
+                >
+                  {{ 'recordForm.contacts.clear' | transloco }}
+                </button>
+              }
+            </div>
+          } @else if (hasLinkedCompany() && companyContacts().length > 0 && !isReadOnly()) {
+            <ui-field
+              size="bare"
+              [label]="'recordForm.contacts.pick' | transloco"
+              [for]="uid + '-pick-' + idx"
+              [hint]="'recordForm.contacts.pickHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-pick-' + idx"
+                [label]="'recordForm.contacts.pick' | transloco"
+                [options]="companyContactOptions()"
+                [value]="''"
+                (valueChange)="pickExistingContact(idx, $event)"
+              />
+            </ui-field>
+          }
+
+          <div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+            <ui-field
+              size="bare"
+              [label]="'recordForm.contacts.titleField' | transloco"
+              [for]="uid + '-title-' + idx"
+              [hint]="'recordForm.contacts.titleFieldHint' | transloco: { max: limits().honorificTitle }"
+              [count]="contact.honorificTitle.length"
+              [max]="limits().honorificTitle"
+              [error]="titleErr"
+            >
+              <ui-suggest-input
+                [value]="contact.honorificTitle"
+                (valueChange)="setTextValue(idx, 'honorificTitle', $event)"
+                [options]="allTitles()"
+                [maxLength]="limits().honorificTitle"
+                [inputId]="uid + '-title-' + idx"
+                [describedBy]="uid + '-title-' + idx + '-hint'"
+                [label]="'recordForm.contacts.titleField' | transloco"
+                [invalid]="!!titleErr"
+                [readonly]="isReadOnly()"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [label]="'recordForm.contacts.jobTitle' | transloco"
+              [for]="uid + '-job-' + idx"
+              [hint]="'recordForm.contacts.jobTitleHint' | transloco: { max: limits().jobTitle }"
+              [count]="contact.jobTitle.length"
+              [max]="limits().jobTitle"
+              [error]="jobErr"
+            >
+              <ui-suggest-input
+                [value]="contact.jobTitle"
+                (valueChange)="setTextValue(idx, 'jobTitle', $event)"
+                [options]="allJobTitles()"
+                [maxLength]="limits().jobTitle"
+                [inputId]="uid + '-job-' + idx"
+                [describedBy]="uid + '-job-' + idx + '-hint'"
+                [label]="'recordForm.contacts.jobTitle' | transloco"
+                [invalid]="!!jobErr"
+                [readonly]="isReadOnly()"
+              />
+            </ui-field>
+
+            <ui-field
+              [label]="'recordForm.contacts.firstName' | transloco"
+              [for]="uid + '-first-' + idx"
+              [hint]="'recordForm.contacts.firstNameHint' | transloco: { max: limits().firstName }"
+              [required]="true"
+              [count]="contact.firstName.length"
+              [max]="limits().firstName"
+              [error]="firstErr"
+            >
+              <input
+                [id]="uid + '-first-' + idx"
+                type="text"
+                autocomplete="given-name"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="lockedIdentity"
+                [value]="contact.firstName"
+                [attr.aria-invalid]="firstErr ? 'true' : null"
+                (input)="setTextField(idx, 'firstName', $event)"
+              />
+            </ui-field>
+
+            <ui-field
+              [label]="'recordForm.contacts.lastName' | transloco"
+              [for]="uid + '-last-' + idx"
+              [hint]="'recordForm.contacts.lastNameHint' | transloco: { max: limits().lastName }"
+              [count]="contact.lastName.length"
+              [max]="limits().lastName"
+              [error]="lastErr"
+            >
+              <input
+                [id]="uid + '-last-' + idx"
+                type="text"
+                autocomplete="family-name"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="lockedIdentity"
+                [value]="contact.lastName"
+                [attr.aria-invalid]="lastErr ? 'true' : null"
+                (input)="setTextField(idx, 'lastName', $event)"
+              />
+            </ui-field>
+
+            <div [class]="layout() === 'page' ? 'col-span-2 desktop:col-span-1' : ''">
+              <app-phone-list
+                [phones]="phones"
+                (phonesChange)="setPhones(idx, $event)"
+                [countries]="countries()"
+                [max]="limits().phones"
+                [maxLength]="limits().phoneLength"
+                [readonly]="isReadOnly()"
+                [label]="'recordForm.contacts.mobile' | transloco"
+                [hint]="'recordForm.contacts.mobileHint' | transloco"
+                [addLabel]="'recordForm.contacts.addPhone' | transloco"
+                [removeLabel]="'recordForm.contacts.removePhone' | transloco"
+                [idPrefix]="uid + '-phone-' + idx"
+                [errors]="contactPhoneErrors(contact)"
+                [crm]="crm()"
+                [source]="source()"
+              />
+            </div>
+
+            <ui-field
+              [label]="'recordForm.contacts.email' | transloco"
+              [for]="uid + '-email-' + idx"
+              [hint]="'recordForm.contacts.emailHint' | transloco"
+              [count]="contact.email.length"
+              [max]="limits().email"
+              [error]="mailErr"
+            >
+              <input
+                [id]="uid + '-email-' + idx"
+                type="email"
+                dir="ltr"
+                autocomplete="email"
+                class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="isReadOnly()"
+                [value]="contact.email"
+                [attr.aria-invalid]="mailErr ? 'true' : null"
+                (input)="setTextField(idx, 'email', $event)"
+              />
+            </ui-field>
+          </div>
+        </article>
+      }
+    }
+  </div>
+
+  @if (sectionError(); as err) {
+    <p class="flex items-center gap-3 text-11 leading-16 text-danger-text" role="alert">
+      <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+      {{ err }}
+    </p>
+  }
+
+  @if (!isReadOnly()) {
+    <div class="flex">
+      <button
+        [id]="uid + '-add'"
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [disabled]="atMaxContacts() || savingContact()"
+        [attr.title]="atMaxContacts() ? ('recordForm.contacts.max' | transloco: { max: maxContacts() }) : null"
+        [attr.aria-invalid]="sectionError() && !isPrimarySectionError() ? 'true' : null"
+        (click)="addContact()"
+      >
+        <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+        {{ 'recordForm.contacts.add' | transloco }}
+      </button>
+    </div>
+  }
+</div>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'recordForm.contacts.unsavedTitle' | transloco"
+  [text]="'recordForm.contacts.unsavedText' | transloco"
+  [saveLabel]="'recordForm.contacts.save' | transloco"
+  [discardLabel]="'recordForm.contacts.discard' | transloco"
+  [cancelLabel]="'recordForm.contacts.keepEditing' | transloco"
+/>
+
+<div #deleteDialogWrap (keydown.escape)="onDeleteDialogEscape($event)" (cancel)="onDeleteDialogEscape($event)">
+  <ui-confirm-dialog
+    #deleteDialog
+    tone="danger"
+    [title]="'recordForm.contacts.deleteTitle' | transloco"
+    [text]="'recordForm.contacts.deleteText' | transloco: { name: deletingContactName() }"
+    [confirmLabel]="'recordForm.contacts.deleteConfirm' | transloco"
+    [cancelLabel]="'recordForm.contacts.cancel' | transloco"
+  />
+</div>

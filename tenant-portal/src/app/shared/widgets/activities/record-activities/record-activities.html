@@ -1,0 +1,374 @@
+<ui-modal
+  size="activity"
+  icon="tablerCalendarEvent"
+  tile="bg-icon-violet"
+  [title]="'activities.title' | transloco"
+  [subtitle]="record() ? ('activities.subtitle' | transloco: { record: record()!.label }) : ''"
+  [closeLabel]="'toast.close' | transloco"
+  [dismissable]="!formSaving() && !actionBusy()"
+  (closed)="onModalClosed()"
+>
+  @if (screen() !== 'edit') {
+    <div
+      role="tablist"
+      class="mb-10 flex h-tab items-stretch border-b border-border text-12 leading-18"
+      [attr.aria-label]="'activities.title' | transloco"
+    >
+      <button
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-open'"
+        [attr.aria-selected]="screen() === 'open'"
+        [attr.aria-controls]="uid + '-panel-open'"
+        class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="screen() === 'open' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+        (click)="switchToOpen()"
+      >
+        <span>{{ 'activities.tabs.open' | transloco }}</span>
+        <span
+          class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-4 text-11 leading-16 font-medium text-on-neutral-soft"
+        >
+          {{ openCount() }}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-new'"
+        [attr.aria-selected]="screen() === 'new'"
+        [attr.aria-controls]="uid + '-panel-new'"
+        class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="screen() === 'new' ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+        (click)="switchToNew()"
+      >
+        <span>{{ 'activities.tabs.new' | transloco }}</span>
+      </button>
+    </div>
+
+    @if (screen() === 'open') {
+      <div
+        role="tabpanel"
+        [id]="uid + '-panel-open'"
+        [attr.aria-labelledby]="uid + '-tab-open'"
+        class="flex flex-col gap-10"
+        [attr.aria-busy]="loading()"
+      >
+        <div class="grid grid-cols-3 gap-8">
+          <div class="rounded-10 border border-border bg-surface p-8">
+            <div class="text-20 leading-26 font-medium text-danger-text">{{ summary().overdue }}</div>
+            <div class="text-12 leading-18 text-text-muted">{{ 'activities.counters.overdue' | transloco }}</div>
+          </div>
+          <div class="rounded-10 border border-border bg-surface p-8">
+            <div class="text-20 leading-26 font-medium text-warning-text">{{ summary().today }}</div>
+            <div class="text-12 leading-18 text-text-muted">{{ 'activities.counters.today' | transloco }}</div>
+          </div>
+          <div class="rounded-10 border border-border bg-surface p-8">
+            <div class="text-20 leading-26 font-medium text-success-text">{{ summary().upcoming }}</div>
+            <div class="text-12 leading-18 text-text-muted">{{ 'activities.counters.upcoming' | transloco }}</div>
+          </div>
+        </div>
+
+        @if (openActivities().length > 0) {
+          <div class="flex flex-col gap-6">
+            @for (item of openActivities(); track item.id) {
+              @let due = dueOf(item);
+              <article class="relative overflow-hidden rounded-10 border border-border bg-surface p-8">
+                <span class="absolute inset-y-0 start-0 w-4" [class]="dueEdgeClass(due)" aria-hidden="true"></span>
+
+                <div class="flex flex-col gap-6 ps-4">
+                  <div class="flex items-center gap-8">
+                    <span
+                      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                      [class]="typeLook[item.type].tile"
+                      [title]="'activities.types.' + item.type | transloco"
+                    >
+                      <ng-icon [name]="typeLook[item.type].icon" size="14" aria-hidden="true" />
+                    </span>
+
+                    <div class="flex min-w-0 flex-1 flex-col">
+                      <button
+                        type="button"
+                        class="cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium text-text outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [disabled]="actionBusy()"
+                        (click)="openActivity(item)"
+                      >
+                        {{ item.subject }}
+                      </button>
+                      <span class="truncate text-12 leading-18 text-text-muted">{{ formatSchedule(item) }}</span>
+                    </div>
+
+                    <span
+                      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                      [class]="dueBadgeClass(due)"
+                    >
+                      {{ 'activities.due.' + due | transloco }}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-6">
+                    @if (item.priority === 'HIGH' || item.priority === 'URGENT') {
+                      <span
+                        class="inline-flex h-badge items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
+                      >
+                        <span
+                          class="size-8 shrink-0 rounded-full"
+                          [class]="item.priority === 'URGENT' ? 'bg-danger' : 'bg-warning'"
+                          aria-hidden="true"
+                        ></span>
+                        {{ 'activities.priorities.' + item.priority | transloco }}
+                      </span>
+                    }
+                    @if (item.status === 'IN_PROGRESS') {
+                      <span class="text-12 leading-18 text-text-muted">
+                        {{ 'activities.statuses.IN_PROGRESS' | transloco }}
+                      </span>
+                    }
+
+                    <span class="flex-1"></span>
+
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-success-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                      [title]="'activities.actions.done' | transloco"
+                      [attr.aria-label]="'activities.actions.done' | transloco"
+                      [disabled]="actionBusy() || outcomeBusy()"
+                      (click)="finishActivity(item, 'complete')"
+                    >
+                      <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                      [title]="'activities.actions.edit' | transloco"
+                      [attr.aria-label]="'activities.actions.edit' | transloco"
+                      [disabled]="actionBusy()"
+                      (click)="openActivity(item)"
+                    >
+                      <ng-icon name="tablerEdit" size="14" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                      [title]="'activities.actions.cancel' | transloco"
+                      [attr.aria-label]="'activities.actions.cancel' | transloco"
+                      [disabled]="actionBusy() || outcomeBusy()"
+                      (click)="finishActivity(item, 'cancel')"
+                    >
+                      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        } @else if (!loading()) {
+          <div class="flex flex-col items-center gap-6 rounded-10 border border-dashed border-border-field p-12 text-center">
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+              <ng-icon name="tablerCalendarEvent" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-13 leading-18 font-medium text-text">{{ 'activities.empty.title' | transloco }}</p>
+            <p class="text-12 leading-18 text-text-muted">{{ 'activities.empty.text' | transloco }}</p>
+            <div class="flex flex-wrap items-center justify-center gap-6">
+              <button type="button" uiButton variant="secondary" size="small" (click)="switchToNew('CALL')">
+                {{ 'activities.empty.quickCall' | transloco }}
+              </button>
+              <button type="button" uiButton variant="secondary" size="small" (click)="switchToNew('MEETING')">
+                {{ 'activities.empty.quickMeeting' | transloco }}
+              </button>
+              <button type="button" uiButton variant="secondary" size="small" (click)="switchToNew('FOLLOW_UP')">
+                {{ 'activities.empty.quickFollowUp' | transloco }}
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div role="tabpanel" [id]="uid + '-panel-new'" [attr.aria-labelledby]="uid + '-tab-new'">
+        <app-activity-form mode="create" [target]="record()" [initialType]="initialType()" />
+      </div>
+    }
+  } @else if (editingActivity(); as act) {
+    <div class="flex flex-col gap-10">
+      <div class="flex flex-wrap items-center gap-8 border-b border-border pb-8">
+        <button
+          type="button"
+          class="inline-flex h-btn-h-sm cursor-pointer items-center gap-4 rounded-6 px-6 text-12 leading-18 font-medium text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="switchToOpen()"
+        >
+          <span class="inline-flex rtl:-scale-x-100">
+            <ng-icon name="tablerArrowLeft" size="14" aria-hidden="true" />
+          </span>
+          <span>{{ 'activities.actions.backToOpen' | transloco }}</span>
+        </button>
+
+        <span
+          class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
+        >
+          {{ 'activities.statuses.' + act.status | transloco }}
+        </span>
+
+        @if (dueState(act); as due) {
+          <span
+            class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+            [class]="dueBadgeClass(due)"
+          >
+            {{ 'activities.due.' + due | transloco }}
+          </span>
+        }
+
+        <span class="flex-1"></span>
+
+        @if (safeMeetingUrl(act); as url) {
+          <a uiButton variant="secondary" size="small" [href]="url" target="_blank" rel="noopener noreferrer">
+            {{ 'activities.actions.joinMeeting' | transloco }}
+          </a>
+        }
+      </div>
+
+      <app-activity-form mode="edit" [activity]="act" />
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center justify-between gap-8">
+    @switch (screen()) {
+      @case ('open') {
+        <button
+          type="button"
+          class="cursor-pointer rounded-6 text-12 leading-18 font-medium text-accent outline-none transition-colors duration-fast hover:text-brand-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="showViewAllSoon()"
+        >
+          {{ 'activities.viewAll' | transloco: { count: totalCount() } }}
+        </button>
+
+        <button type="button" uiButton (click)="switchToNew()">
+          {{ 'activities.newActivity' | transloco }}
+        </button>
+      }
+      @case ('new') {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="formSaving() || actionBusy()"
+          (click)="saveNew(true)"
+        >
+          {{ 'activities.form.saveAndAdd' | transloco }}
+        </button>
+
+        <div class="flex items-center gap-8">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="formSaving() || actionBusy()"
+            (click)="switchToOpen()"
+          >
+            {{ 'activities.form.cancel' | transloco }}
+          </button>
+          <button
+            type="button"
+            uiButton
+            [loading]="formSaving()"
+            [disabled]="actionBusy()"
+            (click)="saveNew(false)"
+          >
+            {{ (formStatus() === 'DONE' ? 'activities.form.saveCompleted' : 'activities.form.save') | transloco }}
+          </button>
+        </div>
+      }
+      @case ('edit') {
+        <div class="flex flex-wrap items-center gap-8">
+          <button
+            type="button"
+            uiButton
+            [loading]="formSaving()"
+            [disabled]="!formDirty() || actionBusy()"
+            (click)="saveEdit()"
+          >
+            {{ 'activities.form.saveChanges' | transloco }}
+          </button>
+          @if (formDirty()) {
+            <span class="text-12 leading-18 text-text-muted">{{ 'activities.form.unsaved' | transloco }}</span>
+          }
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="formSaving() || actionBusy()"
+            (click)="switchToOpen()"
+          >
+            {{ 'activities.form.close' | transloco }}
+          </button>
+        </div>
+
+        @if (editingActivity(); as act) {
+          @if (isOpen(act)) {
+            <div class="flex flex-wrap items-center gap-8">
+              @if (act.status === 'PLANNED') {
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  [disabled]="formSaving() || actionBusy()"
+                  (click)="changeStatus(act, 'IN_PROGRESS')"
+                >
+                  {{ 'activities.actions.start' | transloco }}
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  [disabled]="formSaving() || actionBusy()"
+                  (click)="changeStatus(act, 'PLANNED')"
+                >
+                  {{ 'activities.actions.moveBack' | transloco }}
+                </button>
+              }
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                [disabled]="formSaving() || actionBusy() || outcomeBusy()"
+                (click)="finishActivity(act, 'complete')"
+              >
+                <ng-icon name="tablerCheck" size="15" class="text-success-text" aria-hidden="true" />
+                {{ 'activities.actions.done' | transloco }}
+              </button>
+              <button
+                type="button"
+                uiButton
+                variant="danger"
+                [disabled]="formSaving() || actionBusy() || outcomeBusy()"
+                (click)="finishActivity(act, 'cancel')"
+              >
+                {{ 'activities.actions.cancel' | transloco }}
+              </button>
+            </div>
+          }
+        }
+      }
+    }
+  </div>
+</ui-modal>
+
+<app-activity-outcome [busy]="outcomeBusy()" />
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'activities.conflict.title' | transloco"
+  [text]="'activities.conflict.text' | transloco"
+  [confirmLabel]="'activities.conflict.reload' | transloco"
+  [cancelLabel]="'activities.conflict.keep' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'activities.discard.title' | transloco"
+  [text]="'activities.discard.text' | transloco"
+  [confirmLabel]="'activities.discard.confirm' | transloco"
+  [cancelLabel]="'activities.discard.keep' | transloco"
+/>

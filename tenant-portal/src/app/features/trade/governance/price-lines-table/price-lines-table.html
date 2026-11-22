@@ -1,0 +1,579 @@
+<div class="flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <div
+    class="flex h-field min-w-0 flex-1 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+    <input
+      type="search"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [attr.aria-label]="'pricing.lines.searchLabel' | transloco"
+      [placeholder]="'pricing.lines.searchPlaceholder' | transloco"
+      [value]="searchDraft()"
+      (input)="onSearchInput($event)"
+    />
+    @if (searchDraft()) {
+      <button
+        type="button"
+        class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'pricing.lines.clearSearch' | transloco"
+        (click)="clearSearch()"
+      >
+        <ng-icon name="tablerX" size="14" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <div class="shrink-0">
+    <ui-dropdown
+      size="button"
+      [label]="'pricing.lines.unitFilterLabel' | transloco"
+      [options]="unitFilterOptions()"
+      [value]="uomFilter()"
+      (valueChange)="onUomFilterChange($event)"
+    />
+  </div>
+
+  @if (makerCheckerCaption(); as caption) {
+    <p class="text-11 leading-16 text-text-muted">{{ caption }}</p>
+  }
+</div>
+
+@if (loadFailed()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'pricing.lines.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="retry.emit()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'pricing.retry' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'pricing.lines.tableLabel' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [class]="gridTemplate()"
+      >
+        @if (editable()) {
+          <span role="columnheader" class="flex items-center justify-center">
+            <span class="sr-only">{{ 'pricing.lines.moveHandle' | transloco }}</span>
+          </span>
+        }
+        <span
+          role="columnheader"
+          class="flex min-w-0 items-center justify-center px-6"
+          [class.border-s]="editable()"
+          [class.border-on-nav-line]="editable()"
+        >
+          {{ 'pricing.lines.columns.number' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.item' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.unit' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.minQty' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.maxQty' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.unitPrice' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.floorPrice' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.lines.columns.priority' | transloco }}
+        </span>
+        @if (canViewCost()) {
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'pricing.lines.columns.standardCost' | transloco }}
+          </span>
+        }
+        @if (editable()) {
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'pricing.lines.columns.actions' | transloco }}</span>
+          </span>
+        }
+      </div>
+
+      @if (loading()) {
+        @for (item of skeletonRows; track item) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+            [class]="gridTemplate()"
+          >
+            @if (editable()) {
+              <span role="cell" class="flex items-center justify-center">
+                <span class="size-icon-sm rounded-4 bg-neutral-soft"></span>
+              </span>
+            }
+            <span
+              role="cell"
+              class="flex items-center justify-center px-6"
+              [class.border-s]="editable()"
+              [class.border-border]="editable()"
+            >
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            @if (canViewCost()) {
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              </span>
+            }
+            @if (editable()) {
+              <span role="cell" class="flex items-center justify-center border-s border-border px-6">
+                <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+              </span>
+            }
+          </div>
+        }
+      } @else if (entries().length === 0) {
+        <div class="mt-6 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+          <p class="text-12 leading-18 text-text-muted">
+            {{ (searchDraft() || uomFilter() ? 'pricing.lines.emptyFiltered' : 'pricing.lines.emptyTitle') | transloco }}
+          </p>
+          @if (editable() && !searchDraft() && !uomFilter()) {
+            <button type="button" uiButton variant="secondary" size="small" (click)="addLine.emit()">
+              <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+              {{ 'pricing.lines.addLine' | transloco }}
+            </button>
+          }
+        </div>
+      } @else {
+        <div
+          cdkDropList
+          [cdkDropListData]="entries()"
+          [cdkDropListDisabled]="!editable()"
+          (cdkDropListDropped)="onDrop($event)"
+        >
+          @for (row of entries(); track row.id; let index = $index) {
+            @let errs = rowErrors(row.id);
+            @let num = lineNumber(index);
+            <div
+              cdkDrag
+              [cdkDragDisabled]="!editable()"
+              role="row"
+              class="mt-6 grid min-h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridTemplate()"
+            >
+              <div
+                *cdkDragPlaceholder
+                class="mt-6 h-table-row rounded-10 border-2 border-dashed border-brand bg-brand-soft"
+              ></div>
+
+              <div
+                *cdkDragPreview
+                class="flex h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 text-12 font-medium text-text shadow-drag"
+              >
+                <bdi dir="ltr">#{{ num }}</bdi>
+                <span class="truncate">{{ itemDisplayName(row) || row.itemCode || ('pricing.lines.columns.item' | transloco) }}</span>
+              </div>
+
+              @if (editable()) {
+                <span role="cell" class="flex items-start justify-center pt-8">
+                  <button
+                    type="button"
+                    cdkDragHandle
+                    class="inline-flex size-btn-h-sm cursor-grab items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong active:cursor-grabbing"
+                    [attr.aria-label]="'pricing.lines.moveHandle' | transloco"
+                    [title]="'pricing.lines.moveHandle' | transloco"
+                  >
+                    <ng-icon name="tablerGripVertical" size="14" aria-hidden="true" />
+                  </button>
+                </span>
+              }
+
+              <span
+                role="cell"
+                class="flex min-w-0 items-start justify-center px-6 pt-10 text-12 text-text-muted tabular-nums"
+                [class.border-s]="editable()"
+                [class.border-border]="editable()"
+              >
+                <bdi dir="ltr">{{ num }}</bdi>
+              </span>
+
+              @if (editable()) {
+                <!-- Item cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <div
+                    #itemBox
+                    class="flex h-field w-full items-center gap-4 rounded-8 border bg-surface-field px-8 text-12 transition-colors duration-fast"
+                    [class]="
+                      errs.itemId
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : activeItemRowId() === row.id
+                          ? 'border-focus-ring ring-3 ring-focus-halo'
+                          : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                    "
+                    (click)="onItemBoxClick(row, itemBox)"
+                  >
+                    <input
+                      [id]="'line-item-' + row.id"
+                      type="text"
+                      role="combobox"
+                      autocomplete="off"
+                      aria-autocomplete="list"
+                      class="min-w-0 flex-1 bg-transparent text-12 font-medium text-text outline-none placeholder:text-text-placeholder"
+                      [attr.aria-label]="'pricing.lines.columns.item' | transloco"
+                      [attr.aria-expanded]="activeItemRowId() === row.id"
+                      [attr.aria-controls]="activeItemRowId() === row.id ? itemListId : null"
+                      [attr.aria-activedescendant]="activeItemRowId() === row.id ? activeItemDescendant() : null"
+                      [attr.aria-invalid]="errs.itemId ? 'true' : null"
+                      [placeholder]="'pricing.lines.itemSearchPlaceholder' | transloco"
+                      [value]="itemInputText(row)"
+                      (focus)="onItemFocus(row, itemBox)"
+                      (input)="onItemInput(row, itemBox, $event)"
+                      (keydown)="onItemKeydown(row, itemBox, $event)"
+                    />
+                    @if (activeItemRowId() !== row.id && row.itemCode) {
+                      <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ row.itemCode }}</bdi>
+                    }
+                  </div>
+                  @if (errs.itemId) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.itemId }}</p>
+                  }
+                </span>
+
+                <!-- Unit cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <ui-dropdown
+                    class="w-full"
+                    size="field"
+                    [label]="'pricing.lines.columns.unit' | transloco"
+                    [options]="uomOptionsForRow(row)"
+                    [value]="row.uomId"
+                    (valueChange)="onUomChange(row, $event)"
+                  />
+                  @if (errs.uomId) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.uomId }}</p>
+                  }
+                </span>
+
+                <!-- Min qty cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <div
+                    class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 transition-colors duration-fast"
+                    [class]="
+                      errs.minimumQuantity
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                    "
+                  >
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      dir="ltr"
+                      class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                      [attr.aria-label]="'pricing.lines.columns.minQty' | transloco"
+                      [attr.aria-invalid]="errs.minimumQuantity ? 'true' : null"
+                      [value]="row.minimumQuantity"
+                      (input)="onMinQtyInput(row, $event)"
+                      (blur)="markTouched(row.id)"
+                    />
+                  </div>
+                  @if (errs.minimumQuantity) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.minimumQuantity }}</p>
+                  }
+                </span>
+
+                <!-- Max qty cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <div
+                    class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 transition-colors duration-fast"
+                    [class]="
+                      errs.maximumQuantity
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                    "
+                  >
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      dir="ltr"
+                      class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                      [attr.aria-label]="'pricing.lines.columns.maxQty' | transloco"
+                      [attr.aria-invalid]="errs.maximumQuantity ? 'true' : null"
+                      [placeholder]="'pricing.emptyDash' | transloco"
+                      [value]="row.maximumQuantity ?? ''"
+                      (input)="onMaxQtyInput(row, $event)"
+                      (blur)="markTouched(row.id)"
+                    />
+                  </div>
+                  @if (errs.maximumQuantity) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.maximumQuantity }}</p>
+                  }
+                </span>
+
+                <!-- Unit price cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <div
+                    dir="ltr"
+                    class="flex h-field w-full items-center gap-4 rounded-8 border bg-surface-field px-8 text-12 transition-colors duration-fast"
+                    [class]="
+                      errs.unitPrice
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                    "
+                  >
+                    <span class="shrink-0 text-11 text-text-muted">{{ currencyCode() }}</span>
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      dir="ltr"
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                      [attr.aria-label]="'pricing.lines.columns.unitPrice' | transloco"
+                      [attr.aria-invalid]="errs.unitPrice ? 'true' : null"
+                      [value]="row.unitPrice"
+                      (input)="onUnitPriceInput(row, $event)"
+                      (blur)="markTouched(row.id)"
+                    />
+                  </div>
+                  @if (errs.unitPrice) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.unitPrice }}</p>
+                  }
+                </span>
+
+                <!-- Floor price cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <div
+                    dir="ltr"
+                    class="flex h-field w-full items-center gap-4 rounded-8 border bg-surface-field px-8 text-12 transition-colors duration-fast"
+                    [class]="
+                      errs.minimumAllowedPrice
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                    "
+                  >
+                    @if (showFloorCurrency(row)) {
+                      <span class="shrink-0 text-11 text-text-muted">{{ currencyCode() }}</span>
+                    }
+                    <input
+                      type="text"
+                      inputmode="decimal"
+                      dir="ltr"
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                      [attr.aria-label]="'pricing.lines.columns.floorPrice' | transloco"
+                      [attr.aria-invalid]="errs.minimumAllowedPrice ? 'true' : null"
+                      [placeholder]="'pricing.emptyDash' | transloco"
+                      [value]="row.minimumAllowedPrice ?? ''"
+                      (focus)="setFocusedPriceField(row.id + ':floor')"
+                      (input)="onFloorPriceInput(row, $event)"
+                      (blur)="setFocusedPriceField(null); markTouched(row.id)"
+                    />
+                  </div>
+                  @if (errs.minimumAllowedPrice) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.minimumAllowedPrice }}</p>
+                  }
+                </span>
+
+                <!-- Priority cell -->
+                <span role="cell" class="flex min-w-0 flex-col border-s border-border px-10 py-8">
+                  <div
+                    class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 transition-colors duration-fast"
+                    [class]="
+                      errs.priority
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                    "
+                  >
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      dir="ltr"
+                      class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                      [attr.aria-label]="'pricing.lines.columns.priority' | transloco"
+                      [attr.aria-invalid]="errs.priority ? 'true' : null"
+                      [value]="priorityDisplay(row)"
+                      (input)="onPriorityInput(row, $event)"
+                      (blur)="onPriorityBlur(row)"
+                    />
+                  </div>
+                  @if (errs.priority) {
+                    <p class="mt-2 text-11 leading-16 text-danger-text">{{ errs.priority }}</p>
+                  }
+                </span>
+
+                @if (canViewCost()) {
+                  <span role="cell" class="flex min-w-0 items-start border-s border-border px-10 pt-10 text-12 text-text-muted tabular-nums">
+                    <bdi dir="ltr" class="truncate">{{ formattedCost(row) }}</bdi>
+                  </span>
+                }
+
+                <span role="cell" class="flex items-start justify-center gap-4 border-s border-border px-4 pt-8">
+                  <ui-actions-menu
+                    [items]="rowMenuItems(index, entries().length)"
+                    [label]="'pricing.lines.rowActions' | transloco"
+                    (selected)="onRowAction(row, index, $event)"
+                  />
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [attr.aria-label]="'pricing.lines.removeLine' | transloco"
+                    [title]="'pricing.lines.removeLine' | transloco"
+                    (click)="removeRow(row.id)"
+                  >
+                    <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                  </button>
+                </span>
+              } @else {
+                <!-- Read-only plain text cells -->
+                <span role="cell" class="flex min-w-0 items-center justify-between gap-8 border-s border-border px-10">
+                  <span class="min-w-0 truncate text-12 font-medium text-text">{{ itemDisplayName(row) || '—' }}</span>
+                  @if (row.itemCode) {
+                    <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ row.itemCode }}</bdi>
+                  }
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+                  <span class="truncate">{{ uomDisplayName(row) }}</span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text tabular-nums">
+                  <bdi dir="ltr" class="truncate">{{ formattedQty(row.minimumQuantity) }}</bdi>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+                  <bdi dir="ltr" class="truncate">{{ formattedQty(row.maximumQuantity) }}</bdi>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 font-medium text-text tabular-nums">
+                  <bdi dir="ltr" class="truncate">{{ formattedUnitPrice(row) }}</bdi>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+                  <bdi dir="ltr" class="truncate">{{ formattedFloorPrice(row) }}</bdi>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text tabular-nums">
+                  <bdi dir="ltr">{{ row.priority }}</bdi>
+                </span>
+                @if (canViewCost()) {
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+                    <bdi dir="ltr" class="truncate">{{ formattedCost(row) }}</bdi>
+                  </span>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@if (!loadFailed()) {
+  <footer class="flex flex-wrap items-center justify-between gap-8 pt-2">
+    <div>
+      @if (editable() && !loading() && entries().length > 0) {
+        <button type="button" uiButton variant="secondary" size="small" (click)="addLine.emit()">
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'pricing.lines.addLine' | transloco }}
+        </button>
+      }
+    </div>
+
+    @if (total() > 0) {
+      <div class="flex flex-wrap items-center gap-8">
+        <ui-pagination
+          [total]="total()"
+          [pageSizes]="pageSizes"
+          [label]="'pricing.lines.paginationLabel' | transloco"
+          [(page)]="page"
+          [(pageSize)]="pageSize"
+        />
+        <span class="text-11 leading-16 text-text-muted tabular-nums">
+          <bdi dir="ltr">{{ 'pricing.lines.lineCount' | transloco: { count: total() } }}</bdi>
+        </span>
+      </div>
+    }
+  </footer>
+}
+
+@if (activeItemRowId(); as rowId) {
+  @let activeRow = activeItemRow();
+  <ul
+    #itemList
+    [id]="itemListId"
+    role="listbox"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover scrollbar-thin"
+    [class.invisible]="!itemPlaced()"
+    [style.top.px]="itemPlace().top"
+    [style.inset-inline-start.px]="itemPlace().start"
+    [style.min-width.px]="itemPlace().width"
+    [style.max-height.px]="itemPlace().maxHeight"
+    (mousedown)="$event.preventDefault()"
+  >
+    @if (itemLoading()) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
+        <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+        <span>{{ 'pricing.lines.loadingItems' | transloco }}</span>
+      </li>
+    } @else if (itemLoadError()) {
+      <li role="presentation" class="flex items-center justify-between gap-8 px-8 py-6 text-12">
+        <span class="text-danger-text">{{ 'pricing.lines.loadItemsFailed' | transloco }}</span>
+        <button type="button" uiButton variant="secondary" size="small" (click)="retryItems()">
+          <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+          {{ 'pricing.retry' | transloco }}
+        </button>
+      </li>
+    } @else if (itemResults().length === 0) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+        {{ 'pricing.lines.noItems' | transloco }}
+      </li>
+    } @else {
+      @for (item of itemResults(); track item.id; let idx = $index) {
+        @let tile = tileFor(item.itemKind);
+        <li
+          [id]="itemOptionId(idx)"
+          role="option"
+          [attr.aria-selected]="activeRow?.itemId === item.id"
+          class="flex h-menu-item shrink-0 items-center gap-8 rounded-6 px-8 transition-colors duration-fast"
+          [class]="itemRowClasses(item, idx, activeRow?.itemId ?? '')"
+          (mouseenter)="itemActiveIndex.set(idx)"
+          (click)="chooseItem(item)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="tile.tile"
+            aria-hidden="true"
+          >
+            <ng-icon [name]="tile.icon" size="14" />
+          </span>
+          <span class="min-w-0 flex-1 truncate">{{ itemRowName(item) }}</span>
+          <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ item.canonicalCode }}</bdi>
+          @if (activeRow?.itemId === item.id) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </li>
+      }
+    }
+  </ul>
+}

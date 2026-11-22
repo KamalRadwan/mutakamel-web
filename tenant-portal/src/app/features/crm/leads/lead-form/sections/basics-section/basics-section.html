@@ -1,0 +1,126 @@
+<div class="flex flex-col gap-8">
+  @if (part() !== 'names') {
+  <ui-field
+    size="bare"
+    [label]="'leadForm.basics.type' | transloco"
+    [hint]="'leadForm.basics.typeHint' | transloco"
+  >
+    <div
+      #typeGroup
+      role="radiogroup"
+      class="inline-flex items-center gap-2 self-start rounded-10 bg-neutral-soft p-3"
+      [attr.aria-labelledby]="uid + '-type-label'"
+      [attr.title]="mode() === 'edit' ? ('leadForm.basics.typeLocked' | transloco) : null"
+    >
+      @for (option of typeOptions(); track option.value) {
+        @let selected = option.value === draft().leadProfileType;
+        <button
+          #typeBtn
+          type="button"
+          role="radio"
+          class="flex h-field items-center gap-6 rounded-8 px-10 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            (selected
+              ? option.activeClass + ' font-medium shadow-card'
+              : 'text-text-muted' + (option.disabled ? '' : ' hover:text-text')) +
+            ' ' +
+            (option.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer')
+          "
+          [disabled]="option.disabled"
+          [attr.aria-checked]="selected"
+          [attr.aria-disabled]="option.disabled ? 'true' : null"
+          [attr.aria-label]="option.label"
+          [tabIndex]="$index === activeTypeTabIndex() ? 0 : -1"
+          (click)="onTypeChange(option.value)"
+          (keydown)="onTypeKeydown($event, $index)"
+        >
+          <ng-icon [name]="option.icon" size="14" aria-hidden="true" />
+          <span>{{ option.label }}</span>
+        </button>
+      }
+    </div>
+  </ui-field>
+  }
+
+  @if (part() !== 'type' && draft().leadProfileType === 'INDIVIDUAL') {
+    <div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-3 items-start gap-x-10 gap-y-8'">
+      @let titleErr = errorText('honorificTitle', limits.honorific);
+      <ui-field
+        size="bare"
+        [label]="'leadForm.identity.title' | transloco"
+        [for]="uid + '-title'"
+        [hint]="'leadForm.identity.titleHint' | transloco"
+        [count]="draft().honorificTitle.length"
+        [max]="limits.honorific"
+        [error]="titleErr"
+      >
+        <ui-suggest-input
+          [value]="draft().honorificTitle"
+          (valueChange)="setHonorificTitle($event)"
+          [options]="allTitles()"
+          [maxLength]="limits.honorific"
+          [inputId]="uid + '-title'"
+          [describedBy]="uid + '-title-hint'"
+          [label]="'leadForm.identity.title' | transloco"
+          [invalid]="!!titleErr"
+          [readonly]="readonly()"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'leadForm.identity.firstName' | transloco"
+        [for]="uid + '-first-name'"
+        [hint]="'leadForm.identity.firstNameHint' | transloco"
+        [required]="true"
+        [count]="draft().firstName.length"
+        [max]="limits.name"
+        [error]="errorText('firstName', limits.name)"
+      >
+        <input
+          #firstNameInput
+          [id]="uid + '-first-name'"
+          type="text"
+          autocomplete="given-name"
+          aria-required="true"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [value]="draft().firstName"
+          [attr.aria-invalid]="errorText('firstName', limits.name) ? 'true' : null"
+          (input)="setField('firstName', $event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'leadForm.identity.lastName' | transloco"
+        [for]="uid + '-last-name'"
+        [hint]="'leadForm.identity.lastNameHint' | transloco"
+        [count]="draft().lastName.length"
+        [max]="limits.name"
+        [error]="errorText('lastName', limits.name)"
+      >
+        <input
+          #lastNameInput
+          [id]="uid + '-last-name'"
+          type="text"
+          autocomplete="family-name"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [value]="draft().lastName"
+          [attr.aria-invalid]="errorText('lastName', limits.name) ? 'true' : null"
+          (input)="setField('lastName', $event)"
+        />
+      </ui-field>
+    </div>
+  }
+</div>
+
+<div #switchTypeWrap (keydown.escape)="onSwitchTypeEscape($event)" (cancel)="onSwitchTypeEscape($event)">
+  <ui-confirm-dialog
+    #switchTypeDialog
+    tone="warning"
+    [title]="'leadModal.switchType.title' | transloco"
+    [text]="'leadModal.switchType.text' | transloco"
+    [confirmLabel]="'leadModal.switchType.confirm' | transloco"
+    [cancelLabel]="'leadModal.unsaved.cancel' | transloco"
+  />
+</div>

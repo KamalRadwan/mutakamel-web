@@ -1,0 +1,185 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerShieldCheck"
+  tile="bg-icon-violet"
+  [title]="'wsEmail.dns.modal' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!busy()"
+  (closed)="onModalClosed()"
+>
+  @if (effectiveConfig(); as cfg) {
+    <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="saveSelector($event)">
+      @if (topError(); as err) {
+        <div role="alert">
+          <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
+        </div>
+      }
+
+      @if (showResetNotice()) {
+        <app-settings-notice tone="warning">
+          {{ 'wsEmail.notice.resetsVerification' | transloco }}
+        </app-settings-notice>
+      }
+
+      <div class="flex flex-wrap items-center gap-8">
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="cfg.dkimVerified ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+        >
+          {{ (cfg.dkimVerified ? 'wsEmail.domain.verified' : 'wsEmail.domain.notVerified') | transloco }}
+        </span>
+        @if (cfg.dkimVerified && verifiedDateText(); as verifiedDate) {
+          <span class="text-12 leading-18 text-text-muted">
+            {{ 'wsEmail.domain.verifiedAt' | transloco: { date: verifiedDate } }}
+          </span>
+        }
+      </div>
+
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <div class="col-span-1">
+          <ui-field
+            [for]="uid + '-sender-domain'"
+            [label]="'wsEmail.fields.senderDomain.label' | transloco"
+            [hint]="'wsEmail.fields.senderDomain.hint' | transloco"
+          >
+            <input
+              [id]="uid + '-sender-domain'"
+              type="text"
+              dir="ltr"
+              readonly
+              aria-readonly="true"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="cfg.senderDomain"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [for]="uid + '-dkim-selector'"
+            [label]="'wsEmail.fields.dkimSelector.label' | transloco"
+            [hint]="'wsEmail.fields.dkimSelector.hint' | transloco"
+            [error]="selectorError()"
+          >
+            <input
+              [id]="uid + '-dkim-selector'"
+              type="text"
+              dir="ltr"
+              maxlength="63"
+              autocomplete="off"
+              spellcheck="false"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [value]="selectorDraft()"
+              [readOnly]="isReadonly() || busy()"
+              [attr.aria-readonly]="isReadonly() ? 'true' : null"
+              [attr.aria-invalid]="selectorError() ? 'true' : null"
+              (input)="onSelectorInput($event)"
+              (blur)="onSelectorBlur()"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-2">
+          <ui-field
+            size="bare"
+            [for]="uid + '-dkim-host'"
+            [label]="'wsEmail.fields.dkimHost.label' | transloco"
+            [hint]="'wsEmail.fields.dkimHost.hint' | transloco"
+          >
+            <div class="flex items-center gap-8">
+              <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8">
+                @if (dkimRecordName(); as recordName) {
+                  <input
+                    [id]="uid + '-dkim-host'"
+                    type="text"
+                    dir="ltr"
+                    readonly
+                    aria-readonly="true"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                    [value]="recordName"
+                  />
+                } @else {
+                  <span [id]="uid + '-dkim-host'" class="min-w-0 flex-1 truncate text-12 text-text-muted">
+                    {{ 'wsEmail.dns.notSet' | transloco }}
+                  </span>
+                }
+              </div>
+              @if (dkimRecordName()) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="ghost"
+                  size="small"
+                  [attr.aria-label]="'wsEmail.dns.copy' | transloco"
+                  [title]="'wsEmail.dns.copy' | transloco"
+                  (click)="copyRecordName()"
+                >
+                  <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+                  <span>{{ 'wsEmail.dns.copy' | transloco }}</span>
+                </button>
+              }
+            </div>
+          </ui-field>
+        </div>
+      </div>
+
+      <app-settings-notice tone="info">
+        {{ 'wsEmail.dns.valueNote' | transloco }}
+      </app-settings-notice>
+    </form>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly()) {
+      @if (dirty()) {
+        <button
+          type="submit"
+          [attr.form]="uid + '-form'"
+          uiButton
+          variant="primary"
+          [loading]="saving()"
+          [disabled]="!canSaveSelector()"
+        >
+          {{ 'wsEmail.dns.saveSelector' | transloco }}
+        </button>
+
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="busy()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [loading]="verifying()"
+          [disabled]="busy()"
+          (click)="verify()"
+        >
+          {{ 'wsEmail.domain.verify' | transloco }}
+        </button>
+
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="busy()"
+          (click)="close()"
+        >
+          {{ 'settings.common.close' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

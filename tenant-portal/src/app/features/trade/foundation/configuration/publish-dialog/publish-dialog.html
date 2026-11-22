@@ -1,0 +1,62 @@
+<ui-modal
+  size="form"
+  icon="tablerSend"
+  tile="bg-icon-blue"
+  [title]="'tradeConfig.publishDialog.title' | transloco"
+  [subtitle]="definition()?.key ?? ''"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!publishing()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text">{{ confirmText() }}</p>
+
+    <ui-field
+      size="bare"
+      [label]="'tradeConfig.publishDialog.replacesLabel' | transloco"
+      [for]="uid + '-replaces'"
+      [hint]="'tradeConfig.publishDialog.replacesHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-replaces'"
+        [describedBy]="uid + '-replaces-hint'"
+        [label]="'tradeConfig.publishDialog.replacesLabel' | transloco"
+        [options]="replacesOptions()"
+        [disabled]="publishing()"
+        [(value)]="supersedesVersionId"
+      />
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="publishing()"
+      (click)="submit()"
+    >
+      {{ 'tradeConfig.publishDialog.confirm' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="publishing()"
+      (click)="close()"
+    >
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'tradeShared.conflict.title' | transloco"
+  [text]="'tradeShared.conflict.text' | transloco"
+  [confirmLabel]="'tradeShared.conflict.reload' | transloco"
+  [cancelLabel]="'tradeShared.conflict.keepMine' | transloco"
+/>

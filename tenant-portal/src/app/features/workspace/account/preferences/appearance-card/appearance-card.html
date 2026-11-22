@@ -1,0 +1,62 @@
+<app-account-section
+  icon="tablerPalette"
+  tile="bg-icon-violet"
+  [title]="'wsAccPrefs.appearance.title' | transloco"
+  [description]="'wsAccPrefs.appearance.desc' | transloco"
+>
+  <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3">
+    <ui-field
+      size="bare"
+      [for]="uid + '-language'"
+      [label]="'wsAccPrefs.appearance.language' | transloco"
+      [hint]="'wsAccPrefs.appearance.languageHint' | transloco"
+    >
+      <div class="flex items-center">
+        <ui-segmented
+          [id]="uid + '-language'"
+          [describedBy]="uid + '-language-hint'"
+          [label]="'wsAccPrefs.appearance.language' | transloco"
+          [options]="languageOptions"
+          [value]="language.current()"
+          (valueChange)="onLanguageChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-theme'"
+      [label]="'wsAccPrefs.appearance.theme' | transloco"
+      [hint]="'wsAccPrefs.appearance.themeHint' | transloco"
+    >
+      <div class="flex items-center">
+        <ui-segmented
+          [id]="uid + '-theme'"
+          [describedBy]="uid + '-theme-hint'"
+          [label]="'wsAccPrefs.appearance.theme' | transloco"
+          [options]="themeOptions()"
+          [value]="theme.current()"
+          (valueChange)="onThemeChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-view-size'"
+      [label]="'wsAccPrefs.appearance.viewSize' | transloco"
+      [hint]="'wsAccPrefs.appearance.viewSizeHint' | transloco"
+    >
+      <div class="flex items-center">
+        <ui-segmented
+          [id]="uid + '-view-size'"
+          [describedBy]="uid + '-view-size-hint'"
+          [label]="'wsAccPrefs.appearance.viewSize' | transloco"
+          [options]="viewSizeOptions()"
+          [value]="viewScale.size()"
+          (valueChange)="onViewSizeChange($event)"
+        />
+      </div>
+    </ui-field>
+  </div>
+</app-account-section>

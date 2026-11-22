@@ -1,0 +1,180 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Confirm",
+    "remove": "Remove",
+    "reload": "Reload",
+    "retry": "Try again",
+    "active": "Active",
+    "actions": "Actions",
+    "noResults": "No matching results.",
+    "loadFailed": "Could not load data.",
+    "saved": "Changes saved.",
+    "removed": "Removed.",
+    "readonly": "View only.",
+    "required": "Required"
+  },
+  "roles": {
+    "branchTitle": "Branch roles",
+    "branchDesc": "Roles that apply in one branch.",
+    "cols": {
+      "branch": "Branch",
+      "role": "Role",
+      "added": "Added",
+      "state": "State"
+    },
+    "perBranch": "Per branch",
+    "add": "Add role",
+    "addTitle": "Add roles",
+    "search": "Search roles or branches",
+    "searchHint": "Filter available role and branch pairs by name.",
+    "choicesLabel": "Available roles",
+    "choicesHint": "Select one or more branch roles to assign to this user.",
+    "loadMore": "Load more",
+    "emptyBranch": "No branch roles assigned.",
+    "emptyChoices": "No available role assignments found.",
+    "added": "{{n}} roles added.",
+    "addedPlural": {
+      "one": "{{n}} role added.",
+      "other": "{{n}} roles added."
+    },
+    "partial": "{{n}} roles were added before an error.",
+    "removeTitle": "Remove this role?",
+    "removeText": "Remove {{role}} in {{branch}}? The user loses the permissions it gives in this branch unless another role gives them.",
+    "seatNeed": "Needs a {{module}} seat · {{free}} free",
+    "seatShort": "Not enough {{module}} seats.",
+    "scopeTitle": "Workspace and company roles",
+    "scopeDesc": "Roles that apply across the workspace, a company or a branch. Only the owner manages them.",
+    "scopeOwnerOnly": "Workspace-wide and company-wide roles are managed by the owner.",
+    "scope": {
+      "TENANT": "Workspace",
+      "COMPANY": "Company {{name}}",
+      "BRANCH": "Branch {{name}}"
+    },
+    "scopeTarget": {
+      "TENANT": "Workspace",
+      "COMPANY": "Company",
+      "BRANCH": "Branch"
+    },
+    "inactiveScope": "Inactive scope",
+    "inactiveScopeHint": "The company or branch is inactive; the role gives nothing until it is active again.",
+    "addScope": "Add scope role",
+    "scopeField": "Scope",
+    "scopeFieldHint": "Where the role applies.",
+    "companyField": "Company",
+    "companyFieldHint": "Select the company where this role applies.",
+    "branchField": "Branch",
+    "branchFieldHint": "Select the branch where this role applies.",
+    "roleField": "Role",
+    "roleFieldHint": "Select the role to grant at this scope.",
+    "emptyScope": "No workspace or company roles assigned.",
+    "needsActive": "Scope roles can be given once the user is active.",
+    "notActiveReadonly": "Roles can be changed only for active users.",
+    "selfReadonly": "You can't change your own roles.",
+    "ownerReadonly": "The workspace owner's roles can't be changed.",
+    "err": {
+      "escalation": "You can only give permissions you hold in that branch.",
+      "noProfile": "This role has no permissions for that branch."
+    }
+  },
+  "teams": {
+    "cols": {
+      "team": "Team",
+      "role": "Role",
+      "primary": "Primary",
+      "reporting": "Reporting branches"
+    },
+    "home": "Home team",
+    "empty": "No team memberships found.",
+    "role": {
+      "MEMBER": "Member",
+      "LEAD": "Lead",
+      "MANAGER": "Manager"
+    },
+    "add": "Add to team",
+    "changeRole": "Change role",
+    "reporting": "Reporting branches",
+    "remove": "Remove",
+    "removeText": "Remove {{name}} from {{team}}?",
+    "homeProtected": "Change the home team from the Profile tab.",
+    "roleField": "Role in the team",
+    "roleFieldHint": "Leads and managers see the team's records according to their CRM permissions."
+  },
+  "rep": {
+    "title": "Reporting branches",
+    "desc": "Extra branches of the same company whose team members this lead or manager covers.",
+    "home": "Home branch",
+    "add": "Add branches",
+    "addHint": "Active branches of the same company, up to 20 in total.",
+    "count": "{{n}} of 20",
+    "emptyAdd": "All active branches of this company are already included.",
+    "noChange": "Nothing to change.",
+    "readonly": "You can't manage this user's reporting branches.",
+    "retry": "A change is in progress. Try again in a moment.",
+    "conflictTitle": "Reporting branches changed",
+    "conflictText": "Another change updated these reporting branches. Reload to see the latest list."
+  },
+  "apps": {
+    "cols": {
+      "app": "Application",
+      "assigned": "Assigned",
+      "state": "State",
+      "source": "Source"
+    },
+    "fromRoles": "Seats come from roles. Change this user's roles to change their seats.",
+    "since": "Since",
+    "source": {
+      "ROLE": "From roles",
+      "MANUAL": "Manual (before automatic seats)"
+    },
+    "state": {
+      "ACTIVE": "Active",
+      "OVER_CAPACITY": "Read-only"
+    },
+    "empty": "No applications assigned.",
+    "assign": "Assign application",
+    "field": "Application",
+    "fieldHint": "Only applications in your subscription are listed. Each takes one seat.",
+    "removeTitle": "Remove application?",
+    "removeText": "Remove {{module}} from this user?",
+    "noSeats": "No free {{module}} seats. Ask the workspace owner to add seats.",
+    "notActive": "Only active users can take a seat.",
+    "addonsFirstTitle": "Add-on seats assigned",
+    "addonsFirst": "Remove this user's add-on seats first in Operations › Add-on seats.",
+    "openAddons": "Open add-on seats",
+    "pendingNote": "Seats may soon follow roles automatically.",
+    "selfReadonly": "You can't change your own seats.",
+    "module": {
+      "crm": "CRM",
+      "trade": "Trade",
+      "accounting": "Accounting"
+    }
+  },
+  "errors": {
+    "ROLE_PRIVILEGE_ESCALATION": "You can only give permissions you hold in that branch.",
+    "ROLE_BRANCH_SCOPE_INVALID": "This role has no permissions for that branch.",
+    "ASSIGNMENT_EXISTS": "This role is already assigned in that branch.",
+    "TENANT_ROLE_ASSIGNMENT_LIMIT_EXCEEDED": "Role assignment limit reached.",
+    "TARGET_AUTHORITY_EXCEEDS_ACTOR": "You cannot modify a user with higher authority.",
+    "BRANCH_ACCESS_DENIED": "You do not have access to that branch.",
+    "ROLE_SELF_ASSIGNMENT_FORBIDDEN": "You can't change your own roles.",
+    "SCOPE_ROLE_ASSIGNMENT_INVALID": "One or more scope role assignments are invalid.",
+    "SCOPE_ROLE_ASSIGNMENT_CONFLICT": "Duplicate or conflicting scope role assignment.",
+    "ROLE_RESERVED_FOR_OWNER": "This role is reserved for the workspace owner.",
+    "PRIMARY_TEAM_MEMBERSHIP_PROTECTED": "Change the home team from the Profile tab.",
+    "TEAM_MEMBERSHIP_ALREADY_EXISTS": "The user is already a member of this team.",
+    "TEAM_MEMBERSHIP_LIMIT_EXCEEDED": "Maximum team memberships reached.",
+    "PLACEMENT_INCONSISTENT": "The selected organization units do not match.",
+    "TEAM_REPORTING_SCOPE_REVISION_CONFLICT": "Reporting branches were updated elsewhere. Reload and try again.",
+    "TEAM_REPORTING_HOME_SCOPE_PROTECTED": "The home branch cannot be removed.",
+    "TEAM_REPORTING_SCOPE_COMPANY_MISMATCH": "Reporting branches must belong to the same company.",
+    "TEAM_REPORTING_SCOPE_LIMIT_EXCEEDED": "Maximum of 20 reporting branches reached.",
+    "TEAM_REPORTING_SCOPE_CHANGE_CONFLICT": "A change is in progress. Try again in a moment.",
+    "SEAT_LIMIT_REACHED": "No free {{module}} seats. Ask the workspace owner to add seats.",
+    "APPLICATION_ALLOWANCE_NOT_READY": "Only active users can take a seat.",
+    "MODULE_NOT_SUBSCRIBED": "This application is not in your subscription.",
+    "ADDON_ASSIGNMENTS_EXIST": "Remove this user's add-on seats first in Operations › Add-on seats."
+  }
+}

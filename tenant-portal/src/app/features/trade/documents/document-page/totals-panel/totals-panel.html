@@ -1,0 +1,23 @@
+<section
+  class="flex w-picker-w-single max-w-full flex-col gap-6 rounded-10 border border-border bg-surface p-10 shadow-card"
+  [attr.aria-label]="'tdpg.totals.grandTotal' | transloco"
+>
+  @for (row of view().primaryRows; track row.key) {
+    <div class="flex items-center justify-between gap-8 text-12 leading-18">
+      <span class="text-text-muted">{{ row.labelKey | transloco }}</span>
+      <bdi dir="ltr" class="text-text tabular-nums">{{ row.amount }}</bdi>
+    </div>
+  }
+
+  <div class="flex items-center justify-between gap-8 border-t border-border pt-6 text-14 leading-20 font-medium text-text">
+    <span>{{ view().grandRow.labelKey | transloco }}</span>
+    <bdi dir="ltr" class="tabular-nums">{{ view().grandRow.amount }}</bdi>
+  </div>
+
+  @for (row of view().trailingRows; track row.key) {
+    <div class="flex items-center justify-between gap-8 text-12 leading-18">
+      <span class="text-text-muted">{{ row.labelKey | transloco }}</span>
+      <bdi dir="ltr" class="font-medium text-text tabular-nums">{{ row.amount }}</bdi>
+    </div>
+  }
+</section>

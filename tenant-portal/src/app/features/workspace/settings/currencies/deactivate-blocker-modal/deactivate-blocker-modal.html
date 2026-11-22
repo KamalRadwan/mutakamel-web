@@ -1,0 +1,28 @@
+<ui-modal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="titleKey() | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  (closed)="onClosed()"
+>
+  @if (state(); as info) {
+    <div class="flex flex-col gap-8">
+      <p class="text-12 leading-18 text-text">{{ reasonText() }}</p>
+
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'wsCurrencies.blocker.record' | transloco: { name: info.currency.name, code: info.currency.code } }}
+      </p>
+
+      @if (nextStepKey(); as nextKey) {
+        <p class="text-12 leading-18 text-text-muted">{{ nextKey | transloco }}</p>
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

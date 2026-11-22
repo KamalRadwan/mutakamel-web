@@ -1,0 +1,172 @@
+@if (!loading() && !items().length) {
+  <div class="rounded-10 border border-border bg-surface p-16 text-center text-12 leading-18 text-text-muted shadow-card">
+    {{ 'tradeConfig.page.empty' | transloco }}
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'tradeConfig.table.ariaLabel' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [class]="
+          canManage()
+            ? 'grid-cols-definition-row-actions'
+            : 'grid-cols-definition-row'
+        "
+      >
+        @for (column of columns; track column; let first = $first) {
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center truncate px-10"
+            [class]="first ? '' : 'border-s border-on-nav-line'"
+          >
+            {{ 'tradeConfig.table.' + column | transloco }}
+          </span>
+        }
+        @if (canManage()) {
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'tradeConfig.table.actions' | transloco }}</span>
+          </span>
+        }
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            aria-hidden="true"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+            [class]="
+              canManage()
+                ? 'grid-cols-definition-row-actions'
+                : 'grid-cols-definition-row'
+            "
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
+              <span class="h-chip w-btn rounded-6 bg-neutral-soft"></span>
+              <span class="h-chip w-btn rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            @if (canManage()) {
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+              </span>
+            }
+          </div>
+        }
+      } @else {
+        @for (def of items(); track def.id) {
+          <div
+            role="row"
+            tabindex="0"
+            [attr.aria-label]="def.key"
+            class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              canManage()
+                ? 'grid-cols-definition-row-actions'
+                : 'grid-cols-definition-row'
+            "
+            (click)="openDefinition.emit(def)"
+            (keydown)="onRowKeydown($event, def)"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+                aria-hidden="true"
+              >
+                <ng-icon name="tablerAdjustmentsHorizontal" size="14" />
+              </span>
+              <button
+                type="button"
+                dir="ltr"
+                class="cursor-pointer truncate text-start font-normal outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [title]="def.key"
+                (click)="$event.stopPropagation(); openDefinition.emit(def)"
+              >
+                {{ def.key }}
+              </button>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-12">{{ 'tradeConfig.type.' + typeKey(def) | transloco }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-12">{{ 'tradeConfig.merge.' + def.mergeStrategy | transloco }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span
+                class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                [class]="riskBadgeClass[def.riskClass]"
+              >
+                {{ 'tradeConfig.risk.' + def.riskClass | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
+              @for (scope of def.allowedScopes; track scope) {
+                <span
+                  class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft"
+                  [title]="'tradeConfig.scope.' + scope | transloco"
+                  [attr.aria-label]="'tradeConfig.scope.' + scope | transloco"
+                >
+                  {{ 'tradeConfig.scopeShort.' + scope | transloco }}
+                </span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              @if (!isAllowedHere(def)) {
+                <span class="truncate text-12 text-text-muted">{{ 'tradeConfig.table.notAllowed' | transloco }}</span>
+              } @else {
+                <span class="text-12 font-medium tabular-nums">
+                  <bdi dir="ltr">{{ def.versions.length }}</bdi>
+                </span>
+                @if (hasLiveVersion(def)) {
+                  <span [class]="liveBadgeClass">
+                    {{ 'tradeConfig.state.LIVE' | transloco }}
+                  </span>
+                }
+              }
+            </span>
+
+            @if (canManage()) {
+              <span
+                role="cell"
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="actionsFor(def)"
+                  [label]="'tradeShared.common.actions' | transloco"
+                  (selected)="onAction(def, $event)"
+                />
+              </span>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
+}

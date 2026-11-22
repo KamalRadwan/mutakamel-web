@@ -1,0 +1,278 @@
+<ui-modal
+  size="form"
+  icon="tablerCategory"
+  [tile]="headerTile()"
+  [title]="modalTitle()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!saving() && !loadingDetail()"
+  (closed)="onModalClosed()"
+>
+  @if (mode() === 'edit' && loadingDetail() && !detail()) {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8" [attr.aria-busy]="true">
+      @for (row of [1, 2, 3, 4, 5, 6]; track row) {
+        <div class="h-table-row motion-safe:animate-pulse rounded-8 bg-neutral-soft" [class.col-span-2]="row >= 5" aria-hidden="true"></div>
+      }
+    </div>
+  } @else {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tradeShared.common.code' | transloco"
+          [for]="uid + '-code'"
+          [required]="mode() === 'create'"
+          [hint]="'tradeCategories.modal.codeHint' | transloco"
+          [count]="mode() === 'create' ? form().code.length : null"
+          [max]="mode() === 'create' ? codeMax : null"
+          [error]="errorText('code')"
+        >
+          <input
+            [id]="uid + '-code'"
+            type="text"
+            dir="ltr"
+            autocomplete="off"
+            [attr.maxlength]="codeMax"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+            [value]="form().code"
+            [readonly]="mode() === 'edit' || !canManage()"
+            [disabled]="saving()"
+            [attr.aria-invalid]="errorText('code') ? 'true' : null"
+            (input)="onCodeInput($event)"
+            (blur)="markTouched('code')"
+          />
+          @if (mode() === 'edit') {
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          }
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tradeCategories.modal.displayName' | transloco"
+          [for]="uid + '-display-name'"
+          [required]="true"
+          [hint]="'tradeCategories.modal.displayNameHint' | transloco"
+          [count]="form().displayName.length"
+          [max]="nameMax"
+          [error]="errorText('displayName')"
+        >
+          <input
+            [id]="uid + '-display-name'"
+            type="text"
+            dir="auto"
+            autocomplete="off"
+            [attr.maxlength]="nameMax"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="form().displayName"
+            [readonly]="!canManage()"
+            [disabled]="saving()"
+            [attr.aria-invalid]="errorText('displayName') ? 'true' : null"
+            (input)="onFieldInput('displayName', $event)"
+            (blur)="markTouched('displayName')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tradeShared.common.nameEn' | transloco"
+          [for]="uid + '-name-en'"
+          [required]="true"
+          [hint]="'tradeCategories.modal.nameEnHint' | transloco"
+          [count]="form().nameEn.length"
+          [max]="nameMax"
+          [error]="errorText('nameEn')"
+        >
+          <input
+            [id]="uid + '-name-en'"
+            type="text"
+            dir="ltr"
+            autocomplete="off"
+            [attr.maxlength]="nameMax"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="form().nameEn"
+            [readonly]="!canManage()"
+            [disabled]="saving()"
+            [attr.aria-invalid]="errorText('nameEn') ? 'true' : null"
+            (input)="onFieldInput('nameEn', $event)"
+            (blur)="markTouched('nameEn')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tradeShared.common.nameAr' | transloco"
+          [for]="uid + '-name-ar'"
+          [required]="true"
+          [hint]="'tradeCategories.modal.nameArHint' | transloco"
+          [count]="form().nameAr.length"
+          [max]="nameMax"
+          [error]="errorText('nameAr')"
+        >
+          <input
+            [id]="uid + '-name-ar'"
+            type="text"
+            dir="rtl"
+            autocomplete="off"
+            [attr.maxlength]="nameMax"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="form().nameAr"
+            [readonly]="!canManage()"
+            [disabled]="saving()"
+            [attr.aria-invalid]="errorText('nameAr') ? 'true' : null"
+            (input)="onFieldInput('nameAr', $event)"
+            (blur)="markTouched('nameAr')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          [label]="'tradeCategories.modal.parent' | transloco"
+          [for]="uid + '-parent'"
+          [hint]="'tradeCategories.modal.parentHint' | transloco"
+        >
+          <input
+            [id]="uid + '-parent'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="parentPathText()"
+          />
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        </ui-field>
+      </div>
+
+      @if (mode() === 'edit' && detail(); as current) {
+        <div class="col-span-2 grid grid-cols-3 gap-x-10">
+          <ui-field
+            [label]="'tradeCategories.modal.itemsHere' | transloco"
+            [for]="uid + '-items-here'"
+            [hint]="'tradeCategories.modal.itemsHereHint' | transloco"
+          >
+            <input
+              [id]="uid + '-items-here'"
+              type="text"
+              dir="ltr"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none tabular-nums"
+              [value]="current.usage.directItemCount"
+            />
+          </ui-field>
+
+          <ui-field
+            [label]="'tradeCategories.modal.itemsSubtree' | transloco"
+            [for]="uid + '-items-subtree'"
+            [hint]="'tradeCategories.modal.itemsSubtreeHint' | transloco"
+          >
+            <input
+              [id]="uid + '-items-subtree'"
+              type="text"
+              dir="ltr"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none tabular-nums"
+              [value]="current.usage.subtreeItemCount"
+            />
+          </ui-field>
+
+          <ui-field
+            [label]="'tradeCategories.modal.descendants' | transloco"
+            [for]="uid + '-descendants'"
+            [hint]="'tradeCategories.modal.descendantsHint' | transloco"
+          >
+            <input
+              [id]="uid + '-descendants'"
+              type="text"
+              dir="ltr"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none tabular-nums"
+              [value]="current.usage.descendantCount"
+            />
+          </ui-field>
+        </div>
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || loadingDetail() || !dirty() || !isValid()"
+        (click)="save()"
+      >
+        {{ 'tradeShared.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'tradeShared.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'tradeShared.common.cancel' | transloco }}
+        </button>
+      }
+
+      @if (mode() === 'edit' && detail(); as current) {
+        <div class="ms-auto flex items-center gap-6">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="saving() || activateBlocked()"
+            [attr.title]="activateBlockedTitle()"
+            (click)="statusRequested.emit(current)"
+          >
+            {{ (current.status === 'ACTIVE' ? 'tradeCategories.actions.deactivate' : 'tradeCategories.actions.activate') | transloco }}
+          </button>
+
+          <button
+            type="button"
+            uiButton
+            variant="danger"
+            [disabled]="saving() || !current.usage.canDelete"
+            [attr.title]="deleteBlockedTitle()"
+            (click)="deleteRequested.emit(current)"
+          >
+            {{ 'tradeCategories.actions.delete' | transloco }}
+          </button>
+        </div>
+      }
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        (click)="requestClose()"
+      >
+        {{ 'tradeShared.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tradeShared.discard.title' | transloco"
+  [text]="'tradeShared.discard.text' | transloco"
+  [confirmLabel]="'tradeShared.discard.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

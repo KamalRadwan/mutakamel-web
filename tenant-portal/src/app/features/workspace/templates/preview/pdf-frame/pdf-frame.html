@@ -1,0 +1,7 @@
+@for (entry of frameEntries(); track entry.key) {
+  <iframe
+    class="block h-full w-full flex-1 border-0 bg-paper"
+    [src]="entry.safeUrl"
+    [attr.title]="title()"
+  ></iframe>
+}

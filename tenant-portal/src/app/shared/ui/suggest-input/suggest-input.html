@@ -1,0 +1,67 @@
+<div #fieldBox [class]="boxClasses()">
+  <input
+    #inputEl
+    [id]="inputId()"
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-autocomplete="list"
+    class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+    [attr.maxlength]="maxLength() > 0 ? maxLength() : null"
+    [placeholder]="placeholder()"
+    [readonly]="readonly()"
+    [value]="value()"
+    [attr.aria-expanded]="dropdownVisible()"
+    [attr.aria-controls]="dropdownVisible() ? listboxId() : null"
+    [attr.aria-activedescendant]="activeDescendant()"
+    [attr.aria-invalid]="invalid() ? 'true' : null"
+    (focus)="openMenu()"
+    (click)="openMenu()"
+    (blur)="onBlur()"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+</div>
+
+@if (dropdownVisible()) {
+  <ul
+    #listRef
+    [id]="listboxId()"
+    role="listbox"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+    [class.invisible]="!menuPlaced()"
+    [style.top.px]="menuPlace().top"
+    [style.inset-inline-start.px]="menuPlace().start"
+    [style.min-width.px]="menuPlace().width"
+    [style.max-height.px]="menuPlace().maxHeight"
+    [attr.aria-label]="label() || null"
+  >
+    @for (item of filtered(); track item; let idx = $index) {
+      @let selected = item === value();
+      @let active = idx === activeIndex();
+      <li
+        [id]="optionId(idx)"
+        role="option"
+        [attr.aria-selected]="selected"
+        class="flex h-menu-item shrink-0 cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 transition-colors duration-fast"
+        [class]="
+          selected
+            ? active
+              ? 'bg-brand-soft text-on-brand-soft ring-2 ring-focus-halo'
+              : 'bg-brand-soft text-on-brand-soft'
+            : active
+              ? 'bg-row-hover text-text'
+              : 'text-text hover:bg-row-hover'
+        "
+        (mousedown)="$event.preventDefault()"
+        (mouseenter)="activeIndex.set(idx)"
+        (click)="pick(item)"
+      >
+        <span class="truncate">{{ item }}</span>
+        @if (selected) {
+          <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+        }
+      </li>
+    }
+  </ul>
+}

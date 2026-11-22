@@ -1,0 +1,193 @@
+{
+  "title": "Activities",
+  "subtitle": "Activities of {{record}}",
+  "newActivity": "New activity",
+  "tabs": {
+    "open": "Open",
+    "new": "New activity"
+  },
+  "viewAll": "View all activities ({{count}})",
+  "viewAllSoon": "The activities page comes in a later step",
+  "types": {
+    "TODO": "Task",
+    "CALL": "Call",
+    "MEETING": "Meeting",
+    "EMAIL": "Email",
+    "VISIT": "Visit",
+    "FOLLOW_UP": "Follow-up",
+    "OTHER": "Other"
+  },
+  "statuses": {
+    "PLANNED": "Scheduled",
+    "IN_PROGRESS": "In progress",
+    "DONE": "Completed",
+    "CANCELLED": "Cancelled"
+  },
+  "priorities": {
+    "LOW": "Low",
+    "NORMAL": "Normal",
+    "HIGH": "High",
+    "URGENT": "Urgent"
+  },
+  "directions": {
+    "INBOUND": "Inbound",
+    "OUTBOUND": "Outbound",
+    "INTERNAL": "Internal",
+    "NONE": "None"
+  },
+  "due": {
+    "OVERDUE": "Overdue",
+    "TODAY": "Due today",
+    "UPCOMING": "Upcoming"
+  },
+  "counters": {
+    "overdue": "Overdue",
+    "today": "Due today",
+    "upcoming": "Upcoming"
+  },
+  "empty": {
+    "title": "Nothing is planned yet",
+    "text": "Plan the next call, meeting or visit for this record.",
+    "quickCall": "Call",
+    "quickMeeting": "Meeting",
+    "quickFollowUp": "Follow-up"
+  },
+  "form": {
+    "type": "Activity type",
+    "subject": "Title",
+    "subjectPlaceholder": "What is this activity about?",
+    "due": "Due date and time",
+    "start": "Start",
+    "end": "End",
+    "endOptional": "Optional",
+    "assignee": "Assigned to",
+    "assignToMe": "Assign to me",
+    "me": "(Me)",
+    "priority": "Priority",
+    "status": "Initial status",
+    "direction": "Direction",
+    "location": "Location",
+    "meetingUrl": "Meeting link",
+    "description": "Notes and agenda",
+    "outcome": "Outcome",
+    "reminder": "Reminder",
+    "reminderNone": "No reminder",
+    "reminderMinutes": "{{count}} minutes before",
+    "reminderAtDue": "At the due time",
+    "relatedTo": "Related to",
+    "hour": "Hour",
+    "minute": "Minutes",
+    "presetToday": "Today",
+    "presetTomorrow": "Tomorrow",
+    "presetInTwoDays": "In 2 days",
+    "presetNextWeek": "Next week",
+    "presetNextMonth": "Next month",
+    "minutes": "{{count}} min",
+    "hours": "{{count}} h",
+    "addEnd": "End",
+    "removeEnd": "Remove end",
+    "save": "Save activity",
+    "saveCompleted": "Log completed activity",
+    "saveChanges": "Save changes",
+    "saveAndAdd": "Save and add another",
+    "cancel": "Cancel",
+    "close": "Close",
+    "unsaved": "Unsaved changes"
+  },
+  "hints": {
+    "type": "Choose the kind of activity to show the matching schedule, location, link, or direction fields.",
+    "subject": "Enter a short summary of the activity (up to 180 characters) shown in lists and reminders.",
+    "assignee": "Select the team member responsible for completing this activity and receiving its reminder.",
+    "due": "Pick the date and 24-hour time when this activity is due; drives overdue and today badges.",
+    "start": "Pick the start date and 24-hour time for this activity; shifting it preserves the duration.",
+    "reminder": "Choose when to notify the assignee before the scheduled time, or turn the reminder off.",
+    "end": "Optional end date, 24-hour time, or duration preset (up to 14 days after the start).",
+    "status": "Set whether the new activity is scheduled for later, already in progress, or logged as completed.",
+    "priority": "Select the urgency level; high and urgent activities display a priority badge on cards.",
+    "direction": "Indicate whether the call or email was inbound, outbound, or internal to your team.",
+    "location": "Enter the address, branch, or meeting room (up to 180 characters) where the activity takes place.",
+    "meetingUrl": "Paste a full meeting link starting with http:// or https:// to show a quick join button.",
+    "description": "Add preparation notes, talking points, or agenda details (up to 4,000 characters).",
+    "outcome": "Record what happened and the agreed next steps for this completed activity (up to 2,000 characters).",
+    "completeOutcome": "Optional summary of the result or next steps (up to 2,000 characters) saved when marking as done.",
+    "cancelReason": "Optional reason for cancelling this activity (up to 2,000 characters) saved in the record history."
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "backToOpen": "Open activities",
+    "start": "Start",
+    "moveBack": "Move back to scheduled",
+    "done": "Mark as done",
+    "cancel": "Cancel activity",
+    "joinMeeting": "Join meeting",
+    "activities": "Activities"
+  },
+  "complete": {
+    "title": "Complete this activity",
+    "outcome": "Outcome",
+    "optional": "Optional",
+    "confirm": "Mark as done",
+    "templateAsPlanned": "Completed as planned",
+    "templateFollowUp": "Follow-up needed next week",
+    "templateSummarySent": "Summary and next steps sent",
+    "templateLeftMessage": "Left a message, waiting for a reply"
+  },
+  "cancel": {
+    "title": "Cancel this activity",
+    "reason": "Reason",
+    "confirm": "Cancel activity",
+    "keep": "Keep activity",
+    "templateRescheduled": "Rescheduled to another time",
+    "templateNotNeeded": "No longer needed",
+    "templateOtherChannel": "Handled on another channel",
+    "templateMistake": "Created by mistake"
+  },
+  "conflict": {
+    "title": "This activity was changed",
+    "text": "Someone else changed this activity. Reload it, or keep your changes and save over it.",
+    "reload": "Reload",
+    "keep": "Keep my changes"
+  },
+  "discard": {
+    "title": "Discard your changes?",
+    "text": "Your changes to this activity are not saved.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters.",
+    "startInPast": "A scheduled activity must start in the future.",
+    "doneInFuture": "A completed activity cannot start in the future.",
+    "endBeforeStart": "The end must be after the start.",
+    "endTooLong": "An activity can last at most {{days}} days.",
+    "invalidUrl": "Enter a full link that starts with http:// or https://."
+  },
+  "toasts": {
+    "created": "Activity added",
+    "saved": "Changes saved",
+    "started": "Activity started",
+    "movedBack": "Activity moved back to scheduled",
+    "completed": "Activity completed",
+    "cancelled": "Activity cancelled"
+  },
+  "errors": {
+    "ACTIVITY_INVALID": "Check the activity details and try again",
+    "ACTIVITY_VERSION_CONFLICT": "This activity was changed by someone else",
+    "ACTIVITY_TERMINAL": "A completed or cancelled activity cannot be changed",
+    "ACTIVITY_NOT_FOUND": "This activity no longer exists",
+    "ACTIVITY_ACCESS_DENIED": "You do not have permission for this activity",
+    "ACTIVITY_VERSION_REQUIRED": "Reload the activity and try again",
+    "ACTIVITY_IDEMPOTENCY_KEY_INVALID": "The request could not be repeated safely.",
+    "ACTIVITY_IDEMPOTENCY_MISMATCH": "The request could not be repeated safely.",
+    "ACTIVITY_IDEMPOTENCY_IN_FLIGHT": "This request is already being processed.",
+    "ACTIVITY_TARGET_RESOLVER_UNAVAILABLE": "The record's app is not responding right now.",
+    "CORE_VALIDATION_FAILED": "The submitted data is not valid.",
+    "generic": "The activity could not be saved"
+  },
+  "meta": {
+    "created": "Created {{date}} by {{name}}",
+    "updated": "Updated {{date}}"
+  }
+}

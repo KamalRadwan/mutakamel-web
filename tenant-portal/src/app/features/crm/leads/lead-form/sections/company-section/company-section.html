@@ -1,0 +1,233 @@
+@if (layout() === 'page') {
+  <div [class]="pageGrid">
+    @if (draft().existingCompanyPartyId) {
+      <ui-field
+        size="bare"
+        [label]="'leadForm.identity.companyName' | transloco"
+        [for]="uid + '-existing-company'"
+        [hint]="'leadForm.identity.companyNameHint' | transloco"
+        [required]="true"
+        [error]="companyNameError()"
+      >
+        <div class="flex items-center gap-6">
+          <div
+            class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+          >
+            <input
+              [id]="uid + '-existing-company'"
+              type="text"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="draft().existingCompanyName || draft().companyName"
+              [attr.aria-invalid]="companyNameError() ? 'true' : null"
+            />
+          </div>
+          @if (canChangeCompany()) {
+            <button type="button" uiButton variant="ghost" size="small" (click)="clearExistingCompany()">
+              {{ 'leadForm.identity.change' | transloco }}
+            </button>
+          }
+        </div>
+      </ui-field>
+    } @else {
+      <ui-field
+        [label]="'leadForm.identity.companyName' | transloco"
+        [for]="uid + '-company-name'"
+        [hint]="'leadForm.identity.companyNameHint' | transloco"
+        [required]="true"
+        [count]="draft().companyName.length"
+        [max]="limits.company"
+        [error]="companyNameError()"
+      >
+        <input
+          #companyNameInput
+          [id]="uid + '-company-name'"
+          type="text"
+          autocomplete="organization"
+          aria-required="true"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [value]="draft().companyName"
+          [attr.aria-invalid]="companyNameError() ? 'true' : null"
+          (input)="setField('companyName', $event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'leadForm.company.email' | transloco"
+        [for]="uid + '-email'"
+        [hint]="'leadForm.company.emailHint' | transloco"
+        [count]="draft().companyEmail.length"
+        [max]="limits.email"
+        [error]="emailError()"
+      >
+        <input
+          [id]="uid + '-email'"
+          type="email"
+          dir="ltr"
+          autocomplete="email"
+          class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [value]="draft().companyEmail"
+          [attr.aria-invalid]="emailError() ? 'true' : null"
+          (input)="setField('companyEmail', $event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'leadForm.company.website' | transloco"
+        [for]="uid + '-website'"
+        [hint]="'leadForm.company.websiteHint' | transloco"
+        [error]="websiteError()"
+      >
+        <input
+          [id]="uid + '-website'"
+          type="url"
+          dir="ltr"
+          autocomplete="url"
+          class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [value]="draft().companyWebsite"
+          [attr.aria-invalid]="websiteError() ? 'true' : null"
+          (input)="setField('companyWebsite', $event)"
+        />
+      </ui-field>
+
+      <div class="col-span-2 desktop:col-span-1">
+        <app-phone-list
+          [phones]="phones()"
+          (phonesChange)="onPhonesChange($event)"
+          [countries]="countries()"
+          [max]="limits.phonesMax"
+          [maxLength]="limits.phoneMax"
+          [readonly]="readonly()"
+          [label]="'leadForm.company.phone' | transloco"
+          [hint]="'leadForm.company.phoneHint' | transloco"
+          [addLabel]="'leadForm.reach.addPhone' | transloco"
+          [removeLabel]="'leadForm.reach.removePhone' | transloco"
+          [idPrefix]="uid + '-phone'"
+          [errors]="phoneErrors()"
+          [crm]="crm()"
+          [source]="source()"
+        />
+      </div>
+    }
+  </div>
+} @else {
+  <div class="flex flex-col gap-8">
+    @if (draft().existingCompanyPartyId) {
+      <ui-field
+        size="bare"
+        [label]="'leadForm.identity.companyName' | transloco"
+        [for]="uid + '-existing-company'"
+        [hint]="'leadForm.identity.companyNameHint' | transloco"
+        [required]="true"
+        [error]="companyNameError()"
+      >
+        <div class="flex items-center gap-6">
+          <div
+            class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+          >
+            <input
+              [id]="uid + '-existing-company'"
+              type="text"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="draft().existingCompanyName || draft().companyName"
+              [attr.aria-invalid]="companyNameError() ? 'true' : null"
+            />
+          </div>
+          @if (canChangeCompany()) {
+            <button type="button" uiButton variant="ghost" size="small" (click)="clearExistingCompany()">
+              {{ 'leadForm.identity.change' | transloco }}
+            </button>
+          }
+        </div>
+      </ui-field>
+    } @else {
+      <ui-field
+        [label]="'leadForm.identity.companyName' | transloco"
+        [for]="uid + '-company-name'"
+        [hint]="'leadForm.identity.companyNameHint' | transloco"
+        [required]="true"
+        [count]="draft().companyName.length"
+        [max]="limits.company"
+        [error]="companyNameError()"
+      >
+        <input
+          #companyNameInput
+          [id]="uid + '-company-name'"
+          type="text"
+          autocomplete="organization"
+          aria-required="true"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [value]="draft().companyName"
+          [attr.aria-invalid]="companyNameError() ? 'true' : null"
+          (input)="setField('companyName', $event)"
+        />
+      </ui-field>
+
+      <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+        <app-phone-list
+          [phones]="phones()"
+          (phonesChange)="onPhonesChange($event)"
+          [countries]="countries()"
+          [max]="limits.phonesMax"
+          [maxLength]="limits.phoneMax"
+          [readonly]="readonly()"
+          [label]="'leadForm.company.phone' | transloco"
+          [hint]="'leadForm.company.phoneHint' | transloco"
+          [addLabel]="'leadForm.reach.addPhone' | transloco"
+          [removeLabel]="'leadForm.reach.removePhone' | transloco"
+          [idPrefix]="uid + '-phone'"
+          [errors]="phoneErrors()"
+          [crm]="crm()"
+          [source]="source()"
+        />
+
+        <div class="flex flex-col gap-8">
+          <ui-field
+            [label]="'leadForm.company.email' | transloco"
+            [for]="uid + '-email'"
+            [hint]="'leadForm.company.emailHint' | transloco"
+            [count]="draft().companyEmail.length"
+            [max]="limits.email"
+            [error]="emailError()"
+          >
+            <input
+              [id]="uid + '-email'"
+              type="email"
+              dir="ltr"
+              autocomplete="email"
+              class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().companyEmail"
+              [attr.aria-invalid]="emailError() ? 'true' : null"
+              (input)="setField('companyEmail', $event)"
+            />
+          </ui-field>
+
+          <ui-field
+            [label]="'leadForm.company.website' | transloco"
+            [for]="uid + '-website'"
+            [hint]="'leadForm.company.websiteHint' | transloco"
+            [error]="websiteError()"
+          >
+            <input
+              [id]="uid + '-website'"
+              type="url"
+              dir="ltr"
+              autocomplete="url"
+              class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().companyWebsite"
+              [attr.aria-invalid]="websiteError() ? 'true' : null"
+              (input)="setField('companyWebsite', $event)"
+            />
+          </ui-field>
+        </div>
+      </div>
+    }
+  </div>
+}

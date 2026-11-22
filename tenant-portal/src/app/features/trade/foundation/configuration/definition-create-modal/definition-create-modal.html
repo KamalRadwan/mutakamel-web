@@ -1,0 +1,277 @@
+<ui-modal
+  size="form"
+  icon="tablerPlus"
+  tile="bg-icon-violet"
+  [title]="'tradeConfig.createModal.title' | transloco"
+  [subtitle]="'tradeConfig.createModal.subtitle' | transloco"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+    <div class="col-span-2">
+      <ui-field
+        [label]="'tradeConfig.createModal.keyLabel' | transloco"
+        [for]="uid + '-key'"
+        [required]="true"
+        [hint]="'tradeConfig.createModal.keyHint' | transloco"
+        [error]="keyError()"
+      >
+        <input
+          [id]="uid + '-key'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tradeConfig.createModal.keyPlaceholder' | transloco"
+          [disabled]="saving()"
+          [value]="keyValue()"
+          [attr.aria-invalid]="keyError() ? 'true' : null"
+          (input)="onKeyInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <ui-field
+      size="bare"
+      [label]="'tradeConfig.createModal.typeLabel' | transloco"
+      [for]="uid + '-type'"
+      [required]="true"
+      [hint]="'tradeConfig.createModal.typeHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-type'"
+        [describedBy]="describedBy('type', false)"
+        [label]="'tradeConfig.createModal.typeLabel' | transloco"
+        [disabled]="saving()"
+        [options]="typeOptions()"
+        [value]="valueType()"
+        (valueChange)="onValueTypeChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'tradeConfig.createModal.riskLabel' | transloco"
+      [for]="uid + '-risk'"
+      [required]="true"
+      [hint]="'tradeConfig.createModal.riskHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-risk'"
+        [describedBy]="describedBy('risk', false)"
+        [label]="'tradeConfig.createModal.riskLabel' | transloco"
+        [disabled]="saving()"
+        [options]="riskOptions()"
+        [(value)]="riskClass"
+      />
+    </ui-field>
+
+    @if (valueType() === 'integer' || valueType() === 'number') {
+      <ui-field
+        [label]="'tradeConfig.createModal.minLabel' | transloco"
+        [for]="uid + '-min'"
+        [hint]="'tradeConfig.createModal.limitHint' | transloco"
+        [error]="minError()"
+      >
+        <input
+          [id]="uid + '-min'"
+          type="number"
+          dir="ltr"
+          [step]="valueType() === 'integer' ? 1 : 'any'"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [disabled]="saving()"
+          [value]="minText()"
+          [attr.aria-invalid]="minError() ? 'true' : null"
+          (input)="onMinInput($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'tradeConfig.createModal.maxLabel' | transloco"
+        [for]="uid + '-max'"
+        [hint]="'tradeConfig.createModal.limitHint' | transloco"
+        [error]="maxError()"
+      >
+        <input
+          [id]="uid + '-max'"
+          type="number"
+          dir="ltr"
+          [step]="valueType() === 'integer' ? 1 : 'any'"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [disabled]="saving()"
+          [value]="maxText()"
+          [attr.aria-invalid]="maxError() ? 'true' : null"
+          (input)="onMaxInput($event)"
+        />
+      </ui-field>
+    }
+
+    @if (valueType() === 'string') {
+      <div class="col-span-2">
+        <ui-field
+          [label]="'tradeConfig.createModal.maxLengthLabel' | transloco"
+          [for]="uid + '-max-len'"
+          [hint]="'tradeConfig.createModal.limitHint' | transloco"
+          [error]="maxLengthError()"
+        >
+          <input
+            [id]="uid + '-max-len'"
+            type="number"
+            dir="ltr"
+            step="1"
+            min="1"
+            max="2000"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [disabled]="saving()"
+            [value]="maxLengthText()"
+            [attr.aria-invalid]="maxLengthError() ? 'true' : null"
+            (input)="onMaxLengthInput($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @if (valueType() === 'choiceList') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'tradeConfig.createModal.choicesLabel' | transloco"
+          [for]="uid + '-choices'"
+          [required]="true"
+          [hint]="'tradeConfig.createModal.choicesHint' | transloco"
+          [error]="choicesError()"
+        >
+          <ui-tag-picker
+            [inputId]="uid + '-choices'"
+            [label]="'tradeConfig.createModal.choicesLabel' | transloco"
+            [options]="choiceOptions()"
+            [canCreate]="true"
+            [createTag]="createChoiceTagFn"
+            [max]="100"
+            [disabled]="saving()"
+            [(value)]="choices"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'tradeConfig.createModal.severalLabel' | transloco"
+          [for]="uid + '-several'"
+          [hint]="'tradeConfig.createModal.severalHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [id]="uid + '-several'"
+              [describedBy]="describedBy('several', false)"
+              [label]="'tradeConfig.createModal.severalLabel' | transloco"
+              [disabled]="saving()"
+              [checked]="severalChoices()"
+              (checkedChange)="onSeveralChoicesChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [label]="'tradeConfig.createModal.scopesLabel' | transloco"
+        [for]="uid + '-scopes'"
+        [required]="true"
+        [hint]="'tradeConfig.createModal.scopesHint' | transloco"
+        [error]="scopesError()"
+      >
+        <div role="group" class="flex min-h-field flex-wrap items-center gap-12">
+          <ui-checkbox [(checked)]="allowTenant">
+            {{ 'tradeConfig.scope.TENANT' | transloco }}
+          </ui-checkbox>
+          <ui-checkbox [(checked)]="allowCompany">
+            {{ 'tradeConfig.scope.COMPANY' | transloco }}
+          </ui-checkbox>
+          <ui-checkbox [(checked)]="allowBranch">
+            {{ 'tradeConfig.scope.BRANCH' | transloco }}
+          </ui-checkbox>
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [label]="'tradeConfig.createModal.mergeLabel' | transloco"
+        [for]="uid + '-merge'"
+        [required]="true"
+        [hint]="'tradeConfig.createModal.mergeHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-merge'"
+          [describedBy]="describedBy('merge', false)"
+          [label]="'tradeConfig.createModal.mergeLabel' | transloco"
+          [disabled]="saving()"
+          [options]="mergeOptions()"
+          [(value)]="mergeStrategy"
+        />
+      </ui-field>
+    </div>
+
+    @if (allowBranch()) {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'tradeConfig.createModal.companyLockLabel' | transloco"
+          [for]="uid + '-lock'"
+          [hint]="'tradeConfig.createModal.companyLockHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [id]="uid + '-lock'"
+              [describedBy]="describedBy('lock', false)"
+              [label]="'tradeConfig.createModal.companyLockLabel' | transloco"
+              [disabled]="saving()"
+              [(checked)]="requireCompanyBaseline"
+            />
+          </div>
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      (click)="submit()"
+    >
+      {{ 'tradeConfig.createModal.create' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tradeShared.discard.title' | transloco"
+  [text]="'tradeShared.discard.text' | transloco"
+  [confirmLabel]="'tradeShared.discard.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

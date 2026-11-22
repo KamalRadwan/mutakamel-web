@@ -1,0 +1,80 @@
+@let err = fieldError();
+<ui-field
+  size="bare"
+  [label]="label()"
+  [for]="uid + '-amount'"
+  [hint]="hint()"
+  [error]="err"
+>
+  <div class="grid grid-cols-3 gap-6" dir="ltr">
+    @if (readonly()) {
+      <div
+        class="col-span-1 flex h-field items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+        [class]="hasCurrencyError() ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+      >
+        <input
+          [id]="uid + '-currency'"
+          type="text"
+          readonly
+          [value]="currencyLabel() || '—'"
+          [attr.aria-label]="'recordFields.money.currency' | transloco"
+          [attr.aria-invalid]="hasCurrencyError() ? 'true' : null"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    } @else {
+      <div class="col-span-1" [attr.aria-invalid]="hasCurrencyError() ? 'true' : null">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-currency'"
+          [options]="currencyOptions()"
+          [value]="currency() ?? ''"
+          [label]="'recordFields.money.currency' | transloco"
+          (valueChange)="onCurrencyChange($event)"
+        />
+      </div>
+    }
+
+    <div
+      class="col-span-2 flex h-field min-w-0 items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+      [class]="
+        hasAmountError()
+          ? 'border-danger-border ring-2 ring-danger-halo'
+          : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+      "
+    >
+      <input
+        [id]="uid + '-amount'"
+        type="text"
+        inputmode="decimal"
+        dir="ltr"
+        class="w-full bg-transparent text-end text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [placeholder]="'recordFields.money.amount' | transloco"
+        [value]="displayAmount()"
+        [attr.aria-invalid]="hasAmountError() ? 'true' : null"
+        (focus)="onAmountFocus()"
+        (input)="onAmountInput($event)"
+        (blur)="onAmountBlur()"
+      />
+    </div>
+  </div>
+</ui-field>
+
+@if (preview() || (hasValue() && !readonly())) {
+  <div class="mt-4 flex min-h-label-h-compact items-center justify-between gap-8">
+    @if (preview(); as previewText) {
+      <bdi dir="ltr" class="text-11 leading-16 tabular-nums text-text-muted">{{ previewText }}</bdi>
+    }
+    @if (hasValue() && !readonly()) {
+      <button
+        type="button"
+        class="ms-auto cursor-pointer rounded-4 text-11 leading-16 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="clearValue()"
+      >
+        {{ 'recordFields.money.clear' | transloco }}
+      </button>
+    }
+  </div>
+}

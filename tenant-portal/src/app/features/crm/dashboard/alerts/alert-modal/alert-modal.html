@@ -1,0 +1,891 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerBellRinging"
+  tile="bg-icon-orange"
+  [title]="(isEdit() ? 'alerts.form.editTitle' : 'alerts.form.createTitle') | transloco"
+  [subtitle]="isEdit() ? editingRule()?.name ?? '' : ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form
+    class="grid grid-cols-3 gap-x-10 gap-y-8"
+    (submit)="$event.preventDefault(); save()"
+    (keydown.escape)="onInnerEscape($event)"
+  >
+    <div class="col-span-2">
+      @let nameErr = fieldError('name');
+      <ui-field
+        [label]="'alerts.form.name' | transloco"
+        [for]="uid + '-name'"
+        [hint]="'alerts.form.nameHint' | transloco"
+        [required]="true"
+        [count]="nameCount()"
+        [max]="maxNameLength"
+        [error]="nameErr"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'alerts.form.namePlaceholder' | transloco"
+          [value]="draft().name"
+          [attr.maxlength]="maxNameLength"
+          [attr.aria-invalid]="nameErr ? 'true' : null"
+          (input)="onInputDraft('name', $event, 'name')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.source' | transloco"
+        [for]="uid + '-source'"
+        [hint]="'alerts.form.sourceHint' | transloco"
+        [required]="true"
+      >
+        <ui-segmented
+          [id]="uid + '-source'"
+          [options]="sourceOptions()"
+          [label]="'alerts.form.source' | transloco"
+          [describedBy]="uid + '-source-hint'"
+          [value]="draft().sourceKind"
+          (valueChange)="onSourceChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (draft().sourceKind === 'METRIC') {
+      @let metricErr = fieldError('metricKey');
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.metric' | transloco"
+          [for]="uid + '-metric'"
+          [hint]="'alerts.form.metricHint' | transloco"
+          [required]="true"
+          [error]="metricErr"
+        >
+          <div class="relative inline-flex w-full">
+            <button
+              #metricTrigger
+              type="button"
+              [id]="uid + '-metric'"
+              class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast"
+              [class]="
+                metricErr
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : openPopover() === 'metric'
+                    ? 'border-focus-ring ring-3 ring-focus-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+              "
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="openPopover() === 'metric'"
+              [attr.aria-describedby]="describedBy(uid + '-metric', metricErr)"
+              [attr.aria-invalid]="metricErr ? 'true' : null"
+              (click)="togglePopover('metric')"
+            >
+              @if (selectedMetric(); as metric) {
+                <span class="truncate">{{ metricLabel(metric) }}</span>
+              } @else if (effectiveMetricKey()) {
+                <span class="truncate">{{ effectiveMetricKey() }}</span>
+              } @else {
+                <span class="truncate text-text-placeholder">{{ 'alerts.form.metricPlaceholder' | transloco }}</span>
+              }
+              <span class="inline-flex shrink-0 text-text-muted">
+                <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+              </span>
+            </button>
+          </div>
+        </ui-field>
+      </div>
+    } @else {
+      @let widgetErr = fieldError('widgetId');
+      <div [class]="draft().widgetVersionPolicy === 'PINNED' ? 'col-span-1' : 'col-span-2'">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.widget' | transloco"
+          [for]="uid + '-widget'"
+          [hint]="'alerts.form.widgetHint' | transloco"
+          [required]="true"
+          [error]="widgetErr"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-widget'"
+            [options]="widgetOptions()"
+            [value]="draft().widgetId"
+            [label]="'alerts.form.widget' | transloco"
+            [describedBy]="describedBy(uid + '-widget', widgetErr)"
+            (valueChange)="onWidgetChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.versionPolicy' | transloco"
+          [for]="uid + '-versionPolicy'"
+          [hint]="'alerts.form.versionPolicyHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-versionPolicy'"
+            [options]="versionPolicyOptions()"
+            [value]="draft().widgetVersionPolicy"
+            [label]="'alerts.form.versionPolicy' | transloco"
+            [describedBy]="uid + '-versionPolicy-hint'"
+            (valueChange)="patchDraft({ widgetVersionPolicy: $event })"
+          />
+        </ui-field>
+      </div>
+
+      @if (draft().widgetVersionPolicy === 'PINNED') {
+        @let verErr = fieldError('widgetVersionNumber');
+        <div class="col-span-1">
+          <ui-field
+            size="bare"
+            [label]="'alerts.form.versionNumber' | transloco"
+            [for]="uid + '-versionNumber'"
+            [hint]="'alerts.form.versionNumberHint' | transloco"
+            [required]="true"
+            [error]="verErr"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-versionNumber'"
+              [options]="widgetVersionOptions()"
+              [value]="draft().widgetVersionNumber"
+              [label]="'alerts.form.versionNumber' | transloco"
+              [describedBy]="describedBy(uid + '-versionNumber', verErr)"
+              (valueChange)="patchDraft({ widgetVersionNumber: $event }, 'widgetVersionNumber')"
+            />
+          </ui-field>
+        </div>
+      }
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.conditionKind' | transloco"
+        [for]="uid + '-conditionKind'"
+        [hint]="'alerts.form.conditionKindHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-conditionKind'"
+          [options]="conditionOptions()"
+          [value]="draft().conditionKind"
+          [label]="'alerts.form.conditionKind' | transloco"
+          [describedBy]="uid + '-conditionKind-hint'"
+          (valueChange)="patchDraft({ conditionKind: $event })"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.comparator' | transloco"
+        [for]="uid + '-comparator'"
+        [hint]="'alerts.form.comparatorHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-comparator'"
+          [options]="comparatorOptions()"
+          [value]="draft().comparator"
+          [label]="'alerts.form.comparator' | transloco"
+          [describedBy]="uid + '-comparator-hint'"
+          (valueChange)="patchDraft({ comparator: $event })"
+        />
+      </ui-field>
+    </div>
+
+    @let threshErr = fieldError('threshold');
+    <div class="col-span-1">
+      <ui-field
+        [label]="'alerts.form.threshold' | transloco"
+        [for]="uid + '-threshold'"
+        [hint]="'alerts.form.thresholdHint' | transloco"
+        [required]="true"
+        [error]="threshErr"
+      >
+        @if (showCurrencyPrefix()) {
+          <span dir="ltr" class="shrink-0 text-12 font-medium text-text-muted tabular-nums">
+            {{ draft().currencyCode }}
+          </span>
+        }
+        <input
+          [id]="uid + '-threshold'"
+          type="number"
+          step="any"
+          dir="ltr"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'alerts.form.thresholdPlaceholder' | transloco"
+          [value]="draft().thresholdText"
+          [attr.aria-invalid]="threshErr ? 'true' : null"
+          (input)="onInputDraft('thresholdText', $event, 'threshold')"
+        />
+        @if (showPercentSuffix()) {
+          <span dir="ltr" class="shrink-0 text-12 font-medium text-text-muted">%</span>
+        }
+      </ui-field>
+    </div>
+
+    @let unitErr = fieldError('valueUnit');
+    <div class="col-span-1">
+      <ui-field
+        [label]="'alerts.form.unit' | transloco"
+        [for]="uid + '-unit'"
+        [hint]="'alerts.form.unitHint' | transloco"
+        [error]="unitErr"
+      >
+        <input
+          [id]="uid + '-unit'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="unitLabel()"
+        />
+      </ui-field>
+    </div>
+
+    @if (resolvedValueUnit() === 'MONEY') {
+      @let currErr = fieldError('currencyCode');
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.currency' | transloco"
+          [for]="uid + '-currency'"
+          [hint]="'alerts.form.currencyHint' | transloco"
+          [required]="true"
+          [error]="currErr"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-currency'"
+            [options]="currencyOptions()"
+            [value]="draft().currencyCode"
+            [label]="'alerts.form.currency' | transloco"
+            [describedBy]="describedBy(uid + '-currency', currErr)"
+            (valueChange)="patchDraft({ currencyCode: $event }, 'currencyCode')"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @let minCohortErr = fieldError('minimumCohortSize');
+    <div class="col-span-1">
+      <ui-field
+        [label]="'alerts.form.minimumCohortSize' | transloco"
+        [for]="uid + '-minCohort'"
+        [hint]="'alerts.form.minimumCohortSizeHint' | transloco"
+        [error]="minCohortErr"
+      >
+        <input
+          [id]="uid + '-minCohort'"
+          type="number"
+          min="1"
+          step="1"
+          dir="ltr"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'alerts.form.minimumCohortSizePlaceholder' | transloco"
+          [value]="draft().minimumCohortText"
+          [attr.aria-invalid]="minCohortErr ? 'true' : null"
+          (input)="onInputDraft('minimumCohortText', $event, 'minimumCohortSize')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.scope' | transloco"
+        [for]="uid + '-scope'"
+        [hint]="'alerts.form.scopeHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scope'"
+          [options]="scopeOptions()"
+          [value]="draft().ownerMode"
+          [label]="'alerts.form.scope' | transloco"
+          [describedBy]="uid + '-scope-hint'"
+          (valueChange)="patchDraft({ ownerMode: $event })"
+        />
+      </ui-field>
+    </div>
+
+    <div [class]="resolvedValueUnit() === 'MONEY' ? 'col-span-2' : 'col-span-3'">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.branches' | transloco"
+        [for]="uid + '-branches'"
+        [hint]="'alerts.form.branchesHint' | transloco"
+      >
+        <div class="relative block min-w-0">
+          <div
+            #branchesTrigger
+            [id]="uid + '-branches'"
+            role="combobox"
+            tabindex="0"
+            class="flex min-h-field w-full cursor-pointer flex-wrap items-center justify-between gap-4 rounded-8 border bg-surface-field px-8 py-2 text-12 transition-colors duration-fast outline-none"
+            [class]="
+              openPopover() === 'branches'
+                ? 'border-focus-ring ring-3 ring-focus-halo'
+                : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+            "
+            [attr.aria-label]="'alerts.form.branches' | transloco"
+            [attr.aria-expanded]="openPopover() === 'branches'"
+            [attr.aria-describedby]="uid + '-branches-hint'"
+            aria-haspopup="listbox"
+            (click)="togglePopover('branches')"
+            (keydown.enter)="$event.preventDefault(); togglePopover('branches')"
+            (keydown.space)="$event.preventDefault(); togglePopover('branches')"
+          >
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-4">
+              @for (branch of selectedBranches(); track branch.id) {
+                <span class="inline-flex h-chip items-center gap-4 rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text">
+                  <span>{{ branchName(branch) }}</span>
+                  <button
+                    type="button"
+                    class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [attr.aria-label]="'alerts.form.removeBranch' | transloco: { name: branchName(branch) }"
+                    (click)="removeBranch(branch.id, $event)"
+                  >
+                    <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                  </button>
+                </span>
+              } @empty {
+                <span class="truncate text-text-muted">{{ 'alerts.form.branchesAll' | transloco }}</span>
+              }
+            </div>
+            <span class="inline-flex shrink-0 text-text-muted">
+              <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+            </span>
+          </div>
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.scheduleKind' | transloco"
+        [for]="uid + '-scheduleKind'"
+        [hint]="'alerts.form.scheduleKindHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scheduleKind'"
+          [options]="scheduleOptions()"
+          [value]="draft().scheduleKind"
+          [label]="'alerts.form.scheduleKind' | transloco"
+          [describedBy]="uid + '-scheduleKind-hint'"
+          (valueChange)="patchDraft({ scheduleKind: $event }, 'scheduleMinute')"
+        />
+      </ui-field>
+    </div>
+
+    @let schedMinErr = fieldError('scheduleMinute');
+    @if (draft().scheduleKind === 'HOURLY') {
+      <div class="col-span-1">
+        <ui-field
+          [label]="'alerts.form.scheduleMinute' | transloco"
+          [for]="uid + '-scheduleMinute'"
+          [hint]="'alerts.form.scheduleMinuteHint' | transloco"
+          [required]="true"
+          [error]="schedMinErr"
+        >
+          <input
+            [id]="uid + '-scheduleMinute'"
+            type="number"
+            min="0"
+            max="59"
+            step="1"
+            dir="ltr"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [value]="draft().scheduleMinuteHourlyText"
+            [attr.aria-invalid]="schedMinErr ? 'true' : null"
+            (input)="onInputDraft('scheduleMinuteHourlyText', $event, 'scheduleMinute')"
+          />
+        </ui-field>
+      </div>
+    } @else {
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.scheduleTime' | transloco"
+          [for]="uid + '-scheduleTime'"
+          [hint]="'alerts.form.scheduleTimeHint' | transloco"
+          [required]="true"
+          [error]="schedMinErr"
+        >
+          <ui-time-field
+            [id]="uid + '-scheduleTime'"
+            [ariaLabel]="'alerts.form.scheduleTime' | transloco"
+            [hourLabel]="'alerts.form.hour' | transloco"
+            [minuteLabel]="'alerts.form.minute' | transloco"
+            [describedBy]="describedBy(uid + '-scheduleTime', schedMinErr)"
+            [invalid]="!!schedMinErr"
+            [value]="draft().scheduleTime"
+            (valueChange)="patchDraft({ scheduleTime: $event ?? '09:00' }, 'scheduleMinute')"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @if (draft().scheduleKind === 'WEEKLY') {
+      @let weekdayErr = fieldError('scheduleWeekday');
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.scheduleWeekday' | transloco"
+          [for]="uid + '-scheduleWeekday'"
+          [hint]="'alerts.form.scheduleWeekdayHint' | transloco"
+          [required]="true"
+          [error]="weekdayErr"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-scheduleWeekday'"
+            [options]="weekdayOptions()"
+            [value]="draft().scheduleWeekday"
+            [label]="'alerts.form.scheduleWeekday' | transloco"
+            [describedBy]="describedBy(uid + '-scheduleWeekday', weekdayErr)"
+            (valueChange)="patchDraft({ scheduleWeekday: $event }, 'scheduleWeekday')"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.timeZone' | transloco"
+        [for]="uid + '-timeZone'"
+        [hint]="'alerts.form.timeZoneHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-timeZone'"
+          [options]="timeZoneOptions()"
+          [value]="draft().timeZone"
+          [label]="'alerts.form.timeZone' | transloco"
+          [describedBy]="uid + '-timeZone-hint'"
+          (valueChange)="patchDraft({ timeZone: $event })"
+        />
+      </ui-field>
+    </div>
+
+    @let cooldownErr = fieldError('cooldownMinutes');
+    <div class="col-span-1">
+      <ui-field
+        [label]="'alerts.form.cooldownMinutes' | transloco"
+        [for]="uid + '-cooldown'"
+        [hint]="'alerts.form.cooldownMinutesHint' | transloco"
+        [required]="true"
+        [error]="cooldownErr"
+      >
+        <input
+          [id]="uid + '-cooldown'"
+          type="number"
+          min="0"
+          max="43200"
+          step="1"
+          dir="ltr"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [value]="draft().cooldownText"
+          [attr.aria-invalid]="cooldownErr ? 'true' : null"
+          (input)="onInputDraft('cooldownText', $event, 'cooldownMinutes')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.quietEnabled' | transloco"
+        [for]="uid + '-quietEnabled'"
+        [hint]="'alerts.form.quietEnabledHint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <ui-switch
+            [id]="uid + '-quietEnabled'"
+            [label]="'alerts.form.quietEnabled' | transloco"
+            [describedBy]="uid + '-quietEnabled-hint'"
+            [checked]="draft().quietEnabled"
+            (checkedChange)="patchDraft({ quietEnabled: $event }, 'quietStartMinute')"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    @if (draft().quietEnabled) {
+      @let quietErr = fieldError('quietStartMinute');
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.quietStart' | transloco"
+          [for]="uid + '-quietStart'"
+          [hint]="'alerts.form.quietStartHint' | transloco"
+          [error]="quietErr"
+        >
+          <ui-time-field
+            [id]="uid + '-quietStart'"
+            [ariaLabel]="'alerts.form.quietStart' | transloco"
+            [hourLabel]="'alerts.form.hour' | transloco"
+            [minuteLabel]="'alerts.form.minute' | transloco"
+            [describedBy]="describedBy(uid + '-quietStart', quietErr)"
+            [invalid]="!!quietErr"
+            [value]="draft().quietStartTime"
+            (valueChange)="patchDraft({ quietStartTime: $event ?? '22:00' }, 'quietStartMinute')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.quietEnd' | transloco"
+          [for]="uid + '-quietEnd'"
+          [hint]="'alerts.form.quietEndHint' | transloco"
+        >
+          <ui-time-field
+            [id]="uid + '-quietEnd'"
+            [ariaLabel]="'alerts.form.quietEnd' | transloco"
+            [hourLabel]="'alerts.form.hour' | transloco"
+            [minuteLabel]="'alerts.form.minute' | transloco"
+            [describedBy]="uid + '-quietEnd-hint'"
+            [invalid]="!!quietErr"
+            [value]="draft().quietEndTime"
+            (valueChange)="patchDraft({ quietEndTime: $event ?? '08:00' }, 'quietStartMinute')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.quietBehavior' | transloco"
+          [for]="uid + '-quietBehavior'"
+          [hint]="'alerts.form.quietBehaviorHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-quietBehavior'"
+            [options]="quietBehaviorOptions()"
+            [value]="draft().quietBehavior"
+            [label]="'alerts.form.quietBehavior' | transloco"
+            [describedBy]="uid + '-quietBehavior-hint'"
+            (valueChange)="patchDraft({ quietBehavior: $event })"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.recipientMode' | transloco"
+        [for]="uid + '-recipientMode'"
+        [hint]="'alerts.form.recipientModeHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-recipientMode'"
+          [options]="recipientModeOptions()"
+          [value]="draft().recipientMode"
+          [label]="'alerts.form.recipientMode' | transloco"
+          [describedBy]="uid + '-recipientMode-hint'"
+          (valueChange)="patchDraft({ recipientMode: $event }, 'recipientUserIds')"
+        />
+      </ui-field>
+    </div>
+
+    @if (draft().recipientMode === 'USERS') {
+      @let recErr = fieldError('recipientUserIds');
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'alerts.form.recipients' | transloco"
+          [for]="uid + '-recipients'"
+          [hint]="'alerts.form.recipientsHint' | transloco"
+          [required]="true"
+          [error]="recErr"
+        >
+          <div class="relative block min-w-0">
+            <div
+              #peopleTrigger
+              [id]="uid + '-recipients'"
+              role="combobox"
+              tabindex="0"
+              class="flex min-h-field w-full cursor-pointer flex-wrap items-center justify-between gap-4 rounded-8 border bg-surface-field px-8 py-2 text-12 transition-colors duration-fast outline-none"
+              [class]="
+                recErr
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : openPopover() === 'people'
+                    ? 'border-focus-ring ring-3 ring-focus-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+              "
+              [attr.aria-label]="'alerts.form.recipients' | transloco"
+              [attr.aria-expanded]="openPopover() === 'people'"
+              [attr.aria-describedby]="describedBy(uid + '-recipients', recErr)"
+              [attr.aria-invalid]="recErr ? 'true' : null"
+              aria-haspopup="listbox"
+              (click)="togglePopover('people')"
+              (keydown.enter)="$event.preventDefault(); togglePopover('people')"
+              (keydown.space)="$event.preventDefault(); togglePopover('people')"
+            >
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-4">
+                @for (person of selectedPeople(); track person.id) {
+                  <span class="inline-flex h-chip items-center gap-4 rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text">
+                    <span>{{ personName(person) }}</span>
+                    <button
+                      type="button"
+                      class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [attr.aria-label]="'alerts.form.removeRecipient' | transloco: { name: personName(person) }"
+                      (click)="removePerson(person.id, $event)"
+                    >
+                      <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                    </button>
+                  </span>
+                } @empty {
+                  <span class="truncate text-text-placeholder">{{ 'alerts.form.recipientsPlaceholder' | transloco }}</span>
+                }
+              </div>
+              <span class="inline-flex shrink-0 text-text-muted">
+                <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+              </span>
+            </div>
+          </div>
+        </ui-field>
+      </div>
+    }
+
+    @let chErr = fieldError('channels');
+    <div class="col-span-3">
+      <ui-field
+        size="bare"
+        [label]="'alerts.form.channels' | transloco"
+        [for]="uid + '-channels'"
+        [hint]="'alerts.form.channelsHint' | transloco"
+        [error]="chErr"
+      >
+        <span [id]="uid + '-channels-label'" class="sr-only">{{ 'alerts.form.channels' | transloco }}</span>
+        <div
+          role="group"
+          [attr.aria-labelledby]="uid + '-channels-label'"
+          class="flex min-h-field flex-wrap items-center gap-12"
+        >
+          <ui-checkbox [checked]="draft().inAppEnabled" (change)="onInAppToggle($event)">
+            {{ 'alerts.form.channelInApp' | transloco }}
+          </ui-checkbox>
+          <ui-checkbox [checked]="draft().emailEnabled" (change)="onEmailToggle($event)">
+            {{ 'alerts.form.channelEmail' | transloco }}
+          </ui-checkbox>
+        </div>
+      </ui-field>
+    </div>
+  </form>
+
+  @if (openPopover(); as menu) {
+    <div
+      #popoverPanel
+      class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+      [class.invisible]="!popoverPlaced()"
+      [style.top.px]="popoverPlace().top"
+      [style.inset-inline-start.px]="popoverPlace().start"
+      [style.min-width.px]="popoverPlace().width"
+      [style.max-height.px]="popoverPlace().maxHeight"
+      (keydown.escape)="onInnerEscape($event)"
+    >
+      @if (menu === 'metric') {
+        <div class="flex h-field shrink-0 items-center gap-4 rounded-8 border border-border-field bg-surface-field px-8">
+          <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            #metricSearchInput
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'alerts.form.metricSearch' | transloco"
+            [attr.aria-label]="'alerts.form.metricSearch' | transloco"
+            [value]="metricQuery()"
+            (input)="onMetricSearchInput($event)"
+          />
+        </div>
+        <ul
+          role="listbox"
+          class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+          [attr.aria-label]="'alerts.form.metric' | transloco"
+        >
+          @for (metric of filteredMetrics(); track metric.key) {
+            <li role="option" [attr.aria-selected]="metric.key === draft().metricKey">
+              <button
+                type="button"
+                class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="metric.key === draft().metricKey ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                (click)="selectMetric(metric.key)"
+              >
+                <span class="truncate">{{ metricLabel(metric) }}</span>
+                <span class="flex shrink-0 items-center gap-6">
+                  <ui-badge tone="tag">{{ 'analytics.unit.' + metric.unit | transloco }}</ui-badge>
+                  @if (metric.key === draft().metricKey) {
+                    <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                  }
+                </span>
+              </button>
+            </li>
+          } @empty {
+            <li class="px-8 py-6 text-12 text-text-muted">{{ 'analytics.common.noResults' | transloco }}</li>
+          }
+        </ul>
+      }
+
+      @if (menu === 'branches') {
+        <ul
+          role="listbox"
+          aria-multiselectable="true"
+          class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+          [attr.aria-label]="'alerts.form.branches' | transloco"
+        >
+          @for (branch of branches; track branch.id) {
+            @let selected = draft().branchIds.includes(branch.id);
+            <li role="option" [attr.aria-selected]="selected">
+              <button
+                type="button"
+                class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                (click)="toggleBranch(branch.id)"
+              >
+                <span class="truncate">{{ branchName(branch) }}</span>
+                @if (selected) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (menu === 'people') {
+        <div class="flex h-field shrink-0 items-center gap-4 rounded-8 border border-border-field bg-surface-field px-8">
+          <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            #peopleSearchInput
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'alerts.form.recipientsSearch' | transloco"
+            [attr.aria-label]="'alerts.form.recipientsSearch' | transloco"
+            [value]="peopleQuery()"
+            (input)="onPeopleSearchInput($event)"
+          />
+        </div>
+        <ul
+          role="listbox"
+          aria-multiselectable="true"
+          class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+          [attr.aria-label]="'alerts.form.recipients' | transloco"
+        >
+          @for (person of filteredPeople(); track person.id) {
+            @let selected = draft().recipientUserIds.includes(person.id);
+            <li role="option" [attr.aria-selected]="selected">
+              <button
+                type="button"
+                class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                (click)="togglePerson(person.id)"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  <span class="truncate font-medium">{{ personName(person) }}</span>
+                  <span class="truncate text-11 text-text-muted" dir="ltr">{{ person.email }}</span>
+                </span>
+                @if (selected) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          } @empty {
+            <li class="px-8 py-6 text-12 text-text-muted">{{ 'analytics.common.noResults' | transloco }}</li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="isEdit() && !dirty()"
+      (click)="save()"
+    >
+      {{ 'analytics.common.save' | transloco }}
+    </button>
+
+    @if (isEdit() && dirty()) {
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
+        {{ 'analytics.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'analytics.common.unsaved' | transloco }}</span>
+    }
+
+    <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="requestClose()">
+      {{ 'analytics.common.cancel' | transloco }}
+    </button>
+
+    @if (isEdit()) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [disabled]="saving()"
+        (click)="requestDelete()"
+      >
+        {{ 'analytics.common.delete' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'alerts.unsaved.title' | transloco"
+  [text]="'alerts.unsaved.text' | transloco"
+  [saveLabel]="'analytics.common.save' | transloco"
+  [discardLabel]="'alerts.unsaved.discard' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'analytics.common.conflictTitle' | transloco"
+  [text]="'analytics.common.conflictText' | transloco"
+  [confirmLabel]="'analytics.common.reload' | transloco"
+  [cancelLabel]="'analytics.common.keepMine' | transloco"
+/>

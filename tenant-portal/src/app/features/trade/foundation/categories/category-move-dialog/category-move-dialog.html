@@ -1,0 +1,165 @@
+<ui-modal
+  size="form"
+  icon="tablerArrowsMove"
+  tile="bg-icon-navy"
+  [title]="'tradeCategories.move.title' | transloco: { name: source()?.name ?? '' }"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      [label]="'tradeCategories.move.search' | transloco"
+      [for]="uid + '-search'"
+      [hint]="'tradeCategories.move.searchHint' | transloco"
+    >
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        [id]="uid + '-search'"
+        type="text"
+        autocomplete="off"
+        [attr.maxlength]="searchMax"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'tradeShared.common.search' | transloco"
+        [value]="search()"
+        [disabled]="submitting()"
+        (input)="onSearchInput($event)"
+      />
+      @if (search()) {
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tradeCategories.toolbar.clearSearch' | transloco"
+          (click)="clearSearch()"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </ui-field>
+
+    @if (loading()) {
+      <div class="flex flex-col gap-6" [attr.aria-busy]="true">
+        @for (row of [1, 2, 3, 4]; track row) {
+          <div class="h-table-row motion-safe:animate-pulse rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+        }
+      </div>
+    } @else if (options().length === 0) {
+      <p class="rounded-8 border border-border bg-surface-muted p-12 text-center text-12 text-text-muted">
+        {{ 'tradeShared.common.noResults' | transloco }}
+      </p>
+    } @else {
+      <div
+        role="listbox"
+        [attr.aria-label]="'tradeCategories.move.search' | transloco"
+        class="flex max-h-notif-list-max flex-col gap-4 overflow-y-auto scrollbar-thin"
+        (keydown)="onListKeydown($event)"
+      >
+        @for (option of options(); track option.id) {
+          @let selected = isSelected(option);
+          <button
+            #optionButton
+            type="button"
+            role="option"
+            [attr.data-option-id]="option.id"
+            [tabindex]="rovingId() === option.id ? 0 : -1"
+            class="flex min-h-table-row w-full items-center justify-between gap-8 rounded-8 border px-8 py-6 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              option.disabled
+                ? 'cursor-not-allowed border-border bg-surface-muted opacity-drag-source'
+                : selected
+                  ? 'cursor-pointer border-brand bg-brand-soft text-on-brand-soft'
+                  : 'cursor-pointer border-border bg-surface hover:bg-row-hover'
+            "
+            [attr.aria-selected]="selected"
+            [attr.aria-disabled]="option.disabled ? 'true' : null"
+            [attr.title]="option.reason"
+            [attr.aria-describedby]="option.reason ? uid + '-reason-' + option.id : null"
+            (focus)="onOptionFocus(option)"
+            (click)="selectOption(option)"
+          >
+            @if (option.kind === 'root') {
+              <div class="flex min-w-0 flex-1 items-center gap-8">
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon">
+                  <ng-icon name="tablerCategory" size="14" aria-hidden="true" />
+                </span>
+                <span class="truncate text-13 font-medium text-text">
+                  {{ 'tradeCategories.modal.topLevel' | transloco }}
+                </span>
+              </div>
+            } @else {
+              <div class="flex min-w-0 flex-1 items-center gap-8">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="tileClass(option.node)"
+                >
+                  <ng-icon name="tablerCategory" size="14" aria-hidden="true" />
+                </span>
+
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <div class="flex min-w-0 items-center gap-6">
+                    <span class="truncate text-13 leading-18 font-medium text-text">
+                      {{ option.node.name }}
+                    </span>
+                    <span dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">
+                      {{ option.node.code }}
+                    </span>
+                  </div>
+                  @if (option.node.path.length > 1) {
+                    <div class="flex min-w-0 flex-wrap items-center gap-2 text-11 leading-16 text-text-muted">
+                      @for (step of option.node.path; track step.id; let first = $first) {
+                        @if (!first) {
+                          <ng-icon name="tablerChevronRight" size="11" class="shrink-0 rtl:-scale-x-100" aria-hidden="true" />
+                        }
+                        <span class="truncate">{{ step.name }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <div class="flex shrink-0 items-center gap-6">
+                @if (option.reason) {
+                  <span class="text-11 leading-16 text-danger-text" aria-hidden="true">{{ option.reason }}</span>
+                  <span [id]="uid + '-reason-' + option.id" class="sr-only">{{ option.reason }}</span>
+                }
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="option.node.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                >
+                  {{ (option.node.status === 'ACTIVE' ? 'tradeCategories.active' : 'tradeCategories.inactive') | transloco }}
+                </span>
+              </div>
+            }
+
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0 text-brand-text" aria-hidden="true" />
+            }
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="!canConfirm()"
+      (click)="confirm()"
+    >
+      {{ 'tradeCategories.move.confirm' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="close()"
+    >
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

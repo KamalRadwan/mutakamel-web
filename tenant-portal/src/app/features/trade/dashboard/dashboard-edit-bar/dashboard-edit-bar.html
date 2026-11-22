@@ -1,0 +1,88 @@
+<div
+  role="region"
+  [attr.aria-label]="'tradeDashboard.editBar.regionLabel' | transloco"
+  class="flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+>
+  <span class="text-13 leading-18 font-medium text-text">
+    {{ 'tradeDashboard.editBar.title' | transloco }}
+  </span>
+
+  <button
+    #kbdBtn
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [attr.aria-label]="'tradeDashboard.editBar.keyboardLabel' | transloco"
+    [attr.aria-describedby]="keyboardHintId"
+    (mouseenter)="showTooltip(kbdBtn)"
+    (mouseleave)="hideTooltip()"
+    (focus)="showTooltip(kbdBtn)"
+    (blur)="hideTooltip()"
+    (keydown.escape)="hideTooltip()"
+  >
+    <ng-icon name="tablerKeyboard" size="15" aria-hidden="true" />
+  </button>
+
+  <span
+    #tooltip
+    [id]="keyboardHintId"
+    role="tooltip"
+    class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+    [class.invisible]="!tipOpen()"
+    [style.top.px]="tooltipPlace().top"
+    [style.inset-inline-start.px]="tooltipPlace().start"
+  >
+    {{ 'tradeDashboard.editBar.keyboardHint' | transloco }}
+  </span>
+
+  <span class="min-w-0 flex-1" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="addDisabled()"
+    [attr.title]="addDisabledReason()"
+    (click)="addWidget.emit()"
+  >
+    <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+    <span>{{ 'tradeDashboard.editBar.addWidget' | transloco }}</span>
+  </button>
+
+  @if (dirty()) {
+    <span class="shrink-0 whitespace-nowrap text-12 leading-18 font-medium text-warning-text">
+      {{ 'tradeShared.common.unsaved' | transloco }}
+    </span>
+  }
+
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="!canUndo() || saving()"
+    (click)="undo.emit()"
+  >
+    <ng-icon name="tablerArrowBackUp" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+    <span>{{ 'tradeDashboard.editBar.undo' | transloco }}</span>
+  </button>
+
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="saving()"
+    (click)="cancel.emit()"
+  >
+    {{ 'tradeDashboard.editBar.cancel' | transloco }}
+  </button>
+
+  <button
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="saving()"
+    [disabled]="!dirty() || saving()"
+    (click)="save.emit()"
+  >
+    {{ 'tradeDashboard.editBar.saveLayout' | transloco }}
+  </button>
+</div>

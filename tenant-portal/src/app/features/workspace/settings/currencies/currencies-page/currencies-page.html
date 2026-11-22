@@ -1,0 +1,308 @@
+<app-settings-frame
+  [addLabel]="'wsCurrencies.new' | transloco"
+  [showAdd]="canManage"
+  [searchPlaceholder]="'wsCurrencies.search' | transloco"
+  [loading]="loading()"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="reload()"
+>
+  <div notices class="flex flex-col gap-8">
+    @if (showDefaultUnknown()) {
+      <app-settings-notice tone="warning">
+        {{ 'wsCurrencies.base.unknown' | transloco }}
+      </app-settings-notice>
+    }
+
+    <div class="flex flex-wrap items-end justify-between gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+      @if (defaultCurrency(); as base) {
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-8">
+          <span class="text-12 font-medium text-text-muted">{{ 'wsCurrencies.base.label' | transloco }}</span>
+          <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft">
+            <ng-icon name="tablerStar" size="12" aria-hidden="true" />
+            <span>{{ 'wsCurrencies.badge.default' | transloco }}</span>
+          </span>
+          <span class="text-13 leading-18 font-medium text-text">
+            <bdi dir="ltr" class="tabular-nums">{{ base.code }}</bdi> - {{ base.name }}
+          </span>
+          <span class="text-12 leading-18 text-text-muted">
+            {{ 'wsCurrencies.base.note' | transloco: { code: base.code } }}
+          </span>
+        </div>
+      }
+
+      <div class="ms-auto flex flex-wrap items-end gap-8">
+        <ui-field
+          class="w-toast max-w-full shrink-0"
+          size="bare"
+          [for]="uid + '-filter-show'"
+          [label]="'wsCurrencies.filters.show' | transloco"
+          [hint]="'wsCurrencies.filters.showHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-filter-show'"
+            [describedBy]="uid + '-filter-show-hint'"
+            [options]="filterOptions()"
+            [value]="filter()"
+            [label]="'wsCurrencies.filters.show' | transloco"
+            (valueChange)="onFilterChange($event)"
+          />
+        </ui-field>
+
+        @if (hasActiveFilters()) {
+          <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
+            {{ 'wsCurrencies.filters.clear' | transloco }}
+          </button>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (loadForbidden()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-text-muted">{{ 'settings.errors.permission' | transloco }}</p>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'wsCurrencies.table.ariaLabel' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns"
+        >
+          <span role="columnheader" [attr.aria-sort]="ariaSortFor('code')" class="flex min-w-0 items-center px-10">
+            <button
+              type="button"
+              class="inline-flex min-w-0 cursor-pointer items-center gap-4 truncate rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="toggleSort('code')"
+            >
+              <span class="truncate">{{ 'wsCurrencies.table.code' | transloco }}</span>
+              @if (sortBy() === 'code') {
+                <ng-icon [name]="sortDir() === 'ASC' ? 'tablerChevronUp' : 'tablerChevronDown'" size="12" aria-hidden="true" />
+              }
+            </button>
+          </span>
+
+          <span
+            role="columnheader"
+            [attr.aria-sort]="ariaSortFor('name')"
+            class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+          >
+            <button
+              type="button"
+              class="inline-flex min-w-0 cursor-pointer items-center gap-4 truncate rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="toggleSort('name')"
+            >
+              <span class="truncate">{{ 'wsCurrencies.table.name' | transloco }}</span>
+              @if (sortBy() === 'name') {
+                <ng-icon [name]="sortDir() === 'ASC' ? 'tablerChevronUp' : 'tablerChevronDown'" size="12" aria-hidden="true" />
+              }
+            </button>
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center justify-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsCurrencies.table.decimals' | transloco }}
+          </span>
+
+          <span
+            role="columnheader"
+            [attr.aria-sort]="ariaSortFor('exchangeRate')"
+            class="flex min-w-0 items-center justify-end border-s border-on-nav-line px-10"
+          >
+            <button
+              type="button"
+              class="inline-flex min-w-0 cursor-pointer items-center gap-4 truncate rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="toggleSort('exchangeRate')"
+            >
+              <span class="truncate">
+                {{
+                  defaultCurrency()
+                    ? ('wsCurrencies.table.rate' | transloco: { code: defaultCurrency()!.code })
+                    : ('wsCurrencies.table.rateNoBase' | transloco)
+                }}
+              </span>
+              @if (sortBy() === 'exchangeRate') {
+                <ng-icon [name]="sortDir() === 'ASC' ? 'tablerChevronUp' : 'tablerChevronDown'" size="12" aria-hidden="true" />
+              }
+            </button>
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsCurrencies.table.status' | transloco }}
+          </span>
+
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns"
+              aria-hidden="true"
+            >
+              <span role="cell" class="flex items-center gap-8 px-10">
+                <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+                <span class="h-skeleton-line flex-1 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border px-10">
+                <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-time-dd rounded-8 bg-neutral-soft"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-icon-tile-sm rounded-6 bg-neutral-soft"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (currency of items(); track currency.id) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumns"
+              (click)="onRowClick(currency, $event)"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+                  <ng-icon name="tablerCurrencyDollar" size="14" aria-hidden="true" />
+                </span>
+                <span dir="ltr" class="truncate font-medium tabular-nums">{{ currency.code }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                <button
+                  type="button"
+                  class="min-w-0 cursor-pointer truncate rounded-4 font-medium text-start outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="$event.stopPropagation(); openEdit(currency)"
+                >
+                  {{ currency.name }}
+                </button>
+                @if (currency.symbol && currency.symbol !== currency.code) {
+                  <span dir="ltr" class="shrink-0 text-12 text-text-muted">{{ currency.symbol }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-center border-s border-border px-10 text-12 text-text-muted">
+                <span dir="ltr" class="tabular-nums">{{ currency.decimalPlaces }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-12">
+                <span dir="ltr" class="truncate tabular-nums">{{ currency.exchangeRate ?? '—' }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (currency.isDefault) {
+                  <span class="inline-flex h-badge max-w-full items-center gap-4 truncate rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft">
+                    <ng-icon name="tablerStar" size="12" aria-hidden="true" />
+                    <span>{{ 'wsCurrencies.badge.default' | transloco }}</span>
+                  </span>
+                } @else if (currency.status === 'ACTIVE') {
+                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success px-8 text-12 font-medium whitespace-nowrap text-on-success">
+                    {{ 'settings.common.active' | transloco }}
+                  </span>
+                } @else {
+                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-text-muted">
+                    {{ 'settings.common.inactive' | transloco }}
+                  </span>
+                }
+              </span>
+
+              @if (canManage) {
+                <span
+                  role="cell"
+                  data-row-action
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="actionsFor(currency)"
+                    [label]="'settings.common.actions' | transloco"
+                    (selected)="onRowAction(currency, $event)"
+                  />
+                </span>
+              }
+            </div>
+          } @empty {
+            <div
+              role="row"
+              class="mt-6 flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+            >
+              <span role="cell" class="text-12 text-text-muted">
+                {{ (hasActiveFilters() ? 'wsCurrencies.emptyFiltered' : 'wsCurrencies.empty') | transloco }}
+              </span>
+              @if (hasActiveFilters()) {
+                <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
+                  {{ 'wsCurrencies.filters.clear' | transloco }}
+                </button>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (!loading() && total() > 0) {
+      <ui-pagination
+        [total]="total()"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        [pageSizes]="pageSizes"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
+    }
+  }
+</app-settings-frame>
+
+<app-currency-modal
+  [canManage]="canManage"
+  [defaultCurrency]="defaultCurrency()"
+  [hasCurrencies]="hasCurrencies()"
+  (saved)="onModalSaved()"
+  (notFound)="onModalNotFound()"
+/>
+
+<app-set-default-dialog
+  (confirmed)="onDefaultConfirmed()"
+  (blocked)="onSetDefaultBlocked($event)"
+/>
+
+<ui-confirm-dialog
+  #deactivateConfirm
+  tone="warning"
+  [title]="'wsCurrencies.deactivate.title' | transloco: { name: pendingDeactivate()?.name ?? '', code: pendingDeactivate()?.code ?? '' }"
+  [text]="'wsCurrencies.deactivate.text' | transloco"
+  [confirmLabel]="'wsCurrencies.deactivate.confirm' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<app-deactivate-blocker-modal />

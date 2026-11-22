@@ -1,0 +1,485 @@
+<div class="min-h-0 flex-1 overflow-y-auto p-10">
+  @if (readonly()) {
+    <p class="mb-10 flex items-center gap-6 text-12 leading-18 text-text-muted">
+      <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+      <span>{{ 'wsPartyModal.readonlyHint' | transloco }}</span>
+    </p>
+  }
+
+  @if (mode() === 'edit' && party(); as p) {
+    <div class="mb-12 flex items-center gap-10">
+      @if (imageSrc(); as src) {
+        <img
+          [src]="src"
+          [alt]="p.displayName"
+          class="size-dropzone shrink-0 rounded-10 border border-border object-cover"
+        />
+      } @else {
+        <span
+          class="inline-flex size-dropzone shrink-0 items-center justify-center rounded-10 text-on-icon"
+          [class]="partyType() === 'ORGANIZATION' ? 'bg-icon-navy' : 'bg-icon-blue'"
+          aria-hidden="true"
+        >
+          <ng-icon [name]="partyType() === 'ORGANIZATION' ? 'tablerBuilding' : 'tablerUser'" size="20" />
+        </span>
+      }
+
+      @if (!readonly()) {
+        <div class="flex min-w-0 flex-1 items-center gap-8">
+          <ui-file-drop
+            class="min-w-0 flex-1"
+            accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+            [maxBytes]="limitsConst.imageMaxBytes"
+            [title]="'wsPartyModal.image.title' | transloco"
+            [hint]="'wsPartyModal.image.hint' | transloco"
+            [browseLabel]="'wsPartyModal.image.browse' | transloco"
+            [disabled]="imageBusy() || saving()"
+            (picked)="onImagePicked($event)"
+            (rejected)="onImageRejected($event)"
+          />
+
+          @if (imageSrc()) {
+            <button
+              type="button"
+              uiButton
+              variant="ghost"
+              size="small"
+              [loading]="removingImage()"
+              [disabled]="imageBusy() || saving()"
+              (click)="removeImage()"
+            >
+              {{ 'wsPartyModal.image.remove' | transloco }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    @if (partyType() === 'PERSON') {
+      <ui-field
+        [for]="uid + '-title'"
+        [label]="'wsPartyModal.fields.honorificTitle' | transloco"
+        [hint]="'wsPartyModal.fields.honorificTitleHint' | transloco"
+        [count]="!readonly() ? honorificTitleCount() : null"
+        [max]="!readonly() ? limitsConst.honorificTitle : null"
+        [error]="maxErr(detailsForm.honorificTitle(), limitsConst.honorificTitle)"
+      >
+        <input
+          [id]="uid + '-title'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="!readonly() ? ('wsPartyModal.fields.honorificTitlePlaceholder' | transloco) : ''"
+          [formField]="detailsForm.honorificTitle"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="maxErr(detailsForm.honorificTitle(), limitsConst.honorificTitle) ? 'true' : null"
+          (input)="onPersonNameInput()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-first-name'"
+        [label]="'wsPartyModal.fields.firstName' | transloco"
+        [hint]="'wsPartyModal.fields.firstNameHint' | transloco"
+        [count]="!readonly() ? firstNameCount() : null"
+        [max]="!readonly() ? limitsConst.firstName : null"
+        [error]="maxErr(detailsForm.firstName(), limitsConst.firstName)"
+      >
+        <input
+          [id]="uid + '-first-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.firstName"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="maxErr(detailsForm.firstName(), limitsConst.firstName) ? 'true' : null"
+          (input)="onPersonNameInput()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-last-name'"
+        [label]="'wsPartyModal.fields.lastName' | transloco"
+        [hint]="'wsPartyModal.fields.lastNameHint' | transloco"
+        [count]="!readonly() ? lastNameCount() : null"
+        [max]="!readonly() ? limitsConst.lastName : null"
+        [error]="maxErr(detailsForm.lastName(), limitsConst.lastName)"
+      >
+        <input
+          [id]="uid + '-last-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.lastName"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="maxErr(detailsForm.lastName(), limitsConst.lastName) ? 'true' : null"
+          (input)="onPersonNameInput()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-display-name'"
+        [label]="'wsPartyModal.fields.displayName' | transloco"
+        [hint]="'wsPartyModal.fields.displayNameHint' | transloco"
+        [required]="!readonly()"
+        [count]="!readonly() ? displayNameCount() : null"
+        [max]="!readonly() ? limitsConst.displayName : null"
+        [error]="displayNameError()"
+      >
+        <input
+          [id]="uid + '-display-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.displayName"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="displayNameError() ? 'true' : null"
+          (input)="onDisplayNameInput()"
+        />
+      </ui-field>
+    } @else {
+      <ui-field
+        [for]="uid + '-org-name'"
+        [label]="'wsPartyModal.fields.organizationName' | transloco"
+        [hint]="'wsPartyModal.fields.organizationNameHint' | transloco"
+        [count]="!readonly() ? organizationNameCount() : null"
+        [max]="!readonly() ? limitsConst.organizationName : null"
+        [error]="maxErr(detailsForm.organizationName(), limitsConst.organizationName)"
+      >
+        <input
+          [id]="uid + '-org-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.organizationName"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="maxErr(detailsForm.organizationName(), limitsConst.organizationName) ? 'true' : null"
+          (input)="onOrganizationNameInput()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-display-name'"
+        [label]="'wsPartyModal.fields.displayName' | transloco"
+        [hint]="'wsPartyModal.fields.displayNameHint' | transloco"
+        [required]="!readonly()"
+        [count]="!readonly() ? displayNameCount() : null"
+        [max]="!readonly() ? limitsConst.displayName : null"
+        [error]="displayNameError()"
+      >
+        <input
+          [id]="uid + '-display-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.displayName"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="displayNameError() ? 'true' : null"
+          (input)="onDisplayNameInput()"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [for]="uid + '-legal-name'"
+          [label]="'wsPartyModal.fields.legalName' | transloco"
+          [hint]="'wsPartyModal.fields.legalNameHint' | transloco"
+          [count]="!readonly() ? legalNameCount() : null"
+          [max]="!readonly() ? limitsConst.legalName : null"
+          [error]="maxErr(detailsForm.legalName(), limitsConst.legalName)"
+        >
+          <input
+            [id]="uid + '-legal-name'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [formField]="detailsForm.legalName"
+            [readOnly]="readonly() || saving()"
+            [attr.aria-readonly]="readonly() ? 'true' : null"
+            [attr.aria-invalid]="maxErr(detailsForm.legalName(), limitsConst.legalName) ? 'true' : null"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        [for]="uid + '-tax-number'"
+        [label]="'wsPartyModal.fields.taxNumber' | transloco"
+        [hint]="'wsPartyModal.fields.taxNumberHint' | transloco"
+        [count]="!readonly() ? taxNumberCount() : null"
+        [max]="!readonly() ? limitsConst.taxNumber : null"
+        [error]="maxErr(detailsForm.taxNumber(), limitsConst.taxNumber)"
+      >
+        <input
+          [id]="uid + '-tax-number'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.taxNumber"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="maxErr(detailsForm.taxNumber(), limitsConst.taxNumber) ? 'true' : null"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-cr-number'"
+        [label]="'wsPartyModal.fields.commercialRegistrationNumber' | transloco"
+        [hint]="'wsPartyModal.fields.commercialRegistrationNumberHint' | transloco"
+        [count]="!readonly() ? commercialRegistrationCount() : null"
+        [max]="!readonly() ? limitsConst.commercialRegistrationNumber : null"
+        [error]="maxErr(detailsForm.commercialRegistrationNumber(), limitsConst.commercialRegistrationNumber)"
+      >
+        <input
+          [id]="uid + '-cr-number'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [formField]="detailsForm.commercialRegistrationNumber"
+          [readOnly]="readonly() || saving()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="maxErr(detailsForm.commercialRegistrationNumber(), limitsConst.commercialRegistrationNumber) ? 'true' : null"
+        />
+      </ui-field>
+    }
+
+    @if (readonly()) {
+      <ui-field
+        [for]="uid + '-branch'"
+        [label]="'wsPartyModal.fields.branch' | transloco"
+        [hint]="'wsPartyModal.fields.branchHint' | transloco"
+        [error]="branchError()"
+      >
+        <input
+          [id]="uid + '-branch'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none read-only:cursor-default"
+          [value]="readonlyBranchLabel()"
+          readonly
+          aria-readonly="true"
+        />
+      </ui-field>
+    } @else {
+      <ui-field
+        size="bare"
+        [for]="uid + '-branch'"
+        [label]="'wsPartyModal.fields.branch' | transloco"
+        [hint]="'wsPartyModal.fields.branchHint' | transloco"
+        [error]="branchError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-branch'"
+          [describedBy]="uid + '-branch-hint' + (branchError() ? ' ' + uid + '-branch-error' : '')"
+          [options]="branchOptions()"
+          [value]="branchDropdownValue()"
+          [label]="'wsPartyModal.fields.branch' | transloco"
+          [disabled]="saving()"
+          (valueChange)="onBranchChange($event)"
+        />
+      </ui-field>
+    }
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-owner'"
+      [label]="'wsPartyModal.fields.owner' | transloco"
+      [hint]="'wsPartyModal.fields.ownerHint' | transloco"
+      [error]="ownerError()"
+    >
+      <app-party-owner-picker
+        [fieldId]="uid + '-owner'"
+        [describedBy]="uid + '-owner-hint' + (ownerError() ? ' ' + uid + '-owner-error' : '')"
+        [hasError]="!!ownerError()"
+        [readonly]="readonly()"
+        [disabled]="saving()"
+        [label]="'wsPartyModal.fields.owner' | transloco"
+        [emptyLabel]="'wsPartyModal.fields.noOwner' | transloco"
+        [searchPlaceholder]="'wsPartyModal.fields.ownerSearch' | transloco"
+        [value]="ownerUserId()"
+        (valueChange)="onOwnerChange($event)"
+      />
+    </ui-field>
+
+    @if (mode() === 'edit') {
+      @if (readonly()) {
+        <ui-field
+          [for]="uid + '-status'"
+          [label]="'wsPartyModal.fields.status' | transloco"
+          [hint]="'wsPartyModal.fields.statusHint' | transloco"
+        >
+          <input
+            [id]="uid + '-status'"
+            type="text"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none read-only:cursor-default"
+            [value]="readonlyStatusLabel()"
+            readonly
+            aria-readonly="true"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [for]="uid + '-status'"
+          [label]="'wsPartyModal.fields.status' | transloco"
+          [hint]="'wsPartyModal.fields.statusHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-status'"
+            [describedBy]="uid + '-status-hint'"
+            [options]="statusOptions()"
+            [value]="status()"
+            [label]="'wsPartyModal.fields.status' | transloco"
+            [disabled]="saving()"
+            (valueChange)="onStatusChange($event)"
+          />
+        </ui-field>
+      }
+    }
+
+    @if (mode() === 'create') {
+      <div class="col-span-2 flex flex-col gap-8 border-t border-border pt-10">
+        <div class="flex items-center justify-between gap-8">
+          <div class="flex items-center gap-8">
+            <span class="text-12 font-medium text-text">{{ 'wsPartyModal.fields.firstContacts' | transloco }}</span>
+            <span class="text-11 leading-16 text-text-muted">
+              <bdi dir="ltr">{{ contactRows().length }}</bdi> / <bdi dir="ltr">{{ maxCreateContacts() }}</bdi>
+            </span>
+          </div>
+
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [disabled]="saving() || contactRows().length >= maxCreateContacts()"
+            [attr.title]="
+              contactRows().length >= maxCreateContacts()
+                ? ('wsPartyModal.contacts.limitReached' | transloco)
+                : null
+            "
+            (click)="addContactRow()"
+          >
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'wsPartyModal.fields.addFirstContact' | transloco }}</span>
+          </button>
+        </div>
+
+        @for (row of contactRows(); track row.id) {
+          @let rowErrs = contactValidationMap()[row.id];
+          <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+            <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+              <ui-field
+                size="bare"
+                [for]="uid + '-cm-type-' + row.id"
+                [label]="'wsPartyModal.contacts.type' | transloco"
+                [hint]="'wsPartyModal.contacts.typeHint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  size="field"
+                  [id]="uid + '-cm-type-' + row.id"
+                  [describedBy]="uid + '-cm-type-' + row.id + '-hint'"
+                  [options]="contactTypeOptions()"
+                  [value]="row.methodType"
+                  [label]="'wsPartyModal.contacts.type' | transloco"
+                  [disabled]="saving()"
+                  (valueChange)="updateContactRowType(row.id, $event)"
+                />
+              </ui-field>
+
+              <div class="flex items-end gap-6">
+                <ui-field
+                  class="min-w-0 flex-1"
+                  [for]="uid + '-cm-label-' + row.id"
+                  [label]="'wsPartyModal.contacts.label' | transloco"
+                  [hint]="'wsPartyModal.contacts.labelHint' | transloco"
+                  [count]="row.label.length"
+                  [max]="limitsConst.contactLabel"
+                  [error]="rowErrs?.label ?? null"
+                >
+                  <input
+                    [id]="uid + '-cm-label-' + row.id"
+                    type="text"
+                    dir="auto"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="'wsPartyModal.contacts.labelPlaceholder' | transloco"
+                    [value]="row.label"
+                    [readOnly]="saving()"
+                    [attr.aria-invalid]="rowErrs?.label ? 'true' : null"
+                    (input)="updateContactRowField(row.id, 'label', $event)"
+                  />
+                </ui-field>
+
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                  [disabled]="saving()"
+                  [attr.aria-label]="'wsPartyModal.common.remove' | transloco"
+                  [title]="'wsPartyModal.common.remove' | transloco"
+                  (click)="removeContactRow(row.id)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div class="col-span-2">
+                <ui-field
+                  [for]="uid + '-cm-value-' + row.id"
+                  [label]="'wsPartyModal.contacts.value' | transloco"
+                  [hint]="'wsPartyModal.contacts.valueHint' | transloco"
+                  [required]="true"
+                  [count]="row.value.length"
+                  [max]="limitsConst.contactValue"
+                  [error]="rowErrs?.value ?? null"
+                >
+                  <input
+                    [id]="uid + '-cm-value-' + row.id"
+                    type="text"
+                    [dir]="isContactLtr(row.methodType) ? 'ltr' : 'auto'"
+                    class="min-w-0 flex-1 bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [value]="row.value"
+                    [readOnly]="saving()"
+                    [attr.aria-invalid]="rowErrs?.value ? 'true' : null"
+                    (input)="updateContactRowField(row.id, 'value', $event)"
+                  />
+                </ui-field>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-create-roles'"
+          [label]="'wsPartyModal.fields.roles' | transloco"
+          [hint]="'wsPartyModal.fields.rolesHint' | transloco"
+        >
+          <app-party-role-select
+            [fieldId]="uid + '-create-roles'"
+            [describedBy]="uid + '-create-roles-hint'"
+            [label]="'wsPartyModal.fields.roles' | transloco"
+            [placeholder]="'wsPartyModal.fields.rolesPlaceholder' | transloco"
+            [removeLabel]="'wsPartyModal.common.remove' | transloco"
+            [options]="roleOptions()"
+            [disabled]="saving()"
+            [(value)]="selectedRoles"
+          />
+        </ui-field>
+      </div>
+    }
+  </form>
+</div>

@@ -1,0 +1,399 @@
+<ui-modal
+  #nodeModal
+  size="form"
+  icon="tablerBuildingWarehouse"
+  tile="bg-icon-navy"
+  [title]="'invSetup.nodeModal.title' | transloco"
+  [subtitle]="mode() === 'edit' ? (loadedNode()?.code ?? '') : ''"
+  [closeLabel]="'invSetup.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (mode() === 'edit' && loadedNode(); as node) {
+    <app-inventory-badge modal-header-end kind="nodeStatus" [value]="node.status" />
+  }
+
+  @if (loading()) {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8" aria-busy="true">
+      @for (row of skeletonRows; track row) {
+        <div class="flex flex-col gap-4">
+          <div class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></div>
+          <div class="h-field rounded-8 bg-neutral-soft motion-safe:animate-pulse"></div>
+        </div>
+        <div class="flex flex-col gap-4">
+          <div class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></div>
+          <div class="h-field rounded-8 bg-neutral-soft motion-safe:animate-pulse"></div>
+        </div>
+      }
+    </div>
+  } @else {
+    <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'invSetup.nodeModal.code.label' | transloco"
+        [hint]="'invSetup.nodeModal.code.hint' | transloco"
+        [required]="isCreateEditable()"
+        [count]="isCreateEditable() ? code().length : null"
+        [max]="isCreateEditable() ? limits.nodeCode : null"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          [attr.maxlength]="limits.nodeCode"
+          class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [class.cursor-default]="!isCreateEditable()"
+          [value]="code()"
+          [readOnly]="!isCreateEditable() || saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          (input)="onCodeInput($event)"
+          (blur)="onCodeBlur()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-name'"
+        [label]="'invSetup.nodeModal.name.label' | transloco"
+        [hint]="'invSetup.nodeModal.name.hint' | transloco"
+        [required]="!isReadOnly()"
+        [count]="!isReadOnly() ? name().length : null"
+        [max]="!isReadOnly() ? limits.nodeName : null"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          dir="auto"
+          autocomplete="off"
+          [attr.maxlength]="limits.nodeName"
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [class.cursor-default]="isReadOnly()"
+          [value]="name()"
+          [readOnly]="isReadOnly() || saving()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          (input)="onNameInput($event)"
+          (blur)="markTouched('name')"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        @if (isCreateEditable()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-type'"
+            [label]="'invSetup.nodeModal.type.label' | transloco"
+            [hint]="'invSetup.nodeModal.type.hint' | transloco"
+            [required]="true"
+          >
+            <div
+              role="radiogroup"
+              [attr.aria-label]="'invSetup.nodeModal.type.label' | transloco"
+              class="inline-flex w-fit items-center gap-2 rounded-10 bg-neutral-soft p-3"
+            >
+              @for (item of nodeTypes; track item.value) {
+                <button
+                  #typeBtn
+                  type="button"
+                  role="radio"
+                  [attr.id]="$first ? uid + '-type' : null"
+                  class="flex h-field items-center gap-6 rounded-8 px-10 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="
+                    (item.value === nodeType()
+                      ? 'bg-surface font-medium text-text shadow-card'
+                      : 'text-text-muted hover:text-text') +
+                    ' ' +
+                    (saving() ? 'cursor-not-allowed opacity-drag-source' : 'cursor-pointer')
+                  "
+                  [disabled]="saving()"
+                  [attr.aria-checked]="item.value === nodeType()"
+                  [attr.aria-describedby]="uid + '-type-hint'"
+                  [tabIndex]="$index === activeTypeIndex() ? 0 : -1"
+                  (click)="selectType(item.value)"
+                  (keydown)="onTypeKeydown($event, $index)"
+                >
+                  <ng-icon [name]="item.icon" size="14" class="shrink-0" aria-hidden="true" />
+                  <span>{{ ('tradeInventory.badge.nodeType.' + item.value) | transloco }}</span>
+                </button>
+              }
+            </div>
+          </ui-field>
+        } @else {
+          <ui-field
+            [for]="uid + '-type'"
+            [label]="'invSetup.nodeModal.type.label' | transloco"
+            [hint]="'invSetup.nodeModal.type.hint' | transloco"
+          >
+            <ng-icon [name]="typeIcon(nodeType())" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            <input
+              [id]="uid + '-type'"
+              type="text"
+              readonly
+              class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+              [value]="('tradeInventory.badge.nodeType.' + nodeType()) | transloco"
+            />
+          </ui-field>
+        }
+      </div>
+
+      <div [class.col-span-2]="mode() === 'create'">
+        @if (isReadOnly()) {
+          <ui-field
+            [for]="uid + '-tz'"
+            [label]="'invSetup.nodeModal.timezone.label' | transloco"
+            [hint]="'invSetup.nodeModal.timezone.hint' | transloco"
+          >
+            <input
+              [id]="uid + '-tz'"
+              type="text"
+              dir="ltr"
+              readonly
+              class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+              [value]="timezone()"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-tz'"
+            [label]="'invSetup.nodeModal.timezone.label' | transloco"
+            [hint]="'invSetup.nodeModal.timezone.hint' | transloco"
+            [required]="true"
+            [error]="timezoneError()"
+          >
+            <div #tzContainer class="relative block w-full" (keydown.escape)="onTzEscape($event)">
+              <button
+                #tzTrigger
+                type="button"
+                [id]="uid + '-tz'"
+                class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+                [class]="
+                  timezoneError()
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : tzOpen()
+                      ? 'border-focus-ring ring-3 ring-focus-halo'
+                      : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+                "
+                aria-haspopup="listbox"
+                [attr.aria-expanded]="tzOpen()"
+                [attr.aria-label]="'invSetup.nodeModal.timezone.label' | transloco"
+                [attr.aria-describedby]="uid + '-tz-hint' + (timezoneError() ? ' ' + uid + '-tz-error' : '')"
+                [disabled]="saving()"
+                (click)="toggleTzMenu()"
+              >
+                <bdi dir="ltr" class="min-w-0 truncate text-start">{{ timezone() }}</bdi>
+                <span class="inline-flex shrink-0 text-text-muted">
+                  <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                </span>
+              </button>
+
+              @if (tzOpen()) {
+                <div
+                  #tzPopover
+                  class="fixed z-dropdown flex flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+                  [class.invisible]="!tzPlaced()"
+                  [style.top.px]="tzPlace().top"
+                  [style.inset-inline-start.px]="tzPlace().start"
+                  [style.min-width.px]="tzPlace().width"
+                  [style.max-height.px]="tzPlace().maxHeight"
+                >
+                  <div
+                    class="flex h-field shrink-0 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+                  >
+                    <span class="inline-flex shrink-0 text-text-muted">
+                      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+                    </span>
+                    <input
+                      #tzSearchInput
+                      type="text"
+                      dir="ltr"
+                      autocomplete="off"
+                      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'invSetup.nodeModal.timezone.searchPlaceholder' | transloco"
+                      [attr.aria-label]="'invSetup.nodeModal.timezone.searchPlaceholder' | transloco"
+                      [value]="tzSearch()"
+                      (input)="onTzSearchInput($event)"
+                      (keydown)="onTzSearchKeydown($event)"
+                    />
+                    @if (tzSearch()) {
+                      <button
+                        type="button"
+                        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [attr.aria-label]="'invSetup.nodeModal.timezone.clearSearch' | transloco"
+                        (click)="clearTzSearch()"
+                      >
+                        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                      </button>
+                    }
+                  </div>
+
+                  <ul
+                    role="listbox"
+                    class="scrollbar-thin flex max-h-notif-list-max flex-col gap-2 overflow-y-auto"
+                    [attr.aria-label]="'invSetup.nodeModal.timezone.label' | transloco"
+                  >
+                    @for (zone of filteredTimezones(); track zone) {
+                      <li role="option" [attr.aria-selected]="zone === timezone()">
+                        <button
+                          #tzOptionBtn
+                          type="button"
+                          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                          [class]="zone === timezone() ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                          (click)="selectTimezone(zone)"
+                          (keydown)="onTzOptionKeydown($event, $index)"
+                        >
+                          <bdi dir="ltr" class="truncate">{{ zone }}</bdi>
+                          @if (zone === timezone()) {
+                            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                          }
+                        </button>
+                      </li>
+                    } @empty {
+                      <li role="presentation" class="flex h-menu-item items-center px-8 text-12 text-text-muted">
+                        {{ 'invSetup.nodeModal.timezone.noMatch' | transloco }}
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+
+      @if (mode() === 'edit') {
+        <ui-field
+          size="bare"
+          [for]="uid + '-status'"
+          [label]="'invSetup.nodeModal.status.label' | transloco"
+          [hint]="'invSetup.nodeModal.status.hint' | transloco"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [id]="uid + '-status'"
+              [describedBy]="uid + '-status-hint'"
+              [label]="'invSetup.nodeModal.status.label' | transloco"
+              [checked]="status() === 'ACTIVE'"
+              [disabled]="isReadOnly() || saving()"
+              (checkedChange)="onStatusChange($event)"
+            />
+            <span class="text-12 text-text">
+              {{ ('tradeInventory.badge.nodeStatus.' + status()) | transloco }}
+            </span>
+          </div>
+        </ui-field>
+      }
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-branches'"
+          [label]="'invSetup.nodeModal.branches.label' | transloco"
+          [hint]="'invSetup.nodeModal.branches.hint' | transloco"
+          [required]="!isReadOnly()"
+          [error]="branchesError()"
+        >
+          <ui-tag-picker
+            [inputId]="uid + '-branches'"
+            [label]="'invSetup.nodeModal.branches.label' | transloco"
+            [options]="branchTagOptions()"
+            [max]="maxBranches"
+            [canCreate]="false"
+            [readonly]="isReadOnly()"
+            [disabled]="saving()"
+            [value]="branchIds()"
+            (valueChange)="onBranchesChange($event)"
+          />
+        </ui-field>
+      </div>
+    </form>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (isReadOnly()) {
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'invSetup.common.close' | transloco }}
+      </button>
+    } @else if (mode() === 'create') {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving()"
+      >
+        {{ 'invSetup.nodeModal.createAction' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="requestClose()"
+      >
+        {{ 'invSetup.common.cancel' | transloco }}
+      </button>
+    } @else {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || loading() || !dirty()"
+      >
+        {{ 'invSetup.common.save' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="requestClose()"
+      >
+        {{ 'invSetup.common.close' | transloco }}
+      </button>
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'invSetup.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'invSetup.common.unsaved' | transloco }}</span>
+      }
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'invSetup.discard.title' | transloco"
+  [text]="'invSetup.discard.text' | transloco"
+  [confirmLabel]="'invSetup.discard.confirm' | transloco"
+  [cancelLabel]="'invSetup.discard.keep' | transloco"
+/>
+
+<app-inventory-conflict #conflictDialog (reload)="reloadNode()" />
+
+<ui-modal
+  #inUseAlert
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'invSetup.nodes.inUse.title' | transloco"
+  [closeLabel]="'invSetup.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'invSetup.nodes.inUse.message' | transloco }}</p>
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="closeInUseAlert()">
+      {{ 'invSetup.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

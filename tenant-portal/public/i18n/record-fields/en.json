@@ -1,0 +1,95 @@
+{
+  "scope": {
+    "company": "Company",
+    "companyHint": "The company that owns this record. It cannot change after creation.",
+    "branch": "Branch",
+    "branchHint": "The branch that owns this record. It cannot change after creation."
+  },
+  "owner": {
+    "label": "Owner",
+    "hint": "The person responsible for following up. Leave it empty to assign it to yourself.",
+    "me": "Me (default)",
+    "selfOnlyHint": "You can assign records only to yourself."
+  },
+  "stage": {
+    "label": "Stage",
+    "hint": "The current stage of this record."
+  },
+  "money": {
+    "label": "Amount",
+    "hint": "Enter the amount with its currency.",
+    "currency": "Currency",
+    "amount": "Amount",
+    "clear": "Clear",
+    "errors": {
+      "invalid": "Enter a valid amount.",
+      "tooManyDecimals": "Enter at most {{decimals}} decimals.",
+      "noDecimals": "This currency does not allow decimals."
+    }
+  },
+  "rating": {
+    "label": "Rating",
+    "hint": "Rate from 1 to 3 stars. Click the active star to clear.",
+    "star": "Rating {{n}} of 3"
+  },
+  "color": {
+    "label": "Colour",
+    "hint": "Optional colour stripe shown on the card.",
+    "none": "No colour",
+    "RED": "Red",
+    "ORANGE": "Orange",
+    "AMBER": "Amber",
+    "YELLOW": "Yellow",
+    "GREEN": "Green",
+    "TEAL": "Teal",
+    "BLUE": "Blue",
+    "INDIGO": "Indigo",
+    "PURPLE": "Purple",
+    "PINK": "Pink",
+    "SLATE": "Slate"
+  },
+  "custom": {
+    "hint": "Free text.",
+    "typeHint": {
+      "TEXT": "Free text.",
+      "TEXTAREA": "Free text.",
+      "NUMBER": "Enter a number.",
+      "DATE": "Choose a date.",
+      "DATETIME": "Choose a date and time.",
+      "BOOLEAN": "Turn on or off.",
+      "SELECT": "Choose one option.",
+      "MULTI_SELECT": "Choose one or more options.",
+      "URL": "Enter a web address starting with https://.",
+      "EMAIL": "Enter an email address.",
+      "PHONE": "Choose the country code, then type the number."
+    },
+    "requiredHint": "Required when creating a record.",
+    "requiredOnUpdateHint": "Required when saving changes.",
+    "none": "—",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minutes"
+  },
+  "errors": {
+    "required": "This field is required.",
+    "reachRequired": "Enter at least one phone number or an email.",
+    "phoneInvalid": "Enter at least 5 digits.",
+    "phoneDuplicate": "This number is already in the list.",
+    "emailInvalid": "Enter a valid email, like name@example.com.",
+    "websiteInvalid": "Enter an address that starts with https:// or http://.",
+    "tooLong": "Up to {{max}} characters.",
+    "contactsMin": "Add at least one contact.",
+    "contactsMax": "You can add up to 20 contacts.",
+    "primaryOne": "Choose one primary contact.",
+    "valueInvalid": "Enter a positive amount with up to 3 decimals.",
+    "valueCurrencyRequired": "Choose the currency for this amount.",
+    "currencyValueRequired": "Enter the amount for this currency.",
+    "cfNumber": "Enter a number.",
+    "cfUrl": "Enter a link that starts with https://.",
+    "cfEmail": "Enter a valid email.",
+    "cfPhone": "Enter 7 to 15 digits.",
+    "cfDate": "Enter a valid date."
+  }
+}

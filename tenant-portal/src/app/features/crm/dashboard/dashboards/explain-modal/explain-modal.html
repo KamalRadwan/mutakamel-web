@@ -1,0 +1,287 @@
+<ui-modal
+  size="wide"
+  [title]="'dashFilters.explainTitle' | transloco"
+  icon="tablerHelpCircle"
+  tile="bg-icon-blue"
+  [closeLabel]="'dashFilters.close' | transloco"
+  (closed)="onClosed()"
+>
+  @if (loading()) {
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      @for (row of skeletonRows; track row) {
+        <span class="col-span-1 my-auto h-skeleton-line w-2/3 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+        <span class="col-span-2 my-auto h-skeleton-line w-full rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+      }
+    </div>
+  } @else if (explain()) {
+    <dl class="grid grid-cols-3 gap-x-10 gap-y-4">
+      <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+        <span class="truncate">{{ 'dashFilters.whatCounts' | transloco }}</span>
+        <span
+          #countsTrigger
+          class="relative inline-flex shrink-0 items-center text-accent"
+          tabindex="0"
+          [attr.aria-describedby]="uid + '-counts-hint'"
+          (mouseenter)="showTip('counts', countsTrigger, countsTip)"
+          (mouseleave)="hideTip()"
+          (focus)="showTip('counts', countsTrigger, countsTip)"
+          (blur)="hideTip()"
+          (keydown.escape)="hideTip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #countsTip
+            [id]="uid + '-counts-hint'"
+            role="tooltip"
+            class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="activeTip() === 'counts' ? 'visible' : 'invisible'"
+            [style.top.px]="tipPlace().top"
+            [style.inset-inline-start.px]="tipPlace().start"
+          >
+            {{ 'dashFilters.whatCountsHint' | transloco }}
+          </span>
+        </span>
+      </dt>
+      <dd
+        class="col-span-2 flex min-h-btn flex-col justify-center gap-2 text-12 leading-18 text-text"
+        [attr.aria-describedby]="uid + '-counts-hint'"
+      >
+        <span class="font-medium text-text">{{ metricName() }}</span>
+        <span class="text-12 text-text-muted">{{ definitionSentence() }}</span>
+      </dd>
+
+      <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+        <span class="truncate">{{ 'dashFilters.filters' | transloco }}</span>
+        <span
+          #filtersTrigger
+          class="relative inline-flex shrink-0 items-center text-accent"
+          tabindex="0"
+          [attr.aria-describedby]="uid + '-filters-hint'"
+          (mouseenter)="showTip('filters', filtersTrigger, filtersTip)"
+          (mouseleave)="hideTip()"
+          (focus)="showTip('filters', filtersTrigger, filtersTip)"
+          (blur)="hideTip()"
+          (keydown.escape)="hideTip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #filtersTip
+            [id]="uid + '-filters-hint'"
+            role="tooltip"
+            class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="activeTip() === 'filters' ? 'visible' : 'invisible'"
+            [style.top.px]="tipPlace().top"
+            [style.inset-inline-start.px]="tipPlace().start"
+          >
+            {{ 'dashFilters.filtersHint' | transloco }}
+          </span>
+        </span>
+      </dt>
+      <dd
+        class="col-span-2 flex min-h-btn flex-wrap items-center gap-4 text-12 leading-18 text-text"
+        [attr.aria-describedby]="uid + '-filters-hint'"
+      >
+        @if (filterChips().length === 0) {
+          <span class="text-text-muted">{{ 'dashFilters.noFilters' | transloco }}</span>
+        } @else {
+          @for (chip of filterChips(); track $index) {
+            <ui-badge tone="tag">{{ chip }}</ui-badge>
+          }
+        }
+      </dd>
+
+      @if (rateDisplay(); as rate) {
+        <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+          <span class="truncate">{{ 'dashFilters.nOfN' | transloco }}</span>
+          <span
+            #rateTrigger
+            class="relative inline-flex shrink-0 items-center text-accent"
+            tabindex="0"
+            [attr.aria-describedby]="uid + '-rate-hint'"
+            (mouseenter)="showTip('rate', rateTrigger, rateTip)"
+            (mouseleave)="hideTip()"
+            (focus)="showTip('rate', rateTrigger, rateTip)"
+            (blur)="hideTip()"
+            (keydown.escape)="hideTip()"
+          >
+            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+            <span
+              #rateTip
+              [id]="uid + '-rate-hint'"
+              role="tooltip"
+              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+              [class]="activeTip() === 'rate' ? 'visible' : 'invisible'"
+              [style.top.px]="tipPlace().top"
+              [style.inset-inline-start.px]="tipPlace().start"
+            >
+              {{ 'dashFilters.nOfNHint' | transloco }}
+            </span>
+          </span>
+        </dt>
+        <dd
+          class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
+          [attr.aria-describedby]="uid + '-rate-hint'"
+        >
+          <bdi dir="ltr" class="tabular-nums">{{ rate }}</bdi>
+        </dd>
+      }
+
+      <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+        <span class="truncate">{{ 'dashFilters.value' | transloco }}</span>
+        <span
+          #valueTrigger
+          class="relative inline-flex shrink-0 items-center text-accent"
+          tabindex="0"
+          [attr.aria-describedby]="uid + '-value-hint'"
+          (mouseenter)="showTip('value', valueTrigger, valueTip)"
+          (mouseleave)="hideTip()"
+          (focus)="showTip('value', valueTrigger, valueTip)"
+          (blur)="hideTip()"
+          (keydown.escape)="hideTip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #valueTip
+            [id]="uid + '-value-hint'"
+            role="tooltip"
+            class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="activeTip() === 'value' ? 'visible' : 'invisible'"
+            [style.top.px]="tipPlace().top"
+            [style.inset-inline-start.px]="tipPlace().start"
+          >
+            {{ 'dashFilters.valueHint' | transloco }}
+          </span>
+        </span>
+      </dt>
+      <dd
+        class="col-span-2 flex min-h-btn items-center text-12 leading-18 font-medium text-text"
+        [attr.aria-describedby]="uid + '-value-hint'"
+      >
+        <bdi dir="ltr" class="tabular-nums">{{ valueDisplay() }}</bdi>
+      </dd>
+
+      <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+        <span class="truncate">{{ 'dashFilters.coverage' | transloco }}</span>
+        <span
+          #coverageTrigger
+          class="relative inline-flex shrink-0 items-center text-accent"
+          tabindex="0"
+          [attr.aria-describedby]="uid + '-coverage-hint'"
+          (mouseenter)="showTip('coverage', coverageTrigger, coverageTip)"
+          (mouseleave)="hideTip()"
+          (focus)="showTip('coverage', coverageTrigger, coverageTip)"
+          (blur)="hideTip()"
+          (keydown.escape)="hideTip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #coverageTip
+            [id]="uid + '-coverage-hint'"
+            role="tooltip"
+            class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="activeTip() === 'coverage' ? 'visible' : 'invisible'"
+            [style.top.px]="tipPlace().top"
+            [style.inset-inline-start.px]="tipPlace().start"
+          >
+            {{ 'dashFilters.coverageHint' | transloco }}
+          </span>
+        </span>
+      </dt>
+      <dd
+        class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
+        [attr.aria-describedby]="uid + '-coverage-hint'"
+      >
+        <span>{{ coverageText() }}</span>
+      </dd>
+
+      <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+        <span class="truncate">{{ 'dashFilters.asOf' | transloco }}</span>
+        <span
+          #asOfTrigger
+          class="relative inline-flex shrink-0 items-center text-accent"
+          tabindex="0"
+          [attr.aria-describedby]="uid + '-asOf-hint'"
+          (mouseenter)="showTip('asOf', asOfTrigger, asOfTip)"
+          (mouseleave)="hideTip()"
+          (focus)="showTip('asOf', asOfTrigger, asOfTip)"
+          (blur)="hideTip()"
+          (keydown.escape)="hideTip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #asOfTip
+            [id]="uid + '-asOf-hint'"
+            role="tooltip"
+            class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="activeTip() === 'asOf' ? 'visible' : 'invisible'"
+            [style.top.px]="tipPlace().top"
+            [style.inset-inline-start.px]="tipPlace().start"
+          >
+            {{ 'dashFilters.asOfHint' | transloco }}
+          </span>
+        </span>
+      </dt>
+      <dd
+        class="col-span-2 flex min-h-btn items-center text-12 leading-18 text-text"
+        [attr.aria-describedby]="uid + '-asOf-hint'"
+      >
+        <span>{{ asOfText() }}</span>
+      </dd>
+
+      <dt class="col-span-1 flex min-h-btn items-center gap-4 text-12 leading-18 text-text-muted">
+        <span class="truncate">{{ 'dashFilters.sources' | transloco }}</span>
+        <span
+          #sourcesTrigger
+          class="relative inline-flex shrink-0 items-center text-accent"
+          tabindex="0"
+          [attr.aria-describedby]="uid + '-sources-hint'"
+          (mouseenter)="showTip('sources', sourcesTrigger, sourcesTip)"
+          (mouseleave)="hideTip()"
+          (focus)="showTip('sources', sourcesTrigger, sourcesTip)"
+          (blur)="hideTip()"
+          (keydown.escape)="hideTip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #sourcesTip
+            [id]="uid + '-sources-hint'"
+            role="tooltip"
+            class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="activeTip() === 'sources' ? 'visible' : 'invisible'"
+            [style.top.px]="tipPlace().top"
+            [style.inset-inline-start.px]="tipPlace().start"
+          >
+            {{ 'dashFilters.sourcesHintExplain' | transloco }}
+          </span>
+        </span>
+      </dt>
+      <dd
+        class="col-span-2 flex min-h-btn flex-wrap items-center gap-6 text-12 leading-18 text-text"
+        [attr.aria-describedby]="uid + '-sources-hint'"
+      >
+        @for (src of sourceItems(); track $index) {
+          <span class="inline-flex items-center gap-4">
+            <span>{{ src.label }}</span>
+            <ui-badge tone="tag">{{ src.modeLabel }}</ui-badge>
+          </span>
+        }
+      </dd>
+    </dl>
+    @if (explain()?.evidenceTruncated) {
+      <p class="mt-8 text-12 leading-18 text-text-muted">{{ 'analytics.common.evidenceTruncated' | transloco }}</p>
+    }
+  }
+
+  <ng-container modal-footer>
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'dashFilters.close' | transloco }}
+    </button>
+    <span class="flex-1" aria-hidden="true"></span>
+    @if (recordsTarget()) {
+      <button type="button" uiButton variant="ghost" size="small" (click)="openRecords()">
+        <ng-icon name="tablerTable" size="14" aria-hidden="true" />
+        <span>{{ 'dashFilters.viewRecords' | transloco }}</span>
+      </button>
+    }
+  </ng-container>
+</ui-modal>

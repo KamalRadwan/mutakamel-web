@@ -1,0 +1,134 @@
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  <button uiButton class="shrink-0" (click)="openCreate()">
+    <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+    {{ 'leads.new' | transloco }}
+  </button>
+
+  @if (current() === 'table' && selection.count() > 0) {
+    <app-lead-bulk-menu
+      class="shrink-0"
+      [count]="selection.count()"
+      [capabilities]="capabilities()?.leads ?? null"
+      [canCreateActivity]="capabilities() ? capabilities()!.activities.create !== null : null"
+      [disabled]="resolvingBulk() || bulkBusy()"
+      [disabledReason]="bulkBusy() ? ('leadBulk.job.busy' | transloco) : null"
+      (action)="openBulkAction($event)"
+    />
+  }
+
+  <div
+    class="min-w-0 flex-1"
+    [attr.title]="store.draftDirty() ? ('leads.search.lockedByDraft' | transloco) : null"
+  >
+    <fieldset
+      class="min-w-0"
+      [disabled]="store.draftDirty()"
+      [attr.inert]="store.draftDirty() ? '' : null"
+    >
+      <ui-facet-search
+        [fields]="fields()"
+        [presets]="presets()"
+        [placeholder]="'leads.search' | transloco"
+        [facets]="store.facets()"
+        (facetsChange)="setFacets($event)"
+        (chipClick)="onFacetChipClick($event)"
+      />
+    </fieldset>
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="advancedOpen() ? 'bg-brand-soft text-on-brand-soft' : 'text-text-muted hover:bg-neutral-soft hover:text-text'"
+    [attr.aria-pressed]="advancedOpen()"
+    [attr.aria-expanded]="advancedOpen()"
+    aria-controls="leads-advanced-search"
+    [attr.aria-label]="'leads.advancedSearch' | transloco"
+    [title]="'leads.advancedSearch' | transloco"
+    (click)="toggleAdvanced()"
+  >
+    <ng-icon name="tablerAdjustmentsHorizontal" size="15" aria-hidden="true" />
+  </button>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-view-switcher [options]="views()" [label]="'leads.viewSwitcher' | transloco" [value]="current()" (valueChange)="show($event)" />
+</div>
+
+@if (advancedVisible()) {
+  <ui-query-builder
+    panelId="leads-advanced-search"
+    [fields]="store.fields()"
+    [applied]="store.applied()"
+    [title]="'leads.advancedSearch' | transloco"
+    [(expanded)]="advancedOpen"
+    (apply)="applyAdvanced($event)"
+    (clear)="clearAdvanced()"
+    (dirtyChange)="store.draftDirty.set($event)"
+  />
+}
+
+@if (current() !== 'board') {
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="stageSteps()"
+    [label]="'leads.stageFilter.label' | transloco"
+    [hint]="'leads.stageFilter.hint' | transloco"
+    [value]="stage()"
+    (valueChange)="filterStage($event)"
+  />
+}
+
+@if (current() === 'table' && selection.count() > 0) {
+  <app-lead-selection-bar
+    [body]="effectiveBody()"
+    [pageRows]="pageRows()"
+    [total]="matchingTotal()"
+    [visibleIds]="visibleIds()"
+  />
+}
+
+@switch (current()) {
+  @case ('board') {
+    <app-lead-board [body]="store.body()" (create)="openCreate($event)" (view)="openLead($event)" (activities)="openActivities($event)" />
+  }
+  @case ('cards') {
+    <app-lead-cards
+      [body]="store.body()"
+      [stages]="stages()"
+      [stage]="stage()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+      (view)="openLead($event)"
+      (activities)="openActivities($event)"
+      (countsChanged)="reloadCounts()"
+    />
+  }
+  @case ('table') {
+    <app-lead-table
+      [body]="store.body()"
+      [stages]="stages()"
+      [stage]="stage()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+      (view)="openLead($event)"
+      (activities)="openActivities($event)"
+      (countsChanged)="reloadCounts()"
+    />
+  }
+}
+
+<app-lead-modal class="absolute" (saved)="onLeadSaved($event)" (changed)="onLeadChanged($event)" (deleted)="onLeadDeleted()" />
+
+<app-record-activities class="absolute" />
+
+<app-bulk-assign-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
+<app-bulk-stage-modal class="absolute" [branchId]="branchId()" [stages]="stages()" (submitted)="onBulkSubmitted()" />
+<app-bulk-delete-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
+<app-bulk-activity-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />

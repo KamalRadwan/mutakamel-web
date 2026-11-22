@@ -1,0 +1,192 @@
+{
+  "pages": {
+    "overview": "Billing overview",
+    "invoices": "Invoices",
+    "invoice": "Invoice",
+    "subscription": "Subscription",
+    "change": "Change plan",
+    "catalogue": "Applications and add-ons catalogue"
+  },
+  "status": {
+    "invoice": {
+      "DRAFT": "Draft",
+      "ISSUED": "Issued",
+      "PARTIALLY_PAID": "Partially paid",
+      "PAID": "Paid",
+      "OVERDUE": "Overdue",
+      "VOID": "Void"
+    },
+    "payment": {
+      "CREATED": "Created",
+      "PENDING": "Pending",
+      "SUCCEEDED": "Succeeded",
+      "FAILED": "Failed",
+      "EXPIRED": "Expired",
+      "REQUIRES_REVIEW": "Under review",
+      "REFUND_PENDING": "Refund pending",
+      "REFUNDED": "Refunded"
+    },
+    "subscription": {
+      "PENDING_ACTIVATION": "Pending activation",
+      "TRIAL": "Trial",
+      "ACTIVE": "Active",
+      "PAST_DUE": "Past due",
+      "CANCELLED": "Cancelled"
+    },
+    "wallet": {
+      "ACTIVE": "Active",
+      "FROZEN": "Frozen",
+      "CLOSED": "Closed"
+    }
+  },
+  "access": {
+    "FULL": "Full access",
+    "DUNNING": "Payment due",
+    "READ_ONLY": "Read-only",
+    "BLOCKED": "Blocked"
+  },
+  "purpose": {
+    "TRIAL_ACTIVATION": "Trial activation",
+    "RENEWAL": "Renewal",
+    "PRORATION": "Proration",
+    "MANUAL": "Manual",
+    "WALLET_TOP_UP": "Wallet top-up",
+    "INVOICE_SETTLEMENT": "Invoice payment"
+  },
+  "ledgerReason": {
+    "TOP_UP": "Top-up",
+    "SUBSCRIPTION_CHARGE": "Subscription charge",
+    "PRORATION_CREDIT": "Proration credit",
+    "REFUND": "Refund",
+    "PROMO": "Promotional credit",
+    "ADJUSTMENT": "Adjustment"
+  },
+  "offerStatus": {
+    "PREPARATION_REQUIRED": "Available",
+    "PARENT_REQUIRED": "Needs {{app}}",
+    "INCOMPATIBLE": "Not available on your tier",
+    "UNAVAILABLE": "Price not available"
+  },
+  "provider": {
+    "PAYMOB": "Paymob",
+    "INTERNAL": "Wallet",
+    "OFFLINE": "Offline"
+  },
+  "cycle": {
+    "MONTHLY": "Monthly",
+    "ANNUAL": "Annual"
+  },
+  "common": {
+    "pay": "Pay",
+    "topUp": "Top up",
+    "retry": "Retry",
+    "close": "Close",
+    "cancel": "Cancel",
+    "back": "Back",
+    "open": "Open",
+    "details": "Details",
+    "seats": "Seats",
+    "perMonth": "/ month",
+    "perYear": "/ year",
+    "none": "—",
+    "supportRef": "Support reference"
+  },
+  "forbidden": {
+    "title": "Billing is for the workspace owner",
+    "text": "Ask the workspace owner to manage the subscription and invoices."
+  },
+  "failed": {
+    "title": "We could not load this page",
+    "supportRef": "Support reference: {{id}}"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Could not reach the billing service. Check your connection and try again.",
+    "TENANT_OWNER_REQUIRED": "Only the workspace owner can view or manage billing.",
+    "SUBSCRIPTION_NOT_FOUND": "No subscription was found for this workspace.",
+    "WALLET_NOT_FOUND": "No billing wallet was found for this workspace.",
+    "WALLET_NOT_ACTIVE": "Your wallet is not active right now.",
+    "WALLET_FROZEN": "Your wallet is frozen. Contact support to continue.",
+    "WALLET_INSUFFICIENT": "Your available wallet balance is not enough for this operation.",
+    "INVOICE_NOT_FOUND": "This invoice could not be found.",
+    "INVOICE_ALREADY_PAID": "This invoice has already been paid.",
+    "INVOICE_NOT_PAYABLE": "This invoice cannot be paid in its current state.",
+    "INVOICE_NOT_CANONICAL_USD": "Legacy invoices cannot be paid through online checkout.",
+    "INVOICE_ACCOUNTING_INCONSISTENT": "This invoice could not be loaded due to an accounting mismatch.",
+    "INVOICE_ACCEPTED_HISTORY_UNAVAILABLE": "Pricing history for this invoice is temporarily unavailable.",
+    "INVOICE_ACCEPTED_SOURCE_UNAVAILABLE": "Source pricing details for this invoice are temporarily unavailable.",
+    "PAYMENT_QUOTE_STALE": "The payment amount changed. Request a new amount and try again.",
+    "PAYMENT_QUOTE_INVOICE_MISMATCH": "This payment quote does not belong to the selected invoice.",
+    "PAYMENT_INTENT_ALREADY_ACTIVE": "A payment for this invoice is already in progress.",
+    "PAYMENT_INTENT_UNAVAILABLE": "Payment cannot be started for this invoice right now.",
+    "PAYMENT_NOT_FOUND": "The payment record could not be found.",
+    "FX_QUOTE_NOT_FOUND": "This exchange quote was not found. Request a new amount.",
+    "FX_QUOTE_EXPIRED": "This payment quote expired. Request a new amount.",
+    "FX_QUOTE_ALREADY_CONSUMED": "This payment quote has already been used. Request a new amount.",
+    "FX_RATE_NOT_FOUND": "No exchange rate is available for the selected currency.",
+    "FX_AMOUNT_ROUNDS_TO_ZERO": "The entered amount is too small after currency conversion.",
+    "TOPUP_AMOUNT_OUT_OF_RANGE": "Enter an amount worth between USD 1 and USD 100,000.",
+    "TOPUP_LIMITS_INVALID": "Top-up limits could not be verified right now. Try again later.",
+    "PAYMENT_PROVIDER_UNCONFIGURED": "Online payment is not configured right now.",
+    "PAYMENT_PROVIDER_ERROR": "The payment provider could not process the request. Try again.",
+    "PAYMENT_PROVIDER_CURRENCY_UNSUPPORTED": "The selected currency is not supported for online payment.",
+    "IDEMPOTENCY_KEY_REUSED": "This request key was already used with different details. Try again.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request was already sent with different details. Try again.",
+    "CORE_VALIDATION_FAILED": "Some of the entered values are not valid.",
+    "DOWNGRADE_NOT_ALLOWED": "Downgrading plans or reducing add-on seats is not allowed here.",
+    "SEAT_DOWNGRADE_FREE_UP_REQUIRED": "Free enough seats before lowering the seat count.",
+    "SEAT_DOWNGRADE_FREE_UP_REQUIRED_COUNTS": "{{used}} seats are in use. Free {{excess}} of them before lowering the count to {{target}}.",
+    "SEAT_MODULE_HOLDERS_EXCEED_PURCHASE": "Assigned users exceed the requested seats. Free seats before lowering.",
+    "ADDON_PREPARATION_REQUIRED": "Your plan change is still being prepared. Wait a moment and try again.",
+    "ADDON_PREPARATION_STALE": "This change preparation is out of date. Start the review again.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_STALE": "Your subscription changed since you started. Reload and review again.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_NOT_FOUND": "This price preview could not be found. Start the review again.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_EXPIRED": "This price preview expired. Refresh the price to continue.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_ALREADY_APPLIED": "This plan change has already been applied.",
+    "SUBSCRIPTION_PLAN_CHANGE_IDEMPOTENCY_REUSED": "This change was already sent with different details. Start the review again.",
+    "SUBSCRIPTION_PLAN_CHANGE_PAST_DUE": "Pay the overdue invoice before changing your subscription.",
+    "SUBSCRIPTION_PLAN_CHANGE_PROVISIONING": "Your subscription is still provisioning. Try again shortly.",
+    "SUBSCRIPTION_PLAN_CHANGE_CANCELLED": "Cancelled subscriptions cannot be modified.",
+    "SUBSCRIPTION_PLAN_CHANGE_COLLECTION_IN_PROGRESS": "An invoice collection is in progress. Pay the open invoice first.",
+    "COMMERCIAL_PREPARATION_IN_PROGRESS": "Another plan change is already being prepared.",
+    "COMMERCIAL_CAPACITY_OCCUPIED": "Billing changes are busy right now. Try again in a moment.",
+    "COMMERCIAL_PRICE_UNAVAILABLE": "Pricing is not available for one of the selected items.",
+    "COMMERCIAL_CONTRACT_INVALID": "The requested change is not valid. Review it and try again.",
+    "APPLICATION_SELECTION_NOT_ALLOWED": "One of the selected applications or tiers cannot be changed.",
+    "ADDON_DEFINITION_UNAVAILABLE": "This add-on is not available right now.",
+    "COMMERCIAL_RECOVERY_REVISION_STALE": "This change was updated elsewhere. Reload to see its latest state.",
+    "COMMERCIAL_COMMAND_UNAVAILABLE": "The billing service is temporarily unavailable. Try again shortly.",
+    "TENANT_OPERATION_NOT_FOUND": "This pending plan change could not be found."
+  },
+  "names": {
+    "apps": {
+      "hr": "HR"
+    },
+    "tiers": {
+      "starter": "Starter",
+      "growth": "Growth",
+      "enterprise": "Enterprise",
+      "standard": "Standard",
+      "pro": "Pro"
+    },
+    "addons": {
+      "crm": {
+        "homes": "Homes",
+        "whatsapp": "WhatsApp business",
+        "ai_assistant": "AI sales assistant",
+        "power_dialer": "Power dialer",
+        "outbound_email": "Outbound email"
+      },
+      "hr": {
+        "payroll": "Payroll"
+      }
+    },
+    "currencies": {
+      "USD": "US dollar",
+      "EGP": "Egyptian pound",
+      "SAR": "Saudi riyal",
+      "AED": "UAE dirham",
+      "EUR": "Euro"
+    }
+  }
+}

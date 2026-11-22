@@ -1,0 +1,161 @@
+<div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+  @let weightErr = errorText('weightKg');
+  <ui-field
+    [for]="uid + '-weight'"
+    [label]="'itemForm.fields.weightKg.label' | transloco"
+    [hint]="'itemForm.fields.weightKg.hint' | transloco"
+    [error]="weightErr"
+  >
+    <input
+      [id]="uid + '-weight'"
+      type="text"
+      dir="ltr"
+      inputmode="decimal"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+      [readonly]="readonly()"
+      [attr.aria-invalid]="weightErr ? 'true' : null"
+      [value]="draft().weightKg"
+      (input)="onInput('weightKg', $event)"
+    />
+  </ui-field>
+
+  @let volumeErr = errorText('volumeM3');
+  <ui-field
+    [for]="uid + '-volume'"
+    [label]="'itemForm.fields.volumeM3.label' | transloco"
+    [hint]="'itemForm.fields.volumeM3.hint' | transloco"
+    [error]="volumeErr"
+  >
+    <input
+      [id]="uid + '-volume'"
+      type="text"
+      dir="ltr"
+      inputmode="decimal"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+      [readonly]="readonly()"
+      [attr.aria-invalid]="volumeErr ? 'true' : null"
+      [value]="draft().volumeM3"
+      (input)="onInput('volumeM3', $event)"
+    />
+  </ui-field>
+
+  @let quotationErr = errorText('quotationDescription');
+  <div [class]="layout() === 'page' ? 'desktop:col-span-2' : 'col-span-2'">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-quotation'"
+      [label]="'itemForm.fields.quotationText.label' | transloco"
+      [hint]="'itemForm.fields.quotationText.hint' | transloco"
+      [count]="draft().quotationDescription.trim().length"
+      [max]="limits.description"
+      [error]="quotationErr"
+    >
+      <textarea
+        [id]="uid + '-quotation'"
+        rows="2"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="quotationErr ? 'true' : null"
+        [value]="draft().quotationDescription"
+        (input)="onInput('quotationDescription', $event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  @let salesOrderErr = errorText('salesOrderDescription');
+  <div [class]="layout() === 'page' ? 'desktop:col-span-2' : 'col-span-2'">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-sales-order'"
+      [label]="'itemForm.fields.salesOrderText.label' | transloco"
+      [hint]="'itemForm.fields.salesOrderText.hint' | transloco"
+      [count]="draft().salesOrderDescription.trim().length"
+      [max]="limits.description"
+      [error]="salesOrderErr"
+    >
+      <textarea
+        [id]="uid + '-sales-order'"
+        rows="2"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="salesOrderErr ? 'true' : null"
+        [value]="draft().salesOrderDescription"
+        (input)="onInput('salesOrderDescription', $event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  @let receiptErr = errorText('receiptDescription');
+  <div [class]="layout() === 'page' ? 'desktop:col-span-2' : 'col-span-2'">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-receipt'"
+      [label]="'itemForm.fields.receiptText.label' | transloco"
+      [hint]="'itemForm.fields.receiptText.hint' | transloco"
+      [count]="draft().receiptDescription.trim().length"
+      [max]="limits.description"
+      [error]="receiptErr"
+    >
+      <textarea
+        [id]="uid + '-receipt'"
+        rows="2"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="receiptErr ? 'true' : null"
+        [value]="draft().receiptDescription"
+        (input)="onInput('receiptDescription', $event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  @let deliveryErr = errorText('deliveryOrderDescription');
+  <div [class]="layout() === 'page' ? 'desktop:col-span-2' : 'col-span-2'">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-delivery'"
+      [label]="'itemForm.fields.deliveryText.label' | transloco"
+      [hint]="'itemForm.fields.deliveryText.hint' | transloco"
+      [count]="draft().deliveryOrderDescription.trim().length"
+      [max]="limits.description"
+      [error]="deliveryErr"
+    >
+      <textarea
+        [id]="uid + '-delivery'"
+        rows="2"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="deliveryErr ? 'true' : null"
+        [value]="draft().deliveryOrderDescription"
+        (input)="onInput('deliveryOrderDescription', $event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  @let notesErr = errorText('notes');
+  <div [class]="layout() === 'page' ? 'desktop:col-span-2' : 'col-span-2'">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-notes'"
+      [label]="'itemForm.fields.notes.label' | transloco"
+      [hint]="'itemForm.fields.notes.hint' | transloco"
+      [count]="draft().notes.trim().length"
+      [max]="limits.notes"
+      [error]="notesErr"
+    >
+      <textarea
+        [id]="uid + '-notes'"
+        rows="3"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="notesErr ? 'true' : null"
+        [value]="draft().notes"
+        (input)="onInput('notes', $event)"
+      ></textarea>
+    </ui-field>
+  </div>
+</div>

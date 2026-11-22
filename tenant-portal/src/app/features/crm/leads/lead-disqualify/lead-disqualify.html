@@ -1,0 +1,59 @@
+<ui-modal
+  size="form"
+  icon="tablerThumbDown"
+  tile="bg-icon-red"
+  [title]="'leads.disqualify.title' | transloco"
+  [subtitle]="subtitle()"
+  [closeLabel]="'leads.disqualify.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <div #focusStart class="flex flex-col gap-10 outline-none" tabindex="-1">
+    <ui-field
+      size="bare"
+      [label]="'leads.disqualify.reason' | transloco"
+      [for]="reasonsLoading() ? '' : reasonId"
+      [hint]="'leads.disqualify.reasonHint' | transloco"
+      [required]="true"
+      [error]="reasonError()"
+    >
+      @if (reasonsLoading()) {
+        <div class="flex h-field items-center" role="status" aria-busy="true">
+          <div class="h-skeleton-line w-full animate-pulse rounded-6 bg-neutral-soft"></div>
+        </div>
+      } @else {
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="reasonId"
+          [label]="'leads.disqualify.reason' | transloco"
+          [describedBy]="describedBy()"
+          [options]="reasonOptions()"
+          [value]="selectedReasonId()"
+          [disabled]="submitting() || noReasons()"
+          (valueChange)="onReasonChange($event)"
+        />
+      }
+    </ui-field>
+
+    @if (noReasons()) {
+      <p class="text-12 leading-18 text-text-muted">{{ 'leads.disqualify.noReasons' | transloco }}</p>
+    }
+  </div>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="danger"
+      [loading]="submitting()"
+      [disabled]="submitting() || reasonsLoading() || noReasons()"
+      (click)="confirm()"
+    >
+      {{ 'leads.disqualify.confirm' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="cancel()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

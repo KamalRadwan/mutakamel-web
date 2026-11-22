@@ -1,0 +1,280 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerPlug"
+  tile="bg-icon-teal"
+  [title]="'wsEmail.provider.smtpSettings' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!busy()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
+    @if (probeState() === 'checking') {
+      <div
+        role="status"
+        class="flex items-start gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8 text-12 leading-18 text-text"
+      >
+        <ng-icon name="tablerLoader2" size="14" class="mt-2 shrink-0 animate-spin text-accent" aria-hidden="true" />
+        <div class="min-w-0 flex-1">
+          <p class="text-text-muted">{{ 'wsEmail.probe.note' | transloco }}</p>
+        </div>
+      </div>
+    } @else if (probeState() === 'ok') {
+      <div
+        role="status"
+        class="flex items-start gap-8 rounded-10 border border-success bg-success-soft px-10 py-8 text-12 leading-18 text-on-success-soft"
+      >
+        <ng-icon name="tablerCircleCheck" size="14" class="mt-2 shrink-0 text-success-text" aria-hidden="true" />
+        <div class="flex min-w-0 flex-1 flex-col gap-2">
+          <span class="font-medium">{{ 'wsEmail.probe.ok' | transloco }}</span>
+          <span>{{ 'wsEmail.probe.note' | transloco }}</span>
+        </div>
+      </div>
+    } @else if (probeState() === 'error' && probeError(); as probeErr) {
+      <div
+        role="alert"
+        class="flex items-start gap-8 rounded-10 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-danger-text"
+      >
+        <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="font-medium">{{ probeErr }}</span>
+          <span class="text-on-danger-soft">{{ 'wsEmail.probe.note' | transloco }}</span>
+          <div>
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [disabled]="!canTest()"
+              (click)="runConnectionTest()"
+            >
+              {{ 'settings.common.retry' | transloco }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (topError(); as err) {
+      <div role="alert">
+        <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
+      </div>
+    }
+
+    @if (showResetNotice()) {
+      <app-settings-notice tone="warning">
+        {{ 'wsEmail.notice.resetsVerification' | transloco }}
+      </app-settings-notice>
+    }
+
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-host'"
+          [label]="'wsEmail.fields.smtpHost.label' | transloco"
+          [hint]="'wsEmail.fields.smtpHost.hint' | transloco"
+          [required]="!isReadonly()"
+          [error]="hostError()"
+        >
+          <input
+            [id]="uid + '-host'"
+            type="text"
+            dir="ltr"
+            maxlength="253"
+            autocomplete="off"
+            spellcheck="false"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="hostDraft()"
+            [readOnly]="isReadonly() || busy()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="hostError() ? 'true' : null"
+            (input)="onHostInput($event)"
+            (blur)="onHostBlur()"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-port'"
+          [label]="'wsEmail.fields.smtpPort.label' | transloco"
+          [hint]="'wsEmail.fields.smtpPort.hint' | transloco"
+          [required]="!isReadonly()"
+          [error]="portError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-port'"
+            [describedBy]="uid + '-port-hint'"
+            [label]="'wsEmail.fields.smtpPort.label' | transloco"
+            [options]="portOptions"
+            [value]="portDraft()"
+            [disabled]="isReadonly() || busy()"
+            (valueChange)="onPortChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-username'"
+          [label]="'wsEmail.fields.smtpUsername.label' | transloco"
+          [hint]="'wsEmail.fields.smtpUsername.hint' | transloco"
+          [required]="!isReadonly()"
+          [error]="usernameError()"
+        >
+          <input
+            [id]="uid + '-username'"
+            type="text"
+            dir="ltr"
+            maxlength="320"
+            autocomplete="off"
+            spellcheck="false"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="usernameDraft()"
+            [readOnly]="isReadonly() || busy()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="usernameError() ? 'true' : null"
+            (input)="onUsernameInput($event)"
+            (blur)="markTouched('smtpUsername')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-protocol'"
+          [label]="'wsEmail.fields.smtpProtocol.label' | transloco"
+          [hint]="'wsEmail.fields.smtpProtocol.hint' | transloco"
+          [error]="protocolError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-protocol'"
+            [describedBy]="uid + '-protocol-hint'"
+            [label]="'wsEmail.fields.smtpProtocol.label' | transloco"
+            [options]="protocolOptions"
+            [value]="protocolDraft()"
+            [disabled]="isReadonly() || busy()"
+            (valueChange)="onProtocolChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-password'"
+          [label]="'wsEmail.fields.smtpPassword.label' | transloco"
+          [hint]="'wsEmail.fields.smtpPassword.hint' | transloco"
+          [required]="!isReadonly() && !hasSavedPassword()"
+          [error]="passwordError()"
+        >
+          <input
+            [id]="uid + '-password'"
+            type="password"
+            dir="ltr"
+            maxlength="1024"
+            autocomplete="new-password"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="hasSavedPassword() ? ('wsEmail.smtp.passwordPlaceholder' | transloco) : ''"
+            [value]="passwordDraft()"
+            [readOnly]="isReadonly() || busy()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="passwordError() ? 'true' : null"
+            (input)="onPasswordInput($event)"
+            (blur)="markTouched('smtpPassword')"
+          />
+        </ui-field>
+        @if (hasSavedPassword()) {
+          <div class="mt-4 flex items-center">
+            <span class="inline-flex h-badge items-center rounded-8 bg-success-soft px-8 text-12 font-medium whitespace-nowrap text-on-success-soft">
+              {{ 'wsEmail.provider.configured' | transloco }}
+            </span>
+          </div>
+        }
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-secure'"
+          [label]="'wsEmail.fields.smtpSecure.label' | transloco"
+          [hint]="'wsEmail.fields.smtpSecure.hint' | transloco"
+          [error]="secureError()"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [id]="uid + '-secure'"
+              [describedBy]="uid + '-secure-hint'"
+              [label]="'wsEmail.fields.smtpSecure.label' | transloco"
+              [checked]="secureDraft()"
+              [disabled]="isReadonly() || busy() || protocolDraft() === 'smtps'"
+              (checkedChange)="onSecureChange($event)"
+            />
+            <span class="text-12 text-text">
+              {{ (secureDraft() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+            </span>
+          </div>
+        </ui-field>
+      </div>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [loading]="probing()"
+        [disabled]="!canTest()"
+        [attr.title]="testButtonTitle()"
+        (click)="runConnectionTest()"
+      >
+        {{ 'wsEmail.smtp.test' | transloco }}
+      </button>
+
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="!canSubmit()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="busy()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="busy()"
+          (click)="close()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

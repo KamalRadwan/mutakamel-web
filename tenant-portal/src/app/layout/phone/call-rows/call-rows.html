@@ -1,0 +1,122 @@
+<div [attr.role]="focusable() ? 'radiogroup' : 'list'" class="flex flex-col gap-6">
+  @for (leg of legs(); track leg.id; let idx = $index) {
+    @let look = lookOf(leg);
+    @let badge = badgeKind(leg);
+    @let isFocused = focusable() && leg.id === focusedId();
+    <div
+      [attr.role]="focusable() ? null : 'listitem'"
+      class="flex h-table-row items-center gap-8 rounded-10 border px-8 transition-colors duration-fast"
+      [class]="isFocused ? 'border-brand bg-brand-soft' : 'border-border bg-surface'"
+    >
+      @if (focusable()) {
+        <button
+          #radioBtn
+          type="button"
+          role="radio"
+          [attr.aria-checked]="isFocused"
+          [attr.tabindex]="idx === activeIndex() ? 0 : -1"
+          [attr.aria-label]="'webPhone.callRows.talkTo' | transloco: { name: leg.displayName || leg.number }"
+          class="flex min-w-0 flex-1 cursor-pointer items-center gap-8 rounded-6 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="onFocusRow(leg.id)"
+          (keydown)="onRadioKeydown($event, idx)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="look.tile"
+          >
+            <ng-icon [name]="look.icon" size="14" aria-hidden="true" />
+          </span>
+
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-12 leading-16 font-medium text-text">
+              @if (leg.displayName) {
+                {{ leg.displayName }}
+              } @else {
+                <bdi dir="ltr">{{ leg.number }}</bdi>
+              }
+            </p>
+            @if (leg.displayName) {
+              <p dir="ltr" class="truncate text-11 leading-16 text-text-muted text-start">{{ leg.number }}</p>
+            }
+          </div>
+
+          <span
+            class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+            [class]="
+              badge === 'onHold'
+                ? 'bg-warning text-on-warning'
+                : badge === 'talking'
+                  ? 'bg-success text-on-success'
+                  : 'bg-neutral-soft text-on-neutral-soft'
+            "
+          >
+            @if (badge === 'ringing') {
+              <ng-icon name="tablerLoader2" size="12" class="animate-spin" aria-hidden="true" />
+            }
+            <span>{{ ('webPhone.callRows.' + badge) | transloco }}</span>
+          </span>
+
+          @if (legDuration(leg); as duration) {
+            <span dir="ltr" class="shrink-0 text-12 leading-18 text-text-muted tabular-nums">{{ duration }}</span>
+          }
+        </button>
+      } @else {
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="look.tile"
+        >
+          <ng-icon [name]="look.icon" size="14" aria-hidden="true" />
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-12 leading-16 font-medium text-text">
+            @if (leg.displayName) {
+              {{ leg.displayName }}
+            } @else {
+              <bdi dir="ltr">{{ leg.number }}</bdi>
+            }
+          </p>
+          @if (leg.displayName) {
+            <p dir="ltr" class="truncate text-11 leading-16 text-text-muted text-start">{{ leg.number }}</p>
+          }
+        </div>
+
+        <span
+          class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="
+            badge === 'onHold'
+              ? 'bg-warning text-on-warning'
+              : badge === 'talking'
+                ? 'bg-success text-on-success'
+                : 'bg-neutral-soft text-on-neutral-soft'
+          "
+        >
+          @if (badge === 'ringing') {
+            <ng-icon name="tablerLoader2" size="12" class="animate-spin" aria-hidden="true" />
+          }
+          <span>{{ ('webPhone.callRows.' + badge) | transloco }}</span>
+        </span>
+
+        @if (legDuration(leg); as duration) {
+          <span dir="ltr" class="shrink-0 text-12 leading-18 text-text-muted tabular-nums">{{ duration }}</span>
+        }
+      }
+
+      @if (removable()) {
+        @let removeLabel =
+          isRinging(leg)
+            ? ('webPhone.callRows.cancel' | transloco)
+            : ('webPhone.callRows.removeFromCall' | transloco: { name: leg.displayName || leg.number });
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="removeLabel"
+          [title]="removeLabel"
+          (click)="onRemove($event, leg.id)"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      }
+    </div>
+  }
+</div>

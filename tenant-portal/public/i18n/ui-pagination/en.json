@@ -1,0 +1,11 @@
+{
+  "label": "Pagination",
+  "showing": "Showing {{from}}–{{to}} of {{total}}",
+  "first": "First page",
+  "prev": "Previous page",
+  "next": "Next page",
+  "last": "Last page",
+  "page": "Page {{page}}",
+  "pageSize": "Items per page",
+  "perPage": "{{count}} per page"
+}

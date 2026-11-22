@@ -1,0 +1,102 @@
+{
+  "title": "اللوحات",
+  "newDashboard": "لوحة جديدة",
+  "search": "بحث في اللوحات",
+  "clearSearch": "مسح البحث",
+  "viewSwitcher": "تبديل طريقة العرض",
+  "views": {
+    "table": "جدول",
+    "cards": "بطاقات"
+  },
+  "kind": {
+    "label": "النوع",
+    "all": "الكل",
+    "dashboards": "اللوحات",
+    "reportTemplates": "قوالب التقارير",
+    "dashboard": "لوحة",
+    "reportTemplate": "قالب تقرير"
+  },
+  "favourites": "المفضلة",
+  "tabsLabel": "تصنيفات اللوحات",
+  "tabs": {
+    "all": "الكل",
+    "mine": "لوحاتي",
+    "shared": "تمت مشاركتها معي",
+    "templates": "القوالب"
+  },
+  "tableLabel": "قائمة اللوحات",
+  "columns": {
+    "name": "الاسم",
+    "kind": "النوع",
+    "owner": "المالك",
+    "sharedCount": "المشاركة",
+    "updated": "آخر تحديث",
+    "default": "افتراضية",
+    "actions": "الإجراءات"
+  },
+  "sharedBadge": "مُشاركة",
+  "defaultActive": "{{name}} هي اللوحة الافتراضية",
+  "setDefaultFor": "تعيين {{name}} كلوحة افتراضية",
+  "alreadyDefault": "هذه اللوحة هي الافتراضية بالفعل",
+  "favouriteFor": "إضافة {{name}} إلى المفضلة",
+  "unfavouriteFor": "إزالة {{name}} من المفضلة",
+  "actionsFor": "إجراءات {{name}}",
+  "menu": {
+    "open": "فتح",
+    "duplicate": "تكرار",
+    "share": "مشاركة",
+    "setDefault": "تعيين كلوحة افتراضية",
+    "favourite": "إضافة إلى المفضلة",
+    "unfavourite": "إزالة من المفضلة",
+    "delete": "حذف"
+  },
+  "use": "استخدام",
+  "openTemplate": "فتح",
+  "adopted": "مُعتمدة",
+  "widgets": "العناصر: {{count}}",
+  "confirmTargetsTitle": "تأكيد المستهدفات",
+  "confirmTargetsAction": "تأكيد",
+  "targetsListLabel": "المستهدفات المقترحة",
+  "branchLabel": "الفرع",
+  "branchHint": "اختر الفرع الذي سيتابعه هذا القالب.",
+  "loadMore": "تحميل المزيد",
+  "loadFailedTitle": "تعذر تحميل اللوحات",
+  "forbiddenTitle": "لا توجد صلاحية للوحات التحكم",
+  "empty": {
+    "mine": "لا توجد لديك لوحات بعد.",
+    "shared": "لم تتم مشاركة أي لوحات معك بعد.",
+    "templates": "لا تتوفر قوالب لوحات حاليًا.",
+    "filtered": "لا توجد لوحات تطابق عوامل التصفية الحالية."
+  },
+  "delete": {
+    "title": "حذف لوحة التحكم",
+    "text": "هل تريد حذف «{{name}}»؟ سيؤدي هذا إلى إزالتها لدى جميع من تمت مشاركتها معهم.",
+    "confirm": "حذف"
+  },
+  "toast": {
+    "deleted": "تم حذف لوحة التحكم",
+    "duplicated": "تم تكرار لوحة التحكم",
+    "defaultSet": "تم تحديث اللوحة الافتراضية",
+    "favourited": "تمت الإضافة إلى المفضلة",
+    "unfavourited": "تمت الإزالة من المفضلة",
+    "adopted": "تم إنشاء لوحة التحكم من القالب",
+    "created": "تم إنشاء لوحة التحكم"
+  },
+  "createModal": {
+    "createTitle": "إنشاء لوحة",
+    "nameLabel": "الاسم",
+    "namePlaceholder": "أدخل اسم اللوحة",
+    "nameHint": "اسم فريد يظهر في قائمة اللوحات (بحد أقصى 120 حرفًا).",
+    "nameRequired": "الاسم مطلوب.",
+    "nameTooLong": "يجب ألا يتجاوز الاسم 120 حرفًا.",
+    "descriptionLabel": "الوصف",
+    "descriptionPlaceholder": "اذكر ما تتابعه هذه اللوحة",
+    "descriptionHint": "وصف اختياري لمحتوى لوحة التحكم (بحد أقصى 500 حرف).",
+    "descriptionTooLong": "يجب ألا يتجاوز الوصف 500 حرف.",
+    "startFrom": "البدء من",
+    "startFromHint": "ابدأ بشبكة فارغة أو اعتمد أحد القوالب المتاحة.",
+    "blank": "لوحة فارغة",
+    "create": "إنشاء",
+    "cancel": "إلغاء"
+  }
+}

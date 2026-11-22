@@ -1,0 +1,390 @@
+<ui-modal
+  size="form"
+  icon="tablerListCheck"
+  tile="bg-icon-violet"
+  [title]="(mode() === 'create' ? 'reasons.modal.createTitle' : 'reasons.modal.editTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving() && !conflictBusy()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <div class="col-span-1">
+      <ui-field
+        [label]="'reasons.fields.kind' | transloco"
+        [for]="uid + '-kind'"
+        [hint]="'reasons.hints.kind' | transloco"
+      >
+        <input
+          [id]="uid + '-kind'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="'reasons.tabs.' + kindTabKey() | transloco"
+          [attr.aria-describedby]="uid + '-kind-hint'"
+        />
+        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'reasons.fields.sortOrder' | transloco"
+        [for]="uid + '-order'"
+        [required]="true"
+        [hint]="'reasons.hints.sortOrder' | transloco"
+        [error]="errorText('sortOrder')"
+      >
+        <input
+          [id]="uid + '-order'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().sortOrder"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('sortOrder') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-order-hint' + (errorText('sortOrder') ? ' ' + uid + '-order-error' : '')"
+          (input)="onFieldInput('sortOrder', $event)"
+          (blur)="markTouched('sortOrder')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [label]="'reasons.fields.code' | transloco"
+        [for]="uid + '-code'"
+        [required]="mode() === 'create'"
+        [hint]="'reasons.hints.code' | transloco"
+        [error]="errorText('code')"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="mode() === 'create' ? ('reasons.placeholders.code' | transloco) : ''"
+          [value]="form().code"
+          [readonly]="mode() === 'edit' || !canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('code') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-code-hint' + (errorText('code') ? ' ' + uid + '-code-error' : '')"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+        @if (mode() === 'edit') {
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'settings.common.nameAr' | transloco"
+        [for]="uid + '-name-ar'"
+        [required]="true"
+        [hint]="'reasons.hints.nameAr' | transloco"
+        [count]="form().nameAr.length"
+        [max]="limits.nameMax"
+        [error]="errorText('nameAr')"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameAr"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('nameAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-ar-hint' + (errorText('nameAr') ? ' ' + uid + '-name-ar-error' : '')"
+          (input)="onFieldInput('nameAr', $event)"
+          (blur)="markTouched('nameAr')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'settings.common.nameEn' | transloco"
+        [for]="uid + '-name-en'"
+        [required]="true"
+        [hint]="'reasons.hints.nameEn' | transloco"
+        [count]="form().nameEn.length"
+        [max]="limits.nameMax"
+        [error]="errorText('nameEn')"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameEn"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('nameEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-en-hint' + (errorText('nameEn') ? ' ' + uid + '-name-en-error' : '')"
+          (input)="onFieldInput('nameEn', $event)"
+          (blur)="markTouched('nameEn')"
+        />
+      </ui-field>
+    </div>
+
+    @if (isActivityOutcome()) {
+      @if (mode() === 'create') {
+        <div class="col-span-1">
+          <ui-field
+            [bare]="true"
+            [label]="'reasons.fields.polarity' | transloco"
+            [for]="uid + '-polarity'"
+            [required]="true"
+            [hint]="'reasons.hints.polarity' | transloco"
+            [error]="errorText('polarity')"
+          >
+            <ui-segmented
+              [id]="uid + '-polarity'"
+              [options]="polarityOptions()"
+              [label]="'reasons.fields.polarity' | transloco"
+              [value]="form().polarity"
+              [describedBy]="uid + '-polarity-hint' + (errorText('polarity') ? ' ' + uid + '-polarity-error' : '')"
+              (valueChange)="setPolarity($event)"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [bare]="true"
+            [label]="'reasons.fields.activityType' | transloco"
+            [for]="uid + '-activity-type'"
+            [hint]="'reasons.hints.activityType' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-activity-type'"
+              [options]="activityTypeOptions()"
+              [value]="form().activityType"
+              [label]="'reasons.fields.activityType' | transloco"
+              [describedBy]="uid + '-activity-type-hint'"
+              [disabled]="!canManage() || saving()"
+              (valueChange)="setActivityType($event)"
+            />
+          </ui-field>
+        </div>
+      } @else {
+        <div class="col-span-1">
+          <ui-field
+            [label]="'reasons.fields.polarity' | transloco"
+            [for]="uid + '-polarity-ro'"
+            [hint]="'reasons.hints.polarity' | transloco"
+          >
+            <input
+              [id]="uid + '-polarity-ro'"
+              type="text"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="form().polarity ? ('reasons.polarities.' + form().polarity | transloco) : ''"
+              [attr.aria-describedby]="uid + '-polarity-ro-hint'"
+            />
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'reasons.fields.activityType' | transloco"
+            [for]="uid + '-activity-type-ro'"
+            [hint]="'reasons.hints.activityType' | transloco"
+          >
+            <input
+              [id]="uid + '-activity-type-ro'"
+              type="text"
+              readonly
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="form().activityType ? ('reasons.activityTypes.' + form().activityType | transloco) : ('reasons.allTypes' | transloco)"
+              [attr.aria-describedby]="uid + '-activity-type-ro-hint'"
+            />
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </ui-field>
+        </div>
+      }
+    }
+
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [label]="'reasons.fields.definitionAr' | transloco"
+        [for]="uid + '-def-ar'"
+        [hint]="'reasons.hints.definitionAr' | transloco"
+        [count]="form().definitionAr.length"
+        [max]="limits.defMax"
+        [error]="errorText('definitionAr')"
+      >
+        <textarea
+          [id]="uid + '-def-ar'"
+          rows="3"
+          dir="rtl"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().definitionAr"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('definitionAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-def-ar-hint' + (errorText('definitionAr') ? ' ' + uid + '-def-ar-error' : '')"
+          (input)="onFieldInput('definitionAr', $event)"
+          (blur)="markTouched('definitionAr')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [label]="'reasons.fields.definitionEn' | transloco"
+        [for]="uid + '-def-en'"
+        [hint]="'reasons.hints.definitionEn' | transloco"
+        [count]="form().definitionEn.length"
+        [max]="limits.defMax"
+        [error]="errorText('definitionEn')"
+      >
+        <textarea
+          [id]="uid + '-def-en'"
+          rows="3"
+          dir="ltr"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().definitionEn"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('definitionEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-def-en-hint' + (errorText('definitionEn') ? ' ' + uid + '-def-en-error' : '')"
+          (input)="onFieldInput('definitionEn', $event)"
+          (blur)="markTouched('definitionEn')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    @if (mode() === 'edit' && baseReason(); as reason) {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'settings.common.active' | transloco"
+          [for]="uid + '-active'"
+          [hint]="(reason.isSystem ? 'reasons.systemLocked' : 'reasons.hints.active') | transloco"
+        >
+          <div class="flex items-start gap-8">
+            <ui-switch
+              [id]="uid + '-active'"
+              [label]="'settings.common.active' | transloco"
+              [describedBy]="uid + '-active-hint'"
+              [checked]="form().isActive"
+              [disabled]="reason.isSystem || !canManage() || saving()"
+              (checkedChange)="setActive($event)"
+            />
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <span class="text-12 leading-18 text-text">
+                {{ (form().isActive ? 'settings.common.active' : 'settings.common.inactive') | transloco }}
+              </span>
+              @if (reason.isSystem) {
+                <span class="text-11 leading-16 text-text-muted">
+                  {{ 'reasons.systemLocked' | transloco }}
+                </span>
+              }
+            </div>
+          </div>
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || !dirty() || !isValid()"
+        (click)="save()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        (click)="requestClose()"
+      >
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'reasons.conflict.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!conflictBusy()"
+  (closed)="onConflictClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'reasons.conflict.text' | transloco }}</p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="conflictBusy()"
+    (click)="reloadLatest()"
+  >
+    {{ 'reasons.conflict.reload' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="conflictBusy()"
+    (click)="saveMineOverStale()"
+  >
+    {{ 'reasons.conflict.keepMine' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'reasons.discard.title' | transloco"
+  [text]="'reasons.discard.text' | transloco"
+  [confirmLabel]="'reasons.discard.confirm' | transloco"
+  [cancelLabel]="'reasons.discard.keep' | transloco"
+/>

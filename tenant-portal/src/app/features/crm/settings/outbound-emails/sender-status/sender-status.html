@@ -1,0 +1,53 @@
+@if (loading() || config()) {
+  <section class="rounded-10 border border-border bg-surface p-8 shadow-card" [attr.aria-busy]="loading()">
+    @if (loading() && !config()) {
+      <div class="flex items-center gap-8">
+        <div class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft"></div>
+        <div class="flex flex-1 items-center gap-8">
+          <span class="h-skeleton-line w-modal-alert rounded-4 bg-neutral-soft"></span>
+          <span class="h-badge w-modal-alert rounded-8 bg-neutral-soft"></span>
+        </div>
+      </div>
+    } @else if (config(); as sender) {
+      <div class="flex flex-wrap items-center justify-between gap-8">
+        <div class="flex min-w-0 flex-wrap items-center gap-8">
+          <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+            <ng-icon name="tablerMail" size="15" aria-hidden="true" />
+          </span>
+
+          <div class="flex min-w-0 flex-wrap items-center gap-6 text-13 leading-18 text-text">
+            <span class="font-medium">{{ 'outboundEmails.sender.sendingFrom' | transloco: { name: sender.fromName } }}</span>
+            <span dir="ltr" class="text-12 text-text-muted">&lt;{{ sender.fromAddress }}&gt;</span>
+          </div>
+
+          <span
+            class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+            [class]="sender.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+          >
+            {{ (sender.status === 'ACTIVE' ? 'outboundEmails.sender.active' : 'outboundEmails.sender.suspended') | transloco }}
+          </span>
+
+          <span
+            class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+            [class]="sender.dkimVerified ? 'bg-success-soft text-on-success-soft' : 'bg-danger-soft text-on-danger-soft'"
+          >
+            {{ (sender.dkimVerified ? 'outboundEmails.sender.domainVerified' : 'outboundEmails.sender.domainUnverified') | transloco }}
+          </span>
+        </div>
+
+        @if (!sender.canSendCrm) {
+          <a uiButton variant="secondary" size="small" routerLink="/workspace/settings">
+            {{ 'outboundEmails.sender.openSettings' | transloco }}
+          </a>
+        }
+      </div>
+
+      @if (!sender.canSendCrm) {
+        <p class="mt-6 flex items-center gap-6 text-12 leading-18 text-warning-text" role="status">
+          <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+          <span>{{ 'outboundEmails.sender.notReadyWarning' | transloco }}</span>
+        </p>
+      }
+    }
+  </section>
+}

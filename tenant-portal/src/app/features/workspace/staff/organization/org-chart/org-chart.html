@@ -1,0 +1,91 @@
+<div class="flex min-h-0 flex-1 overflow-x-auto rounded-10 border border-border bg-surface p-16 shadow-card">
+  <div
+    role="listbox"
+    [attr.aria-label]="'org.views.chart' | transloco"
+    class="inline-flex min-w-full items-start justify-center gap-16"
+  >
+    @for (company of tree(); track company.id) {
+      <ng-container *ngTemplateOutlet="nodeSubtree; context: { $implicit: company }" />
+    }
+  </div>
+</div>
+
+<ng-template #nodeSubtree let-node>
+  <div class="flex flex-col items-center">
+    <div
+      class="flex h-org-card-h w-org-card-w flex-col overflow-hidden rounded-12 border text-start shadow-card transition-colors duration-fast hover:bg-row-hover"
+      [class]="
+        selectedId() === node.id
+          ? 'border-brand bg-brand-soft'
+          : node.isMatch
+            ? 'border-warning bg-surface-muted'
+            : 'border-border bg-surface'
+      "
+    >
+      <span class="h-org-band w-full shrink-0" [class]="meta(node.level).band"></span>
+
+      <div class="flex min-h-0 flex-1 items-center gap-4 px-6">
+        <div
+          role="option"
+          tabindex="0"
+          [attr.aria-selected]="selectedId() === node.id"
+          [attr.aria-label]="node.name"
+          class="flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="selectCard(node)"
+          (keydown.enter)="selectCard(node)"
+          (keydown.space)="selectCard(node); $event.preventDefault()"
+        >
+          <div
+            class="truncate text-12 leading-16 font-medium"
+            [class]="node.isMatch ? 'rounded-2 bg-warning px-2 text-on-warning' : 'text-text'"
+            [title]="node.name"
+          >
+            {{ node.name }}
+          </div>
+          <div class="truncate text-11 leading-16 text-text-muted">
+            {{ meta(node.level).typeKey | transloco }}@if (node.children.length > 0) { · {{ node.children.length }}}@if (node.status === 'INACTIVE') { · {{ 'staff.status.INACTIVE' | transloco }}}
+          </div>
+        </div>
+
+        @if (selectedId() === node.id) {
+          <div
+            data-row-action
+            class="shrink-0"
+            (click)="$event.stopPropagation()"
+            (keydown)="$event.stopPropagation()"
+          >
+            <ui-actions-menu
+              [items]="actionsFor()(node)"
+              [label]="node.name"
+              (selected)="onActionSelected(node, $event)"
+            />
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (node.hiddenByPermission) {
+      <div class="h-12 w-border-w-check bg-border"></div>
+      <div class="inline-flex h-badge items-center gap-4 rounded-8 bg-neutral-soft px-8 text-11 text-text-muted">
+        <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+        <span>{{ 'org.hiddenByPermission' | transloco }}</span>
+      </div>
+    } @else if (node.children.length > 0) {
+      <div class="h-12 w-border-w-check bg-border"></div>
+
+      <div class="flex items-start justify-center">
+        @for (child of node.children; track child.id; let first = $first; let last = $last) {
+          <div class="flex flex-col items-center px-6">
+            <div class="flex w-full items-start">
+              <div class="h-border-w-check flex-1" [class.bg-border]="!first"></div>
+              <div class="h-12 w-border-w-check shrink-0 bg-border"></div>
+              <div class="h-border-w-check flex-1" [class.bg-border]="!last"></div>
+            </div>
+
+            <ng-container *ngTemplateOutlet="nodeSubtree; context: { $implicit: child }" />
+          </div>
+        }
+      </div>
+    }
+  </div>
+</ng-template>

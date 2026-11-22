@@ -1,0 +1,8 @@
+<app-record-activities-tab
+  targetType="LEAD"
+  [targetId]="leadId()"
+  [label]="label()"
+  [canEdit]="canEdit()"
+  [newRequest]="newRequest()"
+  (countChange)="countChange.emit($event)"
+/>

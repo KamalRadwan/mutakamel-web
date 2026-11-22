@@ -1,0 +1,92 @@
+<ui-modal
+  size="form"
+  icon="tablerShieldCheck"
+  tile="bg-icon-violet"
+  [title]="'policy.createModal.title' | transloco"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <form class="flex flex-col gap-12" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      [label]="'policy.createModal.codeLabel' | transloco"
+      [required]="true"
+      [for]="'pol-create-code'"
+      [hint]="'policy.createModal.codeHint' | transloco"
+      [hintText]="'policy.createModal.codePatternHint' | transloco"
+      [error]="codeError()"
+    >
+      <input
+        id="pol-create-code"
+        type="text"
+        dir="ltr"
+        maxlength="100"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'policy.createModal.codePlaceholder' | transloco"
+        [value]="code()"
+        [disabled]="saving()"
+        [attr.aria-invalid]="codeError() ? 'true' : null"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'policy.createModal.kindLabel' | transloco"
+      [required]="true"
+      [for]="'pol-create-kind'"
+      [hint]="'policy.createModal.kindHint' | transloco"
+      [hintText]="kindDescription()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        id="pol-create-kind"
+        [label]="'policy.createModal.kindLabel' | transloco"
+        [options]="kindOptions()"
+        [disabled]="saving()"
+        [value]="kind()"
+        (valueChange)="kind.set($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'policy.createModal.scopeLabel' | transloco"
+      [for]="'pol-create-scope'"
+      [hint]="'policy.createModal.scopeHint' | transloco"
+    >
+      <input
+        id="pol-create-scope"
+        type="text"
+        readonly
+        tabindex="-1"
+        class="w-full cursor-default bg-transparent text-12 text-text-muted outline-none"
+        [value]="scopeDisplay()"
+      />
+    </ui-field>
+  </form>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="submit()"
+    >
+      {{ 'policy.createModal.create' | transloco }}
+    </button>
+    <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="warning"
+  [title]="'policy.createModal.discardTitle' | transloco"
+  [text]="'policy.createModal.discardText' | transloco"
+  [confirmLabel]="'policy.createModal.discardConfirm' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>

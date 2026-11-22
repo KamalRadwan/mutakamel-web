@@ -1,0 +1,101 @@
+<app-auth-card
+  [title]="'authVerify.title' | transloco"
+  [subtitle]="mustRestart() ? '' : ('authVerify.codeSent' | transloco)"
+>
+  <div role="status" [class]="!mustRestart() && throttle.active() ? '' : 'sr-only'">
+    @if (!mustRestart() && throttle.active()) {
+      <app-settings-notice tone="warning">
+        <span class="sr-only">{{ 'auth.shared.throttle' | transloco: { s: throttleInitialSeconds() } }}</span>
+        <span aria-hidden="true">{{ 'auth.shared.throttle' | transloco: { s: throttle.remaining() } }}</span>
+      </app-settings-notice>
+    } @else if (throttleEnded()) {
+      <span class="sr-only">{{ 'auth.shared.throttleDone' | transloco }}</span>
+    }
+  </div>
+
+  @if (mustRestart()) {
+    <app-settings-notice tone="warning">
+      {{ 'authVerify.restart.text' | transloco }}
+    </app-settings-notice>
+
+    <button uiButton type="button" size="large" class="w-full" (click)="signInAgain()">
+      {{ 'authVerify.restart.action' | transloco }}
+    </button>
+  } @else {
+    @if (!throttle.active() && notice(); as current) {
+      @if (current.tone === 'warning') {
+        <app-settings-notice tone="warning">
+          {{ current.key | transloco }}
+        </app-settings-notice>
+      } @else {
+        <div
+          role="alert"
+          class="flex items-start gap-8 rounded-10 border border-danger-border bg-danger-soft px-10 py-6 text-12 leading-18 text-on-danger-soft"
+        >
+          <span class="mt-2 inline-flex shrink-0 text-danger-text">
+            <ng-icon name="tablerCircleX" size="14" aria-hidden="true" />
+          </span>
+          <div class="min-w-0 flex-1">
+            {{ current.key | transloco }}
+          </div>
+        </div>
+      }
+    }
+
+    <form class="flex flex-col gap-16" novalidate (submit)="onSubmit($event)">
+      <ui-field
+        for="verify-code-1"
+        size="bare"
+        [label]="'authVerify.code' | transloco"
+        [hint]="'authVerify.codeHint' | transloco"
+        [required]="true"
+        [error]="fieldError()"
+      >
+        <span id="verify-code-label" class="sr-only">{{ 'authVerify.code' | transloco }}</span>
+        <app-code-boxes
+          [value]="code()"
+          [invalid]="!!fieldError()"
+          [disabled]="verifying() || resending()"
+          [labelledBy]="'verify-code-label'"
+          [describedBy]="codeDescribedBy()"
+          (valueChange)="onCodeChange($event)"
+          (submitted)="verify()"
+        />
+      </ui-field>
+
+      @let exp = expiresParts();
+      <p class="text-center text-11 leading-16 text-text-muted">
+        {{ exp.before }}@if (exp.hasTime) {<bdi dir="ltr" class="tabular-nums">{{ formattedExpiresIn() }}</bdi>}{{ exp.after }}
+      </p>
+
+      <button uiButton type="submit" size="large" class="w-full" [disabled]="!canVerify()" [loading]="verifying()">
+        {{ 'authVerify.submit' | transloco }}
+      </button>
+
+      <button
+        uiButton
+        type="button"
+        variant="ghost"
+        size="small"
+        class="self-center"
+        [disabled]="!canResend()"
+        [loading]="resending()"
+        (click)="resend()"
+      >
+        @if (resendRemainingSeconds() > 0) {
+          {{ 'authVerify.resendIn' | transloco: { s: resendRemainingSeconds() } }}
+        } @else {
+          {{ 'authVerify.resend' | transloco }}
+        }
+      </button>
+    </form>
+
+    <a
+      routerLink="/login"
+      class="block text-center text-12 text-brand-text outline-none hover:underline focus-visible:underline"
+      (click)="backToSignIn()"
+    >
+      {{ 'auth.shared.backToSignIn' | transloco }}
+    </a>
+  }
+</app-auth-card>

@@ -1,0 +1,17 @@
+<app-record-contacts
+  #recordContacts
+  [contacts]="draft().contacts"
+  (contactsChange)="onContactsChange($event)"
+  [mode]="mode()"
+  [layout]="layout()"
+  [countries]="countries()"
+  [limits]="limits"
+  [errors]="mappedErrors()"
+  [readonly]="readonly()"
+  [max]="limits.contacts"
+  [saveContact]="saveContactBound()"
+  [loadCompanyContacts]="companyContactsLoader()"
+  [resetKey]="resetKey()"
+  [crm]="crm()"
+  [source]="source()"
+/>

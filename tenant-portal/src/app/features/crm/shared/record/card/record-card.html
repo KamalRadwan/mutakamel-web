@@ -1,0 +1,157 @@
+<article
+  class="relative flex h-full flex-col overflow-hidden rounded-10 border border-border bg-surface py-8 ps-12 pe-8"
+  [class]="detailed() ? 'shadow-popover' : 'shadow-card'"
+>
+  @if (edgeClass(); as edge) {
+    <span class="absolute inset-y-0 start-0 w-4" [class]="edge" aria-hidden="true"></span>
+  }
+
+  <div class="flex items-center gap-8">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="typeTile()"
+      [attr.title]="typeLabel() || null"
+    >
+      <ng-icon [name]="typeIcon()" size="15" aria-hidden="true" />
+    </span>
+
+    <div class="flex min-h-card-title min-w-0 flex-1 flex-col justify-center">
+      <span class="truncate text-13 leading-18 font-medium text-text">
+        {{ title() }}
+      </span>
+      @if (subtitle(); as sub) {
+        <span class="truncate text-12 leading-18 text-text-muted">{{ sub }}</span>
+      }
+    </div>
+
+    @if (!detailed()) {
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="(expanded() ? 'recordList.card.collapse' : 'recordList.card.expand') | transloco"
+        [attr.aria-expanded]="expanded()"
+        [title]="(expanded() ? 'recordList.card.collapse' : 'recordList.card.expand') | transloco"
+        (click)="expanded.set(!expanded())"
+      >
+        <span class="inline-flex transition-transform duration-fast" [class.rotate-180]="expanded()">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    }
+
+    @if (actions().length) {
+      <ui-actions-menu
+        [items]="actions()"
+        [label]="actionsLabel() || ('recordList.card.actions' | transloco)"
+        [noColorLabel]="'recordList.color.none' | transloco"
+        (selected)="onMenuSelect($event)"
+      />
+    }
+  </div>
+
+  @if (showDetails()) {
+    <div data-no-drag class="mt-8 flex cursor-text flex-col gap-4 text-12 leading-18 text-text select-text">
+      <ng-content select="[cardBadges]" />
+      <ng-content select="[cardBody]" />
+    </div>
+  }
+
+  <!-- In the Cards view every card in the grid has the same height; the footer stays at the bottom. -->
+  <div class="flex-1" aria-hidden="true"></div>
+  <div class="my-8 h-border bg-border" aria-hidden="true"></div>
+
+  <div class="flex items-center gap-6">
+    @if (rating() !== null) {
+      @if (ratingEditable()) {
+        <span
+          class="flex items-center"
+          role="radiogroup"
+          [attr.aria-label]="'recordList.card.rating' | transloco: { value: currentRating() }"
+          (mouseleave)="hovered.set(null)"
+        >
+          @for (star of stars; track star) {
+            <button
+              type="button"
+              class="inline-flex cursor-pointer rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="star <= displayRating() ? 'text-warning-text' : 'text-border-field'"
+              role="radio"
+              [attr.aria-checked]="star === currentRating()"
+              [attr.aria-label]="'recordList.card.rate' | transloco: { value: star }"
+              (mouseenter)="hovered.set(star)"
+              (focus)="hovered.set(star)"
+              (blur)="hovered.set(null)"
+              (click)="chooseRating(star)"
+            >
+              <ng-icon [name]="star <= displayRating() ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+            </button>
+          }
+        </span>
+      } @else {
+        <span
+          class="flex items-center"
+          role="img"
+          [attr.aria-label]="'recordList.card.rating' | transloco: { value: currentRating() }"
+        >
+          @for (star of stars; track star) {
+            <span class="inline-flex" [class]="star <= currentRating() ? 'text-warning-text' : 'text-border-field'">
+              <ng-icon [name]="star <= currentRating() ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+            </span>
+          }
+        </span>
+      }
+    }
+
+    @if (showDue()) {
+      <button
+        type="button"
+        class="inline-flex h-badge cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="dueClass()"
+        (click)="due.emit()"
+      >
+        {{ 'recordList.due.' + resolvedDue() | transloco }}
+      </button>
+    }
+
+    <span class="flex-1"></span>
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="viewLabel() || ('recordList.card.view' | transloco)"
+      [title]="viewLabel() || ('recordList.card.view' | transloco)"
+      (click)="open.emit()"
+    >
+      <ng-icon name="tablerEye" size="14" aria-hidden="true" />
+    </button>
+
+    @if (ownerText()) {
+      @if (owner()?.avatarUrl; as avatarUrl) {
+        <img
+          [src]="avatarUrl"
+          [alt]="ownerText()"
+          class="size-avatar shrink-0 rounded-full object-cover"
+          [title]="ownerText()"
+          [attr.aria-label]="'recordList.card.owner' | transloco: { name: ownerText() }"
+        />
+      } @else {
+        <span
+          class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+          [title]="ownerText()"
+          [attr.aria-label]="'recordList.card.owner' | transloco: { name: ownerText() }"
+          role="img"
+        >
+          {{ initials() }}
+        </span>
+      }
+    } @else {
+      <span
+        class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-neutral-soft text-text-muted"
+        [title]="'recordList.card.noOwner' | transloco"
+        [attr.aria-label]="'recordList.card.noOwner' | transloco"
+        role="img"
+      >
+        <ng-icon name="tablerUserCircle" size="14" aria-hidden="true" />
+      </span>
+    }
+  </div>
+</article>

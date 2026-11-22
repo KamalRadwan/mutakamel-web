@@ -1,0 +1,98 @@
+<div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+  @let codeErr = errorText('canonicalCode');
+  <ui-field
+    [for]="uid + '-code'"
+    [label]="'itemForm.fields.code.label' | transloco"
+    [hint]="'itemForm.fields.code.hint' | transloco"
+    [hintText]="codePreview()"
+    [required]="mode() === 'create'"
+    [count]="mode() === 'create' ? draft().canonicalCode.trim().length : null"
+    [max]="mode() === 'create' ? limits.code : null"
+    [error]="codeErr"
+  >
+    <input
+      #codeInput
+      [id]="uid + '-code'"
+      type="text"
+      dir="ltr"
+      autocomplete="off"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+      [readonly]="codeReadonly()"
+      [attr.aria-required]="mode() === 'create' ? 'true' : null"
+      [attr.aria-invalid]="codeErr ? 'true' : null"
+      [value]="draft().canonicalCode"
+      (input)="onTextInput('canonicalCode', $event)"
+    />
+  </ui-field>
+
+  @let nameEnErr = errorText('nameEn');
+  <ui-field
+    [for]="uid + '-name-en'"
+    [label]="'itemForm.fields.nameEn.label' | transloco"
+    [hint]="'itemForm.fields.nameEn.hint' | transloco"
+    [required]="nameEnRequired()"
+    [count]="draft().nameEn.trim().length"
+    [max]="limits.name"
+    [error]="nameEnErr"
+  >
+    <input
+      #nameEnInput
+      [id]="uid + '-name-en'"
+      type="text"
+      dir="ltr"
+      autocomplete="off"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [readonly]="readonly()"
+      [attr.aria-required]="nameEnRequired() ? 'true' : null"
+      [attr.aria-invalid]="nameEnErr ? 'true' : null"
+      [value]="draft().nameEn"
+      (input)="onTextInput('nameEn', $event)"
+    />
+  </ui-field>
+
+  @let nameArErr = errorText('nameAr');
+  <ui-field
+    [for]="uid + '-name-ar'"
+    [label]="'itemForm.fields.nameAr.label' | transloco"
+    [hint]="'itemForm.fields.nameAr.hint' | transloco"
+    [required]="nameArRequired()"
+    [count]="draft().nameAr.trim().length"
+    [max]="limits.name"
+    [error]="nameArErr"
+  >
+    <input
+      [id]="uid + '-name-ar'"
+      type="text"
+      dir="rtl"
+      autocomplete="off"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [readonly]="readonly()"
+      [attr.aria-required]="nameArRequired() ? 'true' : null"
+      [attr.aria-invalid]="nameArErr ? 'true' : null"
+      [value]="draft().nameAr"
+      (input)="onTextInput('nameAr', $event)"
+    />
+  </ui-field>
+
+  @let barcodeErr = errorText('barcode');
+  <ui-field
+    [for]="uid + '-barcode'"
+    [label]="'itemForm.fields.barcode.label' | transloco"
+    [hint]="'itemForm.fields.barcode.hint' | transloco"
+    [count]="draft().barcode.trim().length"
+    [max]="limits.barcode"
+    [error]="barcodeErr"
+  >
+    <input
+      [id]="uid + '-barcode'"
+      type="text"
+      dir="ltr"
+      autocomplete="off"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+      [readonly]="readonly()"
+      [attr.aria-invalid]="barcodeErr ? 'true' : null"
+      [value]="draft().barcode"
+      (input)="onTextInput('barcode', $event)"
+    />
+  </ui-field>
+</div>

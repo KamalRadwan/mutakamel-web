@@ -1,0 +1,304 @@
+{
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "retry": "Try again",
+    "reload": "Reload",
+    "copy": "Copy",
+    "clearSearch": "Clear search",
+    "clearFilters": "Clear filters",
+    "clearDateRange": "Clear date range",
+    "none": "—",
+    "versionPrefix": "v"
+  },
+  "view": {
+    "label": "Webhook view",
+    "subscriptions": "Subscriptions",
+    "deliveries": "Deliveries",
+    "hint": "Switch between the subscriptions list and the delivery log."
+  },
+  "branchNotice": "Subscriptions are managed at company or tenant level.",
+  "toolbar": {
+    "newSubscription": "New subscription",
+    "searchSubscriptions": "Search by code or endpoint",
+    "searchDeliveries": "Search by subscription or event",
+    "reload": "Reload"
+  },
+  "states": {
+    "loadFailed": "Could not load webhook data.",
+    "noMatches": "No matching subscriptions found.",
+    "notFound": "This webhook record no longer exists."
+  },
+  "conflict": {
+    "title": "This record changed",
+    "text": "Someone else saved newer changes. Reload the latest data, or keep your changes and save again.",
+    "reload": "Reload",
+    "keep": "Keep my changes"
+  },
+  "subscriptions": {
+    "title": "Webhook subscriptions",
+    "pagination": "Subscriptions pagination",
+    "empty": "No webhook subscriptions yet.",
+    "actions": "Subscription actions",
+    "pendingSpinner": "Secret operation in progress",
+    "columns": {
+      "code": "Code",
+      "endpoint": "Endpoint",
+      "scope": "Level",
+      "status": "Status",
+      "secret": "Secret",
+      "version": "Version",
+      "updated": "Updated",
+      "actions": "Actions"
+    },
+    "menu": {
+      "open": "Open",
+      "edit": "Edit",
+      "sendTest": "Send test",
+      "disable": "Disable",
+      "enable": "Enable",
+      "rotateSecret": "Rotate secret"
+    }
+  },
+  "subscription": {
+    "newTitle": "New webhook subscription",
+    "fields": {
+      "code": {
+        "label": "Code",
+        "hint": "Unique uppercase code starting with a letter (letters, digits, and underscores, 2 to 80 characters).",
+        "placeholder": "ERP_SYNC"
+      },
+      "endpointUrl": {
+        "label": "Endpoint URL",
+        "hint": "HTTPS URL where Trade sends signed webhook deliveries (ports 443 or 8443 only). A saved subscription shows only the address and path; enter the full URL again to change it.",
+        "placeholder": "https://erp.example.com/hooks/trade"
+      },
+      "retryPolicy": {
+        "label": "Retry policy",
+        "hint": "Waits {{t1}}, then {{t2}}, {{t3}}, {{t4}}… up to 6 hours between tries.",
+        "standard": "Standard",
+        "conservative": "Conservative"
+      },
+      "maxAttempts": {
+        "label": "Max attempts",
+        "hint": "Maximum delivery tries before marking a delivery as gave up (1 to 10)."
+      },
+      "branches": {
+        "label": "Branches",
+        "hint": "Limit deliveries to selected branches, or leave empty to include all branches.",
+        "allHint": "Empty = all branches"
+      }
+    },
+    "validation": {
+      "required": "This field is required.",
+      "codePattern": "Use 2–80 uppercase letters, digits, or underscores starting with a letter.",
+      "maxAttemptsRange": "Enter a whole number between 1 and 10.",
+      "eventsRequired": "Select between 1 and 30 events.",
+      "atLeastOneField": "Keep at least one field selected for each event."
+    },
+    "endpointProblems": {
+      "HTTPS_REQUIRED": "Use https",
+      "NOT_HTTPS": "Use https",
+      "USERINFO_FORBIDDEN": "Remove credentials from the URL",
+      "NO_USERINFO": "Remove credentials from the URL",
+      "FRAGMENT_FORBIDDEN": "Remove the # fragment from the URL",
+      "NO_FRAGMENT": "Remove the # fragment from the URL",
+      "LOCALHOST_FORBIDDEN": "Localhost and .local hosts are not allowed",
+      "NO_LOCALHOST": "Localhost and .local hosts are not allowed",
+      "PORT_FORBIDDEN": "Port must be 443 or 8443",
+      "INVALID_PORT": "Port must be 443 or 8443",
+      "SECRET_QUERY_KEY": "Remove secret-like words from the query",
+      "SECRET_IN_QUERY": "Remove secret-like words from the query",
+      "INVALID_URL": "Enter a valid URL"
+    },
+    "footer": {
+      "save": "Save",
+      "sendTest": "Send test",
+      "openDelivery": "Open delivery",
+      "undo": "Undo changes",
+      "unsaved": "Unsaved changes",
+      "disable": "Disable",
+      "enable": "Enable"
+    },
+    "unsaved": {
+      "title": "Discard changes?",
+      "text": "You have unsaved changes to this subscription.",
+      "save": "Save",
+      "discard": "Discard",
+      "cancel": "Cancel"
+    }
+  },
+  "eventsSection": {
+    "title": "Events",
+    "caption": "Only the checked fields are sent",
+    "empty": "No webhook events are available.",
+    "keepOneField": "At least one field must stay included.",
+    "maxReached": "You can select up to 30 events.",
+    "listLabel": "Events to send",
+    "listHint": "Select the events this subscription delivers, then choose which payload fields each event includes."
+  },
+  "events": {
+    "trading.catalog.item_changed.v1": "Item changed",
+    "trading.catalog.item_changed": "Item changed",
+    "trading.commercial_account.changed.v1": "Commercial account changed",
+    "trading.commercial_account.changed": "Commercial account changed",
+    "trading.quotation.sent.v1": "Quotation sent",
+    "trading.quotation.sent": "Quotation sent",
+    "trading.quotation.accepted.v1": "Quotation accepted",
+    "trading.quotation.accepted": "Quotation accepted",
+    "trading.sales_order.confirmed.v1": "Sales order confirmed",
+    "trading.sales_order.confirmed": "Sales order confirmed",
+    "trading.purchase_order.confirmed.v1": "Purchase order confirmed",
+    "trading.purchase_order.confirmed": "Purchase order confirmed",
+    "inventory.receipt.completed.v1": "Goods receipt completed",
+    "inventory.receipt.completed": "Goods receipt completed",
+    "inventory.delivery.completed.v1": "Delivery completed",
+    "inventory.delivery.completed": "Delivery completed",
+    "trading.webhook.synthetic_test.v1": "Test delivery"
+  },
+  "secret": {
+    "title": "Signing secret",
+    "algorithm": "Algorithm",
+    "activeFrom": "Active from",
+    "overlapUntil": "Overlap until",
+    "revokedAt": "Revoked at",
+    "reveal": "Reveal secret (once)",
+    "availableUntil": "Available until {{time}}",
+    "rotate": "Rotate",
+    "revoke": "Revoke",
+    "preparing": "Preparing the secret…",
+    "caption": "Reveal works once, within 15 minutes of activation.",
+    "failedFallback": "The secret operation failed.",
+    "rotateModal": {
+      "title": "Rotate signing secret",
+      "overlapLabel": "Overlap hours",
+      "overlapHint": "The old secret keeps working this long.",
+      "overlapRange": "Enter a whole number between 30 and 168.",
+      "confirm": "Rotate"
+    },
+    "revokeConfirm": {
+      "title": "Revoke signing secret?",
+      "text": "Deliveries stop until a new secret is created.",
+      "confirm": "Revoke"
+    }
+  },
+  "reveal": {
+    "title": "Signing secret",
+    "fieldLabel": "Signing secret",
+    "fieldHint": "Store this HMAC signing key in your receiving system to verify request signatures.",
+    "warning": "This secret is shown only once. Store it in your receiving system now.",
+    "storedCheck": "I stored the secret",
+    "alreadyShown": "The secret can no longer be shown. Rotate it to get a new one.",
+    "loading": "Loading signing secret…",
+    "loadError": "Could not load the signing secret.",
+    "storedLabel": "Confirmation",
+    "storedHint": "The secret is shown only once. Confirm you have stored it before closing this window."
+  },
+  "deliveries": {
+    "title": "Webhook deliveries",
+    "pagination": "Deliveries pagination",
+    "empty": "No webhook deliveries yet.",
+    "emptyFiltered": "No deliveries match the selected filters.",
+    "steps": {
+      "label": "Filter deliveries by status",
+      "hint": "Filter the webhook deliveries by status",
+      "all": "All",
+      "PENDING": "Pending",
+      "RETRY_PENDING": "Waiting to retry",
+      "DELIVERED": "Delivered",
+      "FAILED": "Failed",
+      "EXHAUSTED": "Gave up",
+      "DISABLED": "Disabled"
+    },
+    "filters": {
+      "subscription": "Subscription",
+      "allSubscriptions": "All subscriptions",
+      "event": "Event",
+      "allEvents": "All events",
+      "dateRange": "Date range",
+      "dateRangePlaceholder": "All dates"
+    },
+    "columns": {
+      "status": "Status",
+      "event": "Event",
+      "subscription": "Subscription",
+      "attempts": "Attempts",
+      "nextOrEnded": "Next try / ended at",
+      "size": "Size",
+      "created": "Created"
+    }
+  },
+  "delivery": {
+    "title": "Webhook delivery",
+    "fields": {
+      "event": "Event",
+      "subscription": "Subscription",
+      "endpoint": "Endpoint",
+      "sourceEventId": "Source event ID",
+      "payloadHash": "Payload hash",
+      "size": "Size",
+      "created": "Created"
+    },
+    "attemptsTitle": "Attempts",
+    "noAttempts": "No delivery attempts recorded yet.",
+    "attemptNumber": "#{{number}}",
+    "httpStatus": "HTTP {{status}}",
+    "durationMs": "{{ms}} ms",
+    "retryAction": "Retry",
+    "retryModal": {
+      "title": "Retry delivery",
+      "confirm": "Retry",
+      "emptyReasonsHint": "Add reasons in Trade settings."
+    }
+  },
+  "retryClass": {
+    "TIMEOUT": "Timeout",
+    "RATE_LIMIT": "Rate limited",
+    "SERVER_ERROR": "Server error",
+    "CLIENT_ERROR": "Rejected by the endpoint",
+    "DESTINATION_FORBIDDEN": "Destination not allowed",
+    "REDIRECT_FORBIDDEN": "Redirects are not allowed",
+    "SECRET_UNAVAILABLE": "Secret not available",
+    "NETWORK_ERROR": "Network error",
+    "RESPONSE_TOO_LARGE": "Response too large",
+    "INTEGRITY_ERROR": "Integrity check failed"
+  },
+  "toast": {
+    "created": "Subscription created",
+    "savedVersion": "Saved as version {{version}}",
+    "disabled": "Subscription disabled",
+    "enabled": "Subscription enabled",
+    "testSent": "Test sent",
+    "secretRotated": "Signing secret rotation started",
+    "secretRevoked": "Signing secret revoked",
+    "copied": "Copied",
+    "retryScheduled": "Retry scheduled for {{time}}"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "ENDPOINT_FORBIDDEN": "This endpoint URL is not allowed.",
+    "PAYLOAD_INVALID": "Check the selected events and fields, then try again.",
+    "SUBSCRIPTION_CODE_CONFLICT": "This subscription code is already in use.",
+    "SECRET_VERSION_INVALID": "Wait until the secret is ready, then try again.",
+    "DELIVERY_NOT_RETRYABLE": "This delivery can no longer be retried.",
+    "TRADE.WEBHOOK.ENDPOINT_FORBIDDEN": "This endpoint URL is not allowed.",
+    "TRADE.WEBHOOK.PAYLOAD_INVALID": "Check the selected events and fields, then try again.",
+    "TRADE.WEBHOOK.SUBSCRIPTION_CODE_CONFLICT": "This subscription code is already in use.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID": "Wait until the secret is ready, then try again.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE": "This delivery can no longer be retried.",
+    "TRADE.CONCURRENCY.STALE_VERSION": "Someone else updated this subscription. Reload before saving again.",
+    "TRADE.WEBHOOK.SUBSCRIPTION_NOT_FOUND": "This webhook subscription no longer exists.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_FOUND": "This webhook delivery no longer exists.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.operation_pending": "A secret operation is still in progress. Wait for it to finish, then try again.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.not_active": "This needs an active subscription with an active signing secret.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.not_current_reference": "The signing secret changed. Reload the subscription and try again.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.already_revealed": "The secret was already shown. Rotate it to get a new one.",
+    "TRADE.WEBHOOK.SECRET_VERSION_INVALID.reveal_expired": "The 15-minute window to show the secret has ended. Rotate it to get a new one.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.not_exhausted": "Only a delivery that gave up can be retried.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.subscription_not_active": "Enable the subscription before retrying its deliveries.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.payload_purged": "The delivery content was already removed, so it cannot be sent again.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.not_retryable_class": "The last attempt failed for a reason that retrying cannot fix.",
+    "TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE.secret_unavailable": "The signing secret used for this delivery is no longer available."
+  }
+}

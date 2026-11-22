@@ -1,0 +1,182 @@
+<ui-modal
+  #totalsModal
+  size="form"
+  icon="tablerSum"
+  tile="teal"
+  [title]="'tplTables.totals.title' | transloco"
+  [closeLabel]="'tplTables.actions.close' | transloco"
+>
+  <div class="flex flex-col gap-8">
+    <div class="flex items-center justify-between gap-8">
+      <span class="text-12 text-text-muted">
+        {{ 'tplTables.totals.rowsCount' | transloco: { count: rows().length } }}
+      </span>
+      @if (!readOnly()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="rows().length >= 20"
+          (click)="addRow()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'tplTables.actions.addRow' | transloco }}
+        </button>
+      }
+    </div>
+
+    <div class="flex max-h-tpl-list flex-col gap-6 overflow-y-auto pe-2 scrollbar-thin">
+      @for (row of rows(); track row.id; let idx = $index) {
+        <div class="flex flex-col gap-8 rounded-8 border border-border bg-surface-muted p-8">
+          <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+            <ui-field
+              [for]="uid + '-lbl-' + idx"
+              [label]="'tplTables.totals.rowLabel' | transloco"
+              [hint]="'tplTables.totals.rowHint' | transloco"
+              [required]="true"
+              [count]="row.label.length"
+              [max]="500"
+              [error]="labelError(row)"
+            >
+              <input
+                [id]="uid + '-lbl-' + idx"
+                type="text"
+                [readonly]="readOnly()"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                [value]="row.label"
+                (input)="onLabelInput(idx, $event)"
+                (blur)="markLabelTouched(row.id)"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [for]="uid + '-val-' + idx"
+              [label]="'tplTables.totals.valueLabel' | transloco"
+              [hint]="'tplTables.totals.valueHint' | transloco"
+              [required]="true"
+              [error]="valueError(row)"
+            >
+              <button
+                [id]="uid + '-val-' + idx"
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                class="w-full justify-start"
+                aria-haspopup="dialog"
+                [attr.aria-describedby]="uid + '-val-' + idx + '-hint' + (valueError(row) ? ' ' + uid + '-val-' + idx + '-error' : '')"
+                [disabled]="readOnly()"
+                (click)="pickRowValue(idx)"
+              >
+                <ng-icon name="tablerBraces" size="14" aria-hidden="true" />
+                <span class="truncate">
+                  {{ row.binding.path ? '«' + state.fieldLabel(row.binding.path) + '»' : ('tplTables.totals.chooseValue' | transloco) }}
+                </span>
+              </button>
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [for]="uid + '-emp-' + idx"
+              [label]="'tplTables.totals.emphasisLabel' | transloco"
+              [hint]="'tplTables.totals.emphasisHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-emp-' + idx"
+                [options]="emphasisOptions()"
+                [value]="row.emphasis"
+                [label]="'tplTables.totals.emphasisLabel' | transloco"
+                [describedBy]="uid + '-emp-' + idx + '-hint'"
+                [disabled]="readOnly()"
+                (valueChange)="updateRow(idx, { emphasis: $event })"
+              />
+            </ui-field>
+
+            <div class="flex items-end justify-between gap-6">
+              <ui-field
+                size="bare"
+                [for]="uid + '-vis-' + idx"
+                [label]="'tplTables.totals.visibleLabel' | transloco"
+                [hint]="'tplTables.totals.visibleHint' | transloco"
+              >
+                <div class="flex h-field items-center">
+                  @if (readOnly()) {
+                    <span class="relative inline-flex size-checkbox-size shrink-0">
+                      <input
+                        [id]="uid + '-vis-' + idx"
+                        type="checkbox"
+                        disabled
+                        [checked]="row.visible"
+                        class="peer size-checkbox-size cursor-default appearance-none rounded-4 border-check border-border-field bg-surface-field checked:border-brand checked:bg-brand"
+                      />
+                      <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+                        <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                      </span>
+                    </span>
+                  } @else {
+                    <ui-checkbox
+                      [checked]="row.visible"
+                      (checkedChange)="updateRow(idx, { visible: $event })"
+                    />
+                  }
+                </div>
+              </ui-field>
+
+              <div class="flex items-center gap-4">
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  [attr.aria-label]="'tplTables.actions.moveUp' | transloco"
+                  [title]="'tplTables.actions.moveUp' | transloco"
+                  [disabled]="readOnly() || idx === 0"
+                  (click)="moveRow(idx, -1)"
+                >
+                  <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  [attr.aria-label]="'tplTables.actions.moveDown' | transloco"
+                  [title]="'tplTables.actions.moveDown' | transloco"
+                  [disabled]="readOnly() || idx === rows().length - 1"
+                  (click)="moveRow(idx, 1)"
+                >
+                  <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  [attr.aria-label]="'tplTables.actions.remove' | transloco"
+                  [title]="'tplTables.actions.remove' | transloco"
+                  [disabled]="readOnly() || rows().length <= 1"
+                  (click)="removeRow(idx)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!readOnly()) {
+      <button type="button" uiButton variant="primary" (click)="apply()">
+        {{ 'tplTables.actions.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplTables.actions.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="cancel()">
+        {{ 'tplTables.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

@@ -1,0 +1,132 @@
+{
+  "toolbar": {
+    "new": "New channel",
+    "searchPlaceholder": "Search by name or code",
+    "searchLabel": "Search channels",
+    "reload": "Reload",
+    "limited": "Showing the newest 100 of {{total}} channels."
+  },
+  "facets": {
+    "text": "Name or code",
+    "textHint": "Matches part of the name or code",
+    "type": "Type",
+    "typeHint": "Any of the chosen types"
+  },
+  "steps": {
+    "label": "Filter by status",
+    "hint": "Filter the channels by status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "all": "All"
+  },
+  "table": {
+    "label": "Channels",
+    "channel": "Channel",
+    "type": "Type",
+    "status": "Status",
+    "branches": "Branches",
+    "updated": "Updated",
+    "actions": "Actions",
+    "branchCount": {
+      "zero": "No branches",
+      "one": "{{count}} branch",
+      "two": "{{count}} branches",
+      "few": "{{count}} branches",
+      "other": "{{count}} branches"
+    }
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive"
+  },
+  "actions": {
+    "label": "Actions for {{name}}",
+    "open": "Open",
+    "edit": "Edit",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
+  },
+  "deactivate": {
+    "title": "Deactivate {{name}}?",
+    "text": "It can no longer be used as a sales context, and its listings stop showing in pickers. Existing documents are not changed.",
+    "confirm": "Deactivate",
+    "cancel": "Cancel"
+  },
+  "modal": {
+    "newTitle": "New channel",
+    "create": "Create channel",
+    "save": "Save",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "close": "Close",
+    "cancel": "Cancel"
+  },
+  "fields": {
+    "code": {
+      "label": "Code",
+      "hint": "Latin letters, digits, dot, dash or underscore, up to 80. Saved in capitals. It cannot change after creation.",
+      "preview": "Saved as {{code}}"
+    },
+    "name": {
+      "label": "Name",
+      "hint": "The name people see in lists and documents. Up to 160 characters."
+    },
+    "type": {
+      "label": "Type",
+      "hint": "How sales reach customers through this channel. It cannot change after creation."
+    },
+    "active": {
+      "label": "Active",
+      "hint": "Inactive channels cannot be used for new sales or listings."
+    },
+    "linkActive": {
+      "label": "Active link",
+      "ariaLabel": "Active link for {{branch}}",
+      "hint": "Turn on to use this channel in {{branch}}; turn off to stop using it while keeping the link."
+    }
+  },
+  "branches": {
+    "title": "Branches",
+    "createFirst": "Create the channel first, then link branches.",
+    "linked": "Linked",
+    "inactiveLink": "Link inactive",
+    "notLinked": "Not linked",
+    "current": "Current branch"
+  },
+  "errors": {
+    "codeTaken": "This code is already used by another channel of this company.",
+    "codePattern": "Use Latin letters, digits, dot, dash or underscore.",
+    "required": "Required.",
+    "maxLength": "Up to {{max}} characters."
+  },
+  "toast": {
+    "created": "Channel created",
+    "saved": "Channel saved",
+    "activated": "{{name}} activated",
+    "deactivated": "{{name}} deactivated",
+    "companyChanged": "The company changed. Unsaved channel changes were discarded."
+  },
+  "unsaved": {
+    "title": "Save changes?",
+    "text": "You have unsaved changes.",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
+  "conflict": {
+    "title": "This channel changed",
+    "text": "Someone else changed it. Reload, or keep your changes and save again.",
+    "reload": "Reload",
+    "keep": "Keep my changes"
+  },
+  "empty": {
+    "title": "No channels for {{company}} yet",
+    "filtered": "No channels match your search",
+    "clear": "Clear search"
+  },
+  "states": {
+    "loadFailed": "The channels could not be loaded.",
+    "retry": "Retry",
+    "notFound": "This channel was not found."
+  }
+}

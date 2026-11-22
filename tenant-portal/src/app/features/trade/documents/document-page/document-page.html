@@ -1,0 +1,481 @@
+@let cfg = kindConfig();
+@let errKind = loadErrorKind();
+
+@if (loading()) {
+  <div class="mx-auto flex w-full max-w-design flex-col gap-8 pb-16" aria-busy="true">
+    <!-- Header skeleton -->
+    <div class="flex h-btn items-center gap-8">
+      <span class="size-btn shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+      <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+      <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+    </div>
+
+    <!-- Details card skeleton (8 fields) -->
+    <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-10 border border-border bg-surface p-10 shadow-card desktop:grid-cols-4">
+      @for (field of [1, 2, 3, 4, 5, 6, 7, 8]; track field) {
+        <div class="flex flex-col gap-4">
+          <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+        </div>
+      }
+    </div>
+
+    <!-- Items skeleton (bar + 3 rows) -->
+    <span class="h-table-head w-full animate-pulse rounded-10 bg-neutral-soft"></span>
+    @for (row of [1, 2, 3]; track row) {
+      <span class="h-table-row w-full animate-pulse rounded-10 bg-neutral-soft"></span>
+    }
+  </div>
+} @else if (errKind === 'not-found') {
+  <app-not-found-page />
+} @else if (errKind === 'forbidden') {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+    </span>
+    <h1 class="text-16 leading-24 font-medium text-text">{{ 'tdpg.errors.forbiddenTitle' | transloco }}</h1>
+    <p class="text-12 leading-18 text-text-muted">{{ 'tdpg.errors.forbiddenText' | transloco }}</p>
+    <a uiButton routerLink="/">{{ 'tdpg.errors.backHome' | transloco }}</a>
+  </div>
+} @else if (errKind === 'failed') {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <h1 class="text-16 leading-24 font-medium text-text">{{ 'tdpg.errors.loadFailedTitle' | transloco }}</h1>
+    <p class="text-12 leading-18 text-text-muted">{{ 'td.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reloadPage()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      <span>{{ 'td.common.retry' | transloco }}</span>
+    </button>
+  </div>
+} @else {
+  <div class="mx-auto flex w-full max-w-design flex-col gap-8 pb-16">
+    <!-- 1. Header row -->
+    <header class="flex min-h-btn flex-wrap items-center gap-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'tdpg.header.back' | transloco"
+        [title]="'tdpg.header.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="cfg.tile"
+        aria-hidden="true"
+      >
+        <ng-icon [name]="cfg.icon" size="15" />
+      </span>
+
+      <h1 class="min-w-0 truncate text-16 leading-24 font-medium text-text">
+        @if (isNewMode()) {
+          {{ cfg.newKey | transloco }}
+        } @else {
+          {{ cfg.titleKey | transloco }}
+          @if (detail()?.documentNumber; as docNum) {
+            <span> </span>
+            <bdi dir="ltr">{{ docNum }}</bdi>
+          }
+        }
+      </h1>
+
+      @if (lifecycleStatusBadge(); as badge) {
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="badge.className"
+          [attr.title]="reasonTooltipFor('lifecycle')"
+        >
+          {{ badge.labelKey | transloco }}
+        </span>
+      }
+
+      @if (kind() === 'quotation' && currentQuotationRevision(); as rev) {
+        <ui-badge tone="tag">{{ 'tdpg.header.revision' | transloco: { n: rev.revisionNumber } }}</ui-badge>
+      }
+
+      @if (salesOrderHoldBadge(); as hold) {
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="hold.className"
+          [attr.title]="reasonTooltipFor('hold')"
+        >
+          {{ hold.labelKey | transloco }}
+        </span>
+      }
+
+      @if (kind() === 'sales-order' && sourceQuotationId(); as srcQtId) {
+        <a
+          [routerLink]="['/trade/documents/quotations', srcQtId]"
+          class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-accent transition-colors duration-fast hover:bg-brand-soft"
+        >
+          {{ 'tdpg.header.fromQuotation' | transloco: { number: sourceTagNumber() || srcQtId } }}
+        </a>
+      }
+
+      @if (poApprovalBadge(); as appr) {
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="appr.className"
+          [attr.title]="reasonTooltipFor('approval')"
+        >
+          {{ appr.labelKey | transloco }}
+        </span>
+      }
+
+      @if (kind() === 'purchase-order' && sourcePurchaseQuotationId(); as srcPqId) {
+        <a
+          [routerLink]="['/trade/documents/purchase-quotations', srcPqId]"
+          class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-accent transition-colors duration-fast hover:bg-brand-soft"
+        >
+          {{ 'tdpg.header.fromPurchaseQuotation' | transloco: { number: sourceTagNumber() || srcPqId } }}
+        </a>
+      }
+
+      @if (kind() === 'quotation' && detail()?.lifecycleStatus === 'SENT') {
+        <app-price-lock-chip
+          [expiresAt]="currentQuotationRevision()?.priceLockExpiresAt ?? null"
+          [now]="now"
+        />
+      }
+
+      @if (headerOpportunityId(); as oppId) {
+        @let opp = headerOpportunity();
+        <a
+          [routerLink]="['/crm/opportunities', oppId]"
+          class="inline-flex h-badge max-w-modal-alert shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-accent transition-colors duration-fast hover:bg-brand-soft"
+          [attr.title]="
+            opp
+              ? ('tdpg.header.opportunityLink' | transloco: { name: opp.name })
+              : ('tdpg.fields.opportunity' | transloco)
+          "
+        >
+          <ng-icon name="tablerTarget" size="12" class="shrink-0" aria-hidden="true" />
+          <span class="truncate">{{ opp ? opp.name : ('tdpg.fields.opportunity' | transloco) }}</span>
+        </a>
+      }
+
+      @if (showPoDeliveryStatus() && purchaseOrderDetail(); as po) {
+        <app-delivery-status
+          [dispatchStatus]="po.dispatchStatus"
+          [delivery]="po.delivery"
+          (retry)="onActionBarRun('retryDelivery')"
+        />
+      }
+
+      <span class="min-w-0 flex-1"></span>
+
+      @if (dirty()) {
+        <span class="inline-flex items-center gap-4 text-11 font-medium whitespace-nowrap text-warning-text">
+          <span class="size-unread-dot shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
+          <span>{{ 'td.common.unsaved' | transloco }}</span>
+        </span>
+
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving() || commandBusy() !== null"
+          (click)="onUndo()"
+        >
+          <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+          <span>{{ 'td.common.undo' | transloco }}</span>
+        </button>
+      }
+
+      @if (showSaveButton()) {
+        @if (!saving() && isDraftInvalid()) {
+          <button
+            type="button"
+            aria-disabled="true"
+            class="inline-flex h-btn cursor-not-allowed items-center justify-center gap-4 rounded-8 bg-neutral-soft px-12 text-12 font-medium whitespace-nowrap text-text-placeholder outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="revealValidationAndFocusFirst()"
+          >
+            {{ saveLabelKey() | transloco }}
+          </button>
+        } @else {
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            [loading]="saving()"
+            [disabled]="saving() || commandBusy() !== null"
+            (click)="onSave()"
+          >
+            {{ saveLabelKey() | transloco }}
+          </button>
+        }
+      }
+
+      @if ((dirty() || showSaveButton()) && headerActions().length > 0) {
+        <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+      }
+
+      @if (headerActions().length > 0) {
+        <app-action-bar
+          [actions]="headerActions()"
+          [busy]="commandBusy()"
+          (run)="onActionBarRun($event)"
+        />
+      }
+    </header>
+
+    <!-- 2. PO approval line -->
+    @if (showPoApprovalLine() && purchaseOrderDetail(); as po) {
+      <app-approval-line [order]="po" />
+    }
+
+    <!-- 3. Details card -->
+    <app-header-fields
+      [kind]="kind()"
+      [draft]="draft()"
+      (draftChange)="onDraftChange($event)"
+      [detail]="detail()"
+      [mode]="headerFieldMode()"
+      [fieldErrors]="translatedFieldErrors()"
+      [discountPolicy]="discountPolicyQuery.data() ?? null"
+      [sourcePartyName]="sourcePartyName()"
+      [crmPrefill]="crmPrefill()"
+      (opportunityResolved)="resolvedHeaderOpportunity.set($event)"
+      (autoDefaultApplied)="onHeaderAutoDefault($event)"
+    />
+
+    <!-- 4. Items section bar + lines table -->
+    <section class="flex flex-col gap-8">
+      <header class="flex h-table-head shrink-0 items-center gap-6 rounded-10 bg-icon-teal px-10 text-13 leading-18 font-medium text-on-nav">
+        <span class="inline-flex shrink-0 text-on-nav">
+          <ng-icon name="tablerListDetails" size="14" aria-hidden="true" />
+        </span>
+        <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-on-nav">
+          {{ 'tdpg.sections.items' | transloco }}
+        </h2>
+        @if (itemsBarNote(); as note) {
+          <span class="shrink-0 truncate text-12 leading-18 font-normal text-on-nav">{{ note }}</span>
+        }
+      </header>
+
+      <app-document-lines
+        [kind]="kind()"
+        [lines]="draft().lines"
+        (linesChange)="onLinesChange($event)"
+        [currencyCode]="draftCurrency()"
+        [editable]="linesEditable()"
+        [structureLocked]="structureLocked()"
+        [discountMode]="discountMode()"
+        [partyId]="draftPartyId()"
+        [lineErrors]="translatedLineErrors()"
+        [pricingIntent]="draft().pricing ?? { mode: 'NONE' }"
+        [sourceQuotationId]="sourceQuotationId()"
+        [sourcePurchaseQuotationId]="sourcePurchaseQuotationId()"
+      />
+
+      @if (translatedFieldErrors()['lines']; as linesErr) {
+        <p class="flex items-center gap-3 text-11 leading-16 text-danger-text">
+          <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+          <span>{{ linesErr }}</span>
+        </p>
+      }
+    </section>
+
+    <!-- 5. Terms section bar + terms -->
+    <section class="flex flex-col gap-8">
+      <ui-section-bar
+        tone="navy"
+        icon="tablerFileText"
+        [title]="'tdpg.sections.terms' | transloco"
+      />
+      <app-terms-section
+        [kind]="kind()"
+        [mode]="pageMode()"
+        [termSelections]="draft().termSelections"
+        (termSelectionsChange)="onTermSelectionsChange($event)"
+        (defaultsApplied)="onTermsDefaultsApplied($event)"
+        [notes]="draft().notes"
+        (notesChange)="onNotesChange($event)"
+        [termsSnapshot]="activeTermsSnapshot()"
+        [lockedSelections]="convertLockedSelections()"
+        [sourceNotesLocked]="convertNotesLocked()"
+        [showErrors]="showValidationErrors()"
+        [paymentError]="translatedFieldErrors()['paymentTermId'] ?? null"
+        [notesError]="translatedFieldErrors()['notes'] ?? null"
+      />
+    </section>
+
+    <!-- 6. Totals -->
+    <app-totals-panel
+      [kind]="kind()"
+      [currencyCode]="draftCurrency()"
+      [lines]="draft().lines"
+      [totalsSnapshot]="activeTotalsSnapshot()"
+      [quotationRevision]="currentQuotationRevision()"
+      [readonly]="pageMode() === 'readonly'"
+      [currencyDecimalPlaces]="activeCurrencyDecimalPlaces()"
+    />
+
+    <!-- 7. Revisions (quotation only) -->
+    @if (kind() === 'quotation' && !isNewMode()) {
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="violet"
+          icon="tablerHistory"
+          [title]="'tdpg.sections.revisions' | transloco"
+        >
+          <ui-badge barEnd tone="count">{{ quotationRevisions().length }}</ui-badge>
+        </ui-section-bar>
+
+        <app-revisions-panel
+          [revisions]="quotationRevisions()"
+          [currentRevisionId]="quotationDetail()?.currentRevisionId ?? null"
+          [currencyCode]="draftCurrency()"
+        />
+      </section>
+    }
+  </div>
+}
+
+<!-- Unsaved changes dialog -->
+<ui-unsaved-dialog
+  [title]="'tdpg.unsaved.title' | transloco"
+  [text]="'tdpg.unsaved.text' | transloco"
+  [saveLabel]="'tdpg.unsaved.save' | transloco"
+  [discardLabel]="'tdpg.unsaved.discard' | transloco"
+  [cancelLabel]="'tdpg.unsaved.cancel' | transloco"
+/>
+
+<!-- Generic confirmation dialog -->
+<ui-confirm-dialog
+  [tone]="confirmSpec().tone"
+  [title]="confirmSpec().titleKey ? (confirmSpec().titleKey | transloco) : ''"
+  [text]="confirmSpec().textKey ? (confirmSpec().textKey | transloco) : ''"
+  [confirmLabel]="confirmSpec().confirmKey ? (confirmSpec().confirmKey | transloco) : ''"
+  [cancelLabel]="confirmSpec().cancelKey | transloco"
+/>
+
+<!-- 409 Stale version conflict dialog -->
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="detail()?.documentNumber ?? detail()?.draftReference ?? null"
+  (reload)="onConflictReload()"
+  (keepEditing)="onConflictKeep()"
+/>
+
+<!-- Reason dialog -->
+@if (reasonSpec(); as rSpec) {
+  <app-reason-dialog
+    [(open)]="reasonDialogOpen"
+    [reasonKind]="rSpec.reasonKind"
+    [titleKey]="rSpec.titleKey"
+    [textKey]="rSpec.textKey"
+    [confirmKey]="rSpec.confirmKey"
+    [danger]="rSpec.danger"
+    (confirmed)="onReasonConfirmed($event)"
+  />
+}
+
+<!-- Sales order Confirm modal (optional requested deadline) -->
+<ui-modal
+  #soConfirmModal
+  size="confirm"
+  icon="tablerClipboardCheck"
+  tile="bg-icon-green"
+  [title]="'tda.confirm.confirm.title' | transloco"
+  [closeLabel]="'td.common.close' | transloco"
+>
+  <div class="flex flex-col gap-8">
+    <p class="text-12 leading-18 text-text-muted">{{ 'tda.confirm.confirm.text' | transloco }}</p>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-so-deadline'"
+      [label]="'tdpg.confirm.deadlineLabel' | transloco"
+      [hint]="'tdpg.confirm.deadlineHint' | transloco"
+    >
+      <div class="flex items-center gap-6">
+        <ui-date-field
+          class="min-w-0 flex-1"
+          [id]="uid + '-so-deadline'"
+          [min]="todayIso"
+          [(value)]="soConfirmDate"
+          [ariaLabel]="'tdpg.confirm.deadlineLabel' | transloco"
+          [placeholder]="'tdpg.fields.validUntilPlaceholder' | transloco"
+          [todayLabel]="'tdpg.fields.today' | transloco"
+          [prevMonthLabel]="'tdpg.fields.prevMonth' | transloco"
+          [nextMonthLabel]="'tdpg.fields.nextMonth' | transloco"
+        />
+        <ui-time-field
+          [(value)]="soConfirmTime"
+          [ariaLabel]="'tdpg.confirm.deadlineLabel' | transloco"
+          [hourLabel]="'tdpg.fields.hour' | transloco"
+          [minuteLabel]="'tdpg.fields.minute' | transloco"
+        />
+      </div>
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="submitSoConfirm()">
+      {{ 'tda.actions.confirm' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="closeSoConfirm()">
+      {{ 'td.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<!-- Direct PO from PQ modal (required receiving warehouse) -->
+<ui-modal
+  #directPoModal
+  size="confirm"
+  icon="tablerShoppingCart"
+  tile="bg-icon-orange"
+  [title]="'tda.confirm.createPurchaseOrderDirect.title' | transloco"
+  [closeLabel]="'td.common.close' | transloco"
+>
+  <div class="flex flex-col gap-8">
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'tda.confirm.createPurchaseOrderDirect.text' | transloco }}
+    </p>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-direct-po-node'"
+      [label]="'tdpg.confirm.receivingWarehouseLabel' | transloco"
+      [hint]="'tdpg.confirm.receivingWarehouseHint' | transloco"
+      [required]="true"
+      [error]="directPoNodeError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-direct-po-node'"
+        [label]="'tdpg.confirm.receivingWarehouseLabel' | transloco"
+        [options]="receivingNodeDropdownOptions()"
+        [value]="directPoNodeId()"
+        (valueChange)="directPoNodeId.set($event); directPoNodeError.set(null)"
+      />
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="submitDirectPo()">
+      {{ 'tda.actions.createPurchaseOrderDirect' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="closeDirectPo()">
+      {{ 'td.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<!-- Print modal -->
+@if (docId() && printSource(); as pSource) {
+  <app-print-dialog
+    [(open)]="printOpen"
+    [kind]="kind()"
+    [documentId]="docId()!"
+    [documentNumber]="detail()?.documentNumber ?? null"
+    [source]="pSource"
+  />
+}

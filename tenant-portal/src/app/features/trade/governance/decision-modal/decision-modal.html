@@ -1,0 +1,184 @@
+<ui-modal
+  size="wide"
+  icon="tablerReceipt"
+  tile="bg-icon-violet"
+  [title]="'policy.decision.title' | transloco"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (loading()) {
+    <div class="grid gap-10 desktop:grid-cols-2" aria-busy="true">
+      @for (item of [1, 2, 3, 4, 5, 6]; track item) {
+        <div class="flex flex-col gap-4">
+          <span class="h-skeleton-line w-1/3 rounded-6 bg-neutral-soft"></span>
+          <span class="h-field w-full rounded-8 bg-neutral-soft"></span>
+        </div>
+      }
+    </div>
+  } @else if (receipt(); as r) {
+    <div class="grid gap-10 desktop:grid-cols-2">
+      <ui-field
+        [label]="'policy.decision.decisionTypeLabel' | transloco"
+        [hint]="'policy.decision.decisionTypeHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="decisionTypeLabel()"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'policy.decision.outcomeLabel' | transloco"
+        [hint]="'policy.decision.outcomeHint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <span class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium" [class]="outcomeClass()">
+            {{ outcomeLabel() }}
+          </span>
+        </div>
+      </ui-field>
+
+      <ui-field
+        [label]="'policy.decision.reasonCodeLabel' | transloco"
+        [hint]="'policy.decision.reasonCodeHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          dir="ltr"
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="r.reasonCode"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'policy.decision.explanationCodeLabel' | transloco"
+        [hint]="'policy.decision.explanationCodeHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          dir="ltr"
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="r.explanationCode"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'policy.decision.selectedValueLabel' | transloco"
+        [hint]="'policy.decision.selectedValueHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          dir="auto"
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="r.selectedValue ?? '—'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'policy.decision.matchedRuleLabel' | transloco"
+        [hint]="'policy.decision.matchedRuleHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          dir="ltr"
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="r.matchedRuleCode ?? '—'"
+        />
+      </ui-field>
+
+      <div class="desktop:col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'policy.decision.policyVersionsLabel' | transloco"
+          [hint]="'policy.decision.policyVersionsHint' | transloco"
+        >
+          <div class="flex min-h-field flex-wrap items-center gap-6">
+            @for (ref of r.policyVersions; track ref.versionId) {
+              <button
+                type="button"
+                class="inline-flex h-chip cursor-pointer items-center gap-4 rounded-6 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft outline-none transition-colors duration-fast hover:bg-brand hover:text-on-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                dir="ltr"
+                (click)="openVersion(ref)"
+              >
+                {{ 'policy.decision.versionLink' | transloco: { code: ref.definitionCode, n: ref.versionNumber } }}
+              </button>
+            } @empty {
+              <span class="text-12 text-text-muted">—</span>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <ui-field
+        [label]="'policy.decision.documentLabel' | transloco"
+        [hint]="'policy.decision.documentHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          dir="ltr"
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [title]="r.document.aggregateId"
+          [value]="documentText()"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'policy.decision.evaluatedAtLabel' | transloco"
+        [hint]="'policy.decision.evaluatedAtHint' | transloco"
+      >
+        <input
+          type="text"
+          readonly
+          tabindex="-1"
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="evaluatedAtText()"
+        />
+      </ui-field>
+
+      <div class="desktop:col-span-2">
+        <ui-field
+          [label]="'policy.decision.correlationIdLabel' | transloco"
+          [hint]="'policy.decision.correlationIdHint' | transloco"
+        >
+          <input
+            type="text"
+            readonly
+            tabindex="-1"
+            dir="ltr"
+            class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="r.correlationId"
+          />
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'policy.decision.copyCorrelation' | transloco"
+            [title]="'policy.decision.copyCorrelation' | transloco"
+            (click)="copyCorrelationId(r.correlationId)"
+          >
+            <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+          </button>
+        </ui-field>
+      </div>
+    </div>
+  }
+
+  <ng-container modal-footer>
+    <button type="button" uiButton variant="secondary" (click)="closeModal()">
+      {{ 'tradeShared.common.close' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

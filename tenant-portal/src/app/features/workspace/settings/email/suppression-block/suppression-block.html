@@ -1,0 +1,64 @@
+<section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+  <div class="flex items-center gap-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerMailOff" size="15" aria-hidden="true" />
+    </span>
+    <h2 class="text-13 leading-18 font-medium text-text">
+      {{ 'wsEmail.suppression.title' | transloco }}
+    </h2>
+  </div>
+
+  @if (locked()) {
+    <div role="alert">
+      <app-settings-notice tone="warning">
+        {{ 'wsEmail.bar.readOnlyHint' | transloco }}
+      </app-settings-notice>
+    </div>
+  }
+
+  <form novalidate class="flex flex-wrap items-start gap-8" (submit)="onSubmit($event)">
+    <div class="min-w-0 flex-1">
+      <ui-field
+        [for]="uid + '-address'"
+        [label]="'wsEmail.suppression.address.label' | transloco"
+        [hint]="'wsEmail.suppression.address.hint' | transloco"
+        [required]="!locked()"
+        [error]="addressError()"
+      >
+        <input
+          [id]="uid + '-address'"
+          type="email"
+          dir="ltr"
+          maxlength="320"
+          autocomplete="off"
+          spellcheck="false"
+          required
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="addressDraft()"
+          [readOnly]="locked() || checking()"
+          [disabled]="locked()"
+          [attr.aria-invalid]="addressError() ? 'true' : null"
+          (input)="onAddressInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="mt-4 pt-16">
+      <button
+        type="submit"
+        uiButton
+        variant="primary"
+        size="small"
+        [loading]="checking()"
+        [disabled]="locked() || checking()"
+      >
+        {{ (checking() ? 'wsEmail.suppression.checking' : 'wsEmail.suppression.check') | transloco }}
+      </button>
+    </div>
+  </form>
+</section>
+
+<app-suppression-modal
+  (busyChange)="checking.set($event)"
+  (forbidden)="onForbidden()"
+/>

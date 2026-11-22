@@ -1,0 +1,63 @@
+{
+  "loadFailed": "Could not load your preferences.",
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "profile": {
+    "title": "Profile",
+    "desc": "Your name and photo as others see them.",
+    "photoAlt": "Your profile photo",
+    "changePhoto": "Change photo",
+    "removePhoto": "Remove",
+    "photoRules": "PNG, JPEG or WebP, up to 2 MB.",
+    "removeTitle": "Remove your photo?",
+    "removeText": "Your initials will show instead.",
+    "removeConfirm": "Remove",
+    "firstName": "First name",
+    "firstNameHint": "Shown on records, activities and messages.",
+    "lastName": "Last name",
+    "lastNameHint": "Shown after your first name everywhere in the app.",
+    "email": "Email",
+    "emailHint": "Your sign-in email. Only an administrator can change it.",
+    "required": "Enter a name.",
+    "save": "Save",
+    "undo": "Undo",
+    "unsaved": "You have unsaved changes."
+  },
+  "appearance": {
+    "title": "Appearance",
+    "desc": "Applies right away on this device and follows you when you sign in.",
+    "language": "Language",
+    "languageHint": "The language of menus, pages and messages.",
+    "theme": "Theme",
+    "themeHint": "Light or dark colours for the whole app.",
+    "light": "Light",
+    "dark": "Dark",
+    "viewSize": "View size",
+    "viewSizeHint": "Makes text and controls smaller or larger. Automatic follows your screen width."
+  },
+  "defaults": {
+    "title": "Defaults",
+    "desc": "Where the app takes you after you sign in.",
+    "startPage": "Start page",
+    "startPageHint": "The first page you see after signing in.",
+    "home": "Workspace home",
+    "last": "The page I last visited",
+    "crmLeads": "CRM leads"
+  },
+  "toast": {
+    "nameSaved": "Your name was saved",
+    "photoSaved": "Your photo was saved",
+    "photoRemoved": "Your photo was removed",
+    "saved": "Preference saved",
+    "deviceOnly": "Saved on this device only. It could not be saved to your account."
+  },
+  "errors": {
+    "generic": "Could not save. Try again.",
+    "CORE_VALIDATION_FAILED": "Check the name fields.",
+    "PARTY_IMAGE_INVALID": "Choose a PNG, JPEG or WebP image.",
+    "PARTY_IMAGE_TOO_LARGE": "The image is larger than 2 MB.",
+    "PROFILE_EXTENSIONS_TOO_LARGE": "Your saved preferences are full. Contact support.",
+    "PARTY_IMAGE_NOT_FOUND": "There is no photo to remove.",
+    "PARTY_NOT_FOUND": "Your account has no linked person record. Contact your administrator."
+  }
+}

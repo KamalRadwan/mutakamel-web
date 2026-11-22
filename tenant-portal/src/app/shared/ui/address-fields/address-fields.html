@@ -1,0 +1,452 @@
+<div class="grid grid-cols-2 gap-x-10 gap-y-8">
+  <!-- Row 1: Country | State -->
+  <ui-field
+    size="bare"
+    [label]="'geo.country' | transloco"
+    [for]="uid + '-country'"
+    [hint]="'geo.countryHint' | transloco"
+    [error]="errors().countryId ?? null"
+  >
+    @if (readonly()) {
+      <div [class]="textBoxClass('countryId')">
+        @if (selectedCountry(); as country) {
+          <img
+            [ngSrc]="flagUrl(country.iso2)"
+            alt=""
+            width="16"
+            height="12"
+            class="h-12 w-16 shrink-0 rounded-2 object-cover"
+          />
+        }
+        <input
+          [id]="uid + '-country'"
+          type="text"
+          readonly
+          [value]="pickerDisplayLabel('country')"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    } @else {
+      <button
+        #countryTrigger
+        type="button"
+        role="combobox"
+        [id]="uid + '-country'"
+        [class]="pickerButtonClass('country')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openPicker() === 'country'"
+        [attr.aria-controls]="openPicker() === 'country' ? uid + '-listbox' : null"
+        [attr.aria-label]="'geo.country' | transloco"
+        [attr.aria-invalid]="errors().countryId ? 'true' : null"
+        [disabled]="isPickerDisabled('country')"
+        (click)="togglePicker('country')"
+        (keydown)="onTriggerKeydown('country', $event)"
+      >
+        <span class="flex min-w-0 items-center gap-6">
+          @if (selectedCountry(); as country) {
+            <img
+              [ngSrc]="flagUrl(country.iso2)"
+              alt=""
+              width="16"
+              height="12"
+              class="h-12 w-16 shrink-0 rounded-2 object-cover"
+            />
+          }
+          <span class="truncate">{{ pickerDisplayLabel('country') }}</span>
+        </span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    }
+  </ui-field>
+
+  <ui-field
+    size="bare"
+    [label]="'geo.state' | transloco"
+    [for]="uid + '-state'"
+    [hint]="'geo.stateHint' | transloco"
+    [error]="errors().stateId ?? null"
+  >
+    @if (readonly()) {
+      <div [class]="textBoxClass('stateId')">
+        <input
+          [id]="uid + '-state'"
+          type="text"
+          readonly
+          [value]="pickerDisplayLabel('state')"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    } @else {
+      <button
+        #stateTrigger
+        type="button"
+        role="combobox"
+        [id]="uid + '-state'"
+        [class]="pickerButtonClass('state')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openPicker() === 'state'"
+        [attr.aria-controls]="openPicker() === 'state' ? uid + '-listbox' : null"
+        [attr.aria-label]="'geo.state' | transloco"
+        [attr.aria-invalid]="errors().stateId ? 'true' : null"
+        [attr.title]="pickerMissingParentTitle('state')"
+        [disabled]="isPickerDisabled('state')"
+        (click)="togglePicker('state')"
+        (keydown)="onTriggerKeydown('state', $event)"
+      >
+        <span class="truncate">{{ pickerDisplayLabel('state') }}</span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    }
+  </ui-field>
+
+  <!-- Row 2: City | District -->
+  <ui-field
+    size="bare"
+    [label]="'geo.city' | transloco"
+    [for]="uid + '-city'"
+    [hint]="'geo.cityHint' | transloco"
+    [error]="errors().cityId ?? null"
+  >
+    @if (readonly()) {
+      <div [class]="textBoxClass('cityId')">
+        <input
+          [id]="uid + '-city'"
+          type="text"
+          readonly
+          [value]="pickerDisplayLabel('city')"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    } @else {
+      <button
+        #cityTrigger
+        type="button"
+        role="combobox"
+        [id]="uid + '-city'"
+        [class]="pickerButtonClass('city')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openPicker() === 'city'"
+        [attr.aria-controls]="openPicker() === 'city' ? uid + '-listbox' : null"
+        [attr.aria-label]="'geo.city' | transloco"
+        [attr.aria-invalid]="errors().cityId ? 'true' : null"
+        [attr.title]="pickerMissingParentTitle('city')"
+        [disabled]="isPickerDisabled('city')"
+        (click)="togglePicker('city')"
+        (keydown)="onTriggerKeydown('city', $event)"
+      >
+        <span class="truncate">{{ pickerDisplayLabel('city') }}</span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    }
+  </ui-field>
+
+  <ui-field
+    size="bare"
+    [label]="'geo.district' | transloco"
+    [for]="uid + '-district'"
+    [hint]="'geo.districtHint' | transloco"
+    [error]="errors().districtId ?? null"
+  >
+    @if (readonly()) {
+      <div [class]="textBoxClass('districtId')">
+        <input
+          [id]="uid + '-district'"
+          type="text"
+          readonly
+          [value]="pickerDisplayLabel('district')"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </div>
+    } @else {
+      <button
+        #districtTrigger
+        type="button"
+        role="combobox"
+        [id]="uid + '-district'"
+        [class]="pickerButtonClass('district')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openPicker() === 'district'"
+        [attr.aria-controls]="openPicker() === 'district' ? uid + '-listbox' : null"
+        [attr.aria-label]="'geo.district' | transloco"
+        [attr.aria-invalid]="errors().districtId ? 'true' : null"
+        [attr.title]="pickerMissingParentTitle('district')"
+        [disabled]="isPickerDisabled('district')"
+        (click)="togglePicker('district')"
+        (keydown)="onTriggerKeydown('district', $event)"
+      >
+        <span class="truncate">{{ pickerDisplayLabel('district') }}</span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    }
+  </ui-field>
+
+  <!-- Row 3: Street (full width) -->
+  <div class="col-span-2">
+    <ui-field
+      size="bare"
+      [label]="'geo.street' | transloco"
+      [for]="uid + '-street1'"
+      [hint]="'geo.streetHint' | transloco"
+      [count]="value().street1.length"
+      [max]="160"
+      [error]="errors().street1 ?? null"
+    >
+      <div [class]="textBoxClass('street1')">
+        <input
+          [id]="uid + '-street1'"
+          type="text"
+          maxlength="160"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [value]="value().street1"
+          [disabled]="disabled()"
+          [readonly]="readonly()"
+          [attr.aria-invalid]="errors().street1 ? 'true' : null"
+          (input)="onTextInput('street1', $event)"
+        />
+      </div>
+    </ui-field>
+  </div>
+
+  <!-- Row 4: Building no. | Floor -->
+  <ui-field
+    size="bare"
+    [label]="'geo.building' | transloco"
+    [for]="uid + '-building'"
+    [hint]="'geo.buildingHint' | transloco"
+    [error]="errors().buildingNo ?? null"
+  >
+    <div [class]="textBoxClass('buildingNo')">
+      <input
+        [id]="uid + '-building'"
+        type="text"
+        maxlength="80"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="value().buildingNo"
+        [disabled]="disabled()"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="errors().buildingNo ? 'true' : null"
+        (input)="onTextInput('buildingNo', $event)"
+      />
+    </div>
+  </ui-field>
+
+  <ui-field
+    size="bare"
+    [label]="'geo.floor' | transloco"
+    [for]="uid + '-floor'"
+    [hint]="'geo.floorHint' | transloco"
+    [error]="errors().floor ?? null"
+  >
+    <div [class]="textBoxClass('floor')">
+      <input
+        [id]="uid + '-floor'"
+        type="text"
+        maxlength="80"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="value().floor"
+        [disabled]="disabled()"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="errors().floor ? 'true' : null"
+        (input)="onTextInput('floor', $event)"
+      />
+    </div>
+  </ui-field>
+
+  <!-- Row 5: Apartment or extra line | Postal code -->
+  <ui-field
+    size="bare"
+    [label]="'geo.street2' | transloco"
+    [for]="uid + '-street2'"
+    [hint]="'geo.street2Hint' | transloco"
+    [error]="errors().street2 ?? null"
+  >
+    <div [class]="textBoxClass('street2')">
+      <input
+        [id]="uid + '-street2'"
+        type="text"
+        maxlength="80"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="value().street2"
+        [disabled]="disabled()"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="errors().street2 ? 'true' : null"
+        (input)="onTextInput('street2', $event)"
+      />
+    </div>
+  </ui-field>
+
+  <ui-field
+    size="bare"
+    [label]="'geo.postal' | transloco"
+    [for]="uid + '-postal'"
+    [hint]="'geo.postalHint' | transloco"
+    [error]="errors().postalCode ?? null"
+  >
+    <div [class]="textBoxClass('postalCode')">
+      <input
+        [id]="uid + '-postal'"
+        type="text"
+        maxlength="40"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="value().postalCode"
+        [disabled]="disabled()"
+        [readonly]="readonly()"
+        [attr.aria-invalid]="errors().postalCode ? 'true' : null"
+        (input)="onTextInput('postalCode', $event)"
+      />
+    </div>
+  </ui-field>
+
+  <!-- Row 6: Landmark (full width) -->
+  <div class="col-span-2">
+    <ui-field
+      size="bare"
+      [label]="'geo.landmark' | transloco"
+      [for]="uid + '-landmark'"
+      [hint]="'geo.landmarkHint' | transloco"
+      [count]="value().landmark.length"
+      [max]="160"
+      [error]="errors().landmark ?? null"
+    >
+      <div [class]="textBoxClass('landmark')">
+        <input
+          [id]="uid + '-landmark'"
+          type="text"
+          maxlength="160"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [value]="value().landmark"
+          [disabled]="disabled()"
+          [readonly]="readonly()"
+          [attr.aria-invalid]="errors().landmark ? 'true' : null"
+          (input)="onTextInput('landmark', $event)"
+        />
+      </div>
+    </ui-field>
+  </div>
+</div>
+
+@if (openPicker(); as activeKey) {
+  <div
+    #popover
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    (keydown)="onPopoverKeydown($event)"
+    (focusout)="onPopoverFocusOut($event)"
+  >
+    <div
+      class="mb-4 flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo-strong"
+    >
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #searchInput
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        [attr.aria-expanded]="true"
+        [attr.aria-controls]="uid + '-listbox'"
+        [attr.aria-activedescendant]="
+          activeIndex() >= 0 && activeIndex() < visibleOptions().length + (showAddAction() ? 1 : 0)
+            ? uid + '-opt-' + activeIndex()
+            : null
+        "
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'geo.search' | transloco"
+        [attr.aria-label]="'geo.search' | transloco"
+        [value]="searchText()"
+        (input)="onSearchInput($event)"
+        (keydown)="onSearchKeydown($event)"
+      />
+    </div>
+
+    <ul
+      [id]="uid + '-listbox'"
+      role="listbox"
+      class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+      [attr.aria-label]="('geo.' + activeKey) | transloco"
+    >
+      @for (option of visibleOptions(); track option.id; let idx = $index) {
+        @let isSelected = option.id === selectedIdFor(activeKey);
+        <li
+          #optionItem
+          [id]="uid + '-opt-' + idx"
+          role="option"
+          [attr.aria-selected]="isSelected"
+          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12"
+          [class]="
+            isSelected
+              ? 'bg-brand-soft text-on-brand-soft'
+              : idx === activeIndex()
+                ? 'bg-row-hover text-text'
+                : 'text-text hover:bg-row-hover'
+          "
+          (click)="selectOption(activeKey, option.id)"
+        >
+          <span class="flex min-w-0 items-center gap-6">
+            @if (option.iso2) {
+              <img
+                [ngSrc]="flagUrl(option.iso2)"
+                alt=""
+                width="16"
+                height="12"
+                class="h-12 w-16 shrink-0 rounded-2 object-cover"
+              />
+              <span class="shrink-0 text-11 font-medium text-text-muted" dir="ltr">{{ option.iso2 }}</span>
+            }
+            <span class="truncate">{{ option.label }}</span>
+            @if (option.kindLabel) {
+              <span class="shrink-0 text-11 text-text-muted">{{ option.kindLabel }}</span>
+            }
+          </span>
+          @if (isSelected) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </li>
+      } @empty {
+        <li
+          role="option"
+          aria-disabled="true"
+          aria-selected="false"
+          class="flex h-menu-item items-center px-8 text-12 text-text-muted"
+        >
+          {{ 'geo.noMatches' | transloco }}
+        </li>
+      }
+    </ul>
+
+    @if (showAddAction()) {
+      <div class="mt-2 shrink-0 border-t border-border pt-2">
+        <button
+          #addPlaceBtn
+          type="button"
+          [id]="uid + '-opt-' + visibleOptions().length"
+          class="flex h-menu-item w-full cursor-pointer items-center gap-6 whitespace-nowrap rounded-6 px-8 text-12 font-medium text-accent outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class.bg-row-hover]="activeIndex() === visibleOptions().length"
+          (click)="openAddPlaceModal()"
+        >
+          <ng-icon name="tablerPlus" size="14" class="shrink-0" aria-hidden="true" />
+          <span class="truncate">
+            @if (searchText().trim(); as typed) {
+              {{ (activeKey === 'city' ? 'geo.addCity' : 'geo.addDistrict') | transloco: { text: typed } }}
+            } @else {
+              {{ (activeKey === 'city' ? 'geo.addCityEmpty' : 'geo.addDistrictEmpty') | transloco }}
+            }
+          </span>
+        </button>
+      </div>
+    }
+  </div>
+}
+
+<app-place-modal (saved)="onPlaceSaved($event)" (closed)="onPlaceModalClosed()" />

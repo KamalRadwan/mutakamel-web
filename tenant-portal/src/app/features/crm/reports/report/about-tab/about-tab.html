@@ -1,0 +1,415 @@
+@if (isInitialLoading()) {
+  <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <div class="flex items-center gap-8">
+      <span class="size-icon-tile-sm rounded-8 bg-neutral-soft" aria-hidden="true"></span>
+      <span class="h-skeleton-line w-1/4 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+    </div>
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3 wide:grid-cols-4">
+      @for (slot of [0, 1, 2, 3, 4, 5, 6, 7]; track slot) {
+        <div class="flex flex-col gap-4">
+          <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+          <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+        </div>
+      }
+    </div>
+  </section>
+} @else if (manifest()) {
+  <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <header class="flex items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerInfoCircle" size="14" aria-hidden="true" />
+      </span>
+      <h2 class="text-13 leading-18 font-medium text-text">{{ 'repTabs.definition' | transloco }}</h2>
+    </header>
+
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3 wide:grid-cols-4">
+      <ui-field
+        size="bare"
+        [for]="uid + '-report'"
+        [label]="'repTabs.report' | transloco"
+        [hint]="'repTabs.reportHint' | transloco"
+      >
+        <div
+          [id]="uid + '-report'"
+          [attr.aria-describedby]="uid + '-report-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ reportTitle() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-domain'"
+        [label]="'repTabs.domain' | transloco"
+        [hint]="'repTabs.domainHint' | transloco"
+      >
+        <div
+          [id]="uid + '-domain'"
+          [attr.aria-describedby]="uid + '-domain-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ domainLabel() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-code'"
+        [label]="'repTabs.code' | transloco"
+        [hint]="'repTabs.codeHint' | transloco"
+      >
+        <div
+          [id]="uid + '-code'"
+          [attr.aria-describedby]="uid + '-code-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          <bdi dir="ltr" class="tabular-nums">{{ reportCode() }}</bdi>
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-basis'"
+        [label]="'repTabs.basis' | transloco"
+        [hint]="'repTabs.basisHint' | transloco"
+      >
+        <div
+          [id]="uid + '-basis'"
+          [attr.aria-describedby]="uid + '-basis-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ basisLabel() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-period'"
+        [label]="'repTabs.period' | transloco"
+        [hint]="'repTabs.periodHint' | transloco"
+      >
+        <div
+          [id]="uid + '-period'"
+          [attr.aria-describedby]="uid + '-period-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ periodText() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-comparison'"
+        [label]="'repTabs.comparison' | transloco"
+        [hint]="'repTabs.comparisonHint' | transloco"
+      >
+        <div
+          [id]="uid + '-comparison'"
+          [attr.aria-describedby]="uid + '-comparison-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ comparisonText() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope'"
+        [label]="'repTabs.recordsCounted' | transloco"
+        [hint]="'repTabs.recordsCountedHint' | transloco"
+      >
+        <div
+          [id]="uid + '-scope'"
+          [attr.aria-describedby]="uid + '-scope-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ recordsCountedText() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-tz'"
+        [label]="'repTabs.timeZone' | transloco"
+        [hint]="'repTabs.timeZoneHint' | transloco"
+      >
+        <div
+          [id]="uid + '-tz'"
+          [attr.aria-describedby]="uid + '-tz-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          <bdi dir="ltr">{{ timeZoneText() }}</bdi>
+        </div>
+      </ui-field>
+    </div>
+
+    <ui-field
+      size="multiline"
+      [for]="uid + '-method'"
+      [label]="'repTabs.method' | transloco"
+      [hint]="'repTabs.methodHint' | transloco"
+    >
+      <textarea
+        [id]="uid + '-method'"
+        rows="3"
+        readonly
+        [value]="methodText()"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none"
+      ></textarea>
+    </ui-field>
+  </section>
+
+  <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <header class="flex flex-wrap items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerDatabase" size="14" aria-hidden="true" />
+      </span>
+      <h2 class="text-13 leading-18 font-medium text-text">{{ 'repTabs.sources' | transloco }}</h2>
+      <span class="min-w-0 flex-1" aria-hidden="true"></span>
+      @if (canViewReadiness) {
+        <a uiButton variant="ghost" size="small" routerLink="/crm/settings/data-readiness">
+          <ng-icon name="tablerDatabase" size="14" aria-hidden="true" />
+          {{ 'repTabs.dataReadiness' | transloco }}
+        </a>
+      }
+    </header>
+
+    @if (sourcesFailed()) {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'analytics.common.loadFailed' | transloco"
+        [actionLabel]="'analytics.common.retry' | transloco"
+        (action)="retrySources()"
+      />
+    } @else {
+    <ui-data-table
+      [columns]="sourceColumns()"
+      [rows]="sourceRows()"
+      [rowKey]="sourceRowKey"
+      [loading]="sourcesLoading()"
+      [emptyText]="'analytics.common.noResults' | transloco"
+      [label]="'repTabs.sources' | transloco"
+    >
+      <ng-template uiCell="sourceKey" let-row>
+        <bdi dir="ltr" class="min-w-0 truncate text-12 text-text-muted tabular-nums">{{ sourceKeyOf(row) }}</bdi>
+      </ng-template>
+      <ng-template uiCell="mode" let-row>
+        <ui-badge tone="tag">{{ modeLabelOf(row) }}</ui-badge>
+      </ng-template>
+      <ng-template uiCell="status" let-row>
+        <ui-badge [tone]="statusToneOf(row)">{{ statusLabelOf(row) }}</ui-badge>
+      </ng-template>
+    </ui-data-table>
+    }
+  </section>
+
+  @if (selectedReceiptId()) {
+    <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <header class="flex flex-wrap items-center gap-8">
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+          aria-hidden="true"
+        >
+          <ng-icon name="tablerChartBar" size="14" aria-hidden="true" />
+        </span>
+        <h2 class="text-13 leading-18 font-medium text-text">{{ 'repTabs.panelExplain' | transloco }}</h2>
+        @if (selectedPanelTitle()) {
+          <ui-badge tone="tag">{{ selectedPanelTitle() }}</ui-badge>
+        }
+        <span class="min-w-0 flex-1" aria-hidden="true"></span>
+        <button type="button" uiButton variant="ghost" size="small" (click)="backToOverview()">
+          <ng-icon name="tablerArrowLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+          {{ 'repTabs.backToOverview' | transloco }}
+        </button>
+      </header>
+
+      @if (explainLoading()) {
+        <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3">
+          @for (slot of [0, 1, 2, 3, 4, 5]; track slot) {
+            <div class="flex flex-col gap-4">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+              <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft" aria-hidden="true"></span>
+            </div>
+          }
+        </div>
+      } @else if (explainFailed()) {
+        <ui-full-state
+          kind="load-failure"
+          [title]="'analytics.common.loadFailed' | transloco"
+          [actionLabel]="'analytics.common.retry' | transloco"
+          (action)="retryExplain()"
+        />
+      } @else {
+        <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3">
+          <ui-field
+            size="bare"
+            [for]="uid + '-what-counts'"
+            [label]="'repTabs.whatCounts' | transloco"
+            [hint]="'repTabs.whatCountsHint' | transloco"
+          >
+            <div
+              [id]="uid + '-what-counts'"
+              [attr.aria-describedby]="uid + '-what-counts-hint'"
+              class="flex min-h-field items-center text-13 leading-18 text-text"
+            >
+              {{ whatCountsText() }}
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [for]="uid + '-nofn'"
+            [label]="'repTabs.nOfN' | transloco"
+            [hint]="'repTabs.nOfNHint' | transloco"
+          >
+            <div
+              [id]="uid + '-nofn'"
+              [attr.aria-describedby]="uid + '-nofn-hint'"
+              class="flex min-h-field items-center text-13 leading-18 text-text tabular-nums"
+            >
+              {{ nOfNText() }}
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [for]="uid + '-explain-value'"
+            [label]="'repTabs.value' | transloco"
+            [hint]="explainValueHint()"
+          >
+            <div
+              [id]="uid + '-explain-value'"
+              [attr.aria-describedby]="uid + '-explain-value-hint'"
+              class="flex min-h-field items-center text-13 leading-18 font-medium text-text tabular-nums"
+            >
+              @if (explainValueIsLtr()) {
+                <bdi dir="ltr">{{ explainValueText() }}</bdi>
+              } @else {
+                {{ explainValueText() }}
+              }
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [for]="uid + '-coverage'"
+            [label]="'repTabs.coverage' | transloco"
+            [hint]="'repTabs.coverageHint' | transloco"
+          >
+            <div
+              [id]="uid + '-coverage'"
+              [attr.aria-describedby]="uid + '-coverage-hint'"
+              class="flex min-h-field items-center text-13 leading-18 text-text"
+            >
+              {{ coverageText() }}
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [for]="uid + '-explain-asof'"
+            [label]="'repTabs.asOf' | transloco"
+            [hint]="'repTabs.asOfHint' | transloco"
+          >
+            <div
+              [id]="uid + '-explain-asof'"
+              [attr.aria-describedby]="uid + '-explain-asof-hint'"
+              class="flex min-h-field items-center text-13 leading-18 text-text"
+            >
+              {{ explainAsOfText() }}
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [for]="uid + '-filters'"
+            [label]="'repTabs.filters' | transloco"
+            [hint]="'repTabs.filtersHint' | transloco"
+          >
+            <div
+              [id]="uid + '-filters'"
+              [attr.aria-describedby]="uid + '-filters-hint'"
+              class="flex min-h-field flex-wrap items-center gap-4 text-13 leading-18 text-text"
+            >
+              @if (filterPills().length === 0) {
+                <span class="text-text-muted">{{ 'repTabs.noFilters' | transloco }}</span>
+              } @else {
+                @for (pill of filterPills(); track pill.key) {
+                  <ui-badge tone="tag">{{ pill.label }}: {{ pill.value }}</ui-badge>
+                }
+              }
+            </div>
+          </ui-field>
+        </div>
+      }
+    </section>
+  }
+
+  <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <header class="flex items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerClock" size="14" aria-hidden="true" />
+      </span>
+      <h2 class="text-13 leading-18 font-medium text-text">{{ 'repTabs.freshness' | transloco }}</h2>
+    </header>
+
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3">
+      <ui-field
+        size="bare"
+        [for]="uid + '-data-asof'"
+        [label]="'repTabs.dataAsOf' | transloco"
+        [hint]="'repTabs.dataAsOfHint' | transloco"
+      >
+        <div
+          [id]="uid + '-data-asof'"
+          [attr.aria-describedby]="uid + '-data-asof-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ dataAsOfText() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-oldest-source'"
+        [label]="'repTabs.oldestSource' | transloco"
+        [hint]="'repTabs.oldestSourceHint' | transloco"
+      >
+        <div
+          [id]="uid + '-oldest-source'"
+          [attr.aria-describedby]="uid + '-oldest-source-hint'"
+          class="flex min-h-field items-center text-13 leading-18 text-text"
+        >
+          {{ oldestSourceText() }}
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-stale'"
+        [label]="'repTabs.stale' | transloco"
+        [hint]="'repTabs.staleHint' | transloco"
+      >
+        <div
+          [id]="uid + '-stale'"
+          [attr.aria-describedby]="uid + '-stale-hint'"
+          class="flex min-h-field items-center"
+        >
+          <ui-badge [tone]="isStale() ? 'warning' : 'success'">
+            {{ (isStale() ? 'repTabs.yes' : 'repTabs.no') | transloco }}
+          </ui-badge>
+        </div>
+      </ui-field>
+    </div>
+  </section>
+}

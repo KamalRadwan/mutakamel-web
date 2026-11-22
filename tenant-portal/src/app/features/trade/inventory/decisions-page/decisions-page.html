@@ -1,0 +1,225 @@
+<app-settings-frame
+  [addLabel]="''"
+  [showAdd]="false"
+  [searchPlaceholder]="'invEvidence.decisions.searchPlaceholder' | transloco"
+  [loading]="loading()"
+  [(search)]="searchDraft"
+  (reload)="reload()"
+  (keydown.enter)="onFrameEnter($event)"
+  (keydown.escape)="onFrameEscape($event)"
+  (focusout)="onFrameFocusout($event)"
+>
+  @if (invalidRecordId()) {
+    <p notices role="alert" class="flex items-center gap-4 px-8 text-11 leading-16 text-danger-text">
+      <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+      {{ 'invEvidence.decisions.invalidRecordId' | transloco }}
+    </p>
+  }
+
+  <div data-decisions-body class="flex min-h-0 flex-1 flex-col gap-8">
+    <ui-step-filter
+      [steps]="steps()"
+      [label]="'invEvidence.decisions.steps.label' | transloco"
+      [hint]="'invEvidence.decisions.steps.hint' | transloco"
+      [value]="policyFilter()"
+      (valueChange)="onPolicyChange($event)"
+    />
+
+    @if (loadFailed() && !loading()) {
+      <div
+        class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+        role="alert"
+      >
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ errorMessageKey() | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+          {{ 'invEvidence.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (!loading() && rows().length === 0) {
+      <div
+        class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+      >
+        @if (!hasActiveFilters()) {
+          <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+            <ng-icon name="tablerGavel" size="18" aria-hidden="true" />
+          </span>
+        }
+        <p class="text-12 leading-18 text-text-muted">
+          {{
+            hasActiveFilters()
+              ? ('invEvidence.common.noResults' | transloco)
+              : ('invEvidence.decisions.empty.all' | transloco)
+          }}
+        </p>
+        @if (hasActiveFilters()) {
+          <button type="button" uiButton variant="secondary" size="small" (click)="clearFilters()">
+            {{ 'invEvidence.common.clearFilters' | transloco }}
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="min-w-doc-table-min"
+          [attr.aria-label]="'invEvidence.decisions.tableLabel' | transloco"
+          [attr.aria-busy]="loading()"
+        >
+          <div
+            role="row"
+            class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+            [class]="gridCols"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'invEvidence.decisions.cols.evaluated' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'invEvidence.decisions.cols.decision' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'invEvidence.decisions.cols.outcome' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'invEvidence.decisions.cols.explanation' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'invEvidence.decisions.cols.record' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'invEvidence.decisions.cols.branch' | transloco }}
+            </span>
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'invEvidence.decisions.cols.actions' | transloco }}</span>
+            </span>
+          </div>
+
+          @if (loading()) {
+            @for (row of skeletonRows; track row) {
+              <div
+                role="row"
+                aria-hidden="true"
+                class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+                [class]="gridCols"
+              >
+                <span role="cell" class="flex items-center px-10">
+                  <span class="h-skeleton-line w-3/4 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-badge w-2/3 motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-3/4 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-1/2 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-btn-h-sm motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+                </span>
+              </div>
+            }
+          } @else {
+            @for (row of rows(); track row.id) {
+              <div
+                role="row"
+                tabindex="0"
+                [attr.aria-label]="('tradeInventory.badge.decision.' + row.decisionType | transloco) + ' ' + formatDateTime(row.evaluatedAt)"
+                class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="gridCols"
+                (click)="openDecision(row)"
+                (keydown)="onRowKeydown($event, row)"
+              >
+                <span role="cell" class="flex min-w-0 items-center px-10">
+                  <bdi dir="ltr" class="truncate text-12 leading-18 text-text-muted tabular-nums">
+                    {{ formatDateTime(row.evaluatedAt) }}
+                  </bdi>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="truncate text-13 leading-18 font-medium text-text">
+                    {{ 'tradeInventory.badge.decision.' + row.decisionType | transloco }}
+                  </span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <app-inventory-badge kind="outcome" [value]="outcomeBadgeValue(row)" />
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span
+                    dir="auto"
+                    class="truncate text-13 leading-18 text-text"
+                    [title]="row.explanation"
+                  >
+                    {{ explanationText(row) }}
+                  </span>
+                </span>
+
+                <span
+                  role="cell"
+                  class="flex min-w-0 items-center gap-6 border-s border-border px-10"
+                  [title]="row.aggregateId"
+                >
+                  <span class="shrink-0 text-12 leading-18 text-text">
+                    {{ aggregateTypeLabel(row.aggregateType) }}
+                  </span>
+                  <bdi dir="ltr" class="min-w-0 truncate text-12 leading-18 text-text-muted tabular-nums">
+                    {{ shortId(row.aggregateId) }}
+                  </bdi>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span
+                    dir="auto"
+                    class="truncate text-13 leading-18 text-text"
+                    [title]="branchName(row.branchId)"
+                  >
+                    {{ branchName(row.branchId) }}
+                  </span>
+                </span>
+
+                <span
+                  role="cell"
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="rowActions(row)"
+                    [label]="'invEvidence.common.rowActions' | transloco"
+                    (selected)="onRowAction(row, $event)"
+                  />
+                </span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+
+    @if (!loadFailed() && total() > 0) {
+      <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
+        <ui-pagination
+          class="min-w-0 flex-1"
+          [total]="total()"
+          [pageSizes]="pageSizes"
+          [label]="'invEvidence.common.pagination' | transloco"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          (pageChange)="onPageChange($event)"
+          (pageSizeChange)="onPageSizeChange($event)"
+        />
+      </footer>
+    }
+  </div>
+</app-settings-frame>
+
+<app-decision-modal (closed)="onModalClosed()" />

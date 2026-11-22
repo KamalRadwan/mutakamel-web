@@ -1,0 +1,473 @@
+<app-bulk-run-modal
+  #formModal
+  size="wide"
+  icon="tablerCalendarPlus"
+  tile="bg-icon-teal"
+  [title]="'customerBulk.activity.title' | transloco"
+  [count]="displayCount()"
+  [summary]="('customerBulk.count' | pluralKey: displayCount()) | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="!submitBlocked()"
+  [dismissable]="!resolving() && !submitting()"
+  [closeOnCancel]="false"
+  [submitLabel]="'customerBulk.activity.go' | transloco: { n: rows().length }"
+  [cancelLabel]="'customerBulk.activity.cancel' | transloco"
+  (submit)="submit()"
+  (cancel)="requestClose()"
+  (closed)="onModalClosed()"
+>
+  @if (requestError(); as err) {
+    <div
+      role="alert"
+      class="flex items-start gap-8 rounded-8 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
+    >
+      <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+    <div class="col-span-3">
+      <ui-field
+        size="bare"
+        [label]="'customerBulk.activity.type' | transloco"
+        [for]="uid + '-type-group'"
+        [hint]="'customerBulk.activity.hints.type' | transloco"
+        [required]="true"
+      >
+        <div
+          [id]="uid + '-type-group'"
+          role="radiogroup"
+          [attr.aria-label]="'customerBulk.activity.type' | transloco"
+          class="grid grid-cols-7 gap-6"
+        >
+          @for (itemType of activityTypes; track itemType; let index = $index) {
+            <button
+              #typeBtn
+              type="button"
+              role="radio"
+              class="flex cursor-pointer flex-col items-center gap-4 rounded-8 border px-2 py-6 text-center text-11 leading-16 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                type() === itemType
+                  ? 'border-brand bg-brand-soft font-medium text-on-brand-soft'
+                  : 'border-border bg-surface text-text hover:bg-row-hover'
+              "
+              [attr.aria-checked]="type() === itemType"
+              [attr.aria-describedby]="uid + '-type-group-hint'"
+              [tabIndex]="type() === itemType ? 0 : -1"
+              [title]="'customerBulk.activity.types.' + itemType | transloco"
+              (click)="setType(itemType)"
+              (keydown)="onTypeKeydown($event, index)"
+            >
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="typeLook[itemType].tile"
+                aria-hidden="true"
+              >
+                <ng-icon [name]="typeLook[itemType].icon" size="14" />
+              </span>
+              <span class="max-w-full truncate">{{ 'customerBulk.activity.types.' + itemType | transloco }}</span>
+            </button>
+          }
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [label]="'customerBulk.activity.subject' | transloco"
+        [for]="uid + '-subject'"
+        [hint]="'customerBulk.activity.hints.subject' | transloco"
+        [required]="true"
+        [count]="subjectCount()"
+        [max]="limits.subject"
+        [error]="subjectError()"
+      >
+        <input
+          [id]="uid + '-subject'"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'customerBulk.activity.subjectPlaceholder' | transloco"
+          [value]="subject()"
+          [attr.aria-invalid]="subjectError() ? 'true' : null"
+          (input)="onTextInput('subject', $event)"
+          (blur)="markTouched('subject')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'customerBulk.activity.priority' | transloco"
+        [for]="uid + '-priority'"
+        [hint]="'customerBulk.activity.hints.priority' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-priority'"
+          [options]="priorityOptions()"
+          [value]="priority()"
+          [label]="'customerBulk.activity.priority' | transloco"
+          [describedBy]="uid + '-priority-hint'"
+          (valueChange)="priority.set($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (typeFields().direction) {
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'customerBulk.activity.direction' | transloco"
+          [for]="uid + '-direction'"
+          [hint]="'customerBulk.activity.hints.direction' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-direction'"
+            [options]="directionOptions()"
+            [value]="direction()"
+            [label]="'customerBulk.activity.direction' | transloco"
+            [describedBy]="uid + '-direction-hint'"
+            (valueChange)="direction.set($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'customerBulk.activity.duration' | transloco"
+        [for]="uid + '-duration'"
+        [hint]="'customerBulk.activity.hints.duration' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-duration'"
+          [options]="durationOptions()"
+          [value]="duration()"
+          [label]="'customerBulk.activity.duration' | transloco"
+          [describedBy]="uid + '-duration-hint'"
+          (valueChange)="duration.set($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div [class]="typeFields().direction ? 'col-span-1' : 'col-span-2'">
+      <ui-field
+        size="bare"
+        [label]="'customerBulk.activity.reminder' | transloco"
+        [for]="uid + '-reminder'"
+        [hint]="'customerBulk.activity.hints.reminder' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-reminder'"
+          [options]="reminderOptions()"
+          [value]="reminder()"
+          [label]="'customerBulk.activity.reminder' | transloco"
+          [describedBy]="uid + '-reminder-hint'"
+          (valueChange)="reminder.set($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (typeFields().location) {
+      <div [class]="typeFields().meetingUrl ? 'col-span-1' : 'col-span-3'">
+        <ui-field
+          [label]="'customerBulk.activity.location' | transloco"
+          [for]="uid + '-location'"
+          [hint]="'customerBulk.activity.hints.location' | transloco"
+          [count]="locationCount()"
+          [max]="limits.location"
+          [error]="locationError()"
+        >
+          <input
+            [id]="uid + '-location'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="location()"
+            [attr.aria-invalid]="locationError() ? 'true' : null"
+            (input)="onTextInput('location', $event)"
+            (blur)="markTouched('location')"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @if (typeFields().meetingUrl) {
+      <div [class]="typeFields().location ? 'col-span-2' : 'col-span-3'">
+        <ui-field
+          [label]="'customerBulk.activity.meetingUrl' | transloco"
+          [for]="uid + '-meeting-url'"
+          [hint]="'customerBulk.activity.hints.meetingUrl' | transloco"
+          [error]="meetingUrlError()"
+        >
+          <input
+            [id]="uid + '-meeting-url'"
+            type="url"
+            dir="ltr"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="meetingUrl()"
+            [attr.aria-invalid]="meetingUrlError() ? 'true' : null"
+            (input)="onTextInput('meetingUrl', $event)"
+            (blur)="markTouched('meetingUrl')"
+          />
+          @if (meetingLinkValid()) {
+            <ng-icon name="tablerCheck" size="12" class="shrink-0 text-success-text" aria-hidden="true" />
+          }
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-3">
+      <ui-field
+        size="multiline"
+        [label]="'customerBulk.activity.description' | transloco"
+        [for]="uid + '-description'"
+        [hint]="'customerBulk.activity.hints.description' | transloco"
+        [count]="descriptionCount()"
+        [max]="limits.description"
+        [error]="descriptionError()"
+      >
+        <textarea
+          [id]="uid + '-description'"
+          rows="2"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="description()"
+          [attr.aria-invalid]="descriptionError() ? 'true' : null"
+          (input)="onTextInput('description', $event)"
+          (blur)="markTouched('description')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    <div class="col-span-3 border-t border-border pt-8">
+      <h3 class="text-13 leading-18 font-medium text-text">{{ 'customerBulk.activity.sec.schedule' | transloco }}</h3>
+    </div>
+
+    <div class="col-span-3 flex flex-wrap items-start gap-10">
+      <div class="min-w-0 flex-1">
+        <ui-field
+          size="bare"
+          [label]="'customerBulk.activity.start' | transloco"
+          [for]="uid + '-start-date'"
+          [hint]="'customerBulk.activity.hints.start' | transloco"
+          [required]="true"
+          [error]="startError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-start-date'"
+              [ariaLabel]="'customerBulk.activity.start' | transloco"
+              [describedBy]="startDescribedBy()"
+              [todayLabel]="todayLabel()"
+              [min]="todayIso()"
+              [value]="startDate()"
+              [invalid]="!!startError()"
+              (valueChange)="onStartDateChange($event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-start-time'"
+              [ariaLabel]="'customerBulk.activity.start' | transloco"
+              [describedBy]="startDescribedBy()"
+              [hourLabel]="'customerBulk.activity.hour' | transloco"
+              [minuteLabel]="'customerBulk.activity.minute' | transloco"
+              [value]="startTime()"
+              [invalid]="!!startError()"
+              (valueChange)="onStartTimeChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="shrink-0">
+        <ui-field
+          size="bare"
+          [label]="'customerBulk.activity.order' | transloco"
+          [for]="uid + '-order'"
+          [hint]="'customerBulk.activity.hints.order' | transloco"
+        >
+          <ui-segmented
+            [id]="uid + '-order'"
+            [options]="orderOptions()"
+            [label]="'customerBulk.activity.order' | transloco"
+            [describedBy]="uid + '-order-hint'"
+            [value]="order()"
+            (valueChange)="onOrderChange($event)"
+          />
+        </ui-field>
+      </div>
+    </div>
+
+    <div class="col-span-3">
+      <ui-field
+        size="bare"
+        [label]="'customerBulk.activity.gap' | transloco"
+        [for]="gapPreset() === 'custom' ? uid + '-custom-gap' : uid + '-gap'"
+        [hint]="'customerBulk.activity.hints.gap' | transloco"
+        [required]="true"
+        [error]="gapError()"
+      >
+        <div class="flex flex-wrap items-center gap-8">
+          <ui-segmented
+            [id]="uid + '-gap'"
+            [options]="gapOptions()"
+            [label]="'customerBulk.activity.gap' | transloco"
+            [describedBy]="gapDescribedBy()"
+            [value]="gapPreset()"
+            (valueChange)="onGapPresetChange($event)"
+          />
+          @if (gapPreset() === 'custom') {
+            <div
+              class="flex h-field w-preset items-center gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+              [class]="
+                gapError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+              "
+            >
+              <input
+                [id]="uid + '-custom-gap'"
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                dir="ltr"
+                placeholder="1–1440"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="customGap()"
+                [attr.aria-label]="'customerBulk.activity.gapCustom' | transloco"
+                [attr.aria-describedby]="gapDescribedBy()"
+                [attr.aria-invalid]="gapError() ? 'true' : null"
+                (input)="onCustomGapInput($event)"
+                (blur)="markTouched('gap')"
+              />
+            </div>
+          }
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-3">
+      <ui-field
+        size="bare"
+        [label]="'customerBulk.activity.assignee.label' | transloco"
+        [for]="assigneeMode() === 'other' ? uid + '-assignee-person' : uid + '-assignee'"
+        [hint]="'customerBulk.activity.hints.assignee' | transloco"
+      >
+        <div class="flex flex-wrap items-center gap-8">
+          <ui-segmented
+            [id]="uid + '-assignee'"
+            [options]="assigneeModeOptions()"
+            [label]="'customerBulk.activity.assignee.label' | transloco"
+            [describedBy]="(assigneeMode() === 'other' ? uid + '-assignee-person' : uid + '-assignee') + '-hint'"
+            [value]="assigneeMode()"
+            (valueChange)="onAssigneeModeChange($event)"
+          />
+          @if (assigneeMode() === 'other') {
+            <ui-dropdown
+              class="min-w-0 flex-1"
+              size="field"
+              [id]="uid + '-assignee-person'"
+              [options]="assigneeDropdownOptions()"
+              [value]="chosenAssigneeId()"
+              [label]="'customerBulk.activity.assignee.other' | transloco"
+              [describedBy]="uid + '-assignee-person-hint'"
+              [disabled]="assigneeDropdownOptions().length === 0"
+              (valueChange)="onChosenAssigneeChange($event)"
+            />
+          }
+        </div>
+      </ui-field>
+    </div>
+
+    @if (assigneeMode() === 'owner') {
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [label]="'customerBulk.activity.perAssignee' | transloco"
+          [for]="uid + '-per-assignee'"
+          [hint]="'customerBulk.activity.hints.perAssignee' | transloco"
+          [hintText]="'customerBulk.activity.perAssigneeHelp' | transloco"
+        >
+          <div class="flex items-center gap-8 py-2">
+            <ui-switch
+              [id]="uid + '-per-assignee'"
+              [label]="'customerBulk.activity.perAssignee' | transloco"
+              [describedBy]="uid + '-per-assignee-hint'"
+              [(checked)]="spacePerAssignee"
+            />
+          </div>
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-3 flex flex-col gap-6 border-t border-border pt-8">
+      <div class="flex flex-wrap items-baseline justify-between gap-8">
+        <h3 class="text-13 leading-18 font-medium text-text">{{ 'customerBulk.activity.sec.preview' | transloco }}</h3>
+        @if (computedSchedule().items.length > 0) {
+          <span class="text-12 leading-18 text-text-muted">
+            {{ 'customerBulk.activity.summary' | transloco: { first: summaryFirst(), last: summaryLast() } }}
+          </span>
+        }
+      </div>
+
+      @if (computedSchedule().runsPastMidnight) {
+        <p class="flex items-center gap-6 text-12 leading-18 text-warning-text">
+          <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+          <span>{{ 'customerBulk.activity.pastMidnight' | transloco }}</span>
+        </p>
+      }
+
+      @if (noOwnerCount() > 0) {
+        <p class="flex items-center gap-6 text-12 leading-18 text-warning-text">
+          <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+          <span>{{ 'customerBulk.activity.noOwner' | transloco: { n: noOwnerCount() } }}</span>
+        </p>
+      }
+
+      @if (previewRows().length > 0) {
+        <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+          @for (item of previewRows(); track item.row.id) {
+            <div
+              class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface px-8 py-6 text-12 leading-18 shadow-card"
+            >
+              <div class="flex min-w-0 items-center gap-4">
+                <span class="truncate font-medium text-text" dir="auto">{{ item.row.displayName }}</span>
+                <span class="shrink-0 text-text-muted" aria-hidden="true">·</span>
+                <span class="truncate text-text-muted" dir="auto">{{ item.assigneeName }}</span>
+              </div>
+              <span class="shrink-0 whitespace-nowrap text-text-muted tabular-nums">
+                {{ formatRowWindow(item.dueDate, item.endDate) }}
+              </span>
+            </div>
+          }
+          @if (moreCount() > 0) {
+            <p class="px-2 text-12 leading-18 text-text-muted">
+              {{ 'customerBulk.activity.more' | transloco: { n: moreCount() } }}
+            </p>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</app-bulk-run-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'customerBulk.activity.discard.title' | transloco"
+  [text]="'customerBulk.activity.discard.text' | transloco"
+  [confirmLabel]="'customerBulk.activity.discard.confirm' | transloco"
+  [cancelLabel]="'customerBulk.activity.cancel' | transloco"
+/>

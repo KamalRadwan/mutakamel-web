@@ -1,0 +1,796 @@
+@if (loading()) {
+  <div class="flex flex-col gap-10" aria-busy="true">
+    <div class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      <div class="flex items-center gap-8">
+        <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-modal-confirm max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-8 border-t border-border pt-8">
+        <span class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-6">
+      @for (row of [1, 2, 3, 4, 5]; track row) {
+        <span class="h-table-row w-full animate-pulse rounded-10 bg-neutral-soft"></span>
+      }
+    </div>
+  </div>
+} @else if (notFound()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerBook" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'pricing.notFound' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="goBack()">
+      <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      {{ 'pricing.back' | transloco }}
+    </button>
+  </div>
+} @else if (loadFailed()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'pricing.loadFailed' | transloco }}</p>
+    <div class="flex items-center gap-8">
+      <button type="button" uiButton (click)="retryLoad()">
+        <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+        {{ 'pricing.retry' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="goBack()">
+        {{ 'pricing.back' | transloco }}
+      </button>
+    </div>
+  </div>
+} @else if (detail(); as d) {
+  <!-- Header card -->
+  <header class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card">
+    <!-- Row 1: Identity & actions -->
+    <div class="flex flex-wrap items-center gap-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'pricing.back' | transloco"
+        [title]="'pricing.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerBook" size="15" aria-hidden="true" />
+      </span>
+
+      <div class="min-w-0">
+        <h1 class="truncate text-16 leading-22 font-medium text-text">
+          {{ bookDisplayName() }} · {{ 'pricing.versionLabel' | transloco: { n: d.version.versionNumber } }}
+        </h1>
+        <p class="truncate text-11 leading-16 text-text-muted">
+          <bdi dir="ltr">{{ d.book.code }} · {{ d.book.currencyCode }}</bdi>
+        </p>
+      </div>
+
+      <app-version-status-badge
+        module="price"
+        [status]="d.version.status"
+        [liveScheduled]="liveScheduled()"
+      />
+
+      <span class="flex-1"></span>
+
+      <div class="flex flex-wrap items-center gap-8">
+        @if (editable() && dirty()) {
+          <span class="inline-flex items-center gap-6 text-12 leading-18 text-text-muted">
+            <span class="size-unread-dot shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
+            {{ 'pricing.header.unsaved' | transloco }}
+          </span>
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            [disabled]="busy()"
+            (click)="undoChanges()"
+          >
+            <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+            {{ 'pricing.actions.undo' | transloco }}
+          </button>
+        }
+
+        @if (status() === 'DRAFT') {
+          @if (can.manage) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [loading]="saving()"
+              [disabled]="!dirty() || testing() || deleting()"
+              (click)="save()"
+            >
+              <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+              {{ 'pricing.actions.save' | transloco }}
+            </button>
+          }
+          @if (can.test) {
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [loading]="testing()"
+              [disabled]="dirty() || saving() || deleting()"
+              [attr.title]="dirty() ? ('pricing.actions.saveFirstHint' | transloco) : null"
+              (click)="runTest()"
+            >
+              <ng-icon name="tablerFlask" size="15" aria-hidden="true" />
+              {{ 'pricing.actions.test' | transloco }}
+            </button>
+          }
+        } @else if (status() === 'TESTED') {
+          @if (can.manage) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [loading]="saving()"
+              [disabled]="!dirty() || testing()"
+              (click)="save()"
+            >
+              <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+              {{ 'pricing.actions.save' | transloco }}
+            </button>
+          }
+          @if (can.test) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [loading]="testing()"
+              [disabled]="dirty() || saving()"
+              [attr.title]="dirty() ? ('pricing.actions.saveFirstHint' | transloco) : null"
+              (click)="runTest()"
+            >
+              <ng-icon name="tablerFlask" size="15" aria-hidden="true" />
+              {{ 'pricing.actions.testAgain' | transloco }}
+            </button>
+          }
+          @if (can.publish) {
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [disabled]="dirty() || busy() || publishBlocked()"
+              [attr.title]="
+                publishBlocked()
+                  ? ('governance.makerChecker.self' | transloco)
+                  : dirty()
+                    ? ('pricing.actions.saveFirstHint' | transloco)
+                    : null
+              "
+              (click)="openPublishDialog()"
+            >
+              <ng-icon name="tablerRocket" size="15" aria-hidden="true" />
+              {{ 'pricing.actions.publish' | transloco }}
+            </button>
+          }
+        } @else if ((status() === 'PUBLISHED' || status() === 'SCHEDULED') && can.manage) {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            class="text-danger-text"
+            [loading]="retiring()"
+            (click)="openRetireDialog()"
+          >
+            <ng-icon name="tablerArchive" size="15" aria-hidden="true" />
+            {{ 'pricing.actions.retire' | transloco }}
+          </button>
+        }
+
+        <ui-actions-menu
+          [items]="moreActions()"
+          [label]="'pricing.actions.more' | transloco"
+          (selected)="onMoreAction($event)"
+        />
+      </div>
+    </div>
+
+    <!-- Row 2: Lifecycle stepper + effective dates + author -->
+    <div class="flex flex-wrap items-center justify-between gap-12 border-t border-border pt-8">
+      <app-lifecycle-stepper
+        class="min-w-0 flex-1"
+        [steps]="stepperSteps()"
+        [current]="stepperCurrent()"
+        [label]="'pricing.stepper.label' | transloco"
+      />
+
+      <div class="flex flex-wrap items-start gap-12">
+        @if (editable()) {
+          <div class="flex flex-wrap items-start gap-8">
+            <ui-field
+              size="bare"
+              [label]="'pricing.header.effectiveFrom' | transloco"
+              [for]="uid + '-from'"
+              [required]="true"
+              [hint]="'pricing.header.effectiveFromHint' | transloco"
+              [error]="fromError()"
+            >
+              <div class="flex items-center gap-4">
+                <ui-date-field
+                  class="w-preset"
+                  [id]="uid + '-from'"
+                  [ariaLabel]="'pricing.header.effectiveFrom' | transloco"
+                  [describedBy]="fromDescribedBy()"
+                  [todayLabel]="'pricing.header.today' | transloco"
+                  [prevMonthLabel]="'pricing.header.prevMonth' | transloco"
+                  [nextMonthLabel]="'pricing.header.nextMonth' | transloco"
+                  [invalid]="!!fromError()"
+                  [disabled]="busy()"
+                  [value]="fromDate()"
+                  (valueChange)="onFromDateChange($event)"
+                />
+                <ui-time-field
+                  class="shrink-0"
+                  [id]="uid + '-from-time'"
+                  [ariaLabel]="'pricing.header.effectiveFrom' | transloco"
+                  [describedBy]="fromDescribedBy()"
+                  [hourLabel]="'pricing.header.hour' | transloco"
+                  [minuteLabel]="'pricing.header.minute' | transloco"
+                  [invalid]="!!fromError()"
+                  [disabled]="busy()"
+                  [(value)]="fromTime"
+                />
+              </div>
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [label]="'pricing.header.effectiveTo' | transloco"
+              [for]="uid + '-to'"
+              [hint]="'pricing.header.effectiveToHint' | transloco"
+              [error]="toError()"
+            >
+              <div class="flex items-center gap-4">
+                <ui-date-field
+                  class="w-preset"
+                  [id]="uid + '-to'"
+                  [ariaLabel]="'pricing.header.effectiveTo' | transloco"
+                  [describedBy]="toDescribedBy()"
+                  [todayLabel]="'pricing.header.today' | transloco"
+                  [prevMonthLabel]="'pricing.header.prevMonth' | transloco"
+                  [nextMonthLabel]="'pricing.header.nextMonth' | transloco"
+                  [placeholder]="'pricing.header.openEnded' | transloco"
+                  [min]="fromDate()"
+                  [invalid]="!!toError()"
+                  [disabled]="busy()"
+                  [value]="toDate()"
+                  (valueChange)="onToDateChange($event)"
+                />
+                <ui-time-field
+                  class="shrink-0"
+                  [id]="uid + '-to-time'"
+                  [ariaLabel]="'pricing.header.effectiveTo' | transloco"
+                  [describedBy]="toDescribedBy()"
+                  [hourLabel]="'pricing.header.hour' | transloco"
+                  [minuteLabel]="'pricing.header.minute' | transloco"
+                  [invalid]="!!toError()"
+                  [disabled]="busy()"
+                  [value]="toTime()"
+                  (valueChange)="onToTimeChange($event)"
+                />
+                @if (hasEffectiveTo()) {
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [attr.aria-label]="'pricing.header.clearEffectiveTo' | transloco"
+                    [title]="'pricing.header.clearEffectiveTo' | transloco"
+                    [disabled]="busy()"
+                    (click)="clearEffectiveTo()"
+                  >
+                    <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                  </button>
+                }
+              </div>
+            </ui-field>
+          </div>
+        } @else {
+          <div class="flex items-center gap-6 text-12 leading-18">
+            <span class="text-text-muted">{{ 'pricing.header.effective' | transloco }}</span>
+            <span class="font-medium text-text">{{ effectiveRangeDisplay() }}</span>
+          </div>
+        }
+
+        <div class="flex items-center gap-6 text-12 leading-18">
+          <span class="text-text-muted">{{ 'pricing.header.createdBy' | transloco }}</span>
+          <span class="font-medium text-text">{{ createdByText() }}</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Underline tabs -->
+  <ui-tabs
+    [tabs]="tabs()"
+    [label]="'pricing.tabs.label' | transloco"
+    [active]="activeTab()"
+    (activeChange)="selectTab($event)"
+  />
+
+  <!-- Tab panels (stay mounted once visited) -->
+  <div class="min-h-0 flex-1">
+    <!-- Lines tab -->
+    <div
+      role="tabpanel"
+      [id]="tabPanelId('lines')"
+      [attr.aria-labelledby]="tabButtonId('lines')"
+      [class]="activeTab() === 'lines' ? 'block' : 'hidden'"
+    >
+      <app-price-lines-table
+        [entries]="visiblePageEntries()"
+        [allUpserts]="allUpsertRows()"
+        [uoms]="uoms()"
+        [currencyCode]="d.book.currencyCode"
+        [editable]="editable()"
+        [canViewCost]="d.canViewCost"
+        [loading]="linesLoading()"
+        [loadFailed]="linesLoadFailed()"
+        [total]="effectiveFilteredLinesTotal()"
+        [page]="linePage()"
+        [pageSize]="linePageSize()"
+        [search]="lineSearch()"
+        [uomFilter]="lineUomFilter()"
+        [makerCheckerCaption]="makerCheckerCaption()"
+        [serverOverlapErrors]="serverOverlapErrors()"
+        [focusRowId]="focusLineId()"
+        [showAllErrors]="showLineErrors()"
+        (pageChange)="onLinePageChange($event)"
+        (pageSizeChange)="onLinePageSizeChange($event)"
+        (searchChange)="onLineSearchChange($event)"
+        (uomFilterChange)="onLineUomFilterChange($event)"
+        (retry)="reloadLines()"
+        (entryChange)="onEntryChange($event)"
+        (entryRemove)="onEntryRemove($event)"
+        (addLine)="onAddLine()"
+        (reorder)="onReorderLines($event)"
+        (focusHandled)="focusLineId.set(null)"
+      />
+    </div>
+
+    <!-- Promotions tab -->
+    @if (visited().has('promotions')) {
+      <div
+        role="tabpanel"
+        [id]="tabPanelId('promotions')"
+        [attr.aria-labelledby]="tabButtonId('promotions')"
+        [class]="activeTab() === 'promotions' ? 'flex flex-col gap-8' : 'hidden'"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+          <span class="text-12 text-text-muted tabular-nums">
+            <bdi dir="ltr">{{ 'pricing.promotions.countSummary' | transloco: { count: effectivePromotions().length } }}</bdi>
+          </span>
+          @if (editable()) {
+            <button type="button" uiButton variant="secondary" size="small" (click)="openCreatePromotion()">
+              <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+              {{ 'pricing.promotions.addPromotion' | transloco }}
+            </button>
+          }
+        </div>
+
+        @if (effectivePromotions().length === 0) {
+          <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+              <ng-icon name="tablerPercentage" size="18" aria-hidden="true" />
+            </span>
+            <h3 class="text-13 leading-18 font-medium text-text">{{ 'pricing.promotions.emptyTitle' | transloco }}</h3>
+            <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">{{ 'pricing.promotions.emptyText' | transloco }}</p>
+            @if (editable()) {
+              <button type="button" uiButton variant="secondary" (click)="openCreatePromotion()">
+                <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+                {{ 'pricing.promotions.addPromotion' | transloco }}
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="overflow-x-auto pb-4">
+            <div
+              role="table"
+              class="min-w-doc-table-min"
+              [attr.aria-label]="'pricing.promotions.tableLabel' | transloco"
+            >
+              <div
+                role="row"
+                class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+                [class]="promoGrid"
+              >
+                <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                  {{ 'pricing.promotions.columns.code' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'pricing.promotions.columns.name' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'pricing.promotions.columns.benefit' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'pricing.promotions.columns.appliesTo' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'pricing.promotions.columns.priority' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'pricing.promotions.columns.stackGroup' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center justify-center truncate border-s border-on-nav-line px-10">
+                  {{ 'pricing.promotions.columns.exclusive' | transloco }}
+                </span>
+                <span role="columnheader" class="border-s border-on-nav-line">
+                  <span class="sr-only">{{ 'pricing.promotions.columns.actions' | transloco }}</span>
+                </span>
+              </div>
+
+              @for (promo of effectivePromotions(); track promo.id) {
+                @let chips = promotionSelectorChips(promo);
+                <div
+                  role="row"
+                  class="mt-6 grid min-h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+                  [class.cursor-pointer]="editable()"
+                  [class]="promoGrid"
+                  (click)="openEditPromotion(promo)"
+                >
+                  <span role="cell" class="flex min-w-0 items-center px-10 text-12 font-medium text-text tabular-nums">
+                    <bdi dir="ltr" class="truncate">{{ promo.code }}</bdi>
+                  </span>
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+                    <span class="truncate">{{ promo.name }}</span>
+                  </span>
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 font-medium text-text tabular-nums">
+                    <bdi dir="ltr" class="truncate">{{ formatBenefit(promo) }}</bdi>
+                  </span>
+                  <span role="cell" class="flex min-w-0 flex-wrap items-center gap-4 border-s border-border px-10 py-6">
+                    @if (chips.length === 0) {
+                      <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+                        {{ 'pricing.promotions.everything' | transloco }}
+                      </span>
+                    } @else {
+                      @for (chip of chips; track $index) {
+                        <span class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                          {{ chip }}
+                        </span>
+                      }
+                    }
+                  </span>
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text tabular-nums">
+                    <bdi dir="ltr">{{ promo.priority }}</bdi>
+                  </span>
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted">
+                    <bdi dir="ltr" class="truncate">{{ promo.stackGroup }}</bdi>
+                  </span>
+                  <span role="cell" class="flex items-center justify-center border-s border-border px-10">
+                    @if (promo.exclusive) {
+                      <ng-icon
+                        name="tablerCheck"
+                        size="16"
+                        class="text-success-text"
+                        [attr.aria-label]="'pricing.promotions.exclusiveYes' | transloco"
+                      />
+                    } @else {
+                      <span class="text-12 text-text-muted" [attr.aria-label]="'pricing.promotions.exclusiveNo' | transloco">—</span>
+                    }
+                  </span>
+                  <span
+                    role="cell"
+                    class="flex items-center justify-center border-s border-border"
+                    (click)="$event.stopPropagation()"
+                  >
+                    @if (editable()) {
+                      <ui-actions-menu
+                        [items]="promotionMenuItems()"
+                        [label]="'pricing.promotions.actionsLabel' | transloco"
+                        (selected)="onPromotionAction(promo, $event)"
+                      />
+                    }
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Test result tab -->
+    @if (visited().has('test')) {
+      <div
+        role="tabpanel"
+        [id]="tabPanelId('test')"
+        [attr.aria-labelledby]="tabButtonId('test')"
+        [class]="activeTab() === 'test' ? 'flex flex-col gap-8' : 'hidden'"
+      >
+        @if (activeTestEvidence(); as ev) {
+          <div class="flex flex-wrap items-center justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+            <div class="flex flex-wrap items-center gap-10">
+              <span
+                class="inline-flex h-badge items-center gap-4 rounded-8 px-8 text-12 font-medium"
+                [class]="ev.passed ? 'bg-success text-on-success' : 'bg-danger text-on-danger'"
+              >
+                <ng-icon [name]="ev.passed ? 'tablerCircleCheck' : 'tablerCircleX'" size="12" aria-hidden="true" />
+                {{ (ev.passed ? 'pricing.testResult.passed' : 'pricing.testResult.failed') | transloco }}
+              </span>
+
+              <span class="text-12 font-medium text-text tabular-nums">
+                <bdi dir="ltr">
+                  {{
+                    'pricing.testResult.summaryCounts'
+                      | transloco: { entries: ev.report.entryCount, promotions: ev.report.promotionCount }
+                  }}
+                </bdi>
+              </span>
+
+              <span class="text-11 text-text-muted">
+                {{ 'pricing.testResult.testedAt' | transloco: { time: formatTestTime(ev.testedAt) } }}
+              </span>
+            </div>
+
+            @if (editable() && can.test) {
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                [loading]="testing()"
+                [disabled]="dirty() || saving()"
+                [attr.title]="dirty() ? ('pricing.actions.saveFirstHint' | transloco) : null"
+                (click)="runTest()"
+              >
+                <ng-icon name="tablerFlask" size="15" aria-hidden="true" />
+                {{ 'pricing.testResult.retest' | transloco }}
+              </button>
+            }
+          </div>
+
+          @if (ev.passed) {
+            <div class="rounded-10 border border-border bg-surface p-12 text-12 text-text-muted shadow-card">
+              {{ 'pricing.testResult.noProblems' | transloco }}
+            </div>
+          } @else {
+            @if (parsedLineConflicts().length > 0) {
+              <section class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-10 shadow-card">
+                <h3 class="text-13 leading-18 font-medium text-text">
+                  {{ 'pricing.testResult.lineConflictsHeading' | transloco }}
+                </h3>
+                <ul class="flex flex-col gap-6">
+                  @for (conflict of parsedLineConflicts(); track conflict.raw) {
+                    <li class="flex flex-wrap items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-10 py-6 text-12">
+                      @if (conflict.kind === 'NO_ENTRIES') {
+                        <span class="text-text">{{ 'pricing.testResult.noEntriesProblem' | transloco }}</span>
+                        <button type="button" uiButton variant="secondary" size="small" (click)="jumpToLine()">
+                          {{ 'pricing.testResult.goToLines' | transloco }}
+                        </button>
+                      } @else if (conflict.kind === 'OVERLAP') {
+                        <span class="text-text">
+                          {{ 'pricing.testResult.overlapProblem' | transloco: { a: conflict.lineA, b: conflict.lineB } }}
+                        </span>
+                        <div class="flex items-center gap-6">
+                          <button
+                            type="button"
+                            uiButton
+                            variant="secondary"
+                            size="small"
+                            (click)="jumpToLine(conflict.idA, conflict.lineA)"
+                          >
+                            {{ 'pricing.testResult.jumpToLine' | transloco: { n: conflict.lineA } }}
+                          </button>
+                          <button
+                            type="button"
+                            uiButton
+                            variant="secondary"
+                            size="small"
+                            (click)="jumpToLine(conflict.idB, conflict.lineB)"
+                          >
+                            {{ 'pricing.testResult.jumpToLine' | transloco: { n: conflict.lineB } }}
+                          </button>
+                        </div>
+                      } @else {
+                        <span class="text-text"><bdi dir="ltr">{{ conflict.raw }}</bdi></span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+
+            @if (parsedPromoConflicts().length > 0) {
+              <section class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-10 shadow-card">
+                <h3 class="text-13 leading-18 font-medium text-text">
+                  {{ 'pricing.testResult.promoProblemsHeading' | transloco }}
+                </h3>
+                <ul class="flex flex-col gap-6">
+                  @for (conflict of parsedPromoConflicts(); track conflict.raw) {
+                    <li class="flex flex-wrap items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-10 py-6 text-12">
+                      @if (conflict.kind === 'EQUAL_PRECEDENCE') {
+                        <span class="text-text">
+                          {{
+                            'pricing.testResult.equalPrecedenceProblem'
+                              | transloco: { a: conflict.codeA, b: conflict.codeB }
+                          }}
+                        </span>
+                      } @else if (conflict.kind === 'DUPLICATE') {
+                        <span class="text-text">
+                          {{ 'pricing.testResult.duplicateProblem' | transloco: { code: conflict.codeA } }}
+                        </span>
+                      } @else if (conflict.kind === 'INVALID_BENEFIT') {
+                        <span class="text-text">
+                          {{ 'pricing.testResult.invalidBenefitProblem' | transloco: { code: conflict.codeA } }}
+                        </span>
+                      } @else {
+                        <span class="text-text"><bdi dir="ltr">{{ conflict.raw }}</bdi></span>
+                      }
+                      <button type="button" uiButton variant="secondary" size="small" (click)="selectTab('promotions')">
+                        {{ 'pricing.testResult.openPromotions' | transloco }}
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+          }
+        } @else {
+          <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+              <ng-icon name="tablerFlask" size="18" aria-hidden="true" />
+            </span>
+            <h3 class="text-13 leading-18 font-medium text-text">{{ 'pricing.testResult.emptyTitle' | transloco }}</h3>
+            <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">{{ 'pricing.testResult.emptyText' | transloco }}</p>
+            @if (editable() && can.test) {
+              <button
+                type="button"
+                uiButton
+                variant="primary"
+                [loading]="testing()"
+                [disabled]="dirty() || saving()"
+                [attr.title]="dirty() ? ('pricing.actions.saveFirstHint' | transloco) : null"
+                (click)="runTest()"
+              >
+                <ng-icon name="tablerFlask" size="15" aria-hidden="true" />
+                {{ 'pricing.testResult.runTest' | transloco }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Compare tab -->
+    @if (visited().has('compare')) {
+      <div
+        role="tabpanel"
+        [id]="tabPanelId('compare')"
+        [attr.aria-labelledby]="tabButtonId('compare')"
+        [class]="activeTab() === 'compare' ? 'block' : 'hidden'"
+      >
+        <app-price-diff
+          [versionId]="d.version.id"
+          [bookId]="d.book.id"
+          [currencyCode]="d.book.currencyCode"
+          [bookVersions]="d.book.versions"
+          [baselineId]="compareBaselineId()"
+          (baselineIdChange)="onBaselineChange($event)"
+        />
+      </div>
+    }
+
+    <!-- History tab -->
+    @if (visited().has('history')) {
+      <div
+        role="tabpanel"
+        [id]="tabPanelId('history')"
+        [attr.aria-labelledby]="tabButtonId('history')"
+        [class]="activeTab() === 'history' ? 'block' : 'hidden'"
+      >
+        <div class="flex flex-col rounded-10 border border-border bg-surface p-8 shadow-card">
+          @if (d.auditTrail.length === 0) {
+            <p class="py-16 text-center text-12 text-text-muted">{{ 'pricing.history.empty' | transloco }}</p>
+          } @else {
+            @for (entry of d.auditTrail; track entry.id; let last = $last) {
+              <div class="flex items-start gap-8 py-8" [class.border-b]="!last" [class.border-border]="!last">
+                <span
+                  class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                  aria-hidden="true"
+                >
+                  {{ actorInitials(entry) }}
+                </span>
+
+                <div class="flex min-w-0 flex-1 flex-col gap-4">
+                  <div class="flex items-baseline justify-between gap-8">
+                    <p class="min-w-0 flex-1 text-12 leading-18 text-text">
+                      <span class="font-medium">{{ auditActorName(entry) }}</span>
+                      {{ ' ' + auditActionText(entry.action) }}
+                    </p>
+                    <time class="shrink-0 text-11 leading-16 text-text-muted" [attr.datetime]="entry.occurredAt">
+                      {{ formatTestTime(entry.occurredAt) }}
+                    </time>
+                  </div>
+
+                  @if (auditReasonLabel(entry); as reasonText) {
+                    <div class="flex items-center gap-6 text-11 leading-16 text-text-muted">
+                      <span>{{ 'pricing.history.reasonPrefix' | transloco }}:</span>
+                      <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+                        {{ reasonText }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <app-promotion-modal
+    [bookPurpose]="d.book.purpose"
+    [currencyCode]="d.book.currencyCode"
+    [existingPromotions]="effectivePromotions()"
+    [uoms]="uoms()"
+    [branches]="branches()"
+    [channels]="channels()"
+    [accounts]="accounts()"
+    (saved)="onPromotionSaved($event)"
+  />
+
+  <app-publish-price-dialog
+    [versionId]="d.version.id"
+    [versionNumber]="d.version.versionNumber"
+    [ifMatchVersion]="currentIfMatch()"
+    [effectiveFrom]="d.version.effectiveFrom"
+    [bookVersions]="d.book.versions"
+    [soloOwnerGovernanceEligible]="d.soloOwnerGovernanceEligible"
+    [createdByUserId]="d.version.createdByUserId"
+    (published)="onPublished($event)"
+    (staleConflict)="onConflictFromChild()"
+  />
+
+  <app-reason-dialog
+    kind="PRICE_VERSION_RETIRE"
+    [title]="'pricing.dialogs.retire.title' | transloco: { n: d.version.versionNumber }"
+    [text]="'pricing.dialogs.retire.text' | transloco: { n: d.version.versionNumber }"
+    [confirmLabel]="'pricing.dialogs.retire.confirm' | transloco"
+    [required]="true"
+    tone="danger"
+    [loading]="retiring()"
+    (confirmed)="onRetireConfirmed($event)"
+  />
+}
+
+<app-conflict-dialog
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>
+
+<ui-confirm-dialog
+  #returnToDraftDialog
+  tone="warning"
+  [title]="'pricing.dialogs.returnToDraft.title' | transloco"
+  [text]="'pricing.dialogs.returnToDraft.text' | transloco"
+  [confirmLabel]="'pricing.dialogs.returnToDraft.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteDraftDialog
+  tone="danger"
+  [title]="'pricing.dialogs.deleteDraft.title' | transloco"
+  [text]="'pricing.dialogs.deleteDraft.text' | transloco: { n: detail()?.version?.versionNumber ?? '' }"
+  [confirmLabel]="'pricing.dialogs.deleteDraft.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'pricing.dialogs.unsaved.title' | transloco"
+  [text]="'pricing.dialogs.unsaved.text' | transloco"
+  [saveLabel]="'pricing.dialogs.unsaved.save' | transloco"
+  [discardLabel]="'pricing.dialogs.unsaved.discard' | transloco"
+  [cancelLabel]="'pricing.dialogs.unsaved.cancel' | transloco"
+/>

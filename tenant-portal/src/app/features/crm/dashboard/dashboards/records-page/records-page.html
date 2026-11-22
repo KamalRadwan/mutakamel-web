@@ -1,0 +1,91 @@
+<header class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-10 shadow-card">
+  <ui-breadcrumbs [items]="breadcrumbs()" [label]="'dashFilters.breadcrumbsLabel' | transloco" />
+
+  <div class="flex flex-wrap items-center justify-between gap-8">
+    <h1 class="min-w-0 truncate text-16 leading-24 font-medium text-text">
+      {{ 'dashFilters.recordsBehind' | transloco: { title: widgetTitle() } }}
+    </h1>
+
+    @if (filterChips().length > 0) {
+      <div class="flex flex-wrap items-center gap-6">
+        @for (chip of filterChips(); track $index) {
+          <ui-badge tone="tag">{{ chip }}</ui-badge>
+        }
+      </div>
+    }
+  </div>
+</header>
+
+@if (errorState(); as err) {
+  <ui-full-state
+    [kind]="err.kind"
+    [title]="err.titleKey | transloco"
+    [text]="err.textKey | transloco"
+    [actionLabel]="(err.retryable ? 'analytics.common.retry' : 'dashFilters.backToDashboard') | transloco"
+    (action)="onErrorAction()"
+  />
+} @else {
+  <div class="flex min-h-0 flex-1 flex-col gap-8">
+    <!-- Always rendered so the live region persists; out of the layout (sr-only) while it is empty. -->
+    <p role="status" class="text-12 leading-16 text-text-muted" [class.sr-only]="!retrying()">
+      @if (retrying()) {
+        {{ 'analytics.common.retrying' | transloco }}
+      }
+    </p>
+    <ui-data-table
+      [columns]="columns()"
+      [rows]="records()"
+      [rowKey]="rowKeyFn"
+      [loading]="loading()"
+      [rowClickable]="true"
+      [emptyText]="'dashFilters.empty' | transloco"
+      [label]="'dashFilters.recordsTableLabel' | transloco"
+      (rowClick)="onRowClick($event)"
+    >
+      <ng-template uiCell="status" let-row>
+        @if (row.status) {
+          <ui-badge [tone]="statusTone(row.status)">{{ statusLabel(row.status) }}</ui-badge>
+        } @else {
+          <span>—</span>
+        }
+      </ng-template>
+
+      <ng-template uiCell="amount" let-row>
+        {{ formatRecordMoney(row) }}
+      </ng-template>
+
+      <ng-template uiCell="value" let-row>
+        {{ formatRecordValue(row) }}
+      </ng-template>
+
+      <ng-template uiCell="createdAt" let-row>
+        {{ formatRecordDate(row.createdAt) }}
+      </ng-template>
+
+      <ng-template uiCell="convertedAt" let-row>
+        {{ formatRecordDate(row.convertedAt) }}
+      </ng-template>
+
+      <ng-template uiCell="closedAt" let-row>
+        {{ formatRecordDate(row.closedAt) }}
+      </ng-template>
+
+      <ng-template uiCell="dueAt" let-row>
+        {{ formatRecordDate(row.dueAt) }}
+      </ng-template>
+    </ui-data-table>
+
+    @if (showPagination()) {
+      <div class="mt-auto pt-4">
+        <ui-pagination
+          [total]="paginationTotal()"
+          [page]="currentPage()"
+          [pageSize]="pageSize"
+          [pageSizes]="pageSizes"
+          [label]="'dashFilters.recordsPaginationLabel' | transloco"
+          (pageChange)="onPageChange($event)"
+        />
+      </div>
+    }
+  </div>
+}

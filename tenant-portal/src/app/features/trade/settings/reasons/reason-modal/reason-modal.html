@@ -1,0 +1,300 @@
+<ui-modal
+  #reasonModal
+  size="form"
+  icon="tablerListCheck"
+  tile="bg-icon-violet"
+  [title]="(mode() === 'create' ? 'treasons.modal.createTitle' : 'treasons.modal.editTitle') | transloco"
+  [closeLabel]="'treasons.actions.close' | transloco"
+  [dismissable]="!saving() && !conflictBusy() && !deleting()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <div class="col-span-1">
+      <ui-field
+        [label]="'treasons.fields.kind' | transloco"
+        [for]="uid + '-kind'"
+        [hint]="'treasons.hints.kind' | transloco"
+      >
+        <input
+          [id]="uid + '-kind'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="'tset.kinds.' + kind() | transloco"
+          [attr.aria-describedby]="uid + '-kind-hint'"
+        />
+        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'treasons.fields.sortOrder' | transloco"
+        [for]="uid + '-order'"
+        [required]="true"
+        [hint]="'treasons.hints.sortOrder' | transloco"
+        [error]="errorText('sortOrder')"
+      >
+        <input
+          [id]="uid + '-order'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().sortOrder"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('sortOrder') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-order-hint' + (errorText('sortOrder') ? ' ' + uid + '-order-error' : '')"
+          (input)="onFieldInput('sortOrder', $event)"
+          (blur)="markTouched('sortOrder')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [label]="'treasons.fields.code' | transloco"
+        [for]="uid + '-code'"
+        [required]="mode() === 'create'"
+        [hint]="'treasons.hints.code' | transloco"
+        [error]="errorText('code')"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          maxlength="40"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="mode() === 'create' ? ('treasons.placeholders.code' | transloco) : ''"
+          [value]="form().code"
+          [readonly]="mode() === 'edit' || !canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('code') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-code-hint' + (errorText('code') ? ' ' + uid + '-code-error' : '')"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+        @if (mode() === 'edit') {
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'treasons.fields.nameAr' | transloco"
+        [for]="uid + '-name-ar'"
+        [required]="true"
+        [hint]="'treasons.hints.nameAr' | transloco"
+        [count]="form().nameAr.length"
+        [max]="nameMax"
+        [error]="errorText('nameAr')"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameAr"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('nameAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-ar-hint' + (errorText('nameAr') ? ' ' + uid + '-name-ar-error' : '')"
+          (input)="onFieldInput('nameAr', $event)"
+          (blur)="markTouched('nameAr')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'treasons.fields.nameEn' | transloco"
+        [for]="uid + '-name-en'"
+        [required]="true"
+        [hint]="'treasons.hints.nameEn' | transloco"
+        [count]="form().nameEn.length"
+        [max]="nameMax"
+        [error]="errorText('nameEn')"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameEn"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('nameEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-en-hint' + (errorText('nameEn') ? ' ' + uid + '-name-en-error' : '')"
+          (input)="onFieldInput('nameEn', $event)"
+          (blur)="markTouched('nameEn')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'treasons.fields.requiresNote' | transloco"
+        [for]="uid + '-requires-note'"
+        [hint]="'treasons.hints.requiresNote' | transloco"
+        [hintText]="isInventoryKind() ? ('treasons.hints.inventoryNoNote' | transloco) : null"
+      >
+        <div class="flex min-h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-requires-note'"
+            [label]="'treasons.fields.requiresNote' | transloco"
+            [describedBy]="uid + '-requires-note-hint'"
+            [checked]="form().requiresNote"
+            [disabled]="!canManage() || saving() || deleting()"
+            (checkedChange)="setRequiresNote($event)"
+          />
+          <span class="text-12 leading-18 text-text">
+            {{ (form().requiresNote ? 'treasons.yes' : 'treasons.no') | transloco }}
+          </span>
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'treasons.fields.active' | transloco"
+        [for]="uid + '-active'"
+        [hint]="(isSystemRow() ? 'treasons.systemLocked' : 'treasons.hints.active') | transloco"
+        [hintText]="isSystemRow() ? ('treasons.systemLocked' | transloco) : null"
+      >
+        <div class="flex min-h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-active'"
+            [label]="'treasons.fields.active' | transloco"
+            [describedBy]="uid + '-active-hint'"
+            [checked]="form().isActive"
+            [disabled]="isSystemRow() || !canManage() || saving() || deleting()"
+            (checkedChange)="setActive($event)"
+          />
+          <span class="text-12 leading-18 text-text">
+            {{ (form().isActive ? 'treasons.status.active' : 'treasons.status.inactive') | transloco }}
+          </span>
+        </div>
+      </ui-field>
+    </div>
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || deleting() || !dirty() || !isValid()"
+        (click)="save()"
+      >
+        {{ 'treasons.actions.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving() || deleting()"
+          (click)="undo()"
+        >
+          {{ 'treasons.actions.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'treasons.modal.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving() || deleting()"
+          (click)="requestClose()"
+        >
+          {{ 'treasons.actions.cancel' | transloco }}
+        </button>
+      }
+
+      @if (mode() === 'edit' && baseReason(); as reason) {
+        @if (!reason.isSystem) {
+          <button
+            type="button"
+            uiButton
+            variant="danger"
+            class="ms-auto"
+            [loading]="deleting()"
+            [disabled]="saving() || deleting()"
+            (click)="requestDelete()"
+          >
+            {{ 'treasons.actions.delete' | transloco }}
+          </button>
+        }
+      }
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        (click)="requestClose()"
+      >
+        {{ 'treasons.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'treasons.conflict.title' | transloco"
+  [closeLabel]="'treasons.actions.close' | transloco"
+  [dismissable]="!conflictBusy()"
+  (closed)="onConflictClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'treasons.conflict.text' | transloco }}</p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="conflictBusy()"
+    (click)="reloadLatest()"
+  >
+    {{ 'treasons.conflict.reload' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="conflictBusy()"
+    (click)="saveMineOverStale()"
+  >
+    {{ 'treasons.conflict.keepMine' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'treasons.discard.title' | transloco"
+  [text]="'treasons.discard.text' | transloco"
+  [confirmLabel]="'treasons.discard.confirm' | transloco"
+  [cancelLabel]="'treasons.discard.keep' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteDialog
+  tone="danger"
+  [title]="'treasons.delete.title' | transloco"
+  [text]="'treasons.delete.text' | transloco"
+  [confirmLabel]="'treasons.actions.delete' | transloco"
+  [cancelLabel]="'treasons.actions.cancel' | transloco"
+/>

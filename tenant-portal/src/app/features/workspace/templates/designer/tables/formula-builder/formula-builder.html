@@ -1,0 +1,624 @@
+<ui-modal
+  #formulaModal
+  size="wide"
+  icon="tablerMathFunction"
+  tile="orange"
+  [title]="'tplTables.formula.title' | transloco"
+  [closeLabel]="'tplTables.actions.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <!-- Expression tree -->
+    <ng-container
+      [ngTemplateOutlet]="blockTpl"
+      [ngTemplateOutletContext]="{
+        block: rootBlock(),
+        depth: 0,
+        rowContextPath: options().rowArrayPath ?? '',
+        isRoot: true,
+        insideSumRows: false
+      }"
+    />
+
+    <!-- Live readable preview and step counter -->
+    <div class="flex flex-col gap-6 rounded-8 border border-border bg-surface-muted p-8">
+      <div class="flex items-center justify-between gap-8">
+        <span class="text-11 leading-16 font-medium text-text-muted">
+          {{ 'tplTables.formula.previewLabel' | transloco }}
+        </span>
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="stepsExceeded() ? 'bg-danger-soft text-on-danger-soft' : 'bg-neutral-soft text-on-neutral-soft'"
+        >
+          {{ 'tplTables.formula.steps' | transloco: { n: stepCount() } }}
+        </span>
+      </div>
+      <p class="text-12 leading-18 text-text" dir="auto">{{ readableExpression() }}</p>
+      @if (stepsExceeded()) {
+        <p class="text-11 leading-16 text-danger-text">
+          {{ 'tplTables.formula.stepsExceeded' | transloco }}
+        </p>
+      }
+    </div>
+
+    <!-- Display format (NODE and cells only) -->
+    @if (showFormatSection()) {
+      <div class="grid grid-cols-3 gap-x-10 gap-y-8 border-t border-border pt-8">
+        <ui-field
+          size="bare"
+          [for]="uid + '-format-kind'"
+          [label]="'tplTables.formula.format.kindLabel' | transloco"
+          [hint]="'tplTables.formula.format.kindHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-format-kind'"
+            [options]="formatOptions()"
+            [value]="formatKind()"
+            [label]="'tplTables.formula.format.kindLabel' | transloco"
+            [describedBy]="uid + '-format-kind-hint'"
+            [disabled]="readOnly()"
+            (valueChange)="formatKind.set($event)"
+          />
+        </ui-field>
+
+        @if (formatKind() !== 'NONE') {
+          <ui-field
+            [for]="uid + '-format-min'"
+            [label]="'tplTables.formula.format.minDecimals' | transloco"
+            [hint]="'tplTables.formula.format.minDecimalsHint' | transloco"
+            [error]="decimalsOrderError()"
+          >
+            <input
+              [id]="uid + '-format-min'"
+              type="number"
+              min="0"
+              max="8"
+              step="1"
+              dir="ltr"
+              [readonly]="readOnly()"
+              class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="minDecimals()"
+              (input)="onMinDecimalsInput($event)"
+            />
+          </ui-field>
+
+          <ui-field
+            [for]="uid + '-format-max'"
+            [label]="'tplTables.formula.format.maxDecimals' | transloco"
+            [hint]="'tplTables.formula.format.maxDecimalsHint' | transloco"
+          >
+            <input
+              [id]="uid + '-format-max'"
+              type="number"
+              min="0"
+              max="8"
+              step="1"
+              dir="ltr"
+              [readonly]="readOnly()"
+              class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="maxDecimals()"
+              (input)="onMaxDecimalsInput($event)"
+            />
+          </ui-field>
+
+          <div class="col-span-2 min-w-0">
+            <ui-field
+              size="bare"
+              [for]="uid + '-format-group'"
+              [label]="'tplTables.formula.format.useGrouping' | transloco"
+              [hint]="'tplTables.formula.format.useGroupingHint' | transloco"
+            >
+              <div class="flex h-field items-center">
+                @if (readOnly()) {
+                  <span class="relative inline-flex size-checkbox-size shrink-0">
+                    <input
+                      [id]="uid + '-format-group'"
+                      type="checkbox"
+                      disabled
+                      [checked]="useGrouping()"
+                      class="peer size-checkbox-size cursor-default appearance-none rounded-4 border-check border-border-field bg-surface-field checked:border-brand checked:bg-brand"
+                    />
+                    <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+                      <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                    </span>
+                  </span>
+                } @else {
+                  <ui-checkbox
+                    [checked]="useGrouping()"
+                    (checkedChange)="onUseGroupingChange($event)"
+                  />
+                }
+              </div>
+            </ui-field>
+          </div>
+
+          @if (formatKind() === 'CURRENCY') {
+            <div class="col-span-3 min-w-0">
+              <ui-field
+                size="bare"
+                [for]="uid + '-format-curr'"
+                [label]="'tplTables.formula.format.currencyFromLabel' | transloco"
+                [hint]="'tplTables.formula.format.currencyFromHint' | transloco"
+              >
+                <div class="flex items-center gap-6">
+                  <button
+                    [id]="uid + '-format-curr'"
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    aria-haspopup="dialog"
+                    [attr.aria-describedby]="uid + '-format-curr-hint'"
+                    [disabled]="readOnly()"
+                    (click)="pickCurrencyPath()"
+                  >
+                    <ng-icon name="tablerBraces" size="14" aria-hidden="true" />
+                    <span class="truncate">
+                      {{ currencyCodePath() ? resolveFieldLabel(currencyCodePath()) : ('tplTables.actions.choose' | transloco) }}
+                    </span>
+                  </button>
+                  @if (currencyCodePath()) {
+                    <span class="min-w-0 flex-1 truncate text-11 text-text-muted" dir="ltr">
+                      {{ currencyCodePath() }}
+                    </span>
+                    @if (!readOnly()) {
+                      <button
+                        type="button"
+                        uiButton
+                        variant="ghost"
+                        size="small"
+                        (click)="clearCurrencyPath()"
+                      >
+                        {{ 'tplTables.actions.clear' | transloco }}
+                      </button>
+                    }
+                  }
+                </div>
+              </ui-field>
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!readOnly()) {
+      <button type="button" uiButton variant="primary" [disabled]="stepsExceeded()" (click)="apply()">
+        {{ 'tplTables.actions.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplTables.actions.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="cancel()">
+        {{ 'tplTables.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ng-template #blockTpl let-block="block" let-depth="depth" let-rowContextPath="rowContextPath" let-isRoot="isRoot" let-insideSumRows="insideSumRows">
+  <div class="flex flex-col gap-8">
+    <!-- Operation header -->
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      <div [class]="block.opKind === 'DIVIDE' || block.opKind === 'ROUND' || block.opKind === 'COMPARE' || block.opKind === 'SUM_ROWS' ? 'col-span-1 min-w-0' : 'col-span-3 min-w-0'">
+        <ui-field
+          size="bare"
+          [for]="block.uid + '-op'"
+          [label]="'tplTables.formula.operationLabel' | transloco"
+          [hint]="'tplTables.formula.operationHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="block.uid + '-op'"
+            [options]="operationOptionsFor(block, isRoot, insideSumRows)"
+            [value]="block.opKind"
+            [label]="'tplTables.formula.operationLabel' | transloco"
+            [describedBy]="block.uid + '-op-hint'"
+            [disabled]="readOnly()"
+            (valueChange)="onOperationChange(block.uid, $event)"
+          />
+        </ui-field>
+      </div>
+
+      @if (block.opKind === 'COMPARE') {
+        <div class="col-span-2 min-w-0">
+          <ui-field
+            size="bare"
+            [for]="block.uid + '-cmp'"
+            [label]="'tplTables.formula.compareOpLabel' | transloco"
+            [hint]="'tplTables.formula.compareOpHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="block.uid + '-cmp'"
+              [options]="compareOpOptions()"
+              [value]="block.compareOp"
+              [label]="'tplTables.formula.compareOpLabel' | transloco"
+              [describedBy]="block.uid + '-cmp-hint'"
+              [disabled]="readOnly()"
+              (valueChange)="onCompareOpChange(block.uid, $event)"
+            />
+          </ui-field>
+        </div>
+      }
+
+      @if (block.opKind === 'DIVIDE' || block.opKind === 'ROUND') {
+        <div class="col-span-1 min-w-0">
+          <ui-field
+            [for]="block.uid + '-scale'"
+            [label]="'tplTables.formula.scaleLabel' | transloco"
+            [hint]="'tplTables.formula.scaleHint' | transloco"
+            [error]="scaleError(block.scale)"
+          >
+            <input
+              [id]="block.uid + '-scale'"
+              type="number"
+              min="0"
+              max="18"
+              step="1"
+              dir="ltr"
+              [readonly]="readOnly()"
+              class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="block.scale"
+              (input)="onScaleInput(block.uid, $event)"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1 min-w-0">
+          <ui-field
+            size="bare"
+            [for]="block.uid + '-round'"
+            [label]="'tplTables.formula.roundingLabel' | transloco"
+            [hint]="'tplTables.formula.roundingHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="block.uid + '-round'"
+              [options]="roundingOptions()"
+              [value]="block.rounding"
+              [label]="'tplTables.formula.roundingLabel' | transloco"
+              [describedBy]="block.uid + '-round-hint'"
+              [disabled]="readOnly()"
+              (valueChange)="onRoundingChange(block.uid, $event)"
+            />
+          </ui-field>
+        </div>
+      }
+
+      @if (block.opKind === 'SUM_ROWS') {
+        <div class="col-span-2 min-w-0">
+          <ui-field
+            size="bare"
+            [for]="block.uid + '-sum-src'"
+            [label]="'tplTables.formula.sumSourceLabel' | transloco"
+            [hint]="'tplTables.formula.sumSourceHint' | transloco"
+            [required]="true"
+            [error]="sumSourceError(block)"
+          >
+            <div class="flex items-center gap-6">
+              @if (arrayOptions().length > 0) {
+                <ui-dropdown
+                  class="min-w-0 flex-1"
+                  size="field"
+                  [id]="block.uid + '-sum-src'"
+                  [options]="arrayOptions()"
+                  [value]="block.sumRowsSourcePath"
+                  [label]="'tplTables.formula.sumSourceLabel' | transloco"
+                  [describedBy]="block.uid + '-sum-src-hint' + (sumSourceError(block) ? ' ' + block.uid + '-sum-src-error' : '')"
+                  [disabled]="readOnly()"
+                  (valueChange)="onSumSourceChange(block.uid, $event)"
+                />
+              } @else {
+                <button
+                  [id]="block.uid + '-sum-src'"
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  aria-haspopup="dialog"
+                  [attr.aria-describedby]="block.uid + '-sum-src-hint' + (sumSourceError(block) ? ' ' + block.uid + '-sum-src-error' : '')"
+                  [disabled]="readOnly()"
+                  (click)="pickSumSourcePath(block.uid, block.sumRowsSourcePath)"
+                >
+                  {{ block.sumRowsSourcePath ? resolveFieldLabel(block.sumRowsSourcePath) : ('tplTables.actions.choose' | transloco) }}
+                </button>
+              }
+            </div>
+          </ui-field>
+        </div>
+      }
+    </div>
+
+    <!-- Operand slots -->
+    @let childRowPath = block.opKind === 'SUM_ROWS' ? block.sumRowsSourcePath : rowContextPath;
+    <div class="flex flex-col gap-6">
+      @for (slot of block.operands; track slot.uid; let idx = $index) {
+        <div class="flex flex-col gap-8 rounded-8 border border-border bg-surface-muted p-8">
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-12 leading-18 font-medium text-text">
+              {{ block.opKind === 'DIRECT' ? ('tplTables.formula.valueLabel' | transloco) : slotTitle(block.opKind, idx) }}
+            </span>
+            @if (canRemoveOperand(block.opKind, block.operands.length) && !readOnly()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'tplTables.actions.remove' | transloco"
+                [title]="'tplTables.actions.remove' | transloco"
+                (click)="removeOperand(block.uid, idx)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+
+          @if (slot.valueType === 'FUNCTION_CALL') {
+            <div class="flex h-field items-center gap-6 rounded-8 border border-border bg-neutral-soft px-8 text-12 text-text-muted">
+              <ng-icon name="tablerLock" size="14" aria-hidden="true" />
+              <span class="truncate">{{ 'tplTables.formula.functionGated' | transloco }}</span>
+            </div>
+          } @else {
+            <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+              <div class="col-span-1 min-w-0">
+                <ui-field
+                  size="bare"
+                  [for]="slot.uid + '-vtype'"
+                  [label]="'tplTables.formula.valueTypeLabel' | transloco"
+                  [hint]="'tplTables.formula.valueTypeHint' | transloco"
+                  [error]="slotValueTypeError(block, idx, slot)"
+                >
+                  <ui-dropdown
+                    class="w-full"
+                    size="field"
+                    [id]="slot.uid + '-vtype'"
+                    [options]="slotValueTypeOptionsFor(slot)"
+                    [value]="slot.valueType"
+                    [label]="'tplTables.formula.valueTypeLabel' | transloco"
+                    [describedBy]="slot.uid + '-vtype-hint' + (slotValueTypeError(block, idx, slot) ? ' ' + slot.uid + '-vtype-error' : '')"
+                    [disabled]="readOnly()"
+                    (valueChange)="onValueTypeChange(slot.uid, $event, childRowPath)"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-2 min-w-0">
+                @switch (slot.valueType) {
+                  @case ('FIELD') {
+                    <ui-field
+                      size="bare"
+                      [for]="slot.uid + '-field'"
+                      [label]="'tplTables.formula.fieldLabel' | transloco"
+                      [hint]="'tplTables.formula.fieldHint' | transloco"
+                      [required]="true"
+                      [error]="fieldSlotError(slot)"
+                    >
+                      <div class="flex flex-wrap items-center gap-6">
+                        <button
+                          [id]="slot.uid + '-field'"
+                          type="button"
+                          uiButton
+                          variant="secondary"
+                          size="small"
+                          aria-haspopup="dialog"
+                          [attr.aria-describedby]="slot.uid + '-field-hint' + (fieldSlotError(slot) ? ' ' + slot.uid + '-field-error' : '')"
+                          [disabled]="readOnly()"
+                          (click)="pickSlotField(slot, block.opKind, idx, childRowPath, false)"
+                        >
+                          <ng-icon name="tablerBraces" size="14" aria-hidden="true" />
+                          <span class="truncate">
+                            {{ slot.path ? '«' + resolveFieldLabel(slot.path) + '»' : ('tplTables.formula.chooseField' | transloco) }}
+                          </span>
+                        </button>
+                        @if (childRowPath && !readOnly()) {
+                          <button
+                            type="button"
+                            uiButton
+                            variant="ghost"
+                            size="small"
+                            aria-haspopup="dialog"
+                            (click)="pickSlotField(slot, block.opKind, idx, childRowPath, true)"
+                          >
+                            {{ 'tplTables.actions.useDocumentField' | transloco }}
+                          </button>
+                        }
+                      </div>
+                      @if (slot.path) {
+                        <p class="mt-2 truncate text-11 leading-16 text-text-muted" dir="ltr">{{ slot.path }}</p>
+                      }
+                    </ui-field>
+                  }
+
+                  @case ('NUMBER') {
+                    <div class="grid grid-cols-2 gap-8">
+                      <ui-field
+                        [for]="slot.uid + '-num'"
+                        [label]="'tplTables.formula.numberLabel' | transloco"
+                        [hint]="'tplTables.formula.numberHint' | transloco"
+                        [error]="numberError(slot.decimalValue, slot.uid)"
+                      >
+                        <input
+                          [id]="slot.uid + '-num'"
+                          type="text"
+                          dir="ltr"
+                          [readonly]="readOnly()"
+                          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                          [value]="slot.decimalValue"
+                          (input)="onDecimalInput(slot.uid, $event)"
+                          (blur)="markTouched(slot.uid + '-num')"
+                        />
+                      </ui-field>
+
+                      <ui-field
+                        size="bare"
+                        [for]="slot.uid + '-dim'"
+                        [label]="'tplTables.formula.dimensionLabel' | transloco"
+                        [hint]="'tplTables.formula.dimensionHint' | transloco"
+                      >
+                        <ui-dropdown
+                          class="w-full"
+                          size="field"
+                          [id]="slot.uid + '-dim'"
+                          [options]="dimensionOptions()"
+                          [value]="slot.dimension"
+                          [label]="'tplTables.formula.dimensionLabel' | transloco"
+                          [describedBy]="slot.uid + '-dim-hint'"
+                          [disabled]="readOnly()"
+                          (valueChange)="onDimensionChange(slot.uid, $event)"
+                        />
+                      </ui-field>
+                    </div>
+                  }
+
+                  @case ('TEXT') {
+                    <ui-field
+                      [for]="slot.uid + '-str'"
+                      [label]="'tplTables.formula.textLabel' | transloco"
+                      [hint]="'tplTables.formula.textHint' | transloco"
+                    >
+                      <input
+                        [id]="slot.uid + '-str'"
+                        type="text"
+                        [readonly]="readOnly()"
+                        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                        [value]="slot.stringValue"
+                        (input)="onTextInput(slot.uid, $event)"
+                      />
+                    </ui-field>
+                  }
+
+                  @case ('DATE') {
+                    <ui-field
+                      size="bare"
+                      [for]="slot.uid + '-date'"
+                      [label]="'tplTables.formula.dateValueLabel' | transloco"
+                      [hint]="'tplTables.formula.dateValueHint' | transloco"
+                      [error]="dateSlotError(slot)"
+                    >
+                      <ui-date-field
+                        [id]="slot.uid + '-date'"
+                        [ariaLabel]="'tplTables.formula.dateValueLabel' | transloco"
+                        [describedBy]="slot.uid + '-date-hint' + (dateSlotError(slot) ? ' ' + slot.uid + '-date-error' : '')"
+                        [disabled]="readOnly()"
+                        [value]="slot.dateValue || null"
+                        (valueChange)="onDateChange(slot.uid, $event)"
+                      />
+                    </ui-field>
+                  }
+
+                  @case ('BOOLEAN') {
+                    <ui-field
+                      size="bare"
+                      [for]="slot.uid + '-bool'"
+                      [label]="'tplTables.formula.boolLabel' | transloco"
+                      [hint]="'tplTables.formula.boolHint' | transloco"
+                    >
+                      <ui-segmented
+                        [id]="slot.uid + '-bool'"
+                        [options]="boolOptions()"
+                        [label]="'tplTables.formula.boolLabel' | transloco"
+                        [describedBy]="slot.uid + '-bool-hint'"
+                        [value]="slot.boolValue ? 'true' : 'false'"
+                        (valueChange)="onBoolChange(slot.uid, $event)"
+                      />
+                    </ui-field>
+                  }
+
+                  @case ('EMPTY') {
+                    <div class="flex h-field items-center pt-16 text-12 text-text-muted">
+                      {{ 'tplTables.formula.emptyValue' | transloco }}
+                    </div>
+                  }
+
+                  @case ('FORMULA_REF') {
+                    <ui-field
+                      size="bare"
+                      [for]="slot.uid + '-fref'"
+                      [label]="'tplTables.formula.formulaRefLabel' | transloco"
+                      [hint]="'tplTables.formula.formulaRefHint' | transloco"
+                      [error]="formulaRefError(slot)"
+                    >
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [id]="slot.uid + '-fref'"
+                        [options]="otherFormulaOptions()"
+                        [value]="slot.formulaId"
+                        [label]="'tplTables.formula.formulaRefLabel' | transloco"
+                        [describedBy]="slot.uid + '-fref-hint' + (formulaRefError(slot) ? ' ' + slot.uid + '-fref-error' : '')"
+                        [disabled]="readOnly()"
+                        (valueChange)="onFormulaRefChange(slot.uid, $event)"
+                      />
+                    </ui-field>
+                  }
+
+                  @case ('PARAMETER') {
+                    <ui-field
+                      size="bare"
+                      [for]="slot.uid + '-param'"
+                      [label]="'tplTables.formula.parameterLabel' | transloco"
+                      [hint]="'tplTables.formula.parameterHint' | transloco"
+                      [error]="parameterError(slot)"
+                    >
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [id]="slot.uid + '-param'"
+                        [options]="parameterOptions()"
+                        [value]="slot.parameterName"
+                        [label]="'tplTables.formula.parameterLabel' | transloco"
+                        [describedBy]="slot.uid + '-param-hint' + (parameterError(slot) ? ' ' + slot.uid + '-param-error' : '')"
+                        [disabled]="readOnly()"
+                        (valueChange)="onParameterChange(slot.uid, $event)"
+                      />
+                    </ui-field>
+                  }
+                }
+              </div>
+            </div>
+
+            @if (slot.valueType === 'OPERATION') {
+              <div class="border-s-2 border-brand ps-10">
+                <ng-container
+                  [ngTemplateOutlet]="blockTpl"
+                  [ngTemplateOutletContext]="{
+                    block: slot,
+                    depth: depth + 1,
+                    rowContextPath: childRowPath,
+                    isRoot: false,
+                    insideSumRows: insideSumRows || block.opKind === 'SUM_ROWS'
+                  }"
+                />
+              </div>
+            }
+          }
+        </div>
+      }
+    </div>
+
+    @if (canAddOperand(block.opKind, block.operands.length) && !readOnly()) {
+      <div>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          (click)="addOperand(block.uid, rowContextPath)"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'tplTables.actions.addValue' | transloco }}
+        </button>
+      </div>
+    }
+  </div>
+</ng-template>
+
+@if (state && !pickField()) {
+  <app-tpl-field-picker #internalPicker />
+}

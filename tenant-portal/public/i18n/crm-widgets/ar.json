@@ -1,0 +1,127 @@
+{
+  "newWidget": "عنصر جديد",
+  "search": "بحث في العناصر",
+  "source": "المصدر",
+  "sourceHint": "تصفية العناصر حسب مصدر بيانات إدارة علاقات العملاء.",
+  "allSources": "جميع المصادر",
+  "owner": "المالك",
+  "ownerHint": "تصفية العناصر حسب المالك الحالي.",
+  "allOwners": "جميع الملاك",
+  "status": "الحالة",
+  "statusHint": "تصفية حسب حالة دورة الحياة (مسودة أو منشور أو مؤرشف).",
+  "allStatuses": "جميع الحالات",
+  "name": "الاسم",
+  "kind": "النوع",
+  "usedOn": "مستخدم في",
+  "usedOnCount": "اللوحات المستخدم فيها: {{count}}",
+  "updated": "آخر تحديث",
+  "tableLabel": "قائمة العناصر",
+  "tabsLabel": "تبويبات نطاق العناصر",
+  "viewSwitcher": "طريقة العرض",
+  "draftChanges": "تعديلات غير منشورة",
+  "loadMore": "تحميل المزيد",
+  "clearFilters": "مسح عوامل التصفية",
+  "loadFailedTitle": "تعذر تحميل العناصر",
+  "views": {
+    "table": "جدول",
+    "cards": "بطاقات"
+  },
+  "tabs": {
+    "mine": "عناصري",
+    "shared": "تمت مشاركتها معي",
+    "published": "المنشورة"
+  },
+  "statusValue": {
+    "DRAFT": "مسودة",
+    "PUBLISHED": "منشور",
+    "ARCHIVED": "مؤرشف"
+  },
+  "sources": {
+    "leads": "العملاء المحتملون",
+    "opportunities": "الفرص",
+    "activities": "الأنشطة",
+    "customer_profiles": "ملفات العملاء",
+    "targets": "المستهدفات"
+  },
+  "actions": {
+    "menu": "إجراءات العنصر",
+    "open": "فتح",
+    "clone": "استنساخ",
+    "share": "مشاركة",
+    "transfer": "نقل الملكية",
+    "archive": "أرشفة",
+    "restore": "استعادة",
+    "delete": "حذف"
+  },
+  "empty": {
+    "filtered": "لا توجد عناصر تطابق عوامل التصفية الحالية.",
+    "mine": "لا تملك أي عناصر بعد.",
+    "shared": "لم تتم مشاركة أي عناصر معك بعد.",
+    "published": "لا توجد عناصر منشورة متاحة."
+  },
+  "deleteConfirm": {
+    "title": "حذف العنصر",
+    "text": "هل أنت متأكد من حذف \"{{name}}\" نهائيًا؟",
+    "deletedToast": "تم حذف العنصر"
+  },
+  "modal": {
+    "reason": "السبب"
+  },
+  "archiveModal": {
+    "archiveTitle": "أرشفة العنصر",
+    "restoreTitle": "استعادة العنصر",
+    "archiveAction": "أرشفة",
+    "restoreAction": "استعادة",
+    "dashboardsAffected": "اللوحات المتأثرة",
+    "dashboardsAffectedHint": "اللوحات التي تحتوي حاليًا على هذا العنصر.",
+    "placementsHidden": "المواضع التي ستُخفى",
+    "placementsHiddenHint": "مواضع اللوحات التي ستُخفى أثناء أرشفة العنصر.",
+    "placementsToResume": "المواضع المؤهلة للاستئناف",
+    "placementsToResumeHint": "المواضع المخفية المؤهلة للظهور مجددًا بعد استعادة العنصر.",
+    "alertRules": "قواعد التنبيه",
+    "alertRulesHint": "قواعد التنبيه النشطة المرتبطة بهذا العنصر وأثر الإجراء عليها.",
+    "willSuspend": "ستتوقف مؤقتًا",
+    "ownerMustResume": "يجب على المالك استئنافها",
+    "none": "لا يوجد",
+    "reasonHint": "ملاحظة اختيارية توثق سبب تغيير الحالة (بحد أقصى 500 حرف).",
+    "reasonPlaceholder": "سبب اختياري لهذا التغيير...",
+    "reasonTooLong": "يجب ألا يتجاوز السبب 500 حرف.",
+    "archivedToast": "تمت أرشفة العنصر",
+    "restoredToast": "تمت استعادة العنصر"
+  },
+  "transferModal": {
+    "title": "نقل ملكية العنصر",
+    "action": "نقل الملكية",
+    "newOwner": "المالك الجديد",
+    "newOwnerHint": "اختر عضو الفريق النشط الذي ستنتقل إليه ملكية هذا العنصر.",
+    "newOwnerPlaceholder": "اختر المالك الجديد",
+    "searchOwners": "البحث في أعضاء الفريق",
+    "noOwners": "لا يوجد أعضاء فريق مطابقون.",
+    "placementsAffected": "المواضع المتأثرة",
+    "placementsAffectedHint": "مواضع اللوحات التي تعرض هذا العنصر حاليًا.",
+    "sharesKept": "المشاركات المحتفظ بها",
+    "sharesKeptHint": "أذونات المشاركة الحالية للمستخدمين والفرق التي ستبقى بعد النقل.",
+    "ownersLosingAccess": "ملاك لوحات سيفقدون الوصول",
+    "ownersLosingAccessHint": "ملاك اللوحات الذين سيفقدون الوصول التلقائي إلى هذا العنصر.",
+    "readersMayNeedShare": "قرّاء قد يحتاجون إلى مشاركة",
+    "readersMayNeedShareHint": "مشاهدو اللوحات الذين قد يحتاجون إلى منحهم مشاركة صريحة بعد النقل.",
+    "reasonHint": "توضيح مطلوب لسبب نقل الملكية (من 1 إلى 500 حرف).",
+    "reasonPlaceholder": "اذكر سبب نقل الملكية...",
+    "reasonRequired": "أدخل سبب نقل الملكية.",
+    "reasonTooLong": "يجب ألا يتجاوز السبب 500 حرف.",
+    "acknowledgeLabel": "الإقرار",
+    "acknowledge": "أدرك الآثار المترتبة",
+    "acknowledgeHint": "أقرّ بمراجعة أثر نقل الملكية على المواضع وصلاحيات الوصول قبل المتابعة.",
+    "transferredToast": "تم نقل ملكية العنصر"
+  },
+  "cloneModal": {
+    "title": "استنساخ العنصر",
+    "action": "استنساخ",
+    "name": "الاسم",
+    "nameHint": "اسم نسخة المسودة الخاصة الجديدة (من 1 إلى 120 حرفًا).",
+    "nameRequired": "اسم العنصر مطلوب.",
+    "nameTooLong": "يجب ألا يتجاوز الاسم 120 حرفًا.",
+    "copyName": "{{name}} (نسخة)",
+    "clonedToast": "تم استنساخ العنصر كمسودة"
+  }
+}

@@ -1,0 +1,25 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerHistory"
+  tile="bg-icon-green"
+  [title]="'phoneCalls.history.title' | transloco"
+  [closeLabel]="'phoneCalls.history.close' | transloco"
+  [hasFooter]="false"
+  bodyClass="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+  (closed)="onModalClosed()"
+>
+  <div class="call-history-body flex min-h-0 flex-1 flex-col overflow-hidden p-10">
+    @if (opened()) {
+      <app-call-log-table
+        [load]="loadCalls"
+        [columns]="['type', 'party', 'date', 'duration', 'actions']"
+        [canCallBack]="true"
+        [callBackDisabled]="phone.busy()"
+        [reloadToken]="reloadToken()"
+        (callBack)="onCallBack($event)"
+        (openRecord)="onOpenRecord()"
+      />
+    }
+  </div>
+</ui-modal>

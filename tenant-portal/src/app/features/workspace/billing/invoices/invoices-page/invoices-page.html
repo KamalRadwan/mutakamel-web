@@ -1,0 +1,224 @@
+@if (!canRenderContent()) {
+  <app-billing-forbidden />
+} @else if (loadFailed() && !loading()) {
+  <app-billing-failed [correlationId]="correlationId()" (retry)="reload()" />
+} @else {
+  <div class="flex shrink-0 items-center justify-end">
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="loading()"
+      [attr.aria-label]="'settings.common.reload' | transloco"
+      [title]="'settings.common.reload' | transloco"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+    </button>
+  </div>
+
+  @if (!loading() && rows().length === 0) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerFileInvoice" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'binv.list.empty' | transloco }}</p>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'binv.list.tableLabel' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid grid-cols-billing-invoice-row-actions h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'binv.list.cols.number' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.status' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.purpose' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.issued' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.due' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.period' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.total' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.paid' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+            {{ 'binv.list.cols.outstanding' | transloco }}
+          </span>
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'binv.list.cols.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid grid-cols-billing-invoice-row-actions h-table-row rounded-10 border border-border bg-surface shadow-card"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 animate-pulse rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 animate-pulse rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (inv of rows(); track inv.id) {
+            <div
+              role="row"
+              tabindex="0"
+              class="mt-6 grid grid-cols-billing-invoice-row-actions h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="openInvoice(inv)"
+              (keydown)="onRowKeydown($event, inv)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <button
+                  type="button"
+                  dir="ltr"
+                  class="min-w-0 cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium text-text tabular-nums outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="$event.stopPropagation(); openInvoice(inv)"
+                >
+                  {{ inv.number }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @let badge = statusBadge(inv.status);
+                <span [class]="badge.classes">{{ badge.labelKey | transloco }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @let purpose = purposeBadge(inv.purpose);
+                <span [class]="purpose.classes">{{ purpose.labelKey | transloco }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 leading-18 text-text-muted">{{ formatDate(inv.issuedAt) }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="truncate text-12 leading-18"
+                  [class]="inv.status === 'OVERDUE' ? 'font-medium text-danger-text' : 'text-text-muted'"
+                >
+                  {{ formatDate(inv.dueAt) }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 leading-18 text-text-muted">
+                  {{ formatPeriod(inv.periodStart, inv.periodEnd) }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end gap-6 border-s border-border px-10">
+                @if (inv.canonicalUsd) {
+                  <span dir="ltr" class="truncate text-13 leading-18 font-medium tabular-nums">
+                    {{ formatUsd(inv.totalUsd) }}
+                  </span>
+                } @else {
+                  <span dir="ltr" class="truncate text-13 leading-18 font-medium tabular-nums">
+                    {{ formatAmount(inv.legacyOriginalAmounts?.total ?? null, inv.legacyOriginalAmounts?.currencyCode ?? inv.currencyCode) }}
+                  </span>
+                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 leading-16 font-medium text-on-neutral-soft whitespace-nowrap">
+                    {{ 'binv.list.legacy' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+                @if (inv.canonicalUsd) {
+                  <span dir="ltr" class="truncate text-13 leading-18 tabular-nums">
+                    {{ formatUsd(inv.amountPaidUsd) }}
+                  </span>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'bill.common.none' | transloco }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+                @if (inv.canonicalUsd) {
+                  <span dir="ltr" class="truncate text-13 leading-18 font-medium tabular-nums">
+                    {{ formatUsd(inv.outstandingUsd) }}
+                  </span>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'bill.common.none' | transloco }}</span>
+                }
+              </span>
+
+              <span
+                role="cell"
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="actionsFor(inv)"
+                  [label]="'binv.list.cols.actions' | transloco"
+                  (selected)="onAction(inv, $event)"
+                />
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (loading() ? total() > 0 : rows().length > 0) {
+      <footer class="mt-auto border-t border-border pt-8">
+        <ui-pagination
+          [total]="total()"
+          [pageSizes]="pageSizes"
+          [label]="'binv.list.pagination' | transloco"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          (pageChange)="onPageChange($event)"
+          (pageSizeChange)="onPageSizeChange($event)"
+        />
+      </footer>
+    }
+  }
+}

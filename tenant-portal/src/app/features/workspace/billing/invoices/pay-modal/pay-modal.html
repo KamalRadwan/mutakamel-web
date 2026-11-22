@@ -1,0 +1,199 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerCreditCard"
+  tile="bg-icon-violet"
+  [title]="'binv.pay.title' | transloco"
+  [subtitle]="invoiceNumber()"
+  [closeLabel]="'bill.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @switch (step()) {
+    @case ('loading') {
+      <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="status" aria-live="polite" aria-busy="true">
+        <ng-icon name="tablerLoader2" size="16" class="animate-spin text-accent" aria-hidden="true" />
+        <p class="text-12 leading-18 text-text-muted">{{ 'binv.pay.loading' | transloco }}</p>
+      </div>
+    }
+
+    @case ('error') {
+      <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="status" aria-live="polite">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'binv.pay.loadFailed' | transloco }}</p>
+      </div>
+    }
+
+    @case ('attempt') {
+      @if (attempt(); as active) {
+        <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="status" aria-live="polite">
+          @switch (active.recoveryAction) {
+            @case ('RECONCILIATION_REQUIRED') {
+              <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+                <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+              </span>
+              <p class="text-13 leading-18 text-text">{{ 'binv.pay.underReview' | transloco }}</p>
+            }
+
+            @case ('CONTINUE_CHECKOUT') {
+              <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+                <ng-icon name="tablerCreditCard" size="18" aria-hidden="true" />
+              </span>
+              <p class="text-13 leading-18 text-text">{{ 'binv.pay.inProgress' | transloco }}</p>
+            }
+
+            @default {
+              <ng-icon
+                name="tablerLoader2"
+                size="16"
+                class="text-accent"
+                [class.animate-spin]="poller.polling()"
+                aria-hidden="true"
+              />
+              <p class="text-13 leading-18 text-text">{{ 'binv.pay.checking' | transloco }}</p>
+            }
+          }
+
+          @if (attemptExpiryText(); as expiry) {
+            <p class="text-12 leading-18 text-text-muted tabular-nums">
+              {{ 'binv.pay.expiresAt' | transloco: { time: expiry } }}
+            </p>
+          }
+        </div>
+      }
+    }
+
+    @case ('quote') {
+      <div class="flex flex-col gap-10">
+        <div class="flex items-end gap-8">
+          <ui-field
+            class="min-w-0 flex-1"
+            size="bare"
+            [label]="'binv.pay.currency' | transloco"
+            [for]="uid + '-currency'"
+            [hint]="'binv.pay.currencyHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-currency'"
+              [describedBy]="uid + '-currency-hint'"
+              [options]="currencyOptions()"
+              [value]="selectedCurrency()"
+              [label]="'binv.pay.currency' | transloco"
+              [disabled]="quoting() || paying()"
+              (valueChange)="onCurrencyChange($event)"
+            />
+          </ui-field>
+
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            class="shrink-0"
+            [loading]="quoting()"
+            [disabled]="paying() || !selectedCurrency()"
+            (click)="requestQuote()"
+          >
+            {{ (quoteExpired() ? 'binv.pay.getNewAmount' : 'binv.pay.getAmount') | transloco }}
+          </button>
+        </div>
+
+        @if (quote(); as q) {
+          <div
+            class="flex flex-col gap-8 rounded-10 border border-border p-10 shadow-card transition-colors duration-fast"
+            [class]="quoteExpired() ? 'bg-surface-muted text-text-muted' : 'bg-surface text-text'"
+          >
+            <div class="flex items-center justify-between gap-8 text-12 leading-18">
+              <span class="text-text-muted">{{ 'binv.pay.outstanding' | transloco }}</span>
+              <span dir="ltr" class="tabular-nums">{{ formatUsd(q.invoiceOutstandingUsd) }}</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-8 text-12 leading-18">
+              <span class="text-text-muted">{{ 'binv.pay.fromWallet' | transloco }}</span>
+              <span dir="ltr" class="tabular-nums">{{ formatUsd(q.walletAppliedUsd) }}</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-8 text-12 leading-18">
+              <span class="text-text-muted">{{ 'binv.pay.toPayNow' | transloco }}</span>
+              <span dir="ltr" class="tabular-nums">{{ formatUsd(q.gatewayAmountUsd) }}</span>
+            </div>
+
+            <div class="border-t border-border"></div>
+
+            <div class="flex items-baseline justify-between gap-8">
+              <span class="text-13 leading-18 font-medium">{{ 'binv.pay.youPay' | transloco }}</span>
+              <span
+                dir="ltr"
+                class="text-20 leading-26 font-medium tabular-nums"
+                [class]="quoteExpired() ? 'text-text-muted' : 'text-text'"
+              >
+                {{ formatAmount(q.providerAmount, q.providerCurrencyCode) }}
+              </span>
+            </div>
+
+            @if (isForeignCurrency()) {
+              <div class="flex items-center justify-between gap-8 text-12 leading-18 text-text-muted">
+                <span>{{ 'binv.pay.rateLabel' | transloco }}</span>
+                <bdi dir="ltr" class="tabular-nums">
+                  {{ 'binv.pay.rateValue' | transloco: { rate: formatRate(q.currencyUnitsPerUsd), currency: q.providerCurrencyCode } }}
+                </bdi>
+              </div>
+            }
+
+            @if (isWalletOnly()) {
+              <p class="text-12 leading-18 text-success-text">{{ 'binv.pay.walletCoversAll' | transloco }}</p>
+            }
+
+            <div class="text-11 leading-16">
+              @if (quoteExpired()) {
+                <p class="font-medium text-warning-text">{{ 'binv.pay.expired' | transloco }}</p>
+              } @else {
+                <p class="text-text-muted tabular-nums">
+                  {{ 'binv.pay.validFor' | transloco: { time: countdownText() } }}
+                </p>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  @if (step() === 'quote') {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [loading]="paying()"
+      [disabled]="!quote() || quoteExpired() || quoting()"
+      (click)="confirmPay()"
+    >
+      {{ confirmLabel() }}
+    </button>
+  } @else if (step() === 'attempt' && attempt()?.recoveryAction === 'CONTINUE_CHECKOUT') {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [disabled]="!attempt()?.checkoutUrl"
+      (click)="openCheckoutUrl()"
+    >
+      {{ (popupBlocked() ? 'binv.pay.openPaymentPage' : 'binv.pay.continuePayment') | transloco }}
+    </button>
+  } @else if (step() === 'attempt' && attempt()?.recoveryAction === 'CHECK_STATUS' && pollTimedOut()) {
+    <button modal-footer type="button" uiButton (click)="retryPolling()">
+      {{ 'binv.pay.checkAgain' | transloco }}
+    </button>
+  } @else if (step() === 'error') {
+    <button modal-footer type="button" uiButton (click)="retryOpen()">
+      {{ 'bill.common.retry' | transloco }}
+    </button>
+  }
+
+  <button modal-footer type="button" uiButton variant="secondary" (click)="close()">
+    {{ 'bill.common.close' | transloco }}
+  </button>
+</ui-modal>

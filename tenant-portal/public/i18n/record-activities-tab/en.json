@@ -1,0 +1,48 @@
+{
+  "new": "New activity",
+  "filter": {
+    "label": "Show activities",
+    "hint": "Choose which activities of this record to list: open, completed or all.",
+    "open": "Open ({{n}})",
+    "done": "Completed ({{n}})",
+    "all": "All ({{n}})"
+  },
+  "due": {
+    "OVERDUE": "Overdue",
+    "TODAY": "Today",
+    "UPCOMING": "Upcoming"
+  },
+  "summary": {
+    "overdue": "{{n}} overdue",
+    "today": "{{n}} today",
+    "upcoming": "{{n}} upcoming"
+  },
+  "status": {
+    "DONE": "Done",
+    "CANCELLED": "Cancelled"
+  },
+  "day": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow"
+  },
+  "loadMore": "Load more ({{shown}} of {{total}})",
+  "empty": {
+    "title": "No open activities",
+    "text": "Plan a call, meeting or task for this record."
+  },
+  "emptyFiltered": "No activities to show.",
+  "loadFailed": "Could not load the activities.",
+  "retry": "Try again",
+  "openActivity": "Open activity {{subject}}",
+  "list": "Activities of this record",
+  "type": {
+    "TODO": "To-do",
+    "CALL": "Call",
+    "MEETING": "Meeting",
+    "EMAIL": "Email",
+    "VISIT": "Visit",
+    "FOLLOW_UP": "Follow-up",
+    "OTHER": "Other"
+  }
+}

@@ -1,0 +1,303 @@
+<header class="rounded-10 border border-border bg-surface shadow-card">
+  @if (loading() && !family()) {
+    <div aria-busy="true">
+      <div class="flex flex-wrap items-center gap-8 px-10 py-8">
+        <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-bp-form-1col max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+      <div class="border-t border-border px-10 py-8">
+        <span class="block h-badge w-full animate-pulse rounded-8 bg-neutral-soft"></span>
+      </div>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-wrap items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'profiles.version.back' | transloco"
+        [title]="'profiles.version.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerFileSettings" size="15" />
+      </span>
+    </div>
+  } @else {
+    <div class="flex flex-wrap items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'profiles.version.back' | transloco"
+        [title]="'profiles.version.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerFileSettings" size="15" />
+      </span>
+
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-8">
+          <h1 class="truncate text-16 leading-24 font-medium text-text">
+            <bdi dir="ltr">{{ headerCode() }}</bdi>
+            @if (documentType(); as type) {
+              <span> · {{ 'profiles.types.' + type | transloco }}</span>
+            }
+            @if (isNewMode()) {
+              <span> · {{ 'profiles.version.newVersionTitle' | transloco }}</span>
+            } @else if (versionDetail(); as ver) {
+              <span> · {{ 'profiles.version.versionLabel' | transloco: { n: ver.profileVersion } }}</span>
+            }
+          </h1>
+
+          <app-version-status-badge module="profile" [status]="currentStatus()" />
+        </div>
+
+        <p class="truncate text-11 leading-16 text-text-muted">{{ headerSubtitle() }}</p>
+      </div>
+
+      <div class="ms-auto flex shrink-0 flex-wrap items-center gap-8">
+        @if (isNewMode()) {
+          @if (can.manage) {
+            <button type="button" uiButton variant="primary" [loading]="saving()" (click)="submitCreateVersion()">
+              <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+              {{ 'profiles.version.createVersion' | transloco }}
+            </button>
+          }
+          <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="goBack()">
+            {{ 'governance.common.cancel' | transloco }}
+          </button>
+        } @else if (versionDetail(); as ver) {
+          @if (ver.status === 'DRAFT' && can.test) {
+            <button type="button" uiButton variant="primary" [loading]="validating()" (click)="runValidate()">
+              <ng-icon name="tablerCheck" size="15" aria-hidden="true" />
+              {{ 'profiles.version.validate' | transloco }}
+            </button>
+          } @else if (ver.status === 'TESTED' && can.publish) {
+            <span [attr.title]="isSelfAuthor() ? ('governance.makerChecker.self' | transloco) : null">
+              <button
+                type="button"
+                uiButton
+                variant="primary"
+                [disabled]="isSelfAuthor() || publishing()"
+                (click)="openPublishModal()"
+              >
+                <ng-icon name="tablerSend" size="15" aria-hidden="true" />
+                {{ 'profiles.version.publish' | transloco }}
+              </button>
+            </span>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="border-t border-border px-10 py-8">
+      <app-lifecycle-stepper
+        [steps]="lifecycleSteps()"
+        [current]="stepperCurrent()"
+        [label]="'profiles.version.lifecycleLabel' | transloco"
+      />
+    </div>
+  }
+</header>
+
+@if (loadFailed()) {
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    role="alert"
+  >
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'profiles.version.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'tradeShared.common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (loading() && !family()) {
+  <div class="flex flex-col gap-8" aria-busy="true">
+    <span class="h-table-head w-full animate-pulse rounded-10 bg-neutral-soft"></span>
+    @for (row of [0, 1, 2, 3, 4]; track row) {
+      <span class="h-table-row w-full animate-pulse rounded-10 bg-neutral-soft"></span>
+    }
+  </div>
+} @else if (family(); as fam) {
+  @if (isNewMode() && can.manage) {
+    <section
+      class="rounded-10 border border-border bg-surface p-10 shadow-card"
+      [attr.aria-label]="'profiles.version.datesCardLabel' | transloco"
+    >
+      <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+        <ui-field
+          size="bare"
+          [label]="'profiles.version.effectiveFrom' | transloco"
+          [for]="uid + '-from'"
+          [required]="true"
+          [hint]="'profiles.version.effectiveFromHint' | transloco"
+          [error]="fromError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-from'"
+              [ariaLabel]="'profiles.version.effectiveFrom' | transloco"
+              [describedBy]="fromDescribedBy()"
+              [todayLabel]="'profiles.version.today' | transloco"
+              [prevMonthLabel]="'profiles.version.prevMonth' | transloco"
+              [nextMonthLabel]="'profiles.version.nextMonth' | transloco"
+              [invalid]="!!fromError()"
+              [disabled]="saving()"
+              [(value)]="fromDate"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-from-time'"
+              [ariaLabel]="'profiles.version.effectiveFrom' | transloco"
+              [describedBy]="fromDescribedBy()"
+              [hourLabel]="'profiles.version.hour' | transloco"
+              [minuteLabel]="'profiles.version.minute' | transloco"
+              [invalid]="!!fromError()"
+              [disabled]="saving()"
+              [(value)]="fromTime"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'profiles.version.effectiveTo' | transloco"
+          [for]="uid + '-to'"
+          [hint]="'profiles.version.effectiveToHint' | transloco"
+          [error]="toError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-to'"
+              [ariaLabel]="'profiles.version.effectiveTo' | transloco"
+              [describedBy]="toDescribedBy()"
+              [todayLabel]="'profiles.version.today' | transloco"
+              [prevMonthLabel]="'profiles.version.prevMonth' | transloco"
+              [nextMonthLabel]="'profiles.version.nextMonth' | transloco"
+              [min]="fromDate()"
+              [invalid]="!!toError()"
+              [disabled]="saving()"
+              [value]="toDate()"
+              (valueChange)="onToDateChange($event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-to-time'"
+              [ariaLabel]="'profiles.version.effectiveTo' | transloco"
+              [describedBy]="toDescribedBy()"
+              [hourLabel]="'profiles.version.hour' | transloco"
+              [minuteLabel]="'profiles.version.minute' | transloco"
+              [invalid]="!!toError()"
+              [disabled]="saving()"
+              [value]="toTime()"
+              (valueChange)="onToTimeChange($event)"
+            />
+            @if (hasEnd()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                [attr.aria-label]="'profiles.version.clearEnd' | transloco"
+                [title]="'profiles.version.clearEnd' | transloco"
+                [disabled]="saving()"
+                (click)="clearEnd()"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+    </section>
+  }
+
+  <div class="rounded-10 border border-border bg-surface px-10 shadow-card">
+    <ui-tabs
+      [tabs]="tabs()"
+      [label]="'profiles.version.tabsLabel' | transloco"
+      [active]="activeTab()"
+      (activeChange)="onTabChange($event)"
+    />
+  </div>
+
+  <div
+    role="tabpanel"
+    [id]="tabPanelId(activeTab())"
+    [attr.aria-labelledby]="tabButtonId(activeTab())"
+    class="min-w-0"
+  >
+    @if (activeTab() === 'cases') {
+      <app-profile-cases
+        [family]="fam"
+        [readonly]="isReadonly()"
+        [validationRun]="latestValidationRun()"
+        [cases]="activeCases()"
+        (casesChange)="onCasesChange($event)"
+      />
+    } @else if (activeContent(); as content) {
+      <app-profile-content-editor
+        [tab]="contentTab()"
+        [family]="fam"
+        [readonly]="isReadonly()"
+        [content]="content"
+        (contentChange)="onContentChange($event)"
+      />
+    }
+  </div>
+}
+
+<ui-modal
+  #publishModal
+  size="confirm"
+  icon="tablerSend"
+  tile="bg-icon-blue"
+  [title]="versionDetail() ? ('profiles.publishModal.title' | transloco: { n: versionDetail()!.profileVersion }) : ''"
+  [closeLabel]="'governance.common.close' | transloco"
+  [dismissable]="!publishing()"
+>
+  <div class="flex flex-col gap-8">
+    <p class="text-12 leading-18 text-text">{{ publishBodyText() }}</p>
+    <p class="flex items-center gap-6 text-11 leading-16 text-text-muted">
+      <ng-icon name="tablerUser" size="14" class="shrink-0" aria-hidden="true" />
+      <span>{{ publishAuthorText() }}</span>
+    </p>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" [loading]="publishing()" (click)="confirmPublish()">
+      {{ (publishScheduled() ? 'profiles.publishModal.schedule' : 'profiles.publishModal.publish') | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="publishing()" (click)="closePublishModal()">
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'profiles.version.discardTitle' | transloco"
+  [text]="'profiles.version.discardText' | transloco"
+  [confirmLabel]="'profiles.version.discardConfirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<app-conflict-dialog (reload)="reload()" />

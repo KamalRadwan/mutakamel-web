@@ -1,0 +1,207 @@
+{
+  "menu": {
+    "assign": "إسناد إلى",
+    "status": "تغيير الحالة",
+    "activity": "نشاط جماعي",
+    "delete": "حذف"
+  },
+  "reason": {
+    "noUpdate": "لا تملك صلاحية تعديل هؤلاء العملاء.",
+    "noStatus": "يتطلب تغيير الحالة صلاحية إدارة الحالة.",
+    "noDelete": "لا تملك صلاحية حذف هؤلاء العملاء."
+  },
+  "table": {
+    "selectPage": "تحديد جميع العملاء في هذه الصفحة",
+    "selectRow": "تحديد {{name}}"
+  },
+  "bar": {
+    "label": "التحديد",
+    "selected": "تم تحديد {{n}}",
+    "hidden": "· {{h}} خارج النتائج الحالية",
+    "selectAll": "تحديد جميع العملاء المطابقين ({{total}})",
+    "tooMany": "يمكن تحديد 10,000 عميل كحدٍّ أقصى.",
+    "truncated": "اقتصر التحديد على أول 10,000 عميل مطابق.",
+    "allSelected": "تم تحديد جميع العملاء المطابقين ({{total}})",
+    "onlyPage": "تحديد هذه الصفحة فقط",
+    "clear": "إلغاء التحديد"
+  },
+  "count": {
+    "zero": "{{n}} عميل",
+    "one": "عميل واحد",
+    "two": "عميلان",
+    "few": "{{n}} عملاء",
+    "many": "{{n}} عميلًا",
+    "other": "{{n}} عميل"
+  },
+  "assign": {
+    "title": "إسناد العملاء",
+    "owner": "المسؤول",
+    "ownerHint": "الشخص الذي سيتولى مسؤولية العملاء المحددين.",
+    "searchPlaceholder": "ابحث عن شخص…",
+    "noOwners": "لا يوجد من يمكن إسناده هنا.",
+    "noMatch": "لا يوجد أشخاص مطابقون.",
+    "summary": "سيُسنَد {{n}} عميلًا إلى {{owner}}.",
+    "go": "إسناد {{n}} عميلًا"
+  },
+  "status": {
+    "title": "تغيير حالة العملاء",
+    "field": "الحالة الجديدة",
+    "fieldHint": "لا تُعيَّن حالة «عميل نشط» إلا بالفوز بفرصة.",
+    "PROSPECT": "عميل مرتقب",
+    "ACTIVE_CUSTOMER": "عميل نشط",
+    "INACTIVE": "غير نشط",
+    "BLACKLISTED": "محظور",
+    "unchanged": "{{u}} لديهم هذه الحالة بالفعل وسيتم تخطيهم.",
+    "blacklistNote": "لا يمكن حذف العملاء المحظورين ولا استخدامهم في فرص جديدة.",
+    "go": "تغيير الحالة"
+  },
+  "activity": {
+    "title": "نشاط جماعي",
+    "customers": "{{n}} عميلًا",
+    "sec": {
+      "activity": "النشاط",
+      "schedule": "الجدولة",
+      "preview": "المعاينة"
+    },
+    "type": "النوع",
+    "subject": "الموضوع",
+    "subjectPlaceholder": "ما موضوع هذا النشاط؟",
+    "priority": "الأولوية",
+    "direction": "الاتجاه",
+    "duration": "المدة",
+    "noEnd": "بلا نهاية",
+    "reminder": "التذكير",
+    "reminderNone": "بلا تذكير",
+    "reminderMin": "قبل {{n}} دقيقة",
+    "reminderDay": "قبل يوم واحد",
+    "location": "المكان",
+    "meetingUrl": "رابط الاجتماع",
+    "description": "الوصف",
+    "start": "البداية",
+    "startPast": "اختر وقتًا في المستقبل.",
+    "gap": "الفاصل بين الأنشطة",
+    "gapCustom": "مخصص",
+    "gapMinutes": "{{n}} دقيقة",
+    "gapInvalid": "أدخل من 1 إلى 1440 دقيقة.",
+    "order": "الترتيب",
+    "orderTable": "ترتيب الجدول",
+    "orderOwner": "حسب المسؤول",
+    "assignee": {
+      "label": "المسؤول",
+      "owner": "مسؤول العميل",
+      "me": "أنا",
+      "other": "اختيار شخص"
+    },
+    "perAssignee": "التوزيع لكل مسؤول",
+    "perAssigneeHelp": "تبدأ أنشطة كل شخص من وقت البداية وتتبع الفاصل، بدلًا من تسلسل واحد طويل للجميع.",
+    "summary": "الأول في {{first}} · الأخير في {{last}}",
+    "more": "و{{n}} أخرى",
+    "pastMidnight": "تمتد الجدولة إلى ما بعد منتصف الليل.",
+    "noOwner": "لا يوجد مسؤول لـ{{n}} من العملاء، وستُسند إليك.",
+    "go": "إنشاء {{n}} نشاطًا",
+    "running": "جارٍ إنشاء الأنشطة",
+    "adjusted": "عدّل الخادم الجدول قليلًا.",
+    "discard": {
+      "title": "تجاهل هذه الدفعة؟",
+      "text": "لن يتم حفظ إعدادات هذا النشاط الجماعي.",
+      "confirm": "تجاهل"
+    },
+    "cancel": "إلغاء",
+    "hints": {
+      "type": "يُنشأ النشاط نفسه لكل عميل محدد.",
+      "subject": "بحد أقصى 180 حرفًا.",
+      "priority": "مدى أهمية النشاط.",
+      "direction": "وارد أو صادر أو داخلي.",
+      "duration": "المدة التي يستغرقها كل نشاط.",
+      "reminder": "موعد تذكير المسؤول قبل كل نشاط.",
+      "location": "بحد أقصى 180 حرفًا.",
+      "meetingUrl": "يبدأ بـ https://.",
+      "description": "اختياري، بحد أقصى 4000 حرف.",
+      "start": "تاريخ ووقت أول نشاط.",
+      "gap": "الوقت المضاف قبل كل نشاط تالٍ.",
+      "order": "الترتيب الذي تُجدول به الأنشطة.",
+      "assignee": "من سينفذ كل نشاط.",
+      "perAssignee": "تبدأ أنشطة كل شخص من وقت البداية وتتبع الفاصل، بدلًا من تسلسل واحد طويل للجميع."
+    },
+    "types": {
+      "TODO": "مهمة",
+      "CALL": "مكالمة",
+      "MEETING": "اجتماع",
+      "EMAIL": "بريد إلكتروني",
+      "VISIT": "زيارة",
+      "FOLLOW_UP": "متابعة",
+      "OTHER": "أخرى"
+    },
+    "priorities": {
+      "LOW": "منخفضة",
+      "NORMAL": "عادية",
+      "HIGH": "عالية",
+      "URGENT": "عاجلة"
+    },
+    "directions": {
+      "NONE": "بلا اتجاه",
+      "INBOUND": "وارد",
+      "OUTBOUND": "صادر",
+      "INTERNAL": "داخلي"
+    },
+    "hour": "الساعة",
+    "minute": "الدقائق",
+    "today": "اليوم",
+    "validation": {
+      "required": "هذا الحقل مطلوب.",
+      "maxLength": "الحد الأقصى {{max}} حرفًا.",
+      "invalidUrl": "أدخل رابطًا كاملًا يبدأ بـ http:// أو https://."
+    }
+  },
+  "delete": {
+    "title": "حذف العملاء",
+    "reason": "السبب",
+    "reasonHint": "اختياري، ويُحفَظ في سجل كل عميل.",
+    "blacklisted": "سيتم تخطي {{b}} من العملاء المحظورين.",
+    "leads": "يُعاد فتح العملاء المحتملين المرتبطين أو يُستبعَدون.",
+    "go": "حذف {{n}} عميلًا"
+  },
+  "job": {
+    "ASSIGN": "إسناد العملاء إلى {{ownerName}}",
+    "SET_STATUS": "تغيير حالة العملاء إلى «{{statusLabel}}»",
+    "CREATE_ACTIVITY": "نشاط جماعي: {{subject}}",
+    "DELETE": "حذف العملاء",
+    "updated": "تم تحديث {{n}} عميلًا.",
+    "created": "تم إنشاء {{n}} نشاطًا.",
+    "deleted": "تم حذف {{n}} عميلًا.",
+    "firstLast": "الأول {{first}} · الأخير {{last}}",
+    "unavailable": "لم يعد {{n}} من العملاء الذين فشلت العملية عليهم متاحين."
+  },
+  "skip": {
+    "UNCHANGED": "مُعيَّن بالفعل",
+    "BLACKLISTED": "عميل محظور"
+  },
+  "codes": {
+    "CUSTOMER_PROFILE_NOT_FOUND": "لم يعد هذا العميل موجودًا.",
+    "CUSTOMER_PROFILE_BLACKLISTED": "لا يمكن حذف عميل محظور.",
+    "CUSTOMER_PROFILE_HAS_ACTIVE_OPPORTUNITIES": "لدى هذا العميل فرص مفتوحة. أغلِقها أو انقلها قبل الحذف.",
+    "CUSTOMER_PROFILE_LINKED_LEAD_LIMIT": "بلغ هذا العميل الحد الأقصى لعدد العملاء المحتملين المرتبطين.",
+    "CUSTOMER_PROFILE_LINKED_LEADS_CHANGED": "تغيّرت سجلات العملاء المحتملين المرتبطة أثناء هذا الإجراء. حاول مرة أخرى.",
+    "CUSTOMER_PROFILE_DISQUALIFY_STAGE_UNAVAILABLE": "لا تتوفر مرحلة استبعاد للعميل المحتمل المرتبط.",
+    "CUSTOMER_PROFILE_REOPEN_STAGE_UNAVAILABLE": "لا تتوفر مرحلة لإعادة فتح العميل المحتمل المرتبط.",
+    "CUSTOMER_PROFILE_SOURCE_LEAD_CONFLICT": "يتعارض ربط هذا العميل بالعميل المحتمل الذي نشأ منه مع سجل آخر.",
+    "CUSTOMER_PROFILE_REFERENCE_CONFLICT": "هذا العميل مرتبط بسجلات أخرى ولا يمكن تعديله.",
+    "CUSTOMER_PROFILE_STATUS_MANAGE_REQUIRED": "ليست لديك صلاحية تغيير حالة العميل.",
+    "CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON": "يصبح العميل نشطًا تلقائيًا عند الفوز بفرصة.",
+    "CRM_SCOPED_PERMISSION_DENIED": "ليست لديك صلاحية الوصول إلى هذا العميل أو تعديله في هذا الفرع.",
+    "CRM": {
+      "CUSTOMER_PROFILE": {
+        "CONCURRENT_UPDATE": "عدّل شخص آخر بيانات هذا العميل. أعِد التحميل لعرض التغييرات."
+      }
+    },
+    "ACTIVITY_INVALID": "قيمة غير صالحة: {{field}}",
+    "ACTIVITY_ACCESS_DENIED": "غير مسموح لهذا العميل أو الشخص.",
+    "ACTIVITY_TARGET_NOT_FOUND": "العميل غير موجود.",
+    "ACTIVITY_ASSIGNEE_INELIGIBLE": "لا يمكن إسناد النشاط لهذا الشخص.",
+    "CUSTOMER_BULK_START_IN_PAST": "اختر وقتًا في المستقبل.",
+    "BULK_SELECTION_TOO_LARGE": "عدد العملاء المحددين كبير جدًا. حدّد {{max}} بحدٍّ أقصى.",
+    "CUSTOMER_PROFILE_SELECTION_TOO_LARGE": "اختر 10,000 عميل كحدٍّ أقصى.",
+    "BULK_JOB_PARAMS_INVALID": "بعض إعدادات الدفعة غير صالحة. راجع اختياراتك وحاول مرة أخرى.",
+    "generic": "تعذّر الإتمام."
+  }
+}

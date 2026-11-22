@@ -1,0 +1,340 @@
+@if (loadingUsage() && !usage()) {
+  <div class="flex flex-col gap-10" aria-busy="true">
+    <div class="flex items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <span class="h-skeleton-line w-modal-alert rounded-6 bg-neutral-soft"></span>
+      <span class="h-btn w-preset rounded-8 bg-neutral-soft"></span>
+    </div>
+
+    <div class="grid grid-cols-1 gap-12 desktop:grid-cols-2">
+      @for (col of [0, 1]; track col) {
+        <div>
+          <div class="h-table-head rounded-10 bg-neutral-soft"></div>
+          @for (row of skeletonRows; track row) {
+            <div class="mt-6 flex h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+              <span class="size-checkbox-size shrink-0 rounded-full bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+              <span class="ms-auto h-badge w-preset rounded-8 bg-neutral-soft"></span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+} @else if (usageError() || holdersError()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'settings.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      {{ 'settings.common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (!activeModule()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-green text-on-icon">
+      <ng-icon name="tablerArrowsLeftRight" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">{{ 'oc.swap.empty' | transloco }}</p>
+    <a uiButton variant="primary" [routerLink]="['/workspace/billing/subscription']">
+      <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      {{ 'oc.swap.back' | transloco }}
+    </a>
+  </div>
+} @else {
+  @let mod = activeModule()!;
+
+  <header class="flex flex-wrap items-end justify-between gap-10 rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
+    <div class="flex flex-wrap items-end gap-12">
+      <div class="flex flex-col gap-4">
+        <a
+          uiButton
+          variant="ghost"
+          size="small"
+          class="w-fit"
+          [routerLink]="['/workspace/billing/subscription']"
+        >
+          <ng-icon name="tablerArrowLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+          {{ 'oc.swap.back' | transloco }}
+        </a>
+        <h1 class="text-16 leading-22 font-medium text-text">{{ 'oc.swap.title' | transloco }}</h1>
+      </div>
+
+      <div class="w-toast">
+        <ui-field
+          size="bare"
+          [label]="'oc.swap.module' | transloco"
+          [for]="uid + '-module'"
+          [hint]="'oc.swap.moduleHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-module'"
+            [describedBy]="uid + '-module-hint'"
+            [label]="'oc.swap.module' | transloco"
+            [options]="moduleOptions()"
+            [value]="selectedModuleKey()"
+            [disabled]="swapping() || affectedModules().length <= 1"
+            (valueChange)="selectModule($event)"
+          />
+        </ui-field>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-8">
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="swapping()"
+        [disabled]="!canSwap()"
+        [attr.title]="inGrace() ? ('oc.swap.graceDisabled' | transloco) : null"
+        (click)="requestSwap()"
+      >
+        <ng-icon name="tablerArrowsLeftRight" size="15" aria-hidden="true" />
+        {{ 'oc.swap.go' | transloco }}
+      </button>
+    </div>
+  </header>
+
+  <section class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
+    <p class="text-14 leading-20 font-medium text-text">
+      <bdi dir="ltr">
+        {{ 'oc.swap.header' | transloco: { module: activeModuleName(), used: mod.used, capacity: mod.capacity } }}
+      </bdi>
+    </p>
+
+    @if (inGrace()) {
+      <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium text-on-warning">
+        <ng-icon name="tablerAlertTriangle" size="12" aria-hidden="true" />
+        {{ 'oc.swap.graceUntil' | transloco: { date: graceDate() } }}
+      </span>
+    } @else if (sinceDate()) {
+      <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-danger px-8 text-12 font-medium text-on-danger">
+        <ng-icon name="tablerLock" size="12" aria-hidden="true" />
+        {{ 'oc.swap.since' | transloco: { date: sinceDate() } }}
+      </span>
+    }
+  </section>
+
+  @if (inGrace()) {
+    <app-settings-notice tone="warning">
+      {{ 'oc.swap.graceDisabled' | transloco }}
+    </app-settings-notice>
+  }
+
+  <div class="flex flex-wrap items-center justify-between gap-8 text-12 leading-18 text-text-muted">
+    <p>{{ 'oc.swap.help' | transloco }}</p>
+    <a
+      uiButton
+      variant="secondary"
+      size="small"
+      [routerLink]="['/workspace/billing/subscription/seats/reduce']"
+      [queryParams]="{ module: selectedModuleKey() }"
+    >
+      {{ 'oc.swap.reduce' | transloco }}
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 gap-12 desktop:grid-cols-2" [attr.aria-busy]="loadingHolders()">
+    <section class="flex min-w-0 flex-col">
+      <div class="bg-nav-gradient flex h-table-head items-center justify-between rounded-10 px-10 text-13 leading-18 font-medium text-on-nav">
+        <span class="flex min-w-0 items-center gap-4">
+          <span class="truncate">{{ 'oc.swap.haveSeat' | transloco }}</span>
+          <span #haveSeatTip class="relative inline-flex shrink-0 items-center text-on-nav" (mouseenter)="showColTip('haveSeat', haveSeatTip, haveSeatTipBody)" (mouseleave)="hideColTip()">
+            <button
+              type="button"
+              class="inline-flex cursor-help items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              [attr.aria-label]="'oc.swap.haveSeat' | transloco"
+              [attr.aria-describedby]="uid + '-col-haveSeat-hint'"
+              (focus)="showColTip('haveSeat', haveSeatTip, haveSeatTipBody)"
+              (blur)="hideColTip()"
+              (keydown.escape)="onColTipEscape($event)"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+            </button>
+            <span
+              #haveSeatTipBody
+              [id]="uid + '-col-haveSeat-hint'"
+              role="tooltip"
+              class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 font-normal text-on-tooltip"
+              [class]="colTip() === 'haveSeat' ? 'visible' : 'invisible'"
+              [style.top.px]="colTipPlace().top"
+              [style.inset-inline-start.px]="colTipPlace().start"
+            >
+              {{ 'oc.swap.haveSeatHint' | transloco }}
+            </span>
+          </span>
+        </span>
+        <span class="inline-flex h-badge items-center rounded-8 bg-nav-glass px-8 text-12 font-medium text-on-nav inset-ring inset-ring-nav-glass-ring">
+          {{ haveSeatHolders().length }}
+        </span>
+      </div>
+
+      @if (loadingHolders()) {
+        @for (row of skeletonRows; track row) {
+          <div class="mt-6 flex h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+            <span class="size-checkbox-size shrink-0 rounded-full bg-neutral-soft"></span>
+            <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            <span class="ms-auto h-badge w-preset rounded-8 bg-neutral-soft"></span>
+          </div>
+        }
+      } @else if (haveSeatHolders().length === 0) {
+        <p class="mt-6 rounded-10 border border-border bg-surface p-12 text-center text-12 text-text-muted shadow-card">
+          {{ 'settings.common.noResults' | transloco }}
+        </p>
+      } @else {
+        <div role="radiogroup" [attr.aria-label]="'oc.swap.haveSeat' | transloco" class="flex flex-col">
+          @for (holder of haveSeatHolders(); track holder.userId) {
+            <label
+              class="mt-6 flex h-table-row items-center gap-8 rounded-10 border px-10 text-14 leading-20 text-text shadow-card transition-colors duration-fast"
+              [class]="
+                (selectedReleaseId() === holder.userId
+                  ? 'border-brand bg-brand-soft'
+                  : 'border-border bg-surface hover:bg-row-hover') +
+                (canPickHolders() ? ' cursor-pointer' : ' cursor-not-allowed')
+              "
+            >
+              <span class="relative inline-flex size-checkbox-size shrink-0 items-center justify-center">
+                <input
+                  type="radio"
+                  [name]="uid + '-have-seat'"
+                  [attr.aria-label]="holder.name"
+                  [attr.aria-describedby]="uid + '-col-haveSeat-hint'"
+                  class="peer size-checkbox-size cursor-pointer appearance-none rounded-full border-check border-border-field bg-surface-field transition-colors duration-fast outline-none hover:border-border-field-hover checked:border-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-border disabled:bg-neutral-soft"
+                  [value]="holder.userId"
+                  [checked]="selectedReleaseId() === holder.userId"
+                  [disabled]="!canPickHolders()"
+                  (change)="selectedReleaseId.set(holder.userId)"
+                />
+                <span class="pointer-events-none absolute hidden size-radio-dot rounded-full bg-brand peer-checked:block peer-disabled:bg-text-placeholder"></span>
+              </span>
+
+              <span class="min-w-0 flex-1 truncate font-medium">{{ holder.name }}</span>
+
+              <span class="flex min-w-0 items-center gap-4 overflow-hidden">
+                @for (role of holder.roles; track role.roleId + ':' + role.scope.target + ':' + (role.scope.companyId ?? '') + ':' + (role.scope.branchId ?? '')) {
+                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+                    {{ roleLabel(role) }}
+                  </span>
+                }
+              </span>
+
+              <span class="shrink-0 whitespace-nowrap text-12 text-text-muted">
+                <bdi dir="ltr">{{ formatDate(holder.grantedAt) }}</bdi>
+              </span>
+            </label>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="flex min-w-0 flex-col">
+      <div class="bg-nav-gradient flex h-table-head items-center justify-between rounded-10 px-10 text-13 leading-18 font-medium text-on-nav">
+        <span class="flex min-w-0 items-center gap-4">
+          <span class="truncate">{{ 'oc.swap.readOnly' | transloco }}</span>
+          <span #readOnlyTip class="relative inline-flex shrink-0 items-center text-on-nav" (mouseenter)="showColTip('readOnly', readOnlyTip, readOnlyTipBody)" (mouseleave)="hideColTip()">
+            <button
+              type="button"
+              class="inline-flex cursor-help items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              [attr.aria-label]="'oc.swap.readOnly' | transloco"
+              [attr.aria-describedby]="uid + '-col-readOnly-hint'"
+              (focus)="showColTip('readOnly', readOnlyTip, readOnlyTipBody)"
+              (blur)="hideColTip()"
+              (keydown.escape)="onColTipEscape($event)"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+            </button>
+            <span
+              #readOnlyTipBody
+              [id]="uid + '-col-readOnly-hint'"
+              role="tooltip"
+              class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 font-normal text-on-tooltip"
+              [class]="colTip() === 'readOnly' ? 'visible' : 'invisible'"
+              [style.top.px]="colTipPlace().top"
+              [style.inset-inline-start.px]="colTipPlace().start"
+            >
+              {{ 'oc.swap.readOnlyHint' | transloco }}
+            </span>
+          </span>
+        </span>
+        <span class="inline-flex h-badge items-center rounded-8 bg-nav-glass px-8 text-12 font-medium text-on-nav inset-ring inset-ring-nav-glass-ring">
+          {{ readOnlyHolders().length }}
+        </span>
+      </div>
+
+      @if (loadingHolders()) {
+        @for (row of skeletonRows; track row) {
+          <div class="mt-6 flex h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+            <span class="size-checkbox-size shrink-0 rounded-full bg-neutral-soft"></span>
+            <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            <span class="ms-auto h-badge w-preset rounded-8 bg-neutral-soft"></span>
+          </div>
+        }
+      } @else if (readOnlyHolders().length === 0) {
+        <p class="mt-6 rounded-10 border border-border bg-surface p-12 text-center text-12 text-text-muted shadow-card">
+          {{ 'settings.common.noResults' | transloco }}
+        </p>
+      } @else {
+        <div role="radiogroup" [attr.aria-label]="'oc.swap.readOnly' | transloco" class="flex flex-col">
+          @for (holder of readOnlyHolders(); track holder.userId) {
+            <label
+              class="mt-6 flex h-table-row items-center gap-8 rounded-10 border px-10 text-14 leading-20 text-text shadow-card transition-colors duration-fast"
+              [class]="
+                (selectedKeepId() === holder.userId
+                  ? 'border-brand bg-brand-soft'
+                  : 'border-border bg-surface hover:bg-row-hover') +
+                (canPickHolders() ? ' cursor-pointer' : ' cursor-not-allowed')
+              "
+            >
+              <span class="relative inline-flex size-checkbox-size shrink-0 items-center justify-center">
+                <input
+                  type="radio"
+                  [name]="uid + '-read-only'"
+                  [attr.aria-label]="holder.name"
+                  [attr.aria-describedby]="uid + '-col-readOnly-hint'"
+                  class="peer size-checkbox-size cursor-pointer appearance-none rounded-full border-check border-border-field bg-surface-field transition-colors duration-fast outline-none hover:border-border-field-hover checked:border-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-border disabled:bg-neutral-soft"
+                  [value]="holder.userId"
+                  [checked]="selectedKeepId() === holder.userId"
+                  [disabled]="!canPickHolders()"
+                  (change)="selectedKeepId.set(holder.userId)"
+                />
+                <span class="pointer-events-none absolute hidden size-radio-dot rounded-full bg-brand peer-checked:block peer-disabled:bg-text-placeholder"></span>
+              </span>
+
+              <span class="min-w-0 flex-1 truncate font-medium">{{ holder.name }}</span>
+
+              <span class="flex min-w-0 items-center gap-4 overflow-hidden">
+                @for (role of holder.roles; track role.roleId + ':' + role.scope.target + ':' + (role.scope.companyId ?? '') + ':' + (role.scope.branchId ?? '')) {
+                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+                    {{ roleLabel(role) }}
+                  </span>
+                }
+              </span>
+
+              @if (inGrace()) {
+                <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                  {{ 'oc.swap.willBe' | transloco: { date: graceDate() } }}
+                </span>
+              }
+
+              <span class="shrink-0 whitespace-nowrap text-12 text-text-muted">
+                <bdi dir="ltr">{{ formatDate(holder.grantedAt) }}</bdi>
+              </span>
+            </label>
+          }
+        </div>
+      }
+    </section>
+  </div>
+}
+
+<ui-confirm-dialog
+  class="contents"
+  tone="warning"
+  [title]="'oc.swap.title' | transloco"
+  [text]="confirmText()"
+  [confirmLabel]="'oc.swap.go' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>

@@ -1,0 +1,33 @@
+<ui-modal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="title() || ('automation.conflict.title' | transloco)"
+  [closeLabel]="'automation.common.close' | transloco"
+  [dismissable]="false"
+  (closed)="onModalClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">
+    {{ text() || ('automation.conflict.text' | transloco) }}
+  </p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    (click)="chooseReload()"
+  >
+    {{ reloadLabel() || ('automation.conflict.reload' | transloco) }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    (click)="chooseKeep()"
+  >
+    {{ keepLabel() || ('automation.conflict.keep' | transloco) }}
+  </button>
+</ui-modal>

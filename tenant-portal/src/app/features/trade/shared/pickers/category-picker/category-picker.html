@@ -1,0 +1,98 @@
+<div #fieldBox [class]="fieldBoxClasses()" (click)="onBoxClick()">
+  <input
+    #inputEl
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-autocomplete="list"
+    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+    [attr.id]="id() || null"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? listId : null"
+    [attr.aria-activedescendant]="activeDescendantId()"
+    [attr.aria-keyshortcuts]="open() && loadError() ? 'Enter' : null"
+    [attr.aria-invalid]="invalid() ? 'true' : null"
+    [disabled]="disabled()"
+    [placeholder]="'tradeShared.common.search' | transloco"
+    [value]="inputText()"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+
+  @if (value() !== null && !disabled()) {
+    <button
+      type="button"
+      class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'tradeShared.picker.clear' | transloco"
+      [title]="'tradeShared.picker.clear' | transloco"
+      (mousedown)="$event.preventDefault()"
+      (click)="clear($event)"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+  }
+
+  <span class="pointer-events-none inline-flex shrink-0 text-text-muted" aria-hidden="true">
+    <ng-icon name="tablerChevronDown" size="14" />
+  </span>
+</div>
+
+@if (open() && !disabled()) {
+  <ul
+    #list
+    [id]="listId"
+    role="listbox"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover scrollbar-thin"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    (mousedown)="$event.preventDefault()"
+  >
+    @if (loading()) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
+        <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+        <span>{{ 'tradeShared.picker.loading' | transloco }}</span>
+      </li>
+    } @else if (loadError()) {
+      <li role="presentation" class="flex items-center justify-between gap-8 px-8 py-6 text-12">
+        <span class="text-danger-text">{{ 'tradeShared.common.loadFailed' | transloco }}</span>
+        <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
+          <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </li>
+    } @else if (rows().length === 0) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+        {{ 'tradeShared.common.noResults' | transloco }}
+      </li>
+    } @else {
+      @for (row of rows(); track row.kind === 'none' ? '__none__' : row.id; let index = $index) {
+        <li
+          [id]="optionId(index)"
+          role="option"
+          [attr.aria-selected]="isRowSelected(row)"
+          class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+          [class]="rowClasses(row, index)"
+          (mouseenter)="activeIndex.set(index)"
+          (click)="chooseRow(row)"
+        >
+          @if (row.kind === 'none') {
+            <span class="min-w-0 flex-1 truncate text-text-muted">{{ 'tradeShared.picker.noCategory' | transloco }}</span>
+          } @else {
+            <span class="flex min-w-0 flex-1 items-center gap-8">
+              <span class="min-w-0 shrink-0 truncate font-medium">{{ row.option.name }}</span>
+              @if (row.option.path.length > 1) {
+                <span class="min-w-0 truncate text-11 text-text-muted">{{ formatPath(row.option) }}</span>
+              }
+            </span>
+          }
+          @if (isRowSelected(row)) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </li>
+      }
+    }
+  </ul>
+}

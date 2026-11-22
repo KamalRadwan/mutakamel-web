@@ -1,0 +1,76 @@
+{
+  "title": "Share {{name}}",
+  "targets": "People or teams",
+  "targetsPlaceholder": "Search users or teams",
+  "targetsHint": "Search for a user or team to grant access to this content.",
+  "clearTarget": "Clear selection",
+  "noTargets": "No matching users or teams",
+  "loadingTargets": "Searching…",
+  "access": "Access",
+  "accessHint": "Choose whether the recipient can only view or also edit.",
+  "accessFor": "Access level for {{name}}",
+  "view": "Can view",
+  "edit": "Can edit",
+  "expires": "Expires",
+  "expiresPlaceholder": "No expiry",
+  "expiresHint": "Optional future date when access automatically ends.",
+  "clearExpires": "Clear expiry date",
+  "today": "Today",
+  "prevMonth": "Previous month",
+  "nextMonth": "Next month",
+  "add": "Add",
+  "current": "Current shares",
+  "tableLabel": "Current shares",
+  "columns": {
+    "name": "Name",
+    "type": "Type",
+    "access": "Access",
+    "expires": "Expires",
+    "actions": "Actions"
+  },
+  "type": "Type",
+  "user": "User",
+  "team": "Team",
+  "revoke": "Revoke",
+  "revokeTitle": "Revoke access",
+  "revokeText": "Remove access for {{name}}? They will no longer be able to open this content.",
+  "done": "Done",
+  "empty": "Not shared with anyone yet.",
+  "expiryPast": "Choose a future date",
+  "targetRequired": "Choose a user or team first.",
+  "toast": {
+    "added": "Access granted",
+    "updated": "Access updated",
+    "revoked": "Access revoked"
+  },
+  "preview": {
+    "title": "Current access of this recipient",
+    "hint": "This shows what they can see today. It does not show any data.",
+    "definitionAccessDashboard": "Access to this dashboard",
+    "definitionAccessWidget": "Access to this widget",
+    "loading": "Loading current access…",
+    "canRead": "Can read",
+    "noAccess": "No access",
+    "variesByMember": "Varies by member",
+    "emptyTeam": "This team has no active members.",
+    "level": {
+      "NONE": "None",
+      "VIEW": "View",
+      "EDIT": "Edit",
+      "OWNER": "Owner"
+    },
+    "scope": {
+      "own": "Own",
+      "team": "Team",
+      "branch": "Branch",
+      "all": "All"
+    },
+    "resource": {
+      "leads": "Leads",
+      "opportunities": "Opportunities",
+      "activities": "Activities",
+      "customer_profiles": "Customers",
+      "targets": "Targets"
+    }
+  }
+}

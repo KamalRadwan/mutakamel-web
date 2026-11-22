@@ -1,0 +1,230 @@
+{
+  "toolbar": {
+    "newAssignment": "تعيين جديد",
+    "testSelection": "اختبار اختيار القالب",
+    "filters": "عوامل التصفية",
+    "clearFilters": "مسح عوامل التصفية",
+    "scopeLabel": "النطاق",
+    "scopeHint": "اختر مساحة العمل أو الشركة أو الفرع لعرض تعيينات القوالب الخاصة به.",
+    "reload": "إعادة التحميل"
+  },
+  "scopes": {
+    "tenant": "مساحة العمل كاملة",
+    "company": "شركة",
+    "branch": "فرع"
+  },
+  "documents": {
+    "QUOTATION": "عرض سعر",
+    "CRM_OUTBOUND_EMAIL": "بريد إدارة العملاء",
+    "PURCHASE_QUOTATION": "عرض سعر شراء",
+    "SALES_ORDER": "أمر بيع",
+    "PURCHASE_ORDER": "أمر شراء",
+    "INVOICE": "فاتورة",
+    "CONTRACT": "عقد",
+    "LETTER": "خطاب تجاري"
+  },
+  "adapters": {
+    "TRADE_QUOTATION_PRINT_V1": "عرض سعر",
+    "CRM_LEAD_OUTBOUND_EMAIL_V1": "بريد عميل محتمل",
+    "CRM_CUSTOMER_OUTBOUND_EMAIL_V1": "بريد عميل",
+    "CRM_OPPORTUNITY_OUTBOUND_EMAIL_V1": "بريد فرصة بيعية",
+    "TRADE_PURCHASE_QUOTATION_PRINT_V1": "عرض سعر شراء",
+    "TRADE_SALES_ORDER_PRINT_V1": "أمر بيع",
+    "TRADE_PURCHASE_ORDER_PRINT_V1": "أمر شراء",
+    "TRADE_INVOICE_PRINT_V1": "فاتورة",
+    "TRADE_CONTRACT_PRINT_V1": "عقد",
+    "CORE_BUSINESS_LETTER_PRINT_V1": "خطاب تجاري"
+  },
+  "locales": {
+    "all": "كل اللغات",
+    "any": "أي لغة",
+    "en-US": "الإنجليزية",
+    "ar-EG": "العربية"
+  },
+  "status": {
+    "all": "كل الحالات",
+    "ACTIVE": "نشط",
+    "INACTIVE": "غير نشط"
+  },
+  "chips": {
+    "document": "المستند: {{value}}",
+    "language": "اللغة: {{value}}",
+    "status": "الحالة: {{value}}",
+    "effectiveAt": "سارٍ في: {{value}}",
+    "remove": "إزالة عامل التصفية"
+  },
+  "table": {
+    "ariaLabel": "تعيينات القوالب",
+    "template": "القالب",
+    "document": "المستند",
+    "language": "اللغة",
+    "scope": "النطاق",
+    "version": "الإصدار",
+    "priority": "الأولوية",
+    "default": "افتراضي",
+    "effective": "فترة السريان",
+    "status": "الحالة",
+    "actions": "الإجراءات",
+    "defaultYes": "تعيين افتراضي",
+    "defaultNo": "غير افتراضي",
+    "unknownTemplate": "قالب غير متاح"
+  },
+  "actions": {
+    "open": "فتح",
+    "deactivate": "إيقاف التفعيل",
+    "deactivateAlreadyInactive": "غير نشط بالفعل",
+    "deactivateNoPermission": "ليست لديك صلاحية لإيقاف تفعيل التعيينات.",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "backToHome": "العودة إلى الرئيسية",
+    "retry": "إعادة المحاولة",
+    "clearFilters": "مسح عوامل التصفية",
+    "apply": "تطبيق",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "save": "حفظ",
+    "undoChanges": "تراجع عن التغييرات",
+    "unsavedChanges": "تغييرات غير محفوظة",
+    "reload": "إعادة التحميل",
+    "keepMyChanges": "الاحتفاظ بتغييراتي",
+    "clearDate": "مسح التاريخ",
+    "clearDateTime": "مسح التاريخ والوقت"
+  },
+  "filtersModal": {
+    "title": "تصفية التعيينات",
+    "documentTypeLabel": "المستند",
+    "documentTypeHint": "التصفية حسب نوع المستند أو محوّل بريد إدارة العملاء.",
+    "allDocuments": "جميع المستندات",
+    "languageLabel": "اللغة",
+    "languageHint": "التصفية حسب لغة محددة أو الافتراضي (كل اللغات).",
+    "statusLabel": "الحالة",
+    "statusHint": "عرض التعيينات النشطة أو غير النشطة.",
+    "effectiveAtLabel": "سارٍ في تاريخ",
+    "effectiveAtHint": "عرض التعيينات السارية في تاريخ محدد.",
+    "effectiveAtPlaceholder": "أي تاريخ"
+  },
+  "modal": {
+    "createTitle": "تعيين جديد",
+    "editTitle": "تعيين القالب",
+    "templateLabel": "القالب",
+    "templateHint": "اختر قالبًا نشطًا يحتوي على إصدار منشور.",
+    "templateLockedHint": "لا يمكن تغيير تعريف القالب بعد إنشاء التعيين.",
+    "selectTemplate": "اختر قالبًا",
+    "templateRequired": "يرجى اختيار قالب.",
+    "versionLabel": "الإصدار المنشور",
+    "versionHint": "حدّد الإصدار المنشور من هذا القالب المراد استخدامه.",
+    "selectVersion": "اختر الإصدار",
+    "versionRequired": "يرجى اختيار إصدار منشور.",
+    "versionOption": "v{{number}}",
+    "documentTypeLabel": "نوع المستند",
+    "documentTypeHint": "مشتق تلقائيًا من تعريف القالب المختار.",
+    "adapterLabel": "مصدر البيانات",
+    "adapterHint": "مشتق تلقائيًا من مصدر بيانات القالب المختار.",
+    "languageLabel": "اللغة",
+    "languageHint": "استخدم لغة القالب أو طبّقه على كل اللغات كخيار افتراضي.",
+    "languageLockedHint": "لا يمكن تغيير اللغة بعد إنشاء التعيين.",
+    "scopeLabel": "النطاق",
+    "scopeHint": "لا يمكن تعيين قوالب الشركة إلا لتلك الشركة أو لفروعها.",
+    "scopeLockedHint": "لا يمكن تغيير النطاق بعد إنشاء التعيين.",
+    "priorityLabel": "الأولوية",
+    "priorityHint": "تفوز القيمة الأعلى عند تطابق عدة تعيينات (من 0 إلى 1000).",
+    "priorityError": "أدخل عددًا صحيحًا بين 0 و 1000.",
+    "defaultLabel": "تعيين افتراضي",
+    "defaultHint": "استخدم هذا التعيين للاختيار التلقائي للقالب.",
+    "effectiveFromLabel": "سارٍ من",
+    "effectiveFromHint": "تاريخ بدء سريان هذا التعيين.",
+    "effectiveFromPlaceholder": "اختر تاريخ البدء",
+    "effectiveFromRequired": "يرجى اختيار تاريخ البدء.",
+    "effectiveToLabel": "سارٍ حتى",
+    "effectiveToHint": "تاريخ انتهاء اختياري؛ اتركه فارغًا لاستمرار السريان دون نهاية.",
+    "effectiveToPlaceholder": "دون تاريخ انتهاء",
+    "effectiveToRangeError": "يجب أن يكون تاريخ الانتهاء مساويًا لتاريخ البدء أو بعده.",
+    "statusLabel": "الحالة",
+    "statusHint": "بيان ما إذا كان هذا التعيين نشطًا أم غير نشط حاليًا.",
+    "noEligibleTemplates": "لا توجد قوالب منشورة مؤهلة للتعيين",
+    "noPublishedVersions": "لا توجد إصدارات منشورة متاحة"
+  },
+  "testModal": {
+    "title": "اختبار اختيار القالب",
+    "run": "تشغيل الاختبار",
+    "documentLabel": "المستند",
+    "documentHint": "اختر المستند أو محوّل البريد الإلكتروني المراد اختباره.",
+    "languageLabel": "اللغة",
+    "languageHint": "لغة المستند المطلوبة.",
+    "scopeLabel": "النطاق",
+    "scopeHint": "مساحة العمل أو الشركة أو الفرع المستهدف للاختيار.",
+    "businessTimeLabel": "وقت التقييم",
+    "businessTimeHint": "تاريخ ووقت اختياريان (بتوقيت UTC) لتقييم نافذة السريان عندهما.",
+    "businessTimePlaceholder": "الوقت الحالي",
+    "resultTitle": "نتيجة الاختيار",
+    "chosenVersion": "إصدار القالب المختار",
+    "matchedScope": "النطاق المطابق",
+    "languageMatch": "مطابقة اللغة",
+    "matchExact": "مطابقة تامة",
+    "matchDefault": "افتراضي (كل اللغات)",
+    "candidateCount": "عدد المرشحين",
+    "noMatchTitle": "لا يوجد تعيين مطابق",
+    "noMatchDescription": "لا يوجد تعيين افتراضي نشط يطابق هذا النطاق والمستند واللغة والوقت."
+  },
+  "confirmDeactivate": {
+    "title": "إيقاف تفعيل التعيين؟",
+    "text": "لن تختار المستندات في هذا النطاق القالب «{{name}}» ({{version}}) بعد الآن. يُحتفظ بالسجل التاريخي.",
+    "confirm": "إيقاف التفعيل"
+  },
+  "unsaved": {
+    "title": "حفظ التغييرات؟",
+    "text": "لديك تغييرات غير محفوظة في هذا التعيين.",
+    "save": "حفظ",
+    "discard": "تجاهل",
+    "cancel": "إلغاء"
+  },
+  "conflict": {
+    "title": "تغيّر التعيين في مكان آخر",
+    "text": "حفظ مستخدم آخر تغييرات أحدث أثناء تعديلك. أعد التحميل للحصول على أحدث نسخة أو احتفظ بتعديلاتك.",
+    "reload": "إعادة التحميل",
+    "keep": "الاحتفاظ بتغييراتي"
+  },
+  "datePicker": {
+    "today": "اليوم",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي"
+  },
+  "timePicker": {
+    "hour": "الساعة",
+    "minute": "الدقائق"
+  },
+  "toasts": {
+    "created": "تم إنشاء التعيين.",
+    "saved": "تم تحديث التعيين.",
+    "deactivated": "تم إيقاف تفعيل التعيين."
+  },
+  "states": {
+    "emptyTitle": "لا توجد تعيينات لهذا النطاق",
+    "emptyDescription": "عيّن إصدارًا منشورًا لقالب لتستخدمه المستندات هنا.",
+    "filteredEmptyTitle": "لا توجد تعيينات تطابق عوامل التصفية",
+    "filteredEmptyDescription": "عدّل عوامل التصفية أو امسحها لعرض التعيينات.",
+    "loadFailedTitle": "تعذّر تحميل التعيينات",
+    "loadFailedDescription": "حدث خطأ غير متوقع أثناء تحميل تعيينات القوالب.",
+    "supportReference": "مرجع الدعم: {{correlationId}}",
+    "forbiddenTitle": "تم رفض الوصول",
+    "forbiddenDescription": "ليست لديك صلاحية لعرض تعيينات القوالب.",
+    "featureDisabledTitle": "مصمم القوالب غير متاح",
+    "featureDisabledDescription": "مصمم القوالب غير متاح لمساحة العمل هذه."
+  },
+  "errors": {
+    "generic": "حدث خطأ. حاول مرة أخرى.",
+    "CORE.TEMPLATE.ASSIGNMENT.CONFLICT": "يوجد تعيين افتراضي متداخل بالفعل لهذا النطاق واللغة والأولوية.",
+    "ASSIGNMENT.CONFLICT": "يوجد تعيين افتراضي متداخل بالفعل لهذا النطاق واللغة والأولوية.",
+    "CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID": "لا يمكن تعيين قوالب الشركة إلا لتلك الشركة أو لفروعها.",
+    "CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE": "الإصدار المختار غير منشور أو غير متوافق مع هذا المستند.",
+    "CORE.TEMPLATE.CONCURRENCY.STALE_REVISION": "تم تحديث هذا التعيين في مكان آخر. أعد التحميل وحاول مرة أخرى.",
+    "CORE.TEMPLATE.PERMISSION.DENIED": "ليست لديك صلاحية لهذا الإجراء.",
+    "CORE.TEMPLATE.FEATURE.DISABLED": "مصمم القوالب غير متاح لمساحة العمل هذه.",
+    "CORE.TEMPLATE.NOT_FOUND": "لم يعد هذا التعيين موجودًا أو يقع خارج نطاقك.",
+    "CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE": "خدمة القوالب غير متاحة مؤقتًا.",
+    "CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "لا يمكن إسناد هذا المستند بعد لأن التطبيق المالك غير متاح لعرضه."
+  },
+  "disabledReasons": {
+    "OWNER_RUNTIME_UNAVAILABLE": "غير متاح بعد"
+  }
+}

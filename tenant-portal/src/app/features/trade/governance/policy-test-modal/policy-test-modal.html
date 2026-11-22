@@ -1,0 +1,272 @@
+<ui-modal
+  size="wide"
+  icon="tablerFlask"
+  tile="bg-icon-violet"
+  [title]="modalTitle()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-12">
+    <ui-field
+      [label]="'policy.tests.modal.codeLabel' | transloco"
+      [required]="true"
+      [for]="'pol-test-code'"
+      [hint]="'policy.tests.modal.codeHint' | transloco"
+      [error]="codeError()"
+    >
+      <input
+        id="pol-test-code"
+        type="text"
+        dir="ltr"
+        maxlength="64"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'HIGH_DISCOUNT_CASE'"
+        [value]="code()"
+        [attr.aria-invalid]="codeError() ? 'true' : null"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-10">
+      <span class="text-12 leading-18 font-medium text-text">
+        {{ 'policy.tests.modal.factsSection' | transloco }}
+      </span>
+
+      <div class="flex flex-col gap-6">
+        @for (row of factRows(); track row.id; let idx = $index) {
+          <div
+            class="grid items-start gap-8 grid-cols-trade-policy-test-input-row"
+          >
+            <div class="min-w-0">
+              @if (idx === 0) {
+                <ui-field
+                  size="bare"
+                  [label]="'policy.tests.modal.factLabel' | transloco"
+                  [for]="'pol-test-fact-' + row.id"
+                  [hint]="'policy.tests.modal.factHint' | transloco"
+                >
+                  <ui-dropdown
+                    class="w-full"
+                    size="field"
+                    [id]="'pol-test-fact-' + row.id"
+                    [label]="'policy.tests.modal.factLabel' | transloco"
+                    [options]="factOptionsForRow(idx, row.fact)"
+                    [value]="row.fact"
+                    (valueChange)="onFactChange(idx, $event)"
+                  />
+                </ui-field>
+              } @else {
+                <ui-dropdown
+                  class="w-full"
+                  size="field"
+                  [id]="'pol-test-fact-' + row.id"
+                  [label]="'policy.tests.modal.factLabel' | transloco"
+                  [options]="factOptionsForRow(idx, row.fact)"
+                  [value]="row.fact"
+                  (valueChange)="onFactChange(idx, $event)"
+                />
+              }
+            </div>
+
+            <div class="min-w-0">
+              @if (idx === 0) {
+                <ui-field
+                  [size]="factTypeOf(row.fact) === 'boolean' ? 'bare' : 'default'"
+                  [label]="'policy.tests.modal.valueLabel' | transloco"
+                  [for]="'pol-test-val-' + row.id"
+                  [hint]="'policy.tests.modal.valueHint' | transloco"
+                  [error]="rowValueError(row)"
+                >
+                  @if (factTypeOf(row.fact) === 'boolean') {
+                    <ui-segmented
+                      [id]="'pol-test-val-' + row.id"
+                      [label]="'policy.tests.modal.valueLabel' | transloco"
+                      [options]="booleanOptions()"
+                      [value]="boolStringValue(row.value)"
+                      (valueChange)="onRowBoolChange(idx, $event)"
+                    />
+                  } @else if (factTypeOf(row.fact) === 'number') {
+                    <input
+                      [id]="'pol-test-val-' + row.id"
+                      type="number"
+                      step="any"
+                      dir="ltr"
+                      class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+                      [value]="numberTextValue(row.value)"
+                      [attr.aria-invalid]="rowValueError(row) ? 'true' : null"
+                      (input)="onRowNumberInput(idx, $event)"
+                    />
+                  } @else {
+                    <input
+                      [id]="'pol-test-val-' + row.id"
+                      type="text"
+                      dir="auto"
+                      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+                      [value]="stringTextValue(row.value)"
+                      [attr.aria-invalid]="rowValueError(row) ? 'true' : null"
+                      (input)="onRowStringInput(idx, $event)"
+                    />
+                  }
+                </ui-field>
+              } @else {
+                @if (factTypeOf(row.fact) === 'boolean') {
+                  <ui-segmented
+                    [id]="'pol-test-val-' + row.id"
+                    [label]="'policy.tests.modal.valueLabel' | transloco"
+                    [describedBy]="'pol-test-val-' + factRows()[0].id + '-hint'"
+                    [options]="booleanOptions()"
+                    [value]="boolStringValue(row.value)"
+                    (valueChange)="onRowBoolChange(idx, $event)"
+                  />
+                } @else if (factTypeOf(row.fact) === 'number') {
+                  <input
+                    [id]="'pol-test-val-' + row.id"
+                    type="number"
+                    step="any"
+                    dir="ltr"
+                    class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                    [class]="
+                      rowValueError(row)
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+                    "
+                    [attr.aria-label]="'policy.tests.modal.valueLabel' | transloco"
+                    [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+                    [value]="numberTextValue(row.value)"
+                    [attr.aria-invalid]="rowValueError(row) ? 'true' : null"
+                    (input)="onRowNumberInput(idx, $event)"
+                  />
+                } @else {
+                  <input
+                    [id]="'pol-test-val-' + row.id"
+                    type="text"
+                    dir="auto"
+                    class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                    [class]="
+                      rowValueError(row)
+                        ? 'border-danger-border ring-2 ring-danger-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+                    "
+                    [attr.aria-label]="'policy.tests.modal.valueLabel' | transloco"
+                    [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+                    [value]="stringTextValue(row.value)"
+                    [attr.aria-invalid]="rowValueError(row) ? 'true' : null"
+                    (input)="onRowStringInput(idx, $event)"
+                  />
+                }
+                @if (rowValueError(row); as err) {
+                  <p class="mt-2 text-11 leading-16 text-danger-text">{{ err }}</p>
+                }
+              }
+            </div>
+
+            <div class="min-w-0">
+              @if (idx === 0) {
+                <span class="mb-2 block h-label" aria-hidden="true"></span>
+              }
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-danger-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'policy.tests.modal.removeFact' | transloco"
+                [title]="'policy.tests.modal.removeFact' | transloco"
+                (click)="removeFactRow(idx)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (factsListError(); as err) {
+        <p class="text-11 leading-16 text-danger-text" role="alert">{{ err }}</p>
+      }
+
+      @if (canAddFact()) {
+        <div class="pt-2">
+          <button type="button" uiButton variant="ghost" size="small" (click)="addFactRow()">
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'policy.tests.modal.addFact' | transloco }}</span>
+          </button>
+        </div>
+      }
+    </div>
+
+    <div class="grid gap-10 grid-cols-trade-policy-test-split">
+      <ui-field
+        size="bare"
+        [label]="'policy.tests.modal.expectedOutcomeLabel' | transloco"
+        [required]="true"
+        [for]="'pol-test-outcome'"
+        [hint]="'policy.tests.modal.expectedOutcomeHint' | transloco"
+      >
+        <ui-segmented
+          id="pol-test-outcome"
+          [label]="'policy.tests.modal.expectedOutcomeLabel' | transloco"
+          [options]="outcomeOptions()"
+          [value]="expectedOutcome()"
+          (valueChange)="onExpectedOutcomeChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'policy.tests.modal.expectedRuleLabel' | transloco"
+        [for]="'pol-test-exp-rule'"
+        [hint]="'policy.tests.modal.expectedRuleHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          id="pol-test-exp-rule"
+          [label]="'policy.tests.modal.expectedRuleLabel' | transloco"
+          [options]="expectedRuleOptions()"
+          [value]="expectedRuleCode()"
+          (valueChange)="expectedRuleCode.set($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (expectedOutcome() === 'SELECT') {
+      <ui-field
+        [label]="'policy.tests.modal.expectedSelectedValueLabel' | transloco"
+        [required]="true"
+        [for]="'pol-test-sel-val'"
+        [hint]="'policy.tests.modal.expectedSelectedValueHint' | transloco"
+        [error]="selectedValueError()"
+      >
+        <input
+          id="pol-test-sel-val"
+          type="text"
+          dir="auto"
+          [attr.maxlength]="maxSelectedValue"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'policy.rules.selectedValuePlaceholder' | transloco"
+          [value]="expectedSelectedValue()"
+          [attr.aria-invalid]="selectedValueError() ? 'true' : null"
+          (input)="onSelectedValueInput($event)"
+        />
+      </ui-field>
+    }
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton variant="primary" (click)="save()">
+      {{ 'policy.tests.modal.save' | transloco }}
+    </button>
+    <button type="button" uiButton variant="ghost" (click)="requestClose()">
+      {{ 'common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="warning"
+  [title]="'policy.tests.modal.discardTitle' | transloco"
+  [text]="'policy.tests.modal.discardText' | transloco"
+  [confirmLabel]="'policy.tests.modal.discardConfirm' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>

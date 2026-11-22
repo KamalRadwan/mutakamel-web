@@ -1,0 +1,355 @@
+<ui-tabs
+  class="shrink-0"
+  [tabs]="tabs()"
+  [label]="'access.tabs.label' | transloco"
+  [active]="activeTab()"
+  (activeChange)="onTabChange($event)"
+/>
+
+<div
+  [id]="tabPanelId(activeTab())"
+  role="tabpanel"
+  [attr.aria-labelledby]="tabButtonId(activeTab())"
+  class="flex min-h-0 flex-1 flex-col gap-8"
+>
+  <div class="flex shrink-0 flex-wrap items-end gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+    @if (activeTab() === 'mine') {
+      <button type="button" uiButton variant="primary" class="shrink-0" (click)="openRequestModal()">
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        {{ 'access.actions.requestAccess' | transloco }}
+      </button>
+    }
+
+    @switch (activeTab()) {
+      @case ('mine') {
+        <ui-field
+          class="w-toast shrink-0"
+          size="bare"
+          [label]="'access.toolbar.status' | transloco"
+          [for]="uid + '-mine-status'"
+          [hint]="'access.toolbar.statusHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-mine-status'"
+            [label]="'access.toolbar.status' | transloco"
+            [describedBy]="uid + '-mine-status-hint'"
+            [options]="requestStatusOptions()"
+            [value]="mineStatus()"
+            (valueChange)="onMineStatusChange($event)"
+          />
+        </ui-field>
+      }
+      @case ('inbox') {
+        <ui-field
+          class="w-toast shrink-0"
+          size="bare"
+          [label]="'access.toolbar.status' | transloco"
+          [for]="uid + '-inbox-status'"
+          [hint]="'access.toolbar.statusHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-inbox-status'"
+            [label]="'access.toolbar.status' | transloco"
+            [describedBy]="uid + '-inbox-status-hint'"
+            [options]="inboxStatusOptions()"
+            [value]="inboxStatus()"
+            (valueChange)="onInboxStatusChange($event)"
+          />
+        </ui-field>
+      }
+      @case ('reviews') {
+        <ui-field
+          class="w-toast shrink-0"
+          size="bare"
+          [label]="'access.toolbar.status' | transloco"
+          [for]="uid + '-review-status'"
+          [hint]="'access.toolbar.statusHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-review-status'"
+            [label]="'access.toolbar.status' | transloco"
+            [describedBy]="uid + '-review-status-hint'"
+            [options]="reviewStatusOptions()"
+            [value]="reviewStatus()"
+            (valueChange)="onReviewStatusChange($event)"
+          />
+        </ui-field>
+      }
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      class="ms-auto shrink-0"
+      [disabled]="loading()"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'access.toolbar.reload' | transloco }}
+    </button>
+  </div>
+
+  @if (loadError(); as errKind) {
+    <ui-full-state
+      [kind]="errKind"
+      [title]="(errKind === 'forbidden' ? 'access.errors.forbiddenTitle' : 'access.errors.loadTitle') | transloco"
+      [text]="(errKind === 'forbidden' ? 'access.errors.forbiddenText' : 'analytics.common.loadFailed') | transloco"
+      [actionLabel]="errKind === 'forbidden' ? '' : ('analytics.common.retry' | transloco)"
+      (action)="reload()"
+    />
+  } @else if (!loading() && activeRowCount() === 0) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span
+        class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerKey" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">
+        @switch (activeTab()) {
+          @case ('mine') {
+            {{ 'access.empty.mine' | transloco }}
+          }
+          @case ('inbox') {
+            {{ 'access.empty.inbox' | transloco }}
+          }
+          @case ('reviews') {
+            {{ 'access.empty.reviews' | transloco }}
+          }
+        }
+      </p>
+    </div>
+  } @else {
+    @switch (activeTab()) {
+      @case ('mine') {
+        <ui-data-table
+          [columns]="mineColumns()"
+          [rows]="mineRows()"
+          [rowKey]="requestRowKey"
+          [loading]="loading()"
+          [label]="'access.table.mineLabel' | transloco"
+        >
+          <ng-template uiCell="requestNumber" let-row>
+            <bdi dir="ltr" class="truncate text-13 font-medium tabular-nums">{{ row.requestNumber }}</bdi>
+          </ng-template>
+
+          <ng-template uiCell="resource" let-row>
+            <div class="flex min-w-0 items-center gap-8">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="row.resourceType === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+                aria-hidden="true"
+              >
+                <ng-icon
+                  [name]="row.resourceType === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                  size="14"
+                />
+              </span>
+              <span class="truncate">{{ resourceDisplay(row) }}</span>
+            </div>
+          </ng-template>
+
+          <ng-template uiCell="requestedLevel" let-row>
+            <ui-badge tone="tag">{{ 'access.level.' + row.requestedLevel | transloco }}</ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="purpose" let-row>
+            <span class="truncate text-12 text-text-muted" [title]="row.purpose">{{ row.purpose }}</span>
+          </ng-template>
+
+          <ng-template uiCell="status" let-row>
+            <ui-badge [tone]="requestStatusTone(row.status)" [attr.title]="row.decisionNote || null">
+              {{ 'access.status.' + row.status | transloco }}
+            </ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="pendingUntil" let-row>
+            <span class="truncate text-12 text-text-muted">{{ formattedDate(row.pendingUntil) }}</span>
+          </ng-template>
+
+          <ng-template uiCell="actions" let-row>
+            @if (row.status === 'PENDING') {
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                [loading]="cancellingId() === row.id"
+                [disabled]="!!cancellingId() && cancellingId() !== row.id"
+                (click)="cancelRequest(row)"
+              >
+                {{ 'access.actions.cancel' | transloco }}
+              </button>
+            } @else {
+              <span class="text-12 text-text-muted">—</span>
+            }
+          </ng-template>
+        </ui-data-table>
+      }
+
+      @case ('inbox') {
+        <ui-data-table
+          [columns]="inboxColumns()"
+          [rows]="inboxRows()"
+          [rowKey]="requestRowKey"
+          [loading]="loading()"
+          [rowClickable]="inboxHasPending()"
+          [label]="'access.table.inboxLabel' | transloco"
+          (rowClick)="openDecideModal($event)"
+        >
+          <ng-template uiCell="requestNumber" let-row>
+            <bdi dir="ltr" class="truncate text-13 font-medium tabular-nums">{{ row.requestNumber }}</bdi>
+          </ng-template>
+
+          <ng-template uiCell="requester" let-row>
+            <span class="truncate">{{ personDisplay(row.requesterUserId) }}</span>
+          </ng-template>
+
+          <ng-template uiCell="resource" let-row>
+            <div class="flex min-w-0 items-center gap-8">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="row.resourceType === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+                aria-hidden="true"
+              >
+                <ng-icon
+                  [name]="row.resourceType === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                  size="14"
+                />
+              </span>
+              <span class="truncate">{{ resourceDisplay(row) }}</span>
+            </div>
+          </ng-template>
+
+          <ng-template uiCell="requestedLevel" let-row>
+            <ui-badge tone="tag">{{ 'access.level.' + row.requestedLevel | transloco }}</ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="purpose" let-row>
+            <span class="truncate text-12 text-text-muted" [title]="row.purpose">{{ row.purpose }}</span>
+          </ng-template>
+
+          <ng-template uiCell="heldLevelAtRequest" let-row>
+            <ui-badge tone="tag">{{ 'analytics.access.' + row.heldLevelAtRequest | transloco }}</ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="pendingUntil" let-row>
+            <span class="truncate text-12 text-text-muted">{{ formattedDate(row.pendingUntil) }}</span>
+          </ng-template>
+
+          <ng-template uiCell="actions" let-row>
+            @if (row.status === 'PENDING') {
+              <button type="button" uiButton variant="secondary" size="small" (click)="openDecideModal(row)">
+                {{ 'access.actions.decide' | transloco }}
+              </button>
+            } @else {
+              <ui-badge [tone]="requestStatusTone(row.status)">
+                {{ 'access.status.' + row.status | transloco }}
+              </ui-badge>
+            }
+          </ng-template>
+        </ui-data-table>
+      }
+
+      @case ('reviews') {
+        <ui-data-table
+          [columns]="reviewColumns()"
+          [rows]="reviewRows()"
+          [rowKey]="reviewRowKey"
+          [loading]="loading()"
+          [rowClickable]="true"
+          [label]="'access.table.reviewsLabel' | transloco"
+          (rowClick)="openReviewModal($event)"
+        >
+          <ng-template uiCell="resource" let-row>
+            <div class="flex min-w-0 items-center gap-8">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="row.resourceType === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+                aria-hidden="true"
+              >
+                <ng-icon
+                  [name]="row.resourceType === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                  size="14"
+                />
+              </span>
+              <span class="truncate">{{ resourceDisplay(row) }}</span>
+            </div>
+          </ng-template>
+
+          <ng-template uiCell="owner" let-row>
+            <div class="flex min-w-0 items-center gap-6">
+              <span class="truncate">{{ personDisplay(row.ownerUserId) }}</span>
+              @if (personInactive(row.ownerUserId)) {
+                <ui-badge tone="tag">{{ 'access.inactive' | transloco }}</ui-badge>
+              }
+            </div>
+          </ng-template>
+
+          <ng-template uiCell="triggerReason" let-row>
+            <span class="truncate text-12 text-text-muted">
+              {{ 'access.reviewReason.' + row.triggerReason | transloco }}
+            </span>
+          </ng-template>
+
+          <ng-template uiCell="status" let-row>
+            <ui-badge [tone]="reviewStatusTone(row.status)">
+              {{ 'access.reviewStatus.' + row.status | transloco }}
+            </ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="reviewUntil" let-row>
+            <span class="truncate text-12 text-text-muted">{{ formattedDate(row.reviewUntil) }}</span>
+          </ng-template>
+
+          <ng-template uiCell="actions" let-row>
+            @if (row.status === 'OPEN') {
+              <button type="button" uiButton variant="secondary" size="small" (click)="openReviewModal(row)">
+                {{ 'access.actions.review' | transloco }}
+              </button>
+            } @else {
+              <button type="button" uiButton variant="ghost" size="small" (click)="openReviewModal(row)">
+                {{ 'access.actions.view' | transloco }}
+              </button>
+            }
+          </ng-template>
+        </ui-data-table>
+      }
+    }
+
+    @if (activeHasMore()) {
+      <div class="flex shrink-0 justify-center pt-4">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'access.actions.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+</div>
+
+<ui-confirm-dialog
+  #cancelConfirm
+  tone="warning"
+  [title]="'access.confirmCancelRequest.title' | transloco"
+  [text]="'access.confirmCancelRequest.text' | transloco"
+  [confirmLabel]="'access.confirmCancelRequest.confirm' | transloco"
+  [cancelLabel]="'analytics.common.close' | transloco"
+/>
+
+<app-request-modal class="absolute" (created)="onRequestCreated()" />
+<app-decide-modal class="absolute" (decided)="onRequestDecided()" />
+<app-review-modal class="absolute" (updated)="onReviewUpdated()" />

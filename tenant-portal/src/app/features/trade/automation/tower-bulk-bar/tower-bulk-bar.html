@@ -1,0 +1,174 @@
+<div
+  role="region"
+  [attr.aria-label]="'tower.bulk.label' | transloco"
+  class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+>
+  <div class="flex min-w-0 flex-wrap items-center gap-6">
+    <span class="font-medium tabular-nums">
+      {{ 'tower.bulk.selected' | transloco: { n: count() } }}
+    </span>
+
+    @if (hiddenCount() > 0) {
+      <span class="text-text-muted tabular-nums">
+        {{ 'tower.bulk.hidden' | transloco: { h: hiddenCount() } }}
+      </span>
+    }
+
+    @if (canOfferSelectAll()) {
+      <button
+        uiButton
+        variant="ghost"
+        size="small"
+        type="button"
+        [disabled]="tooMany()"
+        [attr.title]="tooMany() ? ('tower.bulk.tooMany' | transloco: { max: maxSelectionLimit }) : null"
+        (click)="selectAllMatching.emit()"
+      >
+        {{ 'tower.bulk.selectAll' | transloco: { total: total() } }}
+      </button>
+      @if (tooMany()) {
+        <span class="text-text-muted">
+          {{ 'tower.bulk.tooMany' | transloco: { max: maxSelectionLimit } }}
+        </span>
+      }
+    }
+
+    @if (needsCategory()) {
+      <span class="text-text-muted">{{ 'tower.bulk.pickCategory' | transloco }}</span>
+    }
+
+    @if (mode() === 'query') {
+      <span class="tabular-nums">
+        {{ 'tower.bulk.allSelected' | transloco: { total: total() } }}
+      </span>
+      <button
+        uiButton
+        variant="ghost"
+        size="small"
+        type="button"
+        (click)="selectOnlyPage.emit()"
+      >
+        {{ 'tower.bulk.onlyPage' | transloco }}
+      </button>
+    }
+  </div>
+
+  <div class="flex shrink-0 items-center gap-6">
+    <button
+      uiButton
+      variant="primary"
+      size="small"
+      type="button"
+      [disabled]="bulkBusy() || allowedCodes().length === 0"
+      [attr.title]="resolveDisabledReason()"
+      (click)="openModal()"
+    >
+      {{ 'tower.bulk.resolveAction' | transloco }}
+    </button>
+
+    <button
+      uiButton
+      variant="ghost"
+      size="small"
+      type="button"
+      (click)="clear.emit()"
+    >
+      {{ 'tower.bulk.clear' | transloco }}
+    </button>
+  </div>
+</div>
+
+<ui-modal
+  #bulkModal
+  size="form"
+  icon="tablerCheck"
+  tile="bg-icon-green"
+  [title]="'tower.bulk.modalTitle' | transloco"
+  [closeLabel]="'tower.common.cancel' | transloco"
+  [dismissable]="!submitting()"
+  [preventDismiss]="hasUnsavedChanges()"
+  (dismiss)="requestCloseModal()"
+  (closed)="onModalClosed()"
+>
+  <span
+    modal-header-end
+    class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft tabular-nums"
+  >
+    {{ 'tower.bulk.selected' | transloco: { n: count() } }}
+  </span>
+
+  <div class="flex flex-col gap-10">
+    <ui-field
+      size="bare"
+      [label]="'tower.modal.resolutionLabel' | transloco"
+      [for]="uid + '-resolution'"
+      [hint]="'tower.bulk.resolutionHint' | transloco"
+      [required]="true"
+      [error]="resolutionError()"
+    >
+      <ui-dropdown
+        size="field"
+        [id]="uid + '-resolution'"
+        [label]="'tower.modal.resolutionLabel' | transloco"
+        [options]="resolutionOptions()"
+        [value]="resolutionCode()"
+        [disabled]="submitting()"
+        (valueChange)="onResolutionChange($event)"
+      />
+    </ui-field>
+
+    <app-trade-reason-picker
+      kind="CONTROL_TOWER_RESOLVE"
+      [idPrefix]="uid + '-reason'"
+      [disabled]="submitting()"
+      [showErrors]="submittedForm()"
+      [(value)]="reasonValue"
+    />
+
+    @if (hasEmptyReasons()) {
+      <p class="text-11 leading-16 text-danger-text" role="alert">
+        {{ 'tower.bulk.emptyReasonsHint' | transloco }}
+      </p>
+    }
+
+    <app-evidence-editor
+      [idPrefix]="uid + '-evidence'"
+      [disabled]="submitting()"
+      [showErrors]="submittedForm()"
+      [(value)]="evidence"
+    />
+  </div>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="submitDisabled()"
+      (click)="submit()"
+    >
+      {{ 'tower.bulk.submitAction' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="requestCloseModal()"
+    >
+      {{ 'tower.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  class="contents"
+  tone="warning"
+  [title]="'tower.common.discardTitle' | transloco"
+  [text]="'tower.common.discardText' | transloco"
+  [confirmLabel]="'tower.common.discardConfirm' | transloco"
+  [cancelLabel]="'tower.common.cancel' | transloco"
+/>

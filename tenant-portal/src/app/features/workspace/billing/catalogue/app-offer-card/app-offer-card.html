@@ -1,0 +1,218 @@
+@let item = group();
+
+<article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-popover">
+  <header class="flex items-center justify-between gap-8">
+    <div class="flex min-w-0 items-center gap-8">
+      <span
+        [class]="
+          'inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon ' +
+          item.visual.tile
+        "
+      >
+        <ng-icon [name]="item.visual.icon" size="15" aria-hidden="true" />
+      </span>
+      <h2 class="min-w-0 truncate text-13 leading-18 font-medium text-text">
+        {{ item.application.name }}
+      </h2>
+    </div>
+
+    @if (item.subscribed) {
+      <span
+        class="inline-flex h-badge shrink-0 items-center rounded-8 bg-success-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-success-soft"
+      >
+        {{ 'bcat.badges.subscribed' | transloco }}
+      </span>
+    }
+  </header>
+
+  @if (item.tiers.length > 0) {
+    <div class="grid auto-rows-fr grid-cols-1 gap-8 desktop:grid-cols-3">
+      @for (tier of item.tiers; track tier.id) {
+        <div
+          [class]="
+            'flex flex-col gap-8 rounded-10 border p-8 ' +
+            (tier.current ? 'border-brand bg-brand-soft' : 'border-border bg-surface')
+          "
+        >
+          <div class="flex items-baseline justify-between gap-8">
+            <h3 class="min-w-0 truncate text-13 leading-18 font-medium text-text">
+              {{ tier.name }}
+            </h3>
+            <span class="shrink-0 text-12 leading-16 text-text-muted">
+              {{ 'bcat.tier.rank' | transloco: { rank: tier.rank } }}
+            </span>
+          </div>
+
+          <div class="text-12 leading-18">
+            @if (tier.fromPrice; as price) {
+              <p class="flex flex-wrap items-baseline gap-4 text-text-muted">
+                <span>{{ 'bcat.price.fromPrefix' | transloco }}</span>
+                <span dir="ltr" class="font-medium text-text tabular-nums">{{ price }}</span>
+                <span>{{
+                  (cycle() === 'ANNUAL' ? 'bcat.price.perUserYear' : 'bcat.price.perUserMonth')
+                    | transloco
+                }}</span>
+              </p>
+            } @else {
+              <p class="text-text-muted">{{ 'bcat.price.unavailable' | transloco }}</p>
+            }
+          </div>
+
+          <div class="mt-auto flex flex-wrap items-center justify-between gap-8 pt-4">
+            @switch (tier.actionKind) {
+              @case ('current') {
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-brand"
+                >
+                  {{ 'bcat.badges.current' | transloco }}
+                </span>
+              }
+              @case ('upgrade') {
+                @if (tier.actionLink; as link) {
+                  <a
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    [routerLink]="link.path"
+                    [queryParams]="link.queryParams"
+                  >
+                    {{ 'bcat.actions.upgrade' | transloco }}
+                  </a>
+                }
+              }
+              @case ('add') {
+                @if (tier.actionLink; as link) {
+                  <a
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    [routerLink]="link.path"
+                    [queryParams]="link.queryParams"
+                  >
+                    {{ 'bcat.actions.addToPlan' | transloco }}
+                  </a>
+                }
+              }
+              @case ('lower') {
+                <span class="text-12 leading-16 text-text-muted">
+                  {{ 'bcat.tier.lowerTier' | transloco }}
+                </span>
+              }
+              @default {
+                <span></span>
+              }
+            }
+
+            <button
+              type="button"
+              uiButton
+              variant="ghost"
+              size="small"
+              (click)="openPrices.emit(tier.priceTarget)"
+            >
+              {{ 'bcat.actions.prices' | transloco }}
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  @if (item.addons.length > 0) {
+    <section
+      class="flex flex-col gap-4 border-t border-border pt-8"
+      [attr.aria-label]="'bcat.addons.title' | transloco"
+    >
+      <h3 class="text-12 leading-16 font-medium text-text-muted">
+        {{ 'bcat.addons.title' | transloco }}
+      </h3>
+
+      <div class="flex flex-col divide-y divide-border">
+        @for (addon of item.addons; track addon.id) {
+          <div
+            class="flex min-h-table-row flex-wrap items-center justify-between gap-8 px-4 transition-colors duration-fast hover:bg-row-hover"
+          >
+            <div class="flex min-w-0 flex-1 items-center gap-8">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+              >
+                <ng-icon name="tablerPuzzle" size="14" aria-hidden="true" />
+              </span>
+              <span class="min-w-0 truncate text-13 leading-18 font-medium text-text">
+                {{ addon.name }}
+              </span>
+              <span [class]="'shrink-0 ' + addon.statusBadge.classes">
+                {{ addon.statusBadge.labelKey | transloco: { app: item.application.name } }}
+              </span>
+            </div>
+
+            <div class="flex shrink-0 flex-wrap items-center gap-8">
+              <div class="text-12 leading-18">
+                @if (addon.fromPrice; as price) {
+                  <span class="inline-flex flex-wrap items-baseline gap-4 text-text-muted">
+                    <span>{{ 'bcat.price.fromPrefix' | transloco }}</span>
+                    <span dir="ltr" class="font-medium text-text tabular-nums">{{ price }}</span>
+                    <span>{{
+                      (cycle() === 'ANNUAL' ? 'bcat.price.perUserYear' : 'bcat.price.perUserMonth')
+                        | transloco
+                    }}</span>
+                  </span>
+                } @else if (addon.status !== 'UNAVAILABLE') {
+                  <span class="text-text-muted">{{ 'bcat.price.unavailable' | transloco }}</span>
+                } @else {
+                  <span class="text-text-muted">{{ 'bill.common.none' | transloco }}</span>
+                }
+              </div>
+
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                (click)="openPrices.emit(addon.priceTarget)"
+              >
+                {{ 'bcat.actions.prices' | transloco }}
+              </button>
+
+              @switch (addon.actionKind) {
+                @case ('subscribed') {
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 bg-success-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-success-soft"
+                  >
+                    {{ 'bcat.badges.subscribed' | transloco }}
+                  </span>
+                }
+                @case ('add') {
+                  @if (addon.actionLink; as link) {
+                    <a
+                      uiButton
+                      variant="secondary"
+                      size="small"
+                      [routerLink]="link.path"
+                      [queryParams]="link.queryParams"
+                    >
+                      {{ 'bcat.actions.addToPlan' | transloco }}
+                    </a>
+                  }
+                }
+                @case ('upgradeTier') {
+                  @if (addon.actionLink; as link) {
+                    <a
+                      uiButton
+                      variant="secondary"
+                      size="small"
+                      [routerLink]="link.path"
+                      [queryParams]="link.queryParams"
+                    >
+                      {{ 'bcat.actions.upgradeTier' | transloco }}
+                    </a>
+                  }
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+</article>

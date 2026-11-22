@@ -1,0 +1,486 @@
+<ui-modal
+  #dialog
+  size="form"
+  icon="tablerArrowsExchange"
+  tile="bg-icon-violet"
+  [title]="modalTitle()"
+  [subtitle]="modalSubtitle()"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (mode() === 'view' && viewing(); as rev) {
+    <app-inventory-badge modal-header-end kind="uom" [value]="rev.status" />
+  }
+
+  @if (mode() === 'view' && viewing(); as rev) {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-2">
+        <ui-field
+          [label]="'invUom.modal.item' | transloco"
+          [for]="uid + '-view-item'"
+          [hint]="'invUom.modal.itemHint' | transloco"
+        >
+          <input
+            [id]="uid + '-view-item'"
+            type="text"
+            readonly
+            class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="viewItemDisplay(rev)"
+            [attr.aria-describedby]="uid + '-view-item-hint'"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        [label]="'invUom.modal.fromUnit' | transloco"
+        [for]="uid + '-view-from'"
+        [hint]="'invUom.modal.fromUnitHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-from'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewUnitDisplay(rev.fromUomId, rev.fromUomCode)"
+          [attr.aria-describedby]="uid + '-view-from-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.toUnit' | transloco"
+        [for]="uid + '-view-to'"
+        [hint]="'invUom.modal.toUnitHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-to'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewUnitDisplay(rev.toUomId, rev.toUomCode)"
+          [attr.aria-describedby]="uid + '-view-to-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.numerator' | transloco"
+        [for]="uid + '-view-num'"
+        [hint]="'invUom.modal.numeratorHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-num'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="rev.factorNumerator"
+          [attr.aria-describedby]="uid + '-view-num-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.denominator' | transloco"
+        [for]="uid + '-view-den'"
+        [hint]="'invUom.modal.denominatorHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-den'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="rev.factorDenominator"
+          [attr.aria-describedby]="uid + '-view-den-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.effectiveFrom' | transloco"
+        [for]="uid + '-view-eff'"
+        [hint]="'invUom.modal.effectiveFromHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-eff'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="viewDateTime(rev.effectiveFrom)"
+          [attr.aria-describedby]="uid + '-view-eff-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.revision' | transloco"
+        [for]="uid + '-view-rev'"
+        [hint]="'invUom.modal.revisionHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-rev'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="'invUom.table.revisionValue' | transloco: { n: rev.revisionNumber }"
+          [attr.aria-describedby]="uid + '-view-rev-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.status' | transloco"
+        [for]="uid + '-view-status'"
+        [hint]="'invUom.modal.statusHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-status'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="'tradeInventory.badge.uom.' + rev.status | transloco"
+          [attr.aria-describedby]="uid + '-view-status-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.id' | transloco"
+        [for]="uid + '-view-id'"
+        [hint]="'invUom.modal.idHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-id'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="min-w-0 flex-1 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="viewShortId(rev.id)"
+          [title]="rev.id"
+          [attr.aria-describedby]="uid + '-view-id-hint'"
+        />
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tradeInventory.common.copy' | transloco"
+          [title]="'tradeInventory.common.copy' | transloco"
+          (click)="copyRevisionId(rev.id)"
+        >
+          <ng-icon [name]="copiedId() ? 'tablerCheck' : 'tablerCopy'" size="14" aria-hidden="true" />
+        </button>
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.publishedAt' | transloco"
+        [for]="uid + '-view-pub-at'"
+        [hint]="'invUom.modal.publishedAtHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-pub-at'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="viewDateTime(rev.publishedAt)"
+          [attr.aria-describedby]="uid + '-view-pub-at-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.publishedBy' | transloco"
+        [for]="uid + '-view-pub-by'"
+        [hint]="'invUom.modal.publishedByHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-pub-by'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewUser(rev.publishedBy)"
+          [attr.aria-describedby]="uid + '-view-pub-by-hint'"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [label]="'invUom.modal.publishReason' | transloco"
+          [for]="uid + '-view-pub-reason'"
+          [hint]="'invUom.modal.publishReasonHint' | transloco"
+        >
+          <input
+            [id]="uid + '-view-pub-reason'"
+            type="text"
+            readonly
+            class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="viewReason('INVENTORY_UOM_PUBLISH', rev.publishReasonCode)"
+            [attr.aria-describedby]="uid + '-view-pub-reason-hint'"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        [label]="'invUom.modal.retiredAt' | transloco"
+        [for]="uid + '-view-ret-at'"
+        [hint]="'invUom.modal.retiredAtHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-ret-at'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="viewDateTime(rev.retiredAt)"
+          [attr.aria-describedby]="uid + '-view-ret-at-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.retiredBy' | transloco"
+        [for]="uid + '-view-ret-by'"
+        [hint]="'invUom.modal.retiredByHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-ret-by'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewUser(rev.retiredBy)"
+          [attr.aria-describedby]="uid + '-view-ret-by-hint'"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [label]="'invUom.modal.retireReason' | transloco"
+          [for]="uid + '-view-ret-reason'"
+          [hint]="'invUom.modal.retireReasonHint' | transloco"
+        >
+          <input
+            [id]="uid + '-view-ret-reason'"
+            type="text"
+            readonly
+            class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="viewReason('INVENTORY_UOM_RETIRE', rev.retireReasonCode)"
+            [attr.aria-describedby]="uid + '-view-ret-reason-hint'"
+          />
+        </ui-field>
+      </div>
+    </div>
+
+    @if (preview(); as p) {
+      <div class="mt-8 flex items-center gap-6 rounded-8 bg-brand-soft p-8 text-12 leading-18 text-on-brand-soft">
+        <ng-icon name="tablerEqual" size="14" class="shrink-0" aria-hidden="true" />
+        <span class="min-w-0 flex-1 tabular-nums">
+          {{ 'invUom.modal.preview' | transloco: { from: p.from, factor: p.factor, to: p.to, ten: p.ten } }}
+          @if (!p.exact) {
+            <span> {{ 'invUom.modal.notExact' | transloco }}</span>
+          }
+        </span>
+      </div>
+    }
+  } @else {
+    <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'invUom.modal.item' | transloco"
+          [for]="uid + '-item'"
+          [required]="true"
+          [hint]="'invUom.modal.itemHint' | transloco"
+          [error]="itemError()"
+        >
+          <app-trade-item-picker
+            [id]="uid + '-item'"
+            [kinds]="productKinds"
+            [context]="companyCtx()"
+            [describedBy]="itemDescribedBy()"
+            [invalid]="!!itemError()"
+            [disabled]="saving()"
+            [value]="selectedItemId()"
+            (valueChange)="onItemSelected($event)"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        size="bare"
+        [label]="'invUom.modal.fromUnit' | transloco"
+        [for]="uid + '-from-uom'"
+        [required]="true"
+        [hint]="'invUom.modal.fromUnitHint' | transloco"
+        [hintText]="noOtherUnitsNote()"
+        [error]="fromUnitError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-from-uom'"
+          [label]="'invUom.modal.fromUnit' | transloco"
+          [describedBy]="fromUnitDescribedBy()"
+          [options]="fromUnitOptions()"
+          [value]="fromUomId()"
+          [disabled]="saving() || loadingItem() || !itemDetail() || noOtherUnits() || itemNotStockTracked()"
+          (valueChange)="onFromUomChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.toUnit' | transloco"
+        [for]="uid + '-to-uom'"
+        [hint]="'invUom.modal.toUnitHint' | transloco"
+      >
+        <input
+          [id]="uid + '-to-uom'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tradeInventory.common.none' | transloco"
+          [value]="baseUnitLabel()"
+          [attr.aria-describedby]="uid + '-to-uom-hint'"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.numerator' | transloco"
+        [for]="uid + '-numerator'"
+        [required]="true"
+        [hint]="'invUom.modal.numeratorHint' | transloco"
+        [error]="numeratorError()"
+      >
+        <input
+          [id]="uid + '-numerator'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          autocomplete="off"
+          maxlength="18"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [value]="factorNumerator()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="numeratorError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-numerator-hint' + (numeratorError() ? ' ' + uid + '-numerator-error' : '')"
+          (input)="onFactorInput('numerator', $event)"
+          (blur)="markTouched('numerator')"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'invUom.modal.denominator' | transloco"
+        [for]="uid + '-denominator'"
+        [required]="true"
+        [hint]="'invUom.modal.denominatorHint' | transloco"
+        [error]="denominatorError()"
+      >
+        <input
+          [id]="uid + '-denominator'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          autocomplete="off"
+          maxlength="18"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [value]="factorDenominator()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="denominatorError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-denominator-hint' + (denominatorError() ? ' ' + uid + '-denominator-error' : '')"
+          (input)="onFactorInput('denominator', $event)"
+          (blur)="markTouched('denominator')"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'invUom.modal.effectiveFrom' | transloco"
+          [for]="uid + '-effective'"
+          [required]="true"
+          [hint]="'invUom.modal.effectiveFromHint' | transloco"
+          [error]="effectiveFromError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-effective'"
+              [ariaLabel]="'invUom.modal.effectiveFrom' | transloco"
+              [describedBy]="effectiveDescribedBy()"
+              [todayLabel]="'invUom.date.today' | transloco"
+              [prevMonthLabel]="'invUom.date.prevMonth' | transloco"
+              [nextMonthLabel]="'invUom.date.nextMonth' | transloco"
+              [invalid]="!!effectiveFromError()"
+              [disabled]="saving()"
+              [value]="effectiveDate()"
+              (valueChange)="onEffectiveDateChange($event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-effective-time'"
+              [ariaLabel]="'invUom.modal.effectiveFrom' | transloco"
+              [describedBy]="effectiveDescribedBy()"
+              [hourLabel]="'invUom.date.hour' | transloco"
+              [minuteLabel]="'invUom.date.minute' | transloco"
+              [invalid]="!!effectiveFromError()"
+              [disabled]="saving()"
+              [value]="effectiveTime()"
+              (valueChange)="onEffectiveTimeChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+    </form>
+
+    @if (preview(); as p) {
+      <div class="mt-8 flex items-center gap-6 rounded-8 bg-brand-soft p-8 text-12 leading-18 text-on-brand-soft">
+        <ng-icon name="tablerEqual" size="14" class="shrink-0" aria-hidden="true" />
+        <span class="min-w-0 flex-1 tabular-nums">
+          {{ 'invUom.modal.preview' | transloco: { from: p.from, factor: p.factor, to: p.to, ten: p.ten } }}
+          @if (!p.exact) {
+            <span> {{ 'invUom.modal.notExact' | transloco }}</span>
+          }
+        </span>
+      </div>
+    }
+
+    @if (publishedPredecessor(); as pred) {
+      <app-settings-notice tone="warning" class="mt-8">
+        {{ 'invUom.modal.predecessorWarning' | transloco: { n: pred.revisionNumber } }}
+      </app-settings-notice>
+    }
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (mode() === 'view' && viewing(); as rev) {
+      @if (canGovern() && rev.status === 'DRAFT') {
+        <button type="button" uiButton variant="primary" (click)="requestPublishFromView()">
+          {{ 'invUom.actions.publish' | transloco }}
+        </button>
+      }
+      <button type="button" uiButton variant="secondary" (click)="requestClose()">
+        {{ 'tradeInventory.common.close' | transloco }}
+      </button>
+      @if (canGovern() && rev.status === 'PUBLISHED') {
+        <button type="button" uiButton variant="danger" class="ms-auto" (click)="requestRetireFromView()">
+          {{ 'invUom.actions.retire' | transloco }}
+        </button>
+      }
+    } @else {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || loadingItem() || noOtherUnits() || itemNotStockTracked()"
+      >
+        {{ 'invUom.modal.createDraft' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="requestClose()">
+        {{ 'tradeInventory.common.cancel' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tradeShared.discard.title' | transloco"
+  [text]="'tradeShared.discard.text' | transloco"
+  [confirmLabel]="'tradeShared.discard.confirm' | transloco"
+  [cancelLabel]="'tradeInventory.common.cancel' | transloco"
+/>

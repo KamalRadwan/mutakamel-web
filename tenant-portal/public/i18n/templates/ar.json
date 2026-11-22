@@ -1,0 +1,200 @@
+{
+  "pages": {
+    "library": {
+      "title": "القوالب"
+    },
+    "template": {
+      "title": "تصميم القالب"
+    },
+    "assets": {
+      "title": "أصول القوالب"
+    },
+    "assignments": {
+      "title": "تعيينات القوالب"
+    }
+  },
+  "families": {
+    "QUOTATION": "عرض سعر",
+    "PURCHASE_QUOTATION": "عرض سعر شراء",
+    "SALES_ORDER": "أمر بيع",
+    "PURCHASE_ORDER": "أمر شراء",
+    "INVOICE": "فاتورة",
+    "CONTRACT": "عقد",
+    "LETTER": "خطاب تجاري",
+    "CRM_OUTBOUND_EMAIL": "بريد إدارة العملاء"
+  },
+  "channels": {
+    "PRINT": "طباعة",
+    "EMAIL": "بريد إلكتروني"
+  },
+  "layouts": {
+    "HYBRID_DOCUMENT": "مستند هجين",
+    "FLOW_DOCUMENT": "مستند متدفق",
+    "FIXED_CANVAS": "لوحة ثابتة",
+    "EMAIL_FLOW": "تدفق البريد الإلكتروني"
+  },
+  "layoutsShort": {
+    "HYBRID_DOCUMENT": "هجين",
+    "FLOW_DOCUMENT": "متدفق",
+    "FIXED_CANVAS": "لوحة ثابتة",
+    "EMAIL_FLOW": "بريد"
+  },
+  "layoutDescriptions": {
+    "HYBRID_DOCUMENT": "رأس وتذييل ثابتان مع متن متدفق",
+    "FLOW_DOCUMENT": "يتدفق المحتوى تلقائيًا عبر الصفحات",
+    "FIXED_CANVAS": "كل عنصر في موضع محدد بدقة",
+    "EMAIL_FLOW": "تخطيط عمود متجاوب للبريد الإلكتروني"
+  },
+  "validationStates": {
+    "PASSED": "ناجح",
+    "FAILED": "فشل",
+    "STALE": "متغيّر",
+    "NOT_VALIDATED": "لم يُفحص"
+  },
+  "lifecycle": {
+    "ACTIVE": "نشط",
+    "ARCHIVED": "مؤرشف",
+    "INACTIVE": "غير نشط",
+    "PUBLISHED": "منشور",
+    "RETIRED": "موقوف",
+    "notPublished": "غير منشور"
+  },
+  "locales": {
+    "en-US": "الإنجليزية",
+    "ar-EG": "العربية",
+    "all": "جميع اللغات"
+  },
+  "directions": {
+    "AUTO": "تلقائي",
+    "LTR": "من اليسار إلى اليمين",
+    "RTL": "من اليمين إلى اليسار"
+  },
+  "tabs": {
+    "label": "أقسام القالب",
+    "overview": "نظرة عامة",
+    "design": "التصميم",
+    "preview": "المعاينة",
+    "validation": "التحقق",
+    "versions": "الإصدارات",
+    "recovery": "الاسترداد"
+  },
+  "actions": {
+    "newTemplate": "قالب جديد",
+    "open": "فتح",
+    "save": "حفظ",
+    "undoChanges": "تراجع عن التغييرات",
+    "validate": "تحقق",
+    "publish": "نشر",
+    "preview": "معاينة",
+    "duplicate": "إنشاء نسخة",
+    "createConvertedCopy": "إنشاء نسخة محوّلة",
+    "archive": "أرشفة",
+    "restore": "استعادة",
+    "delete": "حذف",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "retry": "إعادة المحاولة",
+    "clearFilters": "مسح عوامل التصفية",
+    "reload": "إعادة التحميل",
+    "keepMyChanges": "الاحتفاظ بتغييراتي",
+    "upload": "رفع",
+    "retire": "إيقاف",
+    "testSelection": "اختبار الاختيار",
+    "newAssignment": "تعيين جديد",
+    "deactivate": "إيقاف التفعيل",
+    "previous": "السابق",
+    "next": "التالي"
+  },
+  "states": {
+    "unsavedChanges": "تغييرات غير محفوظة",
+    "saved": "محفوظ",
+    "saving": "جارٍ الحفظ…",
+    "saveFirst": "احفظ التغييرات قبل التحقق أو المعاينة.",
+    "emptyFirstUse": {
+      "title": "لا توجد قوالب بعد",
+      "description": "أنشئ أول قالب للطباعة أو البريد الإلكتروني للبدء."
+    },
+    "emptyFiltered": {
+      "title": "لا توجد قوالب تطابق عوامل التصفية",
+      "description": "عدّل عوامل التصفية أو امسحها لعرض القوالب."
+    },
+    "emptyAssets": {
+      "title": "لا توجد أصول بعد",
+      "description": "ارفع الشعارات أو الخلفيات أو الصور لاستخدامها في القوالب."
+    },
+    "emptyAssignments": {
+      "title": "لا توجد تعيينات لهذا النطاق",
+      "description": "عيّن إصدارًا منشورًا لقالب لتستخدمه المستندات هنا."
+    },
+    "emptyVersions": {
+      "title": "لا توجد إصدارات منشورة بعد",
+      "description": "تحقّق من المسودة وانشرها لإنشاء الإصدار الأول."
+    },
+    "emptyRecovery": {
+      "title": "لا توجد لقطات استرداد",
+      "description": "تُنشأ اللقطات تلقائيًا أثناء ترقية المخطط أو تحويل الصفحات الثابتة."
+    },
+    "loadFailed": {
+      "title": "تعذّر تحميل القوالب",
+      "description": "حدث خطأ غير متوقع أثناء تحميل البيانات.",
+      "reference": "مرجع الدعم: {{correlationId}}"
+    },
+    "notFound": {
+      "title": "القالب غير موجود",
+      "description": "هذا القالب غير موجود أو يقع خارج نطاقك الحالي."
+    },
+    "forbidden": {
+      "title": "تم رفض الوصول",
+      "description": "ليست لديك صلاحية لعرض هذا القسم."
+    },
+    "featureDisabled": {
+      "title": "مصمم القوالب غير متاح",
+      "description": "مصمم القوالب غير متاح لمساحة العمل هذه."
+    },
+    "readOnly": {
+      "title": "للعرض فقط",
+      "description": "يمكنك مراجعة القوالب المنشورة، لكن التعديل غير متاح."
+    },
+    "conflict": {
+      "title": "تغيّر القالب في مكان آخر",
+      "description": "حفظ مستخدم آخر تغييرات أحدث أثناء تعديلك. أعد التحميل للحصول على أحدث نسخة أو احتفظ بتعديلاتك."
+    },
+    "offline": {
+      "message": "أنت غير متصل بالإنترنت. ستُحفظ التغييرات عند عودة الاتصال."
+    }
+  },
+  "errors": {
+    "generic": "حدث خطأ. حاول مرة أخرى.",
+    "network": "تعذّر الوصول إلى الخادم.",
+    "CORE.TEMPLATE.FEATURE.DISABLED": "مصمم القوالب غير متاح لمساحة العمل هذه.",
+    "CORE.TEMPLATE.PERMISSION.DENIED": "ليست لديك صلاحية لهذا الإجراء.",
+    "CORE.TEMPLATE.NOT_FOUND": "لم يعد هذا العنصر موجودًا أو يقع خارج نطاقك.",
+    "CORE.TEMPLATE.CODE.CONFLICT": "رمز القالب هذا مستخدم بالفعل.",
+    "CORE.TEMPLATE.CONCURRENCY.STALE_REVISION": "تم تحديث هذا السجل في مكان آخر. أعد التحميل وحاول مرة أخرى.",
+    "CORE.TEMPLATE.CONCURRENCY.PRECONDITION_REQUIRED": "يتطلب هذا التغيير الإصدار الحالي من السجل. أعد تحميل الصفحة ثم حاول مرة أخرى.",
+    "CORE.TEMPLATE.DEFINITION.ARCHIVED": "لا يمكن تعديل القوالب المؤرشفة. استعد القالب أولاً.",
+    "CORE.TEMPLATE.DEFINITION.REFERENCED": "لا يمكن حذف القوالب المنشورة أو المعينة.",
+    "CORE.TEMPLATE.DEFINITION.SYSTEM_PROTECTED": "لا يمكن تعديل قوالب النظام أو أرشفتها.",
+    "CORE.TEMPLATE.VALIDATION.FAILED": "أصلح أخطاء التحقق قبل المتابعة.",
+    "CORE.TEMPLATE.PUBLISH.NOT_VALIDATED": "تحقّق من المسودة الحالية قبل النشر.",
+    "CORE.TEMPLATE.PUBLISH.VALIDATION_STALE": "تغيّرت المسودة منذ آخر فحص. أعد التحقق قبل النشر.",
+    "CORE.TEMPLATE.PUBLISH.NO_CHANGES": "لا توجد تغييرات للنشر منذ الإصدار الحالي.",
+    "CORE.TEMPLATE.ASSET.IN_USE": "هذا الأصل مستخدم في إصدار منشور ولا يمكن إيقافه.",
+    "CORE.TEMPLATE.ASSIGNMENT.CONFLICT": "يوجد تعيين افتراضي متداخل بالفعل لهذا النطاق والأولوية.",
+    "CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID": "لا يمكن تعيين قوالب الشركة إلا لتلك الشركة أو لفروعها.",
+    "CORE.TEMPLATE.PREVIEW.TOO_MANY_ACTIVE": "لديك ثلاث معاينات PDF قيد التنفيذ بالفعل. انتظر حتى تنتهي إحداها ثم حاول مرة أخرى.",
+    "CORE.TEMPLATE.PREVIEW.ARTIFACT_EXPIRED": "انتهت صلاحية معاينة PDF هذه. أنشئها مرة أخرى.",
+    "CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE": "خدمة القوالب غير متاحة مؤقتًا.",
+    "CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED": "تغيّرت حقول مصدر البيانات لهذه المسودة. أعد تحميل المسودة قبل الحفظ.",
+    "CORE.TEMPLATE.IDEMPOTENCY.CONFLICT": "استُخدم هذا الطلب من قبل لإجراء مختلف. حاول مرة أخرى.",
+    "CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT": "لا يزال الطلب نفسه قيد المعالجة. انتظر قليلًا ثم تحقق من النتيجة.",
+    "CORE.TEMPLATE.IDEMPOTENCY.MISMATCH": "لا يطابق هذا الطلب الطلب المرسل سابقًا. أعد تحميل الصفحة ثم حاول مرة أخرى.",
+    "CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_UNAVAILABLE": "لقطة الاسترداد هذه غير متاحة. اختر لقطة أخرى.",
+    "CORE.TEMPLATE.COMPILER.FAILED": "تعذّر تجهيز القالب للإخراج. راجع التصميم ثم أعد التحقق."
+  },
+  "fixtures": {
+    "salesStandardEn": "عرض سعر قياسي (الإنجليزية)",
+    "salesStandardAr": "عرض سعر قياسي (العربية)",
+    "salesLong48En": "عرض سعر طويل · 48 بندًا (الإنجليزية)"
+  }
+}

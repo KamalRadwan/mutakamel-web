@@ -1,0 +1,158 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerAdjustmentsHorizontal"
+  tile="bg-icon-blue"
+  [title]="'templatesLibrary.filtersModal.title' | transloco"
+  [closeLabel]="'templates.actions.close' | transloco"
+  (closed)="closed.emit()"
+>
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+    <ui-field
+      size="bare"
+      [for]="uid + '-doc-type'"
+      [label]="'templatesLibrary.filtersModal.fields.documentType.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.documentType.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-doc-type'"
+        [describedBy]="uid + '-doc-type-hint'"
+        [options]="documentTypeOptions()"
+        [(value)]="draftDocumentType"
+        [label]="'templatesLibrary.filtersModal.fields.documentType.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-channel'"
+      [label]="'templatesLibrary.filtersModal.fields.outputChannel.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.outputChannel.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-channel'"
+        [describedBy]="uid + '-channel-hint'"
+        [options]="outputChannelOptions()"
+        [(value)]="draftOutputChannel"
+        [label]="'templatesLibrary.filtersModal.fields.outputChannel.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-layout'"
+      [label]="'templatesLibrary.filtersModal.fields.layoutMode.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.layoutMode.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-layout'"
+        [describedBy]="uid + '-layout-hint'"
+        [options]="layoutModeOptions()"
+        [(value)]="draftLayoutMode"
+        [label]="'templatesLibrary.filtersModal.fields.layoutMode.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-lifecycle'"
+      [label]="'templatesLibrary.filtersModal.fields.lifecycleStatus.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.lifecycleStatus.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-lifecycle'"
+        [describedBy]="uid + '-lifecycle-hint'"
+        [options]="lifecycleOptions()"
+        [(value)]="draftLifecycleStatus"
+        [label]="'templatesLibrary.filtersModal.fields.lifecycleStatus.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-locale'"
+      [label]="'templatesLibrary.filtersModal.fields.locale.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.locale.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-locale'"
+        [describedBy]="uid + '-locale-hint'"
+        [options]="localeOptions()"
+        [(value)]="draftLocale"
+        [label]="'templatesLibrary.filtersModal.fields.locale.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-scope'"
+      [label]="'templatesLibrary.filtersModal.fields.definitionScopeType.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.definitionScopeType.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-scope'"
+        [describedBy]="uid + '-scope-hint'"
+        [options]="scopeOptions()"
+        [(value)]="draftScopeType"
+        [label]="'templatesLibrary.filtersModal.fields.definitionScopeType.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-published'"
+      [label]="'templatesLibrary.filtersModal.fields.hasPublishedVersion.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.hasPublishedVersion.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-published'"
+        [describedBy]="uid + '-published-hint'"
+        [options]="publishedOptions()"
+        [(value)]="draftHasPublished"
+        [label]="'templatesLibrary.filtersModal.fields.hasPublishedVersion.label' | transloco"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      size="bare"
+      [for]="uid + '-updated'"
+      [label]="'templatesLibrary.filtersModal.fields.updatedRange.label' | transloco"
+      [hint]="'templatesLibrary.filtersModal.fields.updatedRange.hint' | transloco"
+    >
+      <app-library-date-range
+        [id]="uid + '-updated'"
+        [describedBy]="uid + '-updated-hint'"
+        [ariaLabel]="'templatesLibrary.filtersModal.fields.updatedRange.label' | transloco"
+        [placeholder]="'templatesLibrary.dateRange.placeholder' | transloco"
+        [(value)]="draftDateRange"
+      />
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    <button type="button" uiButton (click)="applyFilters()">
+      {{ 'templatesLibrary.filtersModal.apply' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="cancel()">
+      {{ 'templatesLibrary.filtersModal.cancel' | transloco }}
+    </button>
+    <button type="button" uiButton variant="ghost" class="ms-auto" [disabled]="!hasDraftFilters()" (click)="resetDraft()">
+      {{ 'templatesLibrary.filtersModal.clear' | transloco }}
+    </button>
+  </div>
+</ui-modal>

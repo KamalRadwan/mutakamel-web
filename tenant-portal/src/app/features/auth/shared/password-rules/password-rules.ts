@@ -1,0 +1,38 @@
+import { Component, computed, input } from '@angular/core';
+import { provideTranslocoScope, TranslocoPipe } from '@jsverse/transloco';
+import { NgIcon, provideIcons } from '@ng-icons/core';
+import { tablerCircle, tablerCircleCheck } from '@ng-icons/tabler-icons';
+import { passwordChecks } from '../password-policy';
+
+interface RuleRow {
+  key: 'length' | 'lower' | 'upper' | 'digit' | 'symbol' | 'match';
+  labelKey: string;
+  met: boolean;
+}
+
+@Component({
+  selector: 'app-auth-password-rules',
+  imports: [NgIcon, TranslocoPipe],
+  providers: [provideIcons({ tablerCircleCheck, tablerCircle })],
+  viewProviders: [provideTranslocoScope('auth')],
+  templateUrl: './password-rules.html',
+})
+export class PasswordRules {
+  readonly password = input('');
+  readonly confirm = input('');
+
+  protected readonly rows = computed<readonly RuleRow[]>(() => {
+    const value = this.password();
+    const confirmed = this.confirm();
+    const checks = passwordChecks(value);
+    const match = value.length > 0 && confirmed.length > 0 && value === confirmed;
+    return [
+      { key: 'length', labelKey: 'auth.shared.rules.length', met: checks.length },
+      { key: 'lower', labelKey: 'auth.shared.rules.lower', met: checks.lower },
+      { key: 'upper', labelKey: 'auth.shared.rules.upper', met: checks.upper },
+      { key: 'digit', labelKey: 'auth.shared.rules.digit', met: checks.digit },
+      { key: 'symbol', labelKey: 'auth.shared.rules.symbol', met: checks.symbol },
+      { key: 'match', labelKey: 'auth.shared.rules.match', met: match },
+    ];
+  });
+}

@@ -1,0 +1,219 @@
+<div class="overflow-x-auto pb-4">
+  <div
+    role="table"
+    class="min-w-doc-table-min"
+    [attr.aria-label]="'tradeItems.table.label' | transloco"
+    [attr.aria-busy]="loading()"
+  >
+    <div
+      role="row"
+      class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+      [class]="gridCols()"
+    >
+      @if (showSelection()) {
+        <span role="columnheader" class="flex items-center justify-center">
+          <span class="relative inline-flex size-checkbox-size items-center justify-center">
+            <ui-checkbox
+              #pageCb
+              [checked]="pageState() === 'all'"
+              [attr.aria-label]="'tradeItems.table.selectPage' | transloco"
+              [attr.aria-checked]="pageState() === 'some' ? 'mixed' : (pageState() === 'all' ? 'true' : 'false')"
+              (checkedChange)="togglePage(pageCb)"
+            >
+              <span class="sr-only">{{ 'tradeItems.table.selectPage' | transloco }}</span>
+            </ui-checkbox>
+            @if (pageState() === 'some') {
+              <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+              </span>
+            }
+          </span>
+        </span>
+      }
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center justify-center px-8"
+        [class.border-s]="showSelection()"
+        [class.border-on-nav-line]="showSelection()"
+      >
+        <span class="truncate">{{ 'tradeItems.table.image' | transloco }}</span>
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeItems.table.name' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeItems.table.kind' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeItems.table.category' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeItems.table.baseUnit' | transloco }}
+      </span>
+      @if (companyView()) {
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tradeItems.table.price' | transloco }}
+        </span>
+      }
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeShared.common.status' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeShared.common.updated' | transloco }}
+      </span>
+      <span role="columnheader" class="border-s border-on-nav-line">
+        <span class="sr-only">{{ 'tradeShared.common.actions' | transloco }}</span>
+      </span>
+    </div>
+
+    @if (loading()) {
+      @for (row of skeletonRows; track row) {
+        <div
+          role="row"
+          aria-hidden="true"
+          class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+          [class]="gridCols()"
+        >
+          @if (showSelection()) {
+            <span role="cell" class="flex items-center justify-center">
+              <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+            </span>
+          }
+          <span
+            role="cell"
+            class="flex items-center justify-center px-8"
+            [class.border-s]="showSelection()"
+            [class.border-border]="showSelection()"
+          >
+            <span class="size-icon-tile-sm rounded-8 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 flex-col justify-center gap-4 border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+          </span>
+          @if (companyView()) {
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+          }
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex items-center justify-center border-s border-border">
+            <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+          </span>
+        </div>
+      }
+    } @else {
+      @for (item of items(); track item.id) {
+        @let tile = tileFor(item);
+        @let thumb = showThumbs() && item.image ? thumbMap().get(item.id) : null;
+        <div
+          role="row"
+          tabindex="0"
+          [attr.aria-label]="nameOf(item)"
+          class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="gridCols() + ' ' + (isSelected(item.id) ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover')"
+          [attr.aria-selected]="showSelection() ? isSelected(item.id) : null"
+          (click)="open.emit(item)"
+          (keydown)="onRowKeydown($event, item)"
+        >
+          @if (showSelection()) {
+            <span
+              role="cell"
+              class="flex items-center justify-center"
+              (click)="onSelectCellClick($event, item, rowCb)"
+            >
+              <ui-checkbox
+                #rowCb
+                [checked]="isSelected(item.id)"
+                [attr.aria-label]="'tradeItems.table.selectRow' | transloco: { name: nameOf(item) }"
+                (click)="onRowCheckboxClick($event)"
+                (checkedChange)="onRowCheckedChange(item, rowCb)"
+              >
+                <span class="sr-only">{{ 'tradeItems.table.selectRow' | transloco: { name: nameOf(item) } }}</span>
+              </ui-checkbox>
+            </span>
+          }
+          <span
+            role="cell"
+            class="flex items-center justify-center px-8"
+            [class.border-s]="showSelection()"
+            [class.border-border]="showSelection()"
+          >
+            @if (thumb) {
+              <img
+                [src]="thumb"
+                [alt]="nameOf(item)"
+                class="size-item-thumb shrink-0 rounded-8 border border-border object-cover"
+              />
+            } @else {
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="tile.tile"
+                [title]="kindKey[item.itemKind] | transloco"
+              >
+                <ng-icon [name]="tile.icon" size="14" aria-hidden="true" />
+              </span>
+            }
+          </span>
+
+          <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-10">
+            <span dir="auto" class="truncate text-13 leading-18 font-medium text-text">{{ nameOf(item) }}</span>
+            <bdi dir="ltr" class="truncate text-11 leading-16 text-text-muted tabular-nums">{{ item.canonicalCode }}</bdi>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="truncate text-13 text-text">{{ kindKey[item.itemKind] | transloco }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="truncate text-13 text-text-muted" [title]="categoryPath(item)">{{ categoryPath(item) }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="truncate text-13 text-text">{{ baseUnitName(item) }}</span>
+          </span>
+
+          @if (companyView()) {
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <bdi dir="ltr" class="truncate text-13 font-medium text-text tabular-nums">{{ priceText(item) }}</bdi>
+            </span>
+          }
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span [class]="statusBadgeClass(item)">{{ statusKey[item.status] | transloco }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <bdi class="truncate text-13 text-text-muted tabular-nums">{{ updatedText(item) }}</bdi>
+          </span>
+
+          <span
+            role="cell"
+            class="flex items-center justify-center border-s border-border"
+            (click)="$event.stopPropagation()"
+            (keydown)="$event.stopPropagation()"
+          >
+            <ui-actions-menu
+              [items]="actionsFor(item)"
+              [label]="menuLabel(item)"
+              (selected)="onActionSelected(item, $event)"
+            />
+          </span>
+        </div>
+      }
+    }
+  </div>
+</div>

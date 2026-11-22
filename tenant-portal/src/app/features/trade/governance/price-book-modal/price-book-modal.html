@@ -1,0 +1,181 @@
+<ui-modal
+  size="form"
+  icon="tablerBook"
+  tile="bg-icon-blue"
+  [title]="'priceBooks.create.title' | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form class="grid grid-cols-2 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); submit()">
+    <div class="col-span-1">
+      <ui-field
+        [label]="'priceBooks.create.fields.code' | transloco"
+        [for]="uid + '-code'"
+        [hint]="'priceBooks.create.hints.code' | transloco"
+        [required]="true"
+        [count]="code().length"
+        [max]="maxCode"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          [attr.maxlength]="maxCode"
+          class="w-full bg-transparent text-12 text-text uppercase outline-none placeholder:normal-case placeholder:text-text-placeholder"
+          [placeholder]="'priceBooks.create.placeholders.code' | transloco"
+          [value]="code()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          (input)="onCodeInput($event)"
+          (blur)="onCodeBlur()"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [bare]="true"
+        [label]="'priceBooks.create.fields.purpose' | transloco"
+        [for]="uid + '-purpose'"
+        [hint]="'priceBooks.create.hints.purpose' | transloco"
+        [required]="true"
+      >
+        <ui-segmented
+          [id]="uid + '-purpose'"
+          [label]="'priceBooks.create.fields.purpose' | transloco"
+          [describedBy]="uid + '-purpose-hint'"
+          [options]="purposeOptions()"
+          [value]="purpose()"
+          (valueChange)="onPurposeChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [bare]="true"
+        [label]="'priceBooks.create.fields.currency' | transloco"
+        [for]="uid + '-currency'"
+        [hint]="'priceBooks.create.hints.currency' | transloco"
+        [required]="true"
+        [error]="currencyError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-currency'"
+          [label]="'priceBooks.create.fields.currency' | transloco"
+          [describedBy]="uid + '-currency-hint' + (currencyError() ? ' ' + uid + '-currency-error' : '')"
+          [options]="currencyOptions()"
+          [value]="currencyCode()"
+          [disabled]="saving() || currencyOptions().length === 0"
+          (valueChange)="onCurrencyChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-start-1 col-span-1">
+      <ui-field
+        [label]="'priceBooks.create.fields.nameEn' | transloco"
+        [for]="uid + '-name-en'"
+        [hint]="'priceBooks.create.hints.nameEn' | transloco"
+        [error]="nameEnError()"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          [attr.maxlength]="maxName"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'priceBooks.create.placeholders.nameEn' | transloco"
+          [value]="nameEn()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="nameEnError() ? 'true' : null"
+          (input)="onNameEnInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'priceBooks.create.fields.nameAr' | transloco"
+        [for]="uid + '-name-ar'"
+        [hint]="'priceBooks.create.hints.nameAr' | transloco"
+        [error]="nameArError()"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          autocomplete="off"
+          [attr.maxlength]="maxName"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'priceBooks.create.placeholders.nameAr' | transloco"
+          [value]="nameAr()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="nameArError() ? 'true' : null"
+          (input)="onNameArInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [label]="'priceBooks.create.fields.description' | transloco"
+        [for]="uid + '-description'"
+        [hint]="'priceBooks.create.hints.description' | transloco"
+        [count]="description().length"
+        [max]="maxDescription"
+        [error]="descriptionError()"
+      >
+        <textarea
+          [id]="uid + '-description'"
+          rows="3"
+          [attr.maxlength]="maxDescription"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'priceBooks.create.placeholders.description' | transloco"
+          [value]="description()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="descriptionError() ? 'true' : null"
+          (input)="onDescriptionInput($event)"
+        ></textarea>
+      </ui-field>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="submit()"
+    >
+      {{ 'priceBooks.create.submit' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'priceBooks.discardConfirm.title' | transloco"
+  [text]="'priceBooks.discardConfirm.text' | transloco"
+  [confirmLabel]="'priceBooks.discardConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>

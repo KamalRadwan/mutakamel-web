@@ -1,0 +1,148 @@
+<div class="flex shrink-0 flex-col gap-4 border-t border-border pt-8">
+  <div class="flex items-center gap-6 text-11 leading-16 font-medium text-accent">
+    <div
+      class="group relative inline-flex shrink-0"
+      (mouseenter)="onTooltipMouseEnter()"
+      (mouseleave)="onTooltipMouseLeave()"
+      (focusin)="onTooltipFocusIn()"
+      (focusout)="onTooltipFocusOut()"
+      (keydown.escape)="onTooltipEscape($event)"
+    >
+      <button
+        type="button"
+        class="inline-flex size-phone-dot shrink-0 cursor-pointer items-center justify-center rounded-full text-on-icon outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="dotClass()"
+        [attr.aria-label]="'webPhone.statusLine.buttonLabel' | transloco"
+        [attr.aria-expanded]="tooltipOpen()"
+        [attr.aria-describedby]="tooltipId"
+        (click)="toggleTooltip($event)"
+      >
+        <ng-icon name="tablerPhone" size="9" class="size-icon-dot" aria-hidden="true" />
+      </button>
+
+      <div
+        [id]="tooltipId"
+        role="tooltip"
+        class="pointer-events-none absolute bottom-full start-0 z-tooltip mb-6 flex w-modal-alert flex-col gap-2 rounded-6 bg-tooltip-bg p-8 text-12 leading-18 font-normal text-on-tooltip shadow-popover"
+        [class]="
+          tooltipDismissed()
+            ? 'invisible'
+            : tooltipOpen()
+              ? 'visible'
+              : 'invisible group-hover:visible group-focus-within:visible'
+        "
+      >
+        @if (phone.quality(); as q) {
+          <div class="flex items-center justify-between gap-8 font-medium">
+            <span class="text-on-nav-muted">{{ 'webPhone.quality.title' | transloco }}</span>
+            <span>{{ ('webPhone.quality.' + q.level) | transloco }}</span>
+          </div>
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-on-nav-muted">{{ 'webPhone.quality.packetLoss' | transloco }}</span>
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ q.lossPct.toFixed(1) }}%</bdi>
+          </div>
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-on-nav-muted">{{ 'webPhone.quality.jitterBuffer' | transloco }}</span>
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ q.jitterMs }} ms</bdi>
+          </div>
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-on-nav-muted">{{ 'webPhone.quality.roundTrip' | transloco }}</span>
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ q.rttMs }} ms</bdi>
+          </div>
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-on-nav-muted">{{ 'webPhone.quality.mos' | transloco }}</span>
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ q.mos.toFixed(1) }}</bdi>
+          </div>
+          <p class="mt-2 border-t border-on-nav-line pt-4 text-11 leading-16 text-on-nav-muted">
+            {{ 'webPhone.quality.estimatedNote' | transloco }}
+          </p>
+        }
+
+        @if (phone.server().count > 0) {
+          <div
+            class="text-11 leading-16 text-on-nav-muted"
+            [class.mt-2]="!!phone.quality()"
+            [class.border-t]="!!phone.quality()"
+            [class.border-on-nav-line]="!!phone.quality()"
+            [class.pt-4]="!!phone.quality()"
+          >
+            {{ 'webPhone.statusLine.server' | transloco: phone.server() }}
+          </div>
+        } @else if (!phone.quality()) {
+          <div class="text-11 leading-16 text-on-nav-muted">{{ stateText() }}</div>
+        }
+
+        @if (phone.status().detail; as detail) {
+          <div dir="ltr" class="truncate text-11 leading-16 text-on-nav-muted">{{ detail }}</div>
+        }
+      </div>
+    </div>
+
+    <span
+      class="min-w-0 flex-1 truncate"
+      aria-live="polite"
+      [title]="endedInfo() ? endedTooltip(endedInfo()!) : stateText()"
+    >
+      @if (endedInfo(); as ended) {
+        {{ endedPrefix(ended) }} · <bdi dir="ltr" class="tabular-nums">{{ formatDuration(ended.durationSeconds) }}</bdi>
+      } @else if (activePeer(); as peer) {
+        <span>{{ callStatePrefix() }} · </span>
+        @if (peer.source; as source) {
+          <a
+            [routerLink]="sourceRoute(source)"
+            class="rounded-4 underline outline-none hover:text-brand-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          >
+            {{ peer.name }}
+          </a>
+        } @else {
+          <span>{{ peer.name }}</span>
+        }
+      } @else {
+        {{ stateText() }}
+      }
+    </span>
+
+    @if (endedInfo(); as ended) {
+      @if (ended.number) {
+        <button
+          type="button"
+          class="shrink-0 cursor-pointer rounded-4 font-medium text-accent underline outline-none hover:text-brand-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:no-underline"
+          [disabled]="redialDisabled()"
+          (click)="redial(ended)"
+        >
+          {{ 'webPhone.ended.redial' | transloco }}
+        </button>
+      }
+      <button
+        type="button"
+        class="inline-flex size-counter shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'webPhone.common.close' | transloco"
+        [title]="'webPhone.common.close' | transloco"
+        (click)="phone.dismissEnded()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+
+    @if (showTimer()) {
+      <span dir="ltr" class="ms-auto shrink-0 text-12 leading-18 font-medium text-success-text tabular-nums">
+        {{ formattedTimer() }}
+      </span>
+    }
+  </div>
+
+  @if (phone.mediaNotice(); as notice) {
+    <div class="flex items-center justify-between gap-6 text-11 leading-16 text-danger-text">
+      <span class="min-w-0 truncate">{{ ('webPhone.mediaNotice.' + notice) | transloco }}</span>
+      @if (notice === 'permissionDenied' || notice === 'noMicrophone') {
+        <button
+          type="button"
+          class="shrink-0 cursor-pointer rounded-4 font-medium text-accent underline outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="phone.setTab('settings')"
+        >
+          {{ 'webPhone.mediaNotice.fix' | transloco }}
+        </button>
+      }
+    </div>
+  }
+</div>

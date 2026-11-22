@@ -1,0 +1,266 @@
+{
+  "common": {
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "retry": "حاول مرة أخرى",
+    "reload": "إعادة التحميل",
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "clearFilters": "مسح عوامل التصفية",
+    "none": "—",
+    "undo": "تراجع عن التغييرات",
+    "unsaved": "تغييرات غير محفوظة",
+    "discardTitle": "تجاهل التغييرات؟",
+    "discardText": "ستفقد تفاصيل الحل التي أدخلتها.",
+    "discardConfirm": "تجاهل"
+  },
+  "title": "برج المراقبة",
+  "stats": {
+    "open": "مفتوحة",
+    "openHint": "استثناءات تنتظر تدخل مشغّل للتحقق منها وحلّها.",
+    "openSub": "تحتاج إلى شخص",
+    "actionPending": "بانتظار إجراء",
+    "actionPendingHint": "استثناءات تجري لها محاولات تسليم تلقائية حاليًا.",
+    "actionPendingSub": "إعادة محاولة جارية",
+    "resolvedToday": "حُلّت اليوم",
+    "resolvedTodayHint": "استثناءات أُنجز حلّها بواسطة فريقك اليوم.",
+    "resolvedTodaySub": "بواسطة فريقك",
+    "highOrCritical": "عالية أو حرجة",
+    "highOrCriticalHint": "الاستثناءات ذات الخطورة العالية أو الحرجة بأي حالة، من إجمالي صندوق الوارد.",
+    "highOrCriticalSub": "من {{total}} معروضة"
+  },
+  "steps": {
+    "label": "حالة الاستثناء",
+    "hint": "صفِّ الاستثناءات حسب الحالة",
+    "OPEN": "مفتوحة",
+    "ACTION_PENDING": "بانتظار إجراء",
+    "RESOLVED": "محلولة",
+    "QUARANTINED": "معزولة"
+  },
+  "filters": {
+    "severity": "الخطورة",
+    "severityHint": "اعرض الاستثناءات ذات مستوى الخطورة المختار فقط.",
+    "allSeverities": "كل مستويات الخطورة",
+    "HIGH": "عالية",
+    "CRITICAL": "حرجة",
+    "category": "الفئة",
+    "categoryHint": "اعرض الاستثناءات التابعة للفئة المختارة فقط.",
+    "allCategories": "كل الفئات",
+    "reload": "إعادة التحميل",
+    "branch": "الفرع",
+    "branchHint": "اعرض استثناءات فرع واحد فقط من فروع هذه الشركة. يتاح هذا الاختيار في نطاق الشركة.",
+    "allBranches": "كل الفروع",
+    "sort": "الترتيب",
+    "sortHint": "اختر ترتيب الاستثناءات في القائمة.",
+    "sortCreatedAt": "الأحدث أولًا",
+    "sortSeverity": "الأشد خطورة أولًا"
+  },
+  "categories": {
+    "PROFILE_ACTIVATION_CONFLICT": "تعارض في تفعيل ملف تعريف",
+    "RESULT_CONFLICT": "تعارض في نتيجة مستند",
+    "OWNER_TRANSPORT_EXHAUSTED": "تعذّر التسليم إلى الوحدة المالكة",
+    "DATA_CORRECTION_REQUIRED": "بيانات تحتاج إلى تصحيح"
+  },
+  "severities": {
+    "INFO": "معلومة",
+    "WARNING": "تحذير",
+    "HIGH": "عالية",
+    "CRITICAL": "حرجة"
+  },
+  "statuses": {
+    "OPEN": "مفتوحة",
+    "ACKNOWLEDGED": "تم الاطلاع عليها",
+    "ACTION_PENDING": "بانتظار إجراء",
+    "RECONCILIATION_PENDING": "بانتظار المطابقة",
+    "RESOLVED": "محلولة",
+    "QUARANTINED": "معزولة"
+  },
+  "sourceTypes": {
+    "DOCUMENT_PROFILE_VERSION": "نسخة ملف تعريف مستند",
+    "QUOTATION_PDF_RENDER": "ملف PDF لعرض سعر",
+    "BUSINESS_PDF_RENDER": "ملف PDF لمستند تجاري"
+  },
+  "resolutions": {
+    "SOURCE_CORRECTED": "تم تصحيح المصدر",
+    "OWNER_RESULT_APPLIED": "تم تطبيق النتيجة لدى الوحدة المالكة",
+    "RESULT_ACCEPTED": "تم اعتماد النتيجة"
+  },
+  "attemptStatuses": {
+    "CONFLICT": "تعارض",
+    "EXHAUSTED": "استنفد المحاولات",
+    "SUCCEEDED": "نجحت",
+    "DELIVERED": "تم التسليم",
+    "FAILED": "فشلت",
+    "RETRY_SCHEDULED": "إعادة محاولة مجدولة",
+    "PENDING": "قيد الانتظار"
+  },
+  "guidance": {
+    "PROFILE_ACTIVATION_CONFLICT": "أصلح المصدر أولًا (أوقف النسخة أو عدّلها)، ثم علّم هذا التنبيه بأنه محلول.",
+    "RESULT_CONFLICT": "وصلت نتيجتان للمستند. اختر النتيجة المعتمدة للإبقاء عليها، ثم سوِّ الاستثناء.",
+    "OWNER_TRANSPORT_EXHAUSTED": "يُعاد تنفيذ هذه المحاولة تلقائيًا. لا تعلّمها كمحلولة إلا بعد أن تطبّق الوحدة المالكة النتيجة.",
+    "DATA_CORRECTION_REQUIRED": "صحّح البيانات في مصدرها أولًا، ثم علّم هذا التنبيه بأنه محلول."
+  },
+  "problems": {
+    "TRADE_DOCUMENT_PROFILE_EFFECTIVE_OVERLAP": "نسخة أخرى سارية في الفترة نفسها",
+    "TRADE_DOCUMENT_PROFILE_ACTIVATION_CONFLICT": "تعذّر تفعيل نسخة ملف تعريف المستند بسبب تعارض",
+    "TRADE_DOCUMENT_DUPLICATE_ARTIFACT_CONFLICT": "وصلت نتيجتان متعارضتان للمستند للسجل نفسه",
+    "TRADE_DOCUMENT_RESULT_CONFLICT": "نتيجة المستند تتعارض مع مخرج قائم",
+    "TRADE_DOCUMENT_RENDER_FAILED": "فشل إنشاء المستند",
+    "TRADE_DOCUMENT_TEMPLATE_NOT_FOUND": "لم يُعثر على قالب المستند المعيّن",
+    "TRADE_DOCUMENT_TEMPLATE_INVALID": "إعدادات قالب المستند غير صالحة",
+    "TRADE_OWNER_TRANSPORT_TIMEOUT": "انتهت مهلة التسليم إلى الوحدة المالكة",
+    "TRADE_OWNER_TRANSPORT_HTTP_503": "الوحدة المالكة غير متاحة مؤقتًا (HTTP 503)",
+    "TRADE_OWNER_TRANSPORT_HTTP_502": "أعادت الوحدة المالكة خطأ بوابة (HTTP 502)",
+    "TRADE_OWNER_TRANSPORT_HTTP_500": "واجهت الوحدة المالكة خطأً داخليًا (HTTP 500)",
+    "TRADE_OWNER_TRANSPORT_RATE_LIMITED": "قيّدت الوحدة المالكة معدل الطلبات؛ جُدولت إعادة المحاولة",
+    "TRADE_OWNER_TRANSPORT_EXHAUSTED": "استُنفدت جميع محاولات التسليم إلى الوحدة المالكة",
+    "TRADE_OWNER_TRANSPORT_NETWORK_ERROR": "خطأ في الشبكة أثناء التسليم إلى الوحدة المالكة",
+    "TRADE_OWNER_CALLBACK_REJECTED": "رفضت الوحدة المالكة النتيجة المُسلَّمة",
+    "TRADE_TAX_CLASSIFICATION_MISSING": "تصنيف الضريبة مفقود في السجل المصدر",
+    "TRADE_ACCOUNT_PARTY_REFERENCE_INACTIVE": "الطرف المرجعي في الحساب التجاري غير نشط",
+    "TRADE_DATA_CORRECTION_REQUIRED": "يجب تصحيح بيانات المصدر قبل متابعة المعالجة",
+    "TRADE_CATALOG_ITEM_INACTIVE": "الصنف المرجعي في الدليل غير نشط",
+    "TRADE_VALIDATION_FAILED": "فشل التحقق من صحة بيانات المصدر",
+    "ARTIFACT_DIGEST_MISMATCH": "عدم تطابق البصمة الرقمية للمستند",
+    "UPSTREAM_TIMEOUT": "انتهت مهلة الطلب في الخدمة المستهدفة",
+    "TAX_CODE_REQUIRED": "رمز الضريبة مطلوب",
+    "SERVICE_UNAVAILABLE": "الخدمة غير متاحة",
+    "TOO_MANY_REQUESTS": "عدد كبير جدًا من الطلبات"
+  },
+  "table": {
+    "label": "استثناءات برج المراقبة",
+    "selectPage": "تحديد كل الاستثناءات القابلة للحل في هذه الصفحة",
+    "selectRow": "تحديد الاستثناء {{label}}",
+    "unselectableResolved": "هذا الاستثناء مغلق بالفعل.",
+    "unselectableCategory": "يجب حل هذه الفئة خارج الإجراء الجماعي.",
+    "columns": {
+      "severity": "الخطورة",
+      "category": "الفئة",
+      "source": "المصدر",
+      "problem": "المشكلة",
+      "status": "الحالة",
+      "created": "تاريخ الإنشاء"
+    },
+    "unselectableQuarantined": "لا يمكن حل الاستثناءات المعزولة من هنا."
+  },
+  "pagination": {
+    "label": "ترقيم صفحات الاستثناءات"
+  },
+  "states": {
+    "loadFailed": "تعذّر تحميل استثناءات برج المراقبة.",
+    "notFound": "لم يعد هذا الاستثناء موجودًا.",
+    "emptyOpen": "لا يوجد ما يحتاج إلى انتباه.",
+    "emptyActionPending": "لا توجد استثناءات بانتظار إعادة المحاولة حاليًا.",
+    "emptyResolved": "لا توجد استثناءات محلولة بعد.",
+    "countsFailed": "تعذّر تحميل أعداد الاستثناءات.",
+    "emptyFiltered": "لا توجد استثناءات تطابق عوامل التصفية المحددة.",
+    "emptyQuarantined": "لا توجد استثناءات معزولة."
+  },
+  "modal": {
+    "fallbackTitle": "استثناء",
+    "fields": {
+      "source": "المصدر",
+      "status": "الحالة",
+      "problem": "المشكلة",
+      "created": "تاريخ الإنشاء",
+      "correlationId": "معرّف الارتباط",
+      "attempts": "المحاولات"
+    },
+    "hints": {
+      "source": "السجل الذي أنشأ هذا الاستثناء. استخدم الرابط لفتحه.",
+      "status": "الحالة الحالية لمعالجة الاستثناء.",
+      "problem": "رمز الخطأ الآمن الذي أبلغ عنه النظام، معروضًا بصياغة مفهومة.",
+      "created": "وقت إنشاء النظام لهذا الاستثناء أول مرة.",
+      "correlationId": "المعرّف الذي يربط هذا الاستثناء بسجلاته. اذكره عند طلب الدعم.",
+      "attempts": "عدد محاولات التسليم قبل إنشاء الاستثناء."
+    },
+    "openSource": "فتح السجل المصدر",
+    "attemptsTitle": "محاولات التسليم",
+    "attemptColumns": {
+      "owner": "الوحدة المالكة",
+      "status": "الحالة",
+      "tries": "المحاولات",
+      "nextTry": "المحاولة التالية",
+      "lastError": "آخر خطأ"
+    },
+    "resolveTitle": "حل المشكلة",
+    "resolutionLabel": "طريقة الحل",
+    "resolutionHint": "اختر إجراء الحل المطابق لكيفية معالجة المشكلة الأساسية.",
+    "resolutionPlaceholder": "اختر طريقة الحل",
+    "markAsResolved": "تعليم كمحلولة",
+    "emptyReasonsHint": "أضف أسبابًا في إعدادات التجارة.",
+    "resolvedBanner": "تم الحل في {{date}}",
+    "resolvedWithCode": "طريقة الحل: {{code}}"
+  },
+  "evidence": {
+    "label": "الأدلة",
+    "hint": "أضف من 1 إلى 50 بندًا من المفتاح والقيمة لإثبات المعالجة، دون إدراج أسرار أو رموز وصول أو كلمات مرور.",
+    "keyLabel": "مفتاح الدليل {{n}}",
+    "valueLabel": "قيمة الدليل {{n}}",
+    "keyPlaceholder": "رقم التذكرة",
+    "valuePlaceholder": "OPS-4412",
+    "addRow": "إضافة دليل",
+    "removeRow": "حذف صف الدليل",
+    "errors": {
+      "required": "أضف صف دليل واحدًا مكتملًا على الأقل.",
+      "keyRequired": "أدخل مفتاح الدليل.",
+      "valueRequired": "أدخل قيمة الدليل.",
+      "forbiddenName": "هذا الاسم غير مسموح به",
+      "duplicateKey": "مفتاح الدليل هذا مستخدم بالفعل.",
+      "keyTooLong": "يجب ألا يتجاوز مفتاح الدليل 64 حرفًا.",
+      "valueTooLong": "يجب ألا تتجاوز قيمة الدليل 500 حرف.",
+      "maxRows": "الحد الأقصى هو 50 صف دليل.",
+      "payloadTooLarge": "تتجاوز الأدلة الحد الأقصى للحجم (8 كيلوبايت)."
+    }
+  },
+  "bulk": {
+    "label": "الاستثناءات المحددة",
+    "selected": "تم تحديد {{n}}",
+    "hidden": "· {{h}} خارج الصفحة الحالية",
+    "selectAll": "تحديد كل المطابقين وعددهم {{total}}",
+    "allSelected": "تم تحديد كل الاستثناءات المطابقة وعددها {{total}}",
+    "pickCategory": "لتحديد كل الاستثناءات المطابقة، صفِّ أولًا بفئة واحدة.",
+    "onlyPage": "تحديد هذه الصفحة فقط",
+    "tooMany": "يمكن تحديد {{max}} استثناء بحد أقصى في المرة الواحدة.",
+    "resolveAction": "حل المحدد…",
+    "clear": "إلغاء التحديد",
+    "noCommonResolution": "الفئات المحددة لا تشترك في طريقة حل واحدة.",
+    "busy": "توجد عملية حل جماعية أخرى قيد التنفيذ بالفعل.",
+    "modalTitle": "حل الاستثناءات المحددة",
+    "submitAction": "حل",
+    "resolutionHint": "ستُطبَّق طريقة الحل هذه على جميع الاستثناءات المحددة.",
+    "emptyReasonsHint": "أضف أسبابًا في إعدادات التجارة."
+  },
+  "toast": {
+    "resolved": "تم الحل",
+    "bulkResolving": "جارٍ حل {{n}} استثناء في الخلفية",
+    "copied": "تم النسخ"
+  },
+  "errors": {
+    "TRADE_CONTROL_TOWER_EXCEPTION_NOT_FOUND": "لم يعد هذا الاستثناء موجودًا؛ فأعد تحميل صندوق الوارد.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID": "اختر طريقة حل صالحة وسببًا صحيحًا ومفاتيح أدلة آمنة.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_CONFLICT": "تم حل هذا الاستثناء بالفعل.",
+    "TRADE_CONTROL_TOWER_RETRY_IN_PROGRESS": "انتظر انتهاء إعادة المحاولة التلقائية الجارية أولًا.",
+    "TRADE_CONTROL_TOWER_RETRY_DISABLED": "إعادة المحاولة اليدوية معطّلة؛ عالج المشكلة الأساسية بدلًا من ذلك.",
+    "TRADE_CONTROL_TOWER_EVIDENCE_FORBIDDEN": "أزل الكلمات المحظورة مثل secret أو token أو password من مفاتيح الأدلة.",
+    "TRADE_CONCURRENCY_STALE_VERSION": "حدّث مستخدم آخر هذا الاستثناء؛ فأعد التحميل قبل الحفظ مجددًا.",
+    "TRADE_REASON_NOT_FOUND": "اختر سببًا نشطًا من إعدادات التجارة ثم حاول مجددًا.",
+    "TRADE_REASON_INACTIVE": "السبب المحدد غير نشط؛ فاختر سببًا آخر.",
+    "TRADE_REASON_NOTE_REQUIRED": "أدخل ملاحظة توضّح السبب المختار.",
+    "TRADE_REASON_KIND_INVALID": "السبب المحدد لا يخص هذا الإجراء.",
+    "TRADE_BULK_JOB_ACTIVE": "توجد عملية جماعية أخرى قيد التنفيذ هنا بالفعل.",
+    "BULK_JOB_ACTIVE": "توجد عملية جماعية أخرى قيد التنفيذ هنا بالفعل.",
+    "BULK_SELECTION_TOO_LARGE": "عدد الاستثناءات المحددة كبير جدًا.",
+    "network": "تعذّر الاتصال بالخادم.",
+    "generic": "حدث خطأ ما، فحاول مرة أخرى.",
+    "TRADE_CONTROL_TOWER_NOT_FOUND": "لم يعد هذا الاستثناء موجودًا؛ فأعد تحميل صندوق الوارد.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED": "هذا الاستثناء خارج نطاقك الحالي؛ فغيّر الشركة أو الفرع ثم حاول مجددًا.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_include_branches_requires_company": "يتطلب عرض استثناءات الفروع اختيار نطاق الشركة.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_filter_requires_company": "تتطلب التصفية حسب الفرع اختيار نطاق الشركة.",
+    "TRADE_CONTROL_TOWER_RETRY_NOT_ALLOWED": "إعادة المحاولة اليدوية غير متاحة لهذا الاستثناء؛ فعالج المشكلة الأساسية بدلًا من ذلك.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_category_not_resolvable": "طريقة الحل هذه لا تناسب فئة الاستثناء.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_source_still_scheduled": "ما زالت نسخة المصدر مجدولة؛ ففعّلها أو غيّرها أولًا.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_evidence_invalid": "راجع الأدلة: مفتاح آمن واحد على الأقل ضمن حدود الحجم، ويتطلب قبول النتيجة معرّف keptArtifactId صالحًا.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_not_accessible": "هذا الفرع غير متاح في هذه الشركة؛ فقد يكون غير نشط أو محذوفًا، أو ليست لديك صلاحية الوصول إليه. اختر فرعًا آخر."
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Two-step verification",
+  "codeSent": "Enter the 6-digit code we sent to your email.",
+  "code": "Verification code",
+  "codeHint": "The 6 digits from the email. Check your spam folder if it does not arrive.",
+  "digit": "Digit {{n}} of 6",
+  "expiresIn": "The code expires in {{time}}",
+  "submit": "Verify",
+  "resend": "Send a new code",
+  "resendIn": "Send a new code in {{s}} s",
+  "restart": {
+    "text": "This code can no longer be used. Sign in again to get a new code.",
+    "action": "Sign in again"
+  },
+  "toast": {
+    "codeSent": "A new code was sent",
+    "welcome": "Welcome to your workspace"
+  },
+  "errors": {
+    "AUTH_MFA_INVALID_CHALLENGE": "The code is wrong or has expired. Check it or send a new code.",
+    "AUTH_MFA_UNAVAILABLE": "Two-step verification is not available right now. Try again shortly.",
+    "ambiguous": "The connection was lost. The code may already have been used; if it fails again, send a new code.",
+    "format": "Enter the 6 digits."
+  }
+}

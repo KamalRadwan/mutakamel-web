@@ -1,0 +1,175 @@
+<ui-modal
+  size="wide"
+  icon="tablerStar"
+  tile="bg-icon-orange"
+  [title]="'priceBooks.defaults.title' | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  [dismissable]="busyKey() === null"
+  (closed)="onModalClosed()"
+>
+  @if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'priceBooks.defaults.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="primary" (click)="retryLoad()">
+        <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+        {{ 'tradeShared.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (!loading() && rows().length === 0) {
+    <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'priceBooks.defaults.empty' | transloco }}</p>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="w-full"
+        [attr.aria-label]="'priceBooks.defaults.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav grid-cols-trade-company-default-row"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'priceBooks.defaults.columns.purpose' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'priceBooks.defaults.columns.currency' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'priceBooks.defaults.columns.priceBook' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'priceBooks.defaults.columns.actions' | transloco }}
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (item of skeletonRows; track item) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card grid-cols-trade-company-default-row"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-field w-full rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center gap-6 border-s border-border px-10">
+                <span class="h-btn-h-sm w-1/2 rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (row of rows(); track row.key) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card grid-cols-trade-company-default-row"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                  {{ 'priceBooks.purpose.' + row.purpose | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <bdi dir="ltr" class="text-13 font-medium text-text tabular-nums">{{ row.currencyCode }}</bdi>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <ui-dropdown
+                  class="w-full"
+                  size="field"
+                  [label]="'priceBooks.defaults.columns.priceBook' | transloco"
+                  [options]="bookOptionsFor(row)"
+                  [value]="row.draftBookId"
+                  [disabled]="busyKey() !== null || row.books.length === 0"
+                  (valueChange)="onBookSelected(row.key, $event)"
+                />
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end gap-6 border-s border-border px-10">
+                @if (isRowDirty(row)) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="primary"
+                    size="small"
+                    [loading]="busyKey() === row.key"
+                    [disabled]="busyKey() !== null && busyKey() !== row.key"
+                    (click)="saveRow(row)"
+                  >
+                    {{ 'priceBooks.defaults.saveRow' | transloco }}
+                  </button>
+                }
+                @if (row.mapping) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="ghost"
+                    size="small"
+                    [disabled]="busyKey() !== null"
+                    [attr.aria-label]="'priceBooks.defaults.remove' | transloco"
+                    [title]="'priceBooks.defaults.remove' | transloco"
+                    (click)="confirmRemoveRow(row)"
+                  >
+                    <span class="inline-flex items-center gap-4 text-danger-text">
+                      <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                      {{ 'priceBooks.defaults.remove' | transloco }}
+                    </span>
+                  </button>
+                }
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center justify-end gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="busyKey() !== null"
+      (click)="requestClose()"
+    >
+      {{ 'governance.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #removeDialog
+  tone="danger"
+  [title]="'priceBooks.defaults.removeConfirm.title' | transloco"
+  [text]="'priceBooks.defaults.removeConfirm.text' | transloco: { purpose: removeTargetPurpose(), currency: removingRow()?.currencyCode ?? '' }"
+  [confirmLabel]="'priceBooks.defaults.removeConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'priceBooks.discardConfirm.title' | transloco"
+  [text]="'priceBooks.discardConfirm.text' | transloco"
+  [confirmLabel]="'priceBooks.discardConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<app-conflict-dialog
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>

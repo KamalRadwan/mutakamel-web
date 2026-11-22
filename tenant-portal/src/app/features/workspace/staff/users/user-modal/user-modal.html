@@ -1,0 +1,196 @@
+<ui-modal
+  #modal
+  size="wide"
+  [title]="''"
+  [ariaLabel]="user() ? fullName(user()!) : ('users.title' | transloco)"
+  [hasFooter]="false"
+  [bodyClass]="'flex min-h-0 flex-1 flex-col overflow-hidden p-0'"
+  [dismissable]="!activeEditableTab()?.saving()"
+  (closed)="onModalClosed()"
+>
+  @if (user(); as u) {
+    <div class="flex h-modal-user min-h-0 flex-1 flex-col overflow-hidden">
+      <header class="flex shrink-0 items-center gap-8 border-b border-border px-10 py-8">
+        <span
+          class="inline-flex size-avatar-nav shrink-0 items-center justify-center rounded-full text-11 font-medium text-on-icon"
+          [class]="avatarTone(u)"
+          aria-hidden="true"
+        >
+          {{ initials(u) }}
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-6">
+            <h2 class="min-w-0 truncate text-15 leading-22 font-medium text-text">{{ fullName(u) }}</h2>
+            <app-staff-status-badge [status]="u.status" />
+            @if (u.isTenantOwner) {
+              <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft whitespace-nowrap">
+                <ng-icon name="tablerCrown" size="11" aria-hidden="true" />
+                <span>{{ 'users.badge.owner' | transloco }}</span>
+              </span>
+            }
+            @if (isSelf()) {
+              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text whitespace-nowrap">
+                {{ 'users.badge.you' | transloco }}
+              </span>
+            }
+          </div>
+          <p dir="ltr" class="truncate text-11 leading-16 text-text-muted">{{ u.email }}</p>
+        </div>
+
+        @if (headerActions().length) {
+          <ui-actions-menu
+            [items]="headerActions()"
+            [label]="'users.cols.actions' | transloco"
+            (selected)="onStatusAction(u, $event)"
+          />
+        }
+
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'users.common.close' | transloco"
+          (click)="requestClose()"
+        >
+          <ng-icon name="tablerX" size="15" aria-hidden="true" />
+        </button>
+      </header>
+
+      <div
+        role="tablist"
+        class="flex shrink-0 items-center gap-4 overflow-x-auto border-b border-border bg-surface px-10 no-scrollbar"
+        [attr.aria-label]="fullName(u)"
+      >
+        @for (tab of tabs(); track tab.id; let idx = $index) {
+          <button
+            #tabBtn
+            type="button"
+            role="tab"
+            [id]="uid + '-tab-' + tab.id"
+            class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="activeTab() === tab.id ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+            [attr.tabindex]="activeTab() === tab.id ? 0 : -1"
+            [attr.aria-selected]="activeTab() === tab.id"
+            [attr.aria-controls]="uid + '-panel-' + tab.id"
+            (click)="selectTab(tab.id)"
+            (keydown)="onTabKeydown($event, idx)"
+          >
+            <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+            <span>{{ tab.labelKey | transloco }}</span>
+          </button>
+        }
+      </div>
+
+      <div
+        role="tabpanel"
+        [id]="uid + '-panel-' + activeTab()"
+        [attr.aria-labelledby]="uid + '-tab-' + activeTab()"
+        class="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        @switch (activeTab()) {
+          @case ('profile') {
+            <app-user-profile-tab
+              #profileTab
+              [user]="u"
+              [knownUsers]="knownUsers()"
+              (saved)="onProfileSaved($event)"
+              (closeRequested)="requestClose()"
+              (deletedRemotely)="onDeletedRemotely()"
+            >
+              <ng-container footerEnd [ngTemplateOutlet]="deleteButton" [ngTemplateOutletContext]="{ $implicit: u }" />
+            </app-user-profile-tab>
+          }
+          @case ('roles') {
+            <div class="min-h-0 flex-1 overflow-y-auto p-10">
+              <app-user-roles-tab
+                [user]="u"
+                [readonly]="rolesReadonly()"
+                [readonlyReason]="rolesReadonlyReason()"
+                (changed)="reloadUser()"
+              />
+            </div>
+            <footer class="flex shrink-0 items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+              <button type="button" uiButton variant="ghost" (click)="requestClose()">
+                {{ 'users.common.close' | transloco }}
+              </button>
+              <ng-container [ngTemplateOutlet]="deleteButton" [ngTemplateOutletContext]="{ $implicit: u }" />
+            </footer>
+          }
+          @case ('teams') {
+            <div class="min-h-0 flex-1 overflow-y-auto p-10">
+              <app-user-teams-tab
+                [user]="u"
+                [readonly]="teamsReadonly()"
+                [readonlyReason]="teamsReadonlyReason()"
+                (changed)="reloadUser()"
+              />
+            </div>
+            <footer class="flex shrink-0 items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+              <button type="button" uiButton variant="ghost" (click)="requestClose()">
+                {{ 'users.common.close' | transloco }}
+              </button>
+              <ng-container [ngTemplateOutlet]="deleteButton" [ngTemplateOutletContext]="{ $implicit: u }" />
+            </footer>
+          }
+          @case ('apps') {
+            <div class="min-h-0 flex-1 overflow-y-auto p-10">
+              <app-user-apps-tab
+                [user]="u"
+                [readonly]="appsReadonly()"
+                [readonlyReason]="appsReadonlyReason()"
+                (changed)="reloadUser()"
+              />
+            </div>
+            <footer class="flex shrink-0 items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+              <button type="button" uiButton variant="ghost" (click)="requestClose()">
+                {{ 'users.common.close' | transloco }}
+              </button>
+              <ng-container [ngTemplateOutlet]="deleteButton" [ngTemplateOutletContext]="{ $implicit: u }" />
+            </footer>
+          }
+          @case ('phone') {
+            <app-user-phone-tab #phoneTab [user]="u" (closeRequested)="requestClose()">
+              <ng-container footerEnd [ngTemplateOutlet]="deleteButton" [ngTemplateOutletContext]="{ $implicit: u }" />
+            </app-user-phone-tab>
+          }
+          @case ('calls') {
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-10">
+              <app-user-calls-tab [user]="u" (closeRequested)="requestClose()" />
+            </div>
+            <footer class="flex shrink-0 items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+              <button type="button" uiButton variant="ghost" (click)="requestClose()">
+                {{ 'users.common.close' | transloco }}
+              </button>
+              <ng-container [ngTemplateOutlet]="deleteButton" [ngTemplateOutletContext]="{ $implicit: u }" />
+            </footer>
+          }
+        }
+      </div>
+    </div>
+  }
+</ui-modal>
+
+<ng-template #deleteButton let-u>
+  @if (deleteAction(); as action) {
+    <button
+      type="button"
+      uiButton
+      variant="danger"
+      class="ms-auto"
+      [disabled]="action.disabled || !!activeEditableTab()?.saving()"
+      [attr.title]="action.reason ?? null"
+      (click)="onDeleteClick(u)"
+    >
+      {{ action.title }}
+    </button>
+  }
+</ng-template>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'users.confirm.unsavedTitle' | transloco"
+  [text]="'users.confirm.unsavedText' | transloco"
+  [saveLabel]="'users.common.save' | transloco"
+  [discardLabel]="'users.common.discard' | transloco"
+  [cancelLabel]="'users.common.cancel' | transloco"
+/>

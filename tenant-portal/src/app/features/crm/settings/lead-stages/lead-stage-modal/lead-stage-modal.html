@@ -1,0 +1,244 @@
+<ui-modal
+  size="form"
+  icon="tablerListNumbers"
+  tile="bg-icon-green"
+  [title]="modalTitle()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (isProtected()) {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text"
+    >
+      <ng-icon name="tablerLock" size="12" aria-hidden="true" />
+      {{ 'settings.common.system' | transloco }}
+    </span>
+  }
+
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <ui-field
+      [label]="'settings.common.nameAr' | transloco"
+      [for]="uid + '-name-ar'"
+      [required]="true"
+      [hint]="'leadStages.modal.nameArHint' | transloco"
+      [count]="nameAr().length"
+      [max]="maxNameLength"
+      [error]="nameArError()"
+    >
+      <input
+        [id]="uid + '-name-ar'"
+        type="text"
+        dir="rtl"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameAr()"
+        [readonly]="isReadOnly()"
+        [attr.aria-invalid]="nameArError() ? 'true' : null"
+        [attr.aria-describedby]="nameArError() ? uid + '-name-ar-error ' + uid + '-name-ar-hint' : uid + '-name-ar-hint'"
+        (input)="onNameInput('nameAr', $event)"
+        (blur)="markTouched('nameAr')"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'settings.common.nameEn' | transloco"
+      [for]="uid + '-name-en'"
+      [required]="true"
+      [hint]="'leadStages.modal.nameEnHint' | transloco"
+      [count]="nameEn().length"
+      [max]="maxNameLength"
+      [error]="nameEnError()"
+    >
+      <input
+        [id]="uid + '-name-en'"
+        type="text"
+        dir="ltr"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameEn()"
+        [readonly]="isReadOnly()"
+        [attr.aria-invalid]="nameEnError() ? 'true' : null"
+        [attr.aria-describedby]="nameEnError() ? uid + '-name-en-error ' + uid + '-name-en-hint' : uid + '-name-en-hint'"
+        (input)="onNameInput('nameEn', $event)"
+        (blur)="markTouched('nameEn')"
+      />
+    </ui-field>
+
+    @if (isReadOnly()) {
+      <ui-field
+        [label]="'leadStages.modal.meaning' | transloco"
+        [for]="uid + '-meaning'"
+        [hint]="'leadStages.modal.meaningHint' | transloco"
+      >
+        <input
+          [id]="uid + '-meaning'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="selectedFlagLabel()"
+          [attr.aria-describedby]="uid + '-meaning-hint'"
+        />
+      </ui-field>
+    } @else {
+      <ui-field
+        size="bare"
+        [label]="'leadStages.modal.meaning' | transloco"
+        [for]="uid + '-meaning'"
+        [required]="true"
+        [hint]="'leadStages.modal.meaningHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [describedBy]="uid + '-meaning-hint'"
+          [options]="flagOptions()"
+          [value]="flag()"
+          [label]="'leadStages.modal.meaning' | transloco"
+          (valueChange)="onFlagChange($event)"
+        />
+      </ui-field>
+    }
+
+    @if (isReadOnly()) {
+      <ui-field
+        [label]="'leadStages.modal.category' | transloco"
+        [for]="uid + '-category'"
+        [hint]="'leadStages.modal.categoryHint' | transloco"
+      >
+        <input
+          [id]="uid + '-category'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="selectedCategoryLabel()"
+          [attr.aria-describedby]="uid + '-category-hint'"
+        />
+      </ui-field>
+    } @else {
+      <ui-field
+        size="bare"
+        [label]="'leadStages.modal.category' | transloco"
+        [for]="uid + '-category'"
+        [required]="true"
+        [hint]="'leadStages.modal.categoryHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [describedBy]="uid + '-category-hint'"
+          [options]="categoryOptions()"
+          [value]="category()"
+          [label]="'leadStages.modal.category' | transloco"
+          (valueChange)="onCategoryChange($event)"
+        />
+      </ui-field>
+    }
+
+    @if (mode() === 'create') {
+      <ui-field
+        size="bare"
+        [label]="'leadStages.table.default' | transloco"
+        [for]="uid + '-default'"
+        [hint]="'leadStages.modal.defaultHint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <ui-checkbox [(checked)]="isDefault">
+            {{ 'leadStages.modal.defaultCheckbox' | transloco }}
+          </ui-checkbox>
+        </div>
+      </ui-field>
+    } @else {
+      <ui-field
+        size="bare"
+        [label]="'settings.common.active' | transloco"
+        [for]="uid + '-active'"
+        [hint]="(isDefaultStage() ? 'leadStages.modal.activeDefaultHint' : 'leadStages.modal.activeHint') | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [(checked)]="isActive"
+            [disabled]="isReadOnly() || isDefaultStage()"
+            [label]="'settings.common.active' | transloco"
+          />
+          <span class="text-12 text-text">{{ (isActive() ? 'settings.common.active' : 'settings.common.inactive') | transloco }}</span>
+        </div>
+      </ui-field>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center justify-between gap-8">
+    @if (isReadOnly()) {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+      @if (canManage() && isProtected()) {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          aria-disabled="true"
+          [attr.aria-describedby]="uid + '-delete-protected-reason'"
+          [attr.title]="'leadStages.actions.deleteProtectedReason' | transloco"
+        >
+          {{ 'settings.common.delete' | transloco }}
+        </button>
+        <span [id]="uid + '-delete-protected-reason'" class="sr-only">
+          {{ 'leadStages.actions.deleteProtectedReason' | transloco }}
+        </span>
+      }
+    } @else {
+      <div class="flex flex-wrap items-center gap-8">
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [loading]="saving()"
+          [disabled]="saving() || (mode() === 'edit' && !dirty())"
+          (click)="save()"
+        >
+          {{ 'settings.common.save' | transloco }}
+        </button>
+
+        @if (mode() === 'edit' && dirty()) {
+          <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
+            {{ 'settings.common.undo' | transloco }}
+          </button>
+          <span class="text-12 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        }
+
+        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      </div>
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          [disabled]="saving()"
+          [attr.aria-disabled]="isDefaultStage() ? 'true' : null"
+          [attr.aria-describedby]="isDefaultStage() ? uid + '-delete-default-reason' : null"
+          [attr.title]="isDefaultStage() ? ('leadStages.actions.deleteDefaultReason' | transloco) : null"
+          (click)="requestDelete()"
+        >
+          {{ 'settings.common.delete' | transloco }}
+        </button>
+        @if (isDefaultStage()) {
+          <span [id]="uid + '-delete-default-reason'" class="sr-only">
+            {{ 'leadStages.actions.deleteDefaultReason' | transloco }}
+          </span>
+        }
+      }
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'leadStages.modal.discardTitle' | transloco"
+  [text]="'leadStages.modal.discardText' | transloco"
+  [confirmLabel]="'leadStages.modal.discardConfirm' | transloco"
+  [cancelLabel]="'leadStages.modal.discardKeep' | transloco"
+/>

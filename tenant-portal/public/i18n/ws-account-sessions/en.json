@@ -1,0 +1,51 @@
+{
+  "title": "Sessions",
+  "desc": "Devices where you are signed in.",
+  "loadFailed": "Could not load your sessions.",
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "signOutAll": "Sign out everywhere",
+  "allTitle": "Sign out everywhere?",
+  "allText": "Every device is signed out, including this one. You will sign in again.",
+  "allConfirm": "Sign out everywhere",
+  "client": {
+    "WEB": "Web browser",
+    "IOS": "iPhone app",
+    "ANDROID": "Android app",
+    "DESKTOP": "Desktop app"
+  },
+  "thisDevice": "This device",
+  "meta": "Signed in {{signedIn}} · Active {{active}} · Expires {{expires}}",
+  "endSession": "Sign out",
+  "endAria": "Sign out of {{device}}",
+  "endTitle": "Sign out of {{device}}?",
+  "endText": "That device will need to sign in again.",
+  "endCurrentTitle": "Sign out of this device?",
+  "endCurrentText": "This signs you out here. You will go to the sign-in page.",
+  "endConfirm": "Sign out",
+  "history": "Recent sign-outs ({{n}})",
+  "showMore": "Show more",
+  "reasons": {
+    "LOGOUT": "Signed out",
+    "LOGOUT_ALL": "Signed out everywhere",
+    "PASSWORD_CHANGED": "Password changed",
+    "USER_DISABLED": "Account suspended",
+    "USER_DELETED": "Account deleted",
+    "ADMIN_REVOKED": "Ended by an administrator",
+    "DEVICE_REVOKED": "Device removed",
+    "CREDENTIAL_COMPROMISED": "Ended for security",
+    "IDLE_EXPIRED": "Inactive too long",
+    "ABSOLUTE_EXPIRED": "Session expired",
+    "DEVICE_KEY_LOST": "Device key lost",
+    "SESSION_LIMIT": "Too many sessions",
+    "LEGACY_CUTOVER": "System update",
+    "unknown": "Ended"
+  },
+  "toast": {
+    "ended": "The device was signed out",
+    "allEnded": "You were signed out everywhere"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again."
+  }
+}

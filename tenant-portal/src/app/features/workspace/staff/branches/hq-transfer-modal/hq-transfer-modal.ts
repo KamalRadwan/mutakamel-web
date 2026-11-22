@@ -1,0 +1,120 @@
+import { Component, computed, inject, output, signal, viewChild } from '@angular/core';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { provideIcons } from '@ng-icons/core';
+import { tablerAlertTriangle } from '@ng-icons/tabler-icons';
+import { Notify } from '../../../../../core/notify/notify';
+import { Button } from '../../../../../shared/ui/button/button';
+import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { Field } from '../../../../../shared/ui/field/field';
+import { Modal } from '../../../../../shared/ui/modal/modal';
+import { StaffSession } from '../../shared/staff-session';
+import { errorMessage, newIdempotencyKey, updateBranch } from '../../shared/staff.api';
+import { Branch } from '../../shared/staff.model';
+
+export interface HqTransferRequest {
+  branch: Branch;
+  companyName: string;
+  candidateBranches: Branch[];
+  retryAction: () => Promise<void>;
+}
+
+@Component({
+  selector: 'app-hq-transfer-modal',
+  imports: [TranslocoPipe, Button, Dropdown, Field, Modal],
+  providers: [provideIcons({ tablerAlertTriangle })],
+  templateUrl: './hq-transfer-modal.html',
+})
+export class HqTransferModal {
+  private static nextId = 0;
+  protected readonly uid = `hq-transfer-modal-${++HqTransferModal.nextId}`;
+
+  private readonly notify = inject(Notify);
+  private readonly transloco = inject(TranslocoService);
+  private readonly session = inject(StaffSession);
+  private readonly modal = viewChild.required(Modal);
+
+  readonly transferred = output<Branch>();
+  readonly addBranchRequested = output<string>();
+
+  protected readonly sourceBranch = signal<Branch | null>(null);
+  protected readonly companyName = signal('');
+  protected readonly candidates = signal<Branch[]>([]);
+  protected readonly selectedBranchId = signal('');
+  protected readonly submitting = signal(false);
+
+  protected readonly canAddBranch = computed(() => {
+    const branch = this.sourceBranch();
+    return branch ? this.session.can('org.branch.manage', { companyId: branch.companyId }) : false;
+  });
+
+  private pendingRetry: (() => Promise<void>) | null = null;
+  private lastKeyPayload = '';
+  private lastKey = '';
+
+  protected readonly branchOptions = computed<DropdownOption<string>[]>(() =>
+    this.candidates().map((branch) => ({
+      value: branch.id,
+      label: `${branch.name} (${branch.code})`,
+    })),
+  );
+
+  open(request: HqTransferRequest): void {
+    this.sourceBranch.set(request.branch);
+    this.companyName.set(request.companyName);
+    this.candidates.set(request.candidateBranches);
+    this.selectedBranchId.set(request.candidateBranches[0]?.id ?? '');
+    this.pendingRetry = request.retryAction;
+    this.submitting.set(false);
+    this.lastKeyPayload = '';
+    this.lastKey = '';
+    this.modal().open();
+  }
+
+  protected async confirmTransfer(): Promise<void> {
+    const targetId = this.selectedBranchId();
+    if (!targetId || this.submitting()) return;
+
+    const retry = this.pendingRetry;
+    this.submitting.set(true);
+    try {
+      const updated = await updateBranch(targetId, { isHeadquarters: true }, this.idempotencyKeyFor(targetId));
+      this.transferred.emit(updated);
+      this.modal().close();
+      if (retry) {
+        await retry();
+      }
+    } catch (error) {
+      this.notify.error(this.resolveError(error));
+    } finally {
+      this.submitting.set(false);
+    }
+  }
+
+  protected requestAddBranch(): void {
+    const branch = this.sourceBranch();
+    if (!branch || this.submitting()) return;
+    this.modal().close();
+    this.addBranchRequested.emit(branch.companyId);
+  }
+
+  protected close(): void {
+    if (this.submitting()) return;
+    this.modal().close();
+  }
+
+  private idempotencyKeyFor(branchId: string): string {
+    const signature = `${branchId}:isHeadquarters`;
+    if (signature !== this.lastKeyPayload) {
+      this.lastKeyPayload = signature;
+      this.lastKey = newIdempotencyKey();
+    }
+    return this.lastKey;
+  }
+
+  private resolveError(error: unknown): string {
+    const msg = errorMessage(error, 'staff', this.transloco);
+    if (msg && msg !== 'settings.errors.generic') return msg;
+    const fallback = this.transloco.translate('staff.errors.generic');
+    return fallback !== 'staff.errors.generic' ? fallback : msg;
+  }
+}

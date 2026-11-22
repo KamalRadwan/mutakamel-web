@@ -1,0 +1,41 @@
+<dialog
+  #dialog
+  class="z-modal m-auto w-modal-confirm rounded-14 border border-border bg-surface p-0 text-text shadow-modal backdrop:bg-overlay"
+  [attr.aria-labelledby]="titleId"
+  [attr.aria-describedby]="textId"
+  (cancel)="onCancel($event)"
+  (close)="onNativeClose()"
+>
+  <header class="flex items-center gap-8 border-b border-border px-10 py-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="15" aria-hidden="true" />
+    </span>
+    <h2 [id]="titleId" class="text-15 leading-22 font-medium text-text">
+      {{ 'seats.cascade.title' | transloco }}
+    </h2>
+  </header>
+
+  <div class="flex flex-col gap-8 p-10">
+    <p [id]="textId" class="text-12 leading-18 text-text-muted">
+      {{ 'seats.cascade.text' | transloco }}
+    </p>
+    @if (addons().length > 0) {
+      <ul class="flex max-h-time-list-max flex-col gap-4 overflow-y-auto rounded-8 border border-border bg-surface-muted p-8 text-12 leading-18 text-text">
+        @for (item of addons(); track $index) {
+          <li class="truncate">
+            {{ item.userName }}: <span [attr.dir]="item.isKeyFallback ? 'ltr' : 'auto'" class="font-medium">{{ item.addonLabel }}</span>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+
+  <footer class="flex items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+    <button type="button" uiButton variant="primary" (click)="close(true)">
+      {{ 'seats.cascade.confirm' | transloco }}
+    </button>
+    <button #cancelBtn type="button" uiButton variant="secondary" autofocus (click)="close(false)">
+      {{ 'seats.cascade.cancel' | transloco }}
+    </button>
+  </footer>
+</dialog>

@@ -1,0 +1,162 @@
+<ui-modal
+  size="form"
+  icon="tablerCheck"
+  tile="bg-icon-green"
+  [title]="'itemsBulk.action.ENABLE_FOR_COMPANY' | transloco"
+  [closeLabel]="'tradeShared.common.cancel' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <span
+    modal-header-end
+    class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft tabular-nums"
+  >
+    {{ 'itemsBulk.itemsCount' | transloco: { count: selectedCount() } }}
+  </span>
+
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.enableModal.canSell' | transloco"
+      [for]="uid + '-can-sell'"
+      [hint]="'itemsBulk.enableModal.canSellHint' | transloco"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-can-sell'"
+          [checked]="canSell()"
+          [label]="'itemsBulk.enableModal.canSell' | transloco"
+          [describedBy]="uid + '-can-sell-hint'"
+          [disabled]="submitting()"
+          (checkedChange)="onCanSellChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.enableModal.canPurchase' | transloco"
+      [for]="uid + '-can-purchase'"
+      [hint]="'itemsBulk.enableModal.canPurchaseHint' | transloco"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-can-purchase'"
+          [checked]="canPurchase()"
+          [label]="'itemsBulk.enableModal.canPurchase' | transloco"
+          [describedBy]="uid + '-can-purchase-hint'"
+          [disabled]="submitting()"
+          (checkedChange)="onCanPurchaseChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.enableModal.canPos' | transloco"
+      [for]="uid + '-can-pos'"
+      [hint]="'itemsBulk.enableModal.canPosHint' | transloco"
+      [error]="posError()"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-can-pos'"
+          [checked]="canPos()"
+          [label]="'itemsBulk.enableModal.canPos' | transloco"
+          [describedBy]="posDescribedBy()"
+          [disabled]="submitting() || !canSell()"
+          (checkedChange)="onCanPosChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.enableModal.trackInventory' | transloco"
+      [for]="uid + '-track'"
+      [hint]="'itemsBulk.enableModal.trackInventoryHint' | transloco"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-track'"
+          [checked]="trackInventory()"
+          [label]="'itemsBulk.enableModal.trackInventory' | transloco"
+          [describedBy]="uid + '-track-hint'"
+          [disabled]="submitting()"
+          (checkedChange)="onTrackInventoryChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      size="bare"
+      [label]="'itemsBulk.enableModal.trackingMode' | transloco"
+      [for]="uid + '-tracking'"
+      [hint]="'itemsBulk.enableModal.trackingModeHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-tracking'"
+        [label]="'itemsBulk.enableModal.trackingMode' | transloco"
+        [describedBy]="uid + '-tracking-hint'"
+        [options]="trackingOptions()"
+        [value]="trackingMode()"
+        [disabled]="submitting() || !trackInventory()"
+        (valueChange)="onTrackingModeChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.enableModal.salesTax' | transloco"
+      [for]="uid + '-sales-tax'"
+      [hint]="'itemsBulk.enableModal.salesTaxHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-sales-tax'"
+        [label]="'itemsBulk.enableModal.salesTax' | transloco"
+        [describedBy]="uid + '-sales-tax-hint'"
+        [options]="taxOptions()"
+        [value]="salesTaxId()"
+        [disabled]="submitting() || taxesLoading()"
+        (valueChange)="onSalesTaxChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.enableModal.purchaseTax' | transloco"
+      [for]="uid + '-purchase-tax'"
+      [hint]="'itemsBulk.enableModal.purchaseTaxHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-purchase-tax'"
+        [label]="'itemsBulk.enableModal.purchaseTax' | transloco"
+        [describedBy]="uid + '-purchase-tax-hint'"
+        [options]="taxOptions()"
+        [value]="purchaseTaxId()"
+        [disabled]="submitting() || taxesLoading()"
+        (valueChange)="onPurchaseTaxChange($event)"
+      />
+    </ui-field>
+
+    <p class="col-span-2 text-12 leading-18 text-text-muted">
+      {{ 'itemsBulk.enableModal.note' | transloco }}
+    </p>
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton [loading]="submitting()" [disabled]="!canSubmit()" (click)="submit()">
+      {{ 'itemsBulk.run' | transloco: { count: selectedCount() } }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

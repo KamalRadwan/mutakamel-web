@@ -1,0 +1,251 @@
+<div class="overflow-x-auto pb-4">
+  <div
+    role="table"
+    class="min-w-doc-table-min"
+    [attr.aria-label]="tableAriaLabel()"
+    [attr.aria-busy]="loading()"
+  >
+    <div
+      role="row"
+      class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+      [class]="gridCols()"
+    >
+      <span role="columnheader" class="flex items-center justify-center">
+        @if (selection) {
+          <span class="relative inline-flex size-checkbox-size items-center justify-center">
+            <ui-checkbox
+              #pageCb
+              [checked]="pageState() === 'all'"
+              [attr.aria-label]="'tdl.table.selectPage' | transloco"
+              [attr.aria-checked]="pageState() === 'some' ? 'mixed' : (pageState() === 'all' ? 'true' : 'false')"
+              (checkedChange)="togglePage(pageCb)"
+            >
+              <span class="sr-only">{{ 'tdl.table.selectPage' | transloco }}</span>
+            </ui-checkbox>
+            @if (pageState() === 'some') {
+              <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+              </span>
+            }
+          </span>
+        }
+      </span>
+
+      @for (col of columns(); track col.key) {
+        <span
+          role="columnheader"
+          class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+          [class.justify-end]="col.alignEnd"
+          [attr.aria-sort]="ariaSortFor(col.sort)"
+        >
+          @if (col.sort; as sortField) {
+            <button
+              type="button"
+              class="flex h-full w-full min-w-0 cursor-pointer items-center gap-4 outline-none transition-colors duration-fast hover:text-on-nav focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class.justify-end]="col.alignEnd"
+              [attr.aria-label]="sortAriaLabel(col.labelKey)"
+              (click)="onSortClick(sortField)"
+            >
+              <span class="truncate">{{ col.labelKey | transloco }}</span>
+              <ng-icon
+                [name]="sortIconFor(sortField)"
+                size="13"
+                class="shrink-0"
+                [class]="isSortActive(sortField) ? 'text-on-nav' : 'text-on-nav-muted'"
+                aria-hidden="true"
+              />
+            </button>
+          } @else {
+            <span class="truncate">{{ col.labelKey | transloco }}</span>
+          }
+        </span>
+      }
+
+      <span role="columnheader" class="border-s border-on-nav-line">
+        <span class="sr-only">{{ 'tdl.columns.actions' | transloco }}</span>
+      </span>
+    </div>
+
+    @if (loading()) {
+      @for (row of skeletonRows; track row) {
+        <div
+          role="row"
+          class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+          [class]="gridCols()"
+        >
+          <span role="cell" class="flex items-center justify-center">
+            @if (selection) {
+              <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+            }
+          </span>
+
+          @for (col of columns(); track col.key) {
+            <span
+              role="cell"
+              class="flex min-w-0 items-center border-s border-border px-10"
+              [class.justify-end]="col.alignEnd"
+            >
+              @if (col.key === 'status' || col.key === 'approval' || col.key === 'dispatch') {
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+              } @else if (col.key === 'number') {
+                <span class="flex w-full flex-col gap-3">
+                  <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+                  <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+                </span>
+              } @else {
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              }
+            </span>
+          }
+
+          <span role="cell" class="flex items-center justify-center border-s border-border">
+            <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+          </span>
+        </div>
+      }
+    } @else {
+      @for (row of items(); track row.id) {
+        <div
+          role="row"
+          tabindex="0"
+          class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="gridCols() + ' ' + (isSelected(row.id) ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover')"
+          [attr.aria-selected]="selection ? isSelected(row.id) : null"
+          (click)="open.emit(row)"
+          (keydown)="onRowKeydown($event, row)"
+        >
+          @if (selection) {
+            <span
+              role="cell"
+              class="flex items-center justify-center"
+              (click)="onSelectCellClick($event, row, rowCb)"
+            >
+              <ui-checkbox
+                #rowCb
+                [checked]="isSelected(row.id)"
+                [attr.aria-label]="'tdl.table.selectRow' | transloco: { name: rowLabel(row) }"
+                (click)="onRowCheckboxClick($event)"
+                (checkedChange)="onRowCheckedChange(row, rowCb)"
+              >
+                <span class="sr-only">{{ 'tdl.table.selectRow' | transloco: { name: rowLabel(row) } }}</span>
+              </ui-checkbox>
+            </span>
+          } @else {
+            <span
+              role="cell"
+              class="flex items-center justify-center"
+              (click)="$event.stopPropagation()"
+            ></span>
+          }
+
+          @for (col of columns(); track col.key) {
+            @switch (col.key) {
+              @case ('number') {
+                <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-10">
+                  <button
+                    type="button"
+                    class="cursor-pointer truncate text-start text-13 leading-18 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="row.documentNumber ? 'text-text' : 'text-text-muted'"
+                    (click)="$event.stopPropagation(); open.emit(row)"
+                  >
+                    @if (row.documentNumber; as num) {
+                      <bdi dir="ltr" class="tabular-nums">{{ num }}</bdi>
+                    } @else {
+                      {{ 'td.status.DRAFT' | transloco }}
+                    }
+                  </button>
+                  @if (row.draftReference; as ref) {
+                    <bdi dir="ltr" class="truncate text-11 leading-16 text-text-muted tabular-nums">{{ ref }}</bdi>
+                  }
+                </span>
+              }
+
+              @case ('party') {
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span
+                    dir="auto"
+                    class="truncate text-13 leading-18 text-text"
+                    [title]="row.partySnapshot.displayName"
+                  >
+                    {{ row.partySnapshot.displayName }}
+                  </span>
+                </span>
+              }
+
+              @case ('status') {
+                @let badge = lifecycleBadge(row);
+                <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
+                  <span [class]="badgeClass(badge)">{{ badge.labelKey | transloco }}</span>
+                  @if (isSalesOrderHeld(row)) {
+                    @let hold = holdBadge();
+                    <span [class]="badgeClass(hold)">{{ hold.labelKey | transloco }}</span>
+                  }
+                </span>
+              }
+
+              @case ('approval') {
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (approvalBadge(row); as approval) {
+                    <span [class]="badgeClass(approval)">{{ approval.labelKey | transloco }}</span>
+                  }
+                </span>
+              }
+
+              @case ('dispatch') {
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (dispatchBadge(row); as dispatch) {
+                    <span [class]="badgeClass(dispatch)">{{ dispatch.labelKey | transloco }}</span>
+                  }
+                </span>
+              }
+
+              @case ('validUntil') {
+                <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                  <bdi class="truncate text-12 leading-18 text-text-muted tabular-nums">{{ validUntilText(row) }}</bdi>
+                  @if (isPriceLockExpired(row)) {
+                    <span
+                      class="inline-flex size-unread-dot shrink-0 rounded-full bg-danger"
+                      [attr.title]="'tdl.priceHoldEnded' | transloco"
+                    ></span>
+                    <span class="sr-only">{{ 'tdl.priceHoldEnded' | transloco }}</span>
+                  }
+                </span>
+              }
+
+              @case ('businessDate') {
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <bdi class="truncate text-12 leading-18 text-text-muted tabular-nums">{{ dateText(row.businessDate) }}</bdi>
+                </span>
+              }
+
+              @case ('grandTotal') {
+                <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+                  <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums">{{ moneyText(row) }}</bdi>
+                </span>
+              }
+
+              @case ('lastUpdate') {
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <bdi class="truncate text-12 leading-18 text-text-muted tabular-nums">{{ dateText(row.updatedAt) }}</bdi>
+                </span>
+              }
+            }
+          }
+
+          <span
+            role="cell"
+            class="flex items-center justify-center border-s border-border"
+            (click)="$event.stopPropagation()"
+            (keydown)="$event.stopPropagation()"
+          >
+            <ui-actions-menu
+              [items]="menuItems(row)"
+              [label]="'tdl.menu.label' | transloco"
+              (selected)="onAction(row, $event)"
+            />
+          </span>
+        </div>
+      }
+    }
+  </div>
+</div>

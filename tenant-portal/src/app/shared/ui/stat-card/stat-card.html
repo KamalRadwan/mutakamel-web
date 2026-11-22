@@ -1,0 +1,54 @@
+<div
+  class="flex h-full min-w-0 items-end justify-between gap-8"
+  [class.rounded-10]="framed()"
+  [class.bg-surface]="framed()"
+  [class.p-8]="framed()"
+  [class.shadow-card]="framed()"
+  role="group"
+  [attr.aria-labelledby]="labelId"
+  [attr.aria-describedby]="hint().trim() ? hintId : null"
+>
+  <div class="flex min-w-0 flex-1 flex-col justify-center gap-2">
+    <div #labelRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+      <span [id]="labelId" class="min-w-0 truncate" [title]="label()">{{ label() }}</span>
+      @if (hint().trim()) {
+        <span
+          #hintTrigger
+          class="group relative inline-flex shrink-0 items-center text-accent"
+          (mouseenter)="placeTooltip(hintTrigger)"
+          (mouseleave)="hideTooltip()"
+        >
+          <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+          <span
+            #tooltip
+            [id]="hintId"
+            role="tooltip"
+            class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class]="tipPlaced() ? 'invisible group-hover:visible' : 'invisible'"
+            [style.top.px]="tooltipPlace().top"
+            [style.inset-inline-start.px]="tooltipPlace().start"
+          >
+            {{ hint() }}
+          </span>
+        </span>
+      }
+    </div>
+
+    <div class="min-w-0 truncate text-20 leading-26 font-medium text-text tabular-nums" [title]="valueTitle() || value()">
+      <bdi dir="ltr">{{ value() }}</bdi>
+    </div>
+
+    @if (delta(); as deltaText) {
+      <div class="flex min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+        @if (directionIcon(); as iconName) {
+          <ng-icon [name]="iconName" size="12" class="shrink-0" aria-hidden="true" />
+        }
+        <span class="min-w-0 truncate" [title]="deltaText">{{ deltaText }}</span>
+      </div>
+    }
+  </div>
+
+  @if (chart(); as spec) {
+    <ui-sparkline [spec]="spec" />
+  }
+</div>

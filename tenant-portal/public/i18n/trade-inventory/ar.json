@@ -1,0 +1,151 @@
+{
+  "common": {
+    "node": "الموقع",
+    "item": "الصنف",
+    "uom": "الوحدة",
+    "baseUom": "وحدة الأساس",
+    "quantity": "الكمية",
+    "lot": "التشغيلة",
+    "serials": "الأرقام التسلسلية",
+    "status": "الحالة",
+    "updated": "آخر تحديث",
+    "effectiveAt": "تاريخ السريان",
+    "reason": "السبب",
+    "version": "الإصدار",
+    "none": "—",
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "openRecord": "فتح السجل",
+    "advisory": "رقم استرشادي",
+    "canManageOff": "يمكنك عرض هذه الصفحة دون تعديلها.",
+    "cancel": "إلغاء",
+    "close": "إغلاق"
+  },
+  "badge": {
+    "negative": "سالب",
+    "nodeStatus": {
+      "ACTIVE": "نشط",
+      "INACTIVE": "غير نشط"
+    },
+    "nodeType": {
+      "WAREHOUSE": "مستودع",
+      "STORE": "متجر",
+      "VIRTUAL": "افتراضي"
+    },
+    "period": {
+      "OPEN": "مفتوحة",
+      "CLOSED": "مغلقة"
+    },
+    "uom": {
+      "DRAFT": "مسودة",
+      "PUBLISHED": "منشور",
+      "RETIRED": "موقوف"
+    },
+    "serial": {
+      "ON_HAND": "في المخزون",
+      "RESERVED": "محجوز",
+      "DELIVERED": "مُسلَّم",
+      "VOIDED": "ملغى"
+    },
+    "serialEvent": {
+      "OPENING": "افتتاحي",
+      "RECEIPT": "استلام",
+      "RESERVATION": "حجز",
+      "RELEASE": "إفراج",
+      "EXPIRY": "انتهاء الصلاحية",
+      "DELIVERY": "تسليم",
+      "RECEIPT_REVERSAL": "عكس استلام",
+      "DELIVERY_REVERSAL": "عكس تسليم"
+    },
+    "movement": {
+      "OPENING_BALANCE": "افتتاحي",
+      "PURCHASE_RECEIPT": "استلام",
+      "SALES_DELIVERY": "تسليم",
+      "PURCHASE_RECEIPT_REVERSAL": "عكس استلام",
+      "SALES_DELIVERY_REVERSAL": "عكس تسليم"
+    },
+    "outcome": {
+      "ALLOW": "سماح",
+      "PARTIAL": "جزئي",
+      "BACKORDER": "طلب مؤجل",
+      "REJECT": "رفض"
+    },
+    "decision": {
+      "INVENTORY_RESERVATION": "نقص عند الحجز",
+      "INVENTORY_NEGATIVE": "رصيد سالب",
+      "INVENTORY_TOLERANCE": "سماحية الاستلام الزائد",
+      "INVENTORY_OVER_RECEIPT": "سماحية الاستلام الزائد"
+    },
+    "source": {
+      "DRAFT": "مسودة",
+      "POSTED": "مرحَّل",
+      "PARTIALLY_REVERSED": "معكوس جزئيًا",
+      "REVERSED": "معكوس"
+    }
+  },
+  "conflict": {
+    "title": "تغيّر هذا السجل",
+    "text": "عدّل مستخدم آخر هذا السجل؛ أعد تحميله للاطلاع على أحدث إصدار.",
+    "reload": "إعادة التحميل"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما، فحاول مرة أخرى.",
+    "network": "تعذّر الوصول إلى الخادم.",
+    "permission": "ليست لديك صلاحية لهذا الإجراء.",
+    "TRADE_VALIDATION_FAILED": "بعض القيم غير صالحة.",
+    "TRADE_CONCURRENCY_STALE_VERSION": "عدّل مستخدم آخر هذا السجل؛ أعد تحميله للاطلاع على أحدث إصدار.",
+    "TRADE_IDEMPOTENCY_KEY_MISSING": "مفتاح الطلب مفقود، فحاول مرة أخرى.",
+    "TRADE_IDEMPOTENCY_MISMATCH": "أُرسل هذا الطلب من قبل بقيم مختلفة.",
+    "TRADE_INVENTORY_NODE_CONFLICT": "يوجد موقع بهذا الرمز بالفعل.",
+    "TRADE_INVENTORY_NODE_IN_USE": "يحتوي هذا الموقع على مخزون محجوز ولا يمكن تعديله بهذه الطريقة.",
+    "TRADE_INVENTORY_NODE_NOT_FOUND": "هذا الموقع غير متاح في الفرع الحالي.",
+    "TRADE_INVENTORY_SCOPE_INVALID": "اختر فرعًا صالحًا واحدًا على الأقل لهذا الموقع.",
+    "TRADE_INVENTORY_PERIOD_NOT_FOUND": "فترة المخزون غير موجودة.",
+    "TRADE_INVENTORY_PERIOD_CLOSED": {
+      "default": "لا يمكن حفظ هذه الفترة أو تغيير حالتها.",
+      "INVALID_RANGE": "لا يمكن أن يسبق تاريخ الانتهاء تاريخ البدء.",
+      "OVERLAPPING_PERIOD": "تتداخل هذه التواريخ مع فترة مخزون أخرى.",
+      "TRANSITION_NOT_ALLOWED": "لا يمكن تغيير حالة هذه الفترة حاليًا.",
+      "OVERLAPPING_OPEN_PERIOD": "توجد فترة مفتوحة أخرى تغطي هذه التواريخ بالفعل."
+    },
+    "TRADE_INVENTORY_PERIOD_CONFLICT": {
+      "default": "تاريخ السريان لا يقع ضمن فترة مفتوحة.",
+      "PERIOD_MISSING": "لا توجد فترة مخزون تغطي هذا التاريخ.",
+      "PERIOD_CLOSED": "الفترة التي تغطي هذا التاريخ مغلقة.",
+      "FUTURE_DATE": "لا يمكن أن يكون تاريخ السريان في المستقبل.",
+      "BACKDATE_LIMIT": "التاريخ أقدم مما تسمح به هذه الفترة."
+    },
+    "TRADE_INVENTORY_UOM_CONVERSION_NOT_FOUND": "تحويل الوحدة غير موجود.",
+    "TRADE_INVENTORY_UOM_CONVERSION_INVALID": {
+      "default": "تحويل الوحدة هذا غير صالح.",
+      "IDENTITY_NOT_REQUIRED": "لا يمكن أن تتطابق وحدة المصدر مع وحدة الهدف.",
+      "UOM_NOT_REGISTERED_FOR_ITEM": "استخدم الوحدات المسجلة على هذا الصنف.",
+      "TRANSITION_NOT_ALLOWED": "لا يمكن تغيير حالة هذا التحويل حاليًا.",
+      "FUTURE_REPLACEMENT_UNSUPPORTED": "لا يمكن استبدال تحويل منشور بتحويل يبدأ سريانه في المستقبل.",
+      "EFFECTIVE_FROM_NOT_AFTER_PREDECESSOR": "يجب أن يكون تاريخ السريان بعد تاريخ التحويل النشط.",
+      "NON_EXACT_RESULT": "لا تتحوّل هذه الكمية إلى وحدة الأساس تحويلًا دقيقًا."
+    },
+    "TRADE_INVENTORY_UOM_CONVERSION_UNAVAILABLE": "لا يوجد تحويل منشور من هذه الوحدة إلى وحدة الأساس.",
+    "TRADE_INVENTORY_TRACKING_REQUIRED": "بيانات تتبع الدفعة أو الأرقام التسلسلية ناقصة أو لا تطابق الكمية.",
+    "TRADE_INVENTORY_SERIAL_CONFLICT": "أحد هذه الأرقام التسلسلية موجود مسبقًا.",
+    "TRADE_INVENTORY_SERIAL_NOT_FOUND": "الرقم التسلسلي غير موجود.",
+    "TRADE_INVENTORY_QUANTITY_CONFLICT": "يوجد رصيد افتتاحي لهذا الصنف في هذا الموقع بالفعل.",
+    "TRADE_INVENTORY_QUANTITY_INVALID": {
+      "default": "الكمية أو الوحدة المختارة غير صالحة.",
+      "UOM_REQUIRED_FOR_AMBIGUOUS_BALANCE": "اختر وحدة لفحص هذا الرصيد."
+    },
+    "TRADE_INVENTORY_REVERSAL_NOT_ALLOWED": "لم يتبقَّ ما يُعكس، أو أن أحد الأرقام المختارة عُكس مسبقًا.",
+    "TRADE_INVENTORY_POLICY_REJECTED": "منعت إحدى السياسات هذا الإجراء.",
+    "TRADE_REASON_NOT_FOUND": "لم يعد هذا السبب موجودًا، فاختر سببًا آخر.",
+    "TRADE_REASON_INACTIVE": "لم يعد هذا السبب نشطًا، فاختر سببًا آخر.",
+    "TRADE_REASON_KIND_INVALID": "هذا السبب لا يخص هذا الإجراء.",
+    "TRADE_INVENTORY_MOVEMENT_NOT_FOUND": "الحركة غير موجودة.",
+    "TRADE_INVENTORY_RECEIPT_NOT_FOUND": "إيصال الاستلام غير موجود.",
+    "TRADE_INVENTORY_DELIVERY_NOT_FOUND": "إذن التسليم غير موجود.",
+    "TRADE_INVENTORY_DECISION_NOT_FOUND": "قرار السياسة غير موجود.",
+    "TRADE_INVENTORY_PERIOD_CODE_TAKEN": "توجد فترة مخزون أخرى تستخدم هذا الرمز.",
+    "TRADE_INVENTORY_SCOPE_NOT_FOUND": "لم يُعثر على هذا السجل في الشركة الحالية.",
+    "TRADE_INVENTORY_ITEM_NOT_STOCK_TRACKED": "هذا الصنف غير نشط أو لا يتتبّع المخزون.",
+    "TRADE_INVENTORY_TRACKING_UNSUPPORTED": "لا يستخدم هذا الصنف هذا النوع من تتبّع الدفعات أو الأرقام التسلسلية."
+  }
+}

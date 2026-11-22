@@ -1,0 +1,194 @@
+@if (!isNew() && loading() && !widget()) {
+  <header class="flex shrink-0 items-center gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-card" aria-busy="true">
+    <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft" aria-hidden="true"></span>
+    <span class="h-skeleton-line w-modal-confirm max-w-full animate-pulse rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+  </header>
+
+  <div class="flex min-h-0 flex-1 flex-col gap-10 rounded-10 border border-border bg-surface p-12 shadow-card" aria-busy="true">
+    <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+    <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+    <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+  </div>
+} @else if (!isNew() && loadError(); as errorKind) {
+  @switch (errorKind) {
+    @case ('not-found') {
+      <ui-full-state
+        kind="not-found"
+        [title]="'widgetPage.notFound.title' | transloco"
+        [text]="'widgetPage.notFound.text' | transloco"
+        [actionLabel]="'widgetPage.notFound.action' | transloco"
+        (action)="goToWidgets()"
+      />
+    }
+    @case ('forbidden') {
+      <ui-full-state
+        kind="forbidden"
+        [title]="'widgetPage.forbidden.title' | transloco"
+        [text]="'widgetPage.forbidden.text' | transloco"
+        [actionLabel]="'widgetPage.notFound.action' | transloco"
+        (action)="goToWidgets()"
+      />
+    }
+    @case ('load-failure') {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'analytics.common.loadFailed' | transloco"
+        [text]="'widgetPage.loadFailure.text' | transloco"
+        [actionLabel]="'analytics.common.retry' | transloco"
+        (action)="retryLoad()"
+      />
+    }
+  }
+} @else {
+  <header class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+      aria-hidden="true"
+    >
+      <ng-icon name="tablerChartDots3" size="15" />
+    </span>
+
+    <h1 class="min-w-0 truncate text-16 leading-24 font-medium text-text" [title]="pageTitle()">
+      {{ pageTitle() }}
+    </h1>
+
+    @if (isNew()) {
+      <ui-badge tone="tag">{{ 'widgetPage.status.draft' | transloco }}</ui-badge>
+    } @else if (widget(); as w) {
+      @switch (w.status) {
+        @case ('DRAFT') {
+          <ui-badge tone="tag">{{ 'widgetPage.status.draft' | transloco }}</ui-badge>
+        }
+        @case ('PUBLISHED') {
+          <ui-badge tone="brand">{{ 'widgetPage.status.published' | transloco }}</ui-badge>
+          @if (w.hasDraft) {
+            <ui-badge tone="tag">{{ 'widgetPage.status.draftChanges' | transloco }}</ui-badge>
+          }
+        }
+        @case ('ARCHIVED') {
+          <ui-badge tone="tag">{{ 'widgetPage.status.archived' | transloco }}</ui-badge>
+        }
+      }
+
+      @if (w.versionNumber != null) {
+        <span class="shrink-0 text-11 leading-16 text-text-muted tabular-nums">
+          {{ 'widgetPage.version' | transloco: { n: w.versionNumber } }}
+        </span>
+      }
+    }
+
+    @if (isDirty() && activeTab() !== 'builder') {
+      <span class="inline-flex shrink-0 items-center gap-4 text-12 leading-18 text-warning-text" role="status">
+        <span class="size-radio-dot shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
+        <span>{{ 'widgetPage.unsaved' | transloco }}</span>
+      </span>
+    }
+
+    <span class="flex-1"></span>
+
+    @if (!isNew() && widget() && actionItems().length > 0) {
+      <ui-actions-menu
+        [items]="actionItems()"
+        [label]="'widgetPage.actions.label' | transloco"
+        (selected)="onActionSelected($event)"
+      />
+    }
+  </header>
+
+  @if (!isNew() && widget()) {
+    <ui-tabs
+      class="shrink-0"
+      [tabs]="tabs()"
+      [label]="'widgetPage.tabs.label' | transloco"
+      [active]="activeTab()"
+      (activeChange)="onTabChange($event)"
+    />
+  }
+
+  <div class="min-h-0 min-w-0 flex-1 overflow-y-auto">
+    <div
+      role="tabpanel"
+      [id]="tabPanelId('builder')"
+      [attr.aria-labelledby]="tabButtonId('builder')"
+      class="min-h-0"
+      [class.hidden]="!isNew() && activeTab() !== 'builder'"
+    >
+      @for (key of [builderKey()]; track key) {
+        <app-widget-builder
+          [widgetId]="widgetId()"
+          (saved)="onSaved($event)"
+          (published)="onPublished()"
+        />
+      }
+    </div>
+
+    @if (!isNew() && widget(); as w) {
+      @if (activeTab() === 'usage') {
+        <div
+          role="tabpanel"
+          [id]="tabPanelId('usage')"
+          [attr.aria-labelledby]="tabButtonId('usage')"
+          class="min-w-0"
+        >
+          <app-usage-tab [widget]="w" />
+        </div>
+      }
+
+      @if (canViewAccess() && activeTab() === 'access') {
+        <div
+          role="tabpanel"
+          [id]="tabPanelId('access')"
+          [attr.aria-labelledby]="tabButtonId('access')"
+          class="min-w-0"
+        >
+          <app-access-tab
+            [widget]="w"
+            [refreshToken]="accessRefresh()"
+            (countChange)="onShareCountChange($event)"
+          />
+        </div>
+      }
+
+      @if (activeTab() === 'versions') {
+        <div
+          role="tabpanel"
+          [id]="tabPanelId('versions')"
+          [attr.aria-labelledby]="tabButtonId('versions')"
+          class="min-w-0"
+        >
+          <app-versions-tab
+            [widget]="w"
+            [hasUnsavedEdits]="isDirty()"
+            (restored)="onVersionRestored()"
+            (countChange)="onVersionsCountChange($event)"
+          />
+        </div>
+      }
+    }
+  </div>
+}
+
+<app-widget-archive-modal />
+<app-widget-transfer-modal />
+<app-widget-clone-modal />
+
+<div #shareHost class="contents">
+  <app-share-modal />
+</div>
+
+<ui-confirm-dialog
+  #deleteDialog
+  tone="danger"
+  [title]="'widgetPage.delete.title' | transloco"
+  [text]="'widgetPage.delete.text' | transloco: { name: widget()?.name ?? '' }"
+  [confirmLabel]="'widgetPage.actions.delete' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'widgetPage.unsavedDialog.title' | transloco"
+  [text]="'widgetPage.unsavedDialog.text' | transloco"
+  [saveLabel]="'widgetPage.unsavedDialog.save' | transloco"
+  [discardLabel]="'widgetPage.unsavedDialog.discard' | transloco"
+  [cancelLabel]="'widgetPage.unsavedDialog.cancel' | transloco"
+/>

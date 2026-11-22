@@ -1,0 +1,156 @@
+<ui-field
+  size="bare"
+  [for]="uid + '-rating'"
+  [label]="ratingLabel()"
+  [hint]="ratingHint()"
+>
+  <div
+    #ratingGroup
+    [id]="uid + '-rating'"
+    class="flex h-field items-center gap-2"
+    role="radiogroup"
+    [attr.aria-label]="ratingLabel()"
+    (mouseleave)="hoveredStar.set(null)"
+  >
+    @for (star of stars; track star) {
+      <button
+        #starBtn
+        type="button"
+        role="radio"
+        class="inline-flex size-btn-h-sm items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          (star <= activeRating() ? 'text-warning-text' : 'text-border-field') +
+          (readonly() || updating() ? ' cursor-default' : ' cursor-pointer hover:bg-neutral-soft')
+        "
+        [disabled]="readonly() || updating()"
+        [attr.tabindex]="starTabIndex(star)"
+        [attr.aria-checked]="rating() === star"
+        [attr.aria-label]="'recordFields.rating.star' | transloco: { n: star }"
+        (mouseenter)="!readonly() && !updating() && hoveredStar.set(star)"
+        (focus)="!readonly() && !updating() && hoveredStar.set(star)"
+        (blur)="hoveredStar.set(null)"
+        (click)="chooseRating(star)"
+        (keydown)="onRatingKeydown($event, star)"
+      >
+        <ng-icon [name]="star <= activeRating() ? 'tablerStarFill' : 'tablerStar'" size="16" aria-hidden="true" />
+      </button>
+    }
+  </div>
+</ui-field>
+
+<ui-field
+  size="bare"
+  [label]="colorFieldLabel()"
+  [for]="uid + '-color'"
+  [hint]="colorFieldHint()"
+>
+  @if (readonly()) {
+    <div
+      class="flex h-field w-full items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text"
+    >
+      <span
+        class="size-icon-sm shrink-0 rounded-full"
+        [class]="color() ? cardColors[color()!] : 'border border-dashed border-border-field'"
+        aria-hidden="true"
+      ></span>
+      <input
+        [id]="uid + '-color'"
+        type="text"
+        readonly
+        [value]="colorLabel()"
+        class="w-full bg-transparent text-12 text-text outline-none"
+      />
+    </div>
+  } @else {
+    <div class="relative inline-flex w-full">
+      <button
+        #colorTrigger
+        type="button"
+        [id]="uid + '-color'"
+        class="inline-flex h-field w-full items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast"
+        [class]="
+          updating()
+            ? 'cursor-default border-border-field'
+            : colorOpen()
+              ? 'cursor-pointer border-focus-ring ring-3 ring-focus-halo'
+              : 'cursor-pointer border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+        "
+        [disabled]="updating()"
+        [attr.aria-label]="colorFieldLabel()"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="colorOpen()"
+        (click)="toggleColorMenu()"
+        (keydown.escape)="colorOpen() && onEscape($event)"
+      >
+        <span class="flex min-w-0 items-center gap-6">
+          <span
+            class="size-icon-sm shrink-0 rounded-full"
+            [class]="color() ? cardColors[color()!] : 'border border-dashed border-border-field'"
+          ></span>
+          <span class="truncate" [class]="color() ? '' : 'text-text-muted'">
+            {{ colorLabel() }}
+          </span>
+        </span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    </div>
+  }
+</ui-field>
+
+@if (colorOpen()) {
+  <div
+    #menuList
+    role="menu"
+    class="fixed z-dropdown flex flex-col gap-2 rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!menuPlaced()"
+    [style.top.px]="menuPlace().top"
+    [style.inset-inline-start.px]="menuPlace().start"
+    [attr.aria-label]="colorFieldLabel()"
+    (keydown)="onColorMenuKeydown($event)"
+  >
+    <div class="grid gap-4 p-4" [style.grid-template-columns]="'repeat(6, var(--btn-h-sm))'">
+      @for (item of colorKeys; track item) {
+        <button
+          type="button"
+          role="menuitem"
+          class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.tabindex]="color() === item ? 0 : -1"
+          [attr.aria-label]="'recordFields.color.' + item | transloco"
+          [title]="'recordFields.color.' + item | transloco"
+          (click)="selectColor(item)"
+        >
+          <span
+            class="inline-flex size-icon-sm items-center justify-center rounded-full text-on-icon"
+            [class]="
+              cardColors[item] +
+              (color() === item ? ' ring-2 ring-focus-ring ring-offset-2 ring-offset-surface' : '')
+            "
+          >
+            @if (color() === item) {
+              <ng-icon name="tablerCheck" size="11" aria-hidden="true" />
+            }
+          </span>
+        </button>
+      }
+    </div>
+
+    <button
+      type="button"
+      role="menuitem"
+      class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="color() === null ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+      [attr.tabindex]="color() === null ? 0 : -1"
+      (click)="selectColor(null)"
+    >
+      <span class="flex items-center gap-8">
+        <ng-icon name="tablerCircleOff" size="14" aria-hidden="true" />
+        <span>{{ 'recordFields.color.none' | transloco }}</span>
+      </span>
+      @if (color() === null) {
+        <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+      }
+    </button>
+  </div>
+}

@@ -1,0 +1,360 @@
+{
+  "kinds": {
+    "PURCHASE_ORDER": {
+      "name": "Purchase order approval",
+      "desc": "Controls approval states and allowed actions on purchase orders."
+    },
+    "QUOTATION": {
+      "name": "Quotation lifecycle",
+      "desc": "Controls state transitions on sales quotations."
+    },
+    "SALES_ORDER": {
+      "name": "Sales order lifecycle",
+      "desc": "Controls state transitions on sales orders."
+    },
+    "PRICE_CHANGE": {
+      "name": "Price change approval",
+      "desc": "Controls approval steps for price book changes."
+    },
+    "CREDIT_OVERRIDE": {
+      "name": "Credit override approval",
+      "desc": "Controls approval steps for credit limit overrides."
+    }
+  },
+  "actions": {
+    "SUBMIT": "Submit",
+    "APPROVE": "Approve",
+    "REJECT": "Reject",
+    "WITHDRAW": "Withdraw",
+    "CONFIRM": "Confirm",
+    "CANCEL": "Cancel",
+    "HOLD": "Hold",
+    "RELEASE": "Release",
+    "RETRY": "Retry"
+  },
+  "list": {
+    "title": "Workflows",
+    "newWorkflow": "New workflow",
+    "searchPlaceholder": "Search by workflow code…",
+    "kindFilter": "Kind",
+    "allKinds": "All kinds",
+    "statusFilter": "Definition status",
+    "allStatuses": "All",
+    "active": "Active",
+    "inactive": "Inactive",
+    "reload": "Reload",
+    "tableLabel": "Workflow definitions",
+    "columns": {
+      "code": "Workflow code",
+      "kind": "Kind",
+      "live": "Live version",
+      "inProgress": "In progress",
+      "versions": "Versions",
+      "actions": "Actions"
+    },
+    "liveVersion": "Version {{n}} · from {{date}}",
+    "versionsCount": "{{count}}",
+    "actionsLabel": "Workflow actions",
+    "actions": {
+      "open": "Open",
+      "newVersion": "New version",
+      "activate": "Activate",
+      "deactivate": "Deactivate"
+    },
+    "toasts": {
+      "activated": "Workflow activated",
+      "deactivated": "Workflow deactivated",
+      "versionCreated": "Draft version {{n}} created"
+    },
+    "emptyTitle": "No workflows yet",
+    "emptyText": "Create a workflow definition to manage document states, transitions, and approvals.",
+    "noMatchText": "No workflows match the current search or filters.",
+    "loadFailed": "Could not load workflows.",
+    "retry": "Try again",
+    "pagination": "Workflows pages",
+    "statusFilterHint": "Show only workflow definitions with the selected status."
+  },
+  "createModal": {
+    "title": "New workflow",
+    "codeLabel": "Code",
+    "codeHint": "Unique uppercase identifier referenced by document lifecycle engines.",
+    "codePatternHint": "Capital letters, digits, _ . -; 2 to 100 characters",
+    "codePlaceholder": "DEFAULT_PURCHASE_ORDER",
+    "codeRequired": "Enter a workflow code.",
+    "codeInvalid": "Use capital letters, digits, _ . - only (2 to 100 characters).",
+    "codeTaken": "This workflow code is already taken.",
+    "kindLabel": "Kind",
+    "kindHint": "Other document types will be added when the system supports them.",
+    "scopeLabel": "Scope",
+    "scopeHint": "Workflows are created at the scope level you are working in.",
+    "create": "Create workflow",
+    "createdToast": "Workflow created",
+    "discardTitle": "Discard new workflow?",
+    "discardText": "Your entered values will be lost.",
+    "discardConfirm": "Discard"
+  },
+  "detail": {
+    "back": "Back to workflows",
+    "newVersion": "New version",
+    "versionsTitle": "Workflow versions",
+    "emptyVersions": "No versions yet. Create a draft version to start configuring states and transitions.",
+    "loadFailed": "Could not load this workflow.",
+    "retry": "Try again",
+    "fromVersion": "Restored from v{{version}}",
+    "toasts": {
+      "versionCreated": "Draft version {{n}} created",
+      "retired": "Version {{n}} retired",
+      "rolledBack": "Draft version {{n}} created from version {{from}}"
+    },
+    "rollback": {
+      "title": "Rollback to version {{n}}",
+      "text": "A new draft is created from this version. You will be its author, so someone else must approve and publish it.",
+      "confirm": "Create draft"
+    },
+    "retire": {
+      "title": "Retire version {{n}}?",
+      "text": "It stops at once. Documents that depend on this workflow will be blocked until another version is live.",
+      "confirm": "Retire"
+    }
+  },
+  "version": {
+    "back": "Back to workflow",
+    "versionNumber": "Version {{n}}",
+    "subtitle": "{{kind}} · {{scope}}",
+    "loadFailed": "Could not load this workflow version.",
+    "retry": "Try again",
+    "undo": "Undo",
+    "unsavedLabel": "Unsaved changes",
+    "save": "Save",
+    "validate": "Validate",
+    "runTests": "Run tests",
+    "submit": "Submit for approval",
+    "approve": "Approve",
+    "reject": "Reject",
+    "publish": "Publish",
+    "retire": "Retire",
+    "rollback": "Rollback",
+    "deleteDraft": "Delete draft",
+    "moreActions": "More actions",
+    "effectiveFrom": "Effective from",
+    "effectiveFromHint": "Date and time when this workflow version starts applying.",
+    "effectiveTo": "Effective to",
+    "effectiveToHint": "Optional end date and time. Leave empty for open-ended.",
+    "noEnd": "Open-ended",
+    "clearEnd": "Clear end date",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minutes",
+    "effectiveFromInvalid": "Enter a valid start date and time.",
+    "effectiveToInvalid": "Enter a valid end date and time.",
+    "effectiveToBeforeFrom": "Must be after Effective from.",
+    "steps": {
+      "label": "Version lifecycle",
+      "DRAFT": "Draft",
+      "VALIDATED": "Validated",
+      "TESTED": "Tested",
+      "IN_REVIEW": "In review",
+      "APPROVED": "Approved",
+      "PUBLISHED": "Published"
+    },
+    "tabs": {
+      "label": "Workflow version sections",
+      "editor": "States and transitions",
+      "tests": "Tests",
+      "review": "Review",
+      "hasErrors": "This tab has validation errors"
+    },
+    "readonly": {
+      "noPermission": "You have read-only access, so states and transitions cannot be edited.",
+      "inReviewCanApprove": "This version is in review, so it is read-only. Submitted by {{actor}}; you can approve it.",
+      "inReviewMakerChecker": "This version is in review, so it is read-only. Submitted by {{actor}}; another reviewer must approve it.",
+      "inReview": "This version is in review, so it is read-only.",
+      "byStatus": "This version is {{status}}, so it is read-only."
+    },
+    "unsaved": {
+      "title": "Save changes?",
+      "text": "You have unsaved changes on this workflow version.",
+      "save": "Save",
+      "discard": "Discard",
+      "cancel": "Cancel"
+    },
+    "deleteConfirm": {
+      "title": "Delete draft version {{n}}?",
+      "text": "This draft version and its unsaved states, transitions, and tests will be permanently deleted.",
+      "confirm": "Delete draft"
+    },
+    "rejectDialog": {
+      "title": "Reject version {{n}}",
+      "text": "Return this version to the author so it can be revised and retested.",
+      "confirm": "Reject"
+    },
+    "retireDialog": {
+      "title": "Retire version {{n}}?",
+      "text": "It stops at once. Documents that depend on this workflow will be blocked until another version is live.",
+      "confirm": "Retire"
+    },
+    "rollbackDialog": {
+      "title": "Rollback to version {{n}}",
+      "text": "A new draft is created from this version. You will be its author, so someone else must approve and publish it.",
+      "confirm": "Create draft"
+    },
+    "publishDialog": {
+      "title": "Publish version {{n}}",
+      "nowText": "Publish now? It goes live immediately.",
+      "scheduleText": "Schedule for {{date}}? It activates automatically at that time.",
+      "replacesLabel": "Replaces",
+      "replacesHint": "Optional earlier live or scheduled version to supersede when this version goes live.",
+      "replacesNone": "None",
+      "replacesOption": "Version {{n}} ({{range}})",
+      "confirmNow": "Publish now",
+      "confirmSchedule": "Schedule"
+    },
+    "toasts": {
+      "saved": "Draft saved",
+      "saveInvalid": "Fix the highlighted fields before saving.",
+      "saveFirst": "Save your changes before validating or running tests.",
+      "validPassed": "Workflow is valid",
+      "validFailed": "{{count}} problems found",
+      "validFailedOne": "1 problem found",
+      "testsPassed": "All tests passed; version marked as Tested",
+      "testsFailed": "Some tests failed; review the Tests tab",
+      "submitted": "Submitted for approval",
+      "approved": "Version approved",
+      "rejected": "Version rejected",
+      "published": "Version published",
+      "scheduled": "Version scheduled",
+      "retired": "Version retired",
+      "rolledBack": "Draft version {{n}} created",
+      "deleted": "Draft deleted"
+    }
+  },
+  "editor": {
+    "statesTitle": "States",
+    "transitionsTitle": "Transitions",
+    "startSuffix": "start",
+    "endSuffix": "end",
+    "addStateLabel": "Add state",
+    "addStateHint": "Uppercase state code (letters, digits, _ ; 2 to 64 characters, 2 to 50 states).",
+    "addStatePlaceholder": "ESCALATED",
+    "addStateButton": "Add state",
+    "stateActionsLabel": "State actions for {{state}}",
+    "stateMenu": {
+      "makeStart": "Make start",
+      "markEnd": "Mark as end",
+      "unmarkEnd": "Not an end",
+      "rename": "Rename",
+      "remove": "Remove"
+    },
+    "stateDisabled": {
+      "alreadyStart": "This is already the start state.",
+      "cannotStartOnlyEnd": "Mark another state as an end state before making this the start state.",
+      "cannotEndStart": "The start state cannot be marked as an end state.",
+      "hasOutgoingTransitions": "Remove outgoing transitions from this state before marking it as an end state.",
+      "minEndsRequired": "At least one end state is required.",
+      "stateUsedByTransitions": "Remove transitions using this state before removing it.",
+      "minStatesRequired": "At least two states are required.",
+      "cannotRemoveStart": "Choose another start state before removing this one.",
+      "cannotRemoveOnlyEnd": "Mark another end state before removing this one."
+    },
+    "renameModal": {
+      "title": "Rename state {{state}}",
+      "label": "New state code",
+      "hint": "All transitions and references to this state will be updated.",
+      "confirm": "Rename"
+    },
+    "addTransition": "Add transition",
+    "removeTransition": "Remove transition",
+    "minTransitionsRequired": "At least one transition is required.",
+    "transitionsTableLabel": "Workflow transitions",
+    "emptyTransitions": "No transitions yet. Add a transition to connect states.",
+    "codePlaceholder": "APPROVE_PURCHASE_ORDER",
+    "columns": {
+      "code": "Code",
+      "from": "From",
+      "action": "Action",
+      "to": "To",
+      "needsApproval": "Needs approval",
+      "actions": "Actions"
+    },
+    "unreachableCaption": "Unreachable states: {{states}}. Connect every state from the start state.",
+    "unreachableChipHint": "Unreachable from the start state",
+    "poShapeMatch": "Matches the standard purchase-order shape. Every state can be reached from the start.",
+    "poShapeMismatch": "Purchase orders need the standard shape. It can be published, but orders will be blocked.",
+    "allReachable": "Every state can be reached from the start.",
+    "useStandardShape": "Use the standard shape",
+    "standardShapeConfirm": {
+      "title": "Use the standard purchase-order shape?",
+      "text": "This replaces the current states and transitions with PENDING, APPROVED, REJECTED, and WITHDRAWN and their standard transitions.",
+      "confirm": "Use standard shape"
+    },
+    "validation": {
+      "stateCodeInvalid": "Use 2 to 64 uppercase letters, digits, or _.",
+      "stateDuplicate": "This state already exists.",
+      "maxStates": "A workflow can have at most 50 states.",
+      "minStates": "Add at least 2 states.",
+      "needTerminal": "Mark at least 1 end state.",
+      "invalidInitial": "Choose a valid non-end start state.",
+      "minTransitions": "Add at least 1 transition.",
+      "maxTransitions": "A workflow can have at most 200 transitions.",
+      "transitionCodeInvalid": "Use 2 to 64 uppercase letters, digits, or _.",
+      "transitionCodeDuplicate": "Another transition already uses this code.",
+      "fromInvalid": "Choose a valid non-end starting state.",
+      "toInvalid": "Choose a valid target state.",
+      "actionInvalid": "Choose a valid action.",
+      "duplicateFromAction": "This state already has this action",
+      "genericInvalid": "Check this field value."
+    },
+    "needsApprovalHint": "When on, this transition waits for an approval before the document moves to the next state."
+  },
+  "tests": {
+    "summary": "{{passed}} of {{total}} passed",
+    "addTest": "Add test",
+    "empty": "No test cases yet. Add a test case to verify state transitions.",
+    "tableLabel": "Workflow test cases",
+    "columns": {
+      "code": "Code",
+      "startState": "Start state",
+      "actions": "Actions",
+      "expectedState": "Expected state",
+      "actualState": "Actual state",
+      "firstInvalidAction": "First invalid action",
+      "result": "Result",
+      "actionsCol": "Actions"
+    },
+    "pass": "Pass",
+    "fail": "Fail",
+    "actionsLabel": "Test case actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "modal": {
+      "createTitle": "New test case",
+      "editTitle": "Edit test case",
+      "codeLabel": "Code",
+      "codeHint": "Unique uppercase code identifying this test case (2 to 64 characters).",
+      "codePlaceholder": "HAPPY_APPROVAL",
+      "codeError": "Use 2 to 64 uppercase letters, digits, or _.",
+      "codeDuplicate": "Another test case already uses this code.",
+      "startStateLabel": "Start state",
+      "startStateHint": "Initial state before running the action sequence.",
+      "startStateError": "Choose a start state.",
+      "expectedStateLabel": "Expected state",
+      "expectedStateHint": "State expected after all actions succeed.",
+      "expectedStateError": "Choose an expected state.",
+      "actionsLabel": "Actions",
+      "actionsHint": "Ordered sequence of actions applied from the start state (up to 20 actions).",
+      "actionsEmpty": "No actions yet. Add actions in the order they run.",
+      "actionsMaxError": "At most 20 actions are allowed per test case.",
+      "addActionSelect": "Action to add",
+      "addAction": "Add action",
+      "moveEarlier": "Move {{action}} earlier",
+      "moveLater": "Move {{action}} later",
+      "removeAction": "Remove {{action}}",
+      "save": "Save test",
+      "discardTitle": "Discard test case changes?",
+      "discardText": "Your changes to this test case will be lost.",
+      "discardConfirm": "Discard"
+    }
+  }
+}

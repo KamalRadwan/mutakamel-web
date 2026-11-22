@@ -1,0 +1,56 @@
+<div
+  class="grid grid-cols-12 gap-8"
+  [style.grid-auto-rows]="'var(--dash-row-h)'"
+>
+  @for (panel of panels(); track panel.panelKey) {
+    @let view = panelView(panel);
+    @let isPartial = view.status === 'PARTIAL' || view.partialAccess === true;
+    @let partialTip = isPartial ? partialTooltip(panel) : '';
+    <div
+      class="min-h-0 min-w-0"
+      [style.grid-column]="gridColumn(panel)"
+      [style.grid-row]="gridRow(panel)"
+    >
+      <ui-widget-frame
+        [title]="panelTitle(panel)"
+        [hint]="panelHint(panel)"
+        [tag]="panelTag(panel)"
+        [menuItems]="menuItemsFor(panel)"
+        [menuLabel]="'dashboardWidgets.menu.label' | transloco"
+        (menuSelected)="onMenuAction(panel, $event)"
+      >
+        @if (isPartial) {
+                  <span frameBadge class="group relative inline-flex shrink-0 items-center gap-4">
+                    <ui-badge tone="warning">{{ 'dashboardWidgets.partial' | transloco }}</ui-badge>
+                    @if (partialTip) {
+                      <button
+                        type="button"
+                        class="inline-flex cursor-help items-center rounded-full text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+                        [attr.aria-label]="'dashboardWidgets.partial' | transloco"
+                        [attr.aria-describedby]="'rep-partial-' + panel.panelKey"
+                      >
+                        <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+                      </button>
+                      <span
+                        [id]="'rep-partial-' + panel.panelKey"
+                        role="tooltip"
+                        class="pointer-events-none invisible absolute start-0 top-full z-tooltip mt-4 flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip group-focus-within:visible group-hover:visible"
+                      >
+                        {{ partialTip }}
+                      </span>
+                    }
+                  </span>
+                }
+        <app-widget-body
+          [kind]="panel.visualization"
+          [view]="view"
+          [showTable]="isTableShown(panel.panelKey)"
+          [title]="panelTitle(panel)"
+          [canEdit]="false"
+          (retry)="retryPanel(panel.panelKey)"
+          (openReadiness)="onOpenReadiness($event)"
+        />
+      </ui-widget-frame>
+    </div>
+  }
+</div>

@@ -1,0 +1,18 @@
+<label class="inline-flex cursor-pointer items-center gap-6 text-12 text-text">
+  <span class="relative inline-flex size-checkbox-size shrink-0">
+    <input
+      type="checkbox"
+      class="peer size-checkbox-size cursor-pointer appearance-none rounded-4 border-check border-border-field bg-surface-field transition-colors duration-fast outline-none hover:border-border-field-hover checked:border-brand checked:bg-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [checked]="checked()"
+      [indeterminate]="indeterminate()"
+      [disabled]="disabled()"
+      [attr.aria-label]="ariaLabel()"
+      [attr.aria-checked]="indeterminate() ? 'mixed' : null"
+      (change)="toggle($event)"
+    />
+    <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+      <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+    </span>
+  </span>
+  <ng-content />
+</label>

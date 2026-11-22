@@ -1,0 +1,181 @@
+@if (layout() === 'page') {
+  @let nameErr = companyNameError();
+  @let mailErr = emailError();
+  @let siteErr = websiteError();
+  <div [class]="pageGrid">
+    <ui-field
+      [label]="'customerForm.company.name' | transloco"
+      [for]="uid + '-company-name'"
+      [hint]="'customerForm.company.nameHint' | transloco"
+      [required]="true"
+      [count]="draft().companyName.length"
+      [max]="limits.companyName"
+      [error]="nameErr"
+    >
+      <input
+        #companyNameInput
+        [id]="uid + '-company-name'"
+        type="text"
+        autocomplete="organization"
+        aria-required="true"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [value]="draft().companyName"
+        [attr.aria-invalid]="nameErr ? 'true' : null"
+        (input)="setField('companyName', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'customerForm.company.email' | transloco"
+      [for]="uid + '-company-email'"
+      [hint]="'customerForm.company.emailHint' | transloco"
+      [count]="draft().companyEmail.length"
+      [max]="limits.email"
+      [error]="mailErr"
+    >
+      <input
+        [id]="uid + '-company-email'"
+        type="email"
+        dir="ltr"
+        autocomplete="email"
+        class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [value]="draft().companyEmail"
+        [attr.aria-invalid]="mailErr ? 'true' : null"
+        (input)="setField('companyEmail', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'customerForm.company.website' | transloco"
+      [for]="uid + '-company-website'"
+      [hint]="'customerForm.company.websiteHint' | transloco"
+      [count]="draft().companyWebsite.length"
+      [max]="limits.website"
+      [error]="siteErr"
+    >
+      <input
+        [id]="uid + '-company-website'"
+        type="url"
+        dir="ltr"
+        autocomplete="url"
+        class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [value]="draft().companyWebsite"
+        [attr.aria-invalid]="siteErr ? 'true' : null"
+        (input)="setField('companyWebsite', $event)"
+      />
+    </ui-field>
+
+    <div class="col-span-2 desktop:col-span-1">
+      <app-phone-list
+        [phones]="phones()"
+        (phonesChange)="onPhonesChange($event)"
+        [countries]="countries()"
+        [max]="limits.phonesMax"
+        [maxLength]="limits.phoneMax"
+        [readonly]="readonly()"
+        [label]="'customerForm.company.phone' | transloco"
+        [hint]="'customerForm.company.phoneHint' | transloco"
+        [addLabel]="'customerForm.reach.addPhone' | transloco"
+        [removeLabel]="'customerForm.reach.removePhone' | transloco"
+        [idPrefix]="uid + '-phone'"
+        [errors]="phoneErrors()"
+        [crm]="crm()"
+        [source]="source()"
+      />
+    </div>
+  </div>
+} @else {
+  @let nameErr = companyNameError();
+  @let mailErr = emailError();
+  @let siteErr = websiteError();
+  <div class="flex flex-col gap-8">
+    <ui-field
+      [label]="'customerForm.company.name' | transloco"
+      [for]="uid + '-company-name'"
+      [hint]="'customerForm.company.nameHint' | transloco"
+      [required]="true"
+      [count]="draft().companyName.length"
+      [max]="limits.companyName"
+      [error]="nameErr"
+    >
+      <input
+        #companyNameInput
+        [id]="uid + '-company-name'"
+        type="text"
+        autocomplete="organization"
+        aria-required="true"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [value]="draft().companyName"
+        [attr.aria-invalid]="nameErr ? 'true' : null"
+        (input)="setField('companyName', $event)"
+      />
+    </ui-field>
+
+    <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+      <app-phone-list
+        [phones]="phones()"
+        (phonesChange)="onPhonesChange($event)"
+        [countries]="countries()"
+        [max]="limits.phonesMax"
+        [maxLength]="limits.phoneMax"
+        [readonly]="readonly()"
+        [label]="'customerForm.company.phone' | transloco"
+        [hint]="'customerForm.company.phoneHint' | transloco"
+        [addLabel]="'customerForm.reach.addPhone' | transloco"
+        [removeLabel]="'customerForm.reach.removePhone' | transloco"
+        [idPrefix]="uid + '-phone'"
+        [errors]="phoneErrors()"
+        [crm]="crm()"
+        [source]="source()"
+      />
+
+      <div class="flex flex-col gap-8">
+        <ui-field
+          [label]="'customerForm.company.email' | transloco"
+          [for]="uid + '-company-email'"
+          [hint]="'customerForm.company.emailHint' | transloco"
+          [count]="draft().companyEmail.length"
+          [max]="limits.email"
+          [error]="mailErr"
+        >
+          <input
+            [id]="uid + '-company-email'"
+            type="email"
+            dir="ltr"
+            autocomplete="email"
+            class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+            [readonly]="readonly()"
+            [value]="draft().companyEmail"
+            [attr.aria-invalid]="mailErr ? 'true' : null"
+            (input)="setField('companyEmail', $event)"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'customerForm.company.website' | transloco"
+          [for]="uid + '-company-website'"
+          [hint]="'customerForm.company.websiteHint' | transloco"
+          [count]="draft().companyWebsite.length"
+          [max]="limits.website"
+          [error]="siteErr"
+        >
+          <input
+            [id]="uid + '-company-website'"
+            type="url"
+            dir="ltr"
+            autocomplete="url"
+            class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+            [readonly]="readonly()"
+            [value]="draft().companyWebsite"
+            [attr.aria-invalid]="siteErr ? 'true' : null"
+            (input)="setField('companyWebsite', $event)"
+          />
+        </ui-field>
+      </div>
+    </div>
+  </div>
+}

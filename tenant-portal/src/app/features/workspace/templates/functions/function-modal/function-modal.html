@@ -1,0 +1,1390 @@
+<ui-modal
+  #fnModal
+  size="wide"
+  icon="tablerMathFunction"
+  tile="bg-icon-orange"
+  [title]="mode() === 'create' ? ('tplFunctions.modal.createTitle' | transloco) : (detail()?.name || '')"
+  [subtitle]="mode() === 'edit' ? (detail()?.code || '') : ('tplFunctions.modal.createSubtitle' | transloco)"
+  [closeLabel]="'tplFunctions.actions.close' | transloco"
+  [dismissable]="!busy() && !childModalOpen() && !conflictOpen()"
+  bodyClass="flex flex-col p-0 overflow-hidden"
+  (closed)="onModalClosed()"
+>
+  @if (mode() === 'edit' && detail(); as d) {
+    <div modal-header-end class="flex shrink-0 items-center gap-6">
+      <span
+        class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+        [class]="d.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+      >
+        {{ ('tplFunctions.status.' + d.status) | transloco }}
+      </span>
+      @if (validationSummary(); as val) {
+        <span
+          class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="
+            validationExpired()
+              ? 'bg-warning text-on-warning'
+              : val.state === 'PASSED'
+                ? 'bg-success text-on-success'
+                : 'bg-danger text-on-danger'
+          "
+        >
+          {{
+            (validationExpired()
+              ? 'tplFunctions.validationStates.EXPIRED'
+              : 'tplFunctions.validationStates.' + val.state) | transloco
+          }}
+        </span>
+      }
+    </div>
+  }
+
+  <!-- Underline tabs (32) -->
+  <div
+    role="tablist"
+    class="flex shrink-0 items-center gap-4 overflow-x-auto border-b border-border bg-surface px-10 no-scrollbar"
+    [attr.aria-label]="'tplFunctions.modal.tabsAria' | transloco"
+  >
+    @for (tab of tabs(); track tab.id; let idx = $index) {
+      @let active = activeTab() === tab.id;
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-' + tab.id"
+        class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="active ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+        [attr.tabindex]="active ? 0 : -1"
+        [attr.aria-selected]="active"
+        [attr.aria-controls]="uid + '-panel-' + tab.id"
+        (click)="selectTab(tab.id)"
+        (keydown)="onTabKeydown($event, idx)"
+      >
+        <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+        <span>{{ tab.labelKey | transloco }}</span>
+        @if (tab.counter !== undefined) {
+          <span
+            class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-full px-4 text-11 leading-16 font-medium tabular-nums"
+            [class]="active ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text-muted'"
+          >
+            {{ tab.counter }}
+          </span>
+        }
+      </button>
+    }
+  </div>
+
+  <!-- Tab body -->
+  <div class="min-h-0 flex-1 overflow-y-auto p-10" [attr.aria-busy]="loading()">
+    @if (loading()) {
+      <div class="grid grid-cols-3 gap-x-10 gap-y-8" aria-busy="true">
+        <div class="col-span-2 h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        <div class="col-span-1 h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        <div class="col-span-3 h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        <div class="col-span-3 h-textarea animate-pulse rounded-8 bg-neutral-soft"></div>
+        <div class="col-span-3 h-textarea animate-pulse rounded-8 bg-neutral-soft"></div>
+      </div>
+    } @else {
+      @switch (activeTab()) {
+        @case ('definition') {
+          <form [id]="uid + '-form'" class="flex flex-col gap-12" novalidate (submit)="save($event)">
+            <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+              <div class="col-span-1 min-w-0">
+                @if (mode() === 'create') {
+                  <ui-field
+                    [for]="uid + '-code'"
+                    [label]="'tplFunctions.fields.codeLabel' | transloco"
+                    [hint]="'tplFunctions.fields.codeHint' | transloco"
+                    [required]="true"
+                    [count]="draft().code.length"
+                    [max]="100"
+                    [error]="codeError()"
+                  >
+                    <input
+                      [id]="uid + '-code'"
+                      type="text"
+                      dir="ltr"
+                      maxlength="100"
+                      class="min-w-0 flex-1 bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'tplFunctions.fields.codePlaceholder' | transloco"
+                      [value]="draft().code"
+                      (input)="onCodeInput($event)"
+                    />
+                  </ui-field>
+                } @else {
+                  <ui-field
+                    [for]="uid + '-code'"
+                    [label]="'tplFunctions.fields.codeLabel' | transloco"
+                    [hint]="'tplFunctions.fields.codeLockedHint' | transloco"
+                  >
+                    <input
+                      [id]="uid + '-code'"
+                      type="text"
+                      dir="ltr"
+                      readonly
+                      class="min-w-0 flex-1 bg-transparent text-start text-12 text-text outline-none"
+                      [value]="draft().code"
+                    />
+                    <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                  </ui-field>
+                }
+              </div>
+
+              <div [class]="mode() === 'create' && draft().scopeType === 'COMPANY' ? 'col-span-1 min-w-0' : 'col-span-2 min-w-0'">
+                @if (mode() === 'create') {
+                  <ui-field
+                    size="bare"
+                    [for]="uid + '-scope'"
+                    [label]="'tplFunctions.fields.scopeLabel' | transloco"
+                    [hint]="'tplFunctions.fields.scopeHint' | transloco"
+                    [required]="true"
+                  >
+                    <ui-dropdown
+                      class="w-full"
+                      size="field"
+                      [id]="uid + '-scope'"
+                      [options]="scopeTypeOptions()"
+                      [value]="draft().scopeType"
+                      [label]="'tplFunctions.fields.scopeLabel' | transloco"
+                      [describedBy]="uid + '-scope-hint'"
+                      [disabled]="isReadOnly()"
+                      (valueChange)="onScopeTypeChange($event)"
+                    />
+                  </ui-field>
+                } @else {
+                  <ui-field
+                    [for]="uid + '-scope'"
+                    [label]="'tplFunctions.fields.scopeLabel' | transloco"
+                    [hint]="'tplFunctions.fields.scopeLockedHint' | transloco"
+                  >
+                    <input
+                      [id]="uid + '-scope'"
+                      type="text"
+                      readonly
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                      [value]="lockedScopeLabel()"
+                    />
+                    <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                  </ui-field>
+                }
+              </div>
+
+              @if (mode() === 'create' && draft().scopeType === 'COMPANY') {
+                <div class="col-span-1 min-w-0">
+                  <ui-field
+                    size="bare"
+                    [for]="uid + '-company'"
+                    [label]="'tplFunctions.fields.companyLabel' | transloco"
+                    [hint]="'tplFunctions.fields.companyHint' | transloco"
+                    [required]="true"
+                    [error]="companyError()"
+                  >
+                    <ui-dropdown
+                      class="w-full"
+                      size="field"
+                      [id]="uid + '-company'"
+                      [options]="companyDropdownOptions()"
+                      [value]="draft().companyId"
+                      [label]="'tplFunctions.fields.companyLabel' | transloco"
+                      [describedBy]="uid + '-company-hint' + (companyError() ? ' ' + uid + '-company-error' : '')"
+                      [disabled]="isReadOnly()"
+                      (valueChange)="onCompanyChange($event)"
+                    />
+                  </ui-field>
+                </div>
+              }
+
+              <div class="col-span-3 min-w-0">
+                <ui-field
+                  [for]="uid + '-name'"
+                  [label]="'tplFunctions.fields.nameLabel' | transloco"
+                  [hint]="'tplFunctions.fields.nameHint' | transloco"
+                  [required]="true"
+                  [count]="draft().working.name.length"
+                  [max]="200"
+                  [error]="nameError()"
+                >
+                  <input
+                    [id]="uid + '-name'"
+                    type="text"
+                    maxlength="200"
+                    [readonly]="isReadOnly()"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="'tplFunctions.fields.namePlaceholder' | transloco"
+                    [value]="draft().working.name"
+                    (input)="onNameInput($event)"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-3 min-w-0">
+                <ui-field
+                  size="multiline"
+                  [for]="uid + '-desc'"
+                  [label]="'tplFunctions.fields.descriptionLabel' | transloco"
+                  [hint]="'tplFunctions.fields.descriptionHint' | transloco"
+                  [count]="(draft().working.description ?? '').length"
+                  [max]="1000"
+                  [error]="descriptionError()"
+                >
+                  <textarea
+                    [id]="uid + '-desc'"
+                    rows="2"
+                    maxlength="1000"
+                    [readonly]="isReadOnly()"
+                    class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="'tplFunctions.fields.descriptionPlaceholder' | transloco"
+                    [value]="draft().working.description ?? ''"
+                    (input)="onDescriptionInput($event)"
+                  ></textarea>
+                </ui-field>
+              </div>
+            </div>
+
+            @if (!workingAvailable()) {
+              <p class="rounded-10 border border-border bg-surface-muted p-10 text-12 leading-18 text-text-muted">
+                {{ 'tplFunctions.modal.readOnlyWorkingNotice' | transloco }}
+              </p>
+            } @else {
+              <!-- Parameters (1..16) -->
+              <section class="flex flex-col gap-8 border-t border-border pt-10">
+                <div class="flex items-center justify-between gap-8">
+                  <div class="flex items-center gap-8">
+                    <h3 class="text-13 leading-18 font-medium text-text">
+                      {{ 'tplFunctions.parameters.sectionTitle' | transloco }}
+                    </h3>
+                    <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                      <bdi dir="ltr">{{ 'tplFunctions.parameters.count' | transloco: { count: draft().working.parameters.length, max: maxParameters } }}</bdi>
+                    </span>
+                  </div>
+
+                  @if (!isReadOnly()) {
+                    <button
+                      type="button"
+                      uiButton
+                      variant="secondary"
+                      size="small"
+                      [disabled]="draft().working.parameters.length >= maxParameters"
+                      (click)="addParameter()"
+                    >
+                      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                      {{ 'tplFunctions.parameters.add' | transloco }}
+                    </button>
+                  }
+                </div>
+
+                <div class="flex flex-col gap-8">
+                  @for (param of draft().working.parameters; track $index; let idx = $index) {
+                    <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+                      <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+                        <div class="col-span-1 min-w-0">
+                          <ui-field
+                            [for]="uid + '-pname-' + idx"
+                            [label]="'tplFunctions.parameters.nameLabel' | transloco"
+                            [hint]="'tplFunctions.parameters.nameHint' | transloco"
+                            [required]="true"
+                            [error]="paramNameError(idx)"
+                          >
+                            <input
+                              [id]="uid + '-pname-' + idx"
+                              type="text"
+                              dir="ltr"
+                              maxlength="40"
+                              [readonly]="isReadOnly()"
+                              class="min-w-0 flex-1 bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+                              [placeholder]="'tplFunctions.parameters.namePlaceholder' | transloco"
+                              [value]="param.name"
+                              (input)="onParamNameInput(idx, $event)"
+                            />
+                          </ui-field>
+                        </div>
+
+                        <div [class]="param.type === 'DECIMAL' ? 'col-span-1 min-w-0' : 'col-span-2 min-w-0'">
+                          <ui-field
+                            size="bare"
+                            [for]="uid + '-ptype-' + idx"
+                            [label]="'tplFunctions.parameters.typeLabel' | transloco"
+                            [hint]="'tplFunctions.parameters.typeHint' | transloco"
+                            [required]="true"
+                          >
+                            <ui-dropdown
+                              class="w-full"
+                              size="field"
+                              [id]="uid + '-ptype-' + idx"
+                              [options]="scalarTypeOptions()"
+                              [value]="param.type"
+                              [label]="'tplFunctions.parameters.typeLabel' | transloco"
+                              [describedBy]="uid + '-ptype-' + idx + '-hint'"
+                              [disabled]="isReadOnly()"
+                              (valueChange)="onParamTypeChange(idx, $event)"
+                            />
+                          </ui-field>
+                        </div>
+
+                        @if (param.type === 'DECIMAL') {
+                          <div class="col-span-1 min-w-0">
+                            <ui-field
+                              size="bare"
+                              [for]="uid + '-pdim-' + idx"
+                              [label]="'tplFunctions.parameters.kindLabel' | transloco"
+                              [hint]="'tplFunctions.parameters.kindHint' | transloco"
+                              [required]="true"
+                            >
+                              <ui-dropdown
+                                class="w-full"
+                                size="field"
+                                [id]="uid + '-pdim-' + idx"
+                                [options]="dimensionOptions()"
+                                [value]="param.dimension"
+                                [label]="'tplFunctions.parameters.kindLabel' | transloco"
+                                [describedBy]="uid + '-pdim-' + idx + '-hint'"
+                                [disabled]="isReadOnly()"
+                                (valueChange)="onParamDimensionChange(idx, $event)"
+                              />
+                            </ui-field>
+                          </div>
+                        }
+                      </div>
+
+                      <div class="flex items-center justify-between gap-8">
+                        <ui-field
+                          size="bare"
+                          [for]="uid + '-pnull-' + idx"
+                          [label]="'tplFunctions.parameters.nullableLabel' | transloco"
+                          [hint]="'tplFunctions.parameters.nullableHint' | transloco"
+                        >
+                          <div [class.pointer-events-none]="isReadOnly()" [class.opacity-drag-source]="isReadOnly()">
+                            <ui-checkbox
+                              [checked]="param.nullable"
+                              (checkedChange)="onParamNullableChange(idx, $event)"
+                            >
+                              {{ 'tplFunctions.parameters.canBeEmpty' | transloco }}
+                            </ui-checkbox>
+                          </div>
+                        </ui-field>
+
+                        @if (!isReadOnly()) {
+                          <button
+                            type="button"
+                            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                            [disabled]="draft().working.parameters.length <= 1"
+                            [attr.aria-label]="'tplFunctions.parameters.remove' | transloco"
+                            [title]="'tplFunctions.parameters.remove' | transloco"
+                            (click)="removeParameter(idx)"
+                          >
+                            <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              </section>
+
+              <!-- Result -->
+              <section class="flex flex-col gap-8 border-t border-border pt-10">
+                <h3 class="text-13 leading-18 font-medium text-text">
+                  {{ 'tplFunctions.result.sectionTitle' | transloco }}
+                </h3>
+
+                <div class="grid grid-cols-3 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface-muted p-8">
+                  <div [class]="draft().working.result.type === 'DECIMAL' ? 'col-span-1 min-w-0' : 'col-span-2 min-w-0'">
+                    <ui-field
+                      size="bare"
+                      [for]="uid + '-rtype'"
+                      [label]="'tplFunctions.result.typeLabel' | transloco"
+                      [hint]="'tplFunctions.result.typeHint' | transloco"
+                      [required]="true"
+                    >
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [id]="uid + '-rtype'"
+                        [options]="scalarTypeOptions()"
+                        [value]="draft().working.result.type"
+                        [label]="'tplFunctions.result.typeLabel' | transloco"
+                        [describedBy]="uid + '-rtype-hint'"
+                        [disabled]="isReadOnly()"
+                        (valueChange)="onResultTypeChange($event)"
+                      />
+                    </ui-field>
+                  </div>
+
+                  @if (draft().working.result.type === 'DECIMAL') {
+                    <div class="col-span-1 min-w-0">
+                      <ui-field
+                        size="bare"
+                        [for]="uid + '-rdim'"
+                        [label]="'tplFunctions.result.kindLabel' | transloco"
+                        [hint]="'tplFunctions.result.kindHint' | transloco"
+                        [required]="true"
+                      >
+                        <ui-dropdown
+                          class="w-full"
+                          size="field"
+                          [id]="uid + '-rdim'"
+                          [options]="dimensionOptions()"
+                          [value]="draft().working.result.dimension"
+                          [label]="'tplFunctions.result.kindLabel' | transloco"
+                          [describedBy]="uid + '-rdim-hint'"
+                          [disabled]="isReadOnly()"
+                          (valueChange)="onResultDimensionChange($event)"
+                        />
+                      </ui-field>
+                    </div>
+                  }
+
+                  <div class="col-span-1 min-w-0">
+                    <ui-field
+                      size="bare"
+                      [for]="uid + '-rnull'"
+                      [label]="'tplFunctions.result.nullableLabel' | transloco"
+                      [hint]="'tplFunctions.result.nullableHint' | transloco"
+                    >
+                      <div
+                        class="flex h-field items-center"
+                        [class.pointer-events-none]="isReadOnly()"
+                        [class.opacity-drag-source]="isReadOnly()"
+                      >
+                        <ui-checkbox
+                          [checked]="draft().working.result.nullable"
+                          (checkedChange)="onResultNullableChange($event)"
+                        >
+                          {{ 'tplFunctions.result.canBeEmpty' | transloco }}
+                        </ui-checkbox>
+                      </div>
+                    </ui-field>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Expression -->
+              <section class="border-t border-border pt-10">
+                <ui-field
+                  size="bare"
+                  [for]="uid + '-expr-btn'"
+                  [label]="'tplFunctions.expression.label' | transloco"
+                  [hint]="'tplFunctions.expression.hint' | transloco"
+                  [required]="true"
+                  [error]="expressionError()"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface-muted p-8">
+                    <div class="flex min-w-0 flex-1 flex-col gap-4">
+                      <p class="text-12 leading-18 text-text" dir="auto">{{ expressionSummary() }}</p>
+                      <span class="inline-flex h-badge w-fit items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                        <bdi dir="ltr">{{ 'tplFunctions.expression.steps' | transloco: { count: expressionStepCount() } }}</bdi>
+                      </span>
+                    </div>
+
+                    @if (!isReadOnly()) {
+                      <button
+                        [id]="uid + '-expr-btn'"
+                        type="button"
+                        uiButton
+                        variant="secondary"
+                        size="small"
+                        (click)="openFormulaBuilder()"
+                      >
+                        <ng-icon name="tablerMathFunction" size="14" aria-hidden="true" />
+                        {{ 'tplFunctions.expression.edit' | transloco }}
+                      </button>
+                    }
+                  </div>
+                </ui-field>
+              </section>
+            }
+          </form>
+        }
+
+        @case ('tests') {
+          <div class="flex flex-col gap-10">
+            @if (mode() === 'edit' && validationSummary(); as val) {
+              <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+                <div class="flex flex-wrap items-center justify-between gap-8">
+                  <div class="flex items-center gap-8">
+                    <span
+                      class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                      [class]="
+                        validationExpired()
+                          ? 'bg-warning text-on-warning'
+                          : val.state === 'PASSED'
+                            ? 'bg-success text-on-success'
+                            : 'bg-danger text-on-danger'
+                      "
+                    >
+                      {{
+                        (validationExpired()
+                          ? 'tplFunctions.validationStates.EXPIRED'
+                          : 'tplFunctions.validationStates.' + val.state) | transloco
+                      }}
+                    </span>
+                    @if (val.state === 'PASSED') {
+                      <span class="flex items-center gap-4 text-12 leading-18" [class]="validationExpired() ? 'text-warning-text' : 'text-text-muted'">
+                        <ng-icon name="tablerClock" size="14" aria-hidden="true" />
+                        @if (validationExpired()) {
+                          {{ 'tplFunctions.modal.validationExpired' | transloco }}
+                        } @else {
+                          {{ 'tplFunctions.modal.validUntil' | transloco: { time: validUntilTime() } }}
+                        }
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                @if (validationIssues().length > 0) {
+                  <ul class="flex flex-col gap-4 border-t border-border pt-6">
+                    @for (issue of validationIssues(); track $index) {
+                      <li class="flex items-start gap-6 text-12 leading-18 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+                        <span>{{ issueText(issue.code) }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+
+            @if (!workingAvailable()) {
+              <p class="rounded-10 border border-border bg-surface-muted p-10 text-12 leading-18 text-text-muted">
+                {{ 'tplFunctions.modal.readOnlyWorkingNotice' | transloco }}
+              </p>
+            } @else {
+              <div class="flex items-center justify-between gap-8">
+                <div class="flex items-center gap-8">
+                  <h3 class="text-13 leading-18 font-medium text-text">
+                    {{ 'tplFunctions.tests.sectionTitle' | transloco }}
+                  </h3>
+                  <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                    <bdi dir="ltr">{{ 'tplFunctions.tests.count' | transloco: { count: draft().working.tests.length, max: maxTests } }}</bdi>
+                  </span>
+                </div>
+
+                @if (!isReadOnly()) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    [disabled]="draft().working.tests.length >= maxTests"
+                    (click)="addTest()"
+                  >
+                    <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                    {{ 'tplFunctions.tests.add' | transloco }}
+                  </button>
+                }
+              </div>
+
+              <div class="flex flex-col gap-8">
+                @for (test of draft().working.tests; track test.id; let tIdx = $index) {
+                  @let tResult = testResultFor(test.id);
+                  <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+                    <div class="flex items-start gap-8">
+                      <div class="min-w-0 flex-1">
+                        <ui-field
+                          [for]="uid + '-tname-' + test.id"
+                          [label]="'tplFunctions.tests.nameLabel' | transloco"
+                          [hint]="'tplFunctions.tests.nameHint' | transloco"
+                          [required]="true"
+                          [count]="test.name.length"
+                          [max]="100"
+                          [error]="testNameError(test)"
+                        >
+                          <input
+                            [id]="uid + '-tname-' + test.id"
+                            type="text"
+                            maxlength="100"
+                            [readonly]="isReadOnly()"
+                            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                            [placeholder]="'tplFunctions.tests.namePlaceholder' | transloco"
+                            [value]="test.name"
+                            (input)="onTestNameInput(test.id, $event)"
+                          />
+                        </ui-field>
+                      </div>
+
+                      <div class="flex shrink-0 items-center gap-6 pt-16">
+                        @if (tResult) {
+                          <span
+                            class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                            [class]="tResult.state === 'PASSED' ? 'bg-success text-on-success' : 'bg-danger text-on-danger'"
+                          >
+                            {{ ('tplFunctions.validationStates.' + tResult.state) | transloco }}
+                          </span>
+                        }
+                        @if (!isReadOnly()) {
+                          <button
+                            type="button"
+                            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                            [disabled]="draft().working.tests.length <= 1"
+                            [attr.aria-label]="'tplFunctions.tests.remove' | transloco"
+                            [title]="'tplFunctions.tests.remove' | transloco"
+                            (click)="removeTest(test.id)"
+                          >
+                            <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                          </button>
+                        }
+                      </div>
+                    </div>
+
+                    <!-- Parameter argument inputs -->
+                    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+                      @for (param of draft().working.parameters; track $index; let pIdx = $index) {
+                        @let argVal = testArgumentValue(test, param);
+                        <div class="flex flex-col gap-4 rounded-8 border border-border bg-surface p-8">
+                          <div class="flex items-center justify-between gap-6">
+                            <span class="truncate text-12 font-medium text-text" dir="ltr">
+                              {{ param.name || ('tplFunctions.parameters.unnamed' | transloco) }}
+                            </span>
+                            @if (param.nullable) {
+                              <ui-field
+                                size="bare"
+                                class="shrink-0 items-center gap-6"
+                                [style.display]="'flex'"
+                                [label]="'tplFunctions.tests.emptyCheck' | transloco"
+                                [hint]="'tplFunctions.tests.emptyCheckHint' | transloco"
+                              >
+                                <ui-checkbox
+                                  [checked]="argVal.kind === 'NULL'"
+                                  [disabled]="isReadOnly()"
+                                  [aria-label]="'tplFunctions.tests.emptyCheck' | transloco"
+                                  (checkedChange)="onTestArgNullChange(test.id, param, $event)"
+                                />
+                              </ui-field>
+                            }
+                          </div>
+
+                          @if (argVal.kind === 'NULL') {
+                            <p class="text-12 leading-18 text-text-muted">
+                              {{ 'tplFunctions.values.empty' | transloco }}
+                            </p>
+                          } @else {
+                            @switch (param.type) {
+                              @case ('DECIMAL') {
+                                <ui-field
+                                  [for]="uid + '-targ-' + test.id + '-' + pIdx"
+                                  [label]="'tplFunctions.tests.argumentLabel' | transloco"
+                                  [hint]="'tplFunctions.tests.decimalHint' | transloco"
+                                  [error]="valueFieldError(argVal, 'DECIMAL')"
+                                >
+                                  <input
+                                    [id]="uid + '-targ-' + test.id + '-' + pIdx"
+                                    type="text"
+                                    dir="ltr"
+                                    [readonly]="isReadOnly()"
+                                    class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                                    [value]="argVal.kind === 'DECIMAL' ? argVal.value : '0'"
+                                    (input)="onTestArgDecimalInput(test.id, param, $event)"
+                                  />
+                                </ui-field>
+                              }
+                              @case ('STRING') {
+                                <ui-field
+                                  [for]="uid + '-targ-' + test.id + '-' + pIdx"
+                                  [label]="'tplFunctions.tests.argumentLabel' | transloco"
+                                  [hint]="'tplFunctions.tests.textHint' | transloco"
+                                  [error]="valueFieldError(argVal, 'STRING')"
+                                >
+                                  <input
+                                    [id]="uid + '-targ-' + test.id + '-' + pIdx"
+                                    type="text"
+                                    maxlength="1000"
+                                    [readonly]="isReadOnly()"
+                                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                                    [value]="argVal.kind === 'STRING' ? argVal.value : ''"
+                                    (input)="onTestArgTextInput(test.id, param.name, $event)"
+                                  />
+                                </ui-field>
+                              }
+                              @case ('BOOLEAN') {
+                                <ui-field
+                                  size="bare"
+                                  [for]="uid + '-targ-' + test.id + '-' + pIdx"
+                                  [label]="'tplFunctions.tests.argumentLabel' | transloco"
+                                  [hint]="'tplFunctions.tests.booleanHint' | transloco"
+                                >
+                                  <div [class.pointer-events-none]="isReadOnly()">
+                                    <ui-segmented
+                                      [id]="uid + '-targ-' + test.id + '-' + pIdx"
+                                      [options]="boolOptions()"
+                                      [label]="'tplFunctions.tests.argumentLabel' | transloco"
+                                      [describedBy]="uid + '-targ-' + test.id + '-' + pIdx + '-hint'"
+                                      [value]="argVal.kind === 'BOOLEAN' && argVal.value ? 'true' : 'false'"
+                                      (valueChange)="onTestArgBoolChange(test.id, param.name, $event)"
+                                    />
+                                  </div>
+                                </ui-field>
+                              }
+                              @case ('DATE') {
+                                <ui-field
+                                  size="bare"
+                                  [for]="uid + '-targ-' + test.id + '-' + pIdx"
+                                  [label]="'tplFunctions.tests.argumentLabel' | transloco"
+                                  [hint]="'tplFunctions.tests.dateHint' | transloco"
+                                  [error]="valueFieldError(argVal, 'DATE')"
+                                >
+                                  <ui-date-field
+                                    [id]="uid + '-targ-' + test.id + '-' + pIdx"
+                                    [ariaLabel]="'tplFunctions.tests.argumentLabel' | transloco"
+                                    [describedBy]="uid + '-targ-' + test.id + '-' + pIdx + '-hint'"
+                                    [todayLabel]="'tplFunctions.datePicker.today' | transloco"
+                                    [prevMonthLabel]="'tplFunctions.datePicker.prevMonth' | transloco"
+                                    [nextMonthLabel]="'tplFunctions.datePicker.nextMonth' | transloco"
+                                    [disabled]="isReadOnly()"
+                                    [value]="argVal.kind === 'DATE' ? (argVal.value || null) : null"
+                                    (valueChange)="onTestArgDateChange(test.id, param.name, $event)"
+                                  />
+                                </ui-field>
+                              }
+                            }
+                          }
+                        </div>
+                      }
+
+                      <!-- Expected result value -->
+                      <div class="col-span-2 flex flex-col gap-4 rounded-8 border border-border bg-surface p-8">
+                        <div class="flex items-center justify-between gap-6">
+                          <span class="text-12 font-medium text-text">
+                            {{ 'tplFunctions.tests.expectedTitle' | transloco }}
+                          </span>
+                          @if (draft().working.result.nullable) {
+                            <ui-field
+                              size="bare"
+                              class="shrink-0 items-center gap-6"
+                              [style.display]="'flex'"
+                              [label]="'tplFunctions.tests.emptyCheck' | transloco"
+                              [hint]="'tplFunctions.tests.emptyCheckHint' | transloco"
+                            >
+                              <ui-checkbox
+                                [checked]="test.expected.kind === 'NULL'"
+                                [disabled]="isReadOnly()"
+                                [aria-label]="'tplFunctions.tests.emptyCheck' | transloco"
+                                (checkedChange)="onTestExpectedNullChange(test.id, $event)"
+                              />
+                            </ui-field>
+                          }
+                        </div>
+
+                        @if (test.expected.kind === 'NULL') {
+                          <p class="text-12 leading-18 text-text-muted">
+                            {{ 'tplFunctions.values.empty' | transloco }}
+                          </p>
+                        } @else {
+                          @switch (draft().working.result.type) {
+                            @case ('DECIMAL') {
+                              <ui-field
+                                [for]="uid + '-texp-' + test.id"
+                                [label]="'tplFunctions.tests.expectedLabel' | transloco"
+                                [hint]="'tplFunctions.tests.decimalHint' | transloco"
+                                [error]="valueFieldError(test.expected, 'DECIMAL')"
+                              >
+                                <input
+                                  [id]="uid + '-texp-' + test.id"
+                                  type="text"
+                                  dir="ltr"
+                                  [readonly]="isReadOnly()"
+                                  class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                                  [value]="test.expected.kind === 'DECIMAL' ? test.expected.value : '0'"
+                                  (input)="onTestExpectedDecimalInput(test.id, $event)"
+                                />
+                              </ui-field>
+                            }
+                            @case ('STRING') {
+                              <ui-field
+                                [for]="uid + '-texp-' + test.id"
+                                [label]="'tplFunctions.tests.expectedLabel' | transloco"
+                                [hint]="'tplFunctions.tests.textHint' | transloco"
+                                [error]="valueFieldError(test.expected, 'STRING')"
+                              >
+                                <input
+                                  [id]="uid + '-texp-' + test.id"
+                                  type="text"
+                                  maxlength="1000"
+                                  [readonly]="isReadOnly()"
+                                  class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                                  [value]="test.expected.kind === 'STRING' ? test.expected.value : ''"
+                                  (input)="onTestExpectedTextInput(test.id, $event)"
+                                />
+                              </ui-field>
+                            }
+                            @case ('BOOLEAN') {
+                              <ui-field
+                                size="bare"
+                                [for]="uid + '-texp-' + test.id"
+                                [label]="'tplFunctions.tests.expectedLabel' | transloco"
+                                [hint]="'tplFunctions.tests.booleanHint' | transloco"
+                              >
+                                <div [class.pointer-events-none]="isReadOnly()">
+                                  <ui-segmented
+                                    [id]="uid + '-texp-' + test.id"
+                                    [options]="boolOptions()"
+                                    [label]="'tplFunctions.tests.expectedLabel' | transloco"
+                                    [describedBy]="uid + '-texp-' + test.id + '-hint'"
+                                    [value]="test.expected.kind === 'BOOLEAN' && test.expected.value ? 'true' : 'false'"
+                                    (valueChange)="onTestExpectedBoolChange(test.id, $event)"
+                                  />
+                                </div>
+                              </ui-field>
+                            }
+                            @case ('DATE') {
+                              <ui-field
+                                size="bare"
+                                [for]="uid + '-texp-' + test.id"
+                                [label]="'tplFunctions.tests.expectedLabel' | transloco"
+                                [hint]="'tplFunctions.tests.dateHint' | transloco"
+                                [error]="valueFieldError(test.expected, 'DATE')"
+                              >
+                                <ui-date-field
+                                  [id]="uid + '-texp-' + test.id"
+                                  [ariaLabel]="'tplFunctions.tests.expectedLabel' | transloco"
+                                  [describedBy]="uid + '-texp-' + test.id + '-hint'"
+                                  [todayLabel]="'tplFunctions.datePicker.today' | transloco"
+                                  [prevMonthLabel]="'tplFunctions.datePicker.prevMonth' | transloco"
+                                  [nextMonthLabel]="'tplFunctions.datePicker.nextMonth' | transloco"
+                                  [disabled]="isReadOnly()"
+                                  [value]="test.expected.kind === 'DATE' ? (test.expected.value || null) : null"
+                                  (valueChange)="onTestExpectedDateChange(test.id, $event)"
+                                />
+                              </ui-field>
+                            }
+                          }
+                        }
+                      </div>
+                    </div>
+
+                    @if (tResult && tResult.issueCodes.length > 0) {
+                      <ul class="flex flex-col gap-4 border-t border-border pt-6">
+                        @for (code of tResult.issueCodes; track code) {
+                          <li class="flex items-start gap-6 text-12 leading-18 text-danger-text">
+                            <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+                            <span>{{ issueText(code) }}</span>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @case ('versions') {
+          <div class="flex flex-col gap-10">
+            @if (versionsLoading()) {
+              <div class="flex flex-col gap-6" aria-busy="true">
+                @for (item of [1, 2, 3]; track item) {
+                  <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+                }
+              </div>
+            } @else if (versions().length === 0) {
+              <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface-muted p-16 text-center">
+                <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+                  <ng-icon name="tablerHistory" size="18" aria-hidden="true" />
+                </span>
+                <p class="text-13 leading-18 font-medium text-text">
+                  {{ 'tplFunctions.versions.emptyTitle' | transloco }}
+                </p>
+                <p class="text-12 leading-18 text-text-muted">
+                  {{ 'tplFunctions.versions.emptyDescription' | transloco }}
+                </p>
+              </div>
+            } @else {
+              <div class="overflow-x-auto pb-4">
+                <div role="table" [attr.aria-label]="'tplFunctions.versions.tableAria' | transloco">
+                  <div
+                    role="row"
+                    class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav grid-cols-tpl-function-version-row"
+                  >
+                    <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                      {{ 'tplFunctions.versions.columns.version' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'tplFunctions.versions.columns.publishedAt' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'tplFunctions.versions.columns.changeNote' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'tplFunctions.versions.columns.tests' | transloco }}
+                    </span>
+                  </div>
+
+                  @for (ver of versions(); track ver.id) {
+                    @let isCurrent = ver.id === detail()?.publishedVersionId;
+                    @let verDetail = versionDetailsById()[ver.id];
+                    <button
+                      type="button"
+                      role="row"
+                      class="mt-6 grid h-table-row w-full cursor-pointer items-center rounded-10 border border-border bg-surface text-start text-13 leading-18 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong grid-cols-tpl-function-version-row"
+                      (click)="openVersionDetail(ver)"
+                    >
+                      <span role="cell" class="flex min-w-0 items-center gap-6 px-10">
+                        <bdi dir="ltr" class="font-medium">v{{ ver.versionNumber }}</bdi>
+                        @if (isCurrent) {
+                          <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                            {{ 'tplFunctions.versions.current' | transloco }}
+                          </span>
+                        }
+                      </span>
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+                        <span class="truncate">{{ formatDateTime(ver.publishedAt) }}</span>
+                      </span>
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+                        <span class="truncate">{{ ver.changeNote }}</span>
+                      </span>
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 tabular-nums">
+                        @if (verDetail; as vd) {
+                          <bdi dir="ltr">{{ 'tplFunctions.versions.testsSummary' | transloco: { passed: vd.testProof.passedCount, total: vd.testProof.totalCount } }}</bdi>
+                        } @else {
+                          <span class="text-text-muted">—</span>
+                        }
+                      </span>
+                    </button>
+                  }
+                </div>
+              </div>
+
+              @if (versionsHasPrev() || versionsHasNext()) {
+                <div class="flex items-center justify-end gap-4">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+                    [disabled]="!versionsHasPrev() || versionsLoading()"
+                    [attr.aria-label]="'tplFunctions.actions.previousPage' | transloco"
+                    (click)="prevVersionsPage()"
+                  >
+                    <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+                    [disabled]="!versionsHasNext() || versionsLoading()"
+                    [attr.aria-label]="'tplFunctions.actions.nextPage' | transloco"
+                    (click)="nextVersionsPage()"
+                  >
+                    <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        }
+
+        @case ('usage') {
+          <div class="flex flex-col gap-10">
+            <div class="flex flex-wrap items-end justify-between gap-8">
+              <div class="w-tpl-filter-field min-w-0">
+                <ui-field
+                  size="bare"
+                  [for]="uid + '-usage-ver'"
+                  [label]="'tplFunctions.usage.versionFilterLabel' | transloco"
+                  [hint]="'tplFunctions.usage.versionFilterHint' | transloco"
+                >
+                  <ui-dropdown
+                    class="w-full"
+                    size="field"
+                    [id]="uid + '-usage-ver'"
+                    [options]="usageVersionDropdownOptions()"
+                    [value]="usageVersionFilter()"
+                    [label]="'tplFunctions.usage.versionFilterLabel' | transloco"
+                    [describedBy]="uid + '-usage-ver-hint'"
+                    [disabled]="usageLoading()"
+                    (valueChange)="onUsageVersionFilterChange($event)"
+                  />
+                </ui-field>
+              </div>
+
+              @if (canManage() && canUpdateTemplates() && impactTargetVersion(); as targetVer) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  [loading]="openingImpact()"
+                  [disabled]="openingImpact() || usageLoading()"
+                  (click)="openImpactCheck()"
+                >
+                  {{ 'tplFunctions.usage.checkImpact' | transloco: { version: targetVer.versionNumber } }}
+                </button>
+              }
+            </div>
+
+            @if (usageLoading()) {
+              <div class="flex flex-col gap-6" aria-busy="true">
+                @for (item of [1, 2, 3]; track item) {
+                  <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+                }
+              </div>
+            } @else if (usageItems().length === 0) {
+              <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface-muted p-16 text-center">
+                <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+                  <ng-icon name="tablerRoute" size="18" aria-hidden="true" />
+                </span>
+                <p class="text-13 leading-18 font-medium text-text">
+                  {{ 'tplFunctions.usage.emptyTitle' | transloco }}
+                </p>
+                <p class="text-12 leading-18 text-text-muted">
+                  {{ 'tplFunctions.usage.emptyDescription' | transloco }}
+                </p>
+              </div>
+            } @else {
+              <div class="overflow-x-auto pb-4">
+                <div role="table" [attr.aria-label]="'tplFunctions.usage.tableAria' | transloco">
+                  <div
+                    role="row"
+                    class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav grid-cols-tpl-function-usage-row"
+                  >
+                    <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                      {{ 'tplFunctions.usage.columns.template' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'tplFunctions.usage.columns.source' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'tplFunctions.usage.columns.functionVersion' | transloco }}
+                    </span>
+                  </div>
+
+                  @for (row of usageItems(); track row.sourceId + '-' + row.functionVersionId) {
+                    <div
+                      role="row"
+                      class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-13 leading-18 text-text shadow-card grid-cols-tpl-function-usage-row"
+                    >
+                      <span role="cell" class="flex min-w-0 items-center px-10">
+                        <span class="truncate font-medium text-text">{{ row.templateName }}</span>
+                      </span>
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                        <span
+                          class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+                          [class]="row.sourceKind === 'DRAFT' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-on-neutral-soft'"
+                        >
+                          <bdi dir="ltr">
+                            {{
+                              row.sourceKind === 'DRAFT'
+                                ? ('tplFunctions.usage.draftRevision' | transloco: { revision: row.revisionOrVersionNumber })
+                                : ('tplFunctions.usage.publishedVersion' | transloco: { version: row.revisionOrVersionNumber })
+                            }}
+                          </bdi>
+                        </span>
+                      </span>
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+                        {{ versionNumberLabel(row.functionVersionId) }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              @if (usageHasPrev() || usageHasNext()) {
+                <div class="flex items-center justify-end gap-4">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+                    [disabled]="!usageHasPrev() || usageLoading()"
+                    [attr.aria-label]="'tplFunctions.actions.previousPage' | transloco"
+                    (click)="prevUsagePage()"
+                  >
+                    <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+                    [disabled]="!usageHasNext() || usageLoading()"
+                    [attr.aria-label]="'tplFunctions.actions.nextPage' | transloco"
+                    (click)="nextUsagePage()"
+                  >
+                    <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage() && !isArchived() && workingAvailable()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="busy() || loading() || (mode() === 'edit' && !dirty())"
+        (click)="save()"
+      >
+        <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+        {{ 'tplFunctions.actions.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="busy()"
+          (click)="undoChanges()"
+        >
+          {{ 'tplFunctions.actions.undoChanges' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-warning-text">
+          {{ 'tplFunctions.modal.unsavedChanges' | transloco }}
+        </span>
+      }
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [loading]="validating()"
+          [disabled]="validateDisabled()"
+          [title]="validateTooltip()"
+          (click)="runValidate()"
+        >
+          <ng-icon name="tablerShieldCheck" size="15" aria-hidden="true" />
+          {{ 'tplFunctions.actions.validate' | transloco }}
+        </button>
+
+        @if (canPublish()) {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [loading]="publishing()"
+            [disabled]="publishDisabled()"
+            [title]="publishTooltip()"
+            (click)="runPublish()"
+          >
+            <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
+            {{ 'tplFunctions.actions.publish' | transloco }}
+          </button>
+        }
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="busy()"
+        (click)="requestClose()"
+      >
+        {{ (mode() === 'create' ? 'tplFunctions.actions.cancel' : 'tplFunctions.actions.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          class="ms-auto"
+          [loading]="archiving()"
+          [disabled]="busy() || loading()"
+          (click)="runArchiveOrRestore('archive')"
+        >
+          <ng-icon name="tablerArchive" size="15" aria-hidden="true" />
+          {{ 'tplFunctions.actions.archive' | transloco }}
+        </button>
+      }
+    } @else if (canManage() && isArchived()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [loading]="archiving()"
+        [disabled]="busy() || loading()"
+        (click)="runArchiveOrRestore('restore')"
+      >
+        <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+        {{ 'tplFunctions.actions.restore' | transloco }}
+      </button>
+      <button type="button" uiButton variant="ghost" [disabled]="busy()" (click)="requestClose()">
+        {{ 'tplFunctions.actions.close' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'tplFunctions.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<!-- Formula builder (FUNCTION context) -->
+<app-tpl-formula-builder #formula />
+
+<!-- Publish / Archive / Restore reason modal -->
+<app-function-reason-modal #reasonModal />
+
+<!-- Impact & apply-to-drafts modal -->
+<app-function-impact-modal #impactModal (applied)="onImpactModalApplied()" />
+
+<!-- Unsaved changes dialog -->
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'tplFunctions.unsaved.title' | transloco"
+  [text]="'tplFunctions.unsaved.text' | transloco"
+  [saveLabel]="'tplFunctions.unsaved.save' | transloco"
+  [discardLabel]="'tplFunctions.unsaved.discard' | transloco"
+  [cancelLabel]="'tplFunctions.unsaved.cancel' | transloco"
+/>
+
+<!-- 412 Stale revision conflict modal -->
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'tplFunctions.conflict.title' | transloco"
+  [closeLabel]="'tplFunctions.actions.close' | transloco"
+  [dismissable]="false"
+  (closed)="onConflictClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'tplFunctions.conflict.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="reloadFromConflict()">
+      {{ 'tplFunctions.conflict.reload' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="keepChangesAfterConflict()">
+      {{ 'tplFunctions.conflict.keep' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<!-- Read-only Version detail modal (580) -->
+<ui-modal
+  #versionDetailModal
+  size="wide"
+  icon="tablerStack2"
+  tile="bg-icon-blue"
+  [title]="viewingVersion() ? ('tplFunctions.versions.detail.title' | transloco: { version: viewingVersion()!.versionNumber }) : ''"
+  [subtitle]="detail()?.name || ''"
+  [closeLabel]="'tplFunctions.actions.close' | transloco"
+  (closed)="onVersionDetailClosed()"
+>
+  @if (viewingVersion(); as ver) {
+    <div class="flex flex-col gap-10">
+      <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+        <ui-field
+          [for]="uid + '-vdet-num'"
+          [label]="'tplFunctions.versions.detail.versionLabel' | transloco"
+          [hint]="'tplFunctions.versions.detail.versionHint' | transloco"
+        >
+          <input
+            [id]="uid + '-vdet-num'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="'v' + ver.versionNumber"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-vdet-date'"
+          [label]="'tplFunctions.versions.detail.publishedAtLabel' | transloco"
+          [hint]="'tplFunctions.versions.detail.publishedAtHint' | transloco"
+        >
+          <input
+            [id]="uid + '-vdet-date'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="formatDateTime(ver.publishedAt)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-vdet-tests'"
+          [label]="'tplFunctions.versions.detail.testsLabel' | transloco"
+          [hint]="'tplFunctions.versions.detail.testsHint' | transloco"
+        >
+          <input
+            [id]="uid + '-vdet-tests'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="'tplFunctions.versions.testsSummary' | transloco: { passed: ver.testProof.passedCount, total: ver.testProof.totalCount }"
+          />
+        </ui-field>
+
+        <div class="col-span-3">
+          <ui-field
+            size="multiline"
+            [for]="uid + '-vdet-note'"
+            [label]="'tplFunctions.versions.detail.changeNoteLabel' | transloco"
+            [hint]="'tplFunctions.versions.detail.changeNoteHint' | transloco"
+          >
+            <textarea
+              [id]="uid + '-vdet-note'"
+              rows="2"
+              readonly
+              class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none"
+              [value]="ver.changeNote"
+            ></textarea>
+          </ui-field>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-6 border-t border-border pt-8">
+        <span class="text-12 font-medium text-text">
+          {{ 'tplFunctions.versions.detail.parametersTitle' | transloco }}
+        </span>
+        <div class="flex flex-wrap gap-6">
+          @for (p of ver.parameters; track p.name) {
+            <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+              <bdi dir="ltr">{{ p.name }}</bdi>
+              <span>·</span>
+              <span>{{ ('tplFunctions.types.' + p.type) | transloco }}</span>
+              @if (p.type === 'DECIMAL') {
+                <span>({{ ('tplFunctions.dimensions.' + p.dimension) | transloco }})</span>
+              }
+              @if (p.nullable) {
+                <span>· {{ 'tplFunctions.parameters.nullableBadge' | transloco }}</span>
+              }
+            </span>
+          }
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-6 border-t border-border pt-8">
+        <span class="text-12 font-medium text-text">
+          {{ 'tplFunctions.versions.detail.resultTitle' | transloco }}
+        </span>
+        <span class="inline-flex h-badge w-fit items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+          <span>{{ ('tplFunctions.types.' + ver.result.type) | transloco }}</span>
+          @if (ver.result.type === 'DECIMAL') {
+            <span>({{ ('tplFunctions.dimensions.' + ver.result.dimension) | transloco }})</span>
+          }
+          @if (ver.result.nullable) {
+            <span>· {{ 'tplFunctions.parameters.nullableBadge' | transloco }}</span>
+          }
+        </span>
+      </div>
+
+      <div class="border-t border-border pt-8">
+        <ui-field
+          size="bare"
+          [for]="uid + '-vdet-expr'"
+          [label]="'tplFunctions.expression.label' | transloco"
+          [hint]="'tplFunctions.expression.hint' | transloco"
+        >
+          <p
+            [id]="uid + '-vdet-expr'"
+            class="rounded-8 border border-border bg-surface-muted p-8 text-12 leading-18 text-text"
+            dir="auto"
+          >
+            {{ formatExpression(ver.expression) }}
+          </p>
+        </ui-field>
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="closeVersionDetail()">
+      {{ 'tplFunctions.actions.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

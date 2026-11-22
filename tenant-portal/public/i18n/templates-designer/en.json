@@ -1,0 +1,63 @@
+{
+  "node": {
+    "text": "Text",
+    "richText": "Text content",
+    "dataField": "Data field",
+    "image": "Image",
+    "divider": "Line",
+    "spacer": "Spacer",
+    "container": "Section",
+    "row": "Row",
+    "column": "Column",
+    "group": "Group",
+    "staticTable": "Table",
+    "dynamicTable": "Items table",
+    "totals": "Totals",
+    "formula": "Formula",
+    "link": "Link",
+    "button": "Button",
+    "pageBreak": "Page break",
+    "header": "Header",
+    "footer": "Footer",
+    "unsupported": "Unsupported object"
+  },
+  "canvas": {
+    "label": "Design canvas",
+    "selected": "Selected: {{name}}",
+    "moved": "Moved to X {{x}} mm, Y {{y}} mm",
+    "rows": "Up to {{n}} rows · On overflow: reject",
+    "imageUnavailable": "Image unavailable",
+    "formula": "Formula"
+  },
+  "guide": {
+    "alignedWith": "Aligned with {{name}}",
+    "pageCentre": "Centre of page",
+    "margin": "Margin"
+  },
+  "state": {
+    "noPublished": "There is no published version to show yet.",
+    "loadFailed": "Could not load the design.",
+    "retry": "Try again",
+    "reference": "Support reference: {{id}}"
+  },
+  "toasts": {
+    "lockedSkipped": "Locked objects were not changed.",
+    "migrated": "The design was upgraded to the latest format. A recovery copy is kept for 30 days."
+  },
+  "errors": {
+    "editRefused": "This change could not be applied.",
+    "saveInvalid": "The design could not be saved because it is not valid.",
+    "tooLarge": "The design is too large to save.",
+    "schemaChanged": "The data fields changed. The design was reloaded."
+  },
+  "reason": {
+    "readOnly": "You cannot edit this template.",
+    "schemaUnavailable": "Data fields are unavailable right now.",
+    "notInEmail": "Not available in emails.",
+    "printOnly": "Available for printed documents only.",
+    "emailOnly": "Available for emails only.",
+    "absoluteOnly": "Available on a fixed canvas only.",
+    "notInZone": "Not allowed in the header or footer.",
+    "saveFirst": "Save first"
+  }
+}

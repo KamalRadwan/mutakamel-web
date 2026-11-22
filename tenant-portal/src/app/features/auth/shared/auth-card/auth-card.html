@@ -1,0 +1,15 @@
+<main class="relative flex min-h-screen items-center justify-center bg-bg p-16">
+  <ui-preferences class="absolute end-16 top-16" />
+
+  <section class="flex w-login-card flex-col gap-16 rounded-14 border border-border bg-surface p-16 shadow-card">
+    <img [src]="logo()" [alt]="'auth.brand' | transloco" class="mx-auto h-login-logo w-auto" />
+
+    <h1 class="text-center text-16 leading-24 font-medium text-text">{{ title() }}</h1>
+
+    @if (subtitle()) {
+      <p class="text-center text-12 leading-18 text-text-muted">{{ subtitle() }}</p>
+    }
+
+    <ng-content />
+  </section>
+</main>

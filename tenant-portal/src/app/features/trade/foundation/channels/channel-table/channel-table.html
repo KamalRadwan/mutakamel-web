@@ -1,0 +1,164 @@
+@if (loadFailed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeChannels.states.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="retry.emit()">
+      {{ 'tradeChannels.states.retry' | transloco }}
+    </button>
+  </div>
+} @else if (!loading() && rows().length === 0 && !hasAnyChannels()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerBroadcast" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'tradeChannels.empty.title' | transloco: { company: companyName() } }}
+    </p>
+    @if (canManage()) {
+      <button type="button" uiButton variant="primary" (click)="create.emit()">
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        {{ 'tradeChannels.toolbar.new' | transloco }}
+      </button>
+    }
+  </div>
+} @else if (!loading() && rows().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerBroadcast" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">{{ 'tradeChannels.empty.filtered' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="clearSearch.emit()">
+      {{ 'tradeChannels.empty.clear' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'tradeChannels.table.label' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        [class]="'grid ' + gridCols + ' bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav'"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'tradeChannels.table.channel' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tradeChannels.table.type' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tradeChannels.table.status' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tradeChannels.table.branches' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tradeChannels.table.updated' | transloco }}
+        </span>
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'tradeChannels.table.actions' | transloco }}</span>
+        </span>
+      </div>
+
+      @if (loading()) {
+        @for (item of skeletonRows; track item) {
+          <div
+            role="row"
+            aria-hidden="true"
+            [class]="'grid ' + gridCols + ' mt-6 h-table-row rounded-10 border border-border bg-surface shadow-card'"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="size-icon-tile-sm shrink-0 motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+              <span class="flex min-w-0 flex-1 flex-col gap-3">
+                <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-btn-h-sm motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (row of rows(); track row.id) {
+          @let tile = typeTile(row.channelType);
+          @let branchCount = branchCountParts(row.activeBranchCount);
+          <div
+            role="row"
+            tabindex="0"
+            [attr.aria-label]="row.name + ' ' + row.code"
+            [class]="'grid ' + gridCols + ' mt-6 h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong'"
+            (click)="open.emit(row)"
+            (keydown)="onRowKeydown($event, row)"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="tile.tile"
+              >
+                <ng-icon [name]="tile.icon" size="14" aria-hidden="true" />
+              </span>
+              <span class="flex min-w-0 flex-1 flex-col">
+                <span class="truncate text-13 leading-18 font-medium text-text" dir="auto">{{ row.name }}</span>
+                <span class="truncate text-12 leading-16 text-text-muted">
+                  <bdi dir="ltr" class="tabular-nums">{{ row.code }}</bdi>
+                </span>
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-13 leading-18 text-text">{{ typeKeys[row.channelType] | transloco }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span [class]="row.status === 'ACTIVE' ? activeBadgeClass : inactiveBadgeClass">
+                {{ 'tradeChannels.status.' + row.status | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-13 leading-18 text-text">
+                {{ branchCount.before }}@if (branchCount.hasCount) {<bdi dir="ltr" class="tabular-nums">{{ row.activeBranchCount }}</bdi>}{{ branchCount.after }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <bdi dir="ltr" class="truncate text-13 leading-18 text-text-muted tabular-nums">
+                {{ formatUpdated(row.updatedAt) }}
+              </bdi>
+            </span>
+
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border"
+              (click)="$event.stopPropagation()"
+            >
+              <ui-actions-menu
+                [items]="actionItemsById()[row.id] ?? []"
+                [label]="'tradeChannels.actions.label' | transloco: { name: row.name }"
+                (selected)="onAction(row, $event)"
+              />
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}

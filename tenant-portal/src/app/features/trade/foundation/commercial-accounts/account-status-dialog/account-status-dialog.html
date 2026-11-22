@@ -1,0 +1,68 @@
+<ui-modal
+  #modal
+  size="form"
+  [icon]="mode() === 'block' ? 'tablerLock' : 'tablerLockOpen'"
+  [tile]="mode() === 'block' ? 'bg-icon-red' : 'bg-icon-green'"
+  [title]="(mode() === 'block' ? 'tradeAccounts.statusDialog.blockTitle' : 'tradeAccounts.statusDialog.unblockTitle') | transloco"
+  [subtitle]="subtitle()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!saving() && mode() !== 'block'"
+  (closed)="onModalClosed()"
+>
+  <form class="flex flex-col gap-8" (submit)="$event.preventDefault(); submit()">
+    <p class="text-12 leading-18 text-text-muted">
+      {{ (mode() === 'block' ? 'tradeAccounts.statusDialog.blockText' : 'tradeAccounts.statusDialog.unblockText') | transloco }}
+    </p>
+
+    @if (isOpen()) {
+      <app-trade-reason-picker
+        [kind]="reasonKind()"
+        [idPrefix]="uid"
+        [disabled]="saving()"
+        [showErrors]="attempted()"
+        [(value)]="reasonValue"
+      />
+    }
+
+    <ui-field
+      [label]="'tradeAccounts.statusDialog.evidenceLabel' | transloco"
+      [for]="uid + '-evidence'"
+      [hint]="'tradeAccounts.statusDialog.evidenceHint' | transloco"
+      [count]="evidenceRef().length"
+      [max]="maxEvidenceLength"
+    >
+      <input
+        [id]="uid + '-evidence'"
+        type="text"
+        [attr.maxlength]="maxEvidenceLength"
+        [value]="evidenceRef()"
+        [disabled]="saving()"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        (input)="onEvidenceInput($event)"
+      />
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      [variant]="mode() === 'block' ? 'danger' : 'primary'"
+      [loading]="saving()"
+      [disabled]="saving() || !pickerValid()"
+      (click)="submit()"
+    >
+      {{ (mode() === 'block' ? 'tradeAccounts.actions.block' : 'tradeAccounts.actions.unblock') | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestCancel()"
+    >
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

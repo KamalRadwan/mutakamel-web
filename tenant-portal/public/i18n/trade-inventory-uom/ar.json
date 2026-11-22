@@ -1,0 +1,118 @@
+{
+  "toolbar": {
+    "new": "تحويل جديد",
+    "searchItem": "ابحث عن صنف",
+    "searchingItems": "جارٍ البحث عن المنتجات…",
+    "noMatchingItems": "لا توجد منتجات مطابقة.",
+    "searchItemsFailed": "تعذّر البحث عن المنتجات.",
+    "pickItemLabel": "المنتجات المطابقة",
+    "closeSearchList": "إغلاق قائمة المنتجات"
+  },
+  "filter": {
+    "label": "تصفية حسب الحالة",
+    "hint": "صفِّ تحويلات الوحدات حسب الحالة",
+    "all": "الكل",
+    "clear": "مسح التصفية"
+  },
+  "table": {
+    "ariaLabel": "تحويلات وحدات القياس",
+    "item": "الصنف",
+    "conversion": "التحويل",
+    "revision": "المراجعة",
+    "effectiveFrom": "يسري من",
+    "status": "الحالة",
+    "published": "تاريخ النشر",
+    "actions": "الإجراءات",
+    "revisionValue": "م {{n}}",
+    "conversionExpr": "1 {{from}} = {{factor}} {{to}}",
+    "pagination": "صفحات تحويلات الوحدات"
+  },
+  "empty": {
+    "title": "لا توجد تحويلات وحدات بعد",
+    "text": "حدّد كيفية تحويل وحدات البيع أو الشراء البديلة إلى وحدة الأساس للصنف.",
+    "noResults": "لا توجد نتائج",
+    "loadFailed": "تعذّر تحميل تحويلات الوحدات."
+  },
+  "actions": {
+    "open": "فتح",
+    "newRevision": "مراجعة جديدة",
+    "publish": "نشر",
+    "retire": "إيقاف"
+  },
+  "publish": {
+    "title": "نشر المراجعة {{n}}",
+    "confirm": "نشر",
+    "retiresMessage": "النشر يُوقف المراجعة {{n}}.",
+    "firstMessage": "ستستخدم عمليات المخزون الجديدة هذا التحويل.",
+    "done": "نُشرت المراجعة {{n}}"
+  },
+  "retire": {
+    "title": "إيقاف المراجعة {{n}}",
+    "confirm": "إيقاف",
+    "message": "لن تتمكن العمليات الجديدة من استخدام هذا التحويل، وتحتفظ الحركات السابقة به.",
+    "done": "أُوقفت المراجعة {{n}}"
+  },
+  "transitionAlert": {
+    "title": "تعذّر إتمام الإجراء",
+    "TRANSITION_NOT_ALLOWED": "لا يمكن تغيير حالة هذا التحويل حاليًا.",
+    "FUTURE_REPLACEMENT_UNSUPPORTED": "يجب أن يكون البديل ساريًا بالفعل، فاجعل التاريخ الآن أو قبله في مراجعة جديدة.",
+    "EFFECTIVE_FROM_NOT_AFTER_PREDECESSOR": "يجب أن يكون تاريخ السريان بعد تاريخ المراجعة المنشورة حاليًا.",
+    "PUBLISHED_REVISION_EXISTS": "توجد مراجعة منشورة أخرى لهذا الصنف وهذه الوحدة؛ أُعيد تحديث القائمة، فحاول مجددًا.",
+    "CONTENT_HASH_MISMATCH": "تغيّرت هذه المراجعة على الخادم ولم تعد بصمتها مطابقة؛ أعد التحميل وحاول مجددًا."
+  },
+  "modal": {
+    "newTitle": "تحويل جديد",
+    "newRevisionTitle": "مراجعة جديدة",
+    "viewTitle": "التحويل · م {{n}}",
+    "item": "الصنف",
+    "itemHint": "منتج متتبَّع مخزونه.",
+    "fromUnit": "من وحدة",
+    "fromUnitHint": "وحدة البيع أو الشراء الافتراضية للصنف.",
+    "selectFromUnit": "اختر الوحدة",
+    "noOtherUnits": "ليس لهذا الصنف وحدة أخرى للتحويل.",
+    "toUnit": "إلى وحدة",
+    "toUnitHint": "وحدة الأساس للصنف دائمًا.",
+    "numerator": "البسط",
+    "numeratorHint": "عدد صحيح. الوحدة الواحدة تساوي البسط ÷ المقام من وحدة الأساس.",
+    "denominator": "المقام",
+    "denominatorHint": "عدد صحيح، وغالبًا 1.",
+    "effectiveFrom": "يسري من",
+    "effectiveFromHint": "إذا حلّ محل مراجعة منشورة فيجب أن يكون ساريًا بالفعل.",
+    "revision": "المراجعة",
+    "revisionHint": "رقم مراجعة تسلسلي لهذا الصنف وهذه الوحدة.",
+    "status": "الحالة",
+    "statusHint": "الحالة الحالية لهذه المراجعة.",
+    "id": "معرّف المراجعة",
+    "idHint": "المعرّف الفريد لهذه المراجعة.",
+    "publishedAt": "تاريخ النشر",
+    "publishedAtHint": "تاريخ ووقت نشر هذه المراجعة.",
+    "publishedBy": "نُشرت بواسطة",
+    "publishedByHint": "المستخدم الذي نشر هذه المراجعة.",
+    "publishReason": "سبب النشر",
+    "publishReasonHint": "سبب نشر هذه المراجعة.",
+    "retiredAt": "تاريخ الإيقاف",
+    "retiredAtHint": "تاريخ ووقت إيقاف هذه المراجعة.",
+    "retiredBy": "أُوقفت بواسطة",
+    "retiredByHint": "المستخدم الذي أوقف هذه المراجعة.",
+    "retireReason": "سبب الإيقاف",
+    "retireReasonHint": "سبب إيقاف هذه المراجعة.",
+    "preview": "1 {{from}} = {{factor}} {{to}} · 10 {{from}} = {{ten}} {{to}}",
+    "notExact": "(غير دقيق)",
+    "predecessorWarning": "يُحفظ مسودةً، ونشره سيُوقف المراجعة {{n}}.",
+    "createDraft": "إنشاء مسودة",
+    "created": "أُنشئت مسودة المراجعة {{n}}"
+  },
+  "date": {
+    "today": "اليوم",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "hour": "الساعة",
+    "minute": "الدقائق"
+  },
+  "validation": {
+    "positiveInteger": "أدخل عددًا صحيحًا أكبر من الصفر.",
+    "invalidDate": "أدخل تاريخًا ووقتًا صالحين.",
+    "itemNotStockTracked": "اختر منتجًا متتبَّعًا مخزونه.",
+    "nonExactResult": "لا يُنتج هذا المعامل نتيجة دقيقة."
+  }
+}

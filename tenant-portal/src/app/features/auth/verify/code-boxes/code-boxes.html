@@ -1,0 +1,33 @@
+<div
+  dir="ltr"
+  role="group"
+  class="flex items-center justify-center gap-8"
+  [attr.aria-labelledby]="labelledBy() || null"
+  [attr.aria-describedby]="describedBy() || null"
+>
+  @for (i of indexes; track i) {
+    <input
+      #box
+      type="text"
+      inputmode="numeric"
+      pattern="[0-9]*"
+      [attr.maxlength]="i === 0 ? 6 : 1"
+      [attr.id]="i === 0 ? 'verify-code-1' : null"
+      [attr.autocomplete]="i === 0 ? 'one-time-code' : 'off'"
+      [attr.aria-label]="'authVerify.digit' | transloco: { n: i + 1 }"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      [value]="digits()[i]"
+      [disabled]="disabled()"
+      class="size-otp-box rounded-8 border bg-surface-field text-center text-14 font-medium tabular-nums text-text transition-colors duration-fast outline-none disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+      [class]="
+        invalid()
+          ? 'border-danger-border ring-2 ring-danger-halo'
+          : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo-strong'
+      "
+      (focus)="onFocus($event)"
+      (keydown)="onKeydown(i, $event)"
+      (input)="onInput(i, $event)"
+      (paste)="onPaste($event)"
+    />
+  }
+</div>

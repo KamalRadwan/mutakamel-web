@@ -1,0 +1,95 @@
+<ui-modal
+  size="confirm"
+  icon="tablerRocket"
+  tile="bg-icon-blue"
+  [title]="'pricing.publish.title' | transloco: { n: versionNumber() }"
+  [closeLabel]="'governance.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text-muted">
+      {{
+        (startsInFuture() ? 'pricing.publish.textScheduled' : 'pricing.publish.textImmediate')
+          | transloco: { from: formattedStart() }
+      }}
+    </p>
+
+    <ui-field
+      [bare]="true"
+      [label]="'pricing.publish.replacesLabel' | transloco"
+      [for]="uid + '-replaces'"
+      [hint]="'pricing.publish.replacesHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-replaces'"
+        [label]="'pricing.publish.replacesLabel' | transloco"
+        [options]="replaceOptions()"
+        [(value)]="supersedesId"
+        [describedBy]="uid + '-replaces-hint'"
+        [disabled]="submitting()"
+      />
+    </ui-field>
+
+    <ui-field
+      size="multiline"
+      [label]="'pricing.publish.notesLabel' | transloco"
+      [for]="uid + '-notes'"
+      [hint]="'pricing.publish.notesHint' | transloco"
+      [count]="approvalNotes().length"
+      [max]="maxNotesLength"
+    >
+      <textarea
+        [id]="uid + '-notes'"
+        rows="3"
+        [attr.maxlength]="maxNotesLength"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'pricing.publish.notesPlaceholder' | transloco"
+        [value]="approvalNotes()"
+        [disabled]="submitting()"
+        (input)="onNotesInput($event)"
+      ></textarea>
+    </ui-field>
+
+    @if (soloOwnerGovernanceEligible()) {
+      <ui-field
+        [bare]="true"
+        [label]="'pricing.publish.soloOwnerFieldLabel' | transloco"
+        [for]="uid + '-solo'"
+        [hint]="'pricing.publish.soloOwnerHint' | transloco"
+        [required]="isSelfCreated()"
+        [error]="soloError()"
+      >
+        <ui-checkbox [id]="uid + '-solo'" [(checked)]="soloOwnerAttestation">
+          <span class="text-12 leading-18 text-text">{{ 'pricing.publish.soloOwnerLabel' | transloco }}</span>
+        </ui-checkbox>
+      </ui-field>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      (click)="submit()"
+    >
+      {{
+        (startsInFuture() ? 'pricing.publish.scheduleAction' : 'pricing.publish.publishAction')
+          | transloco
+      }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="cancel()"
+    >
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

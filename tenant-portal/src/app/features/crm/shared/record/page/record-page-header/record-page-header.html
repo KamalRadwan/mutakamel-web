@@ -1,0 +1,137 @@
+<div class="flex flex-wrap items-center gap-8 px-10 py-8">
+  @if (hasBackLink()) {
+    <a
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [routerLink]="backLink()"
+      [queryParams]="backQueryParams()"
+      [attr.aria-label]="backLabel() || ('recordPage.back' | transloco)"
+      [title]="backLabel() || ('recordPage.back' | transloco)"
+      (click)="back.emit()"
+    >
+      <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+    </a>
+  } @else {
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="backLabel() || ('recordPage.back' | transloco)"
+      [title]="backLabel() || ('recordPage.back' | transloco)"
+      (click)="back.emit()"
+    >
+      <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+  }
+
+  @if (typeIcon()) {
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="tile()"
+      aria-hidden="true"
+    >
+      <ng-icon [name]="typeIcon()" size="15" />
+    </span>
+  }
+
+  <div class="min-w-0">
+    <h1 class="truncate text-15 leading-22 font-medium text-text">{{ title() }}</h1>
+    @if (subtitle(); as sub) {
+      <p class="truncate text-12 leading-18 text-text-muted">{{ sub }}</p>
+    }
+  </div>
+
+  <ng-content select="[headerBadges]" />
+
+  @if (owner(); as own) {
+    <div
+      class="flex min-w-0 items-center gap-6"
+      [title]="('recordPage.ownerLabel' | transloco) + ': ' + own.name"
+    >
+      @if (own.avatarUrl) {
+        <img
+          [src]="own.avatarUrl"
+          alt=""
+          class="size-avatar shrink-0 rounded-full object-cover"
+          aria-hidden="true"
+        />
+      } @else {
+        <span
+          class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+          aria-hidden="true"
+        >
+          {{ ownerInitials() }}
+        </span>
+      }
+      <span class="truncate text-12 leading-18 text-text">{{ own.name }}</span>
+    </div>
+  }
+
+  <span class="flex-1"></span>
+
+  @if (position(); as pos) {
+    <div class="flex shrink-0 items-center gap-4">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+        [disabled]="pos.index <= 1 || navBusy() || saving() || busy()"
+        [attr.aria-label]="prevLabel() || ('recordPage.nav.prev' | transloco)"
+        [title]="prevLabel() || ('recordPage.nav.prev' | transloco)"
+        (click)="prev.emit()"
+      >
+        <ng-icon name="tablerChevronLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="px-4 text-12 leading-18 text-text-muted tabular-nums">
+        {{ 'recordPage.nav.position' | transloco: { index: pos.index, total: pos.total } }}
+      </span>
+
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+        [disabled]="pos.index >= pos.total || navBusy() || saving() || busy()"
+        [attr.aria-label]="nextLabel() || ('recordPage.nav.next' | transloco)"
+        [title]="nextLabel() || ('recordPage.nav.next' | transloco)"
+        (click)="next.emit()"
+      >
+        <ng-icon name="tablerChevronRight" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+    </div>
+  }
+
+  @if (position() && hasActions()) {
+    <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+  }
+
+  <div class="flex flex-wrap items-center gap-8" [class.hidden]="!hasActions()">
+    <div #primarySlot class="contents"><ng-content select="[headerPrimary]" /></div>
+
+    @if (canEdit() && dirty()) {
+      <button type="button" uiButton variant="ghost" [disabled]="saving() || busy()" (click)="undo.emit()">
+        {{ 'recordPage.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'recordPage.unsavedLabel' | transloco }}</span>
+    }
+
+    @if (showUndoSave()) {
+      <button
+        type="button"
+        uiButton
+        [loading]="saving()"
+        [disabled]="busy()"
+        (click)="save.emit()"
+      >
+        {{ saveLabel() || ('recordPage.save' | transloco) }}
+      </button>
+    }
+
+    @if (showMenu()) {
+      <ui-actions-menu
+        [items]="menuItems()"
+        [label]="actionsLabel() || ('recordPage.actions.label' | transloco)"
+        [noColorLabel]="noColorLabel() || ('recordPage.noColor' | transloco)"
+        (selected)="menuAction.emit($event)"
+      />
+    }
+  </div>
+</div>
+
+<div class="flex flex-wrap items-center gap-6 border-t border-border px-10 py-6 empty:hidden"><ng-content select="[headerRelated]" /></div>

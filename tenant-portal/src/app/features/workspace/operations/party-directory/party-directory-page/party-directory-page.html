@@ -1,0 +1,632 @@
+@if (sessionFailed()) {
+  <app-session-failed-state (retry)="retrySession()" />
+} @else if (!canRead() || forbidden()) {
+  <section class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+    </span>
+    <h1 class="text-16 leading-24 font-medium text-text">{{ 'wsParty.states.forbiddenTitle' | transloco }}</h1>
+    <p class="text-12 leading-18 text-text-muted">{{ 'wsParty.states.forbiddenText' | transloco }}</p>
+    <a uiButton routerLink="/">{{ 'wsParty.states.backToHome' | transloco }}</a>
+  </section>
+} @else {
+  <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+    @if (canManageAny()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        class="shrink-0"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="newMenuOpen() && newMenuSource() === 'toolbar'"
+        (click)="toggleNewMenu($event, $any($event.currentTarget), 'toolbar')"
+      >
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        <span>{{ 'wsParty.newParty' | transloco }}</span>
+        <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+      </button>
+    }
+
+    <div
+      class="flex h-field min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      <span class="inline-flex shrink-0 text-text-muted">
+        <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+      </span>
+      <input
+        #searchInput
+        type="text"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'wsParty.searchPlaceholder' | transloco"
+        [attr.aria-label]="'wsParty.searchPlaceholder' | transloco"
+        [value]="searchDraft()"
+        (input)="onSearchInput($event)"
+        (keydown.enter)="commitSearchNow()"
+        (keydown.escape)="clearSearch()"
+      />
+      @if (searchDraft()) {
+        <button
+          type="button"
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'wsParty.clearSearch' | transloco"
+          [title]="'wsParty.clearSearch' | transloco"
+          (click)="clearSearch(); searchInput.focus()"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </div>
+
+    <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+    <button
+      type="button"
+      class="inline-flex h-btn shrink-0 cursor-pointer items-center gap-6 rounded-8 border px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        filtersOpen() || activeFilterCount() > 0
+          ? 'border-brand bg-brand-soft text-on-brand-soft'
+          : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-surface-muted'
+      "
+      aria-controls="party-directory-filters"
+      [attr.aria-expanded]="filtersOpen()"
+      [attr.aria-pressed]="filtersOpen()"
+      (click)="toggleFilters()"
+    >
+      <ng-icon name="tablerFilter" size="15" aria-hidden="true" />
+      <span>{{ 'wsParty.filters.toggle' | transloco }}</span>
+      @if (activeFilterCount() > 0) {
+        <span class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-brand px-4 text-11 font-medium text-on-brand tabular-nums">
+          <bdi dir="ltr">{{ activeFilterCount() }}</bdi>
+        </span>
+      }
+    </button>
+  </div>
+
+  @if (filtersOpen()) {
+    <section
+      id="party-directory-filters"
+      class="grid shrink-0 grid-cols-1 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface p-10 shadow-card desktop:grid-cols-3 wide:grid-cols-5"
+      [attr.aria-label]="'wsParty.filters.toggle' | transloco"
+    >
+      <ui-field
+        size="bare"
+        for="pd-filter-type"
+        [label]="'wsParty.filters.type' | transloco"
+        [hint]="'wsParty.filters.typeHint' | transloco"
+      >
+        <ui-dropdown
+          id="pd-filter-type"
+          class="w-full"
+          size="field"
+          [options]="typeOptions()"
+          [label]="'wsParty.filters.type' | transloco"
+          [value]="typeFilter()"
+          (valueChange)="setTypeFilter($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        for="pd-filter-status"
+        [label]="'wsParty.filters.status' | transloco"
+        [hint]="'wsParty.filters.statusHint' | transloco"
+      >
+        <ui-dropdown
+          id="pd-filter-status"
+          class="w-full"
+          size="field"
+          [options]="statusOptions()"
+          [label]="'wsParty.filters.status' | transloco"
+          [value]="statusFilter()"
+          (valueChange)="setStatusFilter($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        for="pd-filter-role"
+        [label]="'wsParty.filters.role' | transloco"
+        [hint]="'wsParty.filters.roleHint' | transloco"
+      >
+        <ui-dropdown
+          id="pd-filter-role"
+          class="w-full"
+          size="field"
+          [options]="roleOptions()"
+          [label]="'wsParty.filters.role' | transloco"
+          [value]="roleFilter()"
+          (valueChange)="setRoleFilter($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        for="pd-filter-branch"
+        [label]="'wsParty.filters.branch' | transloco"
+        [hint]="'wsParty.filters.branchHint' | transloco"
+      >
+        <ui-dropdown
+          id="pd-filter-branch"
+          class="w-full"
+          size="field"
+          [options]="branchOptions()"
+          [label]="'wsParty.filters.branch' | transloco"
+          [value]="branchFilter()"
+          (valueChange)="setBranchFilter($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        for="pd-filter-owner"
+        [label]="'wsParty.filters.owner' | transloco"
+        [hint]="'wsParty.filters.ownerHint' | transloco"
+      >
+        <ui-dropdown
+          id="pd-filter-owner"
+          class="w-full"
+          size="field"
+          [options]="ownerOptions()"
+          [label]="'wsParty.filters.owner' | transloco"
+          [value]="ownerFilter()"
+          (valueChange)="setOwnerFilter($event)"
+        />
+      </ui-field>
+    </section>
+  }
+
+  @if (activeFilterChips().length > 0) {
+    <div class="flex shrink-0 flex-wrap items-center gap-6">
+      @for (chip of activeFilterChips(); track chip.key) {
+        <span class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+          <span class="truncate">{{ chip.label }}: {{ chip.valueLabel }}</span>
+          <button
+            type="button"
+            class="inline-flex size-checkbox-size shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="('wsParty.filters.remove' | transloco) + ': ' + chip.label + ': ' + chip.valueLabel"
+            (click)="removeChip(chip.key)"
+          >
+            <ng-icon name="tablerX" size="11" aria-hidden="true" />
+          </button>
+        </span>
+      }
+
+      <button type="button" uiButton variant="ghost" size="small" (click)="clearAllFilters()">
+        {{ 'wsParty.filters.clear' | transloco }}
+      </button>
+    </div>
+  }
+
+  @if (loadFailed() && !loading()) {
+    <section
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+      role="alert"
+    >
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'wsParty.states.loadFailed' | transloco }}</p>
+      @if (errorCorrelationId(); as corrId) {
+        <p class="text-11 leading-16 text-text-muted">
+          {{ 'wsParty.states.referenceLabel' | transloco }} <bdi dir="ltr">{{ corrId }}</bdi>
+        </p>
+      }
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'wsParty.states.retry' | transloco }}
+      </button>
+    </section>
+  } @else if (isFirstUseEmpty()) {
+    <section class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerUsers" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'wsParty.states.emptyFirstUse' | transloco }}</p>
+      @if (canManageAny()) {
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="newMenuOpen() && newMenuSource() === 'empty'"
+          (click)="toggleNewMenu($event, $any($event.currentTarget), 'empty')"
+        >
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          <span>{{ 'wsParty.newParty' | transloco }}</span>
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </button>
+      }
+    </section>
+  } @else if (isFilteredEmpty()) {
+    <section class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <p class="text-12 leading-18 text-text-muted">{{ 'wsParty.states.emptyFiltered' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="clearAllFiltersAndSearch()">
+        {{ 'wsParty.filters.clear' | transloco }}
+      </button>
+    </section>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-bp-wide"
+        [attr.aria-label]="'wsParty.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid grid-cols-ops-party-row-actions h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center px-10" [attr.aria-sort]="ariaSortFor('displayName')">
+            <button
+              type="button"
+              class="flex min-w-0 cursor-pointer items-center gap-4 rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="toggleSort('displayName')"
+            >
+              <span class="truncate">{{ 'wsParty.cols.party' | transloco }}</span>
+              <ng-icon
+                [name]="sortIconFor('displayName')"
+                size="13"
+                class="shrink-0"
+                [class]="sortBy() === 'displayName' ? 'text-on-nav' : 'text-on-nav-muted'"
+                aria-hidden="true"
+              />
+            </button>
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsParty.cols.phone' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsParty.cols.email' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsParty.cols.roles' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsParty.cols.branch' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsParty.cols.owner' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsParty.cols.status' | transloco }}
+          </span>
+
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+            [attr.aria-sort]="ariaSortFor('createdAt')"
+          >
+            <button
+              type="button"
+              class="flex min-w-0 cursor-pointer items-center gap-4 rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="toggleSort('createdAt')"
+            >
+              <span class="truncate">{{ 'wsParty.cols.created' | transloco }}</span>
+              <ng-icon
+                [name]="sortIconFor('createdAt')"
+                size="13"
+                class="shrink-0"
+                [class]="sortBy() === 'createdAt' ? 'text-on-nav' : 'text-on-nav-muted'"
+                aria-hidden="true"
+              />
+            </button>
+          </span>
+
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+            [attr.aria-sort]="ariaSortFor('updatedAt')"
+          >
+            <button
+              type="button"
+              class="flex min-w-0 cursor-pointer items-center gap-4 rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="toggleSort('updatedAt')"
+            >
+              <span class="truncate">{{ 'wsParty.cols.updated' | transloco }}</span>
+              <ng-icon
+                [name]="sortIconFor('updatedAt')"
+                size="13"
+                class="shrink-0"
+                [class]="sortBy() === 'updatedAt' ? 'text-on-nav' : 'text-on-nav-muted'"
+                aria-hidden="true"
+              />
+            </button>
+          </span>
+
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'wsParty.cols.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid grid-cols-ops-party-row-actions h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <span class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
+                <span class="h-badge w-1/2 rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (party of rows(); track party.id) {
+            <div
+              role="row"
+              tabindex="0"
+              class="mt-6 grid grid-cols-ops-party-row-actions h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="openParty(party.id)"
+              (keydown)="onRowKeydown($event, party)"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                @if (partyAvatarSrc(party); as imgSrc) {
+                  <img
+                    [src]="imgSrc"
+                    alt=""
+                    class="size-icon-tile shrink-0 rounded-8 object-cover"
+                    (error)="onImageError(party.id)"
+                  />
+                } @else {
+                  <span
+                    class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-11 font-medium text-on-icon"
+                    [class]="party.partyType === 'ORGANIZATION' ? 'bg-icon-navy' : 'bg-icon-blue'"
+                    aria-hidden="true"
+                  >
+                    {{ partyInitials(party) }}
+                  </span>
+                }
+
+                <span class="flex min-w-0 flex-1 flex-col justify-center">
+                  <button
+                    type="button"
+                    class="min-w-0 cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    (click)="$event.stopPropagation(); openParty(party.id)"
+                  >
+                    {{ party.displayName }}
+                  </button>
+                  <span class="inline-flex h-counter w-fit max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 leading-16 font-medium text-text-muted">
+                    {{ 'wsParty.types.' + party.partyType | transloco }}
+                  </span>
+                </span>
+              </span>
+
+              <span
+                role="cell"
+                class="flex min-w-0 items-center overflow-hidden border-s border-border px-10 text-12"
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
+              >
+                @if (preferredPhone(party); as phone) {
+                  <app-phone-actions [phone]="phone" [source]="phoneSource(party)" />
+                } @else {
+                  <span class="text-12 text-text-muted">—</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (preferredEmail(party); as email) {
+                  <span dir="ltr" class="truncate text-12 text-text" [title]="email">{{ email }}</span>
+                } @else {
+                  <span class="text-12 text-text-muted">—</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-4 overflow-hidden border-s border-border px-10">
+                @if (party.roles.length > 0) {
+                  @for (role of visibleRoles(party); track role.id) {
+                    <span
+                      class="inline-flex h-badge max-w-full shrink-0 items-center gap-4 rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                      [class]="isAppManaged(role) ? 'bg-neutral-soft text-text' : 'bg-brand-soft text-on-brand-soft'"
+                      [attr.title]="roleManagedTitle(role)"
+                    >
+                      @if (isAppManaged(role)) {
+                        <ng-icon name="tablerLock" size="12" class="shrink-0 text-text-muted" aria-hidden="true" />
+                      }
+                      <span>{{ 'wsParty.roles.' + role.roleType | transloco }}</span>
+                    </span>
+                  }
+                  @if (extraRoleCount(party) > 0) {
+                    <span
+                      class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted whitespace-nowrap"
+                      [title]="extraRolesTitle(party)"
+                    >
+                      <bdi dir="ltr">+{{ extraRoleCount(party) }}</bdi>
+                    </span>
+                  }
+                } @else {
+                  <span class="text-12 text-text-muted">—</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12" [class]="party.branchId === null ? 'text-text-muted' : 'text-text'">
+                  {{ branchName(party.branchId) }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                @if (ownerFor(party); as owner) {
+                  <span
+                    class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full text-11 font-medium text-on-icon"
+                    [class]="ownerAvatarTone(owner)"
+                    aria-hidden="true"
+                  >
+                    {{ userInitials(owner) }}
+                  </span>
+                  <span class="truncate text-12 text-text">{{ userFullName(owner) }}</span>
+                } @else {
+                  <span class="text-12 text-text-muted">—</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="statusBadgeClass(party.status)"
+                >
+                  {{ 'wsParty.status.' + party.status | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(party.createdAt) }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(party.updatedAt) }}</span>
+              </span>
+
+              <span
+                role="cell"
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="actionsFor(party)"
+                  [label]="party.displayName"
+                  (selected)="onRowAction(party, $event)"
+                />
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (total() > 0) {
+      <footer class="mt-auto border-t border-border pt-8">
+        <ui-pagination
+          [total]="total()"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          [pageSizes]="pageSizes"
+          [label]="'wsParty.pagination' | transloco"
+          (pageChange)="setPage($event)"
+          (pageSizeChange)="setPageSize($event)"
+        />
+      </footer>
+    }
+  }
+
+  @if (newMenuOpen()) {
+    <ul
+      #newMenuPanel
+      role="menu"
+      class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+      [class.invisible]="!newMenuPlaced()"
+      [style.top.px]="newMenuPlace().top"
+      [style.inset-inline-start.px]="newMenuPlace().start"
+      [attr.aria-label]="'wsParty.newParty' | transloco"
+    >
+      <li role="none">
+        <button
+          #newMenuRow
+          type="button"
+          role="menuitem"
+          class="flex h-menu-item w-full cursor-pointer items-center gap-8 whitespace-nowrap rounded-6 px-8 text-12 text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="chooseNewParty('PERSON')"
+        >
+          <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+            <ng-icon name="tablerUser" size="14" aria-hidden="true" />
+          </span>
+          <span>{{ 'wsParty.types.PERSON' | transloco }}</span>
+        </button>
+      </li>
+      <li role="none">
+        <button
+          #newMenuRow
+          type="button"
+          role="menuitem"
+          class="flex h-menu-item w-full cursor-pointer items-center gap-8 whitespace-nowrap rounded-6 px-8 text-12 text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="chooseNewParty('ORGANIZATION')"
+        >
+          <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon">
+            <ng-icon name="tablerBuilding" size="14" aria-hidden="true" />
+          </span>
+          <span>{{ 'wsParty.types.ORGANIZATION' | transloco }}</span>
+        </button>
+      </li>
+    </ul>
+  }
+
+  <app-party-modal #modal (changed)="reload()" />
+
+  <ui-confirm-dialog
+    #deleteConfirm
+    tone="danger"
+    [title]="'wsParty.confirmDelete.title' | transloco"
+    [text]="'wsParty.confirmDelete.text' | transloco: { name: pendingDeleteParty()?.displayName ?? '' }"
+    [confirmLabel]="'wsParty.confirmDelete.confirm' | transloco"
+    [cancelLabel]="'wsParty.confirmDelete.cancel' | transloco"
+  />
+
+  <ui-modal
+    #inUseDialog
+    size="alert"
+    icon="tablerAlertTriangle"
+    tile="bg-icon-orange"
+    [title]="'wsParty.inUse.title' | transloco"
+    [closeLabel]="'wsParty.inUse.close' | transloco"
+    (closed)="onInUseDialogClosed()"
+  >
+    <p class="text-12 leading-18 text-text-muted">{{ 'wsParty.inUse.text' | transloco }}</p>
+
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="settingInactive()"
+      (click)="confirmSetInactive()"
+    >
+      {{ 'wsParty.inUse.setInactive' | transloco }}
+    </button>
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="settingInactive()"
+      (click)="inUseDialog.close()"
+    >
+      {{ 'wsParty.inUse.cancel' | transloco }}
+    </button>
+  </ui-modal>
+}

@@ -1,0 +1,149 @@
+{
+  "newActivity": "New activity",
+  "searchPlaceholder": "Search activities by subject...",
+  "clearSearch": "Clear search",
+  "filtersToggle": "Filters",
+  "clearFilters": "Clear filters",
+  "viewSwitcher": "View",
+  "views": {
+    "list": "List",
+    "board": "Board",
+    "calendar": "Calendar"
+  },
+  "summary": {
+    "region": "Activity summary",
+    "overdue": "Overdue {{n}}",
+    "today": "Today {{n}}",
+    "upcoming": "Upcoming {{n}}",
+    "completedToday": "Completed today {{n}}"
+  },
+  "sort": {
+    "label": "Sort by due date",
+    "asc": "Oldest first",
+    "desc": "Newest first"
+  },
+  "filters": {
+    "region": "Activity filters",
+    "show": "Show",
+    "showHint": "Switch between activities assigned to you and all activities you are permitted to view.",
+    "myActivities": "My activities",
+    "allVisible": "All I can see",
+    "types": "Types",
+    "typesHint": "Filter activities by one or more activity types.",
+    "allTypes": "All types",
+    "priorities": "Priorities",
+    "prioritiesHint": "Filter activities by one or more priority levels.",
+    "allPriorities": "All priorities",
+    "statuses": "Status",
+    "statusesHint": "Filter activities by status. List view defaults to scheduled and in-progress activities.",
+    "statusesBoardHint": "Board view always shows all four status columns.",
+    "allStatuses": "All statuses",
+    "branch": "Branch",
+    "branchHint": "Limit activities to a specific branch.",
+    "allBranches": "All branches",
+    "recordType": "Record type",
+    "recordTypeHint": "Filters the loaded page by the linked record type.",
+    "allRecordTypes": "All record types",
+    "dueRange": "Due date range",
+    "dueRangeHint": "Filter activities whose due date falls within the selected date range.",
+    "dueRangePlaceholder": "Select date range",
+    "clearDueRange": "Clear due date range",
+    "selectAll": "Select all",
+    "clearAll": "Clear",
+    "moreSelected": "+{{n}}",
+    "overdueActive": "Overdue only",
+    "removeFilter": "Remove {{name}}"
+  },
+  "apps": {
+    "CRM": "CRM",
+    "CORE": "Core",
+    "TRADE": "Trade"
+  },
+  "recordTypes": {
+    "CRM": {
+      "LEAD": "Lead",
+      "CUSTOMER_PROFILE": "Customer",
+      "PARTY": "Party",
+      "OPPORTUNITY": "Opportunity"
+    },
+    "CORE": {
+      "PARTY": "Party"
+    },
+    "TRADE": {
+      "QUOTATION": "Quotation",
+      "SALES_ORDER": "Sales order"
+    }
+  },
+  "table": {
+    "ariaLabel": "Activities list",
+    "paginationLabel": "Activities pagination",
+    "cols": {
+      "type": "Type",
+      "subject": "Subject",
+      "record": "Record",
+      "assignee": "Assignee",
+      "due": "Due",
+      "priority": "Priority",
+      "status": "Status",
+      "actions": "Actions"
+    }
+  },
+  "unavailable": "Unavailable",
+  "unassigned": "Unassigned",
+  "actions": {
+    "menu": "Activity actions",
+    "open": "Open",
+    "complete": "Complete",
+    "cancel": "Cancel",
+    "alreadyClosed": "This activity is already closed.",
+    "noPermission": "You do not have permission for this action."
+  },
+  "board": {
+    "collapse": "Collapse {{status}}",
+    "expand": "Expand {{status}}",
+    "empty": "No activities in this status",
+    "loadMore": "Load more ({{shown}} of {{total}})",
+    "allShown": "All activities shown",
+    "dueSummary": "Overdue {{overdue}}, Today {{today}}, Upcoming {{upcoming}}"
+  },
+  "calendar": {
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today",
+    "more": "+{{count}} more",
+    "dayModalSubtitle": "{{count}} activities",
+    "dayModalSubtitlePlural": {
+      "one": "{{count}} activity",
+      "other": "{{count}} activities"
+    },
+    "truncatedToast": "Only the first 500 activities are shown. Narrow the filters."
+  },
+  "picker": {
+    "title": "Choose a record",
+    "app": "Application",
+    "appHint": "Choose the application that owns the target record.",
+    "recordType": "Record type",
+    "recordTypeHint": "Choose the type of record to link this activity to.",
+    "record": "Record",
+    "recordHint": "Type to search. The first 20 matches are shown.",
+    "searchPlaceholder": "Search records...",
+    "empty": "No matching records found.",
+    "loadFailed": "Could not load records.",
+    "retry": "Try again",
+    "next": "Next",
+    "cancel": "Cancel"
+  },
+  "states": {
+    "forbiddenTitle": "Access denied",
+    "forbiddenText": "You do not have permission to view activities.",
+    "backToHome": "Back to home",
+    "loadFailedTitle": "Could not load activities",
+    "loadFailedText": "Something went wrong while loading activities. Try again.",
+    "reference": "Support reference: {{correlationId}}",
+    "retry": "Try again",
+    "emptyFirstTitle": "No activities yet",
+    "emptyFirstText": "Create your first activity on a CRM, Core, or Trade record.",
+    "emptyFilteredTitle": "No activities match",
+    "emptyFilteredText": "Try adjusting or clearing your filters to see more activities."
+  }
+}

@@ -1,0 +1,376 @@
+{
+  "targets": {
+    "CATALOG_COMPANY_PROFILE": {
+      "label": "Item settings",
+      "hint": "Update company-level sales, purchase, inventory tracking, units, and tax settings for items."
+    },
+    "CATALOG_BRANCH_ASSIGNMENT": {
+      "label": "Branch assortment",
+      "hint": "Assign items to branches with assortment status, fulfilment node, and replenishment policy."
+    }
+  },
+  "fields": {
+    "ITEM_CODE": "Item code",
+    "CAN_SELL": "Can sell",
+    "CAN_PURCHASE": "Can purchase",
+    "TRACK_INVENTORY": "Track inventory",
+    "TRACKING_MODE": "Tracking mode",
+    "DEFAULT_SALES_UOM_CODE": "Default sales unit",
+    "DEFAULT_PURCHASE_UOM_CODE": "Default purchase unit",
+    "TAX_CLASSIFICATION_KEY": "Tax classification",
+    "BRANCH_CODE": "Branch code",
+    "IS_ASSORTED": "Is assorted",
+    "DEFAULT_FULFILLMENT_NODE_CODE": "Default fulfilment node",
+    "REPLENISHMENT_POLICY_KEY": "Replenishment policy"
+  },
+  "transforms": {
+    "NONE": "No transform",
+    "TRIM": "Trim spaces",
+    "NORMALIZE_CODE": "Code (uppercase)",
+    "ENUM_MAP": "Map a value"
+  },
+  "lookups": {
+    "BOOLEAN_V1": "Yes / No words",
+    "TRACKING_MODE_V1": "Tracking mode"
+  },
+  "rowErrors": {
+    "TRADE_IMPORT_REQUIRED_VALUE_MISSING": "Required value is empty",
+    "TRADE_IMPORT_VALUE_INVALID": "Value is not valid",
+    "TRADE_IMPORT_OWNER_COMMAND_FAILED": "Could not save changes to the target record",
+    "TRADE_AUTH_TARGET_DENIED": "You do not have permission to update this record"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "TRADE_IMPORT_SCOPE_MISMATCH": "Imports work inside a company. Choose a company in the scope switcher.",
+    "TRADE_IMPORT_MAPPING_INVALID": "Check the mapping columns, required fields, and transforms.",
+    "TRADE_IMPORT_FILE_TOO_LARGE": "The selected file exceeds the maximum allowed size.",
+    "TRADE_IMPORT_FILE_TYPE_UNSUPPORTED": "Upload a CSV or Excel (.xlsx) file.",
+    "TRADE_IMPORT_SOURCE_IN_USE": "This file cannot be released while an import run is active on it.",
+    "TRADE_IMPORT_RUN_FINISHED": "This import run has already finished.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE": "This import run cannot be started right now.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_RUN_NOT_PREVIEWED": "Wait until the file check finishes before importing.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_NO_VALID_ROWS": "The file has no valid rows to import.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_HAS_INVALID_ROWS": "Fix the invalid rows in the file before starting the import.",
+    "TRADE_IMPORT_FILE_TOO_LARGE_XLSX_OVER_8_MIB": "Excel files must be 8 MB or smaller.",
+    "TRADE_IMPORT_FILE_UNSAFE": "The file is empty or could not be checked. Choose another file.",
+    "TRADE_IMPORT_FILE_UNSAFE_IMPORT_SOURCE_FILE_REQUIRED": "Choose a file to upload.",
+    "TRADE_IMPORT_FILE_REJECTED": "This file can no longer be used. Upload it again.",
+    "TRADE_IMPORT_SOURCE_RELEASE_FORBIDDEN": "This file cannot be released in the current company or branch.",
+    "TRADE_IMPORT_MAPPING_NOT_FOUND": "This import mapping was not found.",
+    "TRADE_IMPORT_RUN_NOT_FOUND": "This import run was not found.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_BULK_JOB_MISSING": "This import has no background job to cancel.",
+    "BULK_JOB_ACTIVE_ACTIVE_JOB_EXISTS": "Another batch operation is already running. Try again when it finishes."
+  },
+  "common": {
+    "none": "—",
+    "company": "Company",
+    "branch": "Branch",
+    "back": "Back",
+    "retry": "Try again",
+    "clearFilters": "Clear filters",
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "open": "Open",
+    "edit": "Edit",
+    "yes": "Yes",
+    "no": "No",
+    "columnsCount": "{{count}} columns",
+    "rowsCount": "{{count}} rows",
+    "versionPrefix": "v{{number}}",
+    "notFound": "Record not found."
+  },
+  "scopeGate": {
+    "tenantBlocked": "Imports work inside a company. Choose a company in the scope switcher."
+  },
+  "mappings": {
+    "toolbar": {
+      "new": "New mapping",
+      "searchPlaceholder": "Search mappings by code or target…",
+      "filterDraft": "Draft",
+      "filterActive": "Active",
+      "reload": "Reload"
+    },
+    "table": {
+      "label": "Import mappings",
+      "code": "Code",
+      "target": "Target",
+      "scope": "Scope",
+      "status": "Status",
+      "published": "Published",
+      "updated": "Last updated",
+      "actions": "Actions"
+    },
+    "menu": {
+      "open": "Open",
+      "edit": "Edit",
+      "importWithMapping": "Import with this mapping",
+      "importNeedsActive": "Publish this mapping before importing."
+    },
+    "empty": {
+      "title": "No import mappings yet.",
+      "filtered": "No mappings match the current search or filter."
+    },
+    "loadFailed": "Could not load import mappings.",
+    "paginationLabel": "Import mappings pages"
+  },
+  "mappingModal": {
+    "title": "New import mapping",
+    "code": "Code",
+    "codeHint": "Unique uppercase code using letters, numbers, and underscores (2 to 80 characters).",
+    "codePlaceholder": "ITEM_SETTINGS",
+    "codeRequired": "Code is required.",
+    "codePattern": "Start with an uppercase letter and use A-Z, 0-9, or _ (2-80 characters).",
+    "codeConflict": "This code is already used, or the mapping could not be created.",
+    "target": "Target",
+    "targetHint": "Choose which Trade records this mapping imports into.",
+    "level": "Level",
+    "levelHint": "Choose whether this mapping applies to the whole company or only the current branch.",
+    "levelCompany": "Company",
+    "levelBranch": "This branch",
+    "submit": "Create mapping",
+    "createdToast": "Import mapping created."
+  },
+  "mappingPage": {
+    "subtitle": "{{target}} · {{scope}} · {{live}}",
+    "noPublished": "No published version",
+    "liveVersion": "Live v{{number}}",
+    "save": "Save",
+    "publish": "Publish",
+    "publishSaveFirst": "Save your column changes before publishing.",
+    "savedToast": "Mapping draft saved.",
+    "publishedToast": "Mapping published.",
+    "tabs": {
+      "label": "Mapping sections",
+      "columns": "Columns",
+      "versions": "Versions"
+    },
+    "versions": {
+      "empty": "No versions yet.",
+      "draft": "Draft",
+      "published": "Published",
+      "notPublished": "Not published yet",
+      "publishedOn": "Published {{date}}",
+      "expand": "Show columns",
+      "collapse": "Hide columns"
+    },
+    "notFound": "Import mapping not found.",
+    "loadFailed": "Could not load the import mapping.",
+    "unsavedTitle": "Unsaved mapping changes",
+    "unsavedText": "Save your column changes before leaving, or discard them.",
+    "unsavedDiscard": "Discard"
+  },
+  "mappingRows": {
+    "help": "The file's first row must have these column names at these positions.",
+    "position": "Position",
+    "positionHint": "1-based column position in the uploaded file (1 to 1,000).",
+    "sourceColumn": "File column name",
+    "sourceColumnHint": "Exact header name in row 1 of the CSV or Excel file.",
+    "sourceColumnPlaceholder": "ItemCode",
+    "targetField": "System field",
+    "targetFieldHint": "Trade field that receives this column's value.",
+    "targetFieldPlaceholder": "Choose field…",
+    "transform": "Transform",
+    "transformHint": "Optional formatting or mapping applied before validating each cell.",
+    "lookup": "Lookup",
+    "lookupHint": "Built-in value table used when mapping text values.",
+    "required": "Required",
+    "requiredHint": "Fail the row if this column value is missing.",
+    "status": "Valid",
+    "remove": "Remove column",
+    "addColumn": "Add column",
+    "complete": "Row complete",
+    "incomplete": "Row incomplete",
+    "errors": {
+      "positionRange": "Position must be between 1 and 1,000.",
+      "positionDuplicate": "Each column position must be unique.",
+      "columnRequired": "File column name is required.",
+      "columnPattern": "Start with a letter and use letters, digits, spaces, _, ., or - (max 100).",
+      "columnDuplicate": "File column names must be unique.",
+      "targetRequired": "Choose a system field.",
+      "missingRequired": "Missing required fields: {{fields}}"
+    }
+  },
+  "runs": {
+    "toolbar": {
+      "new": "New import",
+      "searchPlaceholder": "Search runs by file name…",
+      "reload": "Reload"
+    },
+    "steps": {
+      "label": "Filter runs by status",
+      "hint": "Filter the import runs by status",
+      "all": "All",
+      "inProgress": "In progress",
+      "ready": "Ready to import",
+      "completed": "Completed",
+      "withErrors": "With errors",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "table": {
+      "label": "Import runs",
+      "run": "Run",
+      "mapping": "Mapping",
+      "status": "Status",
+      "rows": "Rows",
+      "fileSize": "File size",
+      "actions": "Actions",
+      "rowsBreakdown": "{{total}} total · {{valid}} valid · {{invalid}} invalid · {{imported}} imported · {{failed}} failed"
+    },
+    "menu": {
+      "openReport": "Open report",
+      "importNow": "Import now",
+      "runAgain": "Run again with a fixed file"
+    },
+    "empty": {
+      "title": "No import runs yet.",
+      "filtered": "No import runs match this status or search."
+    },
+    "loadFailed": "Could not load import runs.",
+    "paginationLabel": "Import runs pages",
+    "startedToast": "Import started in the background."
+  },
+  "wizard": {
+    "title": "New import",
+    "stepsLabel": "Import steps",
+    "steps": {
+      "file": "File",
+      "mapping": "Mapping",
+      "check": "Check",
+      "import": "Import"
+    },
+    "stepperState": {
+      "done": "Completed",
+      "error": "Failed",
+      "current": "Current"
+    },
+    "file": {
+      "label": "Import file",
+      "hint": "Upload a CSV file up to 16 MB or an Excel (.xlsx) file up to 8 MB.",
+      "dropTitle": "Drop a CSV or Excel file here",
+      "dropHint": ".csv up to 16 MB · .xlsx up to 8 MB",
+      "browse": "Choose file",
+      "xlsxTooLarge": "Excel files must be 8 MB or smaller.",
+      "typeError": "Only CSV and Excel (.xlsx) files are supported.",
+      "sizeError": "File must be 16 MB or smaller.",
+      "uploading": "Uploading {{name}}…",
+      "uploaded": "Uploaded and ready for mapping",
+      "removeFile": "Remove file",
+      "csvType": "CSV",
+      "xlsxType": "Excel"
+    },
+    "mapping": {
+      "label": "Mapping",
+      "hint": "Choose an active import mapping that matches the columns in your file.",
+      "placeholder": "Choose a mapping…",
+      "optionFormat": "{{code}} · {{target}}",
+      "noActiveMappings": "No active mappings are published yet. Publish a mapping first.",
+      "expectedHeaders": "Expected file columns",
+      "predecessorLabel": "Continue a previous run",
+      "predecessorHint": "Rows that already succeeded are skipped.",
+      "predecessorNone": "Start fresh (do not skip previous rows)",
+      "predecessorOption": "{{file}} · {{date}}"
+    },
+    "check": {
+      "metaLine": "{{size}} · mapping {{code}}",
+      "checking": "Checking the file in the background. You can close this window; the check continues.",
+      "statRows": "Rows",
+      "statValid": "Valid",
+      "statInvalid": "Invalid",
+      "invalidCaption": "Import starts only when no row is invalid. Fix these rows in the file and upload it again.",
+      "allValid": "All rows passed validation. Continue to start the import.",
+      "tableLabel": "Invalid rows",
+      "colRow": "Row",
+      "colField": "Field",
+      "colProblem": "Problem",
+      "invalidCount": "{{count}} invalid rows",
+      "invalidPagesLabel": "Invalid rows pages",
+      "failedFallback": "The file could not be read.",
+      "chooseAnotherFile": "Choose another file"
+    },
+    "import": {
+      "fileLabel": "File",
+      "mappingLabel": "Mapping",
+      "validRowsLabel": "Valid rows to import",
+      "predecessorLabel": "Continuing from run",
+      "readyCaption": "Starting the import creates a background job. You can track progress in the jobs menu or on the run report page.",
+      "startImport": "Start import",
+      "startedToast": "Import started in the background."
+    },
+    "footer": {
+      "next": "Next",
+      "previous": "Previous",
+      "uploadFixed": "Upload a fixed file",
+      "cancel": "Cancel"
+    },
+    "backgroundToastTitle": "Checking file in the background",
+    "backgroundToastText": "You can open this run anytime from Import runs.",
+    "keptToastTitle": "The checked file is saved as a run"
+  },
+  "runPage": {
+    "subtitle": "Mapping {{code}} · created {{date}}",
+    "startImport": "Start import",
+    "runAgain": "Run again with a fixed file",
+    "cancelRun": "Cancel",
+    "releaseFile": "Release the file",
+    "statRows": "Rows",
+    "statRowsHint": "Total data rows read from the uploaded file.",
+    "statValid": "Valid",
+    "statValidHint": "Rows that passed format and mapping validation.",
+    "statInvalid": "Invalid",
+    "statInvalidHint": "Rows blocked due to validation errors.",
+    "statImported": "Imported",
+    "statImportedHint": "Rows written successfully to Trade.",
+    "statFailed": "Failed",
+    "statFailedHint": "Valid rows whose target update failed during execution.",
+    "progressLabel": "Importing rows…",
+    "progressCounts": "{{done}} / {{total}}",
+    "failureTitle": "Import run failed",
+    "failurePhase": {
+      "PREVIEW": "During file check",
+      "EXECUTE": "During import execution",
+      "DEFAULT": "Run failure"
+    },
+    "downloadResults": "Download results",
+    "filterLabel": "Filter row results",
+    "filters": {
+      "ALL": "All",
+      "VALID": "Valid",
+      "INVALID": "Invalid",
+      "SUCCEEDED": "Imported",
+      "FAILED": "Failed",
+      "SKIPPED": "Skipped"
+    },
+    "cancelConfirm": {
+      "title": "Cancel this import run?",
+      "text": "Rows already imported stay; the rest are skipped.",
+      "confirm": "Cancel run"
+    },
+    "releaseConfirm": {
+      "title": "Release the uploaded file?",
+      "text": "The uploaded file is deleted from storage. Results stay.",
+      "confirm": "Release file"
+    },
+    "cancelledToast": "Cancellation requested for this import run.",
+    "releasedToast": "Uploaded file released from storage.",
+    "startedToast": "Import started in the background.",
+    "notFound": "Import run not found.",
+    "loadFailed": "Could not load the import run.",
+    "filterHint": "Show only the row results with the selected status."
+  },
+  "results": {
+    "tableLabel": "Import run results",
+    "colRow": "Row #",
+    "colStatus": "Status",
+    "colField": "Field",
+    "colProblem": "Problem",
+    "colRecord": "Record",
+    "openItem": "Open item",
+    "empty": "No rows match this filter.",
+    "loadFailed": "Could not load row results.",
+    "paginationLabel": "Run results pages"
+  }
+}

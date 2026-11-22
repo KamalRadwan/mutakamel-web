@@ -1,0 +1,304 @@
+<app-staff-list
+  [addLabel]="'roles.add' | transloco"
+  [showAdd]="canCreate()"
+  [searchPlaceholder]="'roles.search' | transloco"
+  [loading]="loading()"
+  [total]="total()"
+  [filters]="filters()"
+  [sortOptions]="sortOptions()"
+  [search]="search()"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [sort]="sort()"
+  [filterValues]="filterValues()"
+  (searchChange)="onSearchChange($event)"
+  (pageChange)="page.set($event)"
+  (pageSizeChange)="onPageSizeChange($event)"
+  (sortChange)="onSortChange($event)"
+  (filterValuesChange)="onFilterValuesChange($event)"
+  (add)="openCreate()"
+  (reload)="load()"
+>
+  @if (loadError()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCloudOff" size="20" />
+      </span>
+      <p class="text-12 text-danger-text">{{ 'roles.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="load()">
+        {{ 'roles.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'roles.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'roles.cols.role' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'roles.cols.mode' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'roles.cols.branches' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'roles.cols.count' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'roles.cols.users' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'roles.cols.updated' | transloco }}
+          </span>
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'roles.cols.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns"
+              aria-hidden="true"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (role of roles(); track role.id) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumns"
+              (click)="openRole(role)"
+            >
+              <span role="cell" class="flex min-w-0 flex-col justify-center px-10">
+                <span class="flex min-w-0 items-center gap-6">
+                  <button
+                    type="button"
+                    class="min-w-0 cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    (click)="$event.stopPropagation(); openRole(role)"
+                  >
+                    {{ roleName(role) }}
+                  </button>
+                  @if (role.isSystem) {
+                    <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text whitespace-nowrap">
+                      <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+                      {{ 'roles.system' | transloco }}
+                    </span>
+                  }
+                  @if (isAdminRole(role)) {
+                    <span
+                      class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted whitespace-nowrap"
+                      [title]="'roles.adminSeatHint' | transloco"
+                    >
+                      {{ 'roles.adminSeatChip' | transloco }}
+                    </span>
+                  }
+                </span>
+                @if (roleDescription(role); as desc) {
+                  <span class="truncate text-11 leading-16 text-text-muted" [title]="desc">{{ desc }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge max-w-full items-center gap-4 truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="role.permissionMode === 'BRANCH' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text'"
+                >
+                  <ng-icon
+                    [name]="role.permissionMode === 'BRANCH' ? 'tablerBuildingStore' : 'tablerWorld'"
+                    size="11"
+                    class="shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span class="truncate">{{ 'roles.mode.' + role.permissionMode | transloco }}</span>
+                </span>
+              </span>
+
+              <span role="cell" dir="ltr" class="flex min-w-0 items-center border-s border-border px-10 text-12 tabular-nums text-text">
+                {{ role.permissionMode === 'BRANCH' ? role.branchProfileCount : '—' }}
+              </span>
+
+              <span role="cell" dir="ltr" class="flex min-w-0 items-center border-s border-border px-10 text-12 tabular-nums text-text">
+                {{ role.permissionCount }}
+              </span>
+
+              <span role="cell" dir="ltr" class="flex min-w-0 items-center border-s border-border px-10 text-12 tabular-nums text-text">
+                {{ holderCountText(role.id) }}
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(role.updatedAt) }}</span>
+              </span>
+
+              <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
+                <ui-actions-menu
+                  [items]="actionsFor(role)"
+                  [label]="'roles.cols.actions' | transloco"
+                  (selected)="onRowAction(role, $event)"
+                />
+              </span>
+            </div>
+          } @empty {
+            <div role="row">
+              <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+                {{ (hasActiveFilters() ? 'roles.noResults' : 'roles.empty') | transloco }}
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</app-staff-list>
+
+<app-role-modal
+  [canCreate]="canCreate()"
+  [canUpdate]="canUpdate()"
+  [canDelete]="canDelete()"
+  [holderCount]="selectedRoleHolderCount()"
+  (created)="onRoleCreated($event)"
+  (saved)="onRoleSaved()"
+  (deletedRemotely)="onRoleDeletedRemotely()"
+  (deleteRequested)="requestDelete($event)"
+  (permissionsRequested)="onRolePermissionsRequested($event)"
+/>
+
+<app-global-permissions-modal
+  (saved)="onPermissionsSaved()"
+  (branchModeConflict)="load()"
+/>
+
+<app-assign-permissions-wizard (saved)="onPermissionsSaved()" />
+
+<app-blockers-dialog />
+
+<ui-modal
+  #deleteDialog
+  size="confirm"
+  icon="tablerTrash"
+  tile="bg-icon-red"
+  [title]="'roles.delete.title' | transloco: { name: pendingDeleteRole() ? roleName(pendingDeleteRole()!) : '' }"
+  [closeLabel]="'roles.common.close' | transloco"
+  [dismissable]="false"
+  (closed)="onDeleteDialogClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'roles.delete.text' | transloco: { name: pendingDeleteRole() ? roleName(pendingDeleteRole()!) : '' } }}
+    </p>
+    <app-seat-impact [changes]="deleteSeatChanges()" [compact]="true" />
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="danger"
+    (click)="settleDeleteConfirm(true)"
+  >
+    {{ 'roles.common.delete' | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    (click)="settleDeleteConfirm(false)"
+  >
+    {{ 'roles.common.cancel' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-confirm-dialog
+  #convertDialog
+  tone="warning"
+  [title]="'roles.convert.title' | transloco"
+  [text]="
+    'roles.convert.text'
+      | transloco
+        : {
+            name: pendingConvertRole() ? roleName(pendingConvertRole()!) : '',
+            n: pendingConvertRole()?.permissionCount ?? 0,
+          }
+  "
+  [confirmLabel]="'roles.convert.confirm' | transloco"
+  [cancelLabel]="'roles.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #modeChoiceModal
+  size="confirm"
+  icon="tablerShieldLock"
+  tile="bg-icon-violet"
+  [title]="'roles.create.choiceTitle' | transloco"
+  [subtitle]="pendingModeRole() ? roleName(pendingModeRole()!) : ''"
+  [closeLabel]="'roles.common.close' | transloco"
+  (closed)="pendingModeRole.set(null)"
+>
+  <div class="flex flex-col gap-8">
+    <button
+      type="button"
+      class="flex w-full cursor-pointer items-center gap-8 rounded-8 border border-border bg-surface p-8 text-start text-12 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="chooseCreateMode('BRANCH')"
+    >
+      <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+        <ng-icon name="tablerBuildingStore" size="14" aria-hidden="true" />
+      </span>
+      <span class="min-w-0 flex-1">{{ 'roles.create.perBranch' | transloco }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="flex w-full cursor-pointer items-center gap-8 rounded-8 border border-border bg-surface p-8 text-start text-12 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="chooseCreateMode('GLOBAL')"
+    >
+      <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerWorld" size="14" aria-hidden="true" />
+      </span>
+      <span class="min-w-0 flex-1">{{ 'roles.create.workspace' | transloco }}</span>
+    </button>
+  </div>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton variant="ghost" (click)="closeModeChoice()">
+      {{ 'roles.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

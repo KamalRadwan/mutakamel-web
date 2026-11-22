@@ -1,0 +1,137 @@
+<div
+  class="flex h-field items-center gap-4 overflow-hidden rounded-8 border bg-surface-field ps-8 pe-2 text-12 transition-colors duration-fast"
+  [class]="open() ? 'border-focus-ring ring-3 ring-focus-halo-strong' : 'border-border-field hover:border-border-field-hover'"
+  (click)="focus()"
+>
+  <span class="inline-flex shrink-0 text-text-muted">
+    <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+  </span>
+
+  @for (facet of facets(); track facet.field) {
+    <span
+      class="inline-flex h-chip shrink-0 cursor-pointer items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium whitespace-nowrap text-on-brand-soft outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      role="button"
+      tabindex="0"
+      (click)="$event.stopPropagation(); onChipClick(facet)"
+      (keydown.enter)="$event.preventDefault(); $event.stopPropagation(); onChipClick(facet)"
+      (keydown.space)="$event.preventDefault(); $event.stopPropagation(); onChipClick(facet)"
+    >
+      @if (!facet.label) {
+        <ng-icon name="tablerFilter" size="11" aria-hidden="true" />
+      } @else {
+        <span>{{ facet.label }}:</span>
+      }
+      @for (value of facet.values; track value.value; let last = $last) {
+        <span>{{ value.label }}</span>
+        @if (!last) {
+          <span class="font-normal">{{ 'search.or' | transloco }}</span>
+        }
+      }
+      <button
+        type="button"
+        class="-me-4 inline-flex size-icon-tile-sm cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'search.removeNamed' | transloco: { label: facetName(facet) }"
+        (click)="$event.stopPropagation(); remove(facet)"
+      >
+        <ng-icon name="tablerX" size="11" aria-hidden="true" />
+      </button>
+    </span>
+  }
+
+  <input
+    #input
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    class="h-full min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+    [placeholder]="facets().length ? '' : placeholder()"
+    [attr.aria-label]="placeholder()"
+    [attr.aria-expanded]="showList()"
+    aria-autocomplete="list"
+    [attr.aria-controls]="listId"
+    [attr.aria-activedescendant]="activeId()"
+    [value]="text()"
+    (input)="typed($any($event.target).value)"
+    (focus)="onFocus()"
+    (keydown)="keydown($event)"
+  />
+
+  <button
+    type="button"
+    class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [attr.aria-label]="'search.filters' | transloco"
+    (click)="$event.stopPropagation(); open.set(!open())"
+  >
+    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+  </button>
+</div>
+
+@if (showList()) {
+  <ul
+    [id]="listId"
+    role="listbox"
+    class="absolute inset-x-0 top-full z-dropdown mt-4 flex flex-col gap-2 rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+  >
+    @for (row of rows(); track $index; let index = $index) {
+      <li
+        role="option"
+        [id]="optionId(index)"
+        [attr.aria-selected]="index === active()"
+        class="flex h-menu-item cursor-pointer items-center gap-4 rounded-6 px-8 whitespace-nowrap text-text"
+        [class]="(index === active() ? 'bg-row-hover ' : '') + (row.kind === 'option' ? 'ps-tree-indent' : '')"
+        (mouseenter)="active.set(index)"
+        (click)="choose(row)"
+      >
+        @switch (row.kind) {
+          @case ('preset') {
+            <span class="inline-flex text-text-muted"><ng-icon name="tablerFilter" size="14" aria-hidden="true" /></span>
+            <span>{{ row.option.label }}</span>
+          }
+          @case ('option') {
+            <span>{{ row.option.label }}</span>
+          }
+          @case ('field') {
+            @if (row.field.options) {
+              <button
+                type="button"
+                class="-ms-4 inline-flex size-hint-size cursor-pointer items-center justify-center text-text-muted rtl:-scale-x-100"
+                [class.rotate-90]="expanded().has(row.field.id)"
+                [attr.aria-label]="row.field.label"
+                [attr.aria-expanded]="expanded().has(row.field.id)"
+                (click)="$event.stopPropagation(); toggle(row.field.id)"
+              >
+                <ng-icon name="tablerChevronRight" size="12" aria-hidden="true" />
+              </button>
+            } @else {
+              <span class="-ms-4 inline-flex size-hint-size" aria-hidden="true"></span>
+            }
+            <span>{{ 'search.searchIn' | transloco }}</span>
+            <span class="font-medium">{{ row.field.label }}</span>
+            <span>{{ 'search.for' | transloco }}</span>
+            <span class="truncate font-medium text-accent">{{ text() }}</span>
+            @if (row.field.hint ?? row.field.chipHint; as hint) {
+              <span class="ms-auto shrink-0 text-11 text-text-muted">{{ hint }}</span>
+            }
+          }
+        }
+      </li>
+    }
+
+    @if (facets().length) {
+      @if (rows().length) {
+        <li role="separator" class="h-border bg-border"></li>
+      }
+      <li
+        role="option"
+        [id]="optionId(clearAllIndex())"
+        [attr.aria-selected]="active() === clearAllIndex()"
+        class="flex h-menu-item cursor-pointer items-center rounded-6 px-8 text-text-muted hover:bg-row-hover hover:text-text"
+        [class.bg-row-hover]="active() === clearAllIndex()"
+        (mouseenter)="active.set(clearAllIndex())"
+        (click)="clearAll()"
+      >
+        {{ 'search.clearAll' | transloco }}
+      </li>
+    }
+  </ul>
+}

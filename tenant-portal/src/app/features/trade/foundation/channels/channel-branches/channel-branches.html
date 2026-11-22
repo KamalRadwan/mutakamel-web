@@ -1,0 +1,61 @@
+<section class="flex flex-col gap-8">
+  <header class="flex h-table-head items-center gap-6 rounded-10 bg-icon-blue px-10 text-13 leading-18 font-medium text-on-nav">
+    <span class="inline-flex shrink-0 text-on-nav">
+      <ng-icon name="tablerBuilding" size="14" aria-hidden="true" />
+    </span>
+    <h3 class="truncate text-13 leading-18 font-medium text-on-nav">
+      {{ 'tradeChannels.branches.title' | transloco }}
+    </h3>
+  </header>
+
+  @if (mode() === 'create') {
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeChannels.branches.createFirst' | transloco }}</p>
+  } @else {
+    <ul class="flex flex-col gap-6">
+      @for (row of rows(); track row.branch.id) {
+        <li class="flex items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-6">
+            <span class="truncate text-13 leading-18 font-medium text-text" dir="auto">{{ row.name }}</span>
+            @if (row.isCurrent) {
+              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft">
+                {{ 'tradeChannels.branches.current' | transloco }}
+              </span>
+            }
+            @if (row.effectiveActive) {
+              <span [class]="linkedBadgeClass">
+                {{ 'tradeChannels.branches.linked' | transloco }}
+              </span>
+            } @else if (row.link) {
+              <span [class]="inactiveBadgeClass">
+                {{ 'tradeChannels.branches.inactiveLink' | transloco }}
+              </span>
+            } @else {
+              <span [class]="notLinkedBadgeClass">
+                {{ 'tradeChannels.branches.notLinked' | transloco }}
+              </span>
+            }
+          </div>
+
+          <ui-field
+            size="bare"
+            class="shrink-0"
+            [for]="switchId(row.branch.id)"
+            [label]="'tradeChannels.fields.linkActive.label' | transloco"
+            [hint]="'tradeChannels.fields.linkActive.hint' | transloco: { branch: row.name }"
+          >
+            <div class="flex h-field items-center">
+              <ui-switch
+                [id]="switchId(row.branch.id)"
+                [label]="'tradeChannels.fields.linkActive.ariaLabel' | transloco: { branch: row.name }"
+                [describedBy]="switchId(row.branch.id) + '-hint'"
+                [checked]="row.effectiveActive"
+                [disabled]="!canManage() || disabled()"
+                (checkedChange)="onToggle(row.branch.id, $event)"
+              />
+            </div>
+          </ui-field>
+        </li>
+      }
+    </ul>
+  }
+</section>

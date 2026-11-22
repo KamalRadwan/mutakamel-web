@@ -1,0 +1,13 @@
+<app-money-field
+  [currencies]="currencyOptions()"
+  [integerDigits]="limits.valueIntegerDigits"
+  [decimals]="limits.valueDecimals"
+  [amount]="draft().expectedValue || null"
+  [currency]="draft().currencyCode"
+  [readonly]="readonly()"
+  [errors]="moneyErrors()"
+  labelKey="leadSide.value"
+  hintKey="leadSide.valueHint"
+  (amountChange)="onAmountChange($event)"
+  (currencyChange)="onCurrencyChange($event)"
+/>

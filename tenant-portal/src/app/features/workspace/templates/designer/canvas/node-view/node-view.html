@@ -1,0 +1,619 @@
+@if (node(); as n) {
+  @let fStyle = frameStyle();
+  @let bStyle = boxStyle();
+  <div
+    [attr.data-node-id]="n.id"
+    [class]="isAbsolute() ? 'select-none' : 'relative select-none'"
+    [style.position]="fStyle?.position"
+    [style.left]="fStyle?.left"
+    [style.top]="fStyle?.top"
+    [style.width]="fStyle?.width"
+    [style.height]="fStyle?.height"
+    [style.min-height]="fStyle?.minHeight"
+    [style.z-index]="fStyle?.zIndex"
+    [style.transform]="fStyle?.transform"
+    (pointerdown)="onPointerDown($event)"
+    (dblclick)="onDoubleClick($event)"
+  >
+    <div
+      class="relative h-full w-full"
+      [attr.dir]="docDir()"
+      [class]="
+        n.type === 'row'
+          ? 'flex items-stretch'
+          : n.type === 'container' || n.type === 'column' || n.type === 'header' || n.type === 'footer'
+            ? 'flex flex-col'
+            : ''
+      "
+      [style.font-family]="bStyle.fontFamily"
+      [style.font-size]="bStyle.fontSize"
+      [style.font-weight]="bStyle.fontWeight"
+      [style.font-style]="bStyle.fontStyle"
+      [style.text-decoration]="bStyle.textDecoration"
+      [style.line-height]="bStyle.lineHeight"
+      [style.letter-spacing]="bStyle.letterSpacing"
+      [style.color]="bStyle.color"
+      [style.background-color]="bStyle.backgroundColor"
+      [style.text-align]="bStyle.textAlign"
+      [style.padding-block-start]="bStyle.paddingBlockStart"
+      [style.padding-block-end]="bStyle.paddingBlockEnd"
+      [style.padding-inline-start]="bStyle.paddingInlineStart"
+      [style.padding-inline-end]="bStyle.paddingInlineEnd"
+      [style.margin-block-start]="bStyle.marginBlockStart"
+      [style.margin-block-end]="bStyle.marginBlockEnd"
+      [style.margin-inline-start]="bStyle.marginInlineStart"
+      [style.margin-inline-end]="bStyle.marginInlineEnd"
+      [style.gap]="bStyle.gap"
+      [style.border-radius]="bStyle.borderRadius"
+      [style.border]="bStyle.border"
+      [style.opacity]="bStyle.opacity"
+      [style.overflow]="bStyle.overflow"
+      [style.justify-content]="bStyle.justifyContent"
+    >
+      @switch (n.type) {
+        @case ('text') {
+          <div class="whitespace-pre-wrap break-words">{{ n.props.text }}</div>
+        }
+
+        @case ('richText') {
+          <div class="break-words">
+            @for (block of n.props.document.content; track $index) {
+              @switch (block.type) {
+                @case ('paragraph') {
+                  <p [style.text-align]="block.attrs?.textAlign?.toLowerCase() ?? null">
+                    @for (inl of block.content ?? []; track $index) {
+                      @if (inl.type === 'text') {
+                        <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                      } @else if (inl.type === 'variable') {
+                        <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                      } @else if (inl.type === 'hardBreak') {
+                        <br />
+                      }
+                    }
+                  </p>
+                }
+                @case ('heading') {
+                  <div
+                    [style.font-weight]="700"
+                    [style.font-size.em]="block.attrs.level === 1 ? 1.5 : block.attrs.level === 2 ? 1.25 : 1.1"
+                    [style.text-align]="block.attrs.textAlign ? block.attrs.textAlign.toLowerCase() : null"
+                  >
+                    @for (inl of block.content ?? []; track $index) {
+                      @if (inl.type === 'text') {
+                        <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                      } @else if (inl.type === 'variable') {
+                        <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                      } @else if (inl.type === 'hardBreak') {
+                        <br />
+                      }
+                    }
+                  </div>
+                }
+                @case ('bulletList') {
+                  <ul class="list-disc ps-16">
+                    @for (li of block.content; track $index) {
+                      <li>
+                        @for (inl of li.content[0].content ?? []; track $index) {
+                          @if (inl.type === 'text') {
+                            <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                          } @else if (inl.type === 'variable') {
+                            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                          } @else if (inl.type === 'hardBreak') {
+                            <br />
+                          }
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+                @case ('orderedList') {
+                  <ol class="list-decimal ps-16">
+                    @for (li of block.content; track $index) {
+                      <li>
+                        @for (inl of li.content[0].content ?? []; track $index) {
+                          @if (inl.type === 'text') {
+                            <span [class]="markClasses(inl.marks)" [style.font-weight]="markFontWeight(inl.marks)">{{ inl.text }}</span>
+                          } @else if (inl.type === 'variable') {
+                            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(inl.attrs.binding.path) }}»</span>
+                          } @else if (inl.type === 'hardBreak') {
+                            <br />
+                          }
+                        }
+                      </li>
+                    }
+                  </ol>
+                }
+              }
+            }
+          </div>
+        }
+
+        @case ('dataField') {
+          <div [class]="n.props.labelPosition === 'ABOVE' ? 'flex flex-col' : 'inline-block'">
+            @if (n.props.label) {
+              <span [style.color]="paperColors().mutedText">
+                {{ n.props.label }}{{ n.props.labelPosition === 'ABOVE' ? '' : (n.props.separator ?? ': ') }}
+              </span>
+            }
+            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(n.binding.path) }}»</span>
+          </div>
+        }
+
+        @case ('image') {
+          @let asset = assetEntry();
+          @if (asset && asset.status === 'READY' && asset.url) {
+            <img
+              [src]="asset.url"
+              [alt]="n.props.alt || ''"
+              class="pointer-events-none block h-full w-full"
+              [style.object-fit]="(n.style.objectFit ?? 'CONTAIN').toLowerCase()"
+            />
+          } @else if (asset?.status === 'ERROR' || !n.props.assetId) {
+            <div
+              class="flex h-full w-full flex-col items-center justify-center gap-2 rounded-4 border p-4 text-center text-11"
+              [style.border-color]="paperColors().line"
+              [style.background-color]="paperColors().muted"
+              [style.color]="paperColors().mutedText"
+            >
+              <ng-icon name="tablerPhotoOff" size="14" aria-hidden="true" />
+              <span class="truncate max-w-full">{{ 'tplDesigner.canvas.imageUnavailable' | transloco }}</span>
+            </div>
+          } @else {
+            <div class="h-full w-full animate-pulse rounded-4" [style.background-color]="paperColors().muted"></div>
+          }
+        }
+
+        @case ('divider') {
+          <div class="flex h-full w-full items-center">
+            <div class="w-full" [style.border-top-width]="dividerStyle().borderTopWidth" [style.border-top-style]="dividerStyle().borderTopStyle" [style.border-top-color]="dividerStyle().borderTopColor"></div>
+          </div>
+        }
+
+        @case ('spacer') {
+          <div
+            class="w-full"
+            [class]="isSelected() ? 'border border-dashed' : ''"
+            [style.border-color]="isSelected() ? paperColors().line : null"
+            [style.height.px]="isAbsolute() ? null : spacerHeightPx()"
+            [class.h-full]="isAbsolute()"
+          ></div>
+        }
+
+        @case ('container') {
+          @for (childId of n.childIds; track childId) {
+            <app-tpl-node-view
+              [nodeId]="childId"
+              [doc]="doc()"
+              [page]="page()"
+              [zoom]="zoom()"
+              [movingIds]="movingIds()"
+              [dragOffsetPx]="isSelfMoving() ? null : dragOffsetPx()"
+              [resizeOverrideMm]="resizeOverrideMm()"
+              (nodePointerDown)="nodePointerDown.emit($event)"
+              (nodeDoubleClick)="nodeDoubleClick.emit($event)"
+            />
+          }
+        }
+
+        @case ('group') {
+          <div class="relative h-full w-full">
+            @for (childId of n.childIds; track childId) {
+              <app-tpl-node-view
+                [nodeId]="childId"
+                [doc]="doc()"
+                [page]="page()"
+                [zoom]="zoom()"
+                [movingIds]="movingIds()"
+                [dragOffsetPx]="isSelfMoving() ? null : dragOffsetPx()"
+                [resizeOverrideMm]="resizeOverrideMm()"
+                (nodePointerDown)="nodePointerDown.emit($event)"
+                (nodeDoubleClick)="nodeDoubleClick.emit($event)"
+              />
+            }
+          </div>
+        }
+
+        @case ('row') {
+          @for (childId of n.childIds; track childId) {
+            <app-tpl-node-view
+              [nodeId]="childId"
+              [doc]="doc()"
+              [page]="page()"
+              [zoom]="zoom()"
+              [movingIds]="movingIds()"
+              [dragOffsetPx]="isSelfMoving() ? null : dragOffsetPx()"
+              [resizeOverrideMm]="resizeOverrideMm()"
+              (nodePointerDown)="nodePointerDown.emit($event)"
+              (nodeDoubleClick)="nodeDoubleClick.emit($event)"
+            />
+          }
+        }
+
+        @case ('column') {
+          @for (childId of n.childIds; track childId) {
+            <app-tpl-node-view
+              [nodeId]="childId"
+              [doc]="doc()"
+              [page]="page()"
+              [zoom]="zoom()"
+              [movingIds]="movingIds()"
+              [dragOffsetPx]="isSelfMoving() ? null : dragOffsetPx()"
+              [resizeOverrideMm]="resizeOverrideMm()"
+              (nodePointerDown)="nodePointerDown.emit($event)"
+              (nodeDoubleClick)="nodeDoubleClick.emit($event)"
+            />
+          }
+        }
+
+        @case ('header') {
+          <div class="relative flex-1 border border-dashed" [style.border-color]="paperColors().line">
+            <span class="pointer-events-none absolute top-2 start-4 text-11" [style.color]="paperColors().mutedText">
+              {{ 'tplDesigner.node.header' | transloco }}
+            </span>
+            @for (childId of n.childIds; track childId) {
+              <app-tpl-node-view
+                [nodeId]="childId"
+                [doc]="doc()"
+                [page]="page()"
+                [zoom]="zoom()"
+                [movingIds]="movingIds()"
+                [dragOffsetPx]="isSelfMoving() ? null : dragOffsetPx()"
+                [resizeOverrideMm]="resizeOverrideMm()"
+                (nodePointerDown)="nodePointerDown.emit($event)"
+                (nodeDoubleClick)="nodeDoubleClick.emit($event)"
+              />
+            }
+          </div>
+        }
+
+        @case ('footer') {
+          <div class="relative flex-1 border border-dashed" [style.border-color]="paperColors().line">
+            <span class="pointer-events-none absolute top-2 start-4 text-11" [style.color]="paperColors().mutedText">
+              {{ 'tplDesigner.node.footer' | transloco }}
+            </span>
+            @for (childId of n.childIds; track childId) {
+              <app-tpl-node-view
+                [nodeId]="childId"
+                [doc]="doc()"
+                [page]="page()"
+                [zoom]="zoom()"
+                [movingIds]="movingIds()"
+                [dragOffsetPx]="isSelfMoving() ? null : dragOffsetPx()"
+                [resizeOverrideMm]="resizeOverrideMm()"
+                (nodePointerDown)="nodePointerDown.emit($event)"
+                (nodeDoubleClick)="nodeDoubleClick.emit($event)"
+              />
+            }
+          </div>
+        }
+
+        @case ('staticTable') {
+          @if (staticTableData(); as tbl) {
+            <table
+              class="w-full border-collapse table-fixed"
+              [class.h-full]="isAbsolute()"
+              [attr.role]="tbl.hasHeader ? null : 'presentation'"
+            >
+              <colgroup>
+                @for (col of tbl.columns; track col.id) {
+                  <col [style.width]="colWidthCss(col)" />
+                }
+              </colgroup>
+              <tbody>
+                @for (row of tbl.rows; track row.id; let rIdx = $index) {
+                  <tr [style.height.px]="row.heightPx">
+                    @for (slot of row.cells; track slot.id) {
+                      @let cs = cellStyleCss(slot.column, slot.style, rIdx === 0 && !!slot.column.headerStyle, n.props.stripedRows && rIdx % 2 === 1);
+                      <ng-template #staticCellValue>
+                        @switch (slot.value.kind) {
+                          @case ('TEXT') {
+                            <span>{{ slot.value.value }}</span>
+                          }
+                          @case ('BINDING') {
+                            <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(slot.value.binding.path) }}»</span>
+                          }
+                          @case ('FORMULA') {
+                            <span>ƒ {{ formulaLabel(slot.value.expression) }}</span>
+                          }
+                        }
+                      </ng-template>
+                      @if (tbl.hasHeader && rIdx === 0) {
+                        <th
+                          scope="col"
+                          [attr.colspan]="slot.colSpan > 1 ? slot.colSpan : null"
+                          [attr.rowspan]="slot.rowSpan > 1 ? slot.rowSpan : null"
+                          [style.text-align]="cs['textAlign']"
+                          [style.vertical-align]="cs['verticalAlign']"
+                          [style.font-size]="cs['fontSize']"
+                          [style.font-weight]="cs['fontWeight'] ?? 'inherit'"
+                          [style.color]="cs['color']"
+                          [style.background-color]="cs['backgroundColor']"
+                          [style.padding-block-start]="cs['paddingBlockStart']"
+                          [style.padding-block-end]="cs['paddingBlockEnd']"
+                          [style.padding-inline-start]="cs['paddingInlineStart']"
+                          [style.padding-inline-end]="cs['paddingInlineEnd']"
+                          [style.border]="cs['border']"
+                        >
+                          <ng-container [ngTemplateOutlet]="staticCellValue" />
+                        </th>
+                      } @else {
+                        <td
+                          [attr.colspan]="slot.colSpan > 1 ? slot.colSpan : null"
+                          [attr.rowspan]="slot.rowSpan > 1 ? slot.rowSpan : null"
+                          [style.text-align]="cs['textAlign']"
+                          [style.vertical-align]="cs['verticalAlign']"
+                          [style.font-size]="cs['fontSize']"
+                          [style.font-weight]="cs['fontWeight']"
+                          [style.color]="cs['color']"
+                          [style.background-color]="cs['backgroundColor']"
+                          [style.padding-block-start]="cs['paddingBlockStart']"
+                          [style.padding-block-end]="cs['paddingBlockEnd']"
+                          [style.padding-inline-start]="cs['paddingInlineStart']"
+                          [style.padding-inline-end]="cs['paddingInlineEnd']"
+                          [style.border]="cs['border']"
+                        >
+                          <ng-container [ngTemplateOutlet]="staticCellValue" />
+                        </td>
+                      }
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        }
+
+        @case ('dynamicTable') {
+          @let cols = dynamicColumns();
+          <div class="flex h-full w-full flex-col justify-between">
+            <table class="w-full border-collapse table-fixed">
+              <colgroup>
+                @for (col of cols; track col.id) {
+                  <col [style.width]="colWidthCss(col)" />
+                }
+              </colgroup>
+              <thead>
+                <tr>
+                  @for (col of cols; track col.id) {
+                    @let cs = cellStyleCss(col, undefined, true, false);
+                    <th
+                      scope="col"
+                      [style.text-align]="cs['textAlign']"
+                      [style.vertical-align]="cs['verticalAlign']"
+                      [style.font-size]="cs['fontSize']"
+                      [style.font-weight]="cs['fontWeight']"
+                      [style.color]="cs['color']"
+                      [style.background-color]="cs['backgroundColor']"
+                      [style.padding-block-start]="cs['paddingBlockStart']"
+                      [style.padding-block-end]="cs['paddingBlockEnd']"
+                      [style.padding-inline-start]="cs['paddingInlineStart']"
+                      [style.padding-inline-end]="cs['paddingInlineEnd']"
+                      [style.border]="cs['border']"
+                    >
+                      @switch (col.header.kind) {
+                        @case ('TEXT') {
+                          <span>{{ col.header.value }}</span>
+                        }
+                        @case ('BINDING') {
+                          <span class="underline decoration-dotted">«{{ state.fieldLabel(col.header.binding.path) }}»</span>
+                        }
+                        @case ('FORMULA') {
+                          <span>ƒ {{ formulaLabel(col.header.expression) }}</span>
+                        }
+                      }
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (bRow of bandRows(n); track bRow.id) {
+                  <tr>
+                    @for (cell of bRow.cells; track cell.id) {
+                      <td
+                        class="border px-6 py-2 text-11"
+                        [style.border-color]="paperColors().line"
+                        [attr.colspan]="cell.colSpan && cell.colSpan > 1 ? cell.colSpan : null"
+                        [attr.rowspan]="cell.rowSpan && cell.rowSpan > 1 ? cell.rowSpan : null"
+                        [style.color]="cell.style?.color ?? null"
+                        [style.background-color]="cell.style?.backgroundColor ?? null"
+                      >
+                        @switch (cell.value.kind) {
+                          @case ('TEXT') { <span>{{ cell.value.value }}</span> }
+                          @case ('BINDING') { <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(cell.value.binding.path) }}»</span> }
+                          @case ('FORMULA') { <span>ƒ {{ formulaLabel(cell.value.expression) }}</span> }
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+                @for (ghost of [0, 1, 2]; track ghost) {
+                  <tr>
+                    @for (col of cols; track col.id) {
+                      @let cs = cellStyleCss(col, undefined, false, n.props.stripedRows && ghost % 2 === 1);
+                      <td
+                        [style.color]="paperColors().mutedText"
+                        [style.text-align]="cs['textAlign']"
+                        [style.vertical-align]="cs['verticalAlign']"
+                        [style.font-size]="cs['fontSize']"
+                        [style.padding-block-start]="cs['paddingBlockStart']"
+                        [style.padding-block-end]="cs['paddingBlockEnd']"
+                        [style.padding-inline-start]="cs['paddingInlineStart']"
+                        [style.padding-inline-end]="cs['paddingInlineEnd']"
+                        [style.border]="cs['border']"
+                        [style.background-color]="cs['backgroundColor']"
+                      >
+                        @if (isProductImageCol(col)) {
+                          <span
+                            class="inline-flex size-icon-tile-sm items-center justify-center rounded-4"
+                            [style.background-color]="paperColors().muted"
+                            [style.color]="paperColors().mutedText"
+                          >
+                            <ng-icon name="tablerPhoto" size="12" aria-hidden="true" />
+                          </span>
+                        } @else if (dynamicColValue(col); as val) {
+                          @switch (val.kind) {
+                            @case ('TEXT') {
+                              <span>{{ val.value }}</span>
+                            }
+                            @case ('BINDING') {
+                              <span class="underline decoration-dotted">«{{ state.fieldLabel(val.binding.path) }}»</span>
+                            }
+                            @case ('FORMULA') {
+                              <span>ƒ {{ formulaLabel(val.expression) }}</span>
+                            }
+                          }
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+                @for (fRow of footerBandRows(n); track fRow.id) {
+                  <tr>
+                    @for (cell of fRow.cells; track cell.id) {
+                      <td
+                        class="border px-6 py-2 text-11"
+                        [style.border-color]="paperColors().line"
+                        [attr.colspan]="cell.colSpan && cell.colSpan > 1 ? cell.colSpan : null"
+                        [attr.rowspan]="cell.rowSpan && cell.rowSpan > 1 ? cell.rowSpan : null"
+                        [style.color]="cell.style?.color ?? null"
+                        [style.background-color]="cell.style?.backgroundColor ?? null"
+                      >
+                        @switch (cell.value.kind) {
+                          @case ('TEXT') { <span>{{ cell.value.value }}</span> }
+                          @case ('BINDING') { <span class="text-brand-text underline decoration-dotted">«{{ state.fieldLabel(cell.value.binding.path) }}»</span> }
+                          @case ('FORMULA') { <span>ƒ {{ formulaLabel(cell.value.expression) }}</span> }
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+
+            @if (n.props.fixedCanvas; as fc) {
+              <div class="flex justify-end pt-2">
+                <span
+                  class="rounded-4 px-6 py-2 text-11"
+                  [style.background-color]="paperColors().muted"
+                  [style.color]="paperColors().mutedText"
+                >
+                  {{ 'tplDesigner.canvas.rows' | transloco: { n: fc.maxRenderedRows } }}
+                </span>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('totals') {
+          <table role="presentation" class="w-full border-collapse">
+            <tbody>
+              @for (row of n.props.rows; track row.id) {
+                @if (row.visible) {
+                  <tr
+                    [style.color]="row.emphasis === 'GRAND_TOTAL' ? paperColors().surface : null"
+                    [style.background-color]="row.emphasis === 'GRAND_TOTAL' ? paperColors().accent : null"
+                    [style.font-weight]="row.emphasis === 'GRAND_TOTAL' ? 700 : row.emphasis === 'STRONG' ? 600 : 400"
+                  >
+                    <td class="border px-6 py-3 text-start" [style.border-color]="paperColors().line">{{ row.label }}</td>
+                    <td class="border px-6 py-3 text-end" [style.border-color]="paperColors().line">
+                      <span [class]="row.emphasis === 'GRAND_TOTAL' ? 'underline decoration-dotted' : 'text-brand-text underline decoration-dotted'">
+                        «{{ state.fieldLabel(row.binding.path) }}»
+                      </span>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        }
+
+        @case ('formula') {
+          <div class="truncate">ƒ {{ n.name?.trim() || ('tplDesigner.canvas.formula' | transloco) }}</div>
+        }
+
+        @case ('link') {
+          <span class="text-brand-text underline">
+            @for (seg of textTemplateSegments(n.props.label); track $index) {
+              @if (seg.kind === 'TEXT') {
+                <span>{{ seg.value }}</span>
+              } @else {
+                <span class="underline decoration-dotted">«{{ state.fieldLabel(seg.binding.path) }}»</span>
+              }
+            }
+          </span>
+        }
+
+        @case ('button') {
+          @let btn = buttonStyle();
+          <div
+            class="inline-flex items-center justify-center font-medium"
+            [style.background-color]="btn.backgroundColor"
+            [style.color]="btn.color"
+            [style.border-radius]="btn.borderRadius"
+            [style.padding-block-start]="btn.paddingBlockStart"
+            [style.padding-block-end]="btn.paddingBlockEnd"
+            [style.padding-inline-start]="btn.paddingInlineStart"
+            [style.padding-inline-end]="btn.paddingInlineEnd"
+            [style.width]="btn.width"
+          >
+            @for (seg of textTemplateSegments(n.props.label); track $index) {
+              @if (seg.kind === 'TEXT') {
+                <span>{{ seg.value }}</span>
+              } @else {
+                <span>«{{ state.fieldLabel(seg.binding.path) }}»</span>
+              }
+            }
+          </div>
+        }
+
+        @case ('pageBreak') {
+          <div class="my-6 flex items-center gap-8">
+            <span class="h-border flex-1 border-t border-dashed" [style.border-color]="paperColors().line"></span>
+            <span class="text-11" [style.color]="paperColors().mutedText">{{ 'tplDesigner.node.pageBreak' | transloco }}</span>
+            <span class="h-border flex-1 border-t border-dashed" [style.border-color]="paperColors().line"></span>
+          </div>
+        }
+
+        @default {
+          <div
+            class="flex h-full w-full items-center justify-center rounded-4 border border-dashed p-4 text-11"
+            [style.border-color]="paperColors().line"
+            [style.background-color]="paperColors().muted"
+            [style.color]="paperColors().mutedText"
+          >
+            {{ 'tplDesigner.node.unsupported' | transloco }}
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Status indicators (hidden / locked). Physical right on purpose: the designer canvas is dir="ltr". -->
+    @if (n.hidden || (n.locked && isSelected())) {
+      <div class="pointer-events-none absolute top-2 right-2 flex items-center gap-2" aria-hidden="true">
+        @if (n.hidden) {
+          <span
+            class="inline-flex size-counter items-center justify-center rounded-4 border bg-paper shadow-card"
+            [style.color]="paperColors().mutedText"
+            [style.border-color]="paperColors().line"
+          >
+            <ng-icon name="tablerEyeOff" size="12" />
+          </span>
+        }
+        @if (n.locked && isSelected()) {
+          <span
+            class="inline-flex size-counter items-center justify-center rounded-4 border bg-paper shadow-card"
+            [style.color]="paperColors().mutedText"
+            [style.border-color]="paperColors().line"
+          >
+            <ng-icon name="tablerLock" size="12" />
+          </span>
+        }
+      </div>
+    }
+
+    <!-- Selection outline -->
+    @if (isSelected()) {
+      <div class="pointer-events-none absolute inset-0 border border-brand" aria-hidden="true"></div>
+    }
+  </div>
+}

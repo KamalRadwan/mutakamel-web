@@ -1,0 +1,91 @@
+<ui-modal
+  size="form"
+  [icon]="mode() === 'cancel' ? 'tablerAlertTriangle' : 'tablerCheck'"
+  [tile]="mode() === 'cancel' ? 'bg-icon-red' : 'bg-icon-green'"
+  [title]="(mode() === 'cancel' ? 'activities.cancel.title' : 'activities.complete.title') | transloco"
+  [closeLabel]="'toast.close' | transloco"
+  [dismissable]="mode() === 'complete' && !busy()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-8">
+    @if (activity(); as current) {
+      <div class="flex items-center gap-8 rounded-10 border border-border bg-surface-muted p-8">
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="typeLook().tile"
+        >
+          <ng-icon [name]="typeLook().icon" size="14" aria-hidden="true" />
+        </span>
+        <div class="flex min-w-0 flex-1 flex-col">
+          <span class="truncate text-13 leading-18 font-medium text-text">{{ current.subject }}</span>
+          <span class="truncate text-12 leading-18 text-text-muted">
+            {{ ('activities.types.' + current.type) | transloco }} · {{ dueText() }}
+          </span>
+        </div>
+      </div>
+    }
+
+    <div class="flex flex-wrap items-center gap-6">
+      @for (template of templates(); track template) {
+        <button
+          type="button"
+          class="inline-flex h-btn-h-sm cursor-pointer items-center rounded-6 px-8 text-11 leading-16 font-medium outline-none transition-colors duration-fast ease-enter focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [class]="
+            isChosen(template)
+              ? 'bg-brand-soft text-on-brand-soft'
+              : 'bg-neutral-soft text-on-neutral-soft hover:bg-border'
+          "
+          [attr.aria-pressed]="isChosen(template)"
+          [disabled]="busy()"
+          (click)="applyTemplate(template)"
+        >
+          {{ templateKey(template) | transloco }}
+        </button>
+      }
+    </div>
+
+    <ui-field
+      for="activity-outcome-text"
+      size="multiline"
+      [label]="fieldLabel()"
+      [hint]="(mode() === 'cancel' ? 'activities.hints.cancelReason' : 'activities.hints.completeOutcome') | transloco"
+      [count]="text().length"
+      [max]="maxLength"
+      [error]="overLimit() ? ('activities.validation.maxLength' | transloco: { max: maxLength }) : null"
+    >
+      <textarea
+        #textarea
+        id="activity-outcome-text"
+        rows="4"
+        class="min-w-0 flex-1 resize-y bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed"
+        [value]="text()"
+        [disabled]="busy()"
+        [attr.aria-invalid]="overLimit() || null"
+        [attr.aria-describedby]="overLimit() ? 'activity-outcome-text-hint activity-outcome-text-error' : 'activity-outcome-text-hint'"
+        (input)="onInput($event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    [variant]="mode() === 'cancel' ? 'danger' : 'primary'"
+    [loading]="busy()"
+    [disabled]="busy() || overLimit()"
+    (click)="confirm()"
+  >
+    {{ (mode() === 'cancel' ? 'activities.cancel.confirm' : 'activities.complete.confirm') | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="busy()"
+    (click)="cancel()"
+  >
+    {{ (mode() === 'cancel' ? 'activities.cancel.keep' : 'activities.form.cancel') | transloco }}
+  </button>
+</ui-modal>

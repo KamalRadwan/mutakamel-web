@@ -1,0 +1,35 @@
+{
+  "vsPrevious": "vs previous period",
+  "vsLastYear": "vs same period last year",
+  "ofTarget": "{{pct}} · Target {{target}}",
+  "rank": "Rank",
+  "metric": "Metric",
+  "actual": "Actual",
+  "target": "Target",
+  "statusLabel": "Status",
+  "status": {
+    "ON_TRACK": "On track",
+    "AT_RISK": "At risk",
+    "OFF_TRACK": "Off track",
+    "UNKNOWN": "Unknown"
+  },
+  "severity": {
+    "CRITICAL": "Critical",
+    "WARNING": "Warning",
+    "INFO": "Info",
+    "SUCCESS": "Resolved"
+  },
+  "triggered": "Triggered",
+  "total": "Total",
+  "noTarget": "No target",
+  "items": "{{count}} items",
+  "itemsZero": "No items",
+  "itemsOne": "1 item",
+  "itemsTwo": "{{count}} items",
+  "itemsFew": "{{count}} items",
+  "itemsMany": "{{count}} items",
+  "itemsOther": "{{count}} items",
+  "partialAccess": "Some records are hidden by your access",
+  "moreRows": "More rows available",
+  "moreCurrencies": "More currencies"
+}

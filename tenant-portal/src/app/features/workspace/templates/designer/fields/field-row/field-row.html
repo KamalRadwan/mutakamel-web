@@ -1,0 +1,74 @@
+<button
+  #rowBtn
+  type="button"
+  role="option"
+  [attr.data-field-path]="field().path"
+  [attr.aria-selected]="selected()"
+  [attr.aria-disabled]="disabled() ? 'true' : null"
+  [attr.aria-describedby]="tooltipVisible() && disabled() && disabledReason() ? tipId : null"
+  class="flex h-table-row w-full items-center gap-8 rounded-8 px-6 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  [class]="
+    disabled()
+      ? 'cursor-not-allowed opacity-drag-source'
+      : selected()
+        ? 'cursor-pointer bg-brand-soft'
+        : highlighted()
+          ? 'cursor-pointer bg-row-hover'
+          : 'cursor-pointer hover:bg-row-hover'
+  "
+  (mouseenter)="showTooltip()"
+  (mouseleave)="hideTooltip()"
+  (focus)="showTooltip()"
+  (blur)="hideTooltip()"
+  (click)="onActivate()"
+>
+  <span
+    class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+    [class]="visual().tile"
+  >
+    <ng-icon [name]="visual().icon" size="14" aria-hidden="true" />
+  </span>
+
+  <span class="flex min-w-0 flex-1 flex-col">
+    <span
+      class="truncate text-12 leading-16 font-medium"
+      [class]="selected() ? 'text-brand-text' : 'text-text'"
+    >
+      {{ label() }}
+    </span>
+    <span class="truncate text-11 leading-16 text-text-muted">
+      <bdi dir="ltr">{{ field().path }}</bdi>
+    </span>
+  </span>
+
+  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+    {{ typeLabel() }}
+  </span>
+
+  @if (isObject()) {
+    <span class="inline-flex size-icon-btn shrink-0 items-center justify-center text-text-muted">
+      <ng-icon name="tablerChevronRight" size="14" class="rtl:rotate-180" aria-hidden="true" />
+    </span>
+  } @else {
+    <span
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium"
+      [class]="isRequired() ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text-muted'"
+    >
+      {{ isRequired() ? requiredLabel() : optionalLabel() }}
+    </span>
+  }
+</button>
+
+@if (tooltipVisible() && disabled() && disabledReason(); as reason) {
+  <div
+    #tooltipEl
+    [id]="tipId"
+    role="tooltip"
+    class="pointer-events-none fixed z-tooltip max-w-tpl-tooltip rounded-8 bg-tooltip-bg px-8 py-4 text-11 leading-16 text-on-tooltip shadow-popover"
+    [class.opacity-0]="!tooltipPlaced()"
+    [style.top.px]="tooltipTop()"
+    [style.inset-inline-start.px]="tooltipStart()"
+  >
+    {{ reason }}
+  </div>
+}

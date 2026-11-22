@@ -1,0 +1,191 @@
+@let micBadge = micPermissionBadge();
+@let canChooseOutput = phone.devices().canChooseOutput;
+@let prefs = phone.prefs();
+@let notifyPerm = phone.notifyPermission();
+
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+  <div class="flex items-center gap-6">
+    <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+      <ng-icon name="tablerMicrophone" size="14" aria-hidden="true" />
+    </span>
+    <span class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.settings.mic.label' | transloco }}
+    </span>
+    <span
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+      [class]="micBadge.classes"
+    >
+      {{ micBadge.labelKey | transloco }}
+    </span>
+    @if (phone.micPermission() !== 'granted') {
+      <button
+        [id]="uid + '-mic-perm-btn'"
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        class="shrink-0"
+        (click)="phone.requestMicPermission()"
+      >
+        {{ 'phoneCalls.settings.micPermission.allowShort' | transloco }}
+      </button>
+    }
+  </div>
+
+  <ui-field
+    [for]="uid + '-mic'"
+    [label]="'phoneCalls.settings.device.label' | transloco"
+    [hint]="'phoneCalls.settings.mic.hint' | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      [id]="uid + '-mic'"
+      size="field"
+      [label]="'phoneCalls.settings.device.label' | transloco"
+      [options]="micOptions()"
+      [value]="selectedMicId()"
+      (valueChange)="onMicChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    [for]="uid + '-mic-level'"
+    [label]="'phoneCalls.settings.level.label' | transloco"
+    [hint]="'phoneCalls.settings.micLevel.hint' | transloco"
+    [bare]="true"
+  >
+    <div
+      [id]="uid + '-mic-level'"
+      role="meter"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="micLevelPct()"
+      [attr.aria-label]="'phoneCalls.settings.micLevel.label' | transloco"
+      [attr.aria-describedby]="uid + '-mic-level-hint'"
+      class="flex h-status-bar w-full overflow-hidden rounded-2 bg-neutral-soft"
+    >
+      <div class="h-full bg-success transition-all duration-fast" [style.width.%]="micLevelPct()"></div>
+    </div>
+  </ui-field>
+</section>
+
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+  <div class="flex items-center gap-6">
+    <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+      <ng-icon name="tablerVolume" size="14" aria-hidden="true" />
+    </span>
+    <span class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.settings.speaker.label' | transloco }}
+    </span>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      size="small"
+      class="shrink-0"
+      (click)="phone.testSpeaker()"
+    >
+      <ng-icon name="tablerVolume" size="14" aria-hidden="true" />
+      <span>{{ 'phoneCalls.settings.speakerVolume.test' | transloco }}</span>
+    </button>
+  </div>
+
+  <ui-field
+    [for]="uid + '-speaker'"
+    [label]="'phoneCalls.settings.device.label' | transloco"
+    [hint]="(canChooseOutput ? 'phoneCalls.settings.speaker.hint' : 'phoneCalls.settings.speaker.unsupportedHint') | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      [id]="uid + '-speaker'"
+      size="field"
+      [label]="'phoneCalls.settings.device.label' | transloco"
+      [options]="outputOptions()"
+      [value]="selectedSpeakerId()"
+      [disabled]="!canChooseOutput"
+      (valueChange)="onSpeakerChange($event)"
+    />
+  </ui-field>
+</section>
+
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+  <div class="flex items-center gap-6">
+    <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerBell" size="14" aria-hidden="true" />
+    </span>
+    <span class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.settings.ringAlerts' | transloco }}
+    </span>
+  </div>
+
+  <ui-field
+    [for]="uid + '-ring-device'"
+    [label]="'phoneCalls.settings.ringDevice.label' | transloco"
+    [hint]="(canChooseOutput ? 'phoneCalls.settings.ringDevice.hint' : 'phoneCalls.settings.ringDevice.unsupportedHint') | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      [id]="uid + '-ring-device'"
+      size="field"
+      [label]="'phoneCalls.settings.ringDevice.label' | transloco"
+      [options]="outputOptions()"
+      [value]="selectedRingId()"
+      [disabled]="!canChooseOutput"
+      (valueChange)="onRingChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    [for]="uid + '-ring-volume'"
+    [label]="'phoneCalls.settings.ringVolume.label' | transloco"
+    [hint]="'phoneCalls.settings.ringVolume.hint' | transloco"
+    [bare]="true"
+  >
+    <ui-segmented
+      class="devices-segmented"
+      [id]="uid + '-ring-volume'"
+      [label]="'phoneCalls.settings.ringVolume.label' | transloco"
+      [options]="ringVolumeOptions()"
+      [value]="prefs.ringVolume"
+      (valueChange)="onRingVolumeChange($event)"
+    />
+  </ui-field>
+
+  <div class="flex flex-col gap-4">
+    <ui-field
+      class="devices-inline-field"
+      [for]="uid + '-notifications'"
+      [label]="'phoneCalls.settings.notifications.label' | transloco"
+      [hint]="'phoneCalls.settings.notifications.hint' | transloco"
+      [bare]="true"
+    >
+      <div class="flex items-center gap-6">
+        @if (notifyPerm === 'default') {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            (click)="onAllowNotifications()"
+          >
+            {{ 'phoneCalls.settings.notifications.allow' | transloco }}
+          </button>
+        }
+        <ui-switch
+          [id]="uid + '-notifications'"
+          [label]="'phoneCalls.settings.notifications.label' | transloco"
+          [describedBy]="uid + '-notifications-hint'"
+          [checked]="notifyPerm === 'granted' && prefs.notifications"
+          [disabled]="notifyPerm === 'denied' || notifyPerm === 'unsupported'"
+          (checkedChange)="onNotificationsChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    @if (notifyPerm === 'denied') {
+      <p class="text-11 leading-16 text-danger-text">
+        {{ 'phoneCalls.settings.notifications.blocked' | transloco }}
+      </p>
+    }
+  </div>
+</section>

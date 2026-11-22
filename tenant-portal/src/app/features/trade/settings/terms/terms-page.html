@@ -1,0 +1,266 @@
+<ui-tabs
+  class="mx-12 mt-12 shrink-0"
+  [tabs]="tabItems()"
+  [label]="'tterms.tabs.label' | transloco"
+  [active]="activeType()"
+  (activeChange)="onTypeChange($event)"
+/>
+
+<div
+  role="tabpanel"
+  class="flex min-h-0 flex-1 flex-col"
+  [id]="tabPanelId(activeType())"
+  [attr.aria-labelledby]="tabButtonId(activeType())"
+>
+  <app-settings-frame
+    [addLabel]="'tterms.new' | transloco"
+    [searchPlaceholder]="'tterms.search' | transloco"
+    [loading]="loading()"
+    [showAdd]="canManage"
+    [search]="searchInput()"
+    (searchChange)="onSearchChange($event)"
+    (add)="openCreate()"
+    (reload)="reloadAll()"
+  >
+    <div notices class="flex flex-wrap items-center justify-between gap-8">
+      <ui-field
+        size="bare"
+        [label]="'tterms.filters.sideLabel' | transloco"
+        [for]="uid + '-side-filter'"
+        [hint]="'tterms.filters.sideHint' | transloco"
+      >
+        <ui-segmented
+          [id]="uid + '-side-filter'"
+          [options]="sideFilterOptions()"
+          [label]="'tterms.filters.sideLabel' | transloco"
+          [describedBy]="uid + '-side-filter-hint'"
+          [value]="sideFilter()"
+          (valueChange)="onSideChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'tterms.showInactive' | transloco"
+        [for]="uid + '-show-inactive'"
+        [hint]="'tterms.showInactiveHint' | transloco"
+      >
+        <ui-switch
+          [id]="uid + '-show-inactive'"
+          [label]="'tterms.showInactive' | transloco"
+          [describedBy]="uid + '-show-inactive-hint'"
+          [(checked)]="showInactive"
+        />
+      </ui-field>
+    </div>
+
+    @if (failed() && !loading()) {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'tterms.states.loadFailed' | transloco"
+        [actionLabel]="'tterms.states.retry' | transloco"
+        (action)="reloadAll()"
+      />
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="min-w-doc-table-min"
+          [attr.aria-label]="'tterms.columns.ariaLabel' | transloco"
+          [attr.aria-busy]="loading()"
+        >
+          <div
+            role="row"
+            class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+            [class]="gridColumns()"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'tterms.columns.code' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tterms.columns.name' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tterms.columns.text' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tterms.columns.side' | transloco }}
+            </span>
+            @if (hasPaymentColumn()) {
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'tterms.columns.dueDays' | transloco }}
+              </span>
+            } @else if (hasDeliveryColumn()) {
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'tterms.columns.incoterm' | transloco }}
+              </span>
+            }
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tterms.columns.default' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tterms.columns.status' | transloco }}
+            </span>
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'tterms.columns.actions' | transloco }}</span>
+            </span>
+          </div>
+
+          @if (loading()) {
+            @for (row of skeletonRows; track row) {
+              <div
+                role="row"
+                aria-hidden="true"
+                class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+                [class]="gridColumns()"
+              >
+                <span role="cell" class="px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                @if (hasPaymentColumn() || hasDeliveryColumn()) {
+                  <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                }
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"></span>
+              </div>
+            }
+          } @else {
+            @for (term of terms(); track term.id) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+                [class]="gridColumns()"
+                (click)="openTerm(term)"
+              >
+                <span role="cell" class="flex min-w-0 items-center px-10">
+                  <code
+                    dir="ltr"
+                    class="inline-flex h-badge max-w-full items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text tabular-nums"
+                    [title]="term.code"
+                  >
+                    <span class="truncate">{{ term.code }}</span>
+                  </code>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <button
+                    type="button"
+                    class="flex min-w-0 flex-1 cursor-pointer flex-col rounded-4 text-start outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    (click)="openTerm(term); $event.stopPropagation()"
+                  >
+                    <span dir="auto" class="truncate text-12 leading-16 font-medium text-text">{{ primaryName(term) }}</span>
+                    @if (secondaryName(term); as otherName) {
+                      <span dir="auto" class="truncate text-11 leading-16 text-text-muted">{{ otherName }}</span>
+                    }
+                  </button>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (firstLineText(term); as line) {
+                    <span dir="auto" class="truncate text-12 text-text-muted" [title]="fullText(term)">{{ line }}</span>
+                  } @else {
+                    <span class="text-12 text-text-muted">—</span>
+                  }
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <ui-badge tone="tag">{{ 'tset.sides.' + term.side | transloco }}</ui-badge>
+                </span>
+
+                @if (hasPaymentColumn()) {
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    @if (term.dueDays !== null) {
+                      <span dir="ltr" class="text-12 text-text tabular-nums">{{ term.dueDays }}</span>
+                    } @else {
+                      <span class="text-12 text-text-muted">—</span>
+                    }
+                  </span>
+                } @else if (hasDeliveryColumn()) {
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    @if (term.incotermCode; as incoterm) {
+                      <span
+                        dir="ltr"
+                        class="text-12 font-medium text-text tabular-nums"
+                        [title]="incotermName(incoterm)"
+                      >
+                        {{ incoterm }}
+                      </span>
+                    } @else {
+                      <span class="text-12 text-text-muted">—</span>
+                    }
+                  </span>
+                }
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (term.isDefault) {
+                    <ui-badge tone="brand" icon="tablerStar">{{ 'tterms.defaultBadge' | transloco }}</ui-badge>
+                  }
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span
+                    class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                    [class]="term.isActive ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                  >
+                    {{ (term.isActive ? 'tterms.status.active' : 'tterms.status.inactive') | transloco }}
+                  </span>
+                </span>
+
+                <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
+                  <ui-actions-menu
+                    [items]="rowActions(term)"
+                    [label]="'tterms.columns.actions' | transloco"
+                    (selected)="handleAction(term, $event)"
+                  />
+                </span>
+              </div>
+            } @empty {
+              <div role="row" class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+                @if (hasSearchFilter()) {
+                  <span role="cell" class="text-12 text-text-muted">{{ 'tterms.states.noResults' | transloco }}</span>
+                  <button type="button" uiButton variant="ghost" size="small" (click)="clearSearch()">
+                    {{ 'tterms.states.clearSearch' | transloco }}
+                  </button>
+                } @else if (sideFilter() !== 'ALL') {
+                  <span role="cell" class="text-12 text-text-muted">{{ 'tterms.states.noResults' | transloco }}</span>
+                  <button type="button" uiButton variant="ghost" size="small" (click)="clearSideFilter()">
+                    {{ 'tterms.states.clearFilter' | transloco }}
+                  </button>
+                } @else {
+                  <span role="cell" class="text-12 text-text-muted">
+                    {{ 'tterms.states.empty' | transloco: { type: activeTypeEmptyName() } }}
+                  </span>
+                  @if (canManage) {
+                    <button type="button" uiButton variant="ghost" size="small" (click)="openCreate()">
+                      {{ 'tterms.new' | transloco }}
+                    </button>
+                  }
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+
+    <p footer class="text-11 leading-16 text-text-muted">{{ 'tterms.footer' | transloco }}</p>
+  </app-settings-frame>
+</div>
+
+<app-term-modal
+  [canManage]="canManage"
+  (saved)="onTermSaved($event)"
+  (reloaded)="onTermReloaded($event)"
+  (deleted)="onTermDeleted($event)"
+/>
+
+<ui-confirm-dialog
+  #deleteDialog
+  tone="danger"
+  [title]="'tterms.deleteConfirm.title' | transloco"
+  [text]="'tterms.deleteConfirm.text' | transloco"
+  [confirmLabel]="'tterms.deleteConfirm.confirm' | transloco"
+  [cancelLabel]="'tterms.deleteConfirm.cancel' | transloco"
+/>

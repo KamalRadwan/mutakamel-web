@@ -1,0 +1,110 @@
+<ui-modal
+  size="form"
+  icon="tablerMapPin"
+  tile="bg-icon-teal"
+  [title]="(kind() === 'city' ? 'geo.place.titleCity' : districtKind() === 'VILLAGE' ? 'geo.place.titleVillage' : 'geo.place.titleDistrict') | transloco"
+  [closeLabel]="'geo.place.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="closed.emit()"
+>
+  <form [id]="uid + '-form'" class="flex flex-col gap-8" (submit)="onSubmit($event)">
+    <ui-field
+      [label]="'geo.place.parent' | transloco"
+      [for]="uid + '-parent'"
+      [hint]="'geo.place.parentHint' | transloco"
+    >
+      <input
+        [id]="uid + '-parent'"
+        type="text"
+        readonly
+        tabindex="-1"
+        class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+        [value]="parentLabel()"
+      />
+    </ui-field>
+
+    @if (kind() === 'district') {
+      <ui-field
+        size="bare"
+        [label]="'geo.place.kind' | transloco"
+        [for]="uid + '-kind'"
+        [hint]="'geo.place.kindHint' | transloco"
+      >
+        <ui-segmented
+          class="self-start"
+          [id]="uid + '-kind'"
+          [options]="kindOptions()"
+          [label]="'geo.place.kind' | transloco"
+          [value]="districtKind()"
+          (valueChange)="onDistrictKindChange($event)"
+        />
+      </ui-field>
+    }
+
+    <ui-field
+      [label]="'geo.place.nameEn' | transloco"
+      [for]="uid + '-name-en'"
+      [hint]="'geo.place.hint' | transloco"
+      [required]="true"
+      [count]="nameEn().length"
+      [max]="maxLength"
+      [error]="errors().nameEn ?? null"
+    >
+      <input
+        #nameEnInput
+        [id]="uid + '-name-en'"
+        type="text"
+        dir="ltr"
+        [attr.maxlength]="maxLength"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameEn()"
+        [disabled]="saving()"
+        [attr.aria-invalid]="errors().nameEn ? 'true' : null"
+        (input)="onNameEnInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'geo.place.nameAr' | transloco"
+      [for]="uid + '-name-ar'"
+      [hint]="'geo.place.hint' | transloco"
+      [required]="true"
+      [count]="nameAr().length"
+      [max]="maxLength"
+      [error]="errors().nameAr ?? null"
+    >
+      <input
+        [id]="uid + '-name-ar'"
+        type="text"
+        dir="rtl"
+        [attr.maxlength]="maxLength"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameAr()"
+        [disabled]="saving()"
+        [attr.aria-invalid]="errors().nameAr ? 'true' : null"
+        (input)="onNameArInput($event)"
+      />
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      [loading]="saving()"
+      [disabled]="saving()"
+    >
+      {{ 'geo.place.save' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="cancel()"
+    >
+      {{ 'geo.place.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

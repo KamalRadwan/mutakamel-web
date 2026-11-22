@@ -1,0 +1,112 @@
+{
+  "title": "Branches",
+  "add": "Add branch",
+  "search": "Search branches",
+  "hq": "Headquarters",
+  "parentInactive": "The company is inactive.",
+  "filters": {
+    "company": "Company",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "sort": {
+    "name": "Name",
+    "code": "Code",
+    "newest": "Newest"
+  },
+  "cols": {
+    "code": "Code",
+    "name": "Branch",
+    "company": "Company",
+    "phone": "Phone",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "modal": {
+    "new": "New branch",
+    "title": "Branch"
+  },
+  "fields": {
+    "company": "Company",
+    "companyHint": "The company this branch belongs to. Can't be changed later.",
+    "code": "Code",
+    "codeHint": "Letters A-Z, digits, \"_\" and \"-\", up to 32. Can't be changed later.",
+    "codeLocked": "Can't be changed after creation.",
+    "name": "Name",
+    "nameHint": "The name your team uses, up to 120 characters.",
+    "phone": "Phone",
+    "phoneHint": "The branch's main number.",
+    "address": "Address",
+    "addressHint": "Street, area and city, up to 2000 characters.",
+    "hq": "Headquarters",
+    "notHq": "Not headquarters",
+    "hqHelp": "Each company has one headquarters branch.",
+    "hqTaken": "{{name}} is the current headquarters. Use \"Make headquarters\" on a branch instead.",
+    "active": "Active",
+    "activeHelp": "Inactive branches can't receive new departments or users."
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "makeHq": "Make headquarters",
+    "addDepartment": "Add department",
+    "viewDepartments": "View departments",
+    "viewUsers": "View users",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "inactiveBranchReason": "Activate the branch first."
+  },
+  "confirm": {
+    "deleteTitle": "Delete {{name}}?",
+    "deleteText": "A branch that still has departments or users cannot be deleted.",
+    "deactivateTitle": "Deactivate {{name}}?",
+    "deactivateText": "Its departments must be inactive first, and no users can be placed in it.",
+    "activateTitle": "Activate {{name}}?",
+    "activateText": "This branch will be able to receive departments and users again.",
+    "hqTitle": "Change the headquarters?",
+    "hqText": "{{name}} will become the headquarters of {{company}}, and {{old}} will stop being the headquarters.",
+    "staleTitle": "Branch scope changed",
+    "staleText": "The organization hierarchy changed while you were editing. Reload to get the latest data.",
+    "reload": "Reload",
+    "keepChanges": "Keep my changes",
+    "discardTitle": "Discard unsaved changes?",
+    "discardText": "Your changes to this branch have not been saved.",
+    "discardConfirm": "Discard"
+  },
+  "transfer": {
+    "title": "Choose a new headquarters",
+    "text": "Choose another active branch of {{company}} as the headquarters first.",
+    "branch": "New headquarters",
+    "branchHint": "Only active branches of this company are listed.",
+    "go": "Make headquarters and continue",
+    "none": "Add or activate another branch first."
+  },
+  "blockers": {
+    "deactivateInstead": "Deactivate instead",
+    "viewDepartments": "View departments",
+    "viewUsers": "View users"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters.",
+    "codePattern": "Use only uppercase letters A-Z, digits, \"_\" and \"-\", up to 32 characters."
+  },
+  "toast": {
+    "created": "Branch created.",
+    "saved": "Changes saved.",
+    "deleted": "Branch deleted."
+  },
+  "save": "Save",
+  "undo": "Undo changes",
+  "unsaved": "Unsaved changes",
+  "cancel": "Cancel",
+  "close": "Close",
+  "delete": "Delete",
+  "empty": "No branches yet.",
+  "noResults": "No matching results",
+  "loadFailed": "Could not load branches.",
+  "retry": "Try again"
+}

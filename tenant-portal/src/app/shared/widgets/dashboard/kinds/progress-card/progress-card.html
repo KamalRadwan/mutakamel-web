@@ -1,0 +1,10 @@
+@if (card(); as vm) {
+  <ui-stat-card
+    [framed]="false"
+    [label]="vm.label"
+    [value]="vm.value"
+    [valueTitle]="vm.value"
+    [delta]="vm.delta"
+    [chart]="vm.chart"
+  />
+}

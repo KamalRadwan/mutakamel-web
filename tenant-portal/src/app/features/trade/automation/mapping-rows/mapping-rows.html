@@ -1,0 +1,291 @@
+<p class="text-12 leading-18 text-text-muted">{{ 'imports.mappingRows.help' | transloco }}</p>
+
+<div class="overflow-x-auto pb-4">
+  <div class="min-w-doc-table-min flex flex-col gap-6">
+    @for (row of fields(); track $index; let idx = $index; let first = $first) {
+      @let rv = rowValidations()[idx];
+      @let posError = showErrors() ? rv.positionError : null;
+      @let colError = showErrors() ? rv.columnError : null;
+      @let tgtError = showErrors() ? rv.targetError : null;
+      @let rowMeta = targetFieldMap().get(row.targetFieldCode);
+      @let lookupText = lookupLabel(row.lookupCode ?? rowMeta?.lookupCode);
+
+      <div class="flex flex-col gap-3 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <div class="grid items-start gap-8 grid-cols-auto-import-mapping-field-row">
+          @if (first) {
+            <ui-field
+              [for]="uid + '-pos-' + idx"
+              [label]="'imports.mappingRows.position' | transloco"
+              [hint]="'imports.mappingRows.positionHint' | transloco"
+              [required]="true"
+              [error]="posError"
+            >
+              <input
+                [id]="uid + '-pos-' + idx"
+                type="number"
+                min="1"
+                max="1000"
+                dir="ltr"
+                class="h-full min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none"
+                [readonly]="readonly()"
+                [value]="row.sourceOrdinal >= 0 ? row.sourceOrdinal + 1 : ''"
+                (input)="onOrdinalInput(idx, $event)"
+              />
+            </ui-field>
+          } @else {
+            <input
+              [id]="uid + '-pos-' + idx"
+              type="number"
+              min="1"
+              max="1000"
+              dir="ltr"
+              class="h-field w-full min-w-0 rounded-8 border bg-surface-field px-8 text-12 text-text tabular-nums outline-none transition-colors duration-fast"
+              [class]="posError ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+              [attr.aria-label]="'imports.mappingRows.position' | transloco"
+              [readonly]="readonly()"
+              [value]="row.sourceOrdinal >= 0 ? row.sourceOrdinal + 1 : ''"
+              (input)="onOrdinalInput(idx, $event)"
+            />
+          }
+
+          @if (first) {
+            <ui-field
+              [for]="uid + '-col-' + idx"
+              [label]="'imports.mappingRows.sourceColumn' | transloco"
+              [hint]="'imports.mappingRows.sourceColumnHint' | transloco"
+              [required]="true"
+              [error]="colError"
+            >
+              <input
+                [id]="uid + '-col-' + idx"
+                type="text"
+                dir="ltr"
+                autocomplete="off"
+                class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [placeholder]="'imports.mappingRows.sourceColumnPlaceholder' | transloco"
+                [readonly]="readonly()"
+                [value]="row.sourceColumnCode"
+                (input)="onSourceColumnInput(idx, $event)"
+              />
+            </ui-field>
+          } @else {
+            <input
+              [id]="uid + '-col-' + idx"
+              type="text"
+              dir="ltr"
+              autocomplete="off"
+              class="h-field w-full min-w-0 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast placeholder:text-text-placeholder"
+              [class]="colError ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+              [attr.aria-label]="'imports.mappingRows.sourceColumn' | transloco"
+              [placeholder]="'imports.mappingRows.sourceColumnPlaceholder' | transloco"
+              [readonly]="readonly()"
+              [value]="row.sourceColumnCode"
+              (input)="onSourceColumnInput(idx, $event)"
+            />
+          }
+
+          <div class="flex flex-col items-center">
+            @if (first) {
+              <span class="mb-2 h-label shrink-0" aria-hidden="true"></span>
+            }
+            <span class="flex h-field items-center justify-center text-text-muted">
+              <ng-icon name="tablerArrowRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+            </span>
+          </div>
+
+          @if (first) {
+            <ui-field
+              size="bare"
+              [for]="uid + '-tgt-' + idx"
+              [label]="'imports.mappingRows.targetField' | transloco"
+              [hint]="'imports.mappingRows.targetFieldHint' | transloco"
+              [required]="true"
+              [error]="tgtError"
+            >
+              <ui-dropdown
+                size="field"
+                [id]="uid + '-tgt-' + idx"
+                [describedBy]="uid + '-tgt-' + idx + '-hint' + (tgtError ? ' ' + uid + '-tgt-' + idx + '-error' : '')"
+                [label]="'imports.mappingRows.targetField' | transloco"
+                [options]="targetOptionsForRow(idx)"
+                [value]="row.targetFieldCode"
+                [disabled]="readonly()"
+                (valueChange)="updateTargetField(idx, $event)"
+              />
+            </ui-field>
+          } @else {
+            <ui-dropdown
+              size="field"
+              [id]="uid + '-tgt-' + idx"
+              [label]="'imports.mappingRows.targetField' | transloco"
+              [options]="targetOptionsForRow(idx)"
+              [value]="row.targetFieldCode"
+              [disabled]="readonly()"
+              (valueChange)="updateTargetField(idx, $event)"
+            />
+          }
+
+          @if (first) {
+            <ui-field
+              size="bare"
+              [for]="uid + '-tr-' + idx"
+              [label]="'imports.mappingRows.transform' | transloco"
+              [hint]="'imports.mappingRows.transformHint' | transloco"
+            >
+              <ui-dropdown
+                size="field"
+                [id]="uid + '-tr-' + idx"
+                [describedBy]="uid + '-tr-' + idx + '-hint'"
+                [label]="'imports.mappingRows.transform' | transloco"
+                [options]="transformOptionsForRow(row)"
+                [value]="row.transformCode || 'NONE'"
+                [disabled]="transformDisabled(row)"
+                (valueChange)="updateTransform(idx, $event)"
+              />
+            </ui-field>
+          } @else {
+            <ui-dropdown
+              size="field"
+              [id]="uid + '-tr-' + idx"
+              [label]="'imports.mappingRows.transform' | transloco"
+              [options]="transformOptionsForRow(row)"
+              [value]="row.transformCode || 'NONE'"
+              [disabled]="transformDisabled(row)"
+              (valueChange)="updateTransform(idx, $event)"
+            />
+          }
+
+          @if (first) {
+            <ui-field
+              size="bare"
+              [label]="'imports.mappingRows.lookup' | transloco"
+              [hint]="'imports.mappingRows.lookupHint' | transloco"
+            >
+              <div class="flex h-field min-w-0 items-center">
+                @if (lookupText) {
+                  <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+                    {{ lookupText }}
+                  </span>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'imports.common.none' | transloco }}</span>
+                }
+              </div>
+            </ui-field>
+          } @else {
+            <div class="flex h-field min-w-0 items-center" [attr.aria-label]="'imports.mappingRows.lookup' | transloco">
+              @if (lookupText) {
+                <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+                  {{ lookupText }}
+                </span>
+              } @else {
+                <span class="text-12 text-text-muted">{{ 'imports.common.none' | transloco }}</span>
+              }
+            </div>
+          }
+
+          @if (first) {
+            <ui-field
+              size="bare"
+              [for]="uid + '-req-' + idx"
+              [label]="'imports.mappingRows.required' | transloco"
+              [hint]="'imports.mappingRows.requiredHint' | transloco"
+            >
+              <div class="flex h-field items-center">
+                <ui-switch
+                  [id]="uid + '-req-' + idx"
+                  [describedBy]="uid + '-req-' + idx + '-hint'"
+                  [label]="'imports.mappingRows.required' | transloco"
+                  [checked]="row.isRequired"
+                  [disabled]="readonly()"
+                  (checkedChange)="updateRequired(idx, $event)"
+                />
+              </div>
+            </ui-field>
+          } @else {
+            <div class="flex h-field items-center">
+              <ui-switch
+                [id]="uid + '-req-' + idx"
+                [describedBy]="uid + '-req-0-hint'"
+                [label]="'imports.mappingRows.required' | transloco"
+                [checked]="row.isRequired"
+                [disabled]="readonly()"
+                (checkedChange)="updateRequired(idx, $event)"
+              />
+            </div>
+          }
+
+          <div class="flex flex-col items-center">
+            @if (first) {
+              <span class="mb-2 h-label shrink-0" aria-hidden="true"></span>
+            }
+            <div class="flex h-field items-center justify-center">
+              @if (!readonly()) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                  [disabled]="fields().length <= 1"
+                  [attr.aria-label]="'imports.mappingRows.remove' | transloco"
+                  [title]="'imports.mappingRows.remove' | transloco"
+                  (click)="removeColumn(idx)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center">
+            @if (first) {
+              <span class="mb-2 h-label shrink-0" aria-hidden="true"></span>
+            }
+            <span
+              class="flex h-field items-center justify-center"
+              [class]="rv.complete ? 'text-success-text' : 'text-text-placeholder'"
+              [title]="(rv.complete ? 'imports.mappingRows.complete' : 'imports.mappingRows.incomplete') | transloco"
+            >
+              <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+              <span class="sr-only">
+                {{ (rv.complete ? 'imports.mappingRows.complete' : 'imports.mappingRows.incomplete') | transloco }}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        @if (!first) {
+          @if (rowErrorMessage(idx); as msg) {
+            <p class="flex items-center gap-4 text-11 leading-16 text-danger-text">
+              <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+              <span>{{ msg }}</span>
+            </p>
+          }
+        }
+      </div>
+    }
+  </div>
+</div>
+
+@if (showErrors() && missingRequiredLabels().length > 0) {
+  <p class="flex items-center gap-4 text-11 leading-16 text-danger-text" role="alert">
+    <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+    <span>{{ 'imports.mappingRows.errors.missingRequired' | transloco: { fields: missingRequiredLabels().join(', ') } }}</span>
+  </p>
+}
+
+@if (!readonly()) {
+  <div class="flex items-center justify-between gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      size="small"
+      [disabled]="fields().length >= maxRows"
+      (click)="addColumn()"
+    >
+      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+      <span>{{ 'imports.mappingRows.addColumn' | transloco }}</span>
+    </button>
+    <bdi dir="ltr" class="text-11 text-text-muted tabular-nums">
+      {{ fields().length }} / {{ maxRows }}
+    </bdi>
+  </div>
+}

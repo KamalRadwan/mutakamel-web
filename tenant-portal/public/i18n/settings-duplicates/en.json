@@ -1,0 +1,88 @@
+{
+  "types": {
+    "title": "Contact types to check",
+    "desc": "Duplicate rules apply only to the types you check.",
+    "label": "Check these contact types",
+    "hint": "A phone, email or WhatsApp number that already belongs to another contact is refused, unless the rules below allow it.",
+    "email": "Email",
+    "phone": "Phone",
+    "whatsapp": "WhatsApp"
+  },
+  "typesNoneNote": "No contact type is checked, so duplicates are never refused.",
+  "search": "Search companies or branches",
+  "onlyOverrides": "Show only overrides",
+  "onlyOverridesHint": "Hide rows that follow their parent.",
+  "expandAll": "Expand all",
+  "collapseAll": "Collapse all",
+  "expand": "Expand {{name}}",
+  "collapse": "Collapse {{name}}",
+  "cols": {
+    "name": "Company or branch",
+    "u": "Different users",
+    "b": "Different branches",
+    "c": "Different companies",
+    "uHint": "Same branch, different owners.",
+    "bHint": "Different branches of the same company.",
+    "cHint": "Different companies in this workspace."
+  },
+  "workspace": "Workspace default",
+  "branchesCount": {
+    "zero": "{{n}} branches",
+    "one": "{{n}} branch",
+    "two": "{{n}} branches",
+    "few": "{{n}} branches",
+    "many": "{{n}} branches",
+    "other": "{{n}} branches"
+  },
+  "forBranches": "for its branches",
+  "allowed": "Allowed",
+  "notAllowed": "Not allowed",
+  "source": {
+    "here": "Set here",
+    "inherited": "Inherited from {{parent}}",
+    "limitedB": "Limited by Different branches",
+    "limitedC": "Limited by Different companies"
+  },
+  "menu": {
+    "inherit": "Inherit (currently {{state}} from {{parent}})",
+    "allow": "Allow",
+    "deny": "Don't allow"
+  },
+  "disabled": {
+    "needsB": "Allow Different branches first.",
+    "needsC": "Allow Different companies first.",
+    "blocksB": "Turn off Different branches first.",
+    "blocksU": "Turn off Different users first."
+  },
+  "cNotOnBranch": "Set on the company row.",
+  "cellLabel": "{{switch}} for {{node}}: {{state}}, {{source}}",
+  "cellLabelRoot": "{{switch}} for the workspace default: {{state}}, {{source}}",
+  "resets": {
+    "title": "Remove some overrides?",
+    "text": "This change makes these settings invalid. They will go back to inheriting:",
+    "more": "and {{n}} more",
+    "apply": "Apply"
+  },
+  "conflict": {
+    "title": "The rules were changed",
+    "text": "Someone else changed the duplicate rules. Reload to see them, or keep your change and apply it again.",
+    "reload": "Reload",
+    "keep": "Keep my change"
+  },
+  "saved": "Saved.",
+  "resetsDone": "{{n}} overrides went back to inheriting.",
+  "legend1": "Allowing duplicates inside a branch also needs them allowed across branches and across companies.",
+  "legend2": "Between two branches or two companies, both sides must allow it. These rules apply to new and changed contact details in CRM only.",
+  "truncated": "Only the first 500 branches are shown.",
+  "noResults": "No matching companies or branches.",
+  "clearSearch": "Clear search",
+  "loadFailed": "Could not load the duplicate rules.",
+  "retry": "Try again",
+  "errors": {
+    "CRM_DUPLICATE_POLICY_CONFLICT": "Allowing duplicates inside a branch needs them allowed across branches and across companies first.",
+    "CRM_COMPANY_NOT_FOUND": "This company no longer exists or is inactive.",
+    "CRM_BRANCH_NOT_FOUND": "This branch no longer exists or is inactive.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription is read-only, so changes cannot be saved.",
+    "CRM_VALIDATION_FAILED": "Some values are not valid."
+  }
+}

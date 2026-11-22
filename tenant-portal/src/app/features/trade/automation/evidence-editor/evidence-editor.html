@@ -1,0 +1,90 @@
+<ui-field
+  size="bare"
+  [label]="'tower.evidence.label' | transloco"
+  [for]="resolvedPrefix() + '-key-0'"
+  [hint]="'tower.evidence.hint' | transloco"
+  [required]="required()"
+  [error]="sectionError()"
+>
+  <div class="flex flex-col gap-6">
+    @for (row of rows(); track row.uid; let idx = $index) {
+      <div class="flex flex-col gap-2">
+        <div class="grid items-center gap-6 grid-cols-auto-evidence-row">
+          <input
+            [id]="resolvedPrefix() + '-key-' + idx"
+            type="text"
+            dir="ltr"
+            autocomplete="off"
+            [attr.maxlength]="maxKeyLength"
+            [disabled]="disabled()"
+            [value]="row.key"
+            [placeholder]="'tower.evidence.keyPlaceholder' | transloco"
+            [attr.aria-label]="'tower.evidence.keyLabel' | transloco: { n: idx + 1 }"
+            [attr.aria-describedby]="rowError(idx) ? errorId(idx) : null"
+            [attr.aria-invalid]="isKeyInvalid(idx) ? 'true' : null"
+            class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+            [class]="
+              isKeyInvalid(idx)
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'
+            "
+            (input)="onKeyInput(idx, $event)"
+            (blur)="onKeyBlur(idx)"
+          />
+
+          <input
+            [id]="resolvedPrefix() + '-val-' + idx"
+            type="text"
+            autocomplete="off"
+            [attr.maxlength]="maxValueLength"
+            [disabled]="disabled()"
+            [value]="row.val"
+            [placeholder]="'tower.evidence.valuePlaceholder' | transloco"
+            [attr.aria-label]="'tower.evidence.valueLabel' | transloco: { n: idx + 1 }"
+            [attr.aria-describedby]="rowError(idx) ? errorId(idx) : null"
+            [attr.aria-invalid]="isValueInvalid(idx) ? 'true' : null"
+            class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+            [class]="
+              isValueInvalid(idx)
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'
+            "
+            (input)="onValueInput(idx, $event)"
+            (blur)="onValueBlur(idx)"
+          />
+
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted transition-colors duration-fast outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+            [disabled]="!canRemoveRow(row)"
+            [attr.aria-label]="('tower.evidence.removeRow' | transloco) + ' ' + (idx + 1)"
+            [title]="'tower.evidence.removeRow' | transloco"
+            (click)="removeRow(idx)"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        </div>
+
+        @if (rowError(idx); as err) {
+          <p [id]="errorId(idx)" class="flex items-center gap-3 text-11 leading-16 text-danger-text" role="alert">
+            <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+            <span>{{ err }}</span>
+          </p>
+        }
+      </div>
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      size="small"
+      class="self-start"
+      [disabled]="disabled() || rows().length >= maxRows"
+      (click)="addRow()"
+    >
+      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+      <span>{{ 'tower.evidence.addRow' | transloco }}</span>
+    </button>
+  </div>
+</ui-field>

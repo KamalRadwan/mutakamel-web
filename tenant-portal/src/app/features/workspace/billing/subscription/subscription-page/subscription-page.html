@@ -1,0 +1,262 @@
+@if (!isOwner) {
+  <app-billing-forbidden />
+} @else if (loading() && !subscription()) {
+  <div class="flex items-center justify-between gap-8" aria-busy="true">
+    <span class="h-btn w-1/3 rounded-8 bg-neutral-soft animate-pulse"></span>
+    <span class="size-btn rounded-8 bg-neutral-soft animate-pulse"></span>
+  </div>
+
+  <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card" aria-busy="true">
+    <div class="flex items-center gap-8">
+      <span class="size-icon-tile rounded-8 bg-neutral-soft animate-pulse"></span>
+      <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft animate-pulse"></span>
+    </div>
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-4">
+      @for (item of skeletonFields; track item) {
+        <div class="flex flex-col gap-4">
+          <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft animate-pulse"></span>
+          <span class="h-field w-full rounded-8 bg-neutral-soft animate-pulse"></span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card" aria-busy="true">
+    <div class="h-table-head w-full rounded-10 bg-neutral-soft animate-pulse"></div>
+    @for (row of skeletonRows; track row) {
+      <div class="h-table-row w-full rounded-10 bg-neutral-soft animate-pulse"></div>
+    }
+  </section>
+} @else if (failed() && !subscription()) {
+  <app-billing-failed [correlationId]="correlationId()" (retry)="reload()" />
+} @else if (subscription(); as data) {
+  @let sub = data.subscription;
+  @let disabledReason = changeDisabledReasonKey() ? (changeDisabledReasonKey()! | transloco) : null;
+
+  <div class="flex flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [disabled]="changeDisabled()"
+      [attr.title]="disabledReason"
+      [attr.aria-describedby]="disabledReason ? uid + '-change-disabled' : null"
+      (click)="goToChange()"
+    >
+      {{ 'bsub.toolbar.changePlan' | transloco }}
+    </button>
+    @if (disabledReason) {
+      <span [id]="uid + '-change-disabled'" class="sr-only">{{ disabledReason }}</span>
+    }
+
+    @if (sub.currentCollectionInvoiceId; as invoiceId) {
+      <a uiButton variant="secondary" [routerLink]="['/workspace/billing/invoices', invoiceId]">
+        {{ 'bsub.toolbar.viewInvoice' | transloco }}
+      </a>
+    }
+
+    @if (hasUnfinishedChange()) {
+      <a uiButton variant="secondary" [routerLink]="['/workspace/billing/subscription/change']">
+        {{ 'bsub.toolbar.continueChange' | transloco }}
+      </a>
+    }
+
+    <button
+      type="button"
+      class="ms-auto inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+      [disabled]="loading()"
+      [attr.aria-label]="'bsub.toolbar.reload' | transloco"
+      [title]="'bsub.toolbar.reload' | transloco"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+    </button>
+  </div>
+
+  <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <header class="flex items-center gap-8">
+      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerRepeat" size="15" aria-hidden="true" />
+      </span>
+      <h2 class="text-13 leading-18 font-medium text-text">{{ 'bsub.plan.title' | transloco }}</h2>
+    </header>
+
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-4">
+      <ui-field
+        size="bare"
+        [for]="uid + '-status'"
+        [label]="'bsub.plan.fields.status' | transloco"
+        [hint]="'bsub.plan.fields.statusHint' | transloco"
+      >
+        <div
+          [id]="uid + '-status'"
+          [attr.aria-describedby]="uid + '-status-hint'"
+          class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8"
+        >
+          @if (statusBadge(); as badge) {
+            <span [class]="badge.classes">{{ badge.labelKey | transloco }}</span>
+          }
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-access'"
+        [label]="'bsub.plan.fields.access' | transloco"
+        [hint]="'bsub.plan.fields.accessHint' | transloco"
+      >
+        <div
+          [id]="uid + '-access'"
+          [attr.aria-describedby]="uid + '-access-hint'"
+          class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8"
+        >
+          @if (accessBadge(); as badge) {
+            <span [class]="badge.classes">{{ badge.labelKey | transloco }}</span>
+          }
+        </div>
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-cycle'"
+        [label]="'bsub.plan.fields.cycle' | transloco"
+        [hint]="'bsub.plan.fields.cycleHint' | transloco"
+      >
+        <input
+          [id]="uid + '-cycle'"
+          type="text"
+          readonly
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+          [value]="'bill.cycle.' + sub.billingCycle | transloco"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-started'"
+        [label]="'bsub.plan.fields.started' | transloco"
+        [hint]="'bsub.plan.fields.startedHint' | transloco"
+      >
+        <input
+          [id]="uid + '-started'"
+          type="text"
+          readonly
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+          [value]="formatDate(sub.startedAt)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-period'"
+        [label]="'bsub.plan.fields.period' | transloco"
+        [hint]="'bsub.plan.fields.periodHint' | transloco"
+      >
+        <div
+          [id]="uid + '-period'"
+          [attr.aria-describedby]="uid + '-period-hint'"
+          class="flex h-field items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text tabular-nums"
+        >
+          @if (sub.currentPeriodStart) {
+            <span dir="ltr" class="truncate">{{ formatDate(sub.currentPeriodStart) }}</span>
+            <ng-icon name="tablerArrowRight" size="12" class="shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true" />
+            <span dir="ltr" class="truncate">{{ formatDate(sub.currentPeriodEnd) }}</span>
+          } @else {
+            <span class="text-text-muted">{{ 'bill.common.none' | transloco }}</span>
+          }
+        </div>
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-renews'"
+        [label]="'bsub.plan.fields.renewsOn' | transloco"
+        [hint]="'bsub.plan.fields.renewsOnHint' | transloco"
+      >
+        <input
+          [id]="uid + '-renews'"
+          type="text"
+          readonly
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+          [value]="formatDate(sub.currentPeriodEnd)"
+        />
+      </ui-field>
+
+      @if (sub.trialEndsAt) {
+        <ui-field
+          [for]="uid + '-trial'"
+          [label]="'bsub.plan.fields.trialEnds' | transloco"
+          [hint]="'bsub.plan.fields.trialEndsHint' | transloco"
+        >
+          <input
+            [id]="uid + '-trial'"
+            type="text"
+            readonly
+            dir="ltr"
+            class="min-w-0 flex-1 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+            [value]="formatDate(sub.trialEndsAt)"
+          />
+        </ui-field>
+      }
+
+      @if (sub.cancelAt) {
+        <ui-field
+          [for]="uid + '-cancel'"
+          [label]="'bsub.plan.fields.cancelsOn' | transloco"
+          [hint]="'bsub.plan.fields.cancelsOnHint' | transloco"
+        >
+          <input
+            [id]="uid + '-cancel'"
+            type="text"
+            readonly
+            dir="ltr"
+            class="min-w-0 flex-1 bg-transparent text-start text-12 font-medium text-danger-text tabular-nums outline-none"
+            [value]="formatDate(sub.cancelAt)"
+          />
+        </ui-field>
+      }
+
+      <ui-field
+        [for]="uid + '-allowed'"
+        [label]="'bsub.plan.fields.allowedUsers' | transloco"
+        [hint]="'bsub.plan.fields.allowedUsersHint' | transloco"
+      >
+        <input
+          [id]="uid + '-allowed'"
+          type="text"
+          readonly
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+          [value]="data.baseAllowance.effectiveAllowedUsers"
+        />
+      </ui-field>
+    </div>
+
+    <footer class="flex flex-wrap items-center justify-end gap-16 border-t border-border pt-8">
+      <div class="flex items-center gap-6 text-12 leading-18">
+        <span class="text-text-muted">{{ 'bsub.plan.totals.applications' | transloco }}</span>
+        <span dir="ltr" class="font-medium text-text tabular-nums">{{ formatUsd(data.totals.baseRecurringUsd) }}</span>
+      </div>
+      <div class="flex items-center gap-6 text-12 leading-18">
+        <span class="text-text-muted">{{ 'bsub.plan.totals.addons' | transloco }}</span>
+        <span dir="ltr" class="font-medium text-text tabular-nums">{{ formatUsd(data.totals.addonRecurringUsd) }}</span>
+      </div>
+      <div class="flex items-baseline gap-6">
+        <span class="text-12 leading-18 text-text-muted">{{ 'bsub.plan.totals.total' | transloco }}</span>
+        <span dir="ltr" class="text-15 leading-22 font-medium text-text tabular-nums">
+          {{ formatUsd(data.totals.combinedRecurringUsd) }}
+        </span>
+        <span class="text-12 leading-18 text-text-muted">{{ cycleUnitKey() | transloco }}</span>
+      </div>
+    </footer>
+  </section>
+
+  <app-items-table
+    [baseItems]="data.baseItems"
+    [addonSelections]="data.addonSelections"
+    [seatUsage]="seatUsage()"
+    [canChange]="!changeDisabled()"
+    [disabledReason]="disabledReason"
+  />
+
+  <app-seats-section />
+}

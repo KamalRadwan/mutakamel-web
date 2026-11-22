@@ -1,0 +1,30 @@
+{
+  "menu": {
+    "viewData": "View data",
+    "showTable": "Show table",
+    "hideTable": "Show chart",
+    "explain": "Explain number",
+    "openBuilder": "Open in builder",
+    "versionPolicy": "Version policy",
+    "remove": "Remove from dashboard",
+    "label": "Widget actions"
+  },
+  "grip": "Move widget",
+  "remove": "Remove widget",
+  "retry": "Retry",
+  "openBuilder": "Open in builder",
+  "dataReadiness": "Data readiness",
+  "partial": "Partial",
+  "partialDetails": "Details on partial data",
+  "state": {
+    "loading": "Loading",
+    "empty": "No records for this period",
+    "timeout": "This widget took too long to load",
+    "failed": "This widget could not load",
+    "denied": "You do not have access to this data",
+    "retired": "This metric was retired",
+    "busy": "Too many reports are running. Try again.",
+    "retrying": "Many reports are running. Retrying…"
+  },
+  "keyboard": "Arrows move · Shift+arrows resize"
+}

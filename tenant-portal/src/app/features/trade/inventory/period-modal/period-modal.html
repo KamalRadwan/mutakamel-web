@@ -1,0 +1,276 @@
+<ui-modal
+  #periodModal
+  size="form"
+  icon="tablerCalendarStats"
+  tile="bg-icon-blue"
+  [title]="(mode() === 'create' ? 'invSetup.periodModal.newTitle' : 'invSetup.periodModal.title') | transloco"
+  [subtitle]="mode() === 'view' ? (period()?.code ?? '') : ''"
+  [closeLabel]="'invSetup.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (mode() === 'view' && period(); as p) {
+    <app-inventory-badge modal-header-end kind="period" [value]="p.status" />
+  }
+
+  @if (mode() === 'create') {
+    <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submitCreate($event)">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'invSetup.periodModal.code.label' | transloco"
+        [hint]="'invSetup.periodModal.code.hint' | transloco"
+        [required]="true"
+        [count]="code().length"
+        [max]="limits.periodCode"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          [attr.maxlength]="limits.periodCode"
+          class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [value]="code()"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          (input)="onCodeInput($event)"
+          (blur)="onCodeBlur()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-backdate'"
+        [label]="'invSetup.periodModal.maxBackdateDays.label' | transloco"
+        [hint]="'invSetup.periodModal.maxBackdateDays.hint' | transloco"
+        [required]="true"
+        [error]="maxBackdateError()"
+      >
+        <input
+          [id]="uid + '-backdate'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          autocomplete="off"
+          class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [value]="maxBackdateDays()"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="maxBackdateError() ? 'true' : null"
+          (input)="onBackdateInput($event)"
+          (blur)="markTouched('maxBackdateDays')"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-starts'"
+        [label]="'invSetup.periodModal.startsOn.label' | transloco"
+        [hint]="'invSetup.periodModal.startsOn.hint' | transloco"
+        [required]="true"
+        [error]="startsOnError()"
+      >
+        <ui-date-field
+          [id]="uid + '-starts'"
+          [ariaLabel]="'invSetup.periodModal.startsOn.label' | transloco"
+          [describedBy]="uid + '-starts-hint' + (startsOnError() ? ' ' + uid + '-starts-error' : '')"
+          [todayLabel]="'invSetup.common.today' | transloco"
+          [prevMonthLabel]="'invSetup.common.prevMonth' | transloco"
+          [nextMonthLabel]="'invSetup.common.nextMonth' | transloco"
+          [value]="startsOn() || null"
+          [invalid]="!!startsOnError()"
+          [disabled]="saving()"
+          (valueChange)="onStartsOnChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-ends'"
+        [label]="'invSetup.periodModal.endsOn.label' | transloco"
+        [hint]="'invSetup.periodModal.endsOn.hint' | transloco"
+        [required]="true"
+        [error]="endsOnError()"
+      >
+        <ui-date-field
+          [id]="uid + '-ends'"
+          [ariaLabel]="'invSetup.periodModal.endsOn.label' | transloco"
+          [describedBy]="uid + '-ends-hint' + (endsOnError() ? ' ' + uid + '-ends-error' : '')"
+          [todayLabel]="'invSetup.common.today' | transloco"
+          [prevMonthLabel]="'invSetup.common.prevMonth' | transloco"
+          [nextMonthLabel]="'invSetup.common.nextMonth' | transloco"
+          [value]="endsOn() || null"
+          [invalid]="!!endsOnError()"
+          [disabled]="saving()"
+          (valueChange)="onEndsOnChange($event)"
+        />
+      </ui-field>
+    </form>
+  } @else if (period(); as p) {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <ui-field
+        [for]="uid + '-view-code'"
+        [label]="'invSetup.periodModal.code.label' | transloco"
+        [hint]="'invSetup.periodModal.code.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-code'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="p.code"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-backdate'"
+        [label]="'invSetup.periodModal.maxBackdateDays.label' | transloco"
+        [hint]="'invSetup.periodModal.maxBackdateDays.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-backdate'"
+          type="text"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="viewBackdateLabel()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-starts'"
+        [label]="'invSetup.periodModal.startsOn.label' | transloco"
+        [hint]="'invSetup.periodModal.startsOn.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-starts'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="viewStartsOn()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-ends'"
+        [label]="'invSetup.periodModal.endsOn.label' | transloco"
+        [hint]="'invSetup.periodModal.endsOn.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-ends'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="viewEndsOn()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-status'"
+        [label]="'invSetup.periodModal.status.label' | transloco"
+        [hint]="'invSetup.periodModal.status.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-status'"
+          type="text"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewStatusLabel()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-closed-at'"
+        [label]="'invSetup.periodModal.closedAt.label' | transloco"
+        [hint]="'invSetup.periodModal.closedAt.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-closed-at'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="viewClosedAt()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-closed-by'"
+        [label]="'invSetup.periodModal.closedBy.label' | transloco"
+        [hint]="'invSetup.periodModal.closedBy.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-closed-by'"
+          type="text"
+          dir="auto"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewClosedBy()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-close-reason'"
+        [label]="'invSetup.periodModal.closeReason.label' | transloco"
+        [hint]="'invSetup.periodModal.closeReason.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-close-reason'"
+          type="text"
+          dir="auto"
+          readonly
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="viewCloseReason()"
+        />
+      </ui-field>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (mode() === 'create') {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving()"
+      >
+        {{ 'invSetup.periodModal.createAction' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="requestClose()"
+      >
+        {{ 'invSetup.common.cancel' | transloco }}
+      </button>
+    } @else if (period(); as p) {
+      @if (canGovern() && p.status === 'CLOSED') {
+        <button type="button" uiButton variant="primary" (click)="requestReopenPeriod()">
+          {{ 'invSetup.periods.actions.reopen' | transloco }}
+        </button>
+      }
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'invSetup.common.close' | transloco }}
+      </button>
+      @if (canGovern() && p.status === 'OPEN') {
+        <button type="button" uiButton variant="danger" class="ms-auto" (click)="requestClosePeriod()">
+          {{ 'invSetup.periods.actions.close' | transloco }}
+        </button>
+      }
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'invSetup.discard.title' | transloco"
+  [text]="'invSetup.discard.text' | transloco"
+  [confirmLabel]="'invSetup.discard.confirm' | transloco"
+  [cancelLabel]="'invSetup.discard.keep' | transloco"
+/>

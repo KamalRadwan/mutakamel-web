@@ -1,0 +1,46 @@
+{
+  "title": "Exports",
+  "columns": {
+    "requested": "Requested",
+    "source": "Source",
+    "format": "Format",
+    "status": "Status",
+    "size": "Size",
+    "rows": "Rows",
+    "expires": "Expires",
+    "actions": "Actions"
+  },
+  "status": {
+    "QUEUED": "Queued",
+    "RUNNING": "Running",
+    "SUCCEEDED": "Ready",
+    "FAILED": "Failed",
+    "CANCELLED": "Cancelled",
+    "EXPIRED": "Expired"
+  },
+  "failure": {
+    "RUNNER_UNAVAILABLE": "Export service is temporarily unavailable.",
+    "RUN_TIMEOUT": "The export took too long and timed out.",
+    "STORAGE_FAILED": "Could not store the generated export file.",
+    "RENDER_FAILED": "Could not generate the export file.",
+    "PDF_RENDER_FAILED": "Could not generate the PDF file.",
+    "FINGERPRINT_UNAVAILABLE": "Data scope verification was unavailable.",
+    "TOO_LARGE": "The export exceeded the maximum allowed size.",
+    "NO_EXPORTABLE_PANELS": "There are no exportable panels in this item.",
+    "PERMISSION_DENIED": "You do not have permission to export this data.",
+    "PDF_RESULT_INVALID": "The generated PDF output was invalid.",
+    "ABANDONED": "The export job did not finish and was abandoned.",
+    "GENERIC": "The export failed. Try generating a new export."
+  },
+  "download": "Download",
+  "cancel": "Cancel",
+  "cancelTitle": "Cancel export?",
+  "cancelText": "This export will stop and will not produce a downloadable file.",
+  "cancelConfirm": "Cancel export",
+  "cancelledToast": "Export cancelled",
+  "loadMore": "Load more",
+  "empty": "No exports yet",
+  "forbiddenTitle": "Access denied",
+  "forbiddenText": "You do not have permission to view exports.",
+  "reload": "Reload"
+}

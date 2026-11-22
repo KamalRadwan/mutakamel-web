@@ -1,0 +1,361 @@
+<div class="flex flex-wrap items-center gap-6">
+  <div class="flex h-field min-w-org-card-w flex-1 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo hover:border-border-field-hover">
+    <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+    <input
+      type="text"
+      dir="auto"
+      autocomplete="off"
+      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'perm.tree.search' | transloco"
+      [attr.aria-label]="'perm.tree.search' | transloco"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+    />
+    @if (search()) {
+      <button
+        type="button"
+        class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'perm.tree.clearSearch' | transloco"
+        [title]="'perm.tree.clearSearch' | transloco"
+        (click)="clearSearch()"
+      >
+        <ng-icon name="tablerX" size="14" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <div class="w-org-card-w shrink-0">
+    <ui-dropdown
+      class="w-full"
+      size="field"
+      [options]="filterOptions()"
+      [label]="'perm.tree.filterLabel' | transloco"
+      [(value)]="filter"
+    />
+  </div>
+
+  <div class="flex shrink-0 items-center gap-4">
+    <button type="button" uiButton variant="ghost" size="small" (click)="expandAll()">
+      {{ 'perm.tree.expandAll' | transloco }}
+    </button>
+    <button type="button" uiButton variant="ghost" size="small" (click)="collapseAll()">
+      {{ 'perm.tree.collapseAll' | transloco }}
+    </button>
+  </div>
+</div>
+
+@if (!hasAnySelectable()) {
+  <div class="flex flex-1 items-center justify-center rounded-10 border border-border bg-surface p-16 text-center text-12 text-text-muted">
+    {{ 'perm.tree.noMatch' | transloco }}
+  </div>
+} @else if (filteredModules().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center">
+    <p class="text-12 text-text-muted">{{ 'perm.tree.noMatch' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" size="small" (click)="clearSearch()">
+      {{ 'perm.tree.clearSearch' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div
+    role="tree"
+    aria-multiselectable="true"
+    [attr.aria-label]="'perm.tree.label' | transloco"
+    class="min-h-0 flex-1 overflow-y-auto rounded-10 border border-border bg-surface"
+  >
+    @for (mod of filteredModules(); track mod.node.id; let modFirst = $first) {
+      @let modKey = moduleKey(mod.node.id);
+      @let modExpanded = isExpanded(modKey);
+      @let modDisabled = moduleGroupDisabled(mod);
+      @let modStateKey = stateTextKey(mod.state);
+      @let modName = moduleLabelText(mod.node);
+
+      <div
+        #treeItemEl
+        role="treeitem"
+        [attr.data-node-id]="modKey"
+        [attr.aria-level]="1"
+        [attr.aria-expanded]="modExpanded"
+        [attr.aria-checked]="mod.state === 'partial' ? 'mixed' : mod.state === 'all'"
+        [attr.aria-disabled]="modDisabled ? 'true' : null"
+        [attr.tabindex]="rowTabIndex(modKey)"
+        [attr.title]="limitTitle(mod.state === 'none' && atLimit() && !readonly())"
+        class="flex h-tab cursor-pointer items-center gap-6 bg-surface-muted px-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo"
+        [class.border-t]="!modFirst"
+        [class.border-border]="!modFirst"
+        (focus)="onTreeItemFocus(modKey)"
+        (click)="toggleExpand(modKey)"
+        (keydown)="onModuleKeydown($event, modKey, mod)"
+      >
+        <span
+          class="relative inline-flex size-checkbox-size shrink-0"
+          [class.opacity-drag-source]="modDisabled"
+          [class.cursor-not-allowed]="modDisabled"
+          [attr.inert]="modDisabled ? '' : null"
+          (click)="$event.stopPropagation()"
+        >
+          <ui-checkbox
+            aria-hidden="true"
+            tabindex="-1"
+            [checked]="mod.state === 'all'"
+            (checkedChange)="toggleModule(mod)"
+          />
+          @if (mod.state === 'partial') {
+            <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+              <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+            </span>
+          }
+        </span>
+
+        <span class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text" [title]="modName">
+          {{ modName }}
+        </span>
+
+        @if (modStateKey) {
+          <span class="shrink-0 text-11 leading-16 text-text-muted">
+            {{ modStateKey | transloco }}
+          </span>
+        }
+
+        <span class="shrink-0 text-11 leading-16 text-text-muted tabular-nums">
+          {{ 'perm.tree.ofTotal' | transloco: { n: mod.selectedCount, total: mod.totalCount } }}
+        </span>
+
+        <span
+          class="inline-flex shrink-0 text-text-muted transition-transform duration-fast"
+          [class.rotate-180]="modExpanded"
+        >
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </div>
+
+      @if (modExpanded) {
+        @for (area of mod.areas; track area.node.id) {
+          @let areaKeyId = areaKey(area.node.id);
+          @let areaExpanded = isExpanded(areaKeyId);
+          @let areaDisabled = areaGroupDisabled(area);
+          @let areaName = i18nText(area.node.label);
+
+          <div
+            #treeItemEl
+            role="treeitem"
+            [attr.data-node-id]="areaKeyId"
+            [attr.aria-level]="2"
+            [attr.aria-expanded]="areaExpanded"
+            [attr.aria-checked]="area.state === 'partial' ? 'mixed' : area.state === 'all'"
+            [attr.aria-disabled]="areaDisabled ? 'true' : null"
+            [attr.tabindex]="rowTabIndex(areaKeyId)"
+            [attr.title]="limitTitle(area.state === 'none' && atLimit() && !readonly())"
+            style="padding-inline-start: calc(var(--space-8) + var(--tree-indent))"
+            class="flex h-menu-item cursor-pointer items-center gap-6 border-t border-border pe-8 outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo"
+            (focus)="onTreeItemFocus(areaKeyId)"
+            (click)="toggleExpand(areaKeyId)"
+            (keydown)="onAreaKeydown($event, areaKeyId, modKey, area)"
+          >
+            <span
+              class="relative inline-flex size-checkbox-size shrink-0"
+              [class.opacity-drag-source]="areaDisabled"
+              [class.cursor-not-allowed]="areaDisabled"
+              [attr.inert]="areaDisabled ? '' : null"
+              (click)="$event.stopPropagation()"
+            >
+              <ui-checkbox
+                aria-hidden="true"
+                tabindex="-1"
+                [checked]="area.state === 'all'"
+                (checkedChange)="toggleArea(area)"
+              />
+              @if (area.state === 'partial') {
+                <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                  <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+                </span>
+              }
+            </span>
+
+            <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text" [title]="areaName">
+              {{ areaName }}
+            </span>
+
+            <span
+              class="inline-flex shrink-0 text-text-muted transition-transform duration-fast"
+              [class.rotate-180]="areaExpanded"
+            >
+              <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+            </span>
+          </div>
+
+          @if (areaExpanded) {
+            @for (res of area.resources; track res.node.id) {
+              @let resKeyId = resourceKey(res.node.id);
+              @let resExpanded = isExpanded(resKeyId);
+              @let resDisabled = resourceGroupDisabled(res);
+              @let resStateKey = stateTextKey(res.state);
+              @let resName = resourceLabelText(mod.node.id, res.node);
+
+              <div
+                #treeItemEl
+                role="treeitem"
+                [attr.data-node-id]="resKeyId"
+                [attr.aria-level]="3"
+                [attr.aria-expanded]="resExpanded"
+                [attr.aria-checked]="res.state === 'partial' ? 'mixed' : res.state === 'all'"
+                [attr.aria-disabled]="resDisabled ? 'true' : null"
+                [attr.tabindex]="rowTabIndex(resKeyId)"
+                [attr.title]="limitTitle(res.state === 'none' && atLimit() && !readonly())"
+                style="padding-inline-start: calc(var(--space-8) + var(--tree-indent) * 2)"
+                class="flex h-menu-item cursor-pointer items-center gap-6 border-t border-border pe-8 outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo"
+                (focus)="onTreeItemFocus(resKeyId)"
+                (click)="toggleExpand(resKeyId)"
+                (keydown)="onResourceKeydown($event, resKeyId, areaKeyId, res)"
+              >
+                <span
+                  class="relative inline-flex size-checkbox-size shrink-0"
+                  [class.opacity-drag-source]="resDisabled"
+                  [class.cursor-not-allowed]="resDisabled"
+                  [attr.inert]="resDisabled ? '' : null"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-checkbox
+                    aria-hidden="true"
+                    tabindex="-1"
+                    [checked]="res.state === 'all'"
+                    (checkedChange)="toggleResource(res)"
+                  />
+                  @if (res.state === 'partial') {
+                    <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                      <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+                    </span>
+                  }
+                </span>
+
+                <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text" [title]="resName">
+                  {{ resName }}
+                </span>
+
+                @if (resStateKey) {
+                  <span class="shrink-0 text-11 leading-16 text-text-muted">
+                    {{ resStateKey | transloco }}
+                  </span>
+                }
+              </div>
+
+              @if (resExpanded) {
+                @for (action of res.actions; track action.baseKey) {
+                  @let actKeyId = actionKey(action.baseKey);
+                  @let resolved = actionSelection(action);
+                  @let actDisabled = isActionDisabled(action, resolved.checked);
+                  @let actDisabledByLimit = !readonly() && !resolved.checked && atLimit();
+                  @let actName = i18nText(action.label);
+
+                  <div
+                    #treeItemEl
+                    role="treeitem"
+                    [attr.data-node-id]="actKeyId"
+                    [attr.aria-level]="4"
+                    [attr.aria-checked]="resolved.checked"
+                    [attr.aria-disabled]="actDisabled ? 'true' : null"
+                    [attr.tabindex]="rowTabIndex(actKeyId)"
+                    [attr.title]="limitTitle(actDisabledByLimit)"
+                    style="padding-inline-start: calc(var(--space-8) + var(--tree-indent) * 3)"
+                    class="flex min-h-menu-item items-center gap-8 border-t border-border pe-8 outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo"
+                    [class.cursor-pointer]="!actDisabled"
+                    [class.cursor-not-allowed]="actDisabled"
+                    (focus)="onTreeItemFocus(actKeyId)"
+                    (click)="!actDisabled ? toggleAction(action) : null"
+                    (keydown)="onActionKeydown($event, actKeyId, resKeyId, action)"
+                  >
+                    <span
+                      class="relative inline-flex size-checkbox-size shrink-0"
+                      [class.opacity-drag-source]="actDisabled"
+                      [class.cursor-not-allowed]="actDisabled"
+                      [attr.inert]="actDisabled ? '' : null"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <ui-checkbox
+                        aria-hidden="true"
+                        tabindex="-1"
+                        [checked]="resolved.checked"
+                        (checkedChange)="toggleAction(action)"
+                      />
+                    </span>
+
+                    <div class="min-w-0 flex-1 py-2">
+                      <span
+                        class="block truncate text-12 leading-18"
+                        [class]="actDisabledByLimit ? 'text-text-muted' : 'text-text'"
+                        [title]="actName"
+                      >
+                        {{ actName }}
+                      </span>
+                      @if (resolved.hasMultiScope && resolved.activeScope) {
+                        <span class="block truncate text-11 leading-16 text-warning-text">
+                          {{ 'perm.tree.multiScope' | transloco: { scope: scopeLabel(resolved.activeScope) } }}
+                        </span>
+                      }
+                    </div>
+
+                    @if (action.hasScopes && resolved.activeScope) {
+                      <div class="w-org-card-w shrink-0" (click)="$event.stopPropagation()">
+                        <ui-dropdown
+                          class="w-full"
+                          size="field"
+                          [options]="scopeOptionsFor(action)"
+                          [value]="resolved.activeScope"
+                          [label]="'perm.tree.scopeLabel' | transloco: { action: actName }"
+                          [disabled]="readonly() || !resolved.checked || actDisabled"
+                          (valueChange)="setActionScope(action, $event)"
+                        />
+                      </div>
+                    }
+                  </div>
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  </div>
+}
+
+@if (mode() === 'BRANCH' && tenantModules().length > 0) {
+  <section class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+    <div class="flex flex-wrap items-center gap-6">
+      <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <span class="min-w-0 flex-1 text-12 leading-18 text-text-muted">
+        {{ 'perm.strip.text' | transloco }}
+      </span>
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        size="small"
+        [attr.aria-expanded]="showTenantOnly()"
+        (click)="showTenantOnly.update((open) => !open)"
+      >
+        {{ (showTenantOnly() ? 'perm.strip.hide' : 'perm.strip.show') | transloco: { n: totalTenantCount() } }}
+      </button>
+    </div>
+
+    @if (showTenantOnly()) {
+      <p class="text-11 leading-16 text-text-muted">
+        {{ 'perm.strip.note' | transloco }}
+      </p>
+      <div class="flex max-h-time-list-max flex-col gap-6 overflow-y-auto rounded-8 border border-border bg-surface p-8">
+        @for (mod of tenantModules(); track mod.id) {
+          <div class="flex flex-col gap-2">
+            <span class="text-12 leading-18 font-medium text-text">
+              {{ moduleLabelText(mod) }}
+            </span>
+            <div class="flex flex-wrap gap-4">
+              @for (action of tenantModuleActions(mod); track action.baseKey) {
+                <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+                  {{ i18nText(action.label) }}
+                </span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </section>
+}

@@ -1,0 +1,26 @@
+/* Reset the browser popover defaults (zero specificity, so utility classes still win). Do not set inset here. */
+:where([popover]) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.phone-incoming-popover {
+  top: calc(var(--nav-h) + var(--space-12));
+  bottom: auto;
+  inset-inline: 0;
+  margin-inline: auto;
+  max-width: calc(100% - 2 * var(--space-12));
+}
+
+.phone-dock-popover {
+  inset: auto;
+  bottom: 0;
+  inset-inline-end: var(--space-12);
+}
+
+.phone-dock-popover:not(:popover-open) {
+  display: none;
+}

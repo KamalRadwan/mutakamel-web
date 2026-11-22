@@ -1,0 +1,118 @@
+{
+  "toolbar": {
+    "new": "New conversion",
+    "searchItem": "Search item",
+    "searchingItems": "Searching products…",
+    "noMatchingItems": "No matching products.",
+    "searchItemsFailed": "Could not search products.",
+    "pickItemLabel": "Matching products",
+    "closeSearchList": "Close product suggestions"
+  },
+  "filter": {
+    "label": "Filter by status",
+    "hint": "Filter the unit conversions by status",
+    "all": "All",
+    "clear": "Clear filters"
+  },
+  "table": {
+    "ariaLabel": "Unit of measure conversions",
+    "item": "Item",
+    "conversion": "Conversion",
+    "revision": "Revision",
+    "effectiveFrom": "Effective from",
+    "status": "Status",
+    "published": "Published",
+    "actions": "Actions",
+    "revisionValue": "Rev. {{n}}",
+    "conversionExpr": "1 {{from}} = {{factor}} {{to}}",
+    "pagination": "Unit conversion pages"
+  },
+  "empty": {
+    "title": "No unit conversions yet",
+    "text": "Define how alternate sales or purchase units convert to an item's base unit.",
+    "noResults": "No results",
+    "loadFailed": "Could not load unit conversions."
+  },
+  "actions": {
+    "open": "Open",
+    "newRevision": "New revision",
+    "publish": "Publish",
+    "retire": "Retire"
+  },
+  "publish": {
+    "title": "Publish revision {{n}}",
+    "confirm": "Publish",
+    "retiresMessage": "Publishing retires revision {{n}}.",
+    "firstMessage": "New stock operations will use this conversion.",
+    "done": "Revision {{n}} published"
+  },
+  "retire": {
+    "title": "Retire revision {{n}}",
+    "confirm": "Retire",
+    "message": "New operations can no longer use this conversion. Past movements keep it.",
+    "done": "Revision {{n}} retired"
+  },
+  "transitionAlert": {
+    "title": "Action could not be completed",
+    "TRANSITION_NOT_ALLOWED": "This conversion cannot change status right now.",
+    "FUTURE_REPLACEMENT_UNSUPPORTED": "A replacement must already be effective. Change the date to now or earlier in a new revision.",
+    "EFFECTIVE_FROM_NOT_AFTER_PREDECESSOR": "Effective date must be later than the currently published revision.",
+    "PUBLISHED_REVISION_EXISTS": "Another revision is already published for this item and unit. The list was refreshed; try again.",
+    "CONTENT_HASH_MISMATCH": "This revision changed on the server and its checksum no longer matches. Reload and try again."
+  },
+  "modal": {
+    "newTitle": "New conversion",
+    "newRevisionTitle": "New revision",
+    "viewTitle": "Conversion · Rev. {{n}}",
+    "item": "Item",
+    "itemHint": "A stock-tracked product.",
+    "fromUnit": "From unit",
+    "fromUnitHint": "The item default sales or purchase unit.",
+    "selectFromUnit": "Select unit",
+    "noOtherUnits": "This item has no other unit to convert.",
+    "toUnit": "To unit",
+    "toUnitHint": "Always the item base unit.",
+    "numerator": "Numerator",
+    "numeratorHint": "Whole number. One from-unit equals numerator ÷ denominator base units.",
+    "denominator": "Denominator",
+    "denominatorHint": "Whole number, usually 1.",
+    "effectiveFrom": "Effective from",
+    "effectiveFromHint": "When it replaces a published revision it must already be effective.",
+    "revision": "Revision",
+    "revisionHint": "Sequential revision number for this item and unit pair.",
+    "status": "Status",
+    "statusHint": "Current lifecycle state of this revision.",
+    "id": "Revision ID",
+    "idHint": "Unique identifier for this revision.",
+    "publishedAt": "Published at",
+    "publishedAtHint": "When this revision was published.",
+    "publishedBy": "Published by",
+    "publishedByHint": "User who published this revision.",
+    "publishReason": "Publish reason",
+    "publishReasonHint": "Why this revision was published.",
+    "retiredAt": "Retired at",
+    "retiredAtHint": "When this revision was retired.",
+    "retiredBy": "Retired by",
+    "retiredByHint": "User who retired this revision.",
+    "retireReason": "Retire reason",
+    "retireReasonHint": "Why this revision was retired.",
+    "preview": "1 {{from}} = {{factor}} {{to}} · 10 {{from}} = {{ten}} {{to}}",
+    "notExact": "(not exact)",
+    "predecessorWarning": "Saved as a draft. Publishing it will retire revision {{n}}.",
+    "createDraft": "Create draft",
+    "created": "Draft revision {{n}} created"
+  },
+  "date": {
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minutes"
+  },
+  "validation": {
+    "positiveInteger": "Enter a whole number greater than 0.",
+    "invalidDate": "Enter a valid date and time.",
+    "itemNotStockTracked": "Choose a stock-tracked product.",
+    "nonExactResult": "This factor does not produce an exact result."
+  }
+}

@@ -1,0 +1,141 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerCalendarEvent"
+  tile="bg-icon-teal"
+  [title]="'wsActivities.picker.title' | transloco"
+  [closeLabel]="'toast.close' | transloco"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <div class="grid grid-cols-2 gap-10">
+      <ui-field
+        [label]="'wsActivities.picker.app' | transloco"
+        [hint]="'wsActivities.picker.appHint' | transloco"
+        [required]="true"
+        [for]="uid + '-app'"
+        [bare]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-app'"
+          [describedBy]="uid + '-app-hint'"
+          [label]="'wsActivities.picker.app' | transloco"
+          [options]="appOptions()"
+          [value]="selectedApp()"
+          (valueChange)="onAppChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'wsActivities.picker.recordType' | transloco"
+        [hint]="'wsActivities.picker.recordTypeHint' | transloco"
+        [required]="true"
+        [for]="uid + '-type'"
+        [bare]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-type'"
+          [describedBy]="uid + '-type-hint'"
+          [label]="'wsActivities.picker.recordType' | transloco"
+          [options]="typeOptions()"
+          [value]="selectedType()"
+          (valueChange)="onTypeChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <ui-field
+      [label]="'wsActivities.picker.record' | transloco"
+      [hint]="'wsActivities.picker.recordHint' | transloco"
+      [required]="true"
+      [for]="uid + '-search'"
+      [bare]="true"
+    >
+      <div
+        class="flex h-field items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+      >
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          [id]="uid + '-search'"
+          type="text"
+          autocomplete="off"
+          maxlength="100"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'wsActivities.picker.searchPlaceholder' | transloco"
+          [attr.aria-label]="'wsActivities.picker.record' | transloco"
+          [attr.aria-describedby]="uid + '-search-hint'"
+          [value]="search()"
+          (input)="onSearchInput($event)"
+        />
+        @if (search()) {
+          <button
+            type="button"
+            class="inline-flex size-hint-size shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'wsActivities.clearSearch' | transloco"
+            (click)="clearSearch()"
+          >
+            <ng-icon name="tablerX" size="12" aria-hidden="true" />
+          </button>
+        }
+      </div>
+
+      <div
+        role="listbox"
+        [attr.aria-label]="'wsActivities.picker.record' | transloco"
+        [attr.aria-busy]="loading()"
+        class="mt-6 flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 scrollbar-thin"
+      >
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div class="h-menu-item rounded-6 bg-neutral-soft motion-safe:animate-pulse" aria-hidden="true"></div>
+          }
+        } @else if (loadFailed()) {
+          <div class="flex flex-col items-center gap-6 p-12 text-center">
+            <p class="text-12 text-danger-text">{{ 'wsActivities.picker.loadFailed' | transloco }}</p>
+            <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
+              {{ 'wsActivities.picker.retry' | transloco }}
+            </button>
+          </div>
+        } @else if (results().length === 0) {
+          <p class="p-12 text-center text-12 text-text-muted">{{ 'wsActivities.picker.empty' | transloco }}</p>
+        } @else {
+          @for (option of results(); track option.targetApp + ':' + option.targetType + ':' + option.targetId) {
+            @let chosen = isTargetSelected(option);
+            <button
+              type="button"
+              role="option"
+              class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="chosen ? 'bg-brand-soft font-medium text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+              [attr.aria-selected]="chosen"
+              (click)="selectTarget(option)"
+              (dblclick)="confirmWith(option)"
+            >
+              <span class="min-w-0 flex-1 truncate">{{ option.label }}</span>
+              @if (chosen) {
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              }
+            </button>
+          }
+        }
+      </div>
+    </ui-field>
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [disabled]="!selectedTarget()"
+    (click)="confirm()"
+  >
+    {{ 'wsActivities.picker.next' | transloco }}
+  </button>
+  <button modal-footer type="button" uiButton variant="secondary" (click)="close()">
+    {{ 'wsActivities.picker.cancel' | transloco }}
+  </button>
+</ui-modal>

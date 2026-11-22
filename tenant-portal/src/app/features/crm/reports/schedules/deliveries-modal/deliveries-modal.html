@@ -1,0 +1,84 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerHistory"
+  tile="bg-icon-navy"
+  [title]="'repSchedules.deliveries.title' | transloco"
+  [subtitle]="subscription()?.name ?? ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (loadError()) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'analytics.common.loadFailed' | transloco"
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="reload()"
+    />
+  } @else {
+    <ui-data-table
+      [columns]="columns()"
+      [rows]="deliveries()"
+      [rowKey]="rowKey"
+      [loading]="loading()"
+      [emptyText]="'repSchedules.deliveries.empty' | transloco"
+      [label]="'repSchedules.deliveries.title' | transloco"
+    >
+      <ng-template uiCell="scheduledFor" let-row>
+        <span class="truncate text-12 text-text-muted">{{ formatWhen(row.scheduledFor) }}</span>
+      </ng-template>
+
+      <ng-template uiCell="recipientUserId" let-row>
+        @let name = recipientName(row.recipientUserId);
+        <span class="truncate text-13 font-medium text-text" [attr.title]="name">{{ name }}</span>
+      </ng-template>
+
+      <ng-template uiCell="status" let-row>
+        @let note = statusTooltip(row);
+        <ui-badge
+          [tone]="statusTone(row.status)"
+          [attr.title]="note"
+          [attr.aria-describedby]="note ? 'delivery-note-' + row.id : null"
+        >
+          {{ statusLabelKey(row) | transloco }}
+        </ui-badge>
+        @if (note) {
+          <span [id]="'delivery-note-' + row.id" class="sr-only">{{ note }}</span>
+        }
+      </ng-template>
+
+      <ng-template uiCell="attempts" let-row>
+        {{ formatAttempts(row.attempts) }}
+      </ng-template>
+
+      <ng-template uiCell="openedCount" let-row>
+        <ui-badge tone="count">{{ row.openedCount }}</ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="lastOpenedAt" let-row>
+        <span class="truncate text-12 text-text-muted">{{ formatWhen(row.lastOpenedAt) }}</span>
+      </ng-template>
+    </ui-data-table>
+
+    @if (hasMore()) {
+      <div class="flex justify-center pt-8">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'repSchedules.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'analytics.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

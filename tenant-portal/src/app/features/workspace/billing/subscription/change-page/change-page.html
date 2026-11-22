@@ -1,0 +1,404 @@
+@if (!isOwner) {
+  <app-billing-forbidden />
+} @else {
+  <header class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <div class="flex min-w-0 items-center gap-8">
+      <a
+        [routerLink]="['/workspace/billing/subscription']"
+        class="inline-flex size-btn shrink-0 items-center justify-center rounded-8 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'bsub.change.back' | transloco"
+        [title]="'bsub.change.back' | transloco"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </a>
+      <h1 #pageHeading tabindex="-1" class="truncate text-15 leading-22 font-medium text-text outline-none">{{ 'bsub.change.title' | transloco }}</h1>
+    </div>
+  </header>
+
+  @if (loading() && !subscription()) {
+    <div class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card" aria-busy="true">
+      <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+      @for (row of skeletonRows; track row) {
+        <div class="grid grid-cols-1 gap-8 desktop:grid-cols-3">
+          <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+          <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+          <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+        </div>
+      }
+    </div>
+  } @else if (loadFailed() && !subscription()) {
+    <app-billing-failed [correlationId]="correlationId()" (retry)="reload()" />
+  } @else if (subscription(); as sub) {
+    <nav
+      class="flex items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+      [attr.aria-label]="'bsub.change.title' | transloco"
+    >
+      @for (item of steps; track item.num; let last = $last) {
+        @let done = step() === 3 || step() > item.num;
+        @let active = step() !== 3 && step() === item.num;
+        <div class="flex shrink-0 items-center gap-6" [attr.aria-current]="active ? 'step' : null">
+          <span
+            class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 leading-16 font-medium tabular-nums"
+            [class]="
+              done
+                ? 'bg-success text-on-success'
+                : active
+                  ? 'bg-brand text-on-brand'
+                  : 'bg-neutral-soft text-text-muted'
+            "
+          >
+            @if (done) {
+              <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+            } @else {
+              {{ item.num }}
+            }
+          </span>
+          <span
+            class="text-12 leading-18 whitespace-nowrap"
+            [class]="active || done ? 'font-medium text-text' : 'text-text-muted'"
+          >
+            {{ 'bsub.change.steps.' + item.key | transloco }}
+          </span>
+        </div>
+        @if (!last) {
+          <span
+            class="h-2 flex-1 rounded-full"
+            [class]="done ? 'bg-brand' : 'bg-border'"
+            aria-hidden="true"
+          ></span>
+        }
+      }
+    </nav>
+
+    @if (step() === 1) {
+      <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        @if (cart().length) {
+          <div class="flex flex-col gap-8">
+            @for (row of cart(); track row.selectionKey; let idx = $index) {
+              <app-change-row
+                [row]="row"
+                [subscription]="sub"
+                [catalogueGroups]="catalogueGroups()"
+                [catalogueOffers]="catalogueOffers()"
+                [allRows]="cart()"
+                [submitted]="step1Submitted()"
+                (changed)="updateRow(idx, $event)"
+                (removed)="removeRow(idx)"
+              />
+            }
+          </div>
+        } @else {
+          <p class="rounded-8 border border-border bg-surface-muted p-16 text-center text-12 leading-18 text-text-muted">
+            {{ 'bsub.change.emptyCart' | transloco }}
+          </p>
+        }
+
+        <div #addMenuHost class="relative inline-flex self-start">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="addMenuOpen()"
+            (click)="toggleAddMenu()"
+          >
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            {{ 'bsub.change.addChange' | transloco }}
+          </button>
+
+          @if (addMenuOpen()) {
+            <div
+              role="menu"
+              class="absolute start-0 top-full z-dropdown mt-4 flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+              [attr.aria-label]="'bsub.change.addChange' | transloco"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="addAppAvailable() ? 'cursor-pointer hover:bg-row-hover' : 'cursor-not-allowed opacity-drag-source'"
+                [disabled]="!addAppAvailable()"
+                [attr.title]="addAppAvailable() ? null : ('bsub.change.addMenu.noAppsLeft' | transloco)"
+                (click)="addRow('add-app')"
+              >
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+                  <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                </span>
+                <span class="text-12 font-medium" [class]="addAppAvailable() ? 'text-text' : 'text-text-placeholder'">
+                  {{ 'bsub.change.addMenu.addApp' | transloco }}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="changeSeatsAvailable() ? 'cursor-pointer hover:bg-row-hover' : 'cursor-not-allowed opacity-drag-source'"
+                [disabled]="!changeSeatsAvailable()"
+                [attr.title]="changeSeatsAvailable() ? null : ('bsub.change.addMenu.noItemsLeft' | transloco)"
+                (click)="addRow('change-seats')"
+              >
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+                  <ng-icon name="tablerUsers" size="14" aria-hidden="true" />
+                </span>
+                <span class="text-12 font-medium" [class]="changeSeatsAvailable() ? 'text-text' : 'text-text-placeholder'">
+                  {{ 'bsub.change.addMenu.changeSeats' | transloco }}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="upgradeTierAvailable() ? 'cursor-pointer hover:bg-row-hover' : 'cursor-not-allowed opacity-drag-source'"
+                [disabled]="!upgradeTierAvailable()"
+                [attr.title]="upgradeTierAvailable() ? null : ('bsub.change.addMenu.noUpgradesLeft' | transloco)"
+                (click)="addRow('upgrade-tier')"
+              >
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+                  <ng-icon name="tablerTrendingUp" size="14" aria-hidden="true" />
+                </span>
+                <span class="text-12 font-medium" [class]="upgradeTierAvailable() ? 'text-text' : 'text-text-placeholder'">
+                  {{ 'bsub.change.addMenu.upgradeTier' | transloco }}
+                </span>
+              </button>
+            </div>
+          }
+        </div>
+
+        <ui-field
+          size="multiline"
+          [for]="uid + '-reason'"
+          [label]="'bsub.change.reason' | transloco"
+          [hint]="'bsub.change.reasonHint' | transloco"
+          [count]="reason().trim().length"
+          [max]="maxReasonLen"
+          [error]="reasonError()"
+        >
+          <textarea
+            [id]="uid + '-reason'"
+            rows="2"
+            class="min-w-0 flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'bsub.change.reasonPlaceholder' | transloco"
+            [value]="reason()"
+            [attr.aria-invalid]="reasonError() ? 'true' : null"
+            (input)="onReasonInput($event)"
+            (blur)="reasonTouched.set(true)"
+          ></textarea>
+        </ui-field>
+
+        <footer class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            [disabled]="!canReview()"
+            (click)="startReview()"
+          >
+            {{ 'bsub.change.reviewBtn' | transloco }}
+          </button>
+          <a uiButton variant="secondary" [routerLink]="['/workspace/billing/subscription']">
+            {{ 'bill.common.cancel' | transloco }}
+          </a>
+          <span class="ms-auto text-12 leading-18 text-text-muted tabular-nums">
+            {{ 'bsub.change.stepCounter' | transloco: stepCounterParams() }}
+          </span>
+        </footer>
+      </section>
+    } @else if (step() === 2) {
+      <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        @if (reviewPhase() === 'preparing' || reviewPhase() === 'quoting') {
+          <div class="flex flex-col items-center justify-center gap-8 p-16 text-center" role="status" aria-live="polite" aria-busy="true">
+            <ng-icon name="tablerLoader2" size="20" class="animate-spin text-brand-text" aria-hidden="true" />
+            <p class="text-13 leading-18 font-medium text-text">
+              {{ (reviewPhase() === 'preparing' ? 'bsub.change.preparing' : 'bsub.change.quoting') | transloco }}
+            </p>
+          </div>
+        } @else if (preview(); as currentPreview) {
+          <app-quote-view
+            [preview]="currentPreview"
+            [itemLabels]="quoteItemLabels()"
+            [tierNames]="tierNames()"
+            [expired]="quoteExpired()"
+            [remainingText]="remainingText()"
+            [refreshing]="refreshingQuote()"
+            (refreshPrice)="refreshQuote()"
+          />
+        }
+
+        <footer class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          @if (preview() && quoteExpired()) {
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [loading]="refreshingQuote()"
+              [disabled]="refreshingQuote() || cancelling()"
+              (click)="refreshQuote()"
+            >
+              <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+              {{ 'bsub.change.refreshPrice' | transloco }}
+            </button>
+          } @else if (canConfirmApply()) {
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [loading]="applying()"
+              [disabled]="applying() || cancelling() || refreshingQuote()"
+              (click)="confirmApply()"
+            >
+              {{ 'bsub.change.confirmBtn' | transloco }}
+            </button>
+          }
+
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [loading]="cancelling()"
+            [disabled]="cancelling() || applying()"
+            (click)="goBackToStep1()"
+          >
+            {{ 'bill.common.back' | transloco }}
+          </button>
+
+          <span class="ms-auto text-12 leading-18 text-text-muted tabular-nums">
+            {{ 'bsub.change.stepCounter' | transloco: stepCounterParams() }}
+          </span>
+        </footer>
+      </section>
+    } @else if (step() === 3 && receipt(); as doneReceipt) {
+      <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        <div class="flex items-start gap-10 rounded-8 border border-border bg-surface-muted p-12">
+          <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+            <ng-icon name="tablerCircleCheck" size="18" aria-hidden="true" />
+          </span>
+          <div class="flex min-w-0 flex-1 flex-col gap-4">
+            <h2 #doneHeading tabindex="-1" class="text-16 leading-24 font-medium text-text outline-none">{{ 'bsub.change.done.title' | transloco }}</h2>
+
+            <p class="text-13 leading-18 text-text">
+              {{ 'bsub.change.done.newRecurring' | transloco }}:
+              <bdi dir="ltr" class="font-medium tabular-nums">
+                {{ formatUsd(doneReceipt.totals.combinedRecurringUsd) }}
+              </bdi>
+              <span class="text-text-muted">{{ receiptCycleUnitKey() | transloco }}</span>
+            </p>
+
+            @if (doneReceipt.settlement; as settle) {
+              <p class="text-12 leading-18 text-text-muted tabular-nums">
+                @if (settle.direction === 'DEBIT') {
+                  {{
+                    'bsub.change.done.settlementDebit'
+                      | transloco: { amount: formatUsd(settle.amountUsd), balance: formatUsd(settle.balanceAfterUsd) }
+                  }}
+                } @else {
+                  {{
+                    'bsub.change.done.settlementCredit'
+                      | transloco: { amount: formatUsd(settle.amountUsd), balance: formatUsd(settle.balanceAfterUsd) }
+                  }}
+                }
+              </p>
+            }
+          </div>
+        </div>
+
+        <footer class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          <a uiButton variant="primary" [routerLink]="['/workspace/billing/subscription']">
+            {{ 'bsub.change.done.backToSubscription' | transloco }}
+          </a>
+          <a
+            uiButton
+            variant="secondary"
+            [routerLink]="['/workspace/billing/overview']"
+            [queryParams]="{ tab: 'wallet' }"
+          >
+            {{ 'bsub.change.done.viewWallet' | transloco }}
+          </a>
+          <span class="ms-auto text-12 leading-18 text-text-muted tabular-nums">
+            {{ 'bsub.change.stepCounter' | transloco: stepCounterParams() }}
+          </span>
+        </footer>
+      </section>
+    }
+  }
+}
+
+<ui-unsaved-dialog
+  [title]="'bsub.change.unsaved.title' | transloco"
+  [text]="'bsub.change.unsaved.text' | transloco"
+  [saveLabel]="'bsub.change.unsaved.keep' | transloco"
+  [discardLabel]="'bsub.change.unsaved.discard' | transloco"
+  [cancelLabel]="'bsub.change.unsaved.cancel' | transloco"
+/>
+
+<ui-modal
+  #journalModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'bsub.change.journal.title' | transloco"
+  [closeLabel]="'bill.common.close' | transloco"
+  [dismissable]="false"
+  (closed)="onJournalModalClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'bsub.change.journal.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="journalBusy()"
+      [disabled]="journalBusy()"
+      (click)="continueJournal()"
+    >
+      {{ 'bsub.change.journal.continue' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="journalBusy()"
+      (click)="discardJournal()"
+    >
+      {{ 'bsub.change.journal.discard' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'bsub.change.conflict.title' | transloco"
+  [closeLabel]="'bill.common.close' | transloco"
+  [dismissable]="!reloadingConflict()"
+  (closed)="onConflictModalClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'bsub.change.conflict.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="reloadingConflict()"
+      [disabled]="reloadingConflict()"
+      (click)="reloadAfterConflict()"
+    >
+      {{ 'bsub.change.conflict.reload' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="reloadingConflict()"
+      (click)="keepChangesOnConflict()"
+    >
+      {{ 'bsub.change.conflict.keep' | transloco }}
+    </button>
+  </div>
+</ui-modal>

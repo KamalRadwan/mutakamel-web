@@ -1,0 +1,29 @@
+@if (items().length > 0) {
+  <ul class="m-0 flex list-none flex-col divide-y divide-border p-0" [attr.aria-label]="title()">
+    @for (item of items(); track item.id) {
+      <li>
+        <button
+          type="button"
+          class="flex min-h-table-row w-full cursor-pointer items-center gap-8 px-4 py-4 text-start outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="openRecord.emit(item.entityRef)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+            aria-hidden="true"
+          >
+            <ng-icon name="tablerBellRinging" size="14" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-12 leading-16 font-medium text-text" [title]="item.title">
+              {{ item.title }}
+            </span>
+            <span class="block truncate text-11 leading-16 text-text-muted" [title]="item.subtitle">
+              {{ item.datePart }}@if (item.clockPart) { <bdi dir="ltr">{{ item.clockPart }}</bdi>} · {{ item.reason }}
+            </span>
+          </span>
+          <ui-badge [tone]="item.tone">{{ item.severityLabel }}</ui-badge>
+        </button>
+      </li>
+    }
+  </ul>
+}

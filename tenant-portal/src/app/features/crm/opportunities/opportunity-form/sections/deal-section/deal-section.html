@@ -1,0 +1,51 @@
+@let titleErr = errorText('title', limits.title);
+@let descErr = errorText('description', limits.description);
+
+<div [class]="layout() === 'page' ? pageGrid : 'flex flex-col gap-8'">
+  <ui-field
+    [label]="'oppForm.deal.title' | transloco"
+    [for]="uid + '-title'"
+    [hint]="'oppForm.deal.titleHint' | transloco"
+    [required]="true"
+    [count]="draft().title.length"
+    [max]="limits.title"
+    [error]="titleErr"
+  >
+    <input
+      #titleInput
+      [id]="uid + '-title'"
+      type="text"
+      dir="auto"
+      [attr.maxlength]="limits.title"
+      aria-required="true"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [readonly]="readonly()"
+      [value]="draft().title"
+      [attr.aria-invalid]="titleErr ? 'true' : null"
+      (input)="setTitle($event)"
+    />
+  </ui-field>
+
+  <div [class]="layout() === 'page' ? 'col-span-2' : ''">
+    <ui-field
+      size="multiline"
+      [label]="'oppForm.deal.description' | transloco"
+      [for]="uid + '-description'"
+      [hint]="'oppForm.deal.descriptionHint' | transloco"
+      [count]="draft().description.length"
+      [max]="limits.description"
+      [error]="descErr"
+    >
+      <textarea
+        [id]="uid + '-description'"
+        rows="3"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="readonly()"
+        [value]="draft().description"
+        [attr.aria-invalid]="descErr ? 'true' : null"
+        (input)="setDescription($event)"
+      ></textarea>
+    </ui-field>
+  </div>
+</div>

@@ -1,0 +1,262 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerBuildingStore"
+  tile="bg-icon-teal"
+  [title]="(mode() === 'create' ? 'branches.modal.new' : 'branches.modal.title') | transloco"
+  [closeLabel]="'branches.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-1">
+      @if (mode() === 'create') {
+        <app-org-cascade
+          [levels]="['company']"
+          [required]="['company']"
+          [readonly]="!canManage()"
+          [disabledLevels]="saving() ? ['company'] : []"
+          [activeOnly]="true"
+          [errors]="companyError() ? { company: companyError()! } : {}"
+          [hints]="{ company: ('branches.fields.companyHint' | transloco) }"
+          [value]="cascadeValue()"
+          (valueChange)="onCascadeChange($event)"
+        />
+      } @else {
+        <ui-field
+          [for]="uid + '-company'"
+          [label]="'branches.fields.company' | transloco"
+          [hint]="'branches.fields.companyHint' | transloco"
+          [error]="companyError()"
+        >
+          <input
+            [id]="uid + '-company'"
+            type="text"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="selectedCompanyName()"
+            readonly
+          />
+        </ui-field>
+      }
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'branches.fields.code' | transloco"
+        [hint]="(mode() === 'create' ? 'branches.fields.codeHint' : 'branches.fields.codeLocked') | transloco"
+        [required]="mode() === 'create'"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [maxLength]="limits.code"
+          [value]="code()"
+          [readOnly]="mode() === 'edit' || !canManage() || saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name'"
+        [label]="'branches.fields.name' | transloco"
+        [hint]="'branches.fields.nameHint' | transloco"
+        [required]="true"
+        [count]="nameCount()"
+        [max]="limits.name"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="name()"
+          [readOnly]="!canManage() || saving()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          (input)="onNameInput($event)"
+          (blur)="markTouched('name')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [for]="uid + '-phone'"
+        [label]="'branches.fields.phone' | transloco"
+        [hint]="'branches.fields.phoneHint' | transloco"
+        [error]="phoneError()"
+      >
+        <ui-phone-input
+          [countries]="countries()"
+          [defaultIso2]="defaultCountryIso2()"
+          [label]="'branches.fields.phone' | transloco"
+          [inputId]="uid + '-phone'"
+          [disabled]="saving()"
+          [readonly]="!canManage()"
+          [invalid]="!!phoneError()"
+          [value]="phone()"
+          (valueChange)="onPhoneChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [for]="uid + '-address'"
+        [label]="'branches.fields.address' | transloco"
+        [hint]="'branches.fields.addressHint' | transloco"
+        [count]="addressCount()"
+        [max]="limits.address"
+        [error]="addressError()"
+      >
+        <textarea
+          [id]="uid + '-address'"
+          rows="2"
+          class="min-h-textarea min-w-0 flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="address()"
+          [readOnly]="!canManage() || saving()"
+          [attr.aria-invalid]="addressError() ? 'true' : null"
+          (input)="onAddressInput($event)"
+          (blur)="markTouched('address')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [for]="uid + '-hq'"
+        [label]="'branches.fields.hq' | transloco"
+        [hint]="hqHintText()"
+        [error]="hqError()"
+      >
+        <div
+          class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+        >
+          @if (isHeadquarters()) {
+            <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+              <ng-icon name="tablerStar" size="11" aria-hidden="true" />
+              <span>{{ 'branches.hq' | transloco }}</span>
+            </span>
+          } @else {
+            <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+              {{ 'branches.fields.notHq' | transloco }}
+            </span>
+          }
+          <ui-switch
+            [id]="uid + '-hq'"
+            [checked]="isHeadquarters()"
+            [disabled]="hqSwitchDisabled()"
+            [label]="'branches.fields.hq' | transloco"
+            [describedBy]="uid + '-hq-hint' + (hqError() ? ' ' + uid + '-hq-error' : '')"
+            (checkedChange)="onHqChange($event)"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-active'"
+          [label]="'branches.fields.active' | transloco"
+          [hint]="'branches.fields.activeHelp' | transloco"
+        >
+          <div
+            class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+          >
+            <app-staff-status-badge [status]="isActive() ? 'ACTIVE' : 'INACTIVE'" />
+            <ui-switch
+              [id]="uid + '-active'"
+              [(checked)]="isActive"
+              [disabled]="!canManage() || saving()"
+              [label]="'branches.fields.active' | transloco"
+              [describedBy]="uid + '-active-hint'"
+            />
+          </div>
+        </ui-field>
+        <app-seat-impact
+          class="mt-8"
+          [changes]="statusSeatChanges()"
+          [compact]="true"
+          [canBuySeats]="isOwner()"
+          (blocking)="seatBlocked.set($event)"
+        />
+        @if (statusBlocked()) {
+          <p class="mt-4 text-12 leading-18 text-warning-text">{{ 'staff.errors.SEAT_LIMIT_REACHED' | transloco }}</p>
+        }
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || statusBlocked() || (mode() === 'edit' && !dirty())"
+      >
+        {{ 'branches.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
+          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+          {{ 'branches.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'branches.unsaved' | transloco }}</span>
+      }
+
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+        {{ (mode() === 'create' ? 'branches.cancel' : 'branches.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [disabled]="saving()"
+          (click)="requestDelete()"
+        >
+          {{ 'branches.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'branches.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'branches.confirm.discardTitle' | transloco"
+  [text]="'branches.confirm.discardText' | transloco"
+  [confirmLabel]="'branches.confirm.discardConfirm' | transloco"
+  [cancelLabel]="'branches.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #staleDialog
+  tone="warning"
+  [title]="'branches.confirm.staleTitle' | transloco"
+  [text]="'branches.confirm.staleText' | transloco"
+  [confirmLabel]="'branches.confirm.reload' | transloco"
+  [cancelLabel]="'branches.confirm.keepChanges' | transloco"
+/>

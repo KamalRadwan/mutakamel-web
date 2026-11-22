@@ -1,0 +1,149 @@
+@if (state.loadError(); as errKind) {
+  <ui-full-state
+    [kind]="errKind"
+    [title]="fullStateTitle()"
+    [text]="fullStateText()"
+    [actionLabel]="errKind === 'load-failure' ? ('builder.loadError.retry' | transloco) : ''"
+    (action)="retryLoad()"
+  />
+} @else if (state.loading() && !state.catalog()) {
+  <div class="flex flex-col gap-8">
+    <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      @for (line of skeletonLines; track line) {
+        <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="rounded-10 border border-border bg-surface p-8 shadow-card">
+    <ui-stepper
+      [steps]="stepItems()"
+      [clickable]="stepperClickable()"
+      [label]="'builder.stepperLabel' | transloco"
+      [stateLabels]="stepStateLabels()"
+      (stepSelected)="onStepSelect($event)"
+    />
+  </div>
+
+  <div class="grid min-h-0 flex-1 grid-cols-12 items-start gap-8">
+    <div
+      #formPane
+      class="col-span-12 flex min-w-0 flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card desktop:col-span-5"
+    >
+      @if (state.formError(); as formError) {
+        <div
+          class="rounded-8 border border-danger-border bg-danger-soft p-6 text-13 leading-20 text-danger-text"
+          role="alert"
+        >
+          {{ formError }}
+        </div>
+      }
+      @switch (state.step()) {
+        @case ('data') {
+          <app-step-data />
+        }
+        @case ('metrics') {
+          <app-step-metrics />
+        }
+        @case ('scope') {
+          <app-step-scope />
+        }
+        @case ('compare') {
+          <app-step-compare />
+        }
+        @case ('presentation') {
+          <app-step-presentation />
+        }
+        @case ('review') {
+          <app-step-review />
+        }
+      }
+    </div>
+
+    <div class="col-span-12 min-w-0 desktop:col-span-7">
+      <app-builder-preview />
+    </div>
+  </div>
+
+  <footer class="sticky bottom-0 z-sticky flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8 shadow-card">
+    @if (state.step() === 'review') {
+      @if (canSave()) {
+        <button
+          type="button"
+          uiButton
+          [variant]="state.publishReady() ? 'secondary' : 'primary'"
+          [loading]="state.saving()"
+          (click)="save()"
+        >
+          <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+          <span>{{ 'builder.footer.save' | transloco }}</span>
+        </button>
+      }
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        (click)="onPrevious()"
+      >
+        {{ 'builder.footer.previous' | transloco }}
+      </button>
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        (click)="onNext()"
+      >
+        {{ 'builder.footer.next' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="isFirstStep()"
+        (click)="onPrevious()"
+      >
+        {{ 'builder.footer.previous' | transloco }}
+      </button>
+      @if (canSave()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [loading]="state.saving()"
+          (click)="onSaveDraft()"
+        >
+          <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+          <span>{{ 'builder.footer.saveDraft' | transloco }}</span>
+        </button>
+      }
+    }
+
+    @if (state.dirty()) {
+      <span class="inline-flex items-center gap-4 text-11 text-warning-text">
+        <span class="size-unread-dot shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
+        <span>{{ 'analytics.common.unsaved' | transloco }}</span>
+      </span>
+    }
+
+    <span class="min-w-0 flex-1" aria-hidden="true"></span>
+
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      (click)="state.refreshPreview()"
+    >
+      <ng-icon name="tablerRefresh" size="15" class="text-icon-teal" aria-hidden="true" />
+      <span>{{ 'builder.footer.refreshPreview' | transloco }}</span>
+    </button>
+  </footer>
+}
+
+<ui-conflict-dialog
+  [open]="conflictOpen()"
+  [recordLabel]="state.draft().name"
+  (openChange)="onConflictOpenChange($event)"
+  (reload)="onConflictChoice('reload')"
+  (keepEditing)="onConflictChoice('keep')"
+/>

@@ -1,0 +1,107 @@
+@if (failed()) {
+  <div class="flex flex-col items-center gap-8 p-16 text-center">
+    <p class="text-12 text-danger-text" role="alert">{{ 'customers.empty.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="retryLoad()">
+      {{ 'customers.empty.retry' | transloco }}
+    </button>
+  </div>
+} @else if ((!ready() || loading()) && lanes().length === 0) {
+  <div class="flex shrink-0 items-start gap-8 overflow-x-auto pb-8" aria-busy="true">
+    @for (lane of skeletonLanes; track lane) {
+      <div class="flex min-w-kanban-col-min flex-1 flex-col gap-8 rounded-14 bg-neutral-soft p-8 shadow-card">
+        <div class="flex items-center gap-6">
+          <span class="h-skeleton-line w-1/2 rounded-6 bg-surface"></span>
+          <span class="h-badge w-badge rounded-full bg-surface"></span>
+        </div>
+        <span class="h-status-bar w-full rounded-2 bg-status-none"></span>
+        @for (card of skeletonCards; track card) {
+          <div class="rounded-10 border border-border bg-surface p-8 shadow-card">
+            <div class="flex items-center gap-8">
+              <span class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft"></span>
+              <div class="flex min-w-0 flex-1 flex-col gap-4">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+              </div>
+            </div>
+            <div class="my-8 h-border bg-border"></div>
+            <div class="flex items-center justify-between gap-8">
+              <span class="h-badge w-1/3 rounded-8 bg-neutral-soft"></span>
+              <span class="size-avatar rounded-full bg-neutral-soft"></span>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+} @else if (!loading() && totalItems() === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-10 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    @if (hasFilter()) {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerSearch" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-14 leading-20 font-medium text-text">{{ 'customers.empty.noMatches' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="clearSearch.emit()">
+        {{ 'customers.empty.clearSearch' | transloco }}
+      </button>
+    } @else {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerUsers" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-14 leading-20 font-medium text-text">{{ 'customers.empty.noCustomers' | transloco }}</p>
+      @if (canCreate()) {
+        <button type="button" uiButton (click)="create.emit('PROSPECT')">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          {{ 'customers.new' | transloco }}
+        </button>
+      }
+    }
+  </div>
+} @else {
+  <app-record-board
+    [lanes]="boardLanes()"
+    [itemTemplate]="customerCardTpl"
+    [idOf]="itemId"
+    [canDrag]="canDragItem"
+    [loading]="loading()"
+    [collapseStorageKey]="collapseStorageKey"
+    [labels]="boardLabels()"
+    (loadMore)="onLoadMore($event)"
+    (create)="onCreate($event)"
+    (move)="onMove($event)"
+  />
+}
+
+<ng-template #customerCardTpl let-customer let-lane="lane">
+  <app-customer-card
+    [item]="customer"
+    [detailed]="false"
+    [canUpdate]="canUpdate(customer)"
+    [canDelete]="canDelete(customer)"
+    [expanded]="openCards()[lane.id] === customer.id"
+    (expandedChange)="setExpanded(lane.id, customer.id, $event)"
+    (rate)="rate(customer, $event)"
+    (recolor)="recolor(customer, $event)"
+    (delete)="remove(customer)"
+    (view)="view.emit(customer)"
+    (activities)="activities.emit(customer)"
+  />
+</ng-template>
+
+<ui-confirm-dialog
+  #blacklistDialog
+  class="absolute"
+  tone="warning"
+  [title]="'customers.board.blacklistConfirm.title' | transloco: { name: blacklistingName() }"
+  [text]="'customers.board.blacklistConfirm.body' | transloco"
+  [confirmLabel]="'customers.board.blacklistConfirm.confirm' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteDialog
+  class="absolute"
+  [title]="'customers.delete.title' | transloco: { name: deletingName() }"
+  [text]="(deletingHasSourceLead() ? 'customers.delete.textFromLead' : 'customers.delete.text') | transloco"
+  [confirmLabel]="'common.delete' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>

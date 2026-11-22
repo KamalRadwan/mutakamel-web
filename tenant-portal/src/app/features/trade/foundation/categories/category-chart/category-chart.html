@@ -1,0 +1,110 @@
+<div class="flex min-h-0 flex-1 overflow-x-auto rounded-10 border border-border bg-surface p-16 shadow-card">
+  <div
+    role="group"
+    [attr.aria-label]="'tradeCategories.view.chart' | transloco"
+    class="inline-flex min-w-full items-start justify-center gap-16"
+  >
+    @for (root of roots(); track root.id) {
+      <ng-container *ngTemplateOutlet="nodeSubtree; context: { $implicit: root }" />
+    }
+  </div>
+</div>
+
+<ng-template #nodeSubtree let-node>
+  @let muted = isMuted(node);
+  @let selected = selectedId() === node.id;
+  @let expanded = isExpanded(node.id);
+  @let loaded = isLevelLoaded(node.id);
+  @let loading = isLoading(node.id);
+  @let children = childrenOf(node.id);
+
+  <div class="flex flex-col items-center">
+    <div
+      class="flex min-h-org-card-h w-org-card-w flex-col overflow-hidden rounded-12 border text-start shadow-card transition-colors duration-fast hover:bg-row-hover"
+      [class]="selected ? 'border-brand bg-brand-soft' : 'border-border bg-surface'"
+      [attr.title]="muted ? ('tradeCategories.inactiveBecause' | transloco: { parent: ancestorName(node) }) : null"
+    >
+      <span class="h-org-band w-full shrink-0" [class]="tileClass(node)"></span>
+
+      <div class="flex min-h-0 flex-1 items-center gap-4 px-6 py-4">
+        <button
+          type="button"
+          [attr.aria-pressed]="selected"
+          [attr.aria-label]="node.name"
+          [attr.aria-describedby]="muted ? uid + '-muted-' + node.id : null"
+          class="flex h-full min-w-0 flex-1 cursor-pointer flex-col justify-center rounded-4 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="selectCard(node)"
+          (dblclick)="action.emit({ node, action: 'open' })"
+        >
+          <span
+            class="block w-full truncate text-12 leading-16 font-medium"
+            [class]="muted ? 'text-text-muted' : 'text-text'"
+            [title]="node.name"
+          >
+            {{ node.name }}
+          </span>
+          <span class="block w-full truncate text-11 leading-16 text-text-muted">
+            {{ 'tradeCategories.type' | transloco }} · <bdi dir="ltr">{{ node.code }}</bdi>@if (node.childCount > 0) { · {{ node.childCount }}} · {{ (node.status === 'ACTIVE' ? 'tradeCategories.active' : 'tradeCategories.inactive') | transloco }}
+          </span>
+          @if (muted) {
+            <span [id]="uid + '-muted-' + node.id" class="sr-only">
+              {{ 'tradeCategories.inactiveBecause' | transloco: { parent: ancestorName(node) } }}
+            </span>
+          }
+        </button>
+
+        @if (selected) {
+          <div
+            data-row-action
+            class="shrink-0"
+            (click)="$event.stopPropagation()"
+            (keydown)="$event.stopPropagation()"
+          >
+            <ui-actions-menu
+              [items]="actionsFor()(node)"
+              [label]="node.name"
+              (selected)="onActionSelected(node, $event)"
+            />
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (node.hasChildren) {
+      @if (!expanded || !loaded) {
+        <div class="h-8 w-border-w-check bg-border"></div>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loading"
+          [attr.aria-label]="('tradeCategories.expand' | transloco) + ' ' + node.name"
+          [title]="'tradeCategories.expand' | transloco"
+          (click)="onExpandToggle(node.id, $event)"
+        >
+          @if (!loading) {
+            <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+          }
+          <span class="tabular-nums">{{ node.childCount }}</span>
+        </button>
+      } @else if (children.length > 0) {
+        <div class="h-12 w-border-w-check bg-border"></div>
+
+        <div class="flex items-start justify-center">
+          @for (child of children; track child.id; let first = $first; let last = $last) {
+            <div class="flex flex-col items-center px-6">
+              <div class="flex w-full items-start">
+                <div class="h-border-w-check flex-1" [class.bg-border]="!first"></div>
+                <div class="h-12 w-border-w-check shrink-0 bg-border"></div>
+                <div class="h-border-w-check flex-1" [class.bg-border]="!last"></div>
+              </div>
+
+              <ng-container *ngTemplateOutlet="nodeSubtree; context: { $implicit: child }" />
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</ng-template>

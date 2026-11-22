@@ -1,0 +1,222 @@
+<div class="grid shrink-0 grid-cols-3 gap-x-10 gap-y-8">
+  <ui-field
+    [for]="uid + '-type'"
+    [label]="'callLog.filters.type.label' | transloco"
+    [hint]="'callLog.filters.type.hint' | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      [id]="uid + '-type'"
+      size="field"
+      [label]="'callLog.filters.type.label' | transloco"
+      [options]="typeOptions()"
+      [value]="selectedType()"
+      (valueChange)="onTypeChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    [for]="uid + '-from'"
+    [label]="'callLog.filters.from.label' | transloco"
+    [hint]="'callLog.filters.from.hint' | transloco"
+  >
+    <ui-date-field
+      [id]="uid + '-from'"
+      [ariaLabel]="'callLog.filters.from.label' | transloco"
+      [placeholder]="'callLog.filters.from.placeholder' | transloco"
+      [todayLabel]="'callLog.filters.today' | transloco"
+      [prevMonthLabel]="'callLog.filters.prevMonth' | transloco"
+      [nextMonthLabel]="'callLog.filters.nextMonth' | transloco"
+      [value]="fromDate()"
+      (valueChange)="onFromChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    [for]="uid + '-to'"
+    [label]="'callLog.filters.to.label' | transloco"
+    [hint]="'callLog.filters.to.hint' | transloco"
+  >
+    <ui-date-field
+      [id]="uid + '-to'"
+      [ariaLabel]="'callLog.filters.to.label' | transloco"
+      [placeholder]="'callLog.filters.to.placeholder' | transloco"
+      [todayLabel]="'callLog.filters.today' | transloco"
+      [prevMonthLabel]="'callLog.filters.prevMonth' | transloco"
+      [nextMonthLabel]="'callLog.filters.nextMonth' | transloco"
+      [min]="fromDate()"
+      [value]="toDate()"
+      (valueChange)="onToChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    class="col-span-3"
+    [for]="uid + '-search'"
+    [label]="'callLog.filters.search.label' | transloco"
+    [hint]="'callLog.filters.search.hint' | transloco"
+  >
+    <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+    <input
+      [id]="uid + '-search'"
+      type="text"
+      class="min-w-0 flex-1 bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'callLog.filters.search.placeholder' | transloco"
+      [value]="searchInput()"
+      (input)="onSearchInput($event)"
+    />
+  </ui-field>
+</div>
+
+@if (activeChips().length > 0) {
+  <div class="flex shrink-0 flex-wrap items-center gap-6">
+    @for (chip of activeChips(); track chip.id) {
+      <span class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+        <span class="max-w-modal-alert truncate">{{ chip.label }}</span>
+        <button
+          type="button"
+          class="inline-flex size-counter shrink-0 cursor-pointer items-center justify-center rounded-4 text-on-brand-soft outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'callLog.actions.removeFilter' | transloco"
+          [title]="'callLog.actions.removeFilter' | transloco"
+          (click)="removeChip(chip.id)"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      </span>
+    }
+    <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
+      {{ 'callLog.actions.clearAll' | transloco }}
+    </button>
+  </div>
+}
+
+<div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+  @if (failed() && !loading()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">
+        {{ customErrorMessage() ?? ('callLog.states.error' | transloco) }}
+      </p>
+      @if (!customErrorMessage()) {
+        <button type="button" uiButton variant="primary" size="small" (click)="retry()">
+          {{ 'callLog.actions.retry' | transloco }}
+        </button>
+      }
+    </div>
+  } @else if (!loading() && items().length === 0 && !hasActiveFilters()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerHistory" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'callLog.states.empty' | transloco }}</p>
+    </div>
+  } @else if (!loading() && items().length === 0 && hasActiveFilters()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerFilter" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'callLog.states.noMatch' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="clearFilters()">
+        {{ 'callLog.actions.clearFilters' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-modal-form"
+        [attr.aria-label]="'callLog.tableLabel' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="tableColumnsClass()"
+        >
+          @for (col of columns(); track col; let first = $first) {
+            @if (col === 'actions') {
+              <span role="columnheader" [class.border-s]="!first" [class.border-on-nav-line]="!first">
+                <span class="sr-only">{{ 'callLog.cols.actions' | transloco }}</span>
+              </span>
+            } @else {
+              <span
+                role="columnheader"
+                class="flex min-w-0 items-center truncate px-10"
+                [class.justify-end]="col === 'duration'"
+                [class.border-s]="!first"
+                [class.border-on-nav-line]="!first"
+              >
+                {{ ('callLog.cols.' + col) | transloco }}
+              </span>
+            }
+          }
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="tableColumnsClass()"
+            >
+              @for (col of columns(); track col; let first = $first) {
+                @switch (col) {
+                  @case ('type') {
+                    <span role="cell" class="flex min-w-0 items-center gap-8 px-10" [class.border-s]="!first" [class.border-border]="!first">
+                      <span class="size-icon-tile-sm shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+                      <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+                    </span>
+                  }
+                  @case ('duration') {
+                    <span role="cell" class="flex min-w-0 items-center justify-end px-10" [class.border-s]="!first" [class.border-border]="!first">
+                      <span class="h-skeleton-line w-1/2 animate-pulse rounded-6 bg-neutral-soft"></span>
+                    </span>
+                  }
+                  @case ('actions') {
+                    <span role="cell" class="flex items-center justify-center" [class.border-s]="!first" [class.border-border]="!first">
+                      <span class="size-btn-h-sm animate-pulse rounded-6 bg-neutral-soft"></span>
+                    </span>
+                  }
+                  @default {
+                    <span role="cell" class="flex min-w-0 items-center px-10" [class.border-s]="!first" [class.border-border]="!first">
+                      <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+                    </span>
+                  }
+                }
+              }
+            </div>
+          }
+        } @else {
+          @for (item of items(); track item.id) {
+            <app-call-log-row
+              [item]="item"
+              variant="table"
+              [columns]="columns()"
+              [canCallBack]="canCallBack()"
+              [callBackDisabled]="callBackDisabled()"
+              (callBack)="callBack.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+        }
+      </div>
+    </div>
+  }
+</div>
+
+@if (!failed() && total() > 0) {
+  <footer class="shrink-0 border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [pageSizes]="pageSizes()"
+      [label]="'callLog.tableLabel' | transloco"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="onPageChange($event)"
+      (pageSizeChange)="onPageSizeChange($event)"
+    />
+  </footer>
+}

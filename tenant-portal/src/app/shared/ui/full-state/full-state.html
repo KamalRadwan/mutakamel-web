@@ -1,0 +1,24 @@
+<div
+  class="flex flex-col items-center justify-center gap-8 text-center"
+  [attr.role]="kind() === 'load-failure' ? 'alert' : null"
+>
+  <span
+    class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 text-on-icon"
+    [class]="config().tile"
+    aria-hidden="true"
+  >
+    <ng-icon [name]="config().icon" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+  </span>
+
+  <h1 class="text-16 leading-24 font-medium text-text">{{ title() }}</h1>
+
+  @if (text()) {
+    <p class="text-12 leading-18 text-text-muted">{{ text() }}</p>
+  }
+
+  @if (actionLabel()) {
+    <button type="button" uiButton variant="primary" (click)="action.emit()">
+      {{ actionLabel() }}
+    </button>
+  }
+</div>

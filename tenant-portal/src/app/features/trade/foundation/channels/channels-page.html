@@ -1,0 +1,90 @@
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canManage) {
+    <button type="button" uiButton variant="primary" class="shrink-0" (click)="openNew()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'tradeChannels.toolbar.new' | transloco }}
+    </button>
+  }
+
+  <div role="search" [attr.aria-label]="'tradeChannels.toolbar.searchLabel' | transloco" class="min-w-0 flex-1">
+    <ui-facet-search
+      [fields]="searchFields()"
+      [placeholder]="'tradeChannels.toolbar.searchPlaceholder' | transloco"
+      [facets]="facets()"
+      (facetsChange)="onFacetsChange($event)"
+    />
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [attr.aria-label]="'tradeChannels.toolbar.reload' | transloco"
+    [title]="'tradeChannels.toolbar.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+  </button>
+</div>
+
+@if (!loading() && !loadFailed() && totalRows() > limits.page) {
+  @let limited = limitedParts();
+  <p class="px-8 text-12 leading-18 text-text-muted">
+    {{ limited.before }}@if (limited.hasTotal) {<bdi dir="ltr" class="tabular-nums">{{ totalRows() }}</bdi>}{{ limited.after }}
+  </p>
+}
+
+<ui-step-filter
+  class="shrink-0"
+  [steps]="statusSteps()"
+  [label]="'tradeChannels.steps.label' | transloco"
+  [hint]="'tradeChannels.steps.hint' | transloco"
+  [value]="statusFilter()"
+  (valueChange)="onStatusChange($event)"
+/>
+
+<app-channel-table
+  [rows]="rows()"
+  [loading]="loading()"
+  [loadFailed]="loadFailed()"
+  [hasAnyChannels]="hasAnyChannels()"
+  [companyName]="companyName()"
+  [canManage]="canManage"
+  [busyChannelId]="busyChannelId()"
+  (open)="openChannel($event)"
+  (toggleStatus)="onToggleStatus($event)"
+  (create)="openNew()"
+  (clearSearch)="clearSearch()"
+  (retry)="reload()"
+/>
+
+@if (modalOpen()) {
+  <app-channel-modal
+    class="contents"
+    [channelId]="activeChannelId()"
+    [canManage]="canManage"
+    (closed)="onModalClosed()"
+    (saved)="onModalSaved($event)"
+  />
+}
+
+<ui-confirm-dialog
+  #deactivateDialog
+  class="contents"
+  tone="warning"
+  [title]="'tradeChannels.deactivate.title' | transloco: { name: deactivateName() }"
+  [text]="'tradeChannels.deactivate.text' | transloco"
+  [confirmLabel]="'tradeChannels.deactivate.confirm' | transloco"
+  [cancelLabel]="'tradeChannels.deactivate.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  #conflictDialog
+  class="contents"
+  [title]="'tradeChannels.conflict.title' | transloco"
+  [text]="'tradeChannels.conflict.text' | transloco"
+  [saveLabel]="'tradeChannels.conflict.reload' | transloco"
+  [discardLabel]="'tradeChannels.conflict.keep' | transloco"
+  [cancelLabel]="'tradeChannels.unsaved.cancel' | transloco"
+/>

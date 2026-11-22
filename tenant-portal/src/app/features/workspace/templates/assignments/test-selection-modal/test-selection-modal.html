@@ -1,0 +1,232 @@
+<ui-modal
+  size="form"
+  icon="tablerRoute"
+  tile="bg-icon-teal"
+  [title]="'assignments.testModal.title' | transloco"
+  [closeLabel]="'assignments.actions.close' | transloco"
+  [dismissable]="!resolving()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="runTest($event)">
+    <div class="col-span-1 min-w-0">
+      <ui-field
+        size="bare"
+        [for]="uid + '-document'"
+        [label]="'assignments.testModal.documentLabel' | transloco"
+        [hint]="'assignments.testModal.documentHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-document'"
+          [options]="documentOptions()"
+          [value]="adapterKey()"
+          [label]="'assignments.testModal.documentLabel' | transloco"
+          [describedBy]="uid + '-document-hint'"
+          [disabled]="resolving()"
+          (valueChange)="adapterKey.set($event); onInputChange()"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1 min-w-0">
+      <ui-field
+        size="bare"
+        [for]="uid + '-locale'"
+        [label]="'assignments.testModal.languageLabel' | transloco"
+        [hint]="'assignments.testModal.languageHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-locale'"
+          [options]="languageOptions()"
+          [value]="locale()"
+          [label]="'assignments.testModal.languageLabel' | transloco"
+          [describedBy]="uid + '-locale-hint'"
+          [disabled]="resolving()"
+          (valueChange)="locale.set($event); onInputChange()"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2 min-w-0">
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope'"
+        [label]="'assignments.testModal.scopeLabel' | transloco"
+        [hint]="'assignments.testModal.scopeHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scope'"
+          [options]="scopeDropdownOptions()"
+          [value]="scopeKey()"
+          [label]="'assignments.testModal.scopeLabel' | transloco"
+          [describedBy]="uid + '-scope-hint'"
+          [disabled]="resolving()"
+          (valueChange)="scopeKey.set($event); onInputChange()"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2 min-w-0">
+      <ui-field
+        size="bare"
+        [for]="uid + '-business-time'"
+        [label]="'assignments.testModal.businessTimeLabel' | transloco"
+        [hint]="'assignments.testModal.businessTimeHint' | transloco"
+      >
+        <div class="flex items-center gap-6">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            [id]="uid + '-business-time'"
+            [ariaLabel]="'assignments.testModal.businessTimeLabel' | transloco"
+            [describedBy]="uid + '-business-time-hint'"
+            [placeholder]="'assignments.testModal.businessTimePlaceholder' | transloco"
+            [todayLabel]="'assignments.datePicker.today' | transloco"
+            [prevMonthLabel]="'assignments.datePicker.prevMonth' | transloco"
+            [nextMonthLabel]="'assignments.datePicker.nextMonth' | transloco"
+            [disabled]="resolving()"
+            [value]="businessDate()"
+            (valueChange)="onBusinessDateChange($event)"
+          />
+          <ui-time-field
+            class="shrink-0"
+            [id]="uid + '-business-clock'"
+            [ariaLabel]="'assignments.testModal.businessTimeLabel' | transloco"
+            [describedBy]="uid + '-business-time-hint'"
+            [hourLabel]="'assignments.timePicker.hour' | transloco"
+            [minuteLabel]="'assignments.timePicker.minute' | transloco"
+            [disabled]="resolving()"
+            [value]="businessTime()"
+            (valueChange)="onBusinessTimeChange($event)"
+          />
+          @if (businessDate() || businessTime()) {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'assignments.actions.clearDateTime' | transloco"
+              [title]="'assignments.actions.clearDateTime' | transloco"
+              [disabled]="resolving()"
+              (click)="clearBusinessTime()"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+        </div>
+      </ui-field>
+    </div>
+  </form>
+
+  @if (result(); as res) {
+    <section
+      class="mt-10 flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-10"
+      [attr.aria-label]="'assignments.testModal.resultTitle' | transloco"
+    >
+      <h3 class="text-13 leading-18 font-medium text-text">
+        {{ 'assignments.testModal.resultTitle' | transloco }}
+      </h3>
+
+      @if (res.chosen; as chosen) {
+        @let info = chosenTemplateInfo();
+        @let scopeInfo = matchedScopeDescriptor();
+
+        <dl class="grid grid-cols-2 gap-x-10 gap-y-8 text-12 leading-18">
+          <div class="col-span-2 flex items-center justify-between gap-8 border-b border-border pb-6">
+            <dt class="text-text-muted">{{ 'assignments.testModal.chosenVersion' | transloco }}</dt>
+            <dd class="flex min-w-0 items-center gap-6">
+              <span class="truncate font-medium text-text">{{ info?.name }}</span>
+              @if (info?.code) {
+                <span class="truncate text-11 text-text-muted" dir="ltr">{{ info?.code }}</span>
+              }
+              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft" dir="ltr">
+                v{{ chosen.version.versionNumber }}
+              </span>
+            </dd>
+          </div>
+
+          @if (scopeInfo) {
+            <div class="col-span-2 flex items-center justify-between gap-8 border-b border-border pb-6">
+              <dt class="text-text-muted">{{ 'assignments.testModal.matchedScope' | transloco }}</dt>
+              <dd class="flex min-w-0 items-center gap-6">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="scopeInfo.tile"
+                >
+                  <ng-icon [name]="scopeInfo.icon" size="14" aria-hidden="true" />
+                </span>
+                <span class="truncate font-medium text-text">{{ scopeInfo.label }}</span>
+              </dd>
+            </div>
+          }
+
+          <div class="col-span-1 flex items-center justify-between gap-8">
+            <dt class="text-text-muted">{{ 'assignments.testModal.languageMatch' | transloco }}</dt>
+            <dd>
+              <span
+                class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                [class]="chosen.localeMatch === 'EXACT' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text'"
+              >
+                {{
+                  (chosen.localeMatch === 'EXACT'
+                    ? 'assignments.testModal.matchExact'
+                    : 'assignments.testModal.matchDefault') | transloco
+                }}
+              </span>
+            </dd>
+          </div>
+
+          <div class="col-span-1 flex items-center justify-between gap-8">
+            <dt class="text-text-muted">{{ 'assignments.testModal.candidateCount' | transloco }}</dt>
+            <dd class="font-medium tabular-nums text-text" dir="ltr">{{ res.eligibleCandidateCount }}</dd>
+          </div>
+        </dl>
+      } @else {
+        <div class="flex items-start justify-between gap-8">
+          <div class="flex min-w-0 items-start gap-8">
+            <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+              <ng-icon name="tablerCircleOff" size="14" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+              <p class="text-12 leading-18 font-medium text-text">
+                {{ 'assignments.testModal.noMatchTitle' | transloco }}
+              </p>
+              <p class="text-11 leading-16 text-text-muted">
+                {{ 'assignments.testModal.noMatchDescription' | transloco }}
+              </p>
+            </div>
+          </div>
+          <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium tabular-nums text-text" dir="ltr">
+            {{ res.eligibleCandidateCount }}
+          </span>
+        </div>
+      }
+    </section>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      variant="primary"
+      [loading]="resolving()"
+      [disabled]="resolving()"
+    >
+      {{ 'assignments.testModal.run' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="resolving()"
+      (click)="close()"
+    >
+      {{ 'assignments.actions.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

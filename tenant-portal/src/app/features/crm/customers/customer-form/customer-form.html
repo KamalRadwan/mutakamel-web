@@ -1,0 +1,266 @@
+@if (layout() === 'modal') {
+  <div class="flex h-full min-h-0 flex-1 overflow-hidden">
+    <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-y-10 overflow-y-auto px-16 py-10">
+      <app-customer-identity
+        part="type"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="effectiveReadonly()"
+        [mode]="mode()"
+      />
+
+      @if (draft().profileType === 'INDIVIDUAL') {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="navy" icon="tablerUser" [title]="'customerForm.sections.contact' | transloco" />
+          <app-customer-identity
+            part="details"
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="effectiveReadonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+            [crm]="true"
+            [source]="phoneSource()"
+          />
+        </section>
+      } @else {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="navy" icon="tablerBuilding" [title]="'customerForm.sections.company' | transloco" />
+          <app-customer-company
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="effectiveReadonly()"
+            [countries]="countries()"
+            [crm]="true"
+            [source]="phoneSource()"
+          />
+        </section>
+      }
+
+      <app-duplicate-strip
+        [probe]="duplicateProbe()"
+        [check]="checkDuplicates"
+        [disabled]="effectiveReadonly()"
+        openLabelKey="recordDup.openCustomer"
+        (openRecord)="openDuplicate.emit($event)"
+        (blockingChange)="duplicateBlocking.set($event)"
+      />
+
+      @if (draft().profileType === 'CORPORATE') {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="blue" icon="tablerAddressBook" [title]="'customerForm.sections.contacts' | transloco" />
+          <app-record-contacts
+            [contacts]="draft().contacts"
+            (contactsChange)="onContactsChange($event)"
+            [mode]="contactsMode()"
+            layout="modal"
+            [countries]="countries()"
+            [limits]="contactLimits"
+            [errors]="contactErrors()"
+            [readonly]="effectiveReadonly()"
+            [max]="limits.contactsMax"
+            [saveContact]="saveContact()"
+            [loadCompanyContacts]="null"
+            [resetKey]="contactResetKey()"
+            [crm]="true"
+            [source]="phoneSource()"
+            (editingChange)="contactEditingChange.emit($event)"
+          />
+        </section>
+      }
+
+      @if (hasOtherCustomFields()) {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="violet" icon="tablerForms" [title]="'customerForm.sections.custom' | transloco" />
+          <app-record-custom-fields
+            scope="others"
+            layout="modal"
+            [fields]="customFieldsList()"
+            [values]="draft().customFields"
+            [errors]="errors()"
+            [readonly]="effectiveReadonly()"
+            [mode]="mode() === 'create' ? 'create' : 'edit'"
+            [countries]="countries()"
+            (valuesChange)="onCustomFieldsChange($event)"
+          />
+        </section>
+      }
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="blue"
+          icon="tablerDots"
+          [title]="(moreOpen() ? 'customerForm.sections.moreOpen' : 'customerForm.sections.more') | transloco"
+          [expandable]="true"
+          [(expanded)]="moreOpen"
+          [controls]="moreOpen() ? uid + '-more-panel' : null"
+        />
+
+        @if (moreOpen()) {
+          <div [id]="uid + '-more-panel'" class="flex flex-col gap-y-10 pt-2">
+            <app-customer-more
+              layout="modal"
+              [draft]="draft()"
+              (draftChange)="draft.set($event)"
+              [errors]="errors()"
+              [readonly]="effectiveReadonly()"
+              [legacyAddress]="legacyAddress()"
+            />
+          </div>
+        }
+      </section>
+    </div>
+
+    <aside class="flex h-full min-h-0 w-record-side shrink-0 flex-col gap-y-8 overflow-y-auto border-s border-border bg-surface-muted px-16 py-10">
+      <ui-section-bar tone="gradient" icon="tablerTags" [title]="'customerForm.sections.classification' | transloco" />
+      <app-customer-classification
+        layout="modal"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="effectiveReadonly()"
+        [mode]="mode()"
+        [updating]="updating()"
+        [status]="status()"
+        [fallbackOwnerName]="fallbackOwnerName()"
+        (rate)="rate.emit($event)"
+        (recolor)="recolor.emit($event)"
+        (statusChange)="statusChange.emit($event)"
+      />
+    </aside>
+  </div>
+} @else {
+  <div class="flex flex-col gap-10">
+    <section id="cf-classification" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <ui-section-bar tone="gradient" icon="tablerTags" [title]="'customerForm.sections.classification' | transloco" />
+      <app-customer-classification
+        layout="page"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="effectiveReadonly()"
+        [mode]="mode()"
+        [updating]="updating()"
+        [status]="status()"
+        [fallbackOwnerName]="fallbackOwnerName()"
+        (rate)="rate.emit($event)"
+        (recolor)="recolor.emit($event)"
+        (statusChange)="statusChange.emit($event)"
+      />
+    </section>
+
+    @if (draft().profileType === 'INDIVIDUAL') {
+      <section id="cf-contact" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="navy" icon="tablerUser" [title]="'customerForm.sections.contact' | transloco" />
+        <app-customer-identity
+          part="type"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="effectiveReadonly()"
+          [mode]="mode()"
+        />
+        <app-customer-identity
+          part="details"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="effectiveReadonly()"
+          [mode]="mode()"
+          [countries]="countries()"
+          [crm]="true"
+          [source]="phoneSource()"
+        />
+      </section>
+    } @else {
+      <section id="cf-company" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="navy" icon="tablerBuilding" [title]="'customerForm.sections.company' | transloco" />
+        <app-customer-identity
+          part="type"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="effectiveReadonly()"
+          [mode]="mode()"
+        />
+        <app-customer-company
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="effectiveReadonly()"
+          [countries]="countries()"
+          [crm]="true"
+          [source]="phoneSource()"
+        />
+      </section>
+    }
+
+    <app-duplicate-strip
+      [probe]="duplicateProbe()"
+      [check]="checkDuplicates"
+      [disabled]="effectiveReadonly()"
+      openLabelKey="recordDup.openCustomer"
+      (openRecord)="openDuplicate.emit($event)"
+        (blockingChange)="duplicateBlocking.set($event)"
+    />
+
+    @if (draft().profileType === 'CORPORATE') {
+      <section id="cf-contacts" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="blue" icon="tablerAddressBook" [title]="'customerForm.sections.contacts' | transloco" />
+        <app-record-contacts
+          [contacts]="draft().contacts"
+          (contactsChange)="onContactsChange($event)"
+          [mode]="contactsMode()"
+          layout="page"
+          [countries]="countries()"
+          [limits]="contactLimits"
+          [errors]="contactErrors()"
+          [readonly]="effectiveReadonly()"
+          [max]="limits.contactsMax"
+          [saveContact]="saveContact()"
+          [loadCompanyContacts]="null"
+          [resetKey]="contactResetKey()"
+          [crm]="true"
+          [source]="phoneSource()"
+          (editingChange)="contactEditingChange.emit($event)"
+        />
+      </section>
+    }
+
+    @if (hasOtherCustomFields()) {
+      <section id="cf-custom" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="violet" icon="tablerForms" [title]="'customerForm.sections.custom' | transloco" />
+        <app-record-custom-fields
+          scope="others"
+          layout="page"
+          [fields]="customFieldsList()"
+          [values]="draft().customFields"
+          [errors]="errors()"
+          [readonly]="effectiveReadonly()"
+          [mode]="mode() === 'create' ? 'create' : 'edit'"
+          [countries]="countries()"
+          (valuesChange)="onCustomFieldsChange($event)"
+        />
+      </section>
+    }
+
+    <section id="cf-more" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <ui-section-bar tone="blue" icon="tablerDots" [title]="'customerForm.sections.more' | transloco" />
+      <app-customer-more
+        layout="page"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="effectiveReadonly()"
+        [legacyAddress]="legacyAddress()"
+      />
+    </section>
+  </div>
+}

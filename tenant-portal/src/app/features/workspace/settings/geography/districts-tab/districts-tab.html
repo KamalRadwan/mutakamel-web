@@ -1,0 +1,438 @@
+<app-settings-frame
+  [addLabel]="'geoPlaces.districts.new' | transloco"
+  [addDisabled]="!selectedCity()"
+  [addHint]="!selectedCity() ? ('geoPlaces.districts.addHint' | transloco) : null"
+  [searchPlaceholder]="'geoPlaces.districts.search' | transloco"
+  [loading]="loading()"
+  [showAdd]="canManage"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="reload()"
+>
+  <div notices class="rounded-10 border border-border bg-surface p-8 shadow-card">
+    <div class="flex flex-wrap items-start gap-x-10 gap-y-8">
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-country'"
+        [label]="'geoPlaces.filters.country' | transloco"
+        [hint]="'geoPlaces.filters.countryHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-country'"
+          [describedBy]="uid + '-country-hint'"
+          [options]="countryOptions()"
+          [value]="countryId()"
+          [label]="'geoPlaces.filters.country' | transloco"
+          (valueChange)="onCountryChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-state'"
+        [label]="'geoPlaces.filters.state' | transloco"
+        [hint]="'geoPlaces.filters.stateHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-state'"
+          [describedBy]="uid + '-state-hint'"
+          [options]="stateOptions()"
+          [value]="stateId()"
+          [disabled]="!countryId()"
+          [label]="'geoPlaces.filters.state' | transloco"
+          (valueChange)="onStateChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-city'"
+        [label]="'geoPlaces.filters.city' | transloco"
+        [hint]="'geoPlaces.filters.cityHint' | transloco"
+      >
+        <button
+          #cityTrigger
+          type="button"
+          role="combobox"
+          [id]="uid + '-city'"
+          class="inline-flex h-field w-full items-center justify-between gap-6 rounded-8 border px-8 text-12 outline-none transition-colors duration-fast"
+          [class]="
+            !selectedState()
+              ? 'cursor-not-allowed border-border-field bg-neutral-soft text-text-placeholder'
+              : cityPickerOpen()
+                ? 'cursor-pointer border-focus-ring bg-surface-field text-text ring-3 ring-focus-halo'
+                : 'cursor-pointer border-border-field bg-surface-field text-text hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+          "
+          aria-haspopup="listbox"
+          [attr.aria-expanded]="cityPickerOpen()"
+          [attr.aria-controls]="cityPickerOpen() ? uid + '-city-listbox' : null"
+          [attr.aria-label]="('geoPlaces.filters.city' | transloco) + (selectedCityLabel() ? ': ' + selectedCityLabel() : '')"
+          [attr.aria-describedby]="uid + '-city-hint'"
+          [disabled]="!selectedState()"
+          (click)="toggleCityPicker()"
+          (keydown)="onCityTriggerKeydown($event)"
+        >
+          <span class="truncate" [class.text-text-muted]="!selectedCityLabel()">
+            {{ selectedCityLabel() || ('geoPlaces.filters.cityPlaceholder' | transloco) }}
+          </span>
+          <span class="inline-flex shrink-0 text-text-muted">
+            <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+          </span>
+        </button>
+      </ui-field>
+
+      <ui-field
+        class="shrink-0"
+        size="bare"
+        [for]="uid + '-kind-filter'"
+        [label]="'geoPlaces.filters.kind' | transloco"
+        [hint]="'geoPlaces.filters.kindHint' | transloco"
+      >
+        <ui-segmented
+          class="w-fit"
+          [id]="uid + '-kind-filter'"
+          [describedBy]="uid + '-kind-filter-hint'"
+          [label]="'geoPlaces.filters.kind' | transloco"
+          [options]="kindFilterOptions()"
+          [value]="kindFilter()"
+          (valueChange)="onKindFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="shrink-0"
+        size="bare"
+        [for]="uid + '-show-inactive'"
+        [label]="'geoPlaces.filters.showInactive' | transloco"
+        [hint]="'geoPlaces.filters.showInactiveHint' | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-show-inactive'"
+            [describedBy]="uid + '-show-inactive-hint'"
+            [checked]="showInactive()"
+            [label]="'geoPlaces.filters.showInactive' | transloco"
+            (checkedChange)="onShowInactiveChange($event)"
+          />
+        </div>
+      </ui-field>
+    </div>
+  </div>
+
+  @if (!selectedCity()) {
+    <div class="flex flex-col items-center justify-center rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <p class="text-12 text-text-muted">{{ 'geoPlaces.chooseCity' | transloco }}</p>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-danger-text">{{ 'geoPlaces.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'geoPlaces.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto overflow-y-hidden pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'geoPlaces.cols.districts' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'geoPlaces.cols.nameEn' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'geoPlaces.cols.nameAr' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'geoPlaces.cols.kind' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'geoPlaces.cols.updated' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'geoPlaces.cols.status' | transloco }}
+          </span>
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'geoPlaces.cols.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading() && visibleDistricts().length === 0) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns()"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (district of visibleDistricts(); track district.id) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumns()"
+              (click)="onRowClick(district, $event)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <button
+                  type="button"
+                  dir="ltr"
+                  class="cursor-pointer truncate rounded-4 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="$event.stopPropagation(); openEdit(district)"
+                >
+                  {{ district.nameEn }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span dir="rtl" class="truncate">{{ district.nameAr }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium"
+                  [class]="district.kind === 'VILLAGE' ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text'"
+                >
+                  {{ 'geoPlaces.kind.' + district.kind | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(district.updatedAt) }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (district.isActive) {
+                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success px-8 text-12 font-medium text-on-success">
+                    {{ 'geoPlaces.active' | transloco }}
+                  </span>
+                } @else {
+                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+                    {{ 'geoPlaces.inactive' | transloco }}
+                  </span>
+                }
+              </span>
+
+              @if (canManage) {
+                <span role="cell" data-row-action class="flex items-center justify-center border-s border-border">
+                  <ui-actions-menu
+                    [items]="rowActions(district)"
+                    [label]="'geoPlaces.cols.actions' | transloco"
+                    (selected)="onRowAction(district, $event)"
+                  />
+                </span>
+              }
+            </div>
+          } @empty {
+            <div role="row" class="mt-6 flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+              <span role="cell" class="text-12 text-text-muted">{{ 'geoPlaces.noResults' | transloco }}</span>
+              @if (debouncedSearch()) {
+                <button type="button" uiButton variant="secondary" size="small" (click)="clearSearch()">
+                  {{ 'geoPlaces.clearSearch' | transloco }}
+                </button>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (!loading() && nextCursor()) {
+      <div class="flex justify-center pt-4">
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [loading]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'geoPlaces.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+
+  @if (selectedCity() && !loadFailed()) {
+    <span footer>{{ 'geoPlaces.shown' | transloco: { count: visibleDistricts().length } }}</span>
+  }
+</app-settings-frame>
+
+@if (cityPickerOpen()) {
+  <div
+    #cityPopover
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!cityPickerPlaced()"
+    [style.top.px]="cityPickerPlace().top"
+    [style.inset-inline-start.px]="cityPickerPlace().start"
+    [style.min-width.px]="cityPickerPlace().width"
+    [style.max-height.px]="cityPickerPlace().maxHeight"
+    (keydown)="onCityPopoverKeydown($event)"
+    (focusout)="onCityPopoverFocusOut($event)"
+  >
+    <div
+      class="mb-4 flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #citySearchInput
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        [attr.aria-expanded]="true"
+        [attr.aria-controls]="uid + '-city-listbox'"
+        [attr.aria-activedescendant]="
+          cityActiveIndex() >= 0 && cityActiveIndex() < cityOptionsList().length
+            ? uid + '-city-opt-' + cityActiveIndex()
+            : null
+        "
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'geoPlaces.cities.search' | transloco"
+        [attr.aria-label]="'geoPlaces.cities.search' | transloco"
+        [value]="citySearchText()"
+        (input)="onCitySearchInput($event)"
+        (keydown)="onCitySearchKeydown($event)"
+      />
+    </div>
+
+    <ul
+      [id]="uid + '-city-listbox'"
+      role="listbox"
+      class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+      [attr.aria-label]="'geoPlaces.filters.city' | transloco"
+    >
+      @for (option of cityOptionsList(); track option.id; let idx = $index) {
+        @let isSelected = option.id === cityId();
+        <li
+          #cityOptionItem
+          [id]="uid + '-city-opt-' + idx"
+          role="option"
+          [attr.aria-selected]="isSelected"
+          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12"
+          [class]="
+            isSelected
+              ? 'bg-brand-soft text-on-brand-soft'
+              : idx === cityActiveIndex()
+                ? 'bg-row-hover text-text'
+                : 'text-text hover:bg-row-hover'
+          "
+          (click)="selectCityOption(option)"
+        >
+          <span class="flex min-w-0 items-center gap-6">
+            <span class="truncate">{{ cityOptionLabel(option) }}</span>
+            @if (!option.isActive) {
+              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+                {{ 'geoPlaces.inactive' | transloco }}
+              </span>
+            }
+          </span>
+          @if (isSelected) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </li>
+      } @empty {
+        <li
+          role="option"
+          aria-disabled="true"
+          aria-selected="false"
+          class="flex h-menu-item items-center px-8 text-12 text-text-muted"
+        >
+          {{ 'geoPlaces.noResults' | transloco }}
+        </li>
+      }
+    </ul>
+  </div>
+}
+
+<app-place-form-modal
+  [canManage]="canManage"
+  [locationPath]="locationPath()"
+  (districtSaved)="onDistrictSaved($event)"
+  (districtDeleteRequested)="requestDelete($event)"
+  (notFound)="onDistrictNotFound($event)"
+/>
+
+<ui-confirm-dialog
+  #confirmDelete
+  tone="danger"
+  [title]="'geoPlaces.delete.title' | transloco: { name: deletingName() }"
+  [text]="'geoPlaces.delete.text' | transloco"
+  [confirmLabel]="'geoPlaces.actions.delete' | transloco"
+  [cancelLabel]="'geoPlaces.modal.cancel' | transloco"
+/>
+
+<ui-modal
+  #inUseModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'geoPlaces.inUse.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!deactivating()"
+  (closed)="inUseState.set(null)"
+>
+  @if (inUseState(); as info) {
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'geoPlaces.inUse.textDistrict' | transloco }}
+    </p>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (inUseState()?.district?.isActive) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="deactivating()"
+        (click)="deactivateInUseDistrict()"
+      >
+        {{ 'geoPlaces.inUse.makeInactive' | transloco }}
+      </button>
+    }
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="deactivating()"
+      (click)="closeInUseModal()"
+    >
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

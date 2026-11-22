@@ -1,0 +1,202 @@
+{
+  "bar": {
+    "readOnlyHint": "Only the owner or a workspace-wide manager can change these settings."
+  },
+  "common": {
+    "edit": "Edit",
+    "readOnly": "Read only"
+  },
+  "status": {
+    "SUSPENDED": "Suspended"
+  },
+  "sender": {
+    "title": "Sender details",
+    "replyToSame": "Same as the from address",
+    "notSetUp": "Not set up yet"
+  },
+  "provider": {
+    "change": "Change provider",
+    "smtpSettings": "SMTP settings",
+    "next": "Next: SMTP settings",
+    "platform-shared": "Platform shared provider",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "available": "Available",
+    "unavailable": "Unavailable"
+  },
+  "domain": {
+    "title": "Domain verification",
+    "verified": "Verified",
+    "notVerified": "Not verified",
+    "verifiedAt": "Verified on {{date}}",
+    "dns": "DNS details",
+    "verify": "Verify domain"
+  },
+  "delivery": {
+    "title": "Delivery status",
+    "switchLabel": "Email delivery",
+    "switchHint": "When off, the workspace stops sending email through this sender",
+    "hintBlocked": "Verify the sender domain first."
+  },
+  "limits": {
+    "title": "Sending limits",
+    "edit": "Edit limits",
+    "usePlan": "Use the plan limit",
+    "plan": "Plan: {{daily}} per day, {{perMinute}} per minute."
+  },
+  "fields": {
+    "fromName": {
+      "label": "From name",
+      "hint": "Up to 200 characters."
+    },
+    "fromAddress": {
+      "label": "From address",
+      "hint": "Must use the sender domain."
+    },
+    "replyTo": {
+      "label": "Reply-to address",
+      "hint": "Optional. Leave blank to use the from address."
+    },
+    "senderDomain": {
+      "label": "Sender domain",
+      "hint": "The domain you send from. Changing it clears verification."
+    },
+    "providerDriver": {
+      "label": "Delivery provider",
+      "hint": "SMTP uses your own mail server. The shared provider needs no setup."
+    },
+    "smtpHost": {
+      "label": "Host",
+      "hint": "The mail server name, for example smtp.example.com."
+    },
+    "smtpPort": {
+      "label": "Port",
+      "hint": "25, 465, 587 or 2525. Port 587 with encryption is usual."
+    },
+    "smtpUsername": {
+      "label": "Username",
+      "hint": "The login for the mail server."
+    },
+    "smtpProtocol": {
+      "label": "Protocol",
+      "hint": "SMTPS encrypts from the start and requires encryption."
+    },
+    "smtpPassword": {
+      "label": "Password",
+      "hint": "Stored encrypted, never shown again."
+    },
+    "smtpSecure": {
+      "label": "Encrypted connection",
+      "hint": "Connects with TLS. Required for SMTPS."
+    },
+    "dkimSelector": {
+      "label": "DKIM selector",
+      "hint": "Lowercase letters, numbers, _ and - only."
+    },
+    "dkimHost": {
+      "label": "DKIM record name",
+      "hint": "Publish your DKIM record at this DNS name."
+    },
+    "dailyQuota": {
+      "label": "Daily limit",
+      "hint": "Emails per day, up to your plan limit."
+    },
+    "rateLimitPerMin": {
+      "label": "Per-minute limit",
+      "hint": "Emails per minute, up to your plan limit."
+    }
+  },
+  "notice": {
+    "resetsVerification": "Saving clears the domain verification and pauses sending until you verify again."
+  },
+  "smtp": {
+    "passwordPlaceholder": "Leave blank to keep it",
+    "test": "Test connection",
+    "testNeedsSave": "Save your changes first. The test uses saved settings."
+  },
+  "probe": {
+    "ok": "Connection succeeded",
+    "note": "Checks that the server is reachable and the login works. No email is sent."
+  },
+  "dns": {
+    "modal": "Domain verification (DNS)",
+    "notSet": "Not set",
+    "saveSelector": "Save selector",
+    "valueNote": "The expected record value is not shown here. If the domain does not verify, contact support.",
+    "copy": "Copy"
+  },
+  "conflict": {
+    "title428": "Reload required before saving",
+    "title409": "Settings changed in another session",
+    "load": "Load latest",
+    "review": "Review latest",
+    "keep": "Keep my changes",
+    "useLatest": "Use latest saved",
+    "field": "Field",
+    "mine": "Your change",
+    "latest": "Latest saved",
+    "password": "New password entered",
+    "blank": "Blank",
+    "same": "Your changes match the saved values."
+  },
+  "suppression": {
+    "title": "Email suppressions",
+    "modal": "Suppression check",
+    "address": {
+      "label": "Email address",
+      "hint": "Used only for this check and never stored in the browser."
+    },
+    "check": "Check",
+    "checking": "Checking...",
+    "blocked": "This workspace blocks delivery to this address.",
+    "clear": "No workspace block found for this address.",
+    "reasonLabel": "Reason",
+    "reason": {
+      "HARD_BOUNCE": "Permanent bounce",
+      "COMPLAINT": "Spam complaint"
+    },
+    "first": "First recorded",
+    "last": "Last recorded",
+    "lift": {
+      "button": "Lift block",
+      "title": "Lift the block for this address?",
+      "text": "Lifts this workspace's block. Previous emails are not resent.",
+      "ok": "The block was lifted.",
+      "none": "No block was active for this address."
+    },
+    "errors": {
+      "invalidAddress": "Enter a valid email address.",
+      "rateLimited": "Too many requests. Wait a minute.",
+      "failed": "Could not complete the check."
+    }
+  },
+  "states": {
+    "failedTitle": "Could not load the email settings",
+    "notReadyTitle": "Email is still being prepared",
+    "blockedTitle": "Email access is blocked by your access policy",
+    "notEntitledTitle": "Email is not in your plan"
+  },
+  "toast": {
+    "saved": "Email settings saved",
+    "verified": "Sender domain verified",
+    "copied": "Copied"
+  },
+  "errors": {
+    "idemMismatch": "This change no longer matches the earlier attempt. Save again.",
+    "address": "Enter a valid email address.",
+    "domainMismatch": "The from address must use the sender domain.",
+    "domain": "Enter a valid domain, for example example.com.",
+    "required": "This field is required.",
+    "passwordRequired": "Enter the password.",
+    "smtpsNeedsSecure": "SMTPS requires encryption.",
+    "selector": "Lowercase letters, numbers, _ and - only.",
+    "limitRange": "Enter a whole number from 1 to {{max}}.",
+    "noChanges": "No changes to save.",
+    "TENANT_EMAIL_CONFIG_INVALID": "These settings are not valid. Check the values and try again.",
+    "TENANT_EMAIL_CONFIG_QUOTA_EXCEEDS_PLAN": "The limit cannot exceed your plan limit.",
+    "TENANT_EMAIL_CONFIG_VERIFICATION_FAILED": "DNS verification for the sender domain did not pass.",
+    "TENANT_EMAIL_CONFIG_DKIM_PROOF_NOT_REGISTERED": "No DKIM record is registered for this domain and selector. Contact your administrator.",
+    "TENANT_SMTP_CONNECTION_FAILED": "Could not connect to the SMTP server. Check the host, port and login.",
+    "TENANT_EMAIL_CONFIG_DEPENDENCY_UNAVAILABLE": "The email service is temporarily unavailable. Try again later."
+  }
+}

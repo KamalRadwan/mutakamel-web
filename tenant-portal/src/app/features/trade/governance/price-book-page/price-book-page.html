@@ -1,0 +1,516 @@
+<header class="shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
+  @if (loading()) {
+    <div aria-busy="true">
+      <div class="flex items-center gap-8 px-10 py-8">
+        <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-bp-form-1col max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 overflow-x-auto border-t border-border px-10 no-scrollbar">
+        @for (item of [0, 1, 2]; track item) {
+          <span class="inline-flex h-tab shrink-0 items-center px-10">
+            <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+          </span>
+        }
+      </div>
+    </div>
+  } @else if (notFound() || loadFailed()) {
+    <div class="flex items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'priceBooks.page.back' | transloco"
+        [title]="'priceBooks.page.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon" aria-hidden="true">
+        <ng-icon name="tablerBook" size="15" />
+      </span>
+    </div>
+  } @else if (dossier(); as d) {
+    <div class="flex flex-wrap items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'priceBooks.page.back' | transloco"
+        [title]="'priceBooks.page.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="d.book.status === 'INACTIVE' ? 'bg-icon-gray' : 'bg-icon-blue'"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerBook" size="15" />
+      </span>
+
+      <div class="min-w-0">
+        <h1 dir="auto" class="truncate text-16 leading-24 font-medium text-text">{{ displayTitle() }}</h1>
+        <p class="truncate text-11 leading-16 text-text-muted">
+          <bdi dir="ltr">{{ d.book.code }}</bdi>
+          ·
+          {{ 'priceBooks.purpose.' + d.book.purpose | transloco }}
+          ·
+          <bdi dir="ltr">{{ d.book.currencyCode }}</bdi>
+        </p>
+      </div>
+
+      <app-version-status-badge module="price" [status]="d.book.status" />
+
+      @if (d.book.isCompanyDefault) {
+        <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-text">
+          <ng-icon name="tablerStarFill" size="12" class="text-warning-text" aria-hidden="true" />
+          <span>{{ 'priceBooks.companyDefault' | transloco }}</span>
+        </span>
+      }
+
+      <span class="flex-1"></span>
+
+      <div class="flex flex-wrap items-center gap-8">
+        @if (can.manage) {
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            [disabled]="actionBusy() || savingDetails()"
+            (click)="openNewVersionModal()"
+          >
+            <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+            {{ 'priceBooks.actions.newVersion' | transloco }}
+          </button>
+        }
+
+        @if (headerActions().length > 0) {
+          <ui-actions-menu
+            [items]="headerActions()"
+            [label]="'priceBooks.table.actions' | transloco"
+            (selected)="onHeaderAction($event)"
+          />
+        }
+      </div>
+    </div>
+
+    <div
+      role="tablist"
+      class="flex items-center gap-4 overflow-x-auto border-t border-border px-10 no-scrollbar"
+      [attr.aria-label]="'priceBooks.page.tabsLabel' | transloco"
+    >
+      @for (tab of tabs(); track tab.id; let idx = $index) {
+        @let active = activeTab() === tab.id;
+        <button
+          #tabBtn
+          type="button"
+          role="tab"
+          [id]="uid + '-tab-' + tab.id"
+          class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="active ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+          [attr.tabindex]="active ? 0 : -1"
+          [attr.aria-selected]="active"
+          [attr.aria-controls]="uid + '-panel-' + tab.id"
+          (click)="selectTab(tab.id)"
+          (keydown)="onTabKeydown($event, idx)"
+        >
+          <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+          <span>{{ tab.labelKey | transloco }}</span>
+          @if (tab.counter !== null) {
+            <span
+              class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-full px-4 text-11 leading-16 font-medium tabular-nums"
+              [class]="active ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text-muted'"
+            >
+              <bdi dir="ltr">{{ tab.counter }}</bdi>
+            </span>
+          }
+        </button>
+      }
+    </div>
+  }
+</header>
+
+<div class="min-h-0 min-w-0 flex-1 overflow-y-auto">
+  <div class="mx-auto w-full max-w-design pb-16">
+    @if (loading()) {
+      <div class="flex flex-col gap-10" aria-busy="true">
+        <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card">
+          <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3">
+            @for (item of [0, 1, 2]; track item) {
+              <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+            }
+          </div>
+        </div>
+      </div>
+    } @else if (notFound()) {
+      <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+          <ng-icon name="tablerFileSearch" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'priceBooks.page.notFound' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" (click)="goBack()">
+          {{ 'priceBooks.page.back' | transloco }}
+        </button>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'priceBooks.page.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="primary" (click)="retryLoad()">
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (dossier(); as d) {
+      @switch (activeTab()) {
+        @case ('versions') {
+          <div
+            role="tabpanel"
+            [id]="uid + '-panel-versions'"
+            [attr.aria-labelledby]="uid + '-tab-versions'"
+            class="flex flex-col gap-12"
+          >
+            <!-- Details card -->
+            <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+              <div class="flex flex-col gap-2">
+                <h2 class="text-14 leading-20 font-medium text-text">{{ 'priceBooks.page.details.title' | transloco }}</h2>
+                <p class="text-12 leading-18 text-text-muted">
+                  <bdi dir="ltr">{{ d.book.code }}</bdi>
+                  ·
+                  {{ 'priceBooks.purpose.' + d.book.purpose | transloco }}
+                  ·
+                  <bdi dir="ltr">{{ d.book.currencyCode }}</bdi>
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3">
+                <ui-field
+                  [label]="'priceBooks.page.details.fields.nameEn' | transloco"
+                  [for]="uid + '-details-name-en'"
+                  [hint]="'priceBooks.page.details.hints.nameEn' | transloco"
+                  [error]="nameEnError()"
+                >
+                  <input
+                    [id]="uid + '-details-name-en'"
+                    type="text"
+                    dir="ltr"
+                    autocomplete="off"
+                    [attr.maxlength]="maxName"
+                    class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="'priceBooks.create.placeholders.nameEn' | transloco"
+                    [value]="draftDetails().nameEn"
+                    [readonly]="!can.manage || savingDetails()"
+                    [attr.aria-invalid]="nameEnError() ? 'true' : null"
+                    (input)="onNameEnInput($event)"
+                  />
+                </ui-field>
+
+                <ui-field
+                  [label]="'priceBooks.page.details.fields.nameAr' | transloco"
+                  [for]="uid + '-details-name-ar'"
+                  [hint]="'priceBooks.page.details.hints.nameAr' | transloco"
+                  [error]="nameArError()"
+                >
+                  <input
+                    [id]="uid + '-details-name-ar'"
+                    type="text"
+                    dir="rtl"
+                    autocomplete="off"
+                    [attr.maxlength]="maxName"
+                    class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="'priceBooks.create.placeholders.nameAr' | transloco"
+                    [value]="draftDetails().nameAr"
+                    [readonly]="!can.manage || savingDetails()"
+                    [attr.aria-invalid]="nameArError() ? 'true' : null"
+                    (input)="onNameArInput($event)"
+                  />
+                </ui-field>
+
+                <ui-field
+                  [bare]="true"
+                  [label]="'priceBooks.page.details.fields.status' | transloco"
+                  [for]="uid + '-details-status'"
+                  [hint]="'priceBooks.page.details.hints.status' | transloco"
+                >
+                  <div class="flex h-field items-center gap-8">
+                    <ui-switch
+                      [id]="uid + '-details-status'"
+                      [label]="'priceBooks.page.details.fields.status' | transloco"
+                      [describedBy]="uid + '-details-status-hint'"
+                      [checked]="draftDetails().status === 'ACTIVE'"
+                      [disabled]="!can.manage || savingDetails()"
+                      (checkedChange)="onActiveSwitchChange($event)"
+                    />
+                    <span class="text-12 text-text">
+                      {{ 'priceBooks.status.' + draftDetails().status | transloco }}
+                    </span>
+                  </div>
+                </ui-field>
+
+                <div class="desktop:col-span-3">
+                  <ui-field
+                    size="multiline"
+                    [label]="'priceBooks.page.details.fields.description' | transloco"
+                    [for]="uid + '-details-description'"
+                    [hint]="'priceBooks.page.details.hints.description' | transloco"
+                    [count]="draftDetails().description.length"
+                    [max]="maxDescription"
+                    [error]="descriptionError()"
+                  >
+                    <textarea
+                      [id]="uid + '-details-description'"
+                      rows="3"
+                      [attr.maxlength]="maxDescription"
+                      class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'priceBooks.create.placeholders.description' | transloco"
+                      [value]="draftDetails().description"
+                      [readonly]="!can.manage || savingDetails()"
+                      [attr.aria-invalid]="descriptionError() ? 'true' : null"
+                      (input)="onDescriptionInput($event)"
+                    ></textarea>
+                  </ui-field>
+                </div>
+              </div>
+
+              @if (can.manage) {
+                <div class="flex flex-wrap items-center justify-end gap-8 border-t border-border pt-8">
+                  @if (detailsDirty()) {
+                    <span class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.unsaved' | transloco }}</span>
+                    <button
+                      type="button"
+                      uiButton
+                      variant="ghost"
+                      [disabled]="savingDetails()"
+                      (click)="undoDetails()"
+                    >
+                      {{ 'tradeShared.common.undo' | transloco }}
+                    </button>
+                  }
+
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    [loading]="savingDetails()"
+                    [disabled]="!detailsDirty() || savingDetails()"
+                    (click)="saveDetails()"
+                  >
+                    {{ 'tradeShared.common.save' | transloco }}
+                  </button>
+                </div>
+              }
+            </section>
+
+            <!-- Versions table -->
+            <app-governed-versions-table
+              module="price"
+              [rows]="versionRows()"
+              [columns]="versionColumns"
+              (open)="onOpenVersionRow($event)"
+              (action)="onVersionAction($event)"
+            />
+          </div>
+        }
+
+        @case ('accounts') {
+          <div
+            role="tabpanel"
+            [id]="uid + '-panel-accounts'"
+            [attr.aria-labelledby]="uid + '-tab-accounts'"
+          >
+            @if (d.linkedAccounts.length === 0) {
+              <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+                <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+                  <ng-icon name="tablerUsers" size="18" aria-hidden="true" />
+                </span>
+                <p class="text-12 leading-18 text-text-muted">{{ 'priceBooks.page.accounts.empty' | transloco }}</p>
+              </div>
+            } @else {
+              <div class="overflow-x-auto pb-4">
+                <div
+                  role="table"
+                  class="min-w-doc-table-min"
+                  [attr.aria-label]="'priceBooks.page.accounts.label' | transloco"
+                >
+                  <div
+                    role="row"
+                    class="grid bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav grid-cols-trade-price-book-detail-row"
+                  >
+                    <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                      {{ 'priceBooks.page.accounts.columns.account' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'priceBooks.page.accounts.columns.partyType' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'priceBooks.page.accounts.columns.role' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'priceBooks.page.accounts.columns.status' | transloco }}
+                    </span>
+                    <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                      {{ 'priceBooks.page.accounts.columns.creditLimit' | transloco }}
+                    </span>
+                  </div>
+
+                  @for (acc of d.linkedAccounts; track acc.id) {
+                    <div
+                      role="row"
+                      class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card grid-cols-trade-price-book-detail-row"
+                    >
+                      <span role="cell" class="flex min-w-0 items-center px-10">
+                        <span dir="auto" class="truncate text-13 font-medium text-text">{{ acc.partyName }}</span>
+                      </span>
+
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                        <span class="truncate text-12 text-text-muted">
+                          {{ 'priceBooks.partyType.' + acc.partyType | transloco }}
+                        </span>
+                      </span>
+
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                        <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                          {{ 'tradeShared.accountRole.' + acc.accountRole | transloco }}
+                        </span>
+                      </span>
+
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                        <span
+                          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium"
+                          [class]="acc.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-danger text-on-danger'"
+                        >
+                          {{ 'tradeShared.accountStatus.' + acc.status | transloco }}
+                        </span>
+                      </span>
+
+                      <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                        <bdi dir="ltr" class="truncate text-13 font-medium text-text tabular-nums">
+                          {{ accountCreditLimit(acc.creditLimit, acc.creditCurrencyCode) }}
+                        </bdi>
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        @case ('history') {
+          <div
+            role="tabpanel"
+            [id]="uid + '-panel-history'"
+            [attr.aria-labelledby]="uid + '-tab-history'"
+          >
+            @if (d.auditTrail.length === 0) {
+              <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+                <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+                  <ng-icon name="tablerHistory" size="18" aria-hidden="true" />
+                </span>
+                <p class="text-12 leading-18 text-text-muted">{{ 'priceBooks.page.history.empty' | transloco }}</p>
+              </div>
+            } @else {
+              <div class="divide-y divide-border rounded-10 border border-border bg-surface px-10 shadow-card">
+                @for (entry of d.auditTrail; track entry.id) {
+                  <div class="flex items-start gap-8 py-8">
+                    <span
+                      class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                      aria-hidden="true"
+                    >
+                      {{ auditInitials(entry) }}
+                    </span>
+
+                    <div class="flex min-w-0 flex-1 flex-col gap-4">
+                      <div class="flex flex-wrap items-baseline justify-between gap-8">
+                        <p class="min-w-0 text-12 leading-18 text-text">
+                          <span class="font-medium">{{ auditActorDisplay(entry) }}</span>
+                          @if (auditIsMe(entry)) {
+                            <span class="text-11 text-text-muted"> {{ 'governance.common.you' | transloco }}</span>
+                          }
+                          {{ ' ' }}{{ auditActionText(entry.action) }}
+                        </p>
+
+                        <time class="shrink-0 text-11 leading-16 text-text-muted tabular-nums" [attr.datetime]="entry.occurredAt">
+                          {{ auditTime(entry.occurredAt) }}
+                        </time>
+                      </div>
+
+                      @if (auditReasonLabel(entry) || entry.reason) {
+                        <div class="flex flex-wrap items-center gap-6 text-12 leading-18">
+                          @if (auditReasonLabel(entry); as reasonLabel) {
+                            <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+                              {{ reasonLabel }}
+                            </span>
+                          }
+                          @if (entry.reason) {
+                            <span class="text-12 text-text-muted">{{ entry.reason }}</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+</div>
+
+<app-new-version-modal
+  (created)="onVersionCreated($event)"
+  (conflictReload)="retryLoad()"
+/>
+
+<app-reason-dialog
+  kind="PRICE_VERSION_RETIRE"
+  tone="danger"
+  [required]="true"
+  [title]="'priceBooks.retireDialog.title' | transloco: { version: retiringVersion()?.versionNumber ?? '' }"
+  [text]="'priceBooks.retireDialog.text' | transloco"
+  [confirmLabel]="'priceBooks.retireDialog.confirm' | transloco"
+  [loading]="actionBusy()"
+  (confirmed)="onRetireConfirmed($event)"
+  (cancelled)="onRetireCancelled()"
+/>
+
+<ui-confirm-dialog
+  #deactivateDialog
+  tone="warning"
+  [title]="'priceBooks.deactivateConfirm.title' | transloco"
+  [text]="'priceBooks.deactivateConfirm.text' | transloco: { name: displayTitle() }"
+  [confirmLabel]="'priceBooks.deactivateConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteDraftDialog
+  tone="danger"
+  [title]="'priceBooks.deleteDraftConfirm.title' | transloco"
+  [text]="'priceBooks.deleteDraftConfirm.text' | transloco: { version: deletingVersion()?.versionNumber ?? '' }"
+  [confirmLabel]="'priceBooks.deleteDraftConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'priceBooks.page.unsaved.title' | transloco"
+  [text]="'priceBooks.page.unsaved.text' | transloco"
+  [saveLabel]="'priceBooks.page.unsaved.save' | transloco"
+  [discardLabel]="'priceBooks.page.unsaved.discard' | transloco"
+  [cancelLabel]="'priceBooks.page.unsaved.cancel' | transloco"
+/>
+
+<app-conflict-dialog
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>

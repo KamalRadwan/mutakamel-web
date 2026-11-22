@@ -1,0 +1,267 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerUserPlus"
+  tile="bg-icon-blue"
+  [title]="'users.invite.title' | transloco"
+  [closeLabel]="'users.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-3 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-3">
+      <ui-field
+        [for]="uid + '-email'"
+        [label]="'users.fields.email' | transloco"
+        [hint]="'users.fields.emailHint' | transloco"
+        [required]="true"
+        [count]="emailCount()"
+        [max]="limits.email"
+        [error]="emailError()"
+      >
+        <input
+          [id]="uid + '-email'"
+          type="email"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'users.fields.emailPlaceholder' | transloco"
+          [formField]="inviteForm.email"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="emailError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-first-name'"
+        [label]="'users.fields.firstName' | transloco"
+        [hint]="'users.fields.firstNameHint' | transloco"
+        [required]="true"
+        [count]="firstNameCount()"
+        [max]="limits.personName"
+        [error]="firstNameError()"
+      >
+        <input
+          [id]="uid + '-first-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="inviteForm.firstName"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="firstNameError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-last-name'"
+        [label]="'users.fields.lastName' | transloco"
+        [hint]="'users.fields.lastNameHint' | transloco"
+        [required]="true"
+        [count]="lastNameCount()"
+        [max]="limits.personName"
+        [error]="lastNameError()"
+      >
+        <input
+          [id]="uid + '-last-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="inviteForm.lastName"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="lastNameError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'users.fields.code' | transloco"
+        [hint]="'users.fields.codeHint' | transloco"
+        [count]="codeCount()"
+        [max]="limits.employeeCode"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'users.fields.codePlaceholder' | transloco"
+          [formField]="inviteForm.employeeCode"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [for]="uid + '-job-title'"
+        [label]="'users.fields.jobTitle' | transloco"
+        [hint]="'users.fields.jobTitleHint' | transloco"
+        [count]="jobTitleCount()"
+        [max]="limits.jobTitle"
+        [error]="jobTitleError()"
+      >
+        <input
+          [id]="uid + '-job-title'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="inviteForm.jobTitle"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="jobTitleError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-3 grid grid-cols-3 gap-x-10 gap-y-8">
+      <app-org-cascade
+        [levels]="['company', 'branch', 'department', 'team']"
+        [required]="['company', 'branch', 'department']"
+        [disabledLevels]="saving() ? ['company', 'branch', 'department', 'team'] : []"
+        [activeOnly]="true"
+        [errors]="cascadeErrors()"
+        [value]="cascadeValue()"
+        (valueChange)="onCascadeChange($event)"
+      />
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-manager'"
+          [label]="'users.fields.manager' | transloco"
+          [hint]="'users.fields.managerHint' | transloco"
+          [error]="managerError()"
+        >
+          <app-user-manager-picker
+            [fieldId]="uid + '-manager'"
+            [describedBy]="uid + '-manager-hint' + (managerError() ? ' ' + uid + '-manager-error' : '')"
+            [hasError]="!!managerError()"
+            [disabled]="saving()"
+            [knownUsers]="knownUsers()"
+            [label]="'users.fields.manager' | transloco"
+            [emptyLabel]="'users.fields.noManager' | transloco"
+            [searchPlaceholder]="'users.fields.managerSearch' | transloco"
+            [value]="managerId()"
+            (valueChange)="onManagerChange($event)"
+          />
+        </ui-field>
+      </div>
+    </div>
+
+    <div class="col-span-3 border-t border-border pt-8">
+      <ui-field
+        [for]="uid + '-roles'"
+        size="bare"
+        [label]="'users.fields.roles' | transloco"
+        [hint]="'users.fields.rolesHint' | transloco"
+        [error]="rolesError()"
+      >
+        <div
+          class="flex flex-col gap-6"
+          role="group"
+          [attr.aria-labelledby]="uid + '-roles-label'"
+          [attr.aria-describedby]="uid + '-roles-hint' + (rolesError() ? ' ' + uid + '-roles-error' : '')"
+        >
+          @if (roleRows().length > 0) {
+            <div class="flex items-center gap-8 text-11 leading-16 text-text-muted">
+              <span class="min-w-0 flex-1">{{ 'users.fields.roleBranch' | transloco }}</span>
+              <span class="min-w-0 flex-1">{{ 'users.fields.role' | transloco }}</span>
+              <span class="w-btn-h-sm shrink-0"></span>
+            </div>
+
+            @for (row of roleRows(); track row.id; let idx = $index) {
+              <div class="flex items-center gap-8">
+                <ui-dropdown
+                  class="min-w-0 flex-1"
+                  size="field"
+                  [id]="idx === 0 ? uid + '-roles' : uid + '-role-branch-' + idx"
+                  [describedBy]="uid + '-roles-hint' + (rolesError() ? ' ' + uid + '-roles-error' : '')"
+                  [options]="branchOptions()"
+                  [value]="row.branchId"
+                  [label]="'users.fields.roleBranch' | transloco"
+                  [disabled]="saving()"
+                  (valueChange)="updateRoleRowBranch(row.id, $event)"
+                />
+
+                <ui-dropdown
+                  class="min-w-0 flex-1"
+                  size="field"
+                  [id]="uid + '-role-select-' + idx"
+                  [describedBy]="uid + '-roles-hint' + (rolesError() ? ' ' + uid + '-roles-error' : '')"
+                  [options]="roleOptions()"
+                  [value]="row.roleId"
+                  [label]="'users.fields.role' | transloco"
+                  [disabled]="saving()"
+                  (valueChange)="updateRoleRowRole(row.id, $event)"
+                />
+
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                  [disabled]="saving()"
+                  [attr.aria-label]="'users.fields.removeRole' | transloco"
+                  [title]="'users.fields.removeRole' | transloco"
+                  (click)="removeRoleRow(row.id)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              </div>
+            }
+          }
+
+          @if (canAddRoleRow()) {
+            <div>
+              <button
+                [id]="roleRows().length === 0 ? uid + '-roles' : uid + '-add-role'"
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [attr.aria-describedby]="uid + '-roles-hint' + (rolesError() ? ' ' + uid + '-roles-error' : '')"
+                [disabled]="saving()"
+                (click)="addRoleRow()"
+              >
+                <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                <span>{{ 'users.fields.addRole' | transloco }}</span>
+              </button>
+            </div>
+          }
+
+          <app-seat-impact
+            [changes]="seatChanges()"
+            [canBuySeats]="isOwner()"
+            (blocking)="seatBlocked.set($event)"
+          />
+          @if (seatBlocked()) {
+            <p class="text-12 leading-18 text-warning-text">{{ 'users.seatsShort' | transloco }}</p>
+          }
+        </div>
+      </ui-field>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button type="submit" [attr.form]="uid + '-form'" uiButton [loading]="saving()" [disabled]="saving() || seatBlocked()">
+      {{ 'users.invite.send' | transloco }}
+    </button>
+
+    <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="requestClose()">
+      {{ 'users.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'users.confirm.discardTitle' | transloco"
+  [text]="'users.confirm.discardText' | transloco"
+  [confirmLabel]="'users.confirm.discardConfirm' | transloco"
+  [cancelLabel]="'users.common.cancel' | transloco"
+/>

@@ -1,0 +1,719 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerCalendarTime"
+  tile="bg-icon-blue"
+  [title]="(isEdit() ? 'repSchedules.form.editTitle' : 'repSchedules.form.createTitle') | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form class="grid grid-cols-3 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); save()">
+    <div class="col-span-3">
+      @let nameErr = fieldError('name');
+      <ui-field
+        [label]="'repSchedules.form.name' | transloco"
+        [for]="uid + '-name'"
+        [hint]="'repSchedules.form.nameHint' | transloco"
+        [required]="true"
+        [count]="nameCount()"
+        [max]="maxNameLength"
+        [error]="nameErr"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'repSchedules.form.namePlaceholder' | transloco"
+          [value]="name()"
+          [attr.maxlength]="maxNameLength"
+          [readOnly]="!canManage()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="nameErr ? 'true' : null"
+          [attr.aria-describedby]="describedBy(uid + '-name', 'name')"
+          (input)="onNameInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.targetType' | transloco"
+        [for]="uid + '-targetType'"
+        [hint]="'repSchedules.form.targetTypeHint' | transloco"
+      >
+        @if (canManage() && !isEdit()) {
+          <ui-segmented
+            [id]="uid + '-targetType'"
+            [options]="targetTypeOptions()"
+            [label]="'repSchedules.form.targetType' | transloco"
+            [describedBy]="uid + '-targetType-hint'"
+            [value]="targetType()"
+            (valueChange)="onTargetTypeChange($event)"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-targetType'"
+              type="text"
+              readonly
+              [value]="'repSchedules.targetType.' + targetType() | transloco"
+              [attr.aria-describedby]="uid + '-targetType-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      @let targetErr = fieldError('target');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.target' | transloco"
+        [for]="uid + '-target'"
+        [hint]="'repSchedules.form.targetHint' | transloco"
+        [required]="true"
+        [error]="targetErr"
+      >
+        @if (canManage() && !isEdit()) {
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-target'"
+            [options]="targetOptions()"
+            [label]="'repSchedules.form.target' | transloco"
+            [describedBy]="describedBy(uid + '-target', 'target')"
+            [value]="targetId()"
+            (valueChange)="onTargetChange($event)"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-target'"
+              type="text"
+              readonly
+              [value]="selectedTargetLabel()"
+              [attr.aria-describedby]="describedBy(uid + '-target', 'target')"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.period' | transloco"
+        [for]="uid + '-period'"
+        [hint]="'repSchedules.form.periodHint' | transloco"
+        [required]="true"
+      >
+        @if (canManage()) {
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-period'"
+            [options]="periodOptions()"
+            [label]="'repSchedules.form.period' | transloco"
+            [describedBy]="uid + '-period-hint'"
+            [(value)]="periodToken"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-period'"
+              type="text"
+              readonly
+              [value]="'repSchedules.period.' + periodToken() | transloco"
+              [attr.aria-describedby]="uid + '-period-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.recurrence' | transloco"
+        [for]="uid + '-recurrence'"
+        [hint]="'repSchedules.form.recurrenceHint' | transloco"
+        [required]="true"
+      >
+        @if (canManage()) {
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-recurrence'"
+            [options]="recurrenceOptions()"
+            [label]="'repSchedules.form.recurrence' | transloco"
+            [describedBy]="uid + '-recurrence-hint'"
+            [value]="recurrence()"
+            (valueChange)="onRecurrenceChange($event)"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-recurrence'"
+              type="text"
+              readonly
+              [value]="'repSchedules.recurrence.' + recurrence() | transloco"
+              [attr.aria-describedby]="uid + '-recurrence-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    @if (recurrence() === 'WEEKLY') {
+      @let weekdayErr = fieldError('scheduleWeekday');
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'repSchedules.form.weekday' | transloco"
+          [for]="uid + '-weekday'"
+          [hint]="'repSchedules.form.weekdayHint' | transloco"
+          [required]="true"
+          [error]="weekdayErr"
+        >
+          @if (canManage()) {
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-weekday'"
+              [options]="weekdayOptions()"
+              [label]="'repSchedules.form.weekday' | transloco"
+              [describedBy]="describedBy(uid + '-weekday', 'scheduleWeekday')"
+              [(value)]="scheduleWeekday"
+            />
+          } @else {
+            <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <input
+                [id]="uid + '-weekday'"
+                type="text"
+                readonly
+                [value]="'repSchedules.weekdays.' + scheduleWeekday() | transloco"
+                [attr.aria-describedby]="describedBy(uid + '-weekday', 'scheduleWeekday')"
+                class="w-full bg-transparent text-12 text-text outline-none"
+              />
+            </div>
+          }
+        </ui-field>
+      </div>
+    } @else if (recurrence() === 'MONTHLY') {
+      @let monthDayErr = fieldError('scheduleMonthDay');
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'repSchedules.form.monthDay' | transloco"
+          [for]="uid + '-monthDay'"
+          [hint]="'repSchedules.form.monthDayHint' | transloco"
+          [required]="true"
+          [error]="monthDayErr"
+        >
+          @if (canManage()) {
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-monthDay'"
+              [options]="monthDayOptions()"
+              [label]="'repSchedules.form.monthDay' | transloco"
+              [describedBy]="describedBy(uid + '-monthDay', 'scheduleMonthDay')"
+              [(value)]="scheduleMonthDay"
+            />
+          } @else {
+            <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <input
+                [id]="uid + '-monthDay'"
+                type="text"
+                readonly
+                [value]="scheduleMonthDay() === -1 ? ('repSchedules.lastDayOption' | transloco) : scheduleMonthDay()"
+                [attr.aria-describedby]="describedBy(uid + '-monthDay', 'scheduleMonthDay')"
+                class="w-full bg-transparent text-12 text-text outline-none"
+              />
+            </div>
+          }
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      @let timeErr = fieldError('scheduleMinute');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.time' | transloco"
+        [for]="uid + '-time'"
+        [hint]="'repSchedules.form.timeHint' | transloco"
+        [required]="true"
+        [error]="timeErr"
+      >
+        @if (canManage()) {
+          <ui-time-field
+            [id]="uid + '-time'"
+            [ariaLabel]="'repSchedules.form.time' | transloco"
+            [hourLabel]="'repSchedules.form.hour' | transloco"
+            [minuteLabel]="'repSchedules.form.minute' | transloco"
+            [describedBy]="describedBy(uid + '-time', 'scheduleMinute')"
+            [invalid]="!!timeErr"
+            [value]="time()"
+            (valueChange)="onTimeChange($event)"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-time'"
+              type="text"
+              dir="ltr"
+              readonly
+              [value]="time()"
+              [attr.aria-describedby]="describedBy(uid + '-time', 'scheduleMinute')"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      @let tzErr = fieldError('timeZone');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.timeZone' | transloco"
+        [for]="uid + '-timeZone'"
+        [hint]="'repSchedules.form.timeZoneHint' | transloco"
+        [required]="true"
+        [error]="tzErr"
+      >
+        @if (canManage()) {
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-timeZone'"
+            [options]="timeZoneOptions()"
+            [label]="'repSchedules.form.timeZone' | transloco"
+            [describedBy]="describedBy(uid + '-timeZone', 'timeZone')"
+            [(value)]="timeZone"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-timeZone'"
+              type="text"
+              readonly
+              [value]="timeZone()"
+              [attr.aria-describedby]="describedBy(uid + '-timeZone', 'timeZone')"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.language' | transloco"
+        [for]="uid + '-locale'"
+        [hint]="'repSchedules.form.languageHint' | transloco"
+        [required]="true"
+      >
+        @if (canManage()) {
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-locale'"
+            [options]="localeOptions()"
+            [label]="'repSchedules.form.language' | transloco"
+            [describedBy]="uid + '-locale-hint'"
+            [(value)]="locale"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-locale'"
+              type="text"
+              readonly
+              [value]="'repSchedules.locale.' + locale() | transloco"
+              [attr.aria-describedby]="uid + '-locale-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      @let startsErr = fieldError('startsOn');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.startsOn' | transloco"
+        [for]="uid + '-startsOn'"
+        [hint]="'repSchedules.form.startsOnHint' | transloco"
+        [required]="true"
+        [error]="startsErr"
+      >
+        @if (canManage()) {
+          <ui-date-field
+            class="w-full"
+            [id]="uid + '-startsOn'"
+            [ariaLabel]="'repSchedules.form.startsOn' | transloco"
+            [placeholder]="'repSchedules.form.startsOnPlaceholder' | transloco"
+            [todayLabel]="'repSchedules.form.today' | transloco"
+            [prevMonthLabel]="'repSchedules.form.prevMonth' | transloco"
+            [nextMonthLabel]="'repSchedules.form.nextMonth' | transloco"
+            [describedBy]="describedBy(uid + '-startsOn', 'startsOn')"
+            [invalid]="!!startsErr"
+            [value]="startsOn()"
+            (valueChange)="onStartsOnChange($event)"
+          />
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-startsOn'"
+              type="text"
+              readonly
+              [value]="startsOn() || ('repSchedules.form.startsOnPlaceholder' | transloco)"
+              [attr.aria-describedby]="uid + '-startsOn-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      @let endsErr = fieldError('endsOn');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.endsOn' | transloco"
+        [for]="uid + '-endsOn'"
+        [hint]="'repSchedules.form.endsOnHint' | transloco"
+        [error]="endsErr"
+      >
+        @if (canManage()) {
+          <div class="flex items-center gap-4">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-endsOn'"
+              [ariaLabel]="'repSchedules.form.endsOn' | transloco"
+              [placeholder]="'repSchedules.form.endsOnPlaceholder' | transloco"
+              [todayLabel]="'repSchedules.form.today' | transloco"
+              [prevMonthLabel]="'repSchedules.form.prevMonth' | transloco"
+              [nextMonthLabel]="'repSchedules.form.nextMonth' | transloco"
+              [min]="startsOn()"
+              [describedBy]="describedBy(uid + '-endsOn', 'endsOn')"
+              [invalid]="!!endsErr"
+              [value]="endsOn()"
+              (valueChange)="onEndsOnChange($event)"
+            />
+            @if (endsOn()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'repSchedules.actions.clearDate' | transloco"
+                [title]="'repSchedules.actions.clearDate' | transloco"
+                (click)="clearEndsOn()"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-endsOn'"
+              type="text"
+              readonly
+              [value]="endsOn() || ('repSchedules.form.endsOnPlaceholder' | transloco)"
+              [attr.aria-describedby]="describedBy(uid + '-endsOn', 'endsOn')"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      @let ttlErr = fieldError('linkTtlHours');
+      <ui-field
+        [label]="'repSchedules.form.linkTtlHours' | transloco"
+        [for]="uid + '-ttl'"
+        [hint]="'repSchedules.form.linkTtlHoursHint' | transloco"
+        [required]="true"
+        [error]="ttlErr"
+      >
+        <input
+          [id]="uid + '-ttl'"
+          type="number"
+          dir="ltr"
+          min="1"
+          max="720"
+          step="1"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [value]="linkTtlHoursText()"
+          [readOnly]="!canManage()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="ttlErr ? 'true' : null"
+          [attr.aria-describedby]="describedBy(uid + '-ttl', 'linkTtlHours')"
+          (input)="onTtlInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-3">
+      @let recErr = fieldError('recipientUserIds');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.recipients' | transloco"
+        [for]="uid + '-recipients'"
+        [hint]="'repSchedules.form.recipientsHint' | transloco"
+        [required]="true"
+        [count]="recipientUserIds().length"
+        [max]="maxRecipients"
+        [error]="recErr"
+      >
+        @if (canManage()) {
+          <div
+            #recipientsAnchor
+            class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border bg-surface-field px-8 py-2 text-12 transition-colors duration-fast"
+            [class]="
+              recErr
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : recipientOpen()
+                  ? 'border-focus-ring ring-3 ring-focus-halo'
+                  : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+            "
+            (click)="onRecipientFieldClick()"
+          >
+            @for (person of selectedRecipients(); track person.id) {
+              @let displayName = personName(person);
+              <span class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                <span class="truncate">{{ displayName }}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'repSchedules.form.removeRecipient' | transloco: { name: displayName }"
+                  [title]="'repSchedules.form.removeRecipient' | transloco: { name: displayName }"
+                  (click)="$event.stopPropagation(); removeRecipient(person.id)"
+                >
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                </button>
+              </span>
+            }
+
+            <input
+              #recipientInput
+              [id]="uid + '-recipients'"
+              type="text"
+              role="combobox"
+              autocomplete="off"
+              aria-autocomplete="list"
+              class="h-chip min-w-time-dd flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [attr.aria-label]="'repSchedules.form.recipients' | transloco"
+              [attr.aria-expanded]="recipientOpen()"
+              [attr.aria-controls]="recipientOpen() ? uid + '-recipients-list' : null"
+              [attr.aria-activedescendant]="activeRecipientOptionId()"
+              [attr.aria-invalid]="recErr ? 'true' : null"
+              [attr.aria-describedby]="describedBy(uid + '-recipients', 'recipientUserIds')"
+              [readOnly]="atMaxRecipients()"
+              [placeholder]="selectedRecipients().length === 0 ? ('repSchedules.form.recipientsPlaceholder' | transloco) : ''"
+              [value]="recipientQuery()"
+              (input)="onRecipientInput($event)"
+              (keydown)="onRecipientKeydown($event)"
+            />
+          </div>
+
+          @if (recipientOpen()) {
+            <ul
+              #recipientList
+              [id]="uid + '-recipients-list'"
+              role="listbox"
+              aria-multiselectable="true"
+              class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+              [class.invisible]="!recipientPlaced()"
+              [style.top.px]="recipientPlace().top"
+              [style.inset-inline-start.px]="recipientPlace().start"
+              [style.min-width.px]="recipientPlace().width"
+              [style.max-height.px]="recipientPlace().maxHeight"
+              [attr.aria-label]="'repSchedules.form.recipients' | transloco"
+              (mousedown)="$event.preventDefault()"
+            >
+              @for (person of filteredPeople(); track person.id; let index = $index) {
+                @let selected = isRecipientSelected(person.id);
+                @let active = safeRecipientIndex() === index;
+                <li
+                  [id]="recipientOptionId(index)"
+                  role="option"
+                  [attr.aria-selected]="selected"
+                  [attr.aria-disabled]="!selected && atMaxRecipients() ? 'true' : null"
+                  class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+                  [class]="
+                    !selected && atMaxRecipients()
+                      ? 'cursor-not-allowed text-text-placeholder opacity-drag-source'
+                      : selected
+                        ? 'cursor-pointer bg-brand-soft text-on-brand-soft'
+                        : active
+                          ? 'cursor-pointer bg-row-hover text-text'
+                          : 'cursor-pointer text-text hover:bg-row-hover'
+                  "
+                  (mouseenter)="recipientActiveIndex.set(index)"
+                  (click)="toggleRecipient(person.id)"
+                >
+                  <span class="flex min-w-0 items-center gap-6">
+                    <span class="truncate text-12 font-medium">{{ personName(person) }}</span>
+                    <span class="truncate text-11 text-text-muted" dir="ltr">{{ person.email }}</span>
+                  </span>
+                  @if (selected) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                  }
+                </li>
+              } @empty {
+                <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+                  {{ 'repSchedules.form.recipientsEmpty' | transloco }}
+                </li>
+              }
+            </ul>
+          }
+        } @else {
+          <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-recipients'"
+              type="text"
+              readonly
+              [value]="personNamesSummary()"
+              [attr.aria-describedby]="describedBy(uid + '-recipients', 'recipientUserIds')"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-3">
+      <!-- Subscriptions deliver by EMAIL only in this release: fixed read-only text, label and hint kept. -->
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.channel' | transloco"
+        [for]="uid + '-channel'"
+        [hint]="'repSchedules.form.channelHint' | transloco"
+      >
+        <div class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+          <input
+            [id]="uid + '-channel'"
+            type="text"
+            readonly
+            [value]="'repSchedules.channel.EMAIL' | transloco"
+            [attr.aria-describedby]="uid + '-channel-hint'"
+            class="w-full bg-transparent text-12 text-text outline-none"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-3">
+      @let attErr = fieldError('attachmentFormats');
+      <ui-field
+        size="bare"
+        [label]="'repSchedules.form.attachments' | transloco"
+        [for]="uid + '-attachments'"
+        [hint]="'repSchedules.form.attachmentsHint' | transloco"
+        [error]="attErr"
+      >
+        <div
+          [id]="uid + '-attachments'"
+          role="group"
+          class="flex h-field flex-wrap items-center gap-16"
+          [attr.aria-label]="'repSchedules.form.attachments' | transloco"
+          [attr.aria-describedby]="describedBy(uid + '-attachments', 'attachmentFormats')"
+        >
+          @for (fmt of attachmentFormatOptions; track fmt) {
+            @let pdfBlocked = fmt === 'PDF' && !pdfEnabled;
+            @let boxDisabled = !canManage() || pdfBlocked;
+            <span
+              class="inline-flex"
+              [class]="pdfBlocked ? 'cursor-not-allowed opacity-drag-source' : canManage() ? '' : 'cursor-default'"
+              [attr.title]="pdfBlocked ? ('repSchedules.form.notAvailableYet' | transloco) : null"
+            >
+              <ui-checkbox [checked]="hasFormat(fmt)" [disabled]="boxDisabled" (change)="onAttachmentChange(fmt, $event)">
+                {{ 'repSchedules.formats.' + fmt | transloco }}
+              </ui-checkbox>
+            </span>
+          }
+        </div>
+      </ui-field>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        [loading]="saving()"
+        [disabled]="isEdit() ? !dirty() : false"
+        (click)="save()"
+      >
+        {{ 'analytics.common.save' | transloco }}
+      </button>
+    }
+
+    @if (isEdit() && canManage() && dirty()) {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving()"
+        (click)="undo()"
+      >
+        {{ 'analytics.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'analytics.common.unsaved' | transloco }}</span>
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ (canManage() ? 'analytics.common.cancel' : 'analytics.common.close') | transloco }}
+    </button>
+
+    @if (isEdit() && canManage() && editingSubscription(); as sub) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [disabled]="saving()"
+        (click)="deleteRequested.emit(sub)"
+      >
+        {{ 'analytics.common.delete' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'repSchedules.discard.title' | transloco"
+  [text]="'repSchedules.discard.text' | transloco"
+  [saveLabel]="'repSchedules.discard.save' | transloco"
+  [discardLabel]="'repSchedules.discard.discard' | transloco"
+  [cancelLabel]="'repSchedules.discard.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'analytics.common.conflictTitle' | transloco"
+  [text]="'analytics.common.conflictText' | transloco"
+  [confirmLabel]="'analytics.common.reload' | transloco"
+  [cancelLabel]="'analytics.common.keepMine' | transloco"
+/>

@@ -1,0 +1,34 @@
+<nav [attr.aria-label]="label() || null">
+  <ol class="flex min-w-0 items-center gap-4 text-12 leading-18">
+    @for (item of items(); track $index; let last = $last) {
+      <li class="flex min-w-0 items-center gap-4">
+        @if (!last && item.link !== undefined) {
+          <a
+            [routerLink]="item.link"
+            class="min-w-0 truncate rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [title]="item.label"
+          >
+            {{ item.label }}
+          </a>
+        } @else if (!last) {
+          <span class="min-w-0 truncate text-text-muted" [title]="item.label">
+            {{ item.label }}
+          </span>
+        } @else {
+          <span class="min-w-0 truncate text-text" aria-current="page" [title]="item.label">
+            {{ item.label }}
+          </span>
+        }
+
+        @if (!last) {
+          <ng-icon
+            name="tablerChevronRight"
+            size="12"
+            class="shrink-0 text-text-muted rtl:-scale-x-100"
+            aria-hidden="true"
+          />
+        }
+      </li>
+    }
+  </ol>
+</nav>

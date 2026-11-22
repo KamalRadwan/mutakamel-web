@@ -1,0 +1,281 @@
+<ui-modal
+  #pageModal
+  size="form"
+  icon="tablerFileDescription"
+  tile="bg-icon-gray"
+  [title]="'tplFields.pageSetup.title' | transloco"
+  [closeLabel]="'tplFields.pageSetup.close' | transloco"
+>
+  <div class="flex flex-col gap-12">
+    <!-- Top: full-width 2-column form controls -->
+    <div class="grid grid-cols-2 items-start gap-10">
+      <ui-field
+        size="bare"
+        for="tpl-ps-preset"
+        [label]="'tplFields.pageSetup.preset' | transloco"
+        [hint]="'tplFields.pageSetup.presetHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          [id]="'tpl-ps-preset'"
+          size="field"
+          [disabled]="state.readOnly()"
+          [label]="'tplFields.pageSetup.preset' | transloco"
+          [options]="presetOptions()"
+          [value]="preset()"
+          (valueChange)="onPresetChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        for="tpl-ps-orientation"
+        [label]="'tplFields.pageSetup.orientation' | transloco"
+        [hint]="'tplFields.pageSetup.orientationHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          [id]="'tpl-ps-orientation'"
+          size="field"
+          [disabled]="state.readOnly()"
+          [label]="'tplFields.pageSetup.orientation' | transloco"
+          [options]="orientationOptions()"
+          [value]="orientation()"
+          (valueChange)="onOrientationChange($event)"
+        />
+      </ui-field>
+
+      @if (preset() === 'CUSTOM') {
+        <ui-field
+          for="tpl-ps-width"
+          [label]="'tplFields.pageSetup.width' | transloco"
+          [hint]="'tplFields.pageSetup.widthHint' | transloco"
+          [required]="true"
+          [error]="widthError()"
+        >
+          <input
+            id="tpl-ps-width"
+            type="number"
+            dir="ltr"
+            step="1"
+            class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+            [formField]="pageForm.customWidthMm"
+          />
+        </ui-field>
+
+        <ui-field
+          for="tpl-ps-height"
+          [label]="'tplFields.pageSetup.height' | transloco"
+          [hint]="'tplFields.pageSetup.heightHint' | transloco"
+          [required]="true"
+          [error]="heightError()"
+        >
+          <input
+            id="tpl-ps-height"
+            type="number"
+            dir="ltr"
+            step="1"
+            class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+            [formField]="pageForm.customHeightMm"
+          />
+        </ui-field>
+      }
+
+      <ui-field
+        for="tpl-ps-margin-top"
+        [label]="'tplFields.pageSetup.marginTop' | transloco"
+        [hint]="'tplFields.pageSetup.marginTopHint' | transloco"
+        [required]="true"
+        [error]="marginTopError()"
+      >
+        <input
+          id="tpl-ps-margin-top"
+          type="number"
+          dir="ltr"
+          step="1"
+          class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+          [formField]="pageForm.marginTopMm"
+        />
+      </ui-field>
+
+      <ui-field
+        for="tpl-ps-margin-bottom"
+        [label]="'tplFields.pageSetup.marginBottom' | transloco"
+        [hint]="'tplFields.pageSetup.marginBottomHint' | transloco"
+        [required]="true"
+        [error]="marginBottomError()"
+      >
+        <input
+          id="tpl-ps-margin-bottom"
+          type="number"
+          dir="ltr"
+          step="1"
+          class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+          [formField]="pageForm.marginBottomMm"
+        />
+      </ui-field>
+
+      <ui-field
+        for="tpl-ps-margin-start"
+        [label]="'tplFields.pageSetup.marginStart' | transloco"
+        [hint]="'tplFields.pageSetup.marginStartHint' | transloco"
+        [required]="true"
+        [error]="marginStartError()"
+      >
+        <input
+          id="tpl-ps-margin-start"
+          type="number"
+          dir="ltr"
+          step="1"
+          class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+          [formField]="pageForm.marginStartMm"
+        />
+      </ui-field>
+
+      <ui-field
+        for="tpl-ps-margin-end"
+        [label]="'tplFields.pageSetup.marginEnd' | transloco"
+        [hint]="'tplFields.pageSetup.marginEndHint' | transloco"
+        [required]="true"
+        [error]="marginEndError()"
+      >
+        <input
+          id="tpl-ps-margin-end"
+          type="number"
+          dir="ltr"
+          step="1"
+          class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+          [formField]="pageForm.marginEndMm"
+        />
+      </ui-field>
+
+      @if (hasAssetBg()) {
+        <ui-field
+          class="col-span-2"
+          for="tpl-ps-bg-asset"
+          [label]="'tplFields.pageSetup.imageBackgroundLabel' | transloco"
+          [hint]="'tplFields.pageSetup.imageBackgroundHint' | transloco"
+        >
+          <input
+            id="tpl-ps-bg-asset"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-text outline-none"
+            [value]="'tplFields.pageSetup.imageBackgroundValue' | transloco"
+          />
+          @if (!state.readOnly()) {
+            <button type="button" uiButton variant="ghost" size="small" (click)="removeAssetBackground()">
+              <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              <span>{{ 'tplFields.pageSetup.removeBackground' | transloco }}</span>
+            </button>
+          }
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [class]="bgMode() === 'SOLID' ? '' : 'col-span-2'"
+          for="tpl-ps-bg-mode"
+          [label]="'tplFields.pageSetup.backgroundKind' | transloco"
+          [hint]="'tplFields.pageSetup.backgroundKindHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            [id]="'tpl-ps-bg-mode'"
+            size="field"
+            [disabled]="state.readOnly()"
+            [label]="'tplFields.pageSetup.backgroundKind' | transloco"
+            [options]="bgModeOptions()"
+            [value]="bgMode()"
+            (valueChange)="bgMode.set($event)"
+          />
+        </ui-field>
+
+        @if (bgMode() === 'SOLID') {
+          <ui-field
+            for="tpl-ps-bg-color"
+            [label]="'tplFields.pageSetup.backgroundColor' | transloco"
+            [hint]="'tplFields.pageSetup.backgroundColorHint' | transloco"
+            [error]="bgColorError()"
+          >
+            <span
+              class="size-badge shrink-0 rounded-4 border border-border-field"
+              [style.background-color]="swatchBg()"
+              aria-hidden="true"
+            ></span>
+            <input
+              id="tpl-ps-bg-color"
+              type="text"
+              dir="ltr"
+              placeholder="#FFFFFF"
+              class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+              [formField]="pageForm.bgColor"
+              (blur)="onBgColorBlur()"
+            />
+          </ui-field>
+        }
+      }
+
+      @if (showApplyAll()) {
+        <ui-field
+          size="bare"
+          class="col-span-2"
+          for="tpl-ps-apply-all"
+          [label]="'tplFields.pageSetup.applyAllPages' | transloco"
+          [hint]="'tplFields.pageSetup.applyAllPagesHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            @if (state.readOnly()) {
+              <ui-checkbox [checked]="pageModel().applyAllPages" [disabled]="true">
+                <span>{{ 'tplFields.pageSetup.applyAllPages' | transloco }}</span>
+              </ui-checkbox>
+            } @else {
+              <ui-checkbox [formField]="pageForm.applyAllPages">
+                <span>{{ 'tplFields.pageSetup.applyAllPages' | transloco }}</span>
+              </ui-checkbox>
+            }
+          </div>
+        </ui-field>
+      }
+    </div>
+
+    <!-- Bottom: N7 page diagram -->
+    <figure class="flex flex-col items-center gap-6 rounded-10 border border-border bg-surface-muted p-10">
+      <figcaption class="text-12 font-medium text-text-muted">
+        {{ 'tplFields.pageSetup.diagramLabel' | transloco }}
+      </figcaption>
+      <app-template-page-diagram
+        [widthMm]="effectiveWidthMm()"
+        [heightMm]="effectiveHeightMm()"
+        [marginTopMm]="marginTopMm()"
+        [marginEndMm]="marginEndMm()"
+        [marginBottomMm]="marginBottomMm()"
+        [marginStartMm]="marginStartMm()"
+        [rtl]="docIsRtl()"
+        [ariaLabel]="'tplFields.pageSetup.diagramHint' | transloco"
+        [paperLabel]="'tplFields.pageSetup.paperLabel' | transloco"
+        [printableLabel]="'tplFields.pageSetup.printableLabel' | transloco"
+        [topLabel]="'tplFields.pageSetup.topShort' | transloco"
+        [bottomLabel]="'tplFields.pageSetup.bottomShort' | transloco"
+        [startLabel]="'tplFields.pageSetup.startShort' | transloco"
+        [endLabel]="'tplFields.pageSetup.endShort' | transloco"
+      />
+    </figure>
+  </div>
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    @if (!state.readOnly()) {
+      <button type="button" uiButton variant="primary" [disabled]="!canApply()" (click)="apply()">
+        {{ 'tplFields.pageSetup.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplFields.pageSetup.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplFields.pageSetup.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

@@ -1,0 +1,45 @@
+{
+  "back": "العودة إلى العملاء",
+  "newTitle": "عميل جديد",
+  "create": "إنشاء العميل",
+  "statusLabel": "الحالة",
+  "errorsDot": "في هذا التبويب أخطاء",
+  "header": {
+    "customerSince": "عميل منذ {{date}}",
+    "fromLead": "من عميل محتمل",
+    "logActivity": "تسجيل نشاط",
+    "newOpportunity": "فرصة جديدة",
+    "changeColour": "تغيير اللون",
+    "delete": "حذف",
+    "actionsLabel": "إجراءات العميل"
+  },
+  "tabs": {
+    "label": "أقسام العميل",
+    "overview": "نظرة عامة",
+    "activities": "الأنشطة",
+    "calls": "المكالمات",
+    "attachments": "المرفقات",
+    "history": "سجل التغييرات",
+    "missed": "مكالمات فائتة: {{n}}"
+  },
+  "nav": {
+    "prev": "العميل السابق",
+    "next": "العميل التالي"
+  },
+  "navGone": "لم يعد هذا العميل متاحًا.",
+  "created": "تم إنشاء العميل «{{name}}».",
+  "loadFailed": "تعذّر تحميل هذا العميل.",
+  "scopeDenied": "ليست لديك صلاحية لعرض هذا العميل.",
+  "delete": {
+    "title": "حذف {{name}}؟",
+    "bodyReopensLead": "سيُعاد فتح العميل المحتمل الذي نشأ منه هذا العميل.",
+    "bodyPermanent": "لا يمكن التراجع عن هذا الإجراء.",
+    "reasonLabel": "السبب",
+    "reasonHint": "ملاحظة اختيارية توضح سبب حذف هذا العميل، بحد أقصى 500 حرف.",
+    "reasonTooLong": "بحد أقصى 500 حرف.",
+    "done": "تم حذف العميل."
+  },
+  "history": {
+    "rating": "{{n}} من 3 نجوم"
+  }
+}

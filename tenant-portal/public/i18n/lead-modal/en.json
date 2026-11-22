@@ -1,0 +1,71 @@
+{
+  "title": "Lead",
+  "typeLocked": "The lead type cannot change after creation.",
+  "type": {
+    "label": "Lead type",
+    "hint": "Choose whether this lead is an individual person or a company.",
+    "INDIVIDUAL": "Individual",
+    "CORPORATE": "Company"
+  },
+  "switchType": {
+    "title": "Change the lead type?",
+    "text": "The details that belong only to the current type will be cleared.",
+    "confirm": "Change"
+  },
+  "name": {
+    "first": "First name",
+    "last": "Last name",
+    "company": "Company name",
+    "hint": "The first name is required. Up to 80 characters for each part of a person's name, or 180 for a company.",
+    "change": "Change"
+  },
+  "nav": {
+    "prev": "Previous lead",
+    "next": "Next lead"
+  },
+  "rating": {
+    "label": "Rating",
+    "hint": "Rate the lead from 1 to 3 stars. Click the active star to clear.",
+    "star": "Rating {{n}} of 3"
+  },
+  "color": {
+    "label": "Card colour",
+    "hint": "Optional colour stripe shown on the lead card.",
+    "none": "No colour",
+    "RED": "Red",
+    "ORANGE": "Orange",
+    "AMBER": "Amber",
+    "YELLOW": "Yellow",
+    "GREEN": "Green",
+    "TEAL": "Teal",
+    "BLUE": "Blue",
+    "INDIGO": "Indigo",
+    "PURPLE": "Purple",
+    "PINK": "Pink",
+    "SLATE": "Slate"
+  },
+  "stage": {
+    "label": "Stage",
+    "hint": "The current pipeline stage of this lead.",
+    "done": "Moved to {{stage}}.",
+    "reasonRequired": "Moving to {{stage}} needs a reason. Use the lead's actions.",
+    "convertRequired": "Use Convert to move a lead to {{stage}}."
+  },
+  "footer": {
+    "create": "Create lead"
+  },
+  "created": "Lead “{{name}}” created.",
+  "delete": {
+    "title": "Delete this lead?",
+    "text": "“{{name}}” will be removed from the list.",
+    "confirm": "Delete",
+    "done": "Lead deleted."
+  },
+  "unsaved": {
+    "cancel": "Cancel"
+  },
+  "loadFailed": "Could not load this lead.",
+  "leadGone": "That lead no longer exists. Moved to the next one.",
+  "leadGonePrev": "That lead no longer exists. Moved to the previous one.",
+  "newTitle": "New lead"
+}

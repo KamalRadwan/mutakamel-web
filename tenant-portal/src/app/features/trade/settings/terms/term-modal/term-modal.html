@@ -1,0 +1,404 @@
+<ui-modal
+  #termModal
+  size="wide"
+  icon="tablerFileText"
+  tile="bg-icon-teal"
+  [title]="modalTitle()"
+  [closeLabel]="'tterms.modal.close' | transloco"
+  [dismissable]="!saving() && !deleting() && !conflictBusy()"
+  (closed)="onModalClosed()"
+>
+  <ui-badge modal-header-end tone="tag">{{ 'tset.types.' + termType() | transloco }}</ui-badge>
+
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tterms.modal.fields.code' | transloco"
+        [for]="uid + '-code'"
+        [required]="mode() === 'create'"
+        [hint]="'tterms.modal.hints.code' | transloco"
+        [error]="errorText('code')"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="mode() === 'create' ? ('tterms.modal.placeholders.code' | transloco) : ''"
+          [value]="form().code"
+          [readonly]="mode() === 'edit' || !canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('code') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-code-hint' + (errorText('code') ? ' ' + uid + '-code-error' : '')"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+        @if (mode() === 'edit') {
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [label]="'tterms.modal.fields.side' | transloco"
+        [for]="uid + '-side'"
+        [required]="true"
+        [hint]="'tterms.modal.hints.side' | transloco"
+      >
+        <ui-segmented
+          [id]="uid + '-side'"
+          [options]="sideOptions()"
+          [label]="'tterms.modal.fields.side' | transloco"
+          [value]="form().side"
+          [describedBy]="uid + '-side-hint'"
+          (valueChange)="setSide($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tterms.modal.fields.nameAr' | transloco"
+        [for]="uid + '-name-ar'"
+        [required]="true"
+        [hint]="'tterms.modal.hints.nameAr' | transloco"
+        [count]="form().nameAr.length"
+        [max]="limits.nameMax"
+        [error]="errorText('nameAr')"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameAr"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('nameAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-ar-hint' + (errorText('nameAr') ? ' ' + uid + '-name-ar-error' : '')"
+          (input)="onFieldInput('nameAr', $event)"
+          (blur)="markTouched('nameAr')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tterms.modal.fields.nameEn' | transloco"
+        [for]="uid + '-name-en'"
+        [required]="true"
+        [hint]="'tterms.modal.hints.nameEn' | transloco"
+        [count]="form().nameEn.length"
+        [max]="limits.nameMax"
+        [error]="errorText('nameEn')"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameEn"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('nameEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-en-hint' + (errorText('nameEn') ? ' ' + uid + '-name-en-error' : '')"
+          (input)="onFieldInput('nameEn', $event)"
+          (blur)="markTouched('nameEn')"
+        />
+      </ui-field>
+    </div>
+
+    @if (termType() === 'PAYMENT') {
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tterms.modal.fields.dueDays' | transloco"
+          [for]="uid + '-due-days'"
+          [hint]="'tterms.modal.hints.dueDays' | transloco"
+          [error]="errorText('dueDays')"
+        >
+          <input
+            [id]="uid + '-due-days'"
+            type="text"
+            inputmode="numeric"
+            dir="ltr"
+            autocomplete="off"
+            class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [placeholder]="'tterms.modal.placeholders.dueDays' | transloco"
+            [value]="form().dueDays"
+            [readonly]="!canManage()"
+            [disabled]="saving() || deleting()"
+            [attr.aria-invalid]="errorText('dueDays') ? 'true' : null"
+            [attr.aria-describedby]="uid + '-due-days-hint' + (errorText('dueDays') ? ' ' + uid + '-due-days-error' : '')"
+            (input)="onFieldInput('dueDays', $event)"
+            (blur)="markTouched('dueDays')"
+          />
+        </ui-field>
+      </div>
+    } @else if (termType() === 'DELIVERY') {
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'tterms.modal.fields.incoterm' | transloco"
+          [for]="uid + '-incoterm'"
+          [hint]="'tterms.modal.hints.incoterm' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-incoterm'"
+            [options]="incotermOptions()"
+            [value]="form().incotermCode"
+            [label]="'tterms.modal.fields.incoterm' | transloco"
+            [describedBy]="uid + '-incoterm-hint'"
+            [disabled]="!canManage() || saving() || deleting()"
+            (valueChange)="setIncoterm($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tterms.modal.fields.sortOrder' | transloco"
+        [for]="uid + '-order'"
+        [required]="true"
+        [hint]="'tterms.modal.hints.sortOrder' | transloco"
+        [error]="errorText('sortOrder')"
+      >
+        <input
+          [id]="uid + '-order'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [value]="form().sortOrder"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('sortOrder') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-order-hint' + (errorText('sortOrder') ? ' ' + uid + '-order-error' : '')"
+          (input)="onFieldInput('sortOrder', $event)"
+          (blur)="markTouched('sortOrder')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-3">
+      <ui-field
+        size="multiline"
+        [label]="'tterms.modal.fields.textAr' | transloco"
+        [for]="uid + '-text-ar'"
+        [required]="true"
+        [hint]="'tterms.modal.hints.textAr' | transloco"
+        [count]="form().textAr.length"
+        [max]="limits.textMax"
+        [error]="errorText('textAr')"
+      >
+        <textarea
+          [id]="uid + '-text-ar'"
+          dir="rtl"
+          class="h-textarea w-full resize-none overflow-y-auto bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder scrollbar-thin"
+          [value]="form().textAr"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('textAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-text-ar-hint' + (errorText('textAr') ? ' ' + uid + '-text-ar-error' : '')"
+          (input)="onFieldInput('textAr', $event)"
+          (blur)="markTouched('textAr')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    <div class="col-span-3">
+      <ui-field
+        size="multiline"
+        [label]="'tterms.modal.fields.textEn' | transloco"
+        [for]="uid + '-text-en'"
+        [required]="true"
+        [hint]="'tterms.modal.hints.textEn' | transloco"
+        [count]="form().textEn.length"
+        [max]="limits.textMax"
+        [error]="errorText('textEn')"
+      >
+        <textarea
+          [id]="uid + '-text-en'"
+          dir="ltr"
+          class="h-textarea w-full resize-none overflow-y-auto bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder scrollbar-thin"
+          [value]="form().textEn"
+          [readonly]="!canManage()"
+          [disabled]="saving() || deleting()"
+          [attr.aria-invalid]="errorText('textEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-text-en-hint' + (errorText('textEn') ? ' ' + uid + '-text-en-error' : '')"
+          (input)="onFieldInput('textEn', $event)"
+          (blur)="markTouched('textEn')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'tterms.modal.fields.defaultFor.' + form().side | transloco"
+        [for]="uid + '-default'"
+        [hint]="defaultHintKey() | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-default'"
+            [label]="'tterms.modal.fields.defaultFor.' + form().side | transloco"
+            [describedBy]="uid + '-default-hint'"
+            [checked]="form().isDefault"
+            [disabled]="defaultSwitchDisabled()"
+            (checkedChange)="setDefault($event)"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'tterms.modal.fields.active' | transloco"
+        [for]="uid + '-active'"
+        [hint]="'tterms.modal.hints.active' | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-active'"
+            [label]="'tterms.modal.fields.active' | transloco"
+            [describedBy]="uid + '-active-hint'"
+            [checked]="form().isActive"
+            [disabled]="!canManage() || saving() || deleting()"
+            (checkedChange)="setActive($event)"
+          />
+          <span class="text-12 leading-18 text-text">
+            {{ (form().isActive ? 'tterms.status.active' : 'tterms.status.inactive') | transloco }}
+          </span>
+        </div>
+      </ui-field>
+    </div>
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || deleting() || !dirty() || !isValid()"
+        (click)="save()"
+      >
+        {{ 'tterms.modal.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving() || deleting()"
+          (click)="undo()"
+        >
+          {{ 'tterms.modal.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'tterms.modal.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving() || deleting()"
+          (click)="requestClose()"
+        >
+          {{ 'tterms.modal.cancel' | transloco }}
+        </button>
+      }
+
+      @if (mode() === 'edit' && baseTerm(); as current) {
+        <button
+          type="button"
+          class="ms-auto inline-flex h-btn cursor-pointer items-center justify-center gap-4 rounded-8 border border-transparent px-12 text-12 font-medium whitespace-nowrap text-danger-text transition-colors duration-fast ease-enter outline-none hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+          [disabled]="saving() || deleting() || current.isDefault"
+          [attr.aria-busy]="deleting()"
+          [attr.title]="current.isDefault ? ('tterms.actions.deleteDefaultDisabled' | transloco) : null"
+          (click)="requestDelete()"
+        >
+          @if (deleting()) {
+            <ng-icon name="tablerLoader2" size="12" class="animate-spin" aria-hidden="true" />
+          } @else {
+            <ng-icon name="tablerTrash" size="15" aria-hidden="true" />
+          }
+          {{ 'tterms.actions.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        (click)="requestClose()"
+      >
+        {{ 'tterms.modal.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'tterms.conflict.title' | transloco"
+  [closeLabel]="'tterms.modal.close' | transloco"
+  [dismissable]="!conflictBusy()"
+  (closed)="onConflictClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'tterms.conflict.text' | transloco }}</p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="conflictBusy()"
+    (click)="reloadLatest()"
+  >
+    {{ 'tterms.conflict.reload' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="conflictBusy()"
+    (click)="keepMyChanges()"
+  >
+    {{ 'tterms.conflict.keepMine' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'tterms.unsavedDialog.title' | transloco"
+  [text]="'tterms.unsavedDialog.text' | transloco"
+  [saveLabel]="'tterms.unsavedDialog.save' | transloco"
+  [discardLabel]="'tterms.unsavedDialog.discard' | transloco"
+  [cancelLabel]="'tterms.unsavedDialog.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteDialog
+  tone="danger"
+  [title]="'tterms.deleteConfirm.title' | transloco"
+  [text]="'tterms.deleteConfirm.text' | transloco"
+  [confirmLabel]="'tterms.deleteConfirm.confirm' | transloco"
+  [cancelLabel]="'tterms.deleteConfirm.cancel' | transloco"
+/>

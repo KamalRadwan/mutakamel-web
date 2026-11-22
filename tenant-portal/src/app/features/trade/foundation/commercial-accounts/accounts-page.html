@@ -1,0 +1,208 @@
+<div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canManage) {
+    <button type="button" uiButton class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      <span>{{ 'tradeAccounts.toolbar.new' | transloco }}</span>
+    </button>
+  }
+
+  @if (canManage && view() === 'table' && selection.count() > 0) {
+    <app-account-bulk-menu
+      class="shrink-0"
+      [selection]="selection"
+      [context]="ctx()"
+      [filter]="filter()"
+      [total]="total()"
+      (jobFinished)="onBulkJobFinished($event)"
+    />
+  }
+
+  <div class="flex h-field min-w-0 flex-1 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo">
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      type="text"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [attr.aria-label]="'tradeAccounts.toolbar.searchLabel' | transloco"
+      [placeholder]="'tradeAccounts.toolbar.searchPlaceholder' | transloco"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+    />
+    @if (search()) {
+      <button
+        type="button"
+        class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'tradeShared.picker.clear' | transloco"
+        (click)="clearSearch()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <div class="shrink-0">
+    <ui-dropdown
+      size="button"
+      [options]="statusOptions()"
+      [value]="statusFilter()"
+      [label]="'tradeAccounts.filters.status' | transloco"
+      (valueChange)="setStatus($event)"
+    />
+  </div>
+
+  <div class="shrink-0">
+    <ui-dropdown
+      size="button"
+      icon="tablerArrowsSort"
+      [options]="sortOptions()"
+      [value]="sortOption()"
+      [label]="'tradeAccounts.sort.label' | transloco"
+      (valueChange)="setSort($event)"
+    />
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-view-switcher
+    [options]="viewOptions()"
+    [label]="'tradeAccounts.views.switcher' | transloco"
+    [value]="view()"
+    (valueChange)="setView($event)"
+  />
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-surface-muted hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [attr.aria-label]="'tradeAccounts.toolbar.reload' | transloco"
+    [title]="'tradeAccounts.toolbar.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+  </button>
+</div>
+
+<p class="px-2 text-12 leading-18 text-text-muted">
+  {{ 'tradeAccounts.toolbar.visibleToBranch' | transloco: { branch: currentBranchName() } }}
+</p>
+
+<ui-step-filter
+  class="shrink-0"
+  [steps]="roleSteps()"
+  [label]="'tradeAccounts.filters.role' | transloco"
+  [hint]="'tradeAccounts.filters.roleHint' | transloco"
+  [value]="roleFilter()"
+  (valueChange)="setRole($event)"
+/>
+
+@if (canManage && view() === 'table' && selection.count() > 0) {
+  <app-account-selection-bar
+    [selection]="selection"
+    [filter]="filter()"
+    [pageRows]="accounts()"
+    [total]="total()"
+    [visibleIds]="visibleIds()"
+  />
+}
+
+@if (loadFailed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeAccounts.error.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      {{ 'tradeShared.common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (!loading() && accounts().length === 0) {
+  @if (!hasActiveFilters()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerAddressBook" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'tradeAccounts.empty.title' | transloco }}</p>
+      @if (canManage) {
+        <button type="button" uiButton variant="primary" (click)="openCreate()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          <span>{{ 'tradeAccounts.toolbar.new' | transloco }}</span>
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerSearch" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'tradeAccounts.empty.filtered' | transloco }}</p>
+    </div>
+  }
+} @else {
+  @switch (view()) {
+    @case ('cards') {
+      <app-account-cards
+        [accounts]="accounts()"
+        [loading]="loading()"
+        [canManage]="canManage"
+        [priceBookNames]="priceBookNames()"
+        [blockReasonNames]="blockReasonNames()"
+        (open)="openAccount($event)"
+        (block)="openBlockDialog($event)"
+        (unblock)="openUnblockDialog($event)"
+      />
+    }
+    @case ('table') {
+      <app-account-table
+        [accounts]="accounts()"
+        [loading]="loading()"
+        [canManage]="canManage"
+        [priceBookNames]="priceBookNames()"
+        [blockReasonNames]="blockReasonNames()"
+        (open)="openAccount($event)"
+        (block)="openBlockDialog($event)"
+        (unblock)="openUnblockDialog($event)"
+      />
+    }
+  }
+}
+
+@if (!loadFailed() && !loading() && total() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [pageSizes]="pageSizes"
+      [label]="'tradeAccounts.pagination' | transloco"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  </footer>
+}
+
+<app-account-modal
+  class="absolute"
+  [canManage]="canManage"
+  (saved)="onAccountSaved($event)"
+  (closed)="onModalClosed()"
+/>
+
+<app-account-status-dialog
+  class="absolute"
+  [mode]="statusMode()"
+  [account]="statusTarget()"
+  [saving]="statusSaving()"
+  (confirmed)="onStatusConfirmed($event)"
+  (cancelled)="onStatusCancelled()"
+/>
+
+<ui-unsaved-dialog
+  #conflictDialog
+  [title]="'tradeShared.conflict.title' | transloco"
+  [text]="'tradeShared.conflict.text' | transloco"
+  [saveLabel]="'tradeShared.conflict.reload' | transloco"
+  [discardLabel]="'tradeShared.conflict.keepMine' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

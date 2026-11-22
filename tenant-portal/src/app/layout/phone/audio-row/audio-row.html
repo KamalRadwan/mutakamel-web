@@ -1,0 +1,42 @@
+<div class="audio-row-grid grid h-btn items-center gap-8">
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="isMuted() ? 'bg-danger-soft text-on-danger-soft' : 'bg-success-soft text-on-success-soft'"
+    [attr.aria-pressed]="isMuted()"
+    [attr.aria-label]="toggleLabelKey() | transloco"
+    [title]="toggleLabelKey() | transloco"
+    (click)="toggleMute()"
+  >
+    <ng-icon [name]="iconName()" size="15" aria-hidden="true" />
+  </button>
+
+  <div class="relative flex h-counter items-center">
+    <input
+      type="range"
+      min="0"
+      max="100"
+      step="5"
+      class="peer absolute inset-0 z-sticky h-full w-full cursor-pointer opacity-0 outline-none"
+      [value]="volume()"
+      [attr.aria-label]="sliderLabelKey() | transloco"
+      (input)="onVolumeInput($event)"
+      (change)="onVolumeInput($event)"
+    />
+    <div
+      class="pointer-events-none relative h-status-bar w-full rounded-2 bg-neutral-soft peer-focus-visible:ring-3 peer-focus-visible:ring-focus-halo-strong"
+    >
+      <div
+        class="absolute inset-y-0 start-0 rounded-2 bg-success transition-all duration-fast"
+        [style.width.%]="levelPct()"
+      ></div>
+    </div>
+    <span
+      class="pointer-events-none absolute top-2 size-switch-knob rounded-full bg-text-muted ring-2 ring-surface"
+      [style.inset-inline-start]="knobStartExpr()"
+      aria-hidden="true"
+    ></span>
+  </div>
+
+  <span dir="ltr" class="text-end text-11 leading-16 text-text-muted tabular-nums">{{ volume() }}%</span>
+</div>

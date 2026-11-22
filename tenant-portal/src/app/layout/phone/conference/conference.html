@@ -1,0 +1,167 @@
+<div [class]="subView() === 'main' ? 'scrollbar-thin min-h-0 flex-1 overflow-y-auto' : 'shrink-0'">
+  <app-call-rows
+    [legs]="phone.legs()"
+    [focusedId]="phone.focusedLegId()"
+    [removable]="true"
+    [focusable]="false"
+    (remove)="phone.removeParty($event)"
+  />
+</div>
+
+@switch (subView()) {
+  @case ('main') {
+    <div class="grid shrink-0 grid-cols-3 gap-6">
+      <button
+        type="button"
+        data-call-control
+        class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 px-6 text-12 leading-18 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          allHeld()
+            ? 'bg-warning text-on-warning'
+            : 'border border-border bg-surface-muted text-text hover:bg-row-hover'
+        "
+        [attr.aria-pressed]="allHeld()"
+        (click)="toggleHoldAll()"
+      >
+        <ng-icon [name]="allHeld() ? 'tablerPlayerPlay' : 'tablerPlayerPause'" size="15" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ (allHeld() ? 'webPhone.conference.resumeAll' : 'webPhone.conference.holdAll') | transloco }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="subView.set('keypad')"
+      >
+        <ng-icon name="tablerDialpad" size="15" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ 'webPhone.inCall.keypad' | transloco }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-muted"
+        [disabled]="atMaxParties()"
+        [attr.title]="atMaxParties() ? ('webPhone.conference.maxPartiesHint' | transloco) : null"
+        (click)="openAddParty()"
+      >
+        <ng-icon name="tablerUsersPlus" size="15" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ 'webPhone.inCall.add' | transloco }}</span>
+      </button>
+    </div>
+
+    <button
+      type="button"
+      class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 bg-danger px-10 text-12 leading-18 font-medium text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="confirmEnd()"
+    >
+      <ng-icon name="tablerPhoneEnd" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.conference.endForAll' | transloco }}</span>
+    </button>
+  }
+
+  @case ('keypad') {
+    <ui-field
+      class="shrink-0"
+      [label]="'webPhone.conference.sendTonesTo' | transloco"
+      [hint]="'webPhone.conference.sendTonesToHint' | transloco"
+      [bare]="true"
+    >
+      <ui-dropdown
+        size="field"
+        class="w-full"
+        [options]="toneOptions()"
+        [label]="'webPhone.conference.sendTonesTo' | transloco"
+        [value]="selectedToneTarget()"
+        (valueChange)="onSelectToneTarget($event)"
+      />
+    </ui-field>
+
+    <app-keypad (pressed)="phone.pressKey($event)" />
+
+    <button
+      type="button"
+      class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-10 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="subView.set('main')"
+    >
+      <span>{{ 'webPhone.inCall.hideKeypad' | transloco }}</span>
+    </button>
+  }
+
+  @case ('addParty') {
+    <ui-field
+      class="shrink-0"
+      for="phone-conf-add-input"
+      [label]="'webPhone.inCall.addPerson' | transloco"
+      [hint]="'webPhone.inCall.addPersonHint' | transloco"
+      [bare]="true"
+    >
+      <div
+        class="flex h-table-head items-center gap-2 rounded-10 border border-border bg-surface-muted ps-10 pe-4 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+      >
+        <input
+          id="phone-conf-add-input"
+          type="text"
+          inputmode="tel"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-16 leading-22 font-medium text-text tabular-nums outline-none placeholder:text-12 placeholder:font-normal placeholder:text-text-placeholder"
+          [placeholder]="'webPhone.dialer.enterNumber' | transloco"
+          [value]="partyNumber()"
+          (input)="onPartyInput($event)"
+          (keydown.enter)="submitAddParty()"
+        />
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+          [disabled]="!partyNumber()"
+          [attr.aria-label]="'webPhone.dialer.deleteDigit' | transloco"
+          [title]="'webPhone.dialer.deleteDigit' | transloco"
+          (click)="deletePartyKey()"
+        >
+          <ng-icon name="tablerBackspace" size="15" aria-hidden="true" />
+        </button>
+      </div>
+    </ui-field>
+
+    <app-keypad (pressed)="pressPartyKey($event)" />
+
+    <div class="grid shrink-0 grid-cols-2 gap-6">
+      <button
+        type="button"
+        class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="subView.set('main')"
+      >
+        <span class="truncate">{{ 'webPhone.common.cancel' | transloco }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 px-6 text-12 leading-18 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+        [class]="
+          partyNumber().trim()
+            ? 'bg-success text-on-success hover:bg-success-hover active:bg-success-pressed'
+            : 'bg-neutral-soft text-text-muted'
+        "
+        [disabled]="!partyNumber().trim()"
+        (click)="submitAddParty()"
+      >
+        <ng-icon name="tablerPhone" size="15" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ 'webPhone.dialer.call' | transloco }}</span>
+      </button>
+    </div>
+  }
+}
+
+<div class="flex shrink-0 flex-col gap-6">
+  <app-audio-row kind="speaker" />
+  <app-audio-row kind="mic" />
+</div>
+
+<app-status-line />
+
+<ui-confirm-dialog
+  class="contents"
+  tone="danger"
+  [title]="'webPhone.conference.confirmEndTitle' | transloco"
+  [text]="'webPhone.conference.confirmEndText' | transloco"
+  [confirmLabel]="'webPhone.conference.endForAll' | transloco"
+  [cancelLabel]="'webPhone.common.cancel' | transloco"
+/>

@@ -1,0 +1,223 @@
+<ui-modal
+  #modal
+  size="wide"
+  [icon]="headerIcon()"
+  [tile]="headerTile()"
+  [title]="headerTitle()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  @switch (effectivePhase()) {
+    @case ('confirm') {
+      <div class="flex flex-col gap-10">
+        <p class="text-12 leading-18 text-text-muted">{{ 'wsUpdates.apply.text' | transloco }}</p>
+
+        <div class="flex max-h-notif-list-max flex-col gap-6 overflow-y-auto scrollbar-thin pe-2">
+          @for (item of snapshot(); track item.selection.componentKey) {
+            <div class="flex flex-wrap items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-10 py-8">
+              <div class="min-w-0 flex-1">
+                <div dir="ltr" class="truncate text-start text-13 leading-18 font-medium text-text tabular-nums">
+                  {{ item.selection.componentKey }}
+                </div>
+                <div class="text-11 leading-16 text-text-muted">
+                  {{ 'wsUpdates.table.app' | transloco: { app: appName(item.ownerApp) } }}
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-6">
+                <span class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap" [class]="riskBadgeClass(item)">
+                  {{ 'wsUpdates.risk.' + item.riskLevel | transloco }}
+                </span>
+
+                <span class="inline-flex items-center gap-4 text-12 text-text tabular-nums">
+                  <span dir="ltr">{{ item.currentVersion }}</span>
+                  <span class="inline-flex shrink-0 text-text-muted rtl:-scale-x-100">
+                    <ng-icon name="tablerArrowRight" size="14" aria-hidden="true" />
+                  </span>
+                  <span dir="ltr" class="font-medium">{{ item.selection.targetReleaseVersion }}</span>
+                </span>
+
+                @if (item.requiresBackup) {
+                  <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                    {{ 'wsUpdates.table.backupRequired' | transloco }}
+                  </span>
+                }
+                @if (item.requiresMaintenance) {
+                  <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                    {{ 'wsUpdates.table.maintenanceRequired' | transloco }}
+                  </span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+
+        @if (hasRequirements()) {
+          <app-settings-notice tone="warning">
+            {{ 'wsUpdates.apply.warnBackup' | transloco }}
+          </app-settings-notice>
+        }
+
+        <div [class.opacity-drag-source]="submitting()">
+          <ui-field
+            [label]="'wsUpdates.apply.consentLabel' | transloco"
+            [hint]="'wsUpdates.apply.consentHint' | transloco"
+            [required]="true"
+            size="bare"
+          >
+            <ui-checkbox
+              #consentCb
+              [checked]="consent()"
+              [disabled]="submitting()"
+              (checkedChange)="onConsentChange($event, consentCb)"
+            >
+              <span class="text-12 leading-18 text-text">{{ 'wsUpdates.apply.consent' | transloco }}</span>
+            </ui-checkbox>
+          </ui-field>
+        </div>
+
+        @if (submitting()) {
+          <div class="flex items-center gap-6 text-12 text-text-muted" aria-busy="true">
+            <ng-icon name="tablerLoader2" size="14" class="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <span>{{ 'wsUpdates.apply.submitting' | transloco }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    @case ('stale') {
+      <div class="flex flex-col gap-10">
+        <app-settings-notice tone="warning">
+          {{ staleMessage() }}
+        </app-settings-notice>
+
+        <div class="flex max-h-notif-list-max flex-col gap-6 overflow-y-auto scrollbar-thin pe-2">
+          @for (item of snapshot(); track item.selection.componentKey) {
+            <div class="flex flex-wrap items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-10 py-8">
+              <div class="min-w-0 flex-1">
+                <div dir="ltr" class="truncate text-start text-13 leading-18 font-medium text-text tabular-nums">
+                  {{ item.selection.componentKey }}
+                </div>
+                <div class="text-11 leading-16 text-text-muted">
+                  {{ 'wsUpdates.table.app' | transloco: { app: appName(item.ownerApp) } }}
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-6">
+                @if (changedVersion(item); as nextVer) {
+                  <span class="text-12 text-text-muted">
+                    {{ 'wsUpdates.apply.nowVersion' | transloco: { version: nextVer } }}
+                  </span>
+                }
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="liveEligibilityBadge(item)"
+                >
+                  {{ 'wsUpdates.eligibility.' + liveEligibility(item) | transloco }}
+                </span>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @case ('blocked') {
+      <app-settings-notice tone="warning">
+        {{ 'wsUpdates.errors.TENANT_PROVISIONING_OPERATION_STATE_INVALID' | transloco }}
+      </app-settings-notice>
+    }
+
+    @case ('refused') {
+      <app-settings-notice tone="warning">
+        {{ 'wsUpdates.errors.TENANT_PROVISIONING_NO_SELF_SERVICE_UPDATES' | transloco }}
+      </app-settings-notice>
+    }
+
+    @case ('ambiguous') {
+      <div class="flex flex-col gap-10">
+        <app-settings-notice tone="warning">
+          {{ 'wsUpdates.ambiguous.text' | transloco }}
+        </app-settings-notice>
+
+        @if (submitting()) {
+          <div class="flex items-center gap-6 text-12 text-text-muted" aria-busy="true">
+            <ng-icon name="tablerLoader2" size="14" class="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <span>{{ 'wsUpdates.apply.submitting' | transloco }}</span>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <div modal-footer class="flex items-center gap-8">
+    @switch (effectivePhase()) {
+      @case ('confirm') {
+        <button
+          type="button"
+          uiButton
+          [loading]="submitting()"
+          [disabled]="!consent() || snapshot().length === 0 || submitting()"
+          (click)="confirmed.emit()"
+        >
+          {{ 'wsUpdates.apply.confirm' | transloco: { count: snapshot().length } }}
+        </button>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="submitting()"
+          (click)="close()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+
+      @case ('stale') {
+        <button type="button" uiButton (click)="reload.emit()">
+          {{ 'wsUpdates.apply.reload' | transloco }}
+        </button>
+        <button type="button" uiButton variant="secondary" (click)="close()">
+          {{ 'settings.common.close' | transloco }}
+        </button>
+      }
+
+      @case ('blocked') {
+        <button type="button" uiButton variant="secondary" (click)="close()">
+          {{ 'settings.common.close' | transloco }}
+        </button>
+      }
+
+      @case ('refused') {
+        <button type="button" uiButton (click)="reload.emit()">
+          {{ 'wsUpdates.apply.reload' | transloco }}
+        </button>
+        <button type="button" uiButton variant="secondary" (click)="close()">
+          {{ 'settings.common.close' | transloco }}
+        </button>
+      }
+
+      @case ('ambiguous') {
+        <button
+          type="button"
+          uiButton
+          [loading]="submitting()"
+          [disabled]="submitting()"
+          (click)="retry.emit()"
+        >
+          {{ 'wsUpdates.ambiguous.retry' | transloco }}
+        </button>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="submitting()"
+          (click)="close()"
+        >
+          {{ 'settings.common.close' | transloco }}
+        </button>
+      }
+    }
+  </div>
+</ui-modal>

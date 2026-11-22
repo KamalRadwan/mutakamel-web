@@ -1,0 +1,67 @@
+{
+  "drop": {
+    "title": "أفلت الملفات هنا",
+    "hint": "ملفات PDF أو صور أو Excel أو Word أو CSV أو نصوص، بحد أقصى 25 ميغابايت لكل ملف.",
+    "browse": "استعراض"
+  },
+  "col": {
+    "file": "الملف",
+    "type": "النوع",
+    "size": "الحجم",
+    "by": "رفعه",
+    "added": "تاريخ الإضافة",
+    "actions": "الإجراءات"
+  },
+  "type": {
+    "pdf": "PDF",
+    "image": "صورة",
+    "excel": "Excel",
+    "word": "Word",
+    "csv": "CSV",
+    "text": "نص",
+    "other": "ملف"
+  },
+  "download": "تنزيل {{name}}",
+  "deleteFile": "حذف {{name}}",
+  "delete": {
+    "title": "حذف هذا الملف؟",
+    "text": "ستتم إزالة «{{name}}» من هذا السجل.",
+    "confirm": "حذف",
+    "cancel": "إلغاء"
+  },
+  "deleted": "تم حذف الملف.",
+  "uploaded": "تم رفع الملف.",
+  "uploading": "جارٍ رفع {{name}}",
+  "cancelUpload": "إزالة من قائمة الانتظار",
+  "retry": "إعادة المحاولة",
+  "dismiss": "إغلاق",
+  "loadMore": "تحميل المزيد ({{shown}} من {{total}})",
+  "empty": {
+    "title": "لا توجد ملفات بعد",
+    "text": "أضف عروض الأسعار أو العقود أو الصور لهذا السجل."
+  },
+  "loadFailed": "تعذّر تحميل الملفات.",
+  "denied": "ليست لديك صلاحية عرض المرفقات.",
+  "tryAgain": "إعادة المحاولة",
+  "errors": {
+    "CRM_ATTACHMENT_FILE_TOO_LARGE": "حجم هذا الملف أكبر من 25 ميغابايت.",
+    "CRM_ATTACHMENT_FILE_TYPE_UNSUPPORTED": "نوع هذا الملف غير مسموح به.",
+    "CRM_ATTACHMENT_FILE_EMPTY": "هذا الملف فارغ.",
+    "CRM_ATTACHMENT_NOT_FOUND": "لم يعد هذا الملف موجودًا.",
+    "STORAGE_CAPACITY_EXCEEDED": "مساحة التخزين في مساحة العمل ممتلئة.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "اشتراكك للقراءة فقط، لذا لا يمكن حفظ التغييرات.",
+    "CRM_SCOPED_PERMISSION_DENIED": "ليست لديك صلاحية للقيام بذلك.",
+    "CRM_ATTACHMENT_FILE_REQUIRED": "اختر ملفًا لرفعه.",
+    "CRM_ATTACHMENT_INVALID": "لا يطابق هذا الملف نوعه. تحقّق من اسم الملف ثم أعد المحاولة.",
+    "CRM_ATTACHMENT_FILE_NOT_FOUND": "الملف المخزَّن غير متاح.",
+    "CRM_SOURCE_NOT_FOUND": "هذا السجل لم يعد موجودًا.",
+    "CRM_SOURCE_BRANCH_MISMATCH": "هذا السجل يتبع فرعًا آخر.",
+    "CRM_PERMISSION_DENIED": "ليست لديك صلاحية للقيام بهذا الإجراء.",
+    "CRM_VALIDATION_FAILED": "الطلب غير صالح. أعد تحميل الصفحة ثم حاول مرة أخرى.",
+    "GW.IDEM.MISSING": "تعذّر إرسال الرفع بأمان. حاول مرة أخرى.",
+    "GW.IDEM.BAD_VALUE": "تعذّر إرسال الرفع بأمان. حاول مرة أخرى.",
+    "GW.IDEM.MISMATCH": "أُرسل هذا الرفع من قبل بملف مختلف. احذفه ثم أضف الملف مرة أخرى.",
+    "GW.IDEM.IN_FLIGHT": "ما زال هذا الرفع قيد المعالجة.",
+    "generic": "حدث خطأ ما، فأعد المحاولة."
+  }
+}

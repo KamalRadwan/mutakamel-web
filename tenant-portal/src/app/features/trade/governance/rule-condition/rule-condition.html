@@ -1,0 +1,330 @@
+<div
+  class="grid items-start gap-x-8 grid-cols-trade-rule-condition-row"
+  (keydown)="onFactKeydown($event)"
+>
+  <div class="min-w-0">
+    @if (showLabels()) {
+      <span class="mb-2 block h-label" aria-hidden="true"></span>
+    }
+    <span class="flex h-field items-center text-12 leading-18 text-text-muted">
+      {{ (index() === 0 ? 'policy.rules.ifWord' : 'policy.rules.andWord') | transloco }}
+    </span>
+  </div>
+
+  <div class="min-w-0">
+    @if (showLabels()) {
+      <ui-field
+        size="bare"
+        [label]="'policy.rules.factLabel' | transloco"
+        [for]="uid + '-fact'"
+        [hint]="'policy.rules.factHint' | transloco"
+        [hintText]="isUnsupportedFact() ? ('policy.rules.unsupportedFactHint' | transloco) : null"
+        [error]="factError()"
+      >
+        <button
+          #factTrigger
+          type="button"
+          [id]="uid + '-fact'"
+          class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast"
+          [class]="
+            factError()
+              ? 'border-danger-border ring-2 ring-danger-halo'
+              : factOpen()
+                ? 'border-focus-ring ring-3 ring-focus-halo'
+                : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+          "
+          aria-haspopup="listbox"
+          [attr.aria-expanded]="factOpen()"
+          [attr.aria-label]="'policy.rules.factLabel' | transloco"
+          [attr.aria-describedby]="factDescribedBy()"
+          [attr.aria-invalid]="factError() ? 'true' : null"
+          (click)="toggleFactMenu()"
+        >
+          <span class="min-w-0 truncate text-start">
+            {{ selectedFact() ? ('policy.facts.' + selectedFact()!.key | transloco) : condition().fact }}
+          </span>
+          <span class="flex shrink-0 items-center gap-6">
+            <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+              {{ 'policy.factTypes.' + factType() | transloco }}
+            </span>
+            <ng-icon name="tablerChevronDown" size="14" class="text-text-muted" aria-hidden="true" />
+          </span>
+        </button>
+      </ui-field>
+    } @else {
+      <button
+        #factTrigger
+        type="button"
+        [id]="uid + '-fact'"
+        class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast"
+        [class]="
+          factError()
+            ? 'border-danger-border ring-2 ring-danger-halo'
+            : factOpen()
+              ? 'border-focus-ring ring-3 ring-focus-halo'
+              : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="factOpen()"
+        [attr.aria-label]="'policy.rules.factLabel' | transloco"
+        [attr.aria-describedby]="factDescribedBy()"
+        [attr.aria-invalid]="factError() ? 'true' : null"
+        (click)="toggleFactMenu()"
+      >
+        <span class="min-w-0 truncate text-start">
+          {{ selectedFact() ? ('policy.facts.' + selectedFact()!.key | transloco) : condition().fact }}
+        </span>
+        <span class="flex shrink-0 items-center gap-6">
+          <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+            {{ 'policy.factTypes.' + factType() | transloco }}
+          </span>
+          <ng-icon name="tablerChevronDown" size="14" class="text-text-muted" aria-hidden="true" />
+        </span>
+      </button>
+      @if (factError()) {
+        <p [id]="uid + '-fact-error-inline'" class="mt-2 text-11 leading-16 text-danger-text">
+          {{ factError() }}
+        </p>
+      } @else if (isUnsupportedFact()) {
+        <p [id]="uid + '-fact-unsupported'" class="mt-2 text-11 leading-16 text-text-muted">
+          {{ 'policy.rules.unsupportedFactHint' | transloco }}
+        </p>
+      }
+    }
+  </div>
+
+  <div class="min-w-0">
+    @if (showLabels()) {
+      <ui-field
+        size="bare"
+        [label]="'policy.rules.operatorLabel' | transloco"
+        [for]="uid + '-op'"
+        [hint]="'policy.rules.operatorHint' | transloco"
+        [error]="operatorError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-op'"
+          [label]="'policy.rules.operatorLabel' | transloco"
+          [describedBy]="operatorDescribedBy()"
+          [options]="operatorOptions()"
+          [value]="condition().operator"
+          (valueChange)="onOperatorChange($event)"
+        />
+      </ui-field>
+    } @else {
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-op'"
+        [label]="'policy.rules.operatorLabel' | transloco"
+        [describedBy]="operatorDescribedBy()"
+        [options]="operatorOptions()"
+        [value]="condition().operator"
+        (valueChange)="onOperatorChange($event)"
+      />
+      @if (operatorError()) {
+        <p [id]="uid + '-op-error-inline'" class="mt-2 text-11 leading-16 text-danger-text">
+          {{ operatorError() }}
+        </p>
+      }
+    }
+  </div>
+
+  <div class="min-w-0">
+    @if (showLabels()) {
+      <ui-field
+        [size]="condition().operator === 'IN' || factType() === 'boolean' ? 'bare' : 'default'"
+        [label]="'policy.rules.valueLabel' | transloco"
+        [for]="uid + '-val'"
+        [hint]="'policy.rules.valueHint' | transloco"
+        [error]="valueError()"
+      >
+        @if (condition().operator === 'IN') {
+          <ui-tag-picker
+            [inputId]="uid + '-val'"
+            [describedBy]="valueDescribedBy()"
+            [label]="'policy.rules.valueLabel' | transloco"
+            [options]="inTagOptions()"
+            [canCreate]="true"
+            [createTag]="createInTagFn"
+            [max]="100"
+            [value]="inValues()"
+            (valueChange)="onInValuesChange($event)"
+          />
+        } @else if (factType() === 'boolean') {
+          <ui-segmented
+            [id]="uid + '-val'"
+            [label]="'policy.rules.valueLabel' | transloco"
+            [describedBy]="valueDescribedBy()"
+            [options]="booleanOptions()"
+            [value]="boolStringValue()"
+            (valueChange)="onBoolChange($event)"
+          />
+        } @else if (factType() === 'number') {
+          <input
+            [id]="uid + '-val'"
+            type="number"
+            step="any"
+            dir="ltr"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+            [value]="numberTextValue()"
+            [attr.aria-invalid]="valueError() ? 'true' : null"
+            (input)="onNumberInput($event)"
+          />
+        } @else {
+          <input
+            [id]="uid + '-val'"
+            type="text"
+            dir="auto"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+            [value]="stringTextValue()"
+            [attr.aria-invalid]="valueError() ? 'true' : null"
+            (input)="onStringInput($event)"
+          />
+        }
+      </ui-field>
+    } @else {
+      @if (condition().operator === 'IN') {
+        <ui-tag-picker
+          [inputId]="uid + '-val'"
+          [describedBy]="valueDescribedBy()"
+          [label]="'policy.rules.valueLabel' | transloco"
+          [options]="inTagOptions()"
+          [canCreate]="true"
+          [createTag]="createInTagFn"
+          [max]="100"
+          [value]="inValues()"
+          (valueChange)="onInValuesChange($event)"
+        />
+      } @else if (factType() === 'boolean') {
+        <ui-segmented
+          [id]="uid + '-val'"
+          [label]="'policy.rules.valueLabel' | transloco"
+          [describedBy]="valueDescribedBy()"
+          [options]="booleanOptions()"
+          [value]="boolStringValue()"
+          (valueChange)="onBoolChange($event)"
+        />
+      } @else if (factType() === 'number') {
+        <div
+          class="flex h-field items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+          [class]="
+            valueError()
+              ? 'border-danger-border ring-2 ring-danger-halo'
+              : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+          "
+        >
+          <input
+            [id]="uid + '-val'"
+            type="number"
+            step="any"
+            dir="ltr"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [attr.aria-label]="'policy.rules.valueLabel' | transloco"
+            [attr.aria-describedby]="valueDescribedBy()"
+            [attr.aria-invalid]="valueError() ? 'true' : null"
+            [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+            [value]="numberTextValue()"
+            (input)="onNumberInput($event)"
+          />
+        </div>
+      } @else {
+        <div
+          class="flex h-field items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+          [class]="
+            valueError()
+              ? 'border-danger-border ring-2 ring-danger-halo'
+              : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+          "
+        >
+          <input
+            [id]="uid + '-val'"
+            type="text"
+            dir="auto"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [attr.aria-label]="'policy.rules.valueLabel' | transloco"
+            [attr.aria-describedby]="valueDescribedBy()"
+            [attr.aria-invalid]="valueError() ? 'true' : null"
+            [placeholder]="'policy.rules.valuePlaceholder' | transloco"
+            [value]="stringTextValue()"
+            (input)="onStringInput($event)"
+          />
+        </div>
+      }
+
+      @if (valueError()) {
+        <p [id]="uid + '-val-error-inline'" class="mt-2 text-11 leading-16 text-danger-text">
+          {{ valueError() }}
+        </p>
+      }
+    }
+  </div>
+
+  <div class="min-w-0">
+    @if (showLabels()) {
+      <span class="mb-2 block h-label" aria-hidden="true"></span>
+    }
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="!canRemove()"
+      [attr.aria-label]="'policy.rules.removeCondition' | transloco"
+      [title]="'policy.rules.removeCondition' | transloco"
+      (click)="remove.emit()"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+  </div>
+</div>
+
+@if (factOpen()) {
+  <div
+    #factList
+    role="listbox"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!factPlaced()"
+    [style.top.px]="factPlace().top"
+    [style.inset-inline-start.px]="factPlace().start"
+    [style.min-width.px]="factPlace().width"
+    [style.max-height.px]="factPlace().maxHeight"
+    [attr.aria-label]="'policy.rules.factLabel' | transloco"
+  >
+    @for (group of factGroups(); track group.id; let firstGroup = $first) {
+      @if (!firstGroup && group.id === 'other-facts') {
+        <div role="separator" class="my-2 h-border bg-border"></div>
+      }
+      <div class="px-8 py-4">
+        <p class="text-11 leading-16 font-medium text-text-muted">{{ group.labelKey | transloco }}</p>
+        @if (group.subtitleKey) {
+          <p class="text-11 leading-16 text-text-placeholder">{{ group.subtitleKey | transloco }}</p>
+        }
+      </div>
+
+      @for (fact of group.items; track fact.key) {
+        @let isChosen = fact.key === condition().fact;
+        <button
+          type="button"
+          role="option"
+          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="isChosen ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+          [attr.aria-selected]="isChosen"
+          (click)="chooseFact(fact)"
+        >
+          <span class="min-w-0 truncate">{{ 'policy.facts.' + fact.key | transloco }}</span>
+          <span class="flex shrink-0 items-center gap-6">
+            <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+              {{ 'policy.factTypes.' + fact.type | transloco }}
+            </span>
+            @if (isChosen) {
+              <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+            }
+          </span>
+        </button>
+      }
+    }
+  </div>
+}

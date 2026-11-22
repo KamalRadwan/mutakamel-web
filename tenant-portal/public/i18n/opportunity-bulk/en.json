@@ -1,0 +1,223 @@
+{
+  "menu": {
+    "assign": "Assign to",
+    "stage": "Change stage",
+    "activity": "Batch activity",
+    "delete": "Delete"
+  },
+  "bar": {
+    "label": "Selection",
+    "selected": {
+      "one": "{{n}} opportunity selected",
+      "other": "{{n}} opportunities selected"
+    },
+    "pageAllSelected": "All {{n}} opportunities on this page are selected.",
+    "selectAll": "Select all {{total}} matching",
+    "tooMany": "Up to 10,000 opportunities can be selected.",
+    "truncated": "Selection was limited to the first 10,000 matching opportunities.",
+    "hidden": "· {{h}} not in the current results",
+    "allSelected": {
+      "one": "All {{total}} matching opportunity is selected",
+      "other": "All {{total}} matching opportunities are selected"
+    },
+    "onlyPage": "Select only this page",
+    "clear": "Clear selection"
+  },
+  "count": {
+    "one": "{{n}} opportunity",
+    "other": "{{n}} opportunities"
+  },
+  "assign": {
+    "title": "Assign to",
+    "owner": "New owner",
+    "ownerHint": "The salesperson who will own these opportunities. Only people who can own opportunities in this branch are listed.",
+    "searchPlaceholder": "Search people…",
+    "noOwners": "No one can be assigned here.",
+    "noMatch": "No matching people.",
+    "preview": "{{change}} opportunities will move to {{owner}} · {{same}} already belong to them",
+    "go": {
+      "one": "Assign {{n}} opportunity",
+      "other": "Assign {{n}} opportunities"
+    }
+  },
+  "stage": {
+    "title": "Change stage",
+    "stage": "Stage",
+    "stageHint": "Active stages of the current pipeline ordered by rank.",
+    "lossReason": "Loss reason",
+    "winReason": "Win reason (optional)",
+    "reasonHint": "Pick the main reason. Reasons are managed in CRM settings.",
+    "noReason": "No reason selected",
+    "note": "Note",
+    "noteHintLost": "Required when no loss reason is picked. Up to 1000 characters.",
+    "noteHintWon": "Optional. Up to 1000 characters.",
+    "reasonOrNoteRequired": "Pick a loss reason or enter a note.",
+    "winReasonRequired": "A win reason is required.",
+    "noteTooLong": "Note must be 1000 characters or fewer.",
+    "reopenWarning": "Opportunities that are won or lost and move to an open stage are reopened; their reason and date are cleared.",
+    "preview": "{{move}} opportunities will move to {{stage}} · {{same}} already there",
+    "go": {
+      "one": "Move {{n}} opportunity",
+      "other": "Move {{n}} opportunities"
+    }
+  },
+  "activity": {
+    "title": "Batch activity",
+    "sec": {
+      "activity": "Activity",
+      "schedule": "Schedule",
+      "preview": "Preview"
+    },
+    "type": "Type",
+    "subject": "Subject",
+    "subjectPlaceholder": "What is this activity about?",
+    "priority": "Priority",
+    "direction": "Direction",
+    "duration": "Duration",
+    "noEnd": "No end",
+    "reminder": "Reminder",
+    "reminderNone": "None",
+    "reminderMin": "{{n}} min before",
+    "reminderDay": "1 day before",
+    "location": "Location",
+    "meetingUrl": "Meeting link",
+    "description": "Description",
+    "start": "Start",
+    "startPast": "Choose a time in the future.",
+    "gap": "Gap between activities",
+    "gapCustom": "Custom",
+    "gapMinutes": "{{n}} min",
+    "gapInvalid": "Enter 1 to 1440 minutes.",
+    "order": "Order",
+    "orderTable": "Table order",
+    "orderOwner": "By owner",
+    "assignee": "Assignee",
+    "assigneeOwner": "Each opportunity's owner",
+    "assigneeMe": "Me",
+    "assigneeOther": "Choose a person",
+    "perAssignee": "Space per assignee",
+    "perAssigneeHelp": "Each person's activities start at the start time and follow the gap, instead of one long line for everybody.",
+    "summary": "First at {{first}} · last at {{last}}",
+    "more": {
+      "one": "and {{n}} more",
+      "other": "and {{n}} more"
+    },
+    "pastMidnight": "The schedule runs past midnight.",
+    "noOwner": {
+      "one": "{{n}} opportunity has no owner; it will be assigned to you.",
+      "other": "{{n}} opportunities have no owner; they will be assigned to you."
+    },
+    "go": {
+      "one": "Create {{n}} activity",
+      "other": "Create {{n}} activities"
+    },
+    "adjusted": "Times were adjusted to the current selection.",
+    "tooLarge": "Too many opportunities selected. Narrow the search to 10,000 or fewer.",
+    "discard": {
+      "title": "Discard this batch?",
+      "text": "Your batch activity settings will not be saved.",
+      "confirm": "Discard"
+    },
+    "cancel": "Cancel",
+    "hints": {
+      "type": "The same activity is created for every selected opportunity.",
+      "subject": "Up to 180 characters.",
+      "priority": "How urgent the activity is.",
+      "direction": "Inbound or outbound.",
+      "duration": "How long each activity takes.",
+      "reminder": "When the assignee is reminded before each activity.",
+      "location": "Up to 180 characters.",
+      "meetingUrl": "Starts with https://.",
+      "description": "Optional, up to 4000 characters.",
+      "start": "The date and time of the first activity.",
+      "gap": "The time added before each next activity.",
+      "order": "The order in which activities are scheduled.",
+      "assignee": "Who will do each activity.",
+      "perAssignee": "Each person's activities start at the start time and follow the gap, instead of one long line for everybody."
+    },
+    "types": {
+      "TODO": "Task",
+      "CALL": "Call",
+      "MEETING": "Meeting",
+      "EMAIL": "Email",
+      "VISIT": "Visit",
+      "FOLLOW_UP": "Follow-up",
+      "OTHER": "Other"
+    },
+    "priorities": {
+      "LOW": "Low",
+      "NORMAL": "Normal",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "directions": {
+      "NONE": "None",
+      "INBOUND": "Inbound",
+      "OUTBOUND": "Outbound",
+      "INTERNAL": "Internal"
+    },
+    "hour": "Hour",
+    "minute": "Minutes",
+    "today": "Today",
+    "validation": {
+      "required": "This field is required.",
+      "maxLength": "At most {{max}} characters.",
+      "invalidUrl": "Enter a full link that starts with http:// or https://."
+    }
+  },
+  "delete": {
+    "title": "Delete opportunities",
+    "text": {
+      "one": "Delete {{n}} opportunity? This can't be undone.",
+      "other": "Delete {{n}} opportunities? This can't be undone."
+    },
+    "bodyText": "Their notes, attachments and tags are deleted too. Linked leads are unlinked.",
+    "reason": "Reason",
+    "reasonHint": "Optional. Saved in the audit log, up to 1000 characters.",
+    "reasonTooLong": "Reason must be 1000 characters or fewer.",
+    "typeLabel": "Type {{n}} to confirm",
+    "typeHint": "This protects against deleting many opportunities by mistake.",
+    "go": {
+      "one": "Delete {{n}} opportunity",
+      "other": "Delete {{n}} opportunities"
+    }
+  },
+  "job": {
+    "ASSIGN": "Assign opportunities",
+    "MOVE_STAGE": "Move opportunities",
+    "CREATE_ACTIVITY": "Schedule activities for opportunities",
+    "DELETE": "Delete opportunities",
+    "assigned": "{{n}} opportunities updated.",
+    "moved": "{{n}} opportunities moved.",
+    "created": "{{n}} activities created.",
+    "deleted": "{{n}} opportunities deleted.",
+    "firstLast": "First at {{first}} · last at {{last}}",
+    "unavailable": "{{n}} failed opportunities are no longer available.",
+    "busy": "A batch operation is running."
+  },
+  "codes": {
+    "OPPORTUNITY_SELECTION_TOO_LARGE": "Too many opportunities selected. Narrow the selection to {{max}} or fewer.",
+    "BULK_JOB_PARAMS_INVALID": "The batch settings are not valid. Review them and try again.",
+    "OPPORTUNITY_NOT_FOUND": "Not found or outside your access.",
+    "OPPORTUNITY_OWNER_INELIGIBLE": "This user cannot own opportunities in this pipeline or branch.",
+    "CRM_SCOPED_PERMISSION_DENIED": "You do not have permission to modify this opportunity.",
+    "OPPORTUNITY_PIPELINE_MISMATCH": "Skipped because the opportunity belongs to another pipeline.",
+    "CUSTOMER_PROFILE_BLACKLISTED": "This customer is blacklisted. You cannot win or reopen its opportunities.",
+    "CUSTOMER_PROFILE_NOT_FOUND": "The customer of this opportunity no longer exists.",
+    "PIPELINE_STAGE_NOT_FOUND": "This pipeline or stage is no longer available.",
+    "OPPORTUNITY_LOST_REASON_REQUIRED": "A loss reason or note is required.",
+    "CRM_REASON_REQUIRED": "A reason is required for this stage change.",
+    "CRM_REASON_KIND_MISMATCH": "The selected reason does not match the outcome of this stage.",
+    "CRM_REASON_UNAVAILABLE": "This reason is no longer active.",
+    "CRM_OPPORTUNITIES_DISABLED": "Opportunities are turned off for this company.",
+    "CRM_VALIDATION_FAILED": "Some of the batch values are not valid.",
+    "OPPORTUNITY_BULK_START_IN_PAST": "Choose a time in the future.",
+    "LEAD_BULK_START_IN_PAST": "Choose a time in the future.",
+    "BULK_SELECTION_TOO_LARGE": "Too many opportunities selected. Narrow the search to 10,000 or fewer.",
+    "ACTIVITY_INVALID": "Invalid value: {{field}}",
+    "ACTIVITY_ACCESS_DENIED": "Not allowed for this opportunity or person.",
+    "ACTIVITY_TARGET_NOT_FOUND": "Opportunity not found.",
+    "ACTIVITY_ASSIGNEE_INELIGIBLE": "This person cannot be assigned.",
+    "generic": "Could not apply the batch action."
+  }
+}

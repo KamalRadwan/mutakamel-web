@@ -1,0 +1,94 @@
+<div [class]="showKeypad() ? 'shrink-0' : 'scrollbar-thin min-h-0 flex-1 overflow-y-auto'">
+  <app-call-rows
+    [legs]="phone.legs()"
+    [focusedId]="phone.focusedLegId()"
+    [removable]="false"
+    (focus)="onFocusLeg($event)"
+  />
+</div>
+
+@if (showKeypad()) {
+  <app-keypad (pressed)="phone.pressKey($event)" />
+
+  <button
+    type="button"
+    class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-10 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    (click)="showKeypad.set(false)"
+  >
+    <span>{{ 'webPhone.inCall.hideKeypad' | transloco }}</span>
+  </button>
+} @else {
+  <div class="grid shrink-0 grid-cols-2 gap-6">
+    <button
+      type="button"
+      data-call-control
+      class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="phone.swapLegs()"
+    >
+      <ng-icon name="tablerArrowsUpDown" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.consult.swap' | transloco }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="showKeypad.set(true)"
+    >
+      <ng-icon name="tablerDialpad" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.inCall.keypad' | transloco }}</span>
+    </button>
+  </div>
+
+  <button
+    type="button"
+    class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 px-10 text-12 leading-18 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+    [class]="
+      canCompleteTransfer()
+        ? 'bg-success text-on-success hover:bg-success-hover active:bg-success-pressed'
+        : 'bg-neutral-soft text-text-muted'
+    "
+    [disabled]="!canCompleteTransfer()"
+    [attr.title]="canCompleteTransfer() ? null : ('webPhone.consult.transferWaitHint' | transloco)"
+    (click)="phone.completeTransfer()"
+  >
+    <ng-icon name="tablerArrowsExchange" size="15" class="shrink-0" aria-hidden="true" />
+    <span class="truncate">{{ 'webPhone.consult.completeTransfer' | transloco }}</span>
+  </button>
+
+  <div class="grid shrink-0 grid-cols-2 gap-6">
+    <button
+      type="button"
+      class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="phone.cancelConsult()"
+    >
+      <ng-icon name="tablerX" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.consult.cancelConsult' | transloco }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="phone.mergeConference()"
+    >
+      <ng-icon name="tablerUsersPlus" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.consult.merge' | transloco }}</span>
+    </button>
+  </div>
+
+  <button
+    type="button"
+    class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 bg-danger px-10 text-12 leading-18 font-medium text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    (click)="phone.hangup(phone.focusedLegId() ?? undefined)"
+  >
+    <ng-icon name="tablerPhoneEnd" size="15" class="shrink-0" aria-hidden="true" />
+    @let hangupParts = hangupWithParts();
+    <span class="truncate">{{ hangupParts.before }}<bdi [attr.dir]="focusedHasName() ? null : 'ltr'">{{ hangupParts.name }}</bdi>{{ hangupParts.after }}</span>
+  </button>
+}
+
+<div class="flex shrink-0 flex-col gap-6">
+  <app-audio-row kind="speaker" />
+  <app-audio-row kind="mic" />
+</div>
+
+<app-status-line />

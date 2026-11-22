@@ -1,0 +1,387 @@
+<div class="min-h-0 flex-1 overflow-y-auto p-10">
+  @if (loading()) {
+    <div class="flex flex-col gap-10" aria-busy="true">
+      <div class="flex items-center gap-8 rounded-10 border border-border bg-surface p-8">
+        <span class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+          <span class="h-skeleton-line w-stat-chart-w max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+        </div>
+        <span class="h-switch-h w-switch-w shrink-0 rounded-full bg-neutral-soft motion-safe:animate-pulse"></span>
+      </div>
+
+      <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+        @for (row of skeletonRows; track row) {
+          <div class="flex flex-col gap-4">
+            <span class="h-skeleton-line w-stat-chart-w rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            <span class="h-field w-full rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+          </div>
+        }
+      </div>
+
+      <div class="flex flex-col gap-6">
+        @for (row of skeletonRows; track row) {
+          <span class="h-menu-item w-full rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+        }
+      </div>
+    </div>
+  } @else if (fullState() === 'notPurchased') {
+    <div class="flex min-h-full flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerPhone" size="20" aria-hidden="true" />
+      </span>
+      <h3 class="text-13 leading-18 font-medium text-text">{{ 'userPhone.states.notPurchasedTitle' | transloco }}</h3>
+      @if (isOwner()) {
+        <a uiButton variant="primary" routerLink="/workspace/billing/subscription">
+          {{ 'userPhone.states.viewPlans' | transloco }}
+        </a>
+      }
+    </div>
+  } @else if (fullState() === 'provisioning') {
+    <div class="flex min-h-full flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+        <ng-icon name="tablerClock" size="20" aria-hidden="true" />
+      </span>
+      <h3 class="text-13 leading-18 font-medium text-text">{{ 'userPhone.states.provisioningTitle' | transloco }}</h3>
+      <button type="button" uiButton variant="secondary" (click)="reload()">
+        {{ 'userPhone.states.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (fullState() === 'noServers') {
+    <div class="flex min-h-full flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerServer" size="20" aria-hidden="true" />
+      </span>
+      <h3 class="text-13 leading-18 font-medium text-text">{{ 'userPhone.states.noServersTitle' | transloco }}</h3>
+      <p class="text-12 leading-18 text-text-muted">{{ 'userPhone.states.noServersLine' | transloco }}</p>
+    </div>
+  } @else if (fullState() === 'loadFailed') {
+    <div class="flex min-h-full flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerRefresh" size="20" aria-hidden="true" />
+      </span>
+      <h3 class="text-13 leading-18 font-medium text-text">{{ 'userPhone.states.loadFailedTitle' | transloco }}</h3>
+      <button type="button" uiButton variant="secondary" (click)="reload()">
+        {{ 'userPhone.states.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <form [id]="uid + '-form'" class="flex flex-col gap-10" novalidate (submit)="save($event)">
+      <div class="flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface p-8">
+        <span
+          class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="statusTile().tile"
+          aria-hidden="true"
+        >
+          <ng-icon [name]="statusTile().icon" size="15" />
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-6">
+            <span class="text-13 leading-18 font-medium text-text">{{ 'userPhone.status.title' | transloco }}</span>
+            @if (isOverCapacity()) {
+              <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+                <span>{{ 'userPhone.status.pausedBadge' | transloco }}</span>
+              </span>
+            }
+          </div>
+          <p class="text-11 leading-16 text-text-muted">{{ statusLine() }}</p>
+        </div>
+
+        <div class="ms-auto shrink-0">
+          <ui-field
+            size="bare"
+            [for]="uid + '-enable'"
+            [label]="'userPhone.status.enable' | transloco"
+            [hint]="'userPhone.status.enableHint' | transloco"
+          >
+            <ui-switch
+              [id]="uid + '-enable'"
+              [describedBy]="uid + '-enable-hint'"
+              [label]="'userPhone.status.enable' | transloco"
+              [disabled]="isReadonly() || saving()"
+              [checked]="enabledDraft()"
+              (checkedChange)="onEnableChange($event)"
+            />
+          </ui-field>
+        </div>
+      </div>
+
+      <section class="flex flex-col gap-8">
+        <header class="flex h-table-head items-center gap-6 rounded-10 bg-icon-navy px-10 text-13 leading-18 font-medium text-on-nav">
+          <span class="inline-flex shrink-0 text-on-nav">
+            <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+          </span>
+          <h2 class="truncate text-13 leading-18 font-medium text-on-nav">{{ 'userPhone.sections.sip' | transloco }}</h2>
+        </header>
+
+        <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+          <div class="col-span-1">
+            <ui-field
+              [for]="uid + '-extension'"
+              [label]="'userPhone.fields.extension' | transloco"
+              [hint]="'userPhone.fields.extensionHint' | transloco"
+              [required]="!isReadonly()"
+              [count]="!isReadonly() ? extensionCount() : null"
+              [max]="!isReadonly() ? limits.extension : null"
+              [error]="extensionError()"
+            >
+              <input
+                [id]="uid + '-extension'"
+                type="text"
+                dir="ltr"
+                class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                [value]="extensionDraft()"
+                [readOnly]="isReadonly() || saving()"
+                [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                [attr.aria-invalid]="extensionError() ? 'true' : null"
+                (input)="onExtensionInput($event)"
+                (blur)="markTouched('extension')"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-1">
+            <ui-field
+              [for]="uid + '-sip-username'"
+              [label]="'userPhone.fields.sipUsername' | transloco"
+              [hint]="'userPhone.fields.sipUsernameHint' | transloco"
+              [required]="!isReadonly()"
+              [count]="!isReadonly() ? sipUsernameCount() : null"
+              [max]="!isReadonly() ? limits.sipUsername : null"
+              [error]="sipUsernameError()"
+            >
+              <input
+                [id]="uid + '-sip-username'"
+                type="text"
+                autocomplete="off"
+                dir="ltr"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="sipUsernameDraft()"
+                [readOnly]="isReadonly() || saving()"
+                [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                [attr.aria-invalid]="sipUsernameError() ? 'true' : null"
+                (input)="onSipUsernameInput($event)"
+                (blur)="markTouched('sipUsername')"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-1">
+            <ui-field
+              size="bare"
+              [for]="uid + '-sip-password'"
+              [label]="'userPhone.fields.sipPassword' | transloco"
+              [hint]="'userPhone.fields.sipPasswordHint' | transloco"
+              [required]="!isReadonly()"
+              [error]="passwordError()"
+            >
+              <app-phone-password
+                [fieldId]="uid + '-sip-password'"
+                [describedBy]="uid + '-sip-password-hint' + (passwordError() ? ' ' + uid + '-sip-password-error' : '')"
+                [configured]="passwordConfigured()"
+                [readonly]="isReadonly()"
+                [disabled]="saving()"
+                [hasError]="!!passwordError()"
+                [value]="passwordDraft()"
+                (valueChange)="onPasswordChange($event)"
+                (focusout)="markTouched('sipPassword')"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-3 grid grid-cols-2 gap-x-10 gap-y-8">
+            <div class="col-span-1">
+              <ui-field
+                [for]="uid + '-display-name'"
+                [label]="'userPhone.fields.displayName' | transloco"
+                [hint]="'userPhone.fields.displayNameHint' | transloco"
+                [count]="!isReadonly() ? displayNameCount() : null"
+                [max]="!isReadonly() ? limits.displayName : null"
+                [error]="displayNameError()"
+              >
+                <input
+                  [id]="uid + '-display-name'"
+                  type="text"
+                  dir="auto"
+                  class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                  [placeholder]="!isReadonly() ? userDisplayPlaceholder() : ''"
+                  [value]="displayNameDraft()"
+                  [readOnly]="isReadonly() || saving()"
+                  [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                  [attr.aria-invalid]="displayNameError() ? 'true' : null"
+                  (input)="onDisplayNameInput($event)"
+                  (blur)="markTouched('displayName')"
+                />
+              </ui-field>
+            </div>
+
+            <div class="col-span-1">
+              <ui-field
+                [for]="uid + '-caller-id'"
+                [label]="'userPhone.fields.outboundCallerId' | transloco"
+                [hint]="'userPhone.fields.outboundCallerIdHint' | transloco"
+                [count]="!isReadonly() ? callerIdCount() : null"
+                [max]="!isReadonly() ? limits.outboundCallerId : null"
+                [error]="callerIdError()"
+              >
+                <input
+                  [id]="uid + '-caller-id'"
+                  type="text"
+                  dir="ltr"
+                  class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                  [value]="callerIdDraft()"
+                  [readOnly]="isReadonly() || saving()"
+                  [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                  [attr.aria-invalid]="callerIdError() ? 'true' : null"
+                  (input)="onCallerIdInput($event)"
+                  (paste)="onCallerIdPaste($event)"
+                  (blur)="markTouched('outboundCallerId')"
+                />
+              </ui-field>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-8">
+        <header class="flex h-table-head items-center gap-6 rounded-10 bg-icon-blue px-10 text-13 leading-18 font-medium text-on-nav">
+          <span class="inline-flex shrink-0 text-on-nav">
+            <ng-icon name="tablerServer" size="14" aria-hidden="true" />
+          </span>
+          <h2 class="truncate text-13 leading-18 font-medium text-on-nav">{{ 'userPhone.sections.servers' | transloco }}</h2>
+          <span
+            #serversHintTrigger
+            class="group relative inline-flex shrink-0 items-center text-on-nav"
+            (mouseenter)="placeServersTooltip(serversHintTrigger)"
+            (mouseleave)="hideServersTooltip()"
+          >
+            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+            <span
+              #serversTooltip
+              [id]="uid + '-servers-hint'"
+              role="tooltip"
+              class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+              [class]="serversTipPlaced() ? 'invisible group-hover:visible' : 'invisible'"
+              [style.top.px]="serversTipPlace().top"
+              [style.inset-inline-start.px]="serversTipPlace().start"
+            >
+              {{ 'userPhone.sections.serversHint' | transloco }}
+            </span>
+          </span>
+        </header>
+
+        <div
+          role="list"
+          class="flex flex-col gap-2"
+          [attr.aria-label]="'userPhone.sections.servers' | transloco"
+          [attr.aria-describedby]="uid + '-servers-hint'"
+        >
+          @for (srv of chainServers(); track srv.id; let idx = $index; let last = $last) {
+            <div
+              role="listitem"
+              class="flex h-menu-item items-center gap-8 rounded-6 px-6 transition-colors duration-fast hover:bg-row-hover"
+            >
+              <span dir="ltr" class="shrink-0 text-12 tabular-nums text-text-muted">{{ idx + 1 }}</span>
+              <span class="shrink-0 text-12 font-medium text-text">{{ srv.name }}</span>
+              <span dir="ltr" class="min-w-0 flex-1 truncate text-11 text-text-muted">{{ srv.websocketUrl }}</span>
+
+              @if (!isReadonly()) {
+                <div class="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                    [disabled]="saving() || idx === 0"
+                    [attr.aria-label]="'userPhone.servers.moveUp' | transloco: { name: srv.name }"
+                    [title]="'userPhone.servers.moveUp' | transloco: { name: srv.name }"
+                    (click)="moveServerUp(idx)"
+                  >
+                    <ng-icon name="tablerChevronUp" size="14" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                    [disabled]="saving() || last"
+                    [attr.aria-label]="'userPhone.servers.moveDown' | transloco: { name: srv.name }"
+                    [title]="'userPhone.servers.moveDown' | transloco: { name: srv.name }"
+                    (click)="moveServerDown(idx)"
+                  >
+                    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                    [disabled]="saving()"
+                    [attr.aria-label]="'userPhone.servers.remove' | transloco: { name: srv.name }"
+                    [title]="'userPhone.servers.remove' | transloco: { name: srv.name }"
+                    (click)="removeServer(srv.id)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        @if (chainServers().length === 0) {
+          <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-warning-text" role="status">
+            <ng-icon name="tablerAlertTriangle" size="11" class="shrink-0" aria-hidden="true" />
+            <span>{{ 'userPhone.servers.emptyWarning' | transloco }}</span>
+          </p>
+        }
+
+        @if (!isReadonly() && addServerOptions().length > 0) {
+          <div class="flex items-center">
+            <ui-dropdown
+              size="field"
+              icon="tablerPlus"
+              [options]="addServerOptions()"
+              [value]="addServerSelection()"
+              [label]="'userPhone.servers.add' | transloco"
+              [disabled]="saving()"
+              (valueChange)="onAddServer($event)"
+            />
+          </div>
+        }
+      </section>
+
+      <app-phone-seat-impact
+        [seats]="seats()"
+        [delta]="seatDelta()"
+        [canBuy]="isOwner()"
+        [loading]="seatsLoading()"
+        [error]="seatsError()"
+        (blocking)="seatBlocking.set($event)"
+      />
+    </form>
+  }
+</div>
+
+<footer class="flex shrink-0 flex-wrap items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+  @if (!isReadonly() && !loading() && !fullState()) {
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      [loading]="saving()"
+      [disabled]="saving() || !dirty() || seatBlocking() || hasInvalidFields()"
+    >
+      {{ 'users.common.save' | transloco }}
+    </button>
+
+    @if (dirty()) {
+      <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
+        {{ 'users.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'users.common.unsaved' | transloco }}</span>
+    }
+  }
+
+  <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="closeRequested.emit()">
+    {{ 'users.common.close' | transloco }}
+  </button>
+
+  <ng-content select="[footerEnd]" />
+</footer>

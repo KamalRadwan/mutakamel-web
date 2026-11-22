@@ -1,0 +1,52 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "close": {
+    "wonTitle": "Mark as won",
+    "lostTitle": "Mark as lost",
+    "wonSubmit": "Mark as won",
+    "lostSubmit": "Mark as lost",
+    "lossReason": "Loss reason",
+    "winReason": "Win reason",
+    "winReasonOptional": "Win reason (optional)",
+    "reasonHint": "Pick the main reason. Reasons are managed in CRM settings.",
+    "noReason": "No reason selected",
+    "note": "Note",
+    "noteHintLost": "Required when no reason is picked. Up to 1000 characters.",
+    "noteHintLostRequired": "Required. Up to 1000 characters.",
+    "noteHintWon": "Optional. Up to 1000 characters.",
+    "reasonOrNoteRequired": "Pick a reason or write a note.",
+    "noteRequired": "Write a note.",
+    "winReasonRequired": "Pick a win reason.",
+    "noteTooLong": "Up to 1000 characters."
+  },
+  "transfer": {
+    "title": "Move to another pipeline",
+    "pipeline": "Pipeline",
+    "pipelineHint": "Only pipelines you can work on are listed.",
+    "noPipelines": "No other active pipelines",
+    "pipelineRequired": "Pick a pipeline.",
+    "stage": "Stage",
+    "stageHint": "Where the opportunity starts in the new pipeline.",
+    "stageRequired": "Pick a stage.",
+    "noteHint": "Optional. Up to 1000 characters.",
+    "submit": "Move",
+    "ownerIneligible": "The owner cannot work on the target pipeline. Change the owner first."
+  },
+  "reopen": {
+    "title": "Reopen this opportunity?",
+    "body": "Moving it to {{stage}} clears the won/lost reason and date.",
+    "confirm": "Reopen"
+  },
+  "toasts": {
+    "moved": "Moved to {{stage}}",
+    "won": "Marked as won",
+    "lost": "Marked as lost",
+    "reopened": "Reopened in {{stage}}",
+    "transferred": "Moved to the {{pipeline}} pipeline",
+    "failed": "Could not move the opportunity. Try again.",
+    "noTerminalStage": "This pipeline has no won/lost stage."
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "refresh": "تحديث",
+  "retry": "إعادة المحاولة",
+  "allShown": "اطّلعت على جميع الإشعارات.",
+  "loadFailed": {
+    "title": "تعذّر تحميل الإشعارات",
+    "text": "تحقّق من اتصالك ثم حاول مرة أخرى."
+  },
+  "unavailable": {
+    "title": "الإشعارات غير متاحة",
+    "text": "لا يمكن لحسابك تلقّي الإشعارات حاليًا، فتواصل مع المسؤول."
+  },
+  "actions": {
+    "acknowledge": "تأكيد الاطلاع",
+    "open": "فتح",
+    "dismiss": "إخفاء"
+  },
+  "acknowledgedAt": "تم تأكيد الاطلاع {{time}}",
+  "acknowledgedJustNow": "تم تأكيد الاطلاع الآن",
+  "detail": {
+    "entity": "السجل المرتبط: {{type}}",
+    "gone": "لم يعد هذا الإشعار متاحًا."
+  },
+  "entityTypes": {
+    "lead": "عميل محتمل",
+    "opportunity": "فرصة",
+    "customer": "عميل",
+    "activity": "نشاط",
+    "party": "طرف",
+    "quotation": "عرض سعر",
+    "invoice": "فاتورة",
+    "record": "سجل"
+  },
+  "errors": {
+    "NOTIFICATION_NOT_FOUND": "لم يعد هذا الإشعار متاحًا.",
+    "NOTIFICATION_USER_NOT_FOUND": "لا يمكن لحسابك تلقّي الإشعارات حاليًا."
+  }
+}

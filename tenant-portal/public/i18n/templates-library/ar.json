@@ -1,0 +1,164 @@
+{
+  "newTemplate": "قالب جديد",
+  "searchPlaceholder": "ابحث باسم القالب",
+  "searchAria": "البحث في القوالب بالاسم",
+  "clearSearch": "مسح البحث",
+  "advancedFilters": "عوامل تصفية متقدمة",
+  "viewSwitcher": "طريقة العرض",
+  "views": {
+    "cards": "عرض البطاقات",
+    "table": "عرض الجدول"
+  },
+  "chips": {
+    "documentType": "المستند",
+    "outputChannel": "القناة",
+    "layoutMode": "التخطيط",
+    "lifecycleStatus": "الحالة",
+    "locale": "اللغة",
+    "definitionScopeType": "نطاق الملكية",
+    "hasPublishedVersion": "النشر",
+    "updatedRange": "آخر تعديل",
+    "remove": "إزالة عامل التصفية",
+    "clearAll": "مسح عوامل التصفية"
+  },
+  "filtersModal": {
+    "title": "تصفية القوالب",
+    "apply": "تطبيق التصفية",
+    "cancel": "إلغاء",
+    "clear": "مسح عوامل التصفية",
+    "any": "الكل",
+    "yes": "نعم",
+    "no": "لا",
+    "scopeTenant": "المستأجر",
+    "scopeCompany": "الشركة",
+    "fields": {
+      "documentType": {
+        "label": "نوع المستند",
+        "hint": "تصفية القوالب حسب عائلة المستند التجاري."
+      },
+      "outputChannel": {
+        "label": "قناة الإخراج",
+        "hint": "تصفية القوالب حسب الطباعة أو البريد الإلكتروني."
+      },
+      "layoutMode": {
+        "label": "نمط التخطيط",
+        "hint": "تصفية القوالب حسب طريقة ترتيب العناصر."
+      },
+      "lifecycleStatus": {
+        "label": "حالة دورة الحياة",
+        "hint": "عرض القوالب النشطة أو المؤرشفة."
+      },
+      "locale": {
+        "label": "اللغة",
+        "hint": "تصفية القوالب حسب اللغة الأساسية للقالب."
+      },
+      "definitionScopeType": {
+        "label": "نطاق الملكية",
+        "hint": "تصفية القوالب المملوكة للمستأجر أو للشركة."
+      },
+      "hasPublishedVersion": {
+        "label": "حالة النشر",
+        "hint": "تصفية القوالب حسب وجود إصدار منشور من عدمه."
+      },
+      "updatedRange": {
+        "label": "فترة آخر تعديل",
+        "hint": "تصفية القوالب المعدّلة ضمن النطاق الزمني المحدد."
+      }
+    }
+  },
+  "dateRange": {
+    "placeholder": "اختر فترة التعديل",
+    "clear": "مسح الفترة",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "startTime": "وقت البداية",
+    "endTime": "وقت النهاية",
+    "hour": "الساعة",
+    "minute": "الدقيقة",
+    "daysCount": "عدد الأيام: {{count}}",
+    "oneDay": "يوم واحد",
+    "cancel": "إلغاء",
+    "apply": "تطبيق",
+    "presets": {
+      "maximum": "الحد الأقصى",
+      "today": "اليوم",
+      "yesterday": "أمس",
+      "todayAndYesterday": "اليوم وأمس",
+      "thisMonth": "هذا الشهر",
+      "lastMonth": "الشهر الماضي",
+      "thisYear": "هذه السنة",
+      "lastYear": "السنة الماضية",
+      "q1": "الربع الأول",
+      "q2": "الربع الثاني",
+      "q3": "الربع الثالث",
+      "q4": "الربع الرابع"
+    }
+  },
+  "table": {
+    "ariaLabel": "مكتبة القوالب",
+    "template": "القالب",
+    "document": "المستند",
+    "layout": "التخطيط",
+    "language": "اللغة",
+    "published": "المنشور",
+    "draftCheck": "فحص المسودة",
+    "usedIn": "مستخدَم في {{scope}}",
+    "updated": "آخر تعديل",
+    "actions": "الإجراءات",
+    "notPublished": "غير منشور",
+    "archived": "مؤرشف",
+    "unused": "—",
+    "scopeTypes": {
+      "TENANT": "المستأجر",
+      "COMPANY": "الشركة",
+      "BRANCH": "الفرع"
+    }
+  },
+  "row": {
+    "actions": {
+      "label": "إجراءات القالب",
+      "open": "فتح",
+      "design": "التصميم",
+      "preview": "معاينة",
+      "duplicateFromDraft": "نسخ من المسودة",
+      "duplicateFromVersion": "نسخ من الإصدار",
+      "manageAssignments": "إدارة التعيينات",
+      "archive": "أرشفة",
+      "restore": "استعادة",
+      "delete": "حذف",
+      "reasons": {
+        "ARCHIVED": "غير متاح لأن القالب مؤرشف.",
+        "VALIDATION_REQUIRED": "تحقّق من المسودة الحالية قبل النشر.",
+        "NOT_ELIGIBLE": "غير مؤهل لهذا القالب.",
+        "REFERENCED": "لا يمكن حذف القوالب المنشورة أو المعينة.",
+        "NO_PUBLISHED_VERSION": "انشر إصدارًا أولاً.",
+        "ACCESS_POLICY_READ_ONLY": "غير متاح في وضع العرض فقط."
+      }
+    }
+  },
+  "cards": {
+    "thumbnailPending": "جارٍ إنشاء المعاينة",
+    "thumbnailUnavailable": "المعاينة غير متاحة",
+    "retryThumbnail": "إنشاء المعاينة"
+  },
+  "pager": {
+    "label": "ترقيم صفحات القوالب",
+    "total": "عدد القوالب: {{count}}",
+    "one": "قالب واحد",
+    "previous": "الصفحة السابقة",
+    "next": "الصفحة التالية"
+  },
+  "deleteConfirm": {
+    "title": "حذف القالب",
+    "text": "هل أنت متأكد من حذف «{{name}}» نهائيًا؟ لا يمكن التراجع عن هذا الإجراء."
+  },
+  "toasts": {
+    "archived": "تمت أرشفة القالب.",
+    "restored": "تمت استعادة القالب.",
+    "deleted": "تم حذف القالب.",
+    "thumbnailQueued": "تم إرسال طلب إنشاء المعاينة."
+  },
+  "states": {
+    "backToHome": "العودة إلى الرئيسية"
+  }
+}

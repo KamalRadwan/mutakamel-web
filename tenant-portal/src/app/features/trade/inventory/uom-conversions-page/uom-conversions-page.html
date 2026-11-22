@@ -1,0 +1,329 @@
+<app-settings-frame
+  [addLabel]="'invUom.toolbar.new' | transloco"
+  [searchPlaceholder]="'invUom.toolbar.searchItem' | transloco"
+  [loading]="loading()"
+  [showAdd]="canGovern"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="reload()"
+>
+  <div notices class="flex flex-col gap-6 empty:hidden">
+    @if (!canGovern) {
+      <app-settings-notice tone="info">
+        {{ 'tradeInventory.common.canManageOff' | transloco }}
+      </app-settings-notice>
+    }
+
+    @if (itemSuggestionsOpen()) {
+      <div
+        class="rounded-10 border border-border bg-surface p-6 shadow-popover"
+        (keydown.escape)="closeSuggestions()"
+      >
+        <div class="mb-4 flex items-center justify-between gap-8 px-4">
+          <span class="text-11 leading-16 font-medium text-text-muted">
+            {{ 'invUom.toolbar.pickItemLabel' | transloco }}
+          </span>
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'invUom.toolbar.closeSearchList' | transloco"
+            (click)="closeSuggestions()"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        </div>
+
+        @if (searchingItems()) {
+          <div class="flex h-menu-item items-center gap-6 px-8 text-12 text-text-muted">
+            <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+            <span>{{ 'invUom.toolbar.searchingItems' | transloco }}</span>
+          </div>
+        } @else if (itemSearchFailed()) {
+          <div class="flex items-center justify-between gap-8 px-8 py-4 text-12">
+            <span class="text-danger-text">{{ 'invUom.toolbar.searchItemsFailed' | transloco }}</span>
+            <button type="button" uiButton variant="secondary" size="small" (click)="retryItemSearch()">
+              <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+              {{ 'tradeShared.common.retry' | transloco }}
+            </button>
+          </div>
+        } @else if (itemSuggestions().length === 0) {
+          <div class="flex h-menu-item items-center px-8 text-12 text-text-muted">
+            {{ 'invUom.toolbar.noMatchingItems' | transloco }}
+          </div>
+        } @else {
+          <ul
+            role="listbox"
+            class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto scrollbar-thin"
+            [attr.aria-label]="'invUom.toolbar.pickItemLabel' | transloco"
+          >
+            @for (item of itemSuggestions(); track item.id) {
+              <li role="option" [attr.aria-selected]="itemParam() === item.id">
+                <button
+                  type="button"
+                  class="flex h-menu-item w-full cursor-pointer items-center gap-8 rounded-6 px-8 text-start text-12 text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="itemParam() === item.id ? 'bg-brand-soft text-on-brand-soft' : ''"
+                  (click)="pickItemFilter(item)"
+                >
+                  <span
+                    class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+                    aria-hidden="true"
+                  >
+                    <ng-icon name="tablerBox" size="14" />
+                  </span>
+                  <span dir="auto" class="min-w-0 flex-1 truncate">{{ suggestionName(item) }}</span>
+                  <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ item.canonicalCode }}</bdi>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  </div>
+
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="statusSteps()"
+    [label]="'invUom.filter.label' | transloco"
+    [hint]="'invUom.filter.hint' | transloco"
+    [value]="statusFilter()"
+    (valueChange)="onStatusChange($event)"
+  />
+
+  @if (loadFailed() && !loading()) {
+    <div
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+      role="alert"
+    >
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'invUom.empty.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="reload()">
+        {{ 'tradeShared.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (!loading() && hasLoaded() && rows().length === 0) {
+    <div
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    >
+      @if (isFiltered()) {
+        <p class="text-12 leading-18 text-text-muted">{{ 'invUom.empty.noResults' | transloco }}</p>
+        <button type="button" uiButton variant="ghost" (click)="clearFilters()">
+          {{ 'invUom.filter.clear' | transloco }}
+        </button>
+      } @else {
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+          <ng-icon name="tablerArrowsExchange" size="18" aria-hidden="true" />
+        </span>
+        <h2 class="text-15 leading-22 font-medium text-text">{{ 'invUom.empty.title' | transloco }}</h2>
+        <p class="text-12 leading-18 text-text-muted">{{ 'invUom.empty.text' | transloco }}</p>
+        @if (canGovern) {
+          <button type="button" uiButton (click)="openCreate()">
+            <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+            {{ 'invUom.toolbar.new' | transloco }}
+          </button>
+        }
+      }
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'invUom.table.ariaLabel' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'invUom.table.item' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invUom.table.conversion' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invUom.table.revision' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invUom.table.effectiveFrom' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invUom.table.status' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invUom.table.published' | transloco }}
+          </span>
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'invUom.table.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns"
+            >
+              <span role="cell" class="flex items-center gap-8 px-10">
+                <span class="h-skeleton-line w-1/3 rounded-6 bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (row of rows(); track row.id) {
+            <div
+              role="row"
+              tabindex="0"
+              [attr.aria-label]="itemDisplayName(row) + ' ' + row.itemCode"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="gridColumns"
+              (click)="onRowClick(row, $event)"
+              (keydown)="onRowKeydown($event, row)"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <bdi dir="ltr" class="shrink-0 text-12 font-medium text-text tabular-nums">
+                  {{ row.itemCode }}
+                </bdi>
+                <span dir="auto" class="min-w-0 truncate text-13 text-text-muted" [title]="itemDisplayName(row)">
+                  {{ itemDisplayName(row) }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <bdi dir="ltr" class="truncate text-13 font-medium text-text tabular-nums">
+                  {{
+                    'invUom.table.conversionExpr'
+                      | transloco: { from: row.fromUomCode, factor: factorOf(row), to: row.toUomCode }
+                  }}
+                </bdi>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-13 text-text tabular-nums">
+                  {{ 'invUom.table.revisionValue' | transloco: { n: row.revisionNumber } }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <bdi dir="ltr" class="truncate text-12 leading-18 text-text-muted tabular-nums">
+                  {{ formatDateTime(row.effectiveFrom) }}
+                </bdi>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <app-inventory-badge kind="uom" [value]="row.status" />
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (row.publishedAt; as pub) {
+                  <bdi dir="ltr" class="truncate text-12 leading-18 text-text-muted tabular-nums">
+                    {{ formatDateTime(pub) }}
+                  </bdi>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'tradeInventory.common.none' | transloco }}</span>
+                }
+              </span>
+
+              <span
+                role="cell"
+                data-row-action
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="rowActions(row)"
+                  [label]="'invUom.table.actions' | transloco"
+                  (selected)="onRowAction(row, $event)"
+                />
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  @if (!loadFailed() && (loading() ? total() > 0 : rows().length > 0)) {
+    <footer class="mt-auto border-t border-border pt-8">
+      <ui-pagination
+        [total]="total()"
+        [pageSizes]="pageSizes"
+        [label]="'invUom.table.pagination' | transloco"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
+    </footer>
+  }
+</app-settings-frame>
+
+<app-uom-conversion-modal
+  [canGovern]="canGovern"
+  (created)="onConversionCreated()"
+  (publishRequested)="requestPublish($event)"
+  (retireRequested)="requestRetire($event)"
+  (closed)="onModalClosed()"
+/>
+
+<app-inventory-reason-dialog
+  [kind]="reasonDialogKind()"
+  [title]="reasonDialogTitle()"
+  [subtitle]="reasonDialogSubtitle()"
+  [message]="reasonDialogMessage()"
+  [confirmLabel]="reasonDialogConfirmLabel()"
+  [tone]="reasonDialogTone()"
+  [pending]="transitionPending()"
+  (confirmed)="onReasonConfirmed($event)"
+  (cancelled)="onReasonCancelled()"
+/>
+
+<app-inventory-conflict
+  (reload)="onConflictReload()"
+  (cancelled)="conflictRecordId = null"
+/>
+
+<ui-modal
+  #transitionAlertModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'invUom.transitionAlert.title' | transloco"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  (closed)="transitionAlertKey.set(null)"
+>
+  @if (transitionAlertKey(); as msgKey) {
+    <p class="text-12 leading-18 text-text-muted">{{ msgKey | transloco }}</p>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="closeTransitionAlert()">
+      {{ 'tradeInventory.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

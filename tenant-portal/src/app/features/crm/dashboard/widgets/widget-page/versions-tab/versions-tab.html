@@ -1,0 +1,199 @@
+<div class="flex flex-col gap-10">
+  <div class="flex flex-wrap items-center justify-end gap-8">
+    <ui-badge tone="count">{{ selected().length }} / 2</ui-badge>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="selected().length !== 2 || comparing()"
+      [loading]="comparing()"
+      (click)="compareSelected()"
+    >
+      <ng-icon name="tablerArrowsDiff" size="15" aria-hidden="true" />
+      {{ 'widgetPage.versions.compare' | transloco }}
+    </button>
+  </div>
+
+  @if (loadFailed()) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'widgetPage.versions.loadError' | transloco"
+      [text]="'analytics.common.loadFailed' | transloco"
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="retry()"
+    />
+  } @else {
+    <ui-data-table
+      [columns]="columns()"
+      [rows]="items()"
+      [rowKey]="rowKey"
+      [loading]="loading()"
+      [label]="'widgetPage.versions.tableLabel' | transloco"
+      [emptyText]="'widgetPage.versions.empty' | transloco"
+    >
+      <ng-template uiCell="version" let-row>
+        <div class="flex min-w-0 items-center gap-6">
+          <bdi dir="ltr" class="font-medium tabular-nums">v{{ row.versionNumber }}</bdi>
+          @if (row.versionNumber === activeVersionNumber()) {
+            <ui-badge tone="brand">{{ 'widgetPage.versions.active' | transloco }}</ui-badge>
+          }
+        </div>
+      </ng-template>
+
+      <ng-template uiCell="publishedAt" let-row>
+        <bdi dir="ltr" class="truncate tabular-nums">{{ formatPublished(row.publishedAt) }}</bdi>
+      </ng-template>
+
+      <ng-template uiCell="provenance" let-row>
+        <ui-badge tone="tag">{{ provenanceLabel(row.provenance) }}</ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="select" let-row>
+        @let checked = isSelected(row.versionNumber);
+        <span class="relative inline-flex size-checkbox-size shrink-0">
+          <input
+            type="checkbox"
+            class="peer size-checkbox-size cursor-pointer appearance-none rounded-4 border-check border-border-field bg-surface-field transition-colors duration-fast outline-none hover:border-border-field-hover checked:border-brand checked:bg-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-border disabled:bg-neutral-soft"
+            [checked]="checked"
+            [disabled]="!checked && selected().length >= 2"
+            [attr.aria-label]="'widgetPage.versions.selectVersion' | transloco: { n: row.versionNumber }"
+            (change)="toggleVersion(row.versionNumber)"
+          />
+          <span
+            class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex"
+          >
+            <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+          </span>
+        </span>
+      </ng-template>
+    </ui-data-table>
+
+    @if (nextBeforeVersion() !== null) {
+      <div class="flex justify-center">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'widgetPage.versions.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+
+  @if (comparison(); as cmp) {
+    <section
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card"
+      [attr.aria-label]="'widgetPage.versions.compareTitle' | transloco"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-8">
+        <h2 class="text-14 leading-20 font-medium text-text">
+          {{ 'widgetPage.versions.compareTitle' | transloco }}
+        </h2>
+        <button type="button" uiButton variant="ghost" size="small" (click)="clearCompare()">
+          {{ 'analytics.common.close' | transloco }}
+        </button>
+      </div>
+
+      <div class="grid grid-cols-12 items-center gap-8 border-b border-border pb-8 text-12 leading-18 font-medium text-text">
+        <span class="col-span-3 text-text-muted">{{ 'widgetPage.versions.section' | transloco }}</span>
+
+        <div class="col-span-4 flex min-w-0 flex-wrap items-center gap-6">
+          <bdi dir="ltr">{{ 'widgetPage.versions.versionHeader' | transloco: { n: cmp.left.versionNumber } }}</bdi>
+          @if (cmp.restoreState !== 'PERMISSION_REQUIRED') {
+            <span
+              class="inline-flex"
+              [attr.title]="cmp.restoreState === 'DRAFT_EXISTS' ? ('widgetPage.versions.draftExists' | transloco) : null"
+            >
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [disabled]="cmp.restoreState !== 'AVAILABLE' || restoring()"
+                [loading]="restoring()"
+                [attr.title]="cmp.restoreState === 'DRAFT_EXISTS' ? ('widgetPage.versions.draftExists' | transloco) : null"
+                (click)="restoreLeft()"
+              >
+                <ng-icon name="tablerArrowBackUp" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                {{ 'widgetPage.versions.restore' | transloco }}
+              </button>
+            </span>
+          }
+        </div>
+
+        <span class="col-span-1" aria-hidden="true"></span>
+
+        <div class="col-span-4 flex min-w-0 flex-wrap items-center gap-6">
+          <bdi dir="ltr">{{ 'widgetPage.versions.versionHeader' | transloco: { n: cmp.right.versionNumber } }}</bdi>
+          @if (cmp.right.versionNumber === cmp.activeVersionNumber) {
+            <ui-badge tone="brand">{{ 'widgetPage.versions.active' | transloco }}</ui-badge>
+          }
+        </div>
+      </div>
+
+      <div class="flex flex-col">
+        @for (row of compareRows(); track row.key) {
+          <div class="grid grid-cols-12 items-center gap-8 border-b border-border py-8 text-12 leading-18 last:border-b-0">
+            <span class="col-span-3 min-w-0 truncate" [class]="row.changed ? 'font-medium text-text' : 'text-text-muted'">
+              {{ row.label }}
+            </span>
+
+            <div class="col-span-4 min-w-0">
+              @if (row.changed) {
+                <span
+                  class="inline-flex h-chip max-w-full items-center rounded-6 bg-danger-soft px-6 text-12 font-medium text-on-danger-soft"
+                  [title]="row.leftText"
+                >
+                  <span class="truncate">{{ row.leftText }}</span>
+                </span>
+              } @else {
+                <span class="block truncate text-text-muted" [title]="row.leftText">{{ row.leftText }}</span>
+              }
+            </div>
+
+            <div class="col-span-1 flex justify-center" aria-hidden="true">
+              @if (row.changed) {
+                <ng-icon name="tablerArrowRight" size="14" class="shrink-0 text-text-muted rtl:-scale-x-100" />
+              }
+            </div>
+
+            <div class="col-span-4 min-w-0">
+              @if (row.changed) {
+                <span
+                  class="inline-flex h-chip max-w-full items-center rounded-6 bg-success-soft px-6 text-12 font-medium text-on-success-soft"
+                  [title]="row.rightText"
+                >
+                  <span class="truncate">{{ row.rightText }}</span>
+                </span>
+              } @else {
+                <span class="block truncate text-text-muted" [title]="row.rightText">{{ row.rightText }}</span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+</div>
+
+<ui-confirm-dialog
+  #restoreDialog
+  tone="warning"
+  [title]="'widgetPage.versions.restoreTitle' | transloco"
+  [text]="'widgetPage.versions.restoreText' | transloco: { n: comparison()?.left?.versionNumber ?? 0 }"
+  [confirmLabel]="'widgetPage.versions.restore' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'widgetPage.versions.discardTitle' | transloco"
+  [text]="'widgetPage.versions.discardText' | transloco"
+  [confirmLabel]="'widgetPage.versions.discardConfirm' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>

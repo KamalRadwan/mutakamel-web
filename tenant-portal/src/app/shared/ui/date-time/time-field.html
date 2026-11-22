@@ -1,0 +1,70 @@
+<button
+  #hourBtn
+  type="button"
+  class="inline-flex h-field w-time-dd items-center justify-center rounded-6 border text-12 tabular-nums outline-none transition-colors duration-fast"
+  [class]="buttonClasses('hour')"
+  [attr.id]="id()"
+  [attr.aria-label]="hourAriaLabel()"
+  [attr.aria-describedby]="describedBy() || null"
+  [attr.aria-invalid]="invalid() ? 'true' : null"
+  aria-haspopup="listbox"
+  [attr.aria-expanded]="openPart() === 'hour'"
+  [disabled]="disabled()"
+  (click)="togglePart('hour')"
+  (focus)="onFocus('hour')"
+  (blur)="onBlur('hour', $event)"
+  (keydown)="onKeydown('hour', $event)"
+>
+  {{ hourText() }}
+</button>
+
+<span class="select-none text-12 text-text-muted" aria-hidden="true">:</span>
+
+<button
+  #minuteBtn
+  type="button"
+  class="inline-flex h-field w-time-dd items-center justify-center rounded-6 border text-12 tabular-nums outline-none transition-colors duration-fast"
+  [class]="buttonClasses('minute')"
+  [attr.aria-label]="minuteAriaLabel()"
+  [attr.aria-describedby]="describedBy() || null"
+  [attr.aria-invalid]="invalid() ? 'true' : null"
+  aria-haspopup="listbox"
+  [attr.aria-expanded]="openPart() === 'minute'"
+  [disabled]="disabled()"
+  (click)="togglePart('minute')"
+  (focus)="onFocus('minute')"
+  (blur)="onBlur('minute', $event)"
+  (keydown)="onKeydown('minute', $event)"
+>
+  {{ minuteText() }}
+</button>
+
+@if (openPart(); as part) {
+  <div
+    #listEl
+    role="listbox"
+    class="fixed z-dropdown flex max-h-time-list-max w-time-dd flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [attr.dir]="place().rtl ? 'rtl' : 'ltr'"
+    [attr.aria-label]="part === 'minute' ? minuteAriaLabel() : hourAriaLabel()"
+    (keydown)="onKeydown(part, $event)"
+  >
+    @for (option of activeOptions(); track option; let index = $index) {
+      <button
+        #optionEl
+        type="button"
+        role="option"
+        tabindex="-1"
+        class="flex h-btn-h-sm w-full shrink-0 cursor-pointer items-center justify-center rounded-6 text-12 tabular-nums outline-none"
+        [class]="index === selectedIndex() ? 'bg-brand-soft text-on-brand-soft' : index === activeIndex() ? 'bg-row-hover text-text' : 'text-text hover:bg-row-hover'"
+        [attr.aria-selected]="index === selectedIndex()"
+        (mousedown)="$event.preventDefault()"
+        (mouseenter)="activeIndex.set(index)"
+        (click)="choosePart(part, index)"
+      >
+        {{ option }}
+      </button>
+    }
+  </div>
+}

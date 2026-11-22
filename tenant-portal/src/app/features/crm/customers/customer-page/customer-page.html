@@ -1,0 +1,381 @@
+<header class="relative shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
+  @if (showSkeleton()) {
+    <div aria-busy="true">
+      <div class="flex items-center gap-8 px-10 py-8">
+        <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-bp-form-1col max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 overflow-x-auto border-t border-border px-10 no-scrollbar">
+        @for (item of [1, 2, 3, 4]; track item) {
+          <span class="inline-flex h-tab shrink-0 items-center px-10">
+            <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+          </span>
+        }
+      </div>
+    </div>
+  } @else if (scopeDenied() || loadFailed()) {
+    <div class="flex flex-wrap items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'customerPage.back' | transloco"
+        [title]="'customerPage.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="headerTile"
+        aria-hidden="true"
+      >
+        <ng-icon [name]="headerTypeIcon()" size="15" />
+      </span>
+    </div>
+  } @else {
+    @if (edgeClass(); as edge) {
+      <span class="absolute inset-y-0 start-0 w-4" [class]="edge" aria-hidden="true"></span>
+    }
+
+    <app-record-page-header
+      [title]="headerTitle()"
+      [subtitle]="headerSubtitle()"
+      [typeIcon]="headerTypeIcon()"
+      [tile]="headerTile"
+      [backLink]="null"
+      [owner]="headerOwner()"
+      [position]="mode() === 'edit' ? navPos() : null"
+      [dirty]="dirty()"
+      [saving]="saving()"
+      [busy]="deleting()"
+      [navBusy]="instantBusy()"
+      [mode]="mode()"
+      [canEdit]="canEdit()"
+      [menuItems]="mode() === 'edit' ? actionItems() : []"
+      [backLabel]="'customerPage.back' | transloco"
+      [prevLabel]="'customerPage.nav.prev' | transloco"
+      [nextLabel]="'customerPage.nav.next' | transloco"
+      [saveLabel]="(mode() === 'create' ? 'customerPage.create' : 'recordPage.save') | transloco"
+      [actionsLabel]="'customerPage.header.actionsLabel' | transloco"
+      [noColorLabel]="'customers.color.none' | transloco"
+      (back)="goBack()"
+      (prev)="stepNav(-1)"
+      (next)="stepNav(1)"
+      (save)="save()"
+      (undo)="undo()"
+      (menuAction)="onActionSelected($event)"
+    >
+      @if (mode() === 'edit' && headerStatus(); as st) {
+        <span
+          headerBadges
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="st.toneClass"
+          [attr.aria-label]="('customerPage.statusLabel' | transloco) + ': ' + st.label"
+        >
+          {{ st.label }}
+        </span>
+      }
+
+      @if (sourceLeadId(); as leadId) {
+        <a
+          headerBadges
+          [routerLink]="['/crm/leads', leadId]"
+          class="inline-flex h-badge shrink-0 cursor-pointer items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-brand-soft outline-none transition-colors duration-fast ease-enter hover:bg-brand hover:text-on-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        >
+          <ng-icon name="tablerUserPlus" size="12" class="shrink-0" aria-hidden="true" />
+          <span>{{ 'customerPage.header.fromLead' | transloco }}</span>
+        </a>
+      }
+
+      @if (mode() === 'edit' && canLogActivity()) {
+        <button
+          headerPrimary
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving() || deleting()"
+          (click)="logActivity()"
+        >
+          <ng-icon name="tablerCalendarPlus" size="15" aria-hidden="true" />
+          {{ 'customerPage.header.logActivity' | transloco }}
+        </button>
+      }
+
+      @if (mode() === 'edit' && detail(); as currentCustomer) {
+        @if (currentCustomer.id === customerId()) {
+          <app-record-related-badges
+            headerRelated
+            layout="page"
+            recordType="CUSTOMER_PROFILE"
+            [recordId]="currentCustomer.id"
+            [branchId]="currentCustomer.branchId"
+            [partyLabel]="displayName()"
+          />
+        }
+      }
+    </app-record-page-header>
+
+    <app-record-tabs
+      [tabs]="tabs()"
+      [active]="activeTab()"
+      [idPrefix]="uid"
+      [label]="'customerPage.tabs.label' | transloco"
+      (activeChange)="selectTab($event)"
+    />
+  }
+</header>
+
+<div #scrollContainer class="min-h-0 min-w-0 flex-1 overflow-y-auto">
+  <div
+    class="mx-auto w-full max-w-design pb-16"
+    [class]="!showSkeleton() && !scopeDenied() && !loadFailed() && activeTab() === 'calls' ? 'flex h-full flex-col' : ''"
+  >
+    @if (showSkeleton()) {
+      <div class="flex flex-col gap-10 pt-10" aria-busy="true">
+        @for (card of [1, 2, 3]; track card) {
+          <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+            <span class="h-table-head w-full animate-pulse rounded-10 bg-neutral-soft"></span>
+            <div class="grid grid-cols-2 gap-x-10 gap-y-8 desktop:grid-cols-3 wide:grid-cols-4">
+              @for (field of [1, 2, 3, 4]; track field) {
+                <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (scopeDenied()) {
+      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+          <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'customerPage.scopeDenied' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" (click)="goBack()">
+          {{ 'customerPage.back' | transloco }}
+        </button>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="mt-10 flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'customerPage.loadFailed' | transloco }}</p>
+        <button type="button" uiButton (click)="retryLoad()">{{ 'recordPage.retry' | transloco }}</button>
+      </div>
+    }
+
+    <div [class]="showSkeleton() || scopeDenied() || loadFailed() ? 'hidden' : 'contents'">
+      <div
+        role="tabpanel"
+        [id]="uid + '-panel-overview'"
+        [attr.aria-labelledby]="uid + '-tab-overview'"
+        [class]="activeTab() === 'overview' ? 'pt-10' : 'hidden'"
+      >
+        <app-customer-form
+          layout="page"
+          [mode]="mode()"
+          [readonly]="!canEdit()"
+          [errors]="errors()"
+          [customerId]="customerId()"
+          [revision]="formRevision()"
+          [saveContact]="saveContactBound"
+          [excludePartyId]="detail()?.partyId ?? null"
+          [status]="activeStatus()"
+          [showMore]="true"
+          [updating]="instantBusy()"
+          [legacyAddress]="draft().legacyAddress ?? null"
+          [fallbackOwnerName]="fallbackOwnerName()"
+          [draft]="draft()"
+          (draftChange)="onDraftChange($event)"
+          (rate)="onRate($event)"
+          (recolor)="onRecolor($event)"
+          (statusChange)="onStatusChange($event)"
+          (openDuplicate)="onOpenDuplicate($event)"
+          (submitRequest)="save()"
+        />
+      </div>
+
+      @if (mode() === 'edit' && customerId() && visited().has('activities')) {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-activities'"
+          [attr.aria-labelledby]="uid + '-tab-activities'"
+          [class]="activeTab() === 'activities' ? 'pt-10' : 'hidden'"
+        >
+          <app-record-activities-tab
+            targetType="CUSTOMER_PROFILE"
+            [targetId]="customerId()!"
+            [label]="displayName()"
+            [canEdit]="canLogActivity()"
+            [newRequest]="newActivityRequest()"
+            (countChange)="onActivityCountChange($event)"
+          />
+        </div>
+      }
+
+      @if (mode() === 'edit' && customerId() && visited().has('calls')) {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-calls'"
+          [attr.aria-labelledby]="uid + '-tab-calls'"
+          [class]="activeTab() === 'calls' ? 'flex min-h-0 flex-1 flex-col pt-10' : 'hidden'"
+        >
+          <app-party-calls
+            partyType="CUSTOMER_PROFILE"
+            [partyId]="customerId()!"
+            [partyLabel]="displayName()"
+            [reloadToken]="callsReload()"
+            (total)="onCallsTotal($event)"
+            (missed)="onCallsMissed($event)"
+          />
+        </div>
+      }
+
+      @if (mode() === 'edit' && customerId() && visited().has('attachments')) {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-attachments'"
+          [attr.aria-labelledby]="uid + '-tab-attachments'"
+          [class]="activeTab() === 'attachments' ? 'pt-10' : 'hidden'"
+        >
+          <app-record-attachments
+            sourceType="CUSTOMER_PROFILE"
+            [sourceId]="customerId()!"
+            [branchId]="currentBranchId()"
+            [canUpload]="canUploadAttachments()"
+            [canDelete]="canDeleteAttachments()"
+            [uploaderName]="uploaderNameFn()"
+            (countChange)="onAttachmentCountChange($event)"
+          />
+        </div>
+      }
+
+      @if (mode() === 'edit' && customerId() && visited().has('history')) {
+        <div
+          role="tabpanel"
+          [id]="uid + '-panel-history'"
+          [attr.aria-labelledby]="uid + '-tab-history'"
+          [class]="activeTab() === 'history' ? 'pt-10' : 'hidden'"
+        >
+          <app-record-history
+            [entityTypes]="customerHistoryEntityTypes"
+            [entityId]="customerId()!"
+            [partyIds]="detail()?.id === customerId() ? historyPartyIds() : emptyPartyIds"
+            [branchId]="currentBranchId()"
+            [refreshRequest]="historyRefresh()"
+            [categories]="historyCategories"
+            [valueLabel]="historyValueLabel()"
+          />
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<ui-unsaved-dialog
+  [title]="'recordPage.unsaved.title' | transloco"
+  [text]="'recordPage.unsaved.text' | transloco"
+  [saveLabel]="'recordPage.unsaved.save' | transloco"
+  [discardLabel]="'recordPage.unsaved.discard' | transloco"
+  [cancelLabel]="'recordPage.unsaved.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #blacklistDialog
+  tone="warning"
+  [title]="'customers.board.blacklistConfirm.title' | transloco: { name: displayName() }"
+  [text]="'customers.board.blacklistConfirm.body' | transloco"
+  [confirmLabel]="'customers.board.blacklistConfirm.confirm' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>
+
+<dialog
+  #deleteDialog
+  class="z-modal m-auto w-modal-confirm rounded-14 border border-border bg-surface p-0 text-text shadow-modal backdrop:bg-overlay"
+  [attr.aria-labelledby]="uid + '-delete-title'"
+  [attr.aria-describedby]="uid + '-delete-text'"
+  (cancel)="onDeleteDialogCancel($event)"
+  (keydown.escape)="onDeleteDialogEscape($event)"
+  (close)="onDeleteDialogClosed()"
+>
+  <header class="flex items-center gap-8 border-b border-border px-10 py-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerTrash" size="15" aria-hidden="true" />
+    </span>
+    <h2 [id]="uid + '-delete-title'" class="min-w-0 flex-1 truncate text-15 leading-22 font-medium text-text">
+      {{ 'customerPage.delete.title' | transloco: { name: displayName() } }}
+    </h2>
+  </header>
+
+  <div class="flex flex-col gap-8 p-10">
+    <p [id]="uid + '-delete-text'" class="text-12 leading-18 text-text-muted">
+      {{ (sourceLeadId() ? 'customerPage.delete.bodyReopensLead' : 'customerPage.delete.bodyPermanent') | transloco }}
+    </p>
+
+    <ui-field
+      size="multiline"
+      [label]="'customerPage.delete.reasonLabel' | transloco"
+      [for]="uid + '-delete-reason'"
+      [hint]="'customerPage.delete.reasonHint' | transloco"
+      [count]="deleteReason().length"
+      [max]="deleteReasonMax"
+      [error]="deleteReasonError()"
+    >
+      <textarea
+        [id]="uid + '-delete-reason'"
+        rows="3"
+        dir="auto"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [readonly]="deleting()"
+        [value]="deleteReason()"
+        [attr.aria-invalid]="deleteReasonError() ? 'true' : null"
+        (input)="onDeleteReasonInput($event)"
+      ></textarea>
+    </ui-field>
+
+    @if (deleteConflictMessage(); as conflictMsg) {
+      <p
+        role="alert"
+        class="rounded-8 border border-danger-border bg-danger-soft px-8 py-6 text-12 leading-18 text-danger-text"
+      >
+        {{ conflictMsg }}
+      </p>
+    }
+  </div>
+
+  <footer class="flex items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+    <button
+      type="button"
+      uiButton
+      variant="danger"
+      [loading]="deleting()"
+      [disabled]="deleting() || !!deleteReasonError()"
+      (click)="submitDelete()"
+    >
+      {{ 'recordPage.deleteLabel' | transloco }}
+    </button>
+    <button
+      #deleteCancelBtn
+      type="button"
+      uiButton
+      variant="secondary"
+      autofocus
+      [disabled]="deleting()"
+      (click)="closeDeleteDialog()"
+    >
+      {{ 'common.cancel' | transloco }}
+    </button>
+  </footer>
+</dialog>
+
+<ui-conflict-dialog
+  [open]="conflictOpen()"
+  (openChange)="onConflictOpenChange($event)"
+  [recordLabel]="displayName()"
+  (reload)="onConflictChoice('reload')"
+  (keepEditing)="onConflictChoice('keep')"
+/>

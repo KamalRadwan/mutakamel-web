@@ -1,0 +1,95 @@
+<ui-modal
+  size="form"
+  [icon]="action() === 'ARCHIVE' ? 'tablerArchive' : 'tablerRestore'"
+  tile="bg-icon-gray"
+  [title]="(action() === 'ARCHIVE' ? 'widgets.archiveModal.archiveTitle' : 'widgets.archiveModal.restoreTitle') | transloco"
+  [subtitle]="widget()?.name ?? ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    @if (loadingImpact()) {
+      <div class="flex flex-col gap-8" aria-busy="true">
+        <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></div>
+        <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></div>
+        <div class="h-skeleton-line w-3/4 rounded-4 bg-neutral-soft"></div>
+      </div>
+    } @else if (impact()) {
+      <div class="flex flex-col gap-8">
+        <ui-field
+          size="bare"
+          [label]="'widgets.archiveModal.dashboardsAffected' | transloco"
+          [hint]="'widgets.archiveModal.dashboardsAffectedHint' | transloco"
+        >
+          <div class="flex min-h-field flex-wrap items-center gap-6">
+            <ui-badge tone="count">{{ dashboardNames().length }}</ui-badge>
+            @for (dashName of visibleDashboardNames(); track dashName) {
+              <ui-badge tone="tag">{{ dashName }}</ui-badge>
+            }
+            @if (extraDashboardsCount() > 0) {
+              <ui-badge tone="count">+{{ extraDashboardsCount() }}</ui-badge>
+            }
+          </div>
+        </ui-field>
+
+        <div class="grid grid-cols-2 gap-8">
+          <ui-field
+            size="bare"
+            [label]="(action() === 'ARCHIVE' ? 'widgets.archiveModal.placementsHidden' : 'widgets.archiveModal.placementsToResume') | transloco"
+            [hint]="(action() === 'ARCHIVE' ? 'widgets.archiveModal.placementsHiddenHint' : 'widgets.archiveModal.placementsToResumeHint') | transloco"
+          >
+            <div class="flex min-h-field items-center gap-6">
+              <ui-badge tone="count">{{ placementCount() }}</ui-badge>
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [label]="'widgets.archiveModal.alertRules' | transloco"
+            [hint]="'widgets.archiveModal.alertRulesHint' | transloco"
+          >
+            <div class="flex min-h-field flex-wrap items-center gap-6">
+              <ui-badge tone="count">{{ alertRulesCount() }}</ui-badge>
+              @if (alertRulesCount() > 0) {
+                <span class="text-12 leading-18 text-text-muted">{{ alertEffectKey() | transloco }}</span>
+              } @else {
+                <span class="text-12 leading-18 text-text-muted">{{ 'widgets.archiveModal.none' | transloco }}</span>
+              }
+            </div>
+          </ui-field>
+        </div>
+      </div>
+
+      <ui-field
+        size="multiline"
+        [label]="'widgets.modal.reason' | transloco"
+        [for]="uid + '-reason'"
+        [hint]="'widgets.archiveModal.reasonHint' | transloco"
+        [count]="reason().length"
+        [max]="500"
+        [error]="reasonError()"
+      >
+        <textarea
+          [id]="uid + '-reason'"
+          rows="3"
+          maxlength="500"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [value]="reason()"
+          [placeholder]="'widgets.archiveModal.reasonPlaceholder' | transloco"
+          [disabled]="submitting()"
+          (input)="onReasonInput($event)"
+        ></textarea>
+      </ui-field>
+    }
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton [loading]="submitting()" [disabled]="!canSubmit()" (click)="submit()">
+      {{ (action() === 'ARCHIVE' ? 'widgets.archiveModal.archiveAction' : 'widgets.archiveModal.restoreAction') | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'analytics.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

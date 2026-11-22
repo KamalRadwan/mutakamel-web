@@ -1,0 +1,29 @@
+@if (editable() && !disabled()) {
+  <app-trade-item-picker
+    [value]="itemId()"
+    [purpose]="purpose()"
+    [context]="context()"
+    [id]="id()"
+    [describedBy]="describedBy()"
+    [invalid]="invalid()"
+    [disabled]="false"
+    (valueChange)="onValueChange($event)"
+  />
+} @else {
+  <div class="flex min-w-0 flex-col">
+    <span class="truncate text-13 leading-18 text-text" [title]="itemLabel()">
+      {{ itemLabel() || '—' }}
+    </span>
+    @if (showTaxDefault() && itemId() && taxDefault() !== undefined) {
+      @if (taxDefault(); as def) {
+        <span class="truncate text-11 leading-16 text-text-muted">
+          {{ 'tdlines.taxDefault' | transloco: { name: def.name, rate: formatQty(def.rate) } }}
+        </span>
+      } @else {
+        <span class="truncate text-11 leading-16 text-text-muted">
+          {{ 'tdlines.noTaxDefault' | transloco }}
+        </span>
+      }
+    }
+  </div>
+}

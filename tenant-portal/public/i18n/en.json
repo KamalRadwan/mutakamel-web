@@ -1,0 +1,279 @@
+{
+  "brand": "Mutakamel",
+  "common": {
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "browse": "Browse",
+    "charsUsed": "{{count}} of {{max}} characters used"
+  },
+  "toast": {
+    "region": "Notifications",
+    "close": "Close"
+  },
+  "preferences": {
+    "language": "Language",
+    "darkMode": "Switch to dark mode",
+    "lightMode": "Switch to light mode"
+  },
+  "nav": {
+    "appSwitcher": "Switch application",
+    "mainNavigation": "Main navigation",
+    "userMenu": "User menu",
+    "apps": {
+      "workspace": "Workspace",
+      "crm": "CRM",
+      "trade": "Trade",
+      "accounting": "Accounting"
+    },
+    "user": {
+      "preferences": "Preferences",
+      "activities": "Activities",
+      "logout": "Log out"
+    },
+    "features": {
+      "home": "Home",
+      "staff": "Staff",
+      "operations": "Operations",
+      "account": "Account",
+      "billing": "Billing",
+      "settings": "Settings",
+      "dashboard": "Dashboard",
+      "leads": "Leads",
+      "customers": "Customers",
+      "opportunities": "Opportunities",
+      "reports": "Reports",
+      "foundation": "Foundation",
+      "documents": "Documents",
+      "inventory": "Inventory",
+      "governance": "Governance",
+      "automation": "Automation",
+      "journal": "Journal",
+      "accounts": "Accounts",
+      "receivables": "Receivables",
+      "payables": "Payables",
+      "banking": "Banking",
+      "assets": "Assets",
+      "tax": "Tax",
+      "closing": "Closing"
+    },
+    "subNavigation": "Section pages",
+    "pages": {
+      "crm": {
+        "dashboard": {
+          "home": "My dashboard",
+          "dashboards": "Dashboards",
+          "widgets": "Widgets",
+          "alerts": "Alerts",
+          "access": "Access requests"
+        },
+        "reports": {
+          "catalogue": "Report catalogue",
+          "schedules": "Schedules",
+          "exports": "Exports"
+        },
+        "settings": {
+          "lead-stages": "Lead stages",
+          "pipelines": "Pipelines",
+          "opportunity-stages": "Opportunity stages",
+          "lead-sources": "Lead sources",
+          "tags": "Tags",
+          "custom-fields": "Custom fields",
+          "reasons": "Reasons",
+          "outbound-emails": "Outbound emails",
+          "general": "CRM settings",
+          "duplicates": "Duplicate contacts",
+          "static-data": "Static data catalogue",
+          "targets": "Targets",
+          "sla": "Response policies",
+          "calendars": "Working calendars",
+          "data-readiness": "Data readiness"
+        }
+      },
+      "workspace": {
+        "staff": {
+          "organization": "Organization",
+          "companies": "Companies",
+          "branches": "Branches",
+          "departments": "Departments",
+          "teams": "Teams",
+          "users": "Users",
+          "roles": "Roles and permissions"
+        },
+        "operations": {
+          "party-directory": "Party directory",
+          "directory-settings": "Directory settings",
+          "template-platform": "Template platform",
+          "template-assets": "Template assets",
+          "template-assignments": "Template assignments",
+          "activities": "Activities",
+          "audit-log": "Audit log",
+          "application-activation": "Application activation",
+          "addon-seats": "Add-on seats"
+        },
+        "billing": {
+          "overview": "Billing overview",
+          "invoices": "Invoices",
+          "subscription": "Subscription",
+          "catalogue": "Applications and add-ons catalogue"
+        },
+        "account": {
+          "notifications": "Notifications",
+          "preferences": "My preferences",
+          "security": "Authentication and security"
+        },
+        "settings": {
+          "workspace": "Workspace",
+          "currencies": "Currencies",
+          "taxes": "Taxes",
+          "numbering": "Numbering",
+          "email": "Email",
+          "phone": "Phone",
+          "branding": "Branding",
+          "geography": "Geography",
+          "updates": "Updates"
+        }
+      },
+      "trade": {
+        "foundation": {
+          "items": "Items",
+          "units": "Units of measure",
+          "categories": "Categories",
+          "channels": "Channels",
+          "commercial-accounts": "Commercial accounts",
+          "configuration": "Trade configuration"
+        },
+        "documents": {
+          "quotations": "Quotations",
+          "sales-orders": "Sales orders",
+          "purchase-orders": "Purchase orders",
+          "purchase-quotations": "Purchase quotations"
+        },
+        "inventory": {
+          "availability": "Availability",
+          "fulfilment-nodes": "Fulfilment nodes",
+          "periods": "Inventory periods",
+          "uom-conversions": "UOM conversions",
+          "movements": "Movements",
+          "serials": "Serials",
+          "decisions": "Inventory decisions"
+        },
+        "governance": {
+          "price-books": "Price books",
+          "price-evaluation": "Price evaluation",
+          "policy-studio": "Policy studio",
+          "workflows": "Workflows",
+          "document-profiles": "Document profiles"
+        },
+        "automation": {
+          "extension-profiles": "Extension profiles",
+          "import-runs": "Import runs",
+          "import-mappings": "Import mappings",
+          "webhooks": "Webhook subscriptions",
+          "control-tower": "Control tower"
+        },
+        "settings": {
+          "terms": "Terms",
+          "reasons": "Reasons"
+        }
+      }
+    },
+    "more": "More"
+  },
+  "notifications": {
+    "bellLabel": "Notifications",
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "tabs": {
+      "all": "All",
+      "unread": "Unread"
+    },
+    "days": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "earlier": "Earlier"
+    },
+    "actions": {
+      "dismiss": "Dismiss notification"
+    },
+    "types": {
+      "core_activity_assigned": "Activity assigned",
+      "core_activity_cancelled": "Activity cancelled",
+      "core_activity_completed": "Activity completed",
+      "core_activity_reminder": "Activity reminder",
+      "core_activity_updated": "Activity updated",
+      "crm_lead_assigned": "Lead assigned",
+      "record_deleted": "Record deleted",
+      "record_owner_changed": "Owner changed",
+      "other": "Notification"
+    },
+    "empty": "No notifications yet",
+    "emptyUnread": "No unread notifications",
+    "loadError": "Notifications could not be loaded.",
+    "retry": "Try again",
+    "loadMore": "Show more",
+    "viewAll": "View all notifications"
+  },
+  "errors": {
+    "notFound": {
+      "title": "Page not found",
+      "text": "The page you are looking for does not exist or has been moved.",
+      "action": "Back to home"
+    }
+  },
+  "notReady": {
+    "title": "This page is not ready yet",
+    "text": "It is part of the next phases."
+  },
+  "search": {
+    "searchIn": "Search",
+    "for": "for:",
+    "or": "or",
+    "remove": "Remove filter",
+    "removeNamed": "Remove {{label}}",
+    "filters": "Show filters",
+    "clearAll": "Clear all search filters"
+  },
+  "phone": {
+    "call": "Call {{number}}",
+    "callWithPhone": "Call {{number}} with the phone",
+    "inCall": "You are in a call",
+    "whatsapp": "WhatsApp {{number}}",
+    "telegram": "Telegram {{number}}"
+  },
+  "scope": {
+    "label": "Company and branch",
+    "company": "Company",
+    "branch": "Branch"
+  },
+  "view": {
+    "title": "View",
+    "auto": "Automatic",
+    "small": "Small",
+    "balanced": "Balanced",
+    "large": "Large"
+  },
+  "apiErrors": {
+    "generic": "Something went wrong. Try again.",
+    "network": "Could not reach the server.",
+    "notFound": "This item no longer exists. Reload the list.",
+    "permission": "You do not have permission for this action.",
+    "session": "Your session has ended. Sign in again.",
+    "validation": "Check the highlighted fields.",
+    "idempotency": "The same request is already being processed.",
+    "idempotencyKey": "The request could not be sent safely. Reload the page and try again.",
+    "idempotencyMismatch": "This request was already sent with different data. Reload the page and try again.",
+    "rateLimited": "Too many requests. Wait a moment and try again.",
+    "subscription": "Your subscription allows viewing only."
+  },
+  "session": {
+    "ended": {
+      "title": "Session ended",
+      "text": "Sign in again to continue."
+    },
+    "loadFailed": {
+      "title": "Could not load your workspace",
+      "text": "Check your connection and try again.",
+      "retry": "Retry"
+    }
+  }
+}

@@ -1,0 +1,90 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerHistory"
+  tile="bg-icon-navy"
+  [title]="'targets.releasesModal.title' | transloco"
+  [subtitle]="subtitle()"
+  [closeLabel]="'settings.common.close' | transloco"
+  (closed)="onClosed()"
+>
+  @if (loadError()) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'analytics.common.loadFailed' | transloco"
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="reload()"
+    />
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div class="min-w-doc-table-min">
+        <ui-data-table
+          [columns]="columns()"
+          [rows]="releases()"
+          [rowKey]="rowKey"
+          [totals]="null"
+          [loading]="loading()"
+          [emptyText]="'targets.releasesModal.empty' | transloco"
+          [label]="'targets.releasesModal.title' | transloco"
+        >
+          <ng-template uiCell="releaseNumber" let-row>
+            #{{ row.releaseNumber }}
+          </ng-template>
+
+          <ng-template uiCell="targetValue" let-row>
+            {{ formatValue(row) }}
+          </ng-template>
+
+          <ng-template uiCell="approvalBasis" let-row>
+            <ui-badge tone="tag">{{ 'targets.basis.' + row.approvalBasis | transloco }}</ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="correctionReason" let-row>
+            <span class="truncate text-12 text-text-muted" [title]="row.correctionReason || ''">
+              {{ row.correctionReason || dash }}
+            </span>
+          </ng-template>
+
+          <ng-template uiCell="approvedByUserId" let-row>
+            <span class="truncate text-12 text-text" [title]="approvedByName(row.approvedByUserId)">
+              {{ approvedByName(row.approvedByUserId) }}
+            </span>
+          </ng-template>
+
+          <ng-template uiCell="approvedAt" let-row>
+            <span class="truncate text-12 tabular-nums text-text-muted" [title]="formatApprovedAt(row.approvedAt)">
+              {{ formatApprovedAt(row.approvedAt) }}
+            </span>
+          </ng-template>
+
+          <ng-template uiCell="period" let-row>
+            <span class="truncate text-12 text-text-muted" [title]="formatPeriodRange(row)">
+              {{ formatPeriodRange(row) }}
+            </span>
+          </ng-template>
+        </ui-data-table>
+      </div>
+    </div>
+
+    @if (hasMore() && !loading()) {
+      <div class="mt-8 flex justify-center">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'targets.releasesModal.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

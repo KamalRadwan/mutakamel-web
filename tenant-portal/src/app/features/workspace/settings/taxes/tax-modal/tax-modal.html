@@ -1,0 +1,237 @@
+<ui-modal
+  size="form"
+  icon="tablerReceiptTax"
+  tile="bg-icon-violet"
+  [title]="(mode() === 'create' ? 'wsTaxes.modal.createTitle' : 'wsTaxes.modal.editTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (validationNotice(); as notice) {
+    <div class="mb-8">
+      <app-settings-notice tone="warning">{{ notice }}</app-settings-notice>
+    </div>
+  }
+
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-2">
+      @if (mode() === 'create') {
+        <ui-field
+          size="bare"
+          [for]="uid + '-scope'"
+          [label]="'wsTaxes.fields.scope' | transloco"
+          [hint]="'wsTaxes.fields.scopeHint' | transloco"
+          [required]="true"
+          [error]="scopeError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-scope'"
+            [describedBy]="uid + '-scope-hint' + (scopeError() ? ' ' + uid + '-scope-error' : '')"
+            [options]="scopeOptions()"
+            [value]="scopeDraft()"
+            [label]="'wsTaxes.fields.scope' | transloco"
+            [disabled]="!isEditable() || saving()"
+            (valueChange)="onScopeChange($event)"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-scope-ro'"
+          [label]="'wsTaxes.fields.scope' | transloco"
+          [hint]="'wsTaxes.fields.scopeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-scope-ro'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="editScopeLabel()"
+            [attr.aria-describedby]="uid + '-scope-ro-hint'"
+          />
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        </ui-field>
+      }
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'wsTaxes.fields.code' | transloco"
+        [hint]="'wsTaxes.fields.codeHint' | transloco"
+        [required]="mode() === 'create'"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          [attr.maxlength]="limits.code"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="mode() === 'create' ? ('wsTaxes.fields.codePlaceholder' | transloco) : ''"
+          [value]="codeDraft()"
+          [readonly]="mode() === 'edit' || !isEditable() || saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-code-hint' + (codeError() ? ' ' + uid + '-code-error' : '')"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+        @if (mode() === 'edit') {
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-rate'"
+        [label]="'wsTaxes.fields.rate' | transloco"
+        [hint]="'wsTaxes.fields.rateHint' | transloco"
+        [required]="isEditable()"
+        [error]="rateError()"
+      >
+        <input
+          #rateInput
+          [id]="uid + '-rate'"
+          type="text"
+          inputmode="decimal"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [value]="rateDraft()"
+          [readonly]="!isEditable() || saving()"
+          [attr.aria-invalid]="rateError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-rate-hint' + (rateError() ? ' ' + uid + '-rate-error' : '')"
+          (input)="onRateInput($event)"
+          (blur)="markTouched('rate')"
+        />
+        <span class="shrink-0 text-12 text-text-muted select-none" aria-hidden="true">%</span>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [for]="uid + '-name'"
+        [label]="'wsTaxes.fields.name' | transloco"
+        [hint]="'wsTaxes.fields.nameHint' | transloco"
+        [required]="isEditable()"
+        [count]="nameDraft().length"
+        [max]="limits.name"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          dir="auto"
+          [attr.maxlength]="limits.name"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="nameDraft()"
+          [readonly]="!isEditable() || saving()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-hint' + (nameError() ? ' ' + uid + '-name-error' : '')"
+          (input)="onNameInput($event)"
+          (blur)="markTouched('name')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [for]="uid + '-inclusive'"
+        [label]="'wsTaxes.fields.inclusive' | transloco"
+        [hint]="'wsTaxes.fields.inclusiveHint' | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-inclusive'"
+            [describedBy]="uid + '-inclusive-hint'"
+            [label]="'wsTaxes.fields.inclusive' | transloco"
+            [checked]="isInclusiveDraft()"
+            [disabled]="!isEditable() || saving()"
+            (checkedChange)="onInclusiveChange($event)"
+          />
+          <span class="text-12 leading-18 text-text">
+            {{ (isInclusiveDraft() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+          </span>
+        </div>
+      </ui-field>
+    </div>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-active'"
+          [label]="'wsTaxes.fields.active' | transloco"
+          [hint]="'wsTaxes.fields.activeHint' | transloco"
+          [error]="activeError()"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [id]="uid + '-active'"
+              [describedBy]="uid + '-active-hint' + (activeError() ? ' ' + uid + '-active-error' : '')"
+              [label]="'wsTaxes.fields.active' | transloco"
+              [checked]="isActiveDraft()"
+              [disabled]="!isEditable() || saving()"
+              (checkedChange)="onActiveChange($event)"
+            />
+            <span class="text-12 leading-18 text-text">
+              {{ (isActiveDraft() ? 'settings.common.active' : 'settings.common.inactive') | transloco }}
+            </span>
+          </div>
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (isEditable()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || !dirty() || !isValid()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  [title]="'settings.common.unsaved' | transloco"
+  [text]="'wsTaxes.unsaved.text' | transloco"
+  [saveLabel]="'settings.common.save' | transloco"
+  [discardLabel]="'wsTaxes.unsaved.discard' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

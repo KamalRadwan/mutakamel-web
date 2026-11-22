@@ -1,0 +1,341 @@
+@let currentPlan = plan();
+
+@switch (currentPlan.kind) {
+  @case ('boolean') {
+    <ui-field
+      size="bare"
+      [label]="effectiveRootLabel()"
+      [for]="rootId()"
+      [hint]="effectiveRootHint()"
+      [error]="rootError()"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="rootId()"
+          [describedBy]="rootDescribedBy()"
+          [label]="effectiveRootLabel()"
+          [disabled]="disabled()"
+          [checked]="value() === true"
+          (checkedChange)="onBooleanChange($event)"
+        />
+      </div>
+    </ui-field>
+  }
+
+  @case ('enum') {
+    <ui-field
+      size="bare"
+      [label]="effectiveRootLabel()"
+      [for]="rootId()"
+      [hint]="effectiveRootHint()"
+      [error]="rootError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="rootId()"
+        [describedBy]="rootDescribedBy()"
+        [label]="effectiveRootLabel()"
+        [disabled]="disabled()"
+        [options]="enumOptions(currentPlan)"
+        [value]="enumSelectedKey(value())"
+        (valueChange)="onEnumSelect(currentPlan, $event)"
+      />
+    </ui-field>
+  }
+
+  @case ('number') {
+    <ui-field
+      [label]="effectiveRootLabel()"
+      [for]="rootId()"
+      [hint]="effectiveRootHint()"
+      [error]="rootError()"
+    >
+      <input
+        [id]="rootId()"
+        type="number"
+        dir="ltr"
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+        [step]="currentPlan.integer ? 1 : 'any'"
+        [attr.min]="currentPlan.minimum ?? null"
+        [attr.max]="currentPlan.maximum ?? null"
+        [disabled]="disabled()"
+        [value]="numberInputValue(value(), '$')"
+        [attr.aria-invalid]="rootError() ? 'true' : null"
+        (input)="onNumberInput($event, '$')"
+      />
+    </ui-field>
+  }
+
+  @case ('string') {
+    <ui-field
+      [size]="currentPlan.multiline ? 'multiline' : 'default'"
+      [label]="effectiveRootLabel()"
+      [for]="rootId()"
+      [hint]="effectiveRootHint()"
+      [count]="stringCount(value())"
+      [max]="currentPlan.maxLength ?? null"
+      [error]="rootError()"
+    >
+      @if (currentPlan.multiline) {
+        <textarea
+          [id]="rootId()"
+          rows="3"
+          class="w-full resize-y bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [disabled]="disabled()"
+          [value]="stringInputValue(value())"
+          [attr.aria-invalid]="rootError() ? 'true' : null"
+          (input)="onTextInput($event)"
+        ></textarea>
+      } @else {
+        <input
+          [id]="rootId()"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [disabled]="disabled()"
+          [value]="stringInputValue(value())"
+          [attr.aria-invalid]="rootError() ? 'true' : null"
+          (input)="onTextInput($event)"
+        />
+      }
+    </ui-field>
+  }
+
+  @case ('enumArray') {
+    <ui-field
+      size="bare"
+      [label]="effectiveRootLabel()"
+      [for]="rootId()"
+      [hint]="effectiveRootHint()"
+      [error]="rootError()"
+    >
+      <ui-tag-picker
+        [inputId]="rootId()"
+        [label]="effectiveRootLabel()"
+        [options]="enumArrayTagOptions(currentPlan)"
+        [canCreate]="false"
+        [max]="currentPlan.maxItems ?? 50"
+        [disabled]="disabled()"
+        [value]="enumArraySelectedIds(currentPlan, value())"
+        (valueChange)="onEnumArrayChange(currentPlan, $event)"
+      />
+    </ui-field>
+  }
+
+  @case ('primitiveArray') {
+    <ui-field
+      size="bare"
+      [label]="effectiveRootLabel()"
+      [for]="rootId()"
+      [hint]="effectiveRootHint()"
+      [error]="rootError()"
+    >
+      <ui-tag-picker
+        [inputId]="rootId()"
+        [label]="effectiveRootLabel()"
+        [options]="primitiveArrayTagOptions(value())"
+        [canCreate]="true"
+        [createTag]="createPrimitiveTagFn"
+        [max]="currentPlan.maxItems ?? 50"
+        [disabled]="disabled()"
+        [value]="primitiveArraySelectedIds(value())"
+        (valueChange)="onPrimitiveArrayChange(currentPlan, $event)"
+      />
+    </ui-field>
+  }
+
+  @case ('object') {
+    <div class="flex flex-col gap-8">
+      <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+        @for (field of currentPlan.fields; track field.key) {
+          @let fPlan = field.plan;
+          @let fVal = propValue(field.key);
+          @let fErr = propError(field.key);
+
+          @switch (fPlan.kind) {
+            @case ('boolean') {
+              <ui-field
+                size="bare"
+                [label]="field.label"
+                [required]="field.required"
+                [for]="propId(field.key)"
+                [hint]="propHint(field.schema)"
+                [error]="fErr"
+              >
+                <div class="flex h-field items-center">
+                  <ui-switch
+                    [id]="propId(field.key)"
+                    [describedBy]="propDescribedBy(field.key)"
+                    [label]="field.label"
+                    [disabled]="disabled()"
+                    [checked]="fVal === true"
+                    (checkedChange)="onBooleanChange($event, field.key)"
+                  />
+                </div>
+              </ui-field>
+            }
+
+            @case ('enum') {
+              <ui-field
+                size="bare"
+                [label]="field.label"
+                [required]="field.required"
+                [for]="propId(field.key)"
+                [hint]="propHint(field.schema)"
+                [error]="fErr"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  size="field"
+                  [id]="propId(field.key)"
+                  [describedBy]="propDescribedBy(field.key)"
+                  [label]="field.label"
+                  [disabled]="disabled()"
+                  [options]="enumOptions(fPlan)"
+                  [value]="enumSelectedKey(fVal)"
+                  (valueChange)="onEnumSelect(fPlan, $event, field.key)"
+                />
+              </ui-field>
+            }
+
+            @case ('number') {
+              <ui-field
+                [label]="field.label"
+                [required]="field.required"
+                [for]="propId(field.key)"
+                [hint]="propHint(field.schema)"
+                [error]="fErr"
+              >
+                <input
+                  [id]="propId(field.key)"
+                  type="number"
+                  dir="ltr"
+                  class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                  [step]="fPlan.integer ? 1 : 'any'"
+                  [attr.min]="fPlan.minimum ?? null"
+                  [attr.max]="fPlan.maximum ?? null"
+                  [disabled]="disabled()"
+                  [value]="numberInputValue(fVal, field.key)"
+                  [attr.aria-invalid]="fErr ? 'true' : null"
+                  (input)="onNumberInput($event, field.key, field.key)"
+                />
+              </ui-field>
+            }
+
+            @case ('string') {
+              <div [class]="fPlan.multiline ? 'col-span-2' : ''">
+                <ui-field
+                  [size]="fPlan.multiline ? 'multiline' : 'default'"
+                  [label]="field.label"
+                  [required]="field.required"
+                  [for]="propId(field.key)"
+                  [hint]="propHint(field.schema)"
+                  [count]="stringCount(fVal)"
+                  [max]="fPlan.maxLength ?? null"
+                  [error]="fErr"
+                >
+                  @if (fPlan.multiline) {
+                    <textarea
+                      [id]="propId(field.key)"
+                      rows="3"
+                      class="w-full resize-y bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                      [disabled]="disabled()"
+                      [value]="stringInputValue(fVal)"
+                      [attr.aria-invalid]="fErr ? 'true' : null"
+                      (input)="onTextInput($event, field.key)"
+                    ></textarea>
+                  } @else {
+                    <input
+                      [id]="propId(field.key)"
+                      type="text"
+                      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                      [disabled]="disabled()"
+                      [value]="stringInputValue(fVal)"
+                      [attr.aria-invalid]="fErr ? 'true' : null"
+                      (input)="onTextInput($event, field.key)"
+                    />
+                  }
+                </ui-field>
+              </div>
+            }
+
+            @case ('enumArray') {
+              <div class="col-span-2">
+                <ui-field
+                  size="bare"
+                  [label]="field.label"
+                  [required]="field.required"
+                  [for]="propId(field.key)"
+                  [hint]="propHint(field.schema)"
+                  [error]="fErr"
+                >
+                  <ui-tag-picker
+                    [inputId]="propId(field.key)"
+                    [label]="field.label"
+                    [options]="enumArrayTagOptions(fPlan)"
+                    [canCreate]="false"
+                    [max]="fPlan.maxItems ?? 50"
+                    [disabled]="disabled()"
+                    [value]="enumArraySelectedIds(fPlan, fVal)"
+                    (valueChange)="onEnumArrayChange(fPlan, $event, field.key)"
+                  />
+                </ui-field>
+              </div>
+            }
+
+            @case ('primitiveArray') {
+              <div class="col-span-2">
+                <ui-field
+                  size="bare"
+                  [label]="field.label"
+                  [required]="field.required"
+                  [for]="propId(field.key)"
+                  [hint]="propHint(field.schema)"
+                  [error]="fErr"
+                >
+                  <ui-tag-picker
+                    [inputId]="propId(field.key)"
+                    [label]="field.label"
+                    [options]="primitiveArrayTagOptions(fVal)"
+                    [canCreate]="true"
+                    [createTag]="createPrimitiveTagFn"
+                    [max]="fPlan.maxItems ?? 50"
+                    [disabled]="disabled()"
+                    [value]="primitiveArraySelectedIds(fVal)"
+                    (valueChange)="onPrimitiveArrayChange(fPlan, $event, field.key)"
+                  />
+                </ui-field>
+              </div>
+            }
+          }
+        }
+      </div>
+
+      @if (objectUnmatchedError(); as fallbackErr) {
+        <p class="text-11 leading-16 text-danger-text">{{ fallbackErr }}</p>
+      }
+    </div>
+  }
+
+  @case ('json') {
+    <ui-field
+      size="multiline"
+      [label]="'tradeConfig.valueEditor.jsonLabel' | transloco"
+      [for]="rootId()"
+      [hint]="'tradeConfig.valueEditor.jsonHint' | transloco"
+      [error]="rootError()"
+    >
+      <textarea
+        [id]="rootId()"
+        rows="6"
+        dir="ltr"
+        class="w-full resize-y bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [disabled]="disabled()"
+        [value]="jsonText()"
+        [attr.aria-invalid]="rootError() ? 'true' : null"
+        (input)="onJsonInput($event)"
+        (blur)="commit()"
+      ></textarea>
+    </ui-field>
+  }
+}

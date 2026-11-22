@@ -1,0 +1,107 @@
+{
+  "title": "Numbering",
+  "add": "Add sequence",
+  "search": "Search by code or prefix",
+  "filters": {
+    "company": "Company",
+    "allCompanies": "All companies",
+    "sort": "Sort",
+    "clear": "Clear filters"
+  },
+  "sort": {
+    "codeAsc": "Code, ascending",
+    "codeDesc": "Code, descending",
+    "newest": "Newest first",
+    "nextDesc": "Highest next number"
+  },
+  "cols": {
+    "code": "Code",
+    "company": "Company",
+    "prefix": "Prefix",
+    "padding": "Digits",
+    "next": "Next number",
+    "updated": "Updated"
+  },
+  "scope": {
+    "workspace": "All workspace",
+    "unknown": "Unknown company"
+  },
+  "empty": {
+    "title": "No numbering sequences",
+    "filtered": "No sequences match the filters."
+  },
+  "footer": "Numbers only go up, and sequences cannot be deleted.",
+  "readOnlyNotice": "Read-only access. You can't add or change sequences.",
+  "companyLoadFailed": "Companies could not be loaded, so names and the company filter are limited.",
+  "actions": {
+    "open": "Open",
+    "openDesc": "View or change this sequence",
+    "copyCode": "Copy code",
+    "copyCodeDesc": "Copy the sequence code"
+  },
+  "toast": {
+    "copied": "Code copied.",
+    "created": "Sequence added.",
+    "updated": "Sequence updated."
+  },
+  "modal": {
+    "createTitle": "Add numbering sequence",
+    "editTitle": "Numbering sequence",
+    "readOnly": "You can view this sequence but not change it."
+  },
+  "fields": {
+    "code": "Sequence code",
+    "codeHint": "Letters A-Z, digits and . _ : -, up to 64, starting with a letter or digit. Other modules find the sequence by this code. Can't be changed later.",
+    "company": "Company",
+    "companyHint": "Applies to one company or to the whole workspace. Can't be changed after saving.",
+    "prefix": "Prefix",
+    "prefixHint": "Optional. Up to 16 letters, digits or . _ : / # - with no spaces. Shown before the number.",
+    "padding": "Digits",
+    "paddingHint": "Minimum digits in the number, from 1 to 12. Longer numbers are not cut.",
+    "startValue": "Starting number",
+    "startValueHint": "First number this sequence issues. A whole number from 1 to 9007199254740991.",
+    "nextValue": "Next number",
+    "nextValueHint": "The next number to issue. It can only be raised, never lowered. Current value: {{current}}.",
+    "allWorkspace": "All workspace"
+  },
+  "preview": {
+    "title": "Next number preview",
+    "saved": "Saved value",
+    "draft": "Draft preview",
+    "incomplete": "Complete the prefix, digits and number to see the preview.",
+    "nonConsuming": "Previewing does not use up a number.",
+    "counterNote": "Changing the prefix or digits affects only numbers issued from now on.",
+    "notFound": "This sequence no longer exists.",
+    "failed": "The saved value could not be loaded."
+  },
+  "validation": {
+    "codeFormat": "Use A-Z, digits and . _ : - only, starting with a letter or digit, up to 64.",
+    "codeRequired": "Enter a code.",
+    "prefixFormat": "Use up to 16 letters, digits or . _ : / # - with no spaces.",
+    "paddingRange": "Enter a whole number from 1 to 12.",
+    "counterFormat": "Enter a whole number from 1 to 9007199254740991.",
+    "counterLower": "The next number can't be lower than the current value ({{current}}).",
+    "companyRequired": "Choose a company."
+  },
+  "discard": {
+    "title": "Discard changes?",
+    "text": "Your edits to this sequence will be lost.",
+    "confirm": "Discard"
+  },
+  "errors": {
+    "SEQUENCE_NOT_FOUND": "This sequence no longer exists.",
+    "SEQUENCE_CODE_TAKEN": "This code is already used in that scope.",
+    "SEQUENCE_VALUE_INVALID": "The next number can't be lower than the number already issued. Reload and try again.",
+    "COMPANY_INVALID": "Choose an active company.",
+    "COMPANY_PERMISSION_DENIED": "You don't have permission to manage numbering for this company.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Only workspace-wide administrators can manage workspace-wide sequences.",
+    "MISSING_REQUIRED_PERMISSIONS": "You don't have permission to do this.",
+    "CORE_VALIDATION_FAILED": "Check the values and try again.",
+    "IDEM_MISSING": "The request could not be sent safely. Try again.",
+    "generic": "Something went wrong. Try again in a moment.",
+    "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "Your permissions could not be checked right now. Try again in a moment."
+  }
+}

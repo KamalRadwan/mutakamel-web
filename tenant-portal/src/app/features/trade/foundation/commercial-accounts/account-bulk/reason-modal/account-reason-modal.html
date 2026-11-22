@@ -1,0 +1,61 @@
+<ui-modal
+  size="form"
+  [icon]="action() === 'BLOCK' ? 'tablerLock' : 'tablerLockOpen'"
+  [tile]="action() === 'BLOCK' ? 'bg-icon-red' : 'bg-icon-green'"
+  [title]="(action() === 'BLOCK' ? 'accountsBulk.block.title' : 'accountsBulk.unblock.title') | transloco: { count: displayCount() }"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  @if (isOpen()) {
+    <form class="flex flex-col gap-10" (submit)="$event.preventDefault(); submit()">
+      <app-trade-reason-picker
+        #reasonPicker
+        [kind]="reasonKind()"
+        [(value)]="reasonValue"
+        [idPrefix]="uid + '-reason'"
+        [disabled]="submitting()"
+        [showErrors]="showErrors()"
+      />
+
+      @if (action() === 'BLOCK') {
+        <ui-field
+          [label]="'accountsBulk.evidence.label' | transloco"
+          [for]="uid + '-evidence'"
+          [hint]="'accountsBulk.evidence.hint' | transloco"
+          [count]="evidenceLength()"
+          [max]="maxEvidenceLength"
+          [error]="evidenceError()"
+        >
+          <input
+            [id]="uid + '-evidence'"
+            type="text"
+            dir="auto"
+            [attr.maxlength]="maxEvidenceLength"
+            [value]="evidenceRef()"
+            [disabled]="submitting()"
+            [attr.aria-invalid]="evidenceError() ? 'true' : null"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+            (input)="onEvidenceInput($event)"
+          />
+        </ui-field>
+      }
+    </form>
+  }
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="!canSubmit()"
+      (click)="submit()"
+    >
+      {{ 'accountsBulk.run' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

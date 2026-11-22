@@ -1,0 +1,91 @@
+{
+  "leadsCount": "{{n}} leads",
+  "assign": {
+    "title": "Assign to",
+    "owner": "New owner",
+    "ownerHint": "The salesperson who will own these leads. Only people who can own leads in this branch are listed.",
+    "noOwners": "No one can be assigned here.",
+    "noMatch": "No matching people.",
+    "skipConverted": "Skip converted leads",
+    "skipConvertedHint": "Converted leads can't be reassigned in bulk.",
+    "preview": "{{change}} leads will move to {{owner}} · {{same}} already belong to them · {{conv}} converted will be skipped",
+    "go": "Assign {{n}} leads",
+    "running": "Assigning leads"
+  },
+  "stage": {
+    "title": "Change stage",
+    "stage": "Stage",
+    "stageHint": "The stage every selected lead moves to. Converted can't be chosen here.",
+    "reason": "Disqualification reason",
+    "reasonHint": "One reason is applied to every lead.",
+    "convertedNote": "Converted leads are skipped: convert leads one by one.",
+    "preview": "{{move}} leads will move to {{stage}} · {{same}} already there · {{conv}} converted skipped",
+    "go": "Move {{n}} leads",
+    "running": "Moving leads"
+  },
+  "delete": {
+    "title": "Delete leads",
+    "text": "Delete {{n}} leads? This can't be undone.",
+    "converted": "{{c}} of them are converted; their customer profiles stay.",
+    "reason": "Reason",
+    "reasonHint": "Optional. Saved in the history of each lead.",
+    "typeHint": "This protects against deleting many leads by mistake.",
+    "go": "Delete {{n}} leads",
+    "running": "Deleting leads"
+  },
+  "toast": {
+    "assigned": "{{count}} leads assigned.",
+    "moved": "{{count}} leads moved.",
+    "deleted": "{{count}} leads deleted."
+  },
+  "job": {
+    "ASSIGN": "Assign to {{ownerName}}",
+    "MOVE_STAGE": "Move to {{stageName}}",
+    "CREATE_ACTIVITY": "Batch activity: {{subject}}",
+    "DELETE": "Delete leads",
+    "updated": "{{n}} leads updated.",
+    "moved": "{{n}} leads moved.",
+    "created": "{{n}} activities created.",
+    "deleted": "{{n}} leads deleted.",
+    "firstLast": "First at {{first}} · last at {{last}}",
+    "unavailable": "{{n}} failed leads are no longer available.",
+    "busy": "A batch update is already running."
+  },
+  "run": {
+    "progress": "{{done}} of {{total}}",
+    "batch": "Batch {{i}} of {{n}}",
+    "cancel": "Stop",
+    "cancelConfirm": "Stop after the current batch? Leads already changed stay changed.",
+    "stoppedEarly": "Stopped early",
+    "retry": "Retry failed",
+    "selectFailed": "Select failed leads",
+    "close": "Close",
+    "partial": "{{ok}} done, {{failed}} failed."
+  },
+  "status": {
+    "UPDATED": "Updated",
+    "UNCHANGED": "Unchanged",
+    "DELETED": "Deleted",
+    "CREATED": "Created",
+    "SKIPPED": "Skipped",
+    "FAILED": "Failed"
+  },
+  "skip": {
+    "CONVERTED": "Converted lead",
+    "NO_OWNER": "No owner",
+    "NOT_ALLOWED": "Outside your permissions"
+  },
+  "codes": {
+    "LEAD_NOT_FOUND": "Not found or outside your access",
+    "LEAD_ALREADY_CONVERTED": "Already converted",
+    "LEAD_OPEN_EXISTS": "Another open lead exists for this contact in this branch",
+    "LEAD_CONVERSION_REQUIRED": "Use Convert for the converted stage",
+    "CRM_REASON_REQUIRED": "A disqualification reason is required",
+    "CRM_SCOPED_PERMISSION_DENIED": "This owner can't be assigned here",
+    "BRANCH_SCOPE_MISMATCH": "These leads are outside the current branch. Refresh the list and try again.",
+    "LEAD_SELECTION_TOO_LARGE": "Too many leads selected. Narrow the search to 10,000 or fewer.",
+    "LEAD_BULK_START_IN_PAST": "Choose a time in the future.",
+    "CRM_LEADS_DISABLED": "Leads are turned off for this company",
+    "generic": "Couldn't be changed"
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "summary": {
+    "on": "الهاتف مفعّل · {{servers}} خوادم · مقاعد الهاتف {{occupied}} من {{allowed}}",
+    "off": "الهاتف متوقف حتى يُفعَّل خادم"
+  },
+  "toolbar": {
+    "add": "إضافة خادم",
+    "limitHint": "حتى 10 خوادم",
+    "reload": "إعادة التحميل"
+  },
+  "table": {
+    "ariaLabel": "خوادم الهاتف",
+    "dragHandle": "إعادة الترتيب",
+    "order": "الترتيب",
+    "name": "الاسم",
+    "address": "العنوان",
+    "protocol": "البروتوكول",
+    "ice": "ICE",
+    "enabled": "مفعّل",
+    "enabledFor": "تفعيل {{name}}",
+    "enabledHint": "عند التفعيل يمكن لهواتف المستخدمين التسجيل وإجراء المكالمات عبر هذا الخادم.",
+    "actions": "الإجراءات",
+    "secure": "آمن",
+    "notSecure": "غير آمن",
+    "iceOff": "متوقف",
+    "hint": "يحاول الهاتف الخوادم بهذا الترتيب، وينتقل إلى التالي إن لم يستجب الخادم."
+  },
+  "actions": {
+    "open": "فتح",
+    "moveUp": "نقل إلى الأعلى",
+    "moveDown": "نقل إلى الأسفل",
+    "delete": "حذف"
+  },
+  "placeholder": {
+    "name": "خادم جديد"
+  },
+  "states": {
+    "emptyTitle": "لا توجد خوادم هاتف بعد",
+    "emptyLine": "أضف خادم SIP لتشغيل هاتف الويب في مساحة العمل.",
+    "loadFailed": "تعذّر تحميل خوادم الهاتف.",
+    "retry": "إعادة المحاولة",
+    "notPurchasedTitle": "الهاتف ليس ضمن اشتراكك",
+    "notPurchasedLine": "فعّل إضافة الهاتف في اشتراكك لتهيئة خوادم SIP.",
+    "viewPlans": "عرض الخطط",
+    "provisioningTitle": "يجري إعداد الهاتف لمساحة العمل",
+    "provisioningLine": "لا يزال إعداد خدمة الهاتف جارياً. حاول مرة أخرى بعد قليل."
+  },
+  "delete": {
+    "title": "حذف {{name}}؟",
+    "text": "يفقد المستخدمون الذين لديهم هذا الخادم في قائمتهم هذا الخادم، وتستخدم هواتفهم الخادم التالي.",
+    "confirm": "حذف",
+    "cancel": "إلغاء"
+  },
+  "modal": {
+    "tabsLabel": "إعدادات الخادم",
+    "tabs": {
+      "connection": "الاتصال",
+      "advanced": "متقدم",
+      "ice": "ICE"
+    },
+    "groups": {
+      "identity": "هوية SIP والتوجيه",
+      "registration": "التسجيل",
+      "failover": "افتراضيات التحويل التلقائي",
+      "diagnostics": "التشخيص"
+    },
+    "fields": {
+      "name": "الاسم",
+      "nameHint": "تسمية قصيرة يسهل على المستخدمين والمسؤولين التعرّف عليها.",
+      "protocol": "البروتوكول",
+      "protocolHint": "يغيّر بادئة عنوان WebSocket بين الآمن wss وغير المشفر ws.",
+      "protocolWss": "آمن (wss)",
+      "protocolWs": "غير آمن (ws)",
+      "websocketUrl": "عنوان WebSocket",
+      "websocketUrlHint": "العنوان الذي يتصل به المتصفح، مثل wss://pbx.example.com:8089/ws.",
+      "sipDomain": "نطاق SIP",
+      "sipDomainHint": "النطاق الذي يسجّل المستخدمون تحته، مثل pbx.example.com.",
+      "enabled": "مفعّل",
+      "disabled": "معطّل",
+      "enabledHint": "عند التفعيل يمكن لهواتف المستخدمين التسجيل وإجراء المكالمات عبر هذا الخادم.",
+      "realm": "نطاق المصادقة (Realm)",
+      "realmHint": "نطاق مصادقة SIP؛ اتركه فارغاً لاستخدام نطاق SIP.",
+      "fromDomain": "نطاق المرسل (From)",
+      "fromDomainHint": "النطاق المرسل في ترويسة From؛ اتركه فارغاً لاستخدام نطاق SIP.",
+      "registrarServer": "خادم التسجيل",
+      "registrarServerHint": "عنوان sip: المستخدم لطلبات REGISTER إذا اختلف عن النطاق.",
+      "outboundProxy": "الوكيل الصادر",
+      "outboundProxyHint": "عنوان sip: للوكيل الصادر الذي تمرّ عبره رسائل SIP.",
+      "contactUri": "عنوان الاتصال (Contact URI)",
+      "contactUriHint": "عنوان SIP صريح إذا كان خادم البدالة يتطلب عنوان اتصال ثابتاً.",
+      "defaultCallerId": "رقم المتصل الافتراضي",
+      "defaultCallerIdHint": "الرقم الصادر الاحتياطي عندما لا يكون للمستخدم رقم محدد.",
+      "registerExpires": "مهلة التسجيل",
+      "registerExpiresHint": "الفاصل الزمني لتجديد تسجيل الهاتف بالثواني (من 30 إلى 86400).",
+      "sessionTimers": "مؤقتات الجلسة",
+      "sessionTimersHint": "تحافظ على استمرار المكالمات النشطة وتكتشف انقطاعها عبر مؤقتات SIP.",
+      "defaultTimeoutSeconds": "المدة لكل خادم",
+      "defaultTimeoutSecondsHint": "عدد الثواني قبل الانتقال إلى الخادم التالي (من 3 إلى 120؛ الفراغ يعني 10).",
+      "defaultMaxRetries": "المحاولات لكل خادم",
+      "defaultMaxRetriesHint": "عدد محاولات إعادة الاتصال بالخادم قبل الانتقال إلى التالي (من 0 إلى 10؛ الفراغ يعني 2).",
+      "traceSip": "تتبّع SIP في وحدة التحكم",
+      "traceSipHint": "يطبع رسائل SIP في وحدة تحكم المتصفح للمساعدة في تتبّع الأعطال.",
+      "allowInvalidTlsCertificate": "السماح بشهادة TLS غير صالحة",
+      "allowInvalidTlsCertificateHint": "يُشير إلى الشهادات الموقّعة ذاتياً؛ يظل المتصفح يشترط شهادة موثوقة لاتصالات wss://.",
+      "iceEnabled": "استخدام خوادم ICE",
+      "iceEnabledHint": "يفعّل خوادم STUN وTURN لاجتياز جدران الحماية عند تهيئة الصوت.",
+      "iceTransportPolicy": "نقل ICE",
+      "iceTransportPolicyHint": "يمرّر خيار «الترحيل فقط» جميع الوسائط عبر خادم TURN.",
+      "iceAll": "الكل",
+      "iceRelay": "الترحيل فقط"
+    },
+    "ice": {
+      "empty": "لم تُضف خوادم ICE بعد.",
+      "add": "إضافة خادم ICE",
+      "kind": "النوع",
+      "kindHint": "اختر STUN لاكتشاف العنوان أو TURN لترحيل الوسائط.",
+      "stun": "STUN",
+      "turn": "TURN",
+      "enabled": "مفعّل",
+      "enabledHint": "تضمين هذا الخادم عند إنشاء مسار وسائط المكالمة.",
+      "remove": "إزالة",
+      "urls": "العناوين",
+      "urlsHint": "أدخل عنوان STUN أو TURN واحداً في كل سطر يبدأ بـ stun: أو stuns: أو turn: أو turns:.",
+      "username": "اسم المستخدم",
+      "usernameHint": "اسم مستخدم حساب TURN المقترن ببيان الاعتماد.",
+      "credential": "بيان الاعتماد",
+      "credentialHint": "يُحفظ للكتابة فقط على الخادم؛ اتركه فارغاً للإبقاء على القيمة الحالية.",
+      "set": "محفوظ",
+      "notSet": "غير محفوظ",
+      "change": "تغيير",
+      "clear": "مسح",
+      "keepCurrent": "إبقاء الحالي",
+      "show": "إظهار بيان الاعتماد",
+      "hide": "إخفاء بيان الاعتماد"
+    },
+    "footer": {
+      "save": "حفظ",
+      "undo": "تراجع عن التغييرات",
+      "unsaved": "تغييرات غير محفوظة",
+      "cancel": "إلغاء",
+      "close": "إغلاق",
+      "delete": "حذف"
+    },
+    "discard": {
+      "title": "تجاهل التغييرات غير المحفوظة؟",
+      "text": "لديك تغييرات غير محفوظة على خادم الهاتف هذا. هل تريد تجاهلها؟",
+      "confirm": "تجاهل",
+      "cancel": "متابعة التعديل"
+    },
+    "conflict": {
+      "title": "تغيّرت إعدادات الخادم",
+      "text": "حدّث شخص آخر هذا الخادم أثناء تعديلك. أعد تحميل أحدث نسخة أو احتفظ بتغييراتك.",
+      "reload": "إعادة التحميل",
+      "keepMine": "الاحتفاظ بتغييراتي"
+    }
+  },
+  "validation": {
+    "nameRequired": "اسم الخادم مطلوب",
+    "nameMax": "حتى {{max}} حرفاً",
+    "websocketUrlRequired": "عنوان WebSocket مطلوب",
+    "websocketUrlPattern": "يجب أن يبدأ بـ ws:// أو wss://",
+    "sipDomainRequired": "نطاق SIP مطلوب",
+    "sipDomainPattern": "أدخل نطاقاً صالحاً (حروف وأرقام ونقاط و:منفذ اختياري)",
+    "sipUriPattern": "يجب أن يبدأ بـ sip: أو sips:",
+    "contactUriPattern": "لا يجوز أن يحتوي على مسافات",
+    "callerIdPattern": "أرقام وعلامة + في البداية فقط",
+    "registerExpiresRange": "يجب أن يكون عدداً صحيحاً من 30 إلى 86400",
+    "timeoutRange": "يجب أن يكون عدداً صحيحاً من 3 إلى 120",
+    "retriesRange": "يجب أن يكون عدداً صحيحاً من 0 إلى 10",
+    "iceUrlsRequired": "أدخل عنوان ICE واحداً على الأقل",
+    "iceUrlsPattern": "يجب أن يبدأ كل سطر بـ stun: أو stuns: أو turn: أو turns:",
+    "turnUsernameRequired": "اسم المستخدم مطلوب عند تعيين بيان الاعتماد",
+    "turnCredentialRequired": "بيان الاعتماد مطلوب عند تعيين اسم المستخدم",
+    "stunNoAuth": "لا يقبل خادم STUN اسم مستخدم أو بيان اعتماد",
+    "relayWithoutTurn": "يتطلب «الترحيل فقط» خادم TURN واحداً مفعّلاً على الأقل."
+  },
+  "toasts": {
+    "saved": "حُفظ خادم الهاتف",
+    "deleted": "حُذف خادم الهاتف",
+    "reordered": "حُدّث ترتيب الخوادم",
+    "enabled": "فُعّل الخادم",
+    "disabled": "عُطّل الخادم",
+    "iceEnabled": "فُعّلت خوادم ICE",
+    "iceDisabled": "عُطّلت خوادم ICE"
+  },
+  "errors": {
+    "WEBPHONE_SERVER_NOT_FOUND": "لم يعد خادم الهاتف هذا موجوداً. أعد تحميل القائمة.",
+    "WEBPHONE_SERVER_LIMIT_REACHED": "يمكنك تهيئة ما يصل إلى 10 خوادم هاتف.",
+    "WEBPHONE_SERVER_ORDER_INVALID": "تعذّر تحديث ترتيب الخوادم. أعد التحميل وحاول مرة أخرى.",
+    "WEBPHONE_RELAY_WITHOUT_TURN": "يتطلب «الترحيل فقط» خادم TURN واحداً مفعّلاً على الأقل.",
+    "WEBPHONE_ICE_SERVER_NOT_FOUND": "لم يعد أحد إدخالات ICE موجوداً. أعد التحميل وحاول مرة أخرى.",
+    "WEBPHONE_MODULE_NOT_PURCHASED": "الهاتف ليس ضمن اشتراكك.",
+    "WEBPHONE_MODULE_INACTIVE": "اشتراك الهاتف معلّق، والتعديلات متوقفة.",
+    "WEBPHONE_PROVISIONING_PENDING": "لا يزال إعداد الهاتف قيد التنفيذ لمساحة العمل.",
+    "stillProcessing": "لا يزال تغييرك السابق قيد المعالجة. انتظر قليلًا، ثم حاول مرة أخرى.",
+    "generic": "حدث خطأ. حاول مرة أخرى."
+  }
+}

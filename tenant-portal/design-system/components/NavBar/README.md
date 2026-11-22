@@ -1,0 +1,1 @@
+Primary navigation in two levels: a 40px gradient bar for sections and a 32px bar for the pages of the active section. Active section is a glass pill; active page is a filled brand button (`bg-brand text-on-brand`). You provide the sections, the pages, and the app switcher, and the end slot (search, scope switcher, notification bell, avatar).

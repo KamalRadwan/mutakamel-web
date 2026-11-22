@@ -1,0 +1,129 @@
+<ui-modal
+  #pagesModal
+  size="form"
+  icon="tablerFiles"
+  tile="bg-icon-blue"
+  [title]="'tplFields.pages.title' | transloco"
+  [closeLabel]="'tplFields.pages.close' | transloco"
+>
+  <div class="flex flex-col gap-10">
+    <div class="flex max-h-tpl-list flex-col gap-6 overflow-y-auto scrollbar-thin">
+      @for (page of pages(); track page.id; let pIdx = $index) {
+        @let active = state.pageIndex() === pIdx;
+        <div
+          class="flex items-start gap-8 rounded-10 border px-8 py-6 transition-colors duration-fast"
+          [class]="active ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+          (click)="selectPage(pIdx)"
+          (focusin)="selectPage(pIdx)"
+        >
+          <span class="mt-16 inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+            {{ 'tplFields.pages.pageNumber' | transloco: { n: pIdx + 1 } }}
+          </span>
+
+          <ui-field
+            class="min-w-0 flex-1"
+            [for]="'tpl-page-name-' + page.id"
+            [label]="'tplFields.pages.nameLabel' | transloco"
+            [hint]="'tplFields.pages.nameHint' | transloco"
+            [required]="true"
+            [count]="pageNameLength(pIdx)"
+            [max]="100"
+            [error]="pageNameError(pIdx)"
+          >
+            <input
+              #nameInput
+              [id]="'tpl-page-name-' + page.id"
+              type="text"
+              class="min-w-0 flex-1 bg-transparent text-text outline-none"
+              [formField]="pagesForm.names[pIdx]"
+              (click)="$event.stopPropagation(); selectPage(pIdx)"
+              (blur)="commitRename(pIdx)"
+              (keydown.enter)="$event.preventDefault(); nameInput.blur()"
+            />
+          </ui-field>
+
+          <span class="mt-16 shrink-0 whitespace-nowrap text-11 leading-16 text-text-muted">
+            {{ paperSummary(page.page) }}
+          </span>
+
+          @if (!state.readOnly()) {
+            <div class="mt-16 flex shrink-0 items-center gap-4">
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [disabled]="pIdx === 0"
+                [title]="'tplFields.pages.moveUp' | transloco"
+                [attr.aria-label]="'tplFields.pages.moveUp' | transloco"
+                (click)="movePage($event, pIdx, -1)"
+              >
+                <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [disabled]="pIdx === pages().length - 1"
+                [title]="'tplFields.pages.moveDown' | transloco"
+                [attr.aria-label]="'tplFields.pages.moveDown' | transloco"
+                (click)="movePage($event, pIdx, 1)"
+              >
+                <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [disabled]="atMaxPages()"
+                [title]="(atMaxPages() ? 'tplFields.pages.maxPages' : 'tplFields.pages.duplicate') | transloco"
+                [attr.aria-label]="'tplFields.pages.duplicate' | transloco"
+                (click)="duplicatePage($event, pIdx)"
+              >
+                <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-danger-text outline-none hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [disabled]="pages().length <= 1"
+                [title]="'tplFields.pages.delete' | transloco"
+                [attr.aria-label]="'tplFields.pages.delete' | transloco"
+                (click)="deletePage($event, pIdx)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    @if (!state.readOnly()) {
+      <div class="flex items-center gap-8">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="atMaxPages()"
+          [title]="atMaxPages() ? ('tplFields.pages.maxPages' | transloco) : null"
+          (click)="addPage()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          <span>{{ 'tplFields.pages.addPage' | transloco }}</span>
+        </button>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'tplFields.pages.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #confirmDelete
+  tone="danger"
+  [title]="'tplFields.pages.deleteTitle' | transloco"
+  [text]="deleteDialogText()"
+  [confirmLabel]="'tplFields.pages.deleteConfirm' | transloco"
+  [cancelLabel]="'tplFields.pages.cancel' | transloco"
+/>

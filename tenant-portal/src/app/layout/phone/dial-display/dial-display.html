@@ -1,0 +1,88 @@
+<div
+  class="relative flex shrink-0 items-center rounded-10 border border-border bg-surface-muted ps-10 pe-4 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  [class]="inCall() ? 'h-table-row gap-4' : 'h-table-head gap-2'"
+>
+  <input
+    id="phone-dial-input"
+    type="text"
+    inputmode="tel"
+    dir="ltr"
+    [class]="
+      inCall()
+        ? 'sr-only'
+        : 'min-w-0 flex-1 bg-transparent text-start text-16 leading-22 font-medium text-text tabular-nums outline-none placeholder:text-12 placeholder:font-normal placeholder:text-text-placeholder'
+    "
+    [attr.aria-label]="'webPhone.dialer.phoneNumber' | transloco"
+    [placeholder]="'webPhone.dialer.enterNumber' | transloco"
+    [value]="displayNumber()"
+    [readOnly]="inCall()"
+    (input)="onInput($event)"
+    (keydown)="onDialInputKeydown($event)"
+  />
+
+  @if (inCall()) {
+    <div class="min-w-0 flex-1">
+      @if (callName(); as name) {
+        <p class="truncate text-13 leading-16 font-medium text-text" [title]="name">{{ name }}</p>
+        <p class="truncate text-11 leading-16 text-text-muted tabular-nums">
+          <bdi dir="ltr">{{ displayNumber() }}</bdi>
+        </p>
+      } @else {
+        <p class="truncate text-13 leading-16 font-medium text-text tabular-nums">
+          <bdi dir="ltr">{{ displayNumber() }}</bdi>
+        </p>
+      }
+    </div>
+
+    @if (callSource(); as source) {
+      <a
+        [routerLink]="sourceRoute(source)"
+        class="inline-flex h-badge max-w-preset shrink-0 items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [title]="source.label"
+      >
+        <ng-icon [name]="sourceIcon(source.type)" size="12" class="shrink-0" aria-hidden="true" />
+        <span class="truncate">{{ ('webPhone.source.' + source.type) | transloco }}</span>
+      </a>
+    }
+  } @else {
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="!phone.dialValue()"
+      [attr.aria-label]="'webPhone.dialer.deleteDigit' | transloco"
+      [title]="'webPhone.dialer.deleteDigit' | transloco"
+      (click)="phone.deleteKey()"
+    >
+      <ng-icon name="tablerBackspace" size="15" aria-hidden="true" />
+    </button>
+  }
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="!displayNumber()"
+    [attr.aria-label]="'webPhone.dialer.copyNumber' | transloco"
+    [title]="'webPhone.dialer.copyNumber' | transloco"
+    (click)="phone.copyNumber()"
+  >
+    <ng-icon name="tablerCopy" size="15" aria-hidden="true" />
+  </button>
+</div>
+
+@if (!inCall() && phone.dialSource(); as source) {
+  <div class="flex shrink-0 items-center">
+    <span class="inline-flex h-badge max-w-full items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+      <ng-icon [name]="sourceIcon(source.type)" size="14" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ ('webPhone.source.' + source.type) | transloco }} · {{ source.label }}</span>
+      <button
+        type="button"
+        class="inline-flex cursor-pointer items-center justify-center rounded-4 text-on-brand-soft outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'webPhone.dialer.clearSource' | transloco"
+        [title]="'webPhone.dialer.clearSource' | transloco"
+        (click)="phone.dialSource.set(null)"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    </span>
+  </div>
+}

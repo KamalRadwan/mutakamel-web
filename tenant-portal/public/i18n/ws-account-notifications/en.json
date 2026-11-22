@@ -1,0 +1,60 @@
+{
+  "loadFailed": "Could not load your notification settings.",
+  "retry": "Retry",
+  "groups": {
+    "activities": {
+      "title": "Activities",
+      "desc": "Tasks, calls and meetings that involve you."
+    },
+    "crm": {
+      "title": "CRM",
+      "desc": "Leads given to you."
+    },
+    "records": {
+      "title": "Records",
+      "desc": "Changes to records you own."
+    }
+  },
+  "types": {
+    "core_activity_assigned": {
+      "title": "An activity is assigned to me",
+      "desc": "When someone gives you a task, call or meeting."
+    },
+    "core_activity_reminder": {
+      "title": "Activity reminders",
+      "desc": "Before an activity is due, at the reminder time you set."
+    },
+    "core_activity_updated": {
+      "title": "An activity changes",
+      "desc": "When the time, details or owner of your activity change."
+    },
+    "core_activity_completed": {
+      "title": "An activity is completed",
+      "desc": "When an activity you follow is marked done."
+    },
+    "core_activity_cancelled": {
+      "title": "An activity is cancelled",
+      "desc": "When an activity you follow is cancelled."
+    },
+    "crm_lead_assigned": {
+      "title": "A lead is assigned to me",
+      "desc": "When a lead becomes yours, by hand or by a rule."
+    },
+    "record_owner_changed": {
+      "title": "A record's owner changes",
+      "desc": "When a record you own is given to someone else, or given to you."
+    },
+    "record_deleted": {
+      "title": "A record is deleted",
+      "desc": "When a record you own is deleted."
+    }
+  },
+  "footer": "Notifications appear in the bell at the top of the screen. Email notifications are not available yet.",
+  "toast": {
+    "saved": "Notification setting saved"
+  },
+  "errors": {
+    "generic": "Could not save the setting. Try again.",
+    "NOTIFICATION_TYPE_UNKNOWN": "This notification type is no longer available."
+  }
+}

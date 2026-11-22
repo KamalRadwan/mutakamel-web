@@ -1,0 +1,151 @@
+{
+  "toolbar": {
+    "searchPlaceholder": "Search by file name",
+    "clearSearch": "Clear search",
+    "viewSwitcher": "View mode",
+    "views": {
+      "cards": "Cards",
+      "table": "Table"
+    },
+    "filters": {
+      "typeLabel": "Type",
+      "typeAll": "All types",
+      "deliveryLabel": "Delivery",
+      "deliveryAll": "All delivery",
+      "statusLabel": "Status",
+      "statusAll": "All statuses",
+      "scopeLabel": "Scope",
+      "scopeAll": "All scopes",
+      "templateLabel": "Template",
+      "templateAll": "Select template",
+      "sortLabel": "Sort"
+    }
+  },
+  "scopes": {
+    "ALL_AUTHORIZED": "All scopes",
+    "REUSABLE": "Reusable",
+    "DEFINITION": "Template",
+    "reusableBadge": "Reusable"
+  },
+  "types": {
+    "IMAGE": "Image",
+    "LOGO": "Logo",
+    "BACKGROUND": "Background"
+  },
+  "delivery": {
+    "PRIVATE_ONLY": "Private",
+    "EMAIL_PUBLIC": "Email-public"
+  },
+  "emailRendition": {
+    "READY": "Ready",
+    "NOT_REQUESTED": "Not requested"
+  },
+  "sort": {
+    "createdAt:desc": "Newest first",
+    "createdAt:asc": "Oldest first",
+    "fileName:asc": "File name (A–Z)",
+    "fileName:desc": "File name (Z–A)"
+  },
+  "table": {
+    "asset": "Asset",
+    "scope": "Scope",
+    "type": "Type",
+    "delivery": "Delivery",
+    "specs": "Format & size",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "actions": {
+    "open": "Open",
+    "retire": "Retire",
+    "alreadyRetiredReason": "This asset is already retired."
+  },
+  "uploadModal": {
+    "title": "Upload asset",
+    "scopeLabel": "Scope",
+    "scopeHint": "Choose whether this asset can be reused across templates or belongs to one template.",
+    "templateLabel": "Template",
+    "templateHint": "Select the template that owns this asset.",
+    "templatePlaceholder": "Select a template",
+    "typeLabel": "Asset type",
+    "typeHint": "Classify the asset as a logo, image or page background.",
+    "deliveryLabel": "Delivery class",
+    "deliveryHint": "Private assets require sign-in; email-public assets publish a public rendition for emails.",
+    "deliveryPlaceholder": "Select delivery class",
+    "confirmPublicLabel": "Public email delivery",
+    "confirmPublicHint": "Email clients load images without workspace sign-in, so a public rendition will be hosted.",
+    "confirmPublicText": "I confirm this asset may be served publicly in outbound emails.",
+    "fileLabel": "Image file",
+    "fileHint": "Choose a PNG or JPEG image up to 5 MB. The browser computes its SHA-256 checksum.",
+    "dropTitle": "Drop an image here",
+    "dropHint": "PNG or JPEG, up to 5 MB",
+    "browse": "Browse",
+    "removeFile": "Remove file",
+    "hashing": "Computing SHA-256...",
+    "sha256Label": "SHA-256"
+  },
+  "detailModal": {
+    "title": "Asset details",
+    "fileNameLabel": "File name",
+    "fileNameHint": "Original file name recorded when this asset was uploaded.",
+    "scopeLabel": "Scope",
+    "scopeHint": "Whether this asset is reusable across templates or belongs to a specific template.",
+    "typeLabel": "Asset type",
+    "typeHint": "Asset role shown when inserting images in the template designer.",
+    "formatLabel": "Stored format",
+    "formatHint": "Normalized image format stored by the server (PNG or JPEG).",
+    "dimensionsLabel": "Dimensions",
+    "dimensionsHint": "Width and height of the stored image in pixels.",
+    "sizeLabel": "File size",
+    "sizeHint": "Size of the stored image file.",
+    "deliveryLabel": "Delivery class",
+    "deliveryHint": "Access rule for rendering this asset in print or outbound email templates.",
+    "emailRenditionLabel": "Email rendition",
+    "emailRenditionHint": "Status of the public rendition served in outbound email previews and messages.",
+    "updatedLabel": "Last updated",
+    "updatedHint": "Date when this asset was created or last modified.",
+    "checksumLabel": "SHA-256 checksum",
+    "checksumHint": "Cryptographic SHA-256 digest of the stored asset.",
+    "previewUnavailable": "Preview unavailable for retired asset"
+  },
+  "retireConfirm": {
+    "title": "Retire asset?",
+    "text": "{{name}} will be retired and can no longer be added to drafts."
+  },
+  "discardConfirm": {
+    "title": "Discard upload?",
+    "text": "Your selected file and settings have not been uploaded.",
+    "confirm": "Discard"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "confirmPublicRequired": "Confirm public email delivery before uploading.",
+    "fileRequired": "Select an image file to upload.",
+    "fileType": "Only PNG and JPEG images are supported.",
+    "fileSize": "File size must not exceed 5 MB."
+  },
+  "toasts": {
+    "uploaded": "Asset uploaded",
+    "retired": "Asset retired"
+  },
+  "states": {
+    "emptyFiltered": {
+      "title": "No assets match these filters",
+      "description": "Change or clear your filters to see assets."
+    },
+    "loadFailed": {
+      "title": "Could not load assets",
+      "description": "An unexpected error occurred while loading template assets."
+    },
+    "backToHome": "Back to home"
+  },
+  "errors": {
+    "CORE.TEMPLATE.ASSET.IN_USE": "This asset is used by a published version and cannot be retired.",
+    "CORE.TEMPLATE.ASSET.UPLOAD_INVALID": "The uploaded asset request is invalid.",
+    "CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED": "Public email delivery must be confirmed for email-public assets.",
+    "CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH": "The file checksum did not match. Select the file and try again.",
+    "CORE.TEMPLATE.ASSET.INVALID": "The image file could not be processed.",
+    "CORE.TEMPLATE.ASSET.STORAGE_UNAVAILABLE": "Asset storage is temporarily unavailable."
+  }
+}

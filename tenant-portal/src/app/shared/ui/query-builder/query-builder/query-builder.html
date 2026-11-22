@@ -1,0 +1,175 @@
+@if (!expanded()) {
+  <ui-query-summary-bar
+    [id]="panelId()"
+    [title]="resolvedTitle()"
+    [count]="appliedSummary().count"
+    [groups]="appliedSummary().groups"
+    [summaryText]="appliedSummary().text"
+    [dirty]="dirty()"
+    [disabled]="disabled()"
+    (expand)="expanded.set(true)"
+    (clear)="onClearAll()"
+    (apply)="onApply()"
+  />
+} @else {
+  <div [id]="panelId()" class="flex max-h-query-builder flex-col rounded-10 border border-border bg-surface shadow-card">
+    <header class="flex h-table-head shrink-0 items-center gap-8 border-b border-border px-10">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerFilterCog" size="14" aria-hidden="true" />
+      </span>
+
+      <span class="text-13 leading-18 font-medium text-text">{{ resolvedTitle() }}</span>
+
+      <span
+        class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft tabular-nums"
+      >
+        @if (draftSummary().count > 0) {
+          {{ 'qb.count' | transloco: { n: draftSummary().count, g: draftSummary().groups } }}
+        } @else {
+          {{ 'qb.none' | transloco }}
+        }
+      </span>
+
+      <button
+        type="button"
+        class="ms-auto inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-expanded]="expanded()"
+        [attr.aria-controls]="panelId()"
+        [attr.aria-label]="'qb.collapse' | transloco"
+        (click)="expanded.set(false)"
+      >
+        <ng-icon name="tablerChevronUp" size="14" aria-hidden="true" />
+      </button>
+    </header>
+
+    <div class="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-10">
+      @if (rootFields().length > 0) {
+        <section
+          class="flex flex-col gap-6 rounded-8 bg-surface-muted p-8"
+          [attr.aria-label]="'qb.fixed.title' | transloco"
+        >
+          <p class="text-11 leading-16 font-medium text-text-muted">
+            {{ 'qb.fixed.title' | transloco }} · {{ 'qb.fixed.desc' | transloco }}
+          </p>
+
+          @for (cond of draft().fixed; track cond.id) {
+            <ui-query-condition
+              #fixedRow
+              [condition]="cond"
+              [fields]="rootFields()"
+              [availability]="fixedAvailability()"
+              [issues]="issues()"
+              [touched]="applyAttempted() || touchedNodes().has(cond.id)"
+              [timeZone]="timeZone()"
+              [operatorLabel]="operatorLabel()"
+              [disabled]="disabled()"
+              (conditionChange)="onFixedPatch(cond.id, $event)"
+              (remove)="onRemoveFixed(cond.id)"
+              (applyFix)="onApplyFix($event)"
+              (commit)="onApply()"
+            />
+          }
+
+          <div class="flex items-center">
+            <button
+              type="button"
+              uiButton
+              variant="ghost"
+              size="small"
+              [disabled]="!canAddFixed()"
+              [attr.title]="!canAddFixed() && !disabled() ? ('qb.limits.conditions' | transloco) : null"
+              (click)="onAddFixed()"
+            >
+              <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+              <span>{{ 'qb.fixed.add' | transloco }}</span>
+            </button>
+          </div>
+        </section>
+      }
+
+      <ui-query-group
+        #rootGroup
+        [group]="draft().root"
+        [query]="draft()"
+        [fields]="fields()"
+        [depth]="1"
+        [totalConditions]="totalConditions()"
+        [issues]="issues()"
+        [touchedNodes]="touchedNodes()"
+        [allTouched]="applyAttempted()"
+        [timeZone]="timeZone()"
+        [operatorLabel]="operatorLabel()"
+        [disabled]="disabled()"
+        (opChange)="onOpChange($event)"
+        (addConditionClick)="onAddCondition($event)"
+        (addGroupClick)="onAddGroup($event)"
+        (removeNodeClick)="onRemoveNode($event)"
+        (conditionPatch)="onConditionPatch($event)"
+        (applyFix)="onApplyFix($event)"
+        (commit)="onApply()"
+      />
+    </div>
+
+    <footer class="sticky bottom-0 flex shrink-0 flex-wrap items-center gap-8 rounded-b-10 border-t border-border bg-surface-muted px-10 py-8">
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [disabled]="disabled() || !dirty() || (applyAttempted() && !canApplyDraft())"
+        (click)="onApply()"
+      >
+        {{ 'qb.apply' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="disabled()"
+          (click)="discardDraft()"
+        >
+          {{ 'qb.discard' | transloco }}
+        </button>
+      }
+
+      @if (applyAttempted() && attentionCount() > 0) {
+        <span class="text-12 text-danger-text" role="status">
+          {{ 'qb.attention' | transloco: { n: attentionCount() } }}
+        </span>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        class="ms-auto"
+        [disabled]="disabled()"
+        (click)="onClearAll()"
+      >
+        {{ 'qb.clearAll' | transloco }}
+      </button>
+    </footer>
+  </div>
+}
+
+<ui-confirm-dialog
+  #clearDialog
+  tone="warning"
+  [title]="'qb.confirm.clearTitle' | transloco"
+  [text]="'qb.confirm.clearText' | transloco"
+  [confirmLabel]="'qb.confirm.clear' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'qb.confirm.discardTitle' | transloco"
+  [text]="'qb.confirm.discardText' | transloco"
+  [confirmLabel]="'qb.confirm.discard' | transloco"
+  [cancelLabel]="'qb.confirm.keep' | transloco"
+/>

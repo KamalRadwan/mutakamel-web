@@ -1,0 +1,187 @@
+<ui-modal
+  #modal
+  size="form"
+  [icon]="nodeKind() === 'button' ? 'tablerClick' : 'tablerLink'"
+  tile="bg-icon-blue"
+  [title]="(nodeKind() === 'button' ? 'tplEmail.button.title' : 'tplEmail.link.title') | transloco"
+  [closeLabel]="(readOnly() ? 'tplEmail.close' : 'tplEmail.cancel') | transloco"
+  [dismissable]="!busy()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+    <div class="col-span-2 min-w-0">
+      <app-tpl-text-template-input
+        [inputId]="uid + '-label'"
+        [value]="label()"
+        [maxChars]="labelMaxChars"
+        [singleLine]="true"
+        [label]="'tplEmail.label.label' | transloco"
+        [hint]="'tplEmail.label.hint' | transloco"
+        [required]="true"
+        [error]="labelError()"
+        [readOnly]="readOnly()"
+        [pickField]="pickScalarField()"
+        (valueChange)="label.set($event)"
+      />
+    </div>
+
+    <div class="col-span-2 min-w-0">
+      <ui-field
+        size="bare"
+        [for]="uid + '-source'"
+        [label]="'tplEmail.target.label' | transloco"
+        [hint]="'tplEmail.target.hint' | transloco"
+      >
+        <ui-segmented
+          [id]="uid + '-source'"
+          [label]="'tplEmail.target.label' | transloco"
+          [describedBy]="uid + '-source-hint'"
+          [options]="sourceOptions()"
+          [value]="linkSource()"
+          (valueChange)="onSourceChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2 min-w-0">
+      @if (linkSource() === 'LITERAL') {
+        <ui-field
+          [for]="uid + '-href'"
+          [label]="'tplEmail.href.label' | transloco"
+          [hint]="'tplEmail.href.hint' | transloco"
+          [required]="true"
+          [error]="hrefError()"
+        >
+          <input
+            [id]="uid + '-href'"
+            type="url"
+            dir="ltr"
+            [attr.maxlength]="hrefMaxChars"
+            placeholder="https://example.com"
+            [readonly]="readOnly()"
+            [value]="href()"
+            [attr.aria-invalid]="hrefError() ? 'true' : null"
+            class="min-w-0 flex-1 bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+            (input)="onHrefInput($event)"
+            (blur)="onHrefBlur()"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [for]="uid + '-url-field'"
+          [label]="'tplEmail.fieldUrl.label' | transloco"
+          [hint]="'tplEmail.fieldUrl.hint' | transloco"
+          [required]="true"
+          [error]="bindingError()"
+        >
+          <button
+            type="button"
+            [id]="uid + '-url-field'"
+            aria-haspopup="dialog"
+            [disabled]="!readOnly() && schemaFailed()"
+            [attr.aria-disabled]="readOnly() ? 'true' : null"
+            [attr.aria-invalid]="bindingError() ? 'true' : null"
+            [attr.aria-describedby]="uid + '-url-field-hint' + (bindingError() ? ' ' + uid + '-url-field-error' : '')"
+            [attr.title]="!readOnly() && schemaFailed() ? ('tplDesigner.reason.schemaUnavailable' | transloco) : null"
+            class="flex h-field w-full items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+            [class]="
+              (bindingError()
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : 'border-border-field hover:border-border-field-hover') +
+              ' ' +
+              (readOnly() ? 'cursor-default' : 'cursor-pointer')
+            "
+            (click)="onPickUrlField()"
+          >
+            @if (urlBinding(); as b) {
+              <span
+                class="inline-flex h-chip min-w-0 max-w-full items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft"
+                [attr.title]="b.path"
+              >
+                <span class="truncate">«{{ state.fieldLabel(b.path) }}»</span>
+              </span>
+            } @else {
+              <span class="truncate text-text-placeholder">
+                {{ 'tplEmail.fieldUrl.choose' | transloco }}
+              </span>
+            }
+            <ng-icon name="tablerBraces" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </button>
+        </ui-field>
+      }
+    </div>
+
+    <div [class]="nodeKind() === 'button' ? 'col-span-1 min-w-0' : 'col-span-2 min-w-0'">
+      @if (!readOnly()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-open'"
+          [label]="'tplEmail.open.label' | transloco"
+          [hint]="'tplEmail.open.hint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-open'"
+            [label]="'tplEmail.open.label' | transloco"
+            [describedBy]="uid + '-open-hint'"
+            [options]="targetOptions()"
+            [value]="target()"
+            (valueChange)="target.set($event)"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-open'"
+          [label]="'tplEmail.open.label' | transloco"
+          [hint]="'tplEmail.open.hint' | transloco"
+        >
+          <input
+            [id]="uid + '-open'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="selectedTargetLabel()"
+          />
+        </ui-field>
+      }
+    </div>
+
+    @if (nodeKind() === 'button') {
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          size="bare"
+          [for]="uid + '-full-width'"
+          [label]="'tplEmail.fullWidth.label' | transloco"
+          [hint]="'tplEmail.fullWidth.hint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [id]="uid + '-full-width'"
+              [label]="'tplEmail.fullWidth.label' | transloco"
+              [describedBy]="uid + '-full-width-hint'"
+              [checked]="fullWidthOnMobile()"
+              [disabled]="readOnly()"
+              (checkedChange)="fullWidthOnMobile.set($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (!readOnly()) {
+      <button type="submit" [attr.form]="uid + '-form'" uiButton variant="primary">
+        {{ (mode() === 'insert' ? 'tplEmail.insert' : 'tplEmail.apply') | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'tplEmail.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'tplEmail.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

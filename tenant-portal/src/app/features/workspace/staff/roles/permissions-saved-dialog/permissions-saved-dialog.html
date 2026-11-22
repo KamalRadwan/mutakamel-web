@@ -1,0 +1,29 @@
+<ui-modal
+  size="confirm"
+  icon="tablerCircleCheck"
+  tile="bg-success"
+  [title]="'perm.saved.title' | transloco"
+  [closeLabel]="'perm.saved.close' | transloco"
+>
+  @if (summary(); as info) {
+    <div class="flex flex-col gap-6">
+      <p class="text-13 leading-18 font-medium text-text">{{ info.roleName }}</p>
+      <div class="flex flex-col gap-2">
+        @for (branch of info.branches; track branch.branchId) {
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'perm.saved.branchLine' | transloco: { branch: branch.branchName, chip: branch.chip } }}
+          </p>
+        }
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="openViewPermissions()">
+      {{ 'perm.saved.view' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'perm.saved.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

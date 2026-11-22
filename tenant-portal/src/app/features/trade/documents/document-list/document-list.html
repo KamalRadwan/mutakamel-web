@@ -1,0 +1,135 @@
+@let cfg = kindConfig();
+
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canCreate) {
+    <button type="button" uiButton class="shrink-0" (click)="openNew()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      <span>{{ cfg.newKey | transloco }}</span>
+    </button>
+  }
+
+  <div class="flex h-field min-w-0 flex-1 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo">
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      type="text"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [attr.aria-label]="'tdl.search.' + kind() | transloco"
+      [placeholder]="'tdl.search.' + kind() | transloco"
+      [value]="searchInput()"
+      (input)="onSearchInput($event)"
+    />
+    @if (searchInput()) {
+      <button
+        type="button"
+        class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'tdl.clearSearch' | transloco"
+        (click)="clearSearch()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-view-switcher
+    [options]="viewOptions()"
+    [label]="'tdl.view.label' | transloco"
+    [value]="view()"
+    (valueChange)="setView($event)"
+  />
+</div>
+
+<ui-step-filter
+  class="shrink-0"
+  [steps]="stepOptions()"
+  [label]="'tdl.statusFilter' | transloco"
+  [hint]="'tdl.statusFilterHint' | transloco"
+  [value]="status()"
+  (valueChange)="setStatus($event)"
+/>
+
+@if (hasSelection()) {
+  <app-document-bulk-bar
+    [kind]="kind()"
+    [selection]="selection"
+    [query]="query()"
+    [total]="total()"
+    (done)="reload()"
+  />
+}
+
+@if (listQuery.isError()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'td.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      <span>{{ 'td.common.retry' | transloco }}</span>
+    </button>
+  </div>
+} @else if (!listQuery.isLoading() && items().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    @if (hasActiveFilters()) {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerSearch" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'tdl.empty.filtered' | transloco }}</p>
+      <button type="button" uiButton variant="ghost" (click)="clearFilters()">
+        {{ 'tdl.clearFilters' | transloco }}
+      </button>
+    } @else {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 text-on-icon" [class]="cfg.tile">
+        <ng-icon [name]="cfg.icon" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ emptyTitle() }}</p>
+      @if (canCreate) {
+        <button type="button" uiButton variant="primary" (click)="openNew()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          <span>{{ cfg.newKey | transloco }}</span>
+        </button>
+      }
+    }
+  </div>
+} @else {
+  @if (view() === 'cards') {
+    <app-document-cards
+      [kind]="kind()"
+      [items]="items()"
+      [loading]="listQuery.isLoading()"
+      [perms]="rowPerms"
+      (open)="openDocument($event)"
+      (action)="onRowAction($event.row, $event.action)"
+    />
+  } @else {
+    <app-document-table
+      [kind]="kind()"
+      [items]="items()"
+      [loading]="listQuery.isLoading()"
+      [sort]="sort()"
+      [order]="order()"
+      [perms]="rowPerms"
+      (open)="openDocument($event)"
+      (action)="onRowAction($event.row, $event.action)"
+      (sortChange)="toggleSort($event)"
+    />
+  }
+}
+
+@if (!listQuery.isError() && total() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [pageSizes]="pageSizes"
+      [label]="'tdl.pagination' | transloco"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  </footer>
+}

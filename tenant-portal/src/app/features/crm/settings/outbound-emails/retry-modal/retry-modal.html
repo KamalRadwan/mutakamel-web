@@ -1,0 +1,58 @@
+<ui-modal
+  size="form"
+  icon="tablerRefresh"
+  tile="bg-icon-teal"
+  [title]="'outboundEmails.retry.title' | transloco"
+  [subtitle]="subject()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <form [id]="uid + '-form'" class="flex flex-col gap-8" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      size="multiline"
+      [label]="'outboundEmails.retry.reasonLabel' | transloco"
+      [for]="uid + '-reason'"
+      [hint]="'outboundEmails.retry.reasonHint' | transloco"
+      [required]="true"
+      [count]="reasonCount()"
+      [max]="maxLength"
+      [error]="reasonError()"
+    >
+      <textarea
+        #reasonInput
+        [id]="uid + '-reason'"
+        rows="4"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed"
+        [placeholder]="'outboundEmails.retry.reasonPlaceholder' | transloco"
+        [value]="reason()"
+        [disabled]="submitting()"
+        [attr.aria-invalid]="reasonError() ? 'true' : null"
+        [attr.aria-describedby]="uid + '-reason-hint' + (reasonError() ? ' ' + uid + '-reason-error' : '')"
+        (input)="onReasonInput($event)"
+        (blur)="markTouched()"
+      ></textarea>
+    </ui-field>
+  </form>
+
+  <button
+    modal-footer
+    type="submit"
+    [attr.form]="uid + '-form'"
+    uiButton
+    [loading]="submitting()"
+    [disabled]="submitting()"
+  >
+    {{ 'outboundEmails.retry.send' | transloco }}
+  </button>
+
+  <button modal-footer type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+    {{ 'settings.common.cancel' | transloco }}
+  </button>
+
+  @if (existingRetryId()) {
+    <button modal-footer type="button" uiButton variant="ghost" class="ms-auto" (click)="openExistingRetry()">
+      {{ 'outboundEmails.retry.openExisting' | transloco }}
+    </button>
+  }
+</ui-modal>

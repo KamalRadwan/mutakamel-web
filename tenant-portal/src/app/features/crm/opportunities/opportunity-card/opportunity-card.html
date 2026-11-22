@@ -1,0 +1,109 @@
+<app-record-card
+  [title]="row().title"
+  [subtitle]="cardSubtitle()"
+  typeIcon="tablerTarget"
+  typeTile="bg-icon-red"
+  [typeLabel]="'opportunities.record' | transloco"
+  [color]="row().cardColor"
+  [rating]="row().importance"
+  [ratingEditable]="canUpdate()"
+  [dueBucket]="dueBucket()"
+  [owner]="cardOwner()"
+  [actions]="actions()"
+  [actionsLabel]="'opportunities.card.actions' | transloco"
+  [viewLabel]="'opportunities.card.view' | transloco"
+  [detailed]="detailed()"
+  [(expanded)]="expanded"
+  (open)="open.emit(row())"
+  (rate)="rate.emit($event)"
+  (recolor)="recolor.emit($event)"
+  (action)="act($event)"
+  (due)="activities.emit(row())"
+>
+  <ng-container cardBadges>
+    @if (detailed() && stageName()) {
+      <span
+        class="inline-flex h-badge w-fit items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+        [class]="stageBadge()"
+      >
+        {{ stageName() }}
+      </span>
+    }
+  </ng-container>
+
+  <ng-container cardBody>
+    @if (showDetails()) {
+      @if (amountText(); as amount) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'opportunities.card.amount' | transloco">
+            <ng-icon name="tablerCash" size="14" aria-hidden="true" />
+          </span>
+          <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums" [title]="amount">{{ amount }}</bdi>
+          @if (noCurrencyText(); as noCurrency) {
+            <span class="shrink-0 text-12 leading-18 text-text-muted">{{ noCurrency }}</span>
+          }
+        </div>
+      }
+
+      @if (closeDateText(); as closeDate) {
+        <div class="flex min-w-0 items-center gap-6" [class]="closeDateOverdue() ? 'text-danger-text' : 'text-text'">
+          <span
+            class="inline-flex shrink-0"
+            [class]="closeDateOverdue() ? 'text-danger-text' : 'text-text-muted'"
+            [title]="'opportunities.card.expectedClose' | transloco"
+          >
+            <ng-icon name="tablerCalendarDue" size="14" aria-hidden="true" />
+          </span>
+          <span class="truncate tabular-nums">{{ closeDate }}</span>
+          @if (closeDateOverdue()) {
+            <span class="sr-only">{{ 'opportunities.card.overdue' | transloco }}</span>
+          }
+        </div>
+      }
+
+      @if (probabilityText(); as probability) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'opportunities.card.probability' | transloco">
+            <ng-icon name="tablerPercentage" size="14" aria-hidden="true" />
+          </span>
+          <bdi dir="ltr" class="truncate tabular-nums">{{ probability }}</bdi>
+        </div>
+      }
+
+      @if (contactPhone(); as phone) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'opportunities.card.phone' | transloco">
+            <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+          </span>
+          <app-phone-actions [phone]="phone" [crm]="true" [source]="phoneSource()" />
+        </div>
+      }
+
+      @if (visibleTags().length > 0) {
+        <div class="flex flex-wrap items-center gap-4">
+          @for (tag of visibleTags(); track tag.id) {
+            <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+            <span
+              class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+              [class]="tagBg(tag) ? '' : 'bg-neutral-soft text-text'"
+              [style.background-color]="tagBg(tag)"
+              [style.color]="tagText(tag)"
+              dir="auto"
+              [title]="tag.name"
+            >
+              {{ tag.name }}
+            </span>
+          }
+          @if (extraTagsCount() > 0) {
+            <span
+              class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft tabular-nums"
+              [title]="extraTagsTitle()"
+            >
+              <bdi dir="ltr">+{{ extraTagsCount() }}</bdi>
+            </span>
+          }
+        </div>
+      }
+    }
+  </ng-container>
+</app-record-card>

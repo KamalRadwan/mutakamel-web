@@ -1,0 +1,146 @@
+{
+  "types": {
+    "PAYMENT": "Payment terms",
+    "DELIVERY": "Delivery terms",
+    "WARRANTY": "Warranty terms",
+    "RETURNS": "Return policy",
+    "GENERAL": "Terms and conditions"
+  },
+  "sides": {
+    "SALES": "Sales",
+    "PURCHASE": "Purchase",
+    "BOTH": "Both"
+  },
+  "incoterms": {
+    "EXW": "Ex works",
+    "FCA": "Free carrier",
+    "CPT": "Carriage paid to",
+    "CIP": "Carriage and insurance paid to",
+    "DAP": "Delivered at place",
+    "DPU": "Delivered at place unloaded",
+    "DDP": "Delivered duty paid",
+    "FAS": "Free alongside ship",
+    "FOB": "Free on board",
+    "CFR": "Cost and freight",
+    "CIF": "Cost, insurance and freight"
+  },
+  "areas": {
+    "documents": "Documents",
+    "inventory": "Inventory",
+    "catalogue": "Catalogue and accounts",
+    "governance": "Governance and automation"
+  },
+  "kinds": {
+    "DOCUMENT_CANCEL": "Cancel a document",
+    "QUOTATION_REJECT": "Reject a quotation",
+    "DOCUMENT_HOLD": "Hold an order",
+    "DOCUMENT_HOLD_RELEASE": "Release an order hold",
+    "DOCUMENT_DISCOUNT": "Apply a document discount",
+    "PURCHASE_ORDER_REJECT": "Reject a purchase order",
+    "INVENTORY_PERIOD_CLOSE": "Close a stock period",
+    "INVENTORY_PERIOD_REOPEN": "Reopen a stock period",
+    "INVENTORY_UOM_PUBLISH": "Publish a unit conversion",
+    "INVENTORY_UOM_RETIRE": "Retire a unit conversion",
+    "INVENTORY_REVERSAL": "Reverse a movement",
+    "CATEGORY_STATUS": "Change category status",
+    "CATEGORY_DELETE": "Delete a category",
+    "ACCOUNT_BLOCK": "Block an account",
+    "ACCOUNT_UNBLOCK": "Unblock an account",
+    "ITEM_DISCONTINUE": "Discontinue an item",
+    "PRICE_VERSION_RETIRE": "Price version retire",
+    "POLICY_VERSION_REJECT": "Policy rejection",
+    "POLICY_VERSION_RETIRE": "Policy retire",
+    "POLICY_VERSION_ROLLBACK": "Policy rollback",
+    "WORKFLOW_VERSION_REJECT": "Workflow rejection",
+    "WORKFLOW_VERSION_RETIRE": "Workflow retire",
+    "WORKFLOW_VERSION_ROLLBACK": "Workflow rollback",
+    "WEBHOOK_DELIVERY_RETRY": "Webhook delivery retry",
+    "CONTROL_TOWER_RESOLVE": "Control tower resolution"
+  },
+  "select": {
+    "paymentLabel": "Payment terms",
+    "paymentHintSales": "When and how the customer pays. Printed on the document.",
+    "paymentHintPurchase": "When and how we pay the supplier.",
+    "deliveryLabel": "Delivery terms",
+    "deliveryHint": "Where and when the goods are handed over.",
+    "warrantyLabel": "Warranty terms",
+    "warrantyHint": "The warranty you give on the items.",
+    "clausesLabel": "Terms and conditions",
+    "clausesHint": "Extra clauses printed in this order.",
+    "inactive": "Inactive",
+    "noLongerActive": "This term is no longer active. Choose another one.",
+    "showAll": "Show all",
+    "showLess": "Show less",
+    "moveEarlier": "Move earlier",
+    "moveLater": "Move later",
+    "groupReturns": "Return policy",
+    "groupGeneral": "Terms and conditions",
+    "placeholder": "Select…",
+    "clausesPlaceholder": "Add terms…",
+    "searchPlaceholder": "Search",
+    "searchLabel": "Search terms",
+    "clear": "Clear",
+    "removeClause": "Remove {{name}}",
+    "clauseMenu": "Reorder {{name}}",
+    "maxReached": "Up to {{max}} clauses.",
+    "noMatches": "No matching terms.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load terms.",
+    "retry": "Try again"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "TRADE_VALIDATION_FAILED": "Some values are not valid.",
+    "TRADE_CONCURRENCY_STALE_VERSION": "Someone else changed this record. Reload it.",
+    "TRADE_IDEMPOTENCY_KEY_MISSING": "The request key is missing. Try again.",
+    "TRADE_IDEMPOTENCY_KEY_REQUIRED": "The request key is not valid. Try again.",
+    "TRADE_IDEMPOTENCY_MISMATCH": "The request changed while sending. Try again.",
+    "TRADE_CONCURRENCY_IF_MATCH_REQUIRED": "Reload the record before saving your changes.",
+    "TRADE_IDEMPOTENCY_IN_FLIGHT": "This request is still being processed. Try again shortly.",
+    "TRADE_AUTH_TARGET_DENIED": "You do not have access to the selected scope.",
+    "TRADE_TERMS_NOT_FOUND": "This term no longer exists.",
+    "TRADE_TERMS_CODE_TAKEN": "This code is already used for this term type.",
+    "TRADE_TERMS_TEXT_REQUIRED": "Both Arabic and English texts are required for an active term.",
+    "TRADE_TERMS_TYPE_FIELD_INVALID": "That option is not valid for this term type.",
+    "TRADE_TERMS_DEFAULT_INACTIVE": "Inactive terms cannot be the default.",
+    "TRADE_TERMS_DEFAULT_IN_USE": "Choose another default before deleting this term.",
+    "TRADE_TERMS_PAYMENT_REQUIRED": "Choose payment terms.",
+    "TRADE_REASON_NOT_FOUND": "This reason no longer exists.",
+    "TRADE_REASON_CODE_TAKEN": "This code is already used for this reason kind.",
+    "TRADE_REASON_KIND_INVALID": "This reason kind is not valid.",
+    "TRADE_REASON_SYSTEM_IMMUTABLE": "System reasons cannot be turned off or deleted.",
+    "TRADE_REASON_NOTE_REQUIRED": "Add a note for this reason.",
+    "TRADE": {
+      "VALIDATION_FAILED": "Some values are not valid.",
+      "CONCURRENCY": {
+        "STALE_VERSION": "Someone else changed this record. Reload it.",
+        "IF_MATCH_REQUIRED": "Reload the record before saving your changes."
+      },
+      "IDEMPOTENCY": {
+        "KEY_MISSING": "The request key is missing. Try again.",
+        "KEY_REQUIRED": "The request key is not valid. Try again.",
+        "MISMATCH": "The request changed while sending. Try again.",
+        "IN_FLIGHT": "This request is still being processed. Try again shortly."
+      },
+      "AUTH": {
+        "TARGET_DENIED": "You do not have access to the selected scope."
+      },
+      "TERMS": {
+        "NOT_FOUND": "This term no longer exists.",
+        "CODE_TAKEN": "This code is already used for this term type.",
+        "TEXT_REQUIRED": "Both Arabic and English texts are required for an active term.",
+        "TYPE_FIELD_INVALID": "That option is not valid for this term type.",
+        "DEFAULT_INACTIVE": "Inactive terms cannot be the default.",
+        "DEFAULT_IN_USE": "Choose another default before deleting this term.",
+        "PAYMENT_REQUIRED": "Choose payment terms."
+      },
+      "REASON": {
+        "NOT_FOUND": "This reason no longer exists.",
+        "CODE_TAKEN": "This code is already used for this reason kind.",
+        "KIND_INVALID": "This reason kind is not valid.",
+        "SYSTEM_IMMUTABLE": "System reasons cannot be turned off or deleted.",
+        "NOTE_REQUIRED": "Add a note for this reason."
+      }
+    }
+  }
+}

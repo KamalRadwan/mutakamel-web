@@ -1,0 +1,645 @@
+<ui-modal
+  #mainModal
+  size="wide"
+  icon="tablerServer"
+  tile="bg-icon-teal"
+  [title]="modalTitle()"
+  [closeLabel]="'wsPhone.modal.footer.close' | transloco"
+  [dismissable]="!saving()"
+  bodyClass="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+  (closed)="onModalClosed()"
+>
+  <div
+    role="tablist"
+    class="flex shrink-0 items-center gap-4 overflow-x-auto border-b border-border bg-surface px-10 no-scrollbar"
+    [attr.aria-label]="'wsPhone.modal.tabsLabel' | transloco"
+  >
+    @for (tab of tabs; track tab.id; let idx = $index) {
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-' + tab.id"
+        class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="activeTab() === tab.id ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+        [attr.tabindex]="activeTab() === tab.id ? 0 : -1"
+        [attr.aria-selected]="activeTab() === tab.id"
+        [attr.aria-controls]="uid + '-panel-' + tab.id"
+        (click)="selectTab(tab.id)"
+        (keydown)="onTabKeydown($event, idx)"
+      >
+        <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+        <span>{{ tab.labelKey | transloco }}</span>
+        @if (tab.id === 'ice') {
+          <span
+            class="inline-flex h-counter min-w-counter items-center justify-center rounded-full px-4 text-11 font-medium tabular-nums"
+            [class]="activeTab() === 'ice' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-on-neutral-soft'"
+          >
+            {{ iceEntries().length }}
+          </span>
+        }
+      </button>
+    }
+  </div>
+
+  <div
+    role="tabpanel"
+    [id]="uid + '-panel-' + activeTab()"
+    [attr.aria-labelledby]="uid + '-tab-' + activeTab()"
+    class="min-h-0 flex-1 overflow-y-auto p-10"
+  >
+    <form [id]="uid + '-form'" novalidate (submit)="save($event)">
+    @switch (activeTab()) {
+      @case ('connection') {
+        <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+          <div class="col-span-2">
+            <ui-field
+              [for]="uid + '-name'"
+              [label]="'wsPhone.modal.fields.name' | transloco"
+              [hint]="'wsPhone.modal.fields.nameHint' | transloco"
+              [required]="!isReadonly()"
+              [count]="!isReadonly() ? nameDraft().length : null"
+              [max]="!isReadonly() ? maxNameLength : null"
+              [error]="nameError()"
+            >
+              <input
+                [id]="uid + '-name'"
+                type="text"
+                dir="auto"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="nameDraft()"
+                [readOnly]="isReadonly() || saving()"
+                [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                [attr.aria-invalid]="nameError() ? 'true' : null"
+                (input)="onNameInput($event)"
+                (blur)="markTouched('name')"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-1">
+            <ui-field
+              size="bare"
+              [for]="uid + '-enabled'"
+              [label]="'wsPhone.modal.fields.enabled' | transloco"
+              [hint]="'wsPhone.modal.fields.enabledHint' | transloco"
+            >
+              <div class="flex h-field items-center gap-8">
+                <ui-switch
+                  [id]="uid + '-enabled'"
+                  [describedBy]="uid + '-enabled-hint'"
+                  [label]="'wsPhone.modal.fields.enabled' | transloco"
+                  [checked]="enabledDraft()"
+                  [disabled]="isReadonly() || saving()"
+                  (checkedChange)="enabledDraft.set($event)"
+                />
+                <span class="text-12 text-text">
+                  {{ (enabledDraft() ? 'wsPhone.modal.fields.enabled' : 'wsPhone.modal.fields.disabled') | transloco }}
+                </span>
+              </div>
+            </ui-field>
+          </div>
+
+          <div class="col-span-2">
+            <ui-field
+              size="bare"
+              [for]="uid + '-protocol'"
+              [label]="'wsPhone.modal.fields.protocol' | transloco"
+              [hint]="'wsPhone.modal.fields.protocolHint' | transloco"
+            >
+              <div class="flex items-center">
+                <ui-segmented
+                  [id]="uid + '-protocol'"
+                  [describedBy]="uid + '-protocol-hint'"
+                  [label]="'wsPhone.modal.fields.protocol' | transloco"
+                  [options]="protocolOptions()"
+                  [value]="protocolValue()"
+                  (valueChange)="onProtocolChange($event)"
+                />
+              </div>
+            </ui-field>
+          </div>
+
+          <div class="col-span-1">
+            <ui-field
+              [for]="uid + '-sip-domain'"
+              [label]="'wsPhone.modal.fields.sipDomain' | transloco"
+              [hint]="'wsPhone.modal.fields.sipDomainHint' | transloco"
+              [required]="!isReadonly()"
+              [error]="sipDomainError()"
+            >
+              <input
+                [id]="uid + '-sip-domain'"
+                type="text"
+                dir="ltr"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="sipDomainDraft()"
+                [readOnly]="isReadonly() || saving()"
+                [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                [attr.aria-invalid]="sipDomainError() ? 'true' : null"
+                (input)="onSipDomainInput($event)"
+                (blur)="markTouched('sipDomain')"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-3">
+            <ui-field
+              [for]="uid + '-websocket-url'"
+              [label]="'wsPhone.modal.fields.websocketUrl' | transloco"
+              [hint]="'wsPhone.modal.fields.websocketUrlHint' | transloco"
+              [required]="!isReadonly()"
+              [error]="websocketUrlError()"
+            >
+              <input
+                [id]="uid + '-websocket-url'"
+                type="text"
+                dir="ltr"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="websocketUrlDraft()"
+                [readOnly]="isReadonly() || saving()"
+                [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                [attr.aria-invalid]="websocketUrlError() ? 'true' : null"
+                (input)="onWebsocketUrlInput($event)"
+                (blur)="markTouched('websocketUrl')"
+              />
+            </ui-field>
+          </div>
+        </div>
+      }
+
+      @case ('advanced') {
+        <div class="flex flex-col gap-10">
+          <section class="flex flex-col gap-8">
+            <h3 class="text-12 leading-18 font-medium text-text">{{ 'wsPhone.modal.groups.identity' | transloco }}</h3>
+            <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-realm'"
+                  [label]="'wsPhone.modal.fields.realm' | transloco"
+                  [hint]="'wsPhone.modal.fields.realmHint' | transloco"
+                >
+                  <input
+                    [id]="uid + '-realm'"
+                    type="text"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [value]="realmDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    (input)="onTextInput('realm', $event)"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-from-domain'"
+                  [label]="'wsPhone.modal.fields.fromDomain' | transloco"
+                  [hint]="'wsPhone.modal.fields.fromDomainHint' | transloco"
+                >
+                  <input
+                    [id]="uid + '-from-domain'"
+                    type="text"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [value]="fromDomainDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    (input)="onTextInput('fromDomain', $event)"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-default-caller-id'"
+                  [label]="'wsPhone.modal.fields.defaultCallerId' | transloco"
+                  [hint]="'wsPhone.modal.fields.defaultCallerIdHint' | transloco"
+                  [error]="defaultCallerIdError()"
+                >
+                  <input
+                    [id]="uid + '-default-caller-id'"
+                    type="text"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                    [value]="defaultCallerIdDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="defaultCallerIdError() ? 'true' : null"
+                    (input)="onTextInput('defaultCallerId', $event)"
+                    (paste)="onCallerIdPaste($event)"
+                    (blur)="markTouched('defaultCallerId')"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-registrar-server'"
+                  [label]="'wsPhone.modal.fields.registrarServer' | transloco"
+                  [hint]="'wsPhone.modal.fields.registrarServerHint' | transloco"
+                  [error]="registrarServerError()"
+                >
+                  <input
+                    [id]="uid + '-registrar-server'"
+                    type="text"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [value]="registrarServerDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="registrarServerError() ? 'true' : null"
+                    (input)="onTextInput('registrarServer', $event)"
+                    (blur)="markTouched('registrarServer')"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-outbound-proxy'"
+                  [label]="'wsPhone.modal.fields.outboundProxy' | transloco"
+                  [hint]="'wsPhone.modal.fields.outboundProxyHint' | transloco"
+                  [error]="outboundProxyError()"
+                >
+                  <input
+                    [id]="uid + '-outbound-proxy'"
+                    type="text"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [value]="outboundProxyDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="outboundProxyError() ? 'true' : null"
+                    (input)="onTextInput('outboundProxy', $event)"
+                    (blur)="markTouched('outboundProxy')"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-contact-uri'"
+                  [label]="'wsPhone.modal.fields.contactUri' | transloco"
+                  [hint]="'wsPhone.modal.fields.contactUriHint' | transloco"
+                  [error]="contactUriError()"
+                >
+                  <input
+                    [id]="uid + '-contact-uri'"
+                    type="text"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                    [value]="contactUriDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="contactUriError() ? 'true' : null"
+                    (input)="onTextInput('contactUri', $event)"
+                    (blur)="markTouched('contactUri')"
+                  />
+                </ui-field>
+              </div>
+            </div>
+          </section>
+
+          <div class="border-t border-border"></div>
+
+          <section class="flex flex-col gap-8">
+            <h3 class="text-12 leading-18 font-medium text-text">{{ 'wsPhone.modal.groups.registration' | transloco }}</h3>
+            <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-register-expires'"
+                  [label]="'wsPhone.modal.fields.registerExpires' | transloco"
+                  [hint]="'wsPhone.modal.fields.registerExpiresHint' | transloco"
+                  [required]="!isReadonly()"
+                  [error]="registerExpiresError()"
+                >
+                  <input
+                    [id]="uid + '-register-expires'"
+                    type="text"
+                    inputmode="numeric"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                    [value]="registerExpiresDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="registerExpiresError() ? 'true' : null"
+                    (input)="onTextInput('registerExpires', $event)"
+                    (blur)="markTouched('registerExpires')"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-2">
+                <ui-field
+                  size="bare"
+                  [for]="uid + '-session-timers'"
+                  [label]="'wsPhone.modal.fields.sessionTimers' | transloco"
+                  [hint]="'wsPhone.modal.fields.sessionTimersHint' | transloco"
+                >
+                  <div class="flex h-field items-center gap-8">
+                    <ui-switch
+                      [id]="uid + '-session-timers'"
+                      [describedBy]="uid + '-session-timers-hint'"
+                      [label]="'wsPhone.modal.fields.sessionTimers' | transloco"
+                      [checked]="sessionTimersDraft()"
+                      [disabled]="isReadonly() || saving()"
+                      (checkedChange)="sessionTimersDraft.set($event)"
+                    />
+                  </div>
+                </ui-field>
+              </div>
+            </div>
+          </section>
+
+          <div class="border-t border-border"></div>
+
+          <section class="flex flex-col gap-8">
+            <h3 class="text-12 leading-18 font-medium text-text">{{ 'wsPhone.modal.groups.failover' | transloco }}</h3>
+            <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-default-timeout'"
+                  [label]="'wsPhone.modal.fields.defaultTimeoutSeconds' | transloco"
+                  [hint]="'wsPhone.modal.fields.defaultTimeoutSecondsHint' | transloco"
+                  [error]="defaultTimeoutError()"
+                >
+                  <input
+                    [id]="uid + '-default-timeout'"
+                    type="text"
+                    inputmode="numeric"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="!isReadonly() ? timeoutDefault : ''"
+                    [value]="defaultTimeoutDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="defaultTimeoutError() ? 'true' : null"
+                    (input)="onTextInput('defaultTimeoutSeconds', $event)"
+                    (blur)="markTouched('defaultTimeoutSeconds')"
+                  />
+                </ui-field>
+              </div>
+
+              <div class="col-span-1">
+                <ui-field
+                  [for]="uid + '-default-retries'"
+                  [label]="'wsPhone.modal.fields.defaultMaxRetries' | transloco"
+                  [hint]="'wsPhone.modal.fields.defaultMaxRetriesHint' | transloco"
+                  [error]="defaultMaxRetriesError()"
+                >
+                  <input
+                    [id]="uid + '-default-retries'"
+                    type="text"
+                    inputmode="numeric"
+                    dir="ltr"
+                    class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                    [placeholder]="!isReadonly() ? retriesDefault : ''"
+                    [value]="defaultMaxRetriesDraft()"
+                    [readOnly]="isReadonly() || saving()"
+                    [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                    [attr.aria-invalid]="defaultMaxRetriesError() ? 'true' : null"
+                    (input)="onTextInput('defaultMaxRetries', $event)"
+                    (blur)="markTouched('defaultMaxRetries')"
+                  />
+                </ui-field>
+              </div>
+            </div>
+          </section>
+
+          <div class="border-t border-border"></div>
+
+          <section class="flex flex-col gap-8">
+            <h3 class="text-12 leading-18 font-medium text-text">{{ 'wsPhone.modal.groups.diagnostics' | transloco }}</h3>
+            <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+              <div class="col-span-1">
+                <ui-field
+                  size="bare"
+                  [for]="uid + '-trace-sip'"
+                  [label]="'wsPhone.modal.fields.traceSip' | transloco"
+                  [hint]="'wsPhone.modal.fields.traceSipHint' | transloco"
+                >
+                  <div class="flex h-field items-center gap-8">
+                    <ui-switch
+                      [id]="uid + '-trace-sip'"
+                      [describedBy]="uid + '-trace-sip-hint'"
+                      [label]="'wsPhone.modal.fields.traceSip' | transloco"
+                      [checked]="traceSipDraft()"
+                      [disabled]="isReadonly() || saving()"
+                      (checkedChange)="traceSipDraft.set($event)"
+                    />
+                  </div>
+                </ui-field>
+              </div>
+
+              <div class="col-span-2">
+                <ui-field
+                  size="bare"
+                  [for]="uid + '-allow-invalid-tls'"
+                  [label]="'wsPhone.modal.fields.allowInvalidTlsCertificate' | transloco"
+                  [hint]="'wsPhone.modal.fields.allowInvalidTlsCertificateHint' | transloco"
+                >
+                  <div class="flex h-field items-center gap-8">
+                    <ui-switch
+                      [id]="uid + '-allow-invalid-tls'"
+                      [describedBy]="uid + '-allow-invalid-tls-hint'"
+                      [label]="'wsPhone.modal.fields.allowInvalidTlsCertificate' | transloco"
+                      [checked]="allowInvalidTlsDraft()"
+                      [disabled]="isReadonly() || saving()"
+                      (checkedChange)="allowInvalidTlsDraft.set($event)"
+                    />
+                  </div>
+                </ui-field>
+              </div>
+            </div>
+          </section>
+        </div>
+      }
+
+      @case ('ice') {
+        <div class="flex flex-col gap-10">
+          <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+            <div class="col-span-1">
+              <ui-field
+                size="bare"
+                [for]="uid + '-ice-enabled'"
+                [label]="'wsPhone.modal.fields.iceEnabled' | transloco"
+                [hint]="'wsPhone.modal.fields.iceEnabledHint' | transloco"
+              >
+                <div class="flex h-field items-center gap-8">
+                  <ui-switch
+                    [id]="uid + '-ice-enabled'"
+                    [describedBy]="uid + '-ice-enabled-hint'"
+                    [label]="'wsPhone.modal.fields.iceEnabled' | transloco"
+                    [checked]="iceEnabledDraft()"
+                    [disabled]="isReadonly() || saving() || togglingIceEnabled()"
+                    (checkedChange)="onIceEnabledToggle($event)"
+                  />
+                  <span class="text-12 text-text">
+                    {{ (iceEnabledDraft() ? 'wsPhone.modal.fields.enabled' : 'wsPhone.modal.fields.disabled') | transloco }}
+                  </span>
+                </div>
+              </ui-field>
+            </div>
+
+            <div class="col-span-2">
+              <ui-field
+                size="bare"
+                [for]="uid + '-ice-transport'"
+                [label]="'wsPhone.modal.fields.iceTransportPolicy' | transloco"
+                [hint]="'wsPhone.modal.fields.iceTransportPolicyHint' | transloco"
+                [error]="iceTransportError()"
+              >
+                <div class="flex items-center">
+                  <ui-segmented
+                    [id]="uid + '-ice-transport'"
+                    [describedBy]="
+                      iceTransportError()
+                        ? uid + '-ice-transport-hint ' + uid + '-ice-transport-error'
+                        : uid + '-ice-transport-hint'
+                    "
+                    [label]="'wsPhone.modal.fields.iceTransportPolicy' | transloco"
+                    [options]="iceTransportOptions()"
+                    [value]="iceTransportPolicyDraft()"
+                    (valueChange)="onIceTransportPolicyChange($event)"
+                  />
+                </div>
+              </ui-field>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-8">
+            @for (entry of iceEntries(); track entry.uid; let idx = $index) {
+              <app-ice-entry-row
+                [entry]="entry"
+                [index]="idx"
+                [readonly]="isReadonly()"
+                [disabled]="saving()"
+                [errors]="iceRowErrorsMap()[entry.uid] ?? null"
+                (entryChange)="updateIceEntry(idx, $event)"
+                (removed)="removeIceEntry(idx)"
+                (fieldTouched)="markIceRowTouched(entry.uid)"
+              />
+            } @empty {
+              <p class="text-12 leading-18 text-text-muted">{{ 'wsPhone.modal.ice.empty' | transloco }}</p>
+            }
+          </div>
+
+          @if (!isReadonly()) {
+            <div>
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [disabled]="saving()"
+                (click)="addIceEntry()"
+              >
+                <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                {{ 'wsPhone.modal.ice.add' | transloco }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+    }
+    </form>
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || !dirty()"
+      >
+        {{ 'wsPhone.modal.footer.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'wsPhone.modal.footer.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'wsPhone.modal.footer.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'wsPhone.modal.footer.cancel' | transloco }}
+        </button>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [disabled]="saving()"
+        (click)="requestDelete()"
+      >
+        {{ 'wsPhone.modal.footer.delete' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'wsPhone.modal.footer.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'wsPhone.modal.discard.title' | transloco"
+  [text]="'wsPhone.modal.discard.text' | transloco"
+  [confirmLabel]="'wsPhone.modal.discard.confirm' | transloco"
+  [cancelLabel]="'wsPhone.modal.discard.cancel' | transloco"
+/>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'wsPhone.modal.conflict.title' | transloco"
+  [closeLabel]="'wsPhone.modal.footer.close' | transloco"
+  [dismissable]="!conflictBusy()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'wsPhone.modal.conflict.text' | transloco }}</p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="conflictBusy()"
+    (click)="reloadFromConflict()"
+  >
+    {{ 'wsPhone.modal.conflict.reload' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="conflictBusy()"
+    (click)="keepMyChangesAfterConflict()"
+  >
+    {{ 'wsPhone.modal.conflict.keepMine' | transloco }}
+  </button>
+</ui-modal>

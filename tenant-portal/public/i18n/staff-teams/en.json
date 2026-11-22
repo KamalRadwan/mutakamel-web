@@ -1,0 +1,107 @@
+{
+  "title": "Teams",
+  "add": "Add team",
+  "search": "Search teams",
+  "empty": "No teams yet.",
+  "noResults": "No matching teams.",
+  "loadFailed": "Could not load teams.",
+  "retry": "Try again",
+  "notRecorded": "Not recorded",
+  "retryLater": "A team lead change is in progress. Try again in a moment.",
+  "filters": {
+    "company": "Company",
+    "branch": "Branch",
+    "department": "Department",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "sort": {
+    "name": "Name",
+    "code": "Code",
+    "newest": "Newest"
+  },
+  "cols": {
+    "code": "Code",
+    "name": "Team",
+    "department": "Department",
+    "lead": "Team lead",
+    "members": "Members",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "modal": {
+    "new": "New team",
+    "title": "Team"
+  },
+  "fields": {
+    "code": "Code",
+    "codeHint": "Letters A-Z, digits, \"_\" and \"-\", up to 32, unique in the department. Can't be changed later.",
+    "codePlaceholder": "e.g. ENTERPRISE_1",
+    "name": "Name",
+    "nameHint": "Up to 120 characters.",
+    "namePlaceholder": "Enter team name",
+    "lead": "Team lead",
+    "leadHint": "Optional. Must work in this branch or have access to it.",
+    "leadSearch": "Search active users",
+    "noLead": "No lead",
+    "active": "Active",
+    "activeHint": "Controls whether this team is active.",
+    "activeHelp": "A team with members can't be deactivated."
+  },
+  "members": {
+    "title": "Members ({{n}})",
+    "viewAll": "View all members",
+    "hint": "Members are managed from each user's Teams tab.",
+    "none": "No members yet."
+  },
+  "role": {
+    "LEAD": "Lead",
+    "MANAGER": "Manager",
+    "MEMBER": "Member"
+  },
+  "validation": {
+    "companyRequired": "Select a company.",
+    "branchRequired": "Select a branch.",
+    "departmentRequired": "Select a department.",
+    "codeRequired": "Code is required.",
+    "codeInvalid": "Use letters A-Z, digits, \"_\" and \"-\", up to 32 characters.",
+    "nameRequired": "Team name is required.",
+    "nameMaxLength": "Name must be at most {{max}} characters."
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "viewMembers": "View members",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete"
+  },
+  "confirm": {
+    "deleteTitle": "Delete {{name}}?",
+    "deleteText": "A team that still has placed users or memberships cannot be deleted.",
+    "staleTitle": "Team scope changed",
+    "staleText": "The organization hierarchy changed while you were editing. Reload to get the latest data.",
+    "reload": "Reload",
+    "keepChanges": "Keep my changes",
+    "discardTitle": "Discard your changes?",
+    "discardText": "Your unsaved changes to this team will be lost.",
+    "discardConfirm": "Discard",
+    "discardKeep": "Keep editing",
+    "blockersTitle": "Cannot complete action"
+  },
+  "toast": {
+    "created": "Team created.",
+    "saved": "Team saved.",
+    "activated": "Team activated.",
+    "deactivated": "Team deactivated.",
+    "deleted": "Team deleted."
+  },
+  "save": "Save",
+  "undo": "Undo changes",
+  "unsaved": "Unsaved changes",
+  "cancel": "Cancel",
+  "close": "Close",
+  "delete": "Delete"
+}

@@ -1,0 +1,280 @@
+<app-scope-fields
+  [companyId]="scopeCompanyId()"
+  [branchId]="draft().branchId"
+  [companies]="companyOptions()"
+  [branches]="branchOptions()"
+  [locked]="!canEditScope()"
+  [layout]="layout()"
+  [errors]="scopeErrors()"
+  (companyIdChange)="onCompanyChange($event)"
+  (branchIdChange)="onBranchChange($event)"
+/>
+@if (!readonly() && lookups.branchesFailed()) {
+  <app-opp-lookup-retry
+    [class]="layout() === 'page' ? 'col-span-full' : ''"
+    messageKey="oppForm.lookups.branchesFailed"
+    (retry)="lookups.reloadBranches()"
+  />
+}
+
+<div class="min-w-0">
+  <app-owner-field
+    [ownerId]="draft().ownerUserId"
+    [owners]="ownerOptions()"
+    [selfOnly]="isOwnScope()"
+    [readonly]="readonly()"
+    [allowSelfDefault]="mode() === 'create'"
+    [fallbackName]="fallbackOwnerName()"
+    [error]="ownerError()"
+    (ownerIdChange)="onOwnerChange($event)"
+  />
+  @if (!readonly() && lookups.ownersFailed(draft().branchId)) {
+    <app-opp-lookup-retry
+      messageKey="oppForm.lookups.ownersFailed"
+      [busy]="lookups.ownersLoading(draft().branchId)"
+      (retry)="lookups.retryOwners(draft().branchId)"
+    />
+  }
+</div>
+
+@let pErr = pipelineError();
+<div class="min-w-0">
+  <ui-field
+    size="bare"
+    [label]="'oppForm.classification.pipeline' | transloco"
+    [for]="uid + '-pipeline'"
+    [hint]="'oppForm.classification.pipelineHint' | transloco"
+    [required]="mode() === 'create'"
+    [error]="pErr"
+  >
+    @if (canEditPipeline()) {
+      <div [attr.aria-invalid]="pErr ? 'true' : null">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-pipeline'"
+          [describedBy]="fieldDescribedBy(uid + '-pipeline', !!pErr)"
+          [label]="'oppForm.classification.pipeline' | transloco"
+          [options]="pipelineOptions()"
+          [value]="draft().pipelineId ?? ''"
+          [disabled]="lookups.pipelines().length === 0"
+          (valueChange)="onPipelineChange($event)"
+        />
+      </div>
+    } @else {
+      <div
+        class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+        [class]="pErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+      >
+        <input
+          [id]="uid + '-pipeline'"
+          type="text"
+          readonly
+          dir="auto"
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="pipelineLabel() || '—'"
+          [attr.aria-invalid]="pErr ? 'true' : null"
+        />
+      </div>
+    }
+  </ui-field>
+  @if (!readonly() && lookups.pipelinesFailed()) {
+    <app-opp-lookup-retry messageKey="oppForm.lookups.pipelinesFailed" (retry)="lookups.reloadPipelines()" />
+  }
+</div>
+
+<app-stage-field
+  [value]="draft().stageId"
+  [options]="stageOptions()"
+  labelKey="oppForm.classification.stage"
+  hintKey="oppForm.classification.stageHint"
+  [readonly]="readonly()"
+  [updating]="!!updating().stage"
+  [instant]="mode() !== 'create'"
+  [error]="stageError()"
+  (valueChange)="onStageDraftChange($event)"
+  (commit)="onStageCommit($event)"
+/>
+
+<div class="min-w-0">
+  <app-money-field
+    [currencies]="currencyOptions()"
+    [integerDigits]="limits.amountIntegerDigits"
+    [decimals]="limits.amountDecimals"
+    [amount]="draft().amount || null"
+    [currency]="draft().currencyCode"
+    [readonly]="readonly()"
+    [errors]="moneyErrors()"
+    labelKey="oppForm.classification.amount"
+    hintKey="oppForm.classification.amountHint"
+    (amountChange)="onAmountChange($event)"
+    (currencyChange)="onCurrencyChange($event)"
+  />
+  @if (!readonly() && lookups.currenciesFailed()) {
+    <app-opp-lookup-retry messageKey="oppForm.lookups.currenciesFailed" (retry)="lookups.reloadCurrencies()" />
+  }
+</div>
+
+@let probErr = probabilityError();
+<ui-field
+  size="bare"
+  [label]="'oppForm.classification.probability' | transloco"
+  [for]="uid + '-probability'"
+  [hint]="'oppForm.classification.probabilityHint' | transloco"
+  [error]="probErr"
+>
+  <div
+    dir="ltr"
+    class="flex h-field w-full items-center gap-4 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+    [class]="
+      probErr
+        ? 'border-danger-border ring-2 ring-danger-halo'
+        : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+    "
+  >
+    <input
+      [id]="uid + '-probability'"
+      type="text"
+      inputmode="numeric"
+      maxlength="3"
+      dir="ltr"
+      class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+      [readonly]="readonly()"
+      [value]="draft().probabilityPercent"
+      [attr.aria-invalid]="probErr ? 'true' : null"
+      (input)="onProbabilityInput($event)"
+    />
+    <span class="shrink-0 text-12 text-text-muted" aria-hidden="true">%</span>
+  </div>
+</ui-field>
+
+@let closeErr = closeDateError();
+<div class="min-w-0">
+  <ui-field
+    size="bare"
+    [label]="'oppForm.classification.expectedClose' | transloco"
+    [for]="uid + '-expected-close'"
+    [hint]="'oppForm.classification.expectedCloseHint' | transloco"
+    [error]="closeErr"
+  >
+    @if (readonly()) {
+      <div
+        class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+        [class]="closeErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+      >
+        <input
+          [id]="uid + '-expected-close'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="formattedCloseDate() || '—'"
+          [attr.aria-invalid]="closeErr ? 'true' : null"
+        />
+      </div>
+    } @else {
+      <div class="flex items-center gap-6">
+        <ui-date-field
+          class="min-w-0 flex-1"
+          [id]="uid + '-expected-close'"
+          [ariaLabel]="'oppForm.classification.expectedClose' | transloco"
+          [describedBy]="fieldDescribedBy(uid + '-expected-close', !!closeErr)"
+          [todayLabel]="'oppForm.classification.today' | transloco"
+          [prevMonthLabel]="'oppForm.classification.prevMonth' | transloco"
+          [nextMonthLabel]="'oppForm.classification.nextMonth' | transloco"
+          [invalid]="!!closeErr"
+          [value]="draft().expectedCloseDate"
+          (valueChange)="onExpectedCloseDateChange($event)"
+        />
+        @if (draft().expectedCloseDate) {
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'oppForm.classification.clearDate' | transloco"
+            [title]="'oppForm.classification.clearDate' | transloco"
+            (click)="clearExpectedCloseDate()"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        }
+      </div>
+    }
+  </ui-field>
+
+  @if (!closeErr && isOverdue()) {
+    <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+      <ng-icon name="tablerAlertCircle" size="11" class="shrink-0" aria-hidden="true" />
+      <span>{{ 'oppForm.classification.overdue' | transloco }}</span>
+    </p>
+  }
+</div>
+
+@if (lookups.tags() !== null) {
+  @let tagsErr = tagsError();
+  <div class="min-w-0">
+    <ui-field
+      size="bare"
+      [label]="'oppForm.classification.tags' | transloco"
+      [for]="uid + '-tags'"
+      [hint]="(lookups.canManageTags() ? 'oppForm.classification.tagsHint' : 'oppForm.classification.tagsHintNoCreate') | transloco"
+      [error]="tagsErr"
+    >
+      <div [attr.aria-invalid]="tagsErr ? 'true' : null">
+        <ui-tag-picker
+          [inputId]="uid + '-tags'"
+          [options]="tagOptions()"
+          [canCreate]="lookups.canManageTags()"
+          [max]="limits.tags"
+          [readonly]="readonly()"
+          [label]="'oppForm.classification.tags' | transloco"
+          [createTag]="createTagFn"
+          [value]="draft().tagIds"
+          (valueChange)="onTagsChange($event)"
+          (created)="onTagCreated($event)"
+        />
+      </div>
+    </ui-field>
+    @if (!readonly() && lookups.tagsFailed()) {
+      <app-opp-lookup-retry messageKey="oppForm.lookups.tagsFailed" (retry)="lookups.reloadTags()" />
+    }
+  </div>
+}
+
+@if (lookups.customFieldsFailed()) {
+  <app-opp-lookup-retry
+    [class]="layout() === 'page' ? 'col-span-full' : ''"
+    messageKey="oppForm.lookups.customFieldsBlocked"
+    (retry)="lookups.reloadCustomFields()"
+  />
+}
+
+@if (hasRequiredCustomFields()) {
+  <app-record-custom-fields
+    scope="required"
+    [class]="layout() === 'page' ? 'contents' : 'block'"
+    [stacked]="layout() !== 'page'"
+    [fields]="lookups.customFields()"
+    [values]="draft().customFields"
+    [layout]="layout()"
+    [errors]="errors()"
+    [readonly]="readonly()"
+    [mode]="mode() === 'create' ? 'create' : 'edit'"
+    [countries]="countries()"
+    (valuesChange)="onRequiredCustomFieldsChange($event)"
+  />
+}
+
+<app-rating-colour-field
+  [rating]="draft().importance"
+  [color]="draft().cardColor"
+  [instant]="mode() !== 'create'"
+  [readonly]="readonly()"
+  [updating]="!!updating().rating || !!updating().color"
+  ratingLabelKey="oppForm.classification.rating"
+  ratingHintKey="oppForm.classification.ratingHint"
+  colorLabelKey="oppForm.classification.color"
+  colorHintKey="oppForm.classification.colorHint"
+  (ratingChange)="onRatingChange($event)"
+  (colorChange)="onColorChange($event)"
+  (rate)="rate.emit($event)"
+  (recolor)="recolor.emit($event)"
+/>

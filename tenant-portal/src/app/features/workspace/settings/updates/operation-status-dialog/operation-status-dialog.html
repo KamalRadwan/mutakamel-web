@@ -1,0 +1,144 @@
+<ui-modal
+  #modal
+  size="form"
+  [title]="'wsUpdates.operation.title' | transloco"
+  [icon]="headerIcon()"
+  [tile]="headerTile()"
+  [closeLabel]="'settings.common.close' | transloco"
+  (closed)="closed.emit()"
+>
+  <div class="flex flex-col gap-10" aria-live="polite">
+    @if (!operation() && loading()) {
+      <div class="flex flex-col gap-8" aria-busy="true">
+        <span class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+        <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+        <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+      </div>
+    }
+
+    @if (error(); as errMsg) {
+      <app-settings-notice tone="warning">
+        <p>{{ errMsg }}</p>
+        @if (operation()) {
+          <p class="text-11 leading-16 text-text-muted">{{ 'wsUpdates.operation.lastConfirmed' | transloco }}</p>
+        }
+      </app-settings-notice>
+    }
+
+    @if (operation(); as op) {
+      <div class="flex flex-wrap items-center gap-8">
+        <span
+          class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="statusBadgeClass()"
+        >
+          {{ statusKey() | transloco }}
+        </span>
+
+        @if (isActiveStatus()) {
+          <ng-icon
+            name="tablerLoader2"
+            size="14"
+            class="animate-spin text-accent motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+        }
+
+        <span class="text-11 leading-16 text-text-muted">
+          {{ 'wsUpdates.operation.updated' | transloco: { time: formattedUpdated() } }}
+        </span>
+      </div>
+
+      @if (op.status === 'MANUAL_RECOVERY_REQUIRED') {
+        <app-settings-notice tone="warning">
+          <p class="font-medium text-text">{{ 'wsUpdates.operation.manualTitle' | transloco }}</p>
+          <p class="text-12 leading-18 text-text-muted">{{ 'wsUpdates.guidance.MANUAL_RECOVERY_REQUIRED' | transloco }}</p>
+        </app-settings-notice>
+      } @else if (guidanceKey(); as gKey) {
+        <p class="text-12 leading-18 text-text-muted">{{ gKey | transloco }}</p>
+      }
+
+      @if (mappedSafeError(); as safeMsg) {
+        <p class="text-12 leading-18 text-danger-text">{{ safeMsg }}</p>
+      }
+
+      @if (op.currentPhase === 'AWAITING_PREREQUISITES') {
+        <app-settings-notice tone="info">
+          {{ 'wsUpdates.operation.phase' | transloco }}
+        </app-settings-notice>
+      }
+
+      @if (op.progress.totalSteps > 0) {
+        <div class="flex flex-col gap-4">
+          <div class="text-12 leading-18 text-text-muted">
+            {{
+              'wsUpdates.operation.progress'
+                | transloco: {
+                    done: op.progress.completedSteps,
+                    total: op.progress.totalSteps,
+                    percent: op.progress.percent,
+                  }
+            }}
+          </div>
+          <div class="h-status-bar w-full overflow-hidden rounded-full bg-neutral-soft">
+            <div
+              class="h-full rounded-full transition-all duration-base ease-enter"
+              [class]="progressFillClass()"
+              [style.width.%]="clampedPercent()"
+            ></div>
+          </div>
+        </div>
+      }
+
+      @if (op.status === 'SUCCEEDED' && op.steps.length > 0) {
+        <div class="flex max-h-notif-list-max flex-col gap-6 overflow-y-auto scrollbar-thin pe-2">
+          @for (step of op.steps; track step.id) {
+            <div class="flex flex-wrap items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-8 py-6 text-12">
+              <div class="flex min-w-0 flex-1 items-center gap-6">
+                <span dir="ltr" class="truncate text-start font-medium text-text tabular-nums">
+                  {{ step.componentKey }}
+                </span>
+                @if (isAutoAddedStep(step.componentKey)) {
+                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft">
+                    {{ 'wsUpdates.operation.addedAuto' | transloco }}
+                  </span>
+                }
+              </div>
+
+              @if (step.fromVersion || step.targetVersion) {
+                <span class="inline-flex items-center gap-4 text-12 text-text tabular-nums">
+                  <span dir="ltr">{{ step.fromVersion ?? '—' }}</span>
+                  <span class="inline-flex shrink-0 text-text-muted rtl:-scale-x-100">
+                    <ng-icon name="tablerArrowRight" size="14" aria-hidden="true" />
+                  </span>
+                  <span dir="ltr" class="font-medium">{{ step.targetVersion ?? '—' }}</span>
+                </span>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+
+    @if (autoRefreshStopped()) {
+      <app-settings-notice tone="info">
+        {{ 'wsUpdates.operation.autoStopped' | transloco }}
+      </app-settings-notice>
+    }
+  </div>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton (click)="close()">
+      {{ 'settings.common.close' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [loading]="loading()"
+      [disabled]="loading()"
+      (click)="refresh.emit()"
+    >
+      {{ 'wsUpdates.operation.refresh' | transloco }}
+    </button>
+  </div>
+</ui-modal>

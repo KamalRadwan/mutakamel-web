@@ -1,0 +1,358 @@
+<div data-field="series">
+  <ui-field
+    [label]="'builder.metrics.chosen' | transloco"
+    [hint]="'builder.metrics.chosenHint' | transloco"
+    [required]="true"
+    [bare]="true"
+    for="builder-chosen-metrics"
+    [count]="seriesRows().length"
+    [max]="maxSeries()"
+    [error]="seriesError()"
+  >
+    @if (seriesRows().length > 0) {
+      <div
+        id="builder-chosen-metrics"
+        cdkDropList
+        [cdkDropListData]="seriesRows()"
+        (cdkDropListDropped)="onDrop($event)"
+        class="flex flex-col gap-6"
+      >
+        @for (row of seriesRows(); track row.metricKey; let index = $index; let first = $first; let last = $last) {
+          <div class="flex flex-col gap-2" [attr.data-field]="'series.' + index + '.metricKey'">
+            <div
+              cdkDrag
+              class="flex items-center gap-6 rounded-10 border border-brand bg-brand-soft px-8 py-6 text-12"
+            >
+              <button
+                type="button"
+                cdkDragHandle
+                class="inline-flex size-btn-h-sm shrink-0 cursor-grab items-center justify-center rounded-6 text-text-muted outline-none hover:bg-surface active:cursor-grabbing focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'builder.metrics.dragHandle' | transloco"
+                [title]="'builder.metrics.dragHandle' | transloco"
+              >
+                <ng-icon name="tablerGripVertical" size="14" aria-hidden="true" />
+              </button>
+
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="truncate text-12 leading-18 font-medium text-text" [title]="row.label">
+                  {{ row.label }}
+                </span>
+                @if (row.unit || row.timeModel) {
+                  <span class="truncate text-11 leading-16 text-text-muted">
+                    {{ row.unit }}@if (row.unit && row.timeModel) { · }{{ row.timeModel }}
+                  </span>
+                }
+              </div>
+
+              @if (row.unit) {
+                <ui-badge tone="tag">{{ row.unit }}</ui-badge>
+              }
+
+              @if (showDualAxisToggle()) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  [attr.aria-label]="'builder.metrics.axis' | transloco"
+                  (click)="toggleAxis(index)"
+                >
+                  {{ (row.axis === 'RIGHT' ? 'builder.metrics.axisRight' : 'builder.metrics.axisLeft') | transloco }}
+                </button>
+              }
+
+              <div class="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-surface hover:text-text disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [disabled]="first"
+                  [attr.aria-label]="'builder.metrics.moveUp' | transloco"
+                  [title]="'builder.metrics.moveUp' | transloco"
+                  (click)="moveMetric(index, -1)"
+                >
+                  <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-surface hover:text-text disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [disabled]="last"
+                  [attr.aria-label]="'builder.metrics.moveDown' | transloco"
+                  [title]="'builder.metrics.moveDown' | transloco"
+                  (click)="moveMetric(index, 1)"
+                >
+                  <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-surface hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'builder.metrics.remove' | transloco"
+                  [title]="'builder.metrics.remove' | transloco"
+                  (click)="removeMetric(index)"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            @if (row.calculation) {
+              <div
+                class="flex flex-col gap-6 rounded-8 border border-border bg-surface p-8"
+                [attr.data-field]="'series.' + index + '.calculation'"
+              >
+                <div class="grid grid-cols-1 gap-8">
+                  <ui-field
+                    [for]="'series-calc-op-' + index"
+                    [bare]="true"
+                    [label]="'builder.metrics.calcOperation' | transloco"
+                    [hint]="(row.calculation.operation === 'RATIO' ? 'builder.metrics.calcRatioHint' : 'builder.metrics.calcDiffHint') | transloco"
+                  >
+                    <ui-segmented
+                      [id]="'series-calc-op-' + index"
+                      [label]="'builder.metrics.calcOperation' | transloco"
+                      [describedBy]="'series-calc-op-' + index + '-hint'"
+                      [options]="calcOperationOptions()"
+                      [value]="row.calculation.operation"
+                      (valueChange)="onCalcOperationChange(index, $event)"
+                    />
+                  </ui-field>
+
+                  <ui-field
+                    [for]="'series-calc-operand-' + index"
+                    [bare]="true"
+                    [label]="'builder.metrics.calcOperand' | transloco"
+                    [hint]="'builder.metrics.calcOperandHint' | transloco"
+                    [error]="row.calcError"
+                  >
+                    <ui-dropdown
+                      [id]="'series-calc-operand-' + index"
+                      size="field"
+                      [label]="'builder.metrics.calcOperand' | transloco"
+                      [describedBy]="row.calcError ? ('series-calc-operand-' + index + '-hint series-calc-operand-' + index + '-error') : ('series-calc-operand-' + index + '-hint')"
+                      [options]="row.operands"
+                      [value]="row.calculation.operandMetricKey"
+                      (valueChange)="onCalcOperandChange(index, $event)"
+                    />
+                  </ui-field>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    uiButton
+                    variant="ghost"
+                    size="small"
+                    (click)="removeCalculation(index)"
+                  >
+                    <span>{{ 'builder.metrics.removeCalculation' | transloco }}</span>
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div>
+                <button
+                  type="button"
+                  uiButton
+                  variant="ghost"
+                  size="small"
+                  [disabled]="row.operands.length === 0"
+                  [title]="row.operands.length === 0 ? ('builder.metrics.noCompatibleMetric' | transloco) : ''"
+                  (click)="enableCalculation(index)"
+                >
+                  <span>{{ 'builder.metrics.calculateWithOther' | transloco }}</span>
+                </button>
+              </div>
+            }
+
+            @if (row.error) {
+              <p class="flex items-center gap-3 text-11 leading-16 text-danger-text">
+                <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                {{ row.error }}
+              </p>
+            }
+          </div>
+        }
+      </div>
+    }
+  </ui-field>
+</div>
+
+<div class="flex flex-col gap-6">
+  <ui-field
+    [label]="'builder.metrics.addMetric' | transloco"
+    [hint]="(state.draft().source ? 'builder.metrics.addMetricHint' : 'builder.metrics.noSourceFirst') | transloco"
+    for="builder-metric-search"
+  >
+    <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+    <input
+      id="builder-metric-search"
+      type="search"
+      [value]="searchQuery()"
+      [placeholder]="'builder.metrics.searchPlaceholder' | transloco"
+      class="w-full min-w-0 bg-transparent text-12 text-text placeholder:text-text-placeholder outline-none"
+      (input)="onSearchInput($event)"
+    />
+  </ui-field>
+
+  <div class="scrollbar-thin flex max-h-notif-list-max flex-col gap-6 overflow-y-auto">
+    @if (!state.draft().source) {
+      <p class="py-4 text-12 leading-18 text-text-muted">
+        {{ 'builder.metrics.noSourceShort' | transloco }}
+      </p>
+    } @else if (filteredMetrics().length === 0) {
+      <p class="py-4 text-12 leading-18 text-text-muted">
+        {{ 'builder.metrics.noMetrics' | transloco }}
+      </p>
+    } @else {
+      @for (metric of filteredMetrics(); track metric.key) {
+        @if (metric.availability === 'AVAILABLE') {
+          @let added = addedMetricKeys().has(metric.key);
+          <div class="flex items-center gap-8 rounded-10 border border-border bg-surface px-8 py-6">
+            <div class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate text-12 leading-18 font-medium text-text" [title]="metricName(metric)">
+                {{ metricName(metric) }}
+              </span>
+              <span class="truncate text-11 leading-16 text-text-muted">
+                {{ metricCaption(metric) }}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [disabled]="added || atMaxSeries()"
+              (click)="addMetric(metric)"
+            >
+              @if (!added) {
+                <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+              }
+              <span>{{ (added ? 'builder.metrics.added' : 'builder.metrics.add') | transloco }}</span>
+            </button>
+          </div>
+        } @else {
+          @let reason = unavailableReason(metric);
+          <div
+            aria-disabled="true"
+            [title]="reason"
+            class="flex items-center gap-8 rounded-10 border border-border bg-neutral-soft px-8 py-6 text-text-placeholder opacity-drag-source"
+          >
+            <div class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate text-12 leading-18 font-medium" [title]="metricName(metric)">
+                {{ metricName(metric) }}
+              </span>
+              <span class="truncate text-11 leading-16" [title]="reason">
+                {{ reason }}
+              </span>
+            </div>
+            <ng-icon name="tablerLock" size="14" class="shrink-0" aria-hidden="true" />
+          </div>
+        }
+      }
+    }
+  </div>
+</div>
+
+@if (groupByOptions().length > 0) {
+  <div class="flex flex-col gap-8">
+    <div data-field="dimension">
+      <ui-field
+        [label]="'builder.metrics.groupBy' | transloco"
+        [hint]="'builder.metrics.groupByHint' | transloco"
+        [bare]="true"
+        for="builder-group-by"
+        [error]="errors()['dimension'] ?? null"
+      >
+        <ui-dropdown
+          [id]="'builder-group-by'"
+          class="w-full"
+          size="field"
+          [label]="'builder.metrics.groupBy' | transloco"
+          describedBy="builder-group-by-hint"
+          [options]="groupByOptions()"
+          [value]="selectedDimension()"
+          (valueChange)="onGroupByChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (selectedDimension() === 'time') {
+      <ui-field
+        [label]="'builder.metrics.grain' | transloco"
+        [hint]="'builder.metrics.grainHint' | transloco"
+        [bare]="true"
+        for="builder-time-grain"
+      >
+        <ui-dropdown
+          [id]="'builder-time-grain'"
+          class="w-full"
+          size="field"
+          [label]="'builder.metrics.grain' | transloco"
+          describedBy="builder-time-grain-hint"
+          [options]="grainOptions()"
+          [value]="selectedGrain()"
+          [disabled]="requiresDailyGrain()"
+          (valueChange)="onGrainChange($event)"
+        />
+      </ui-field>
+    }
+
+    <div data-field="breakdown">
+      <ui-field
+        [label]="'builder.metrics.splitBy' | transloco"
+        [hint]="'builder.metrics.splitByHint' | transloco"
+        [bare]="true"
+        for="builder-split-by"
+        [error]="errors()['breakdown'] ?? null"
+      >
+        <ui-dropdown
+          [id]="'builder-split-by'"
+          class="w-full"
+          size="field"
+          [label]="'builder.metrics.splitBy' | transloco"
+          describedBy="builder-split-by-hint"
+          [options]="splitByOptions()"
+          [value]="selectedBreakdown()"
+          [disabled]="splitByOptions().length <= 1"
+          (valueChange)="onSplitByChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (selectedBreakdown() !== 'none' && topNAllowed()) {
+      <ui-field
+        [label]="'builder.metrics.topN' | transloco"
+        [hint]="'builder.metrics.topNHint' | transloco"
+        for="builder-top-n"
+        [error]="errors()['breakdown'] ?? null"
+      >
+        <input
+          id="builder-top-n"
+          type="number"
+          min="1"
+          max="50"
+          dir="ltr"
+          [value]="topNValue()"
+          class="w-full min-w-0 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+          (input)="onTopNChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'builder.metrics.groupRest' | transloco"
+        [hint]="'builder.metrics.groupRestHint' | transloco"
+        [bare]="true"
+        for="builder-group-rest"
+      >
+        <ui-checkbox
+          [checked]="groupRestValue()"
+          (checkedChange)="onGroupRestChange($event)"
+        >
+          {{ 'builder.metrics.groupRestOption' | transloco }}
+        </ui-checkbox>
+      </ui-field>
+    }
+  </div>
+}

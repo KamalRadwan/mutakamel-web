@@ -1,0 +1,128 @@
+{
+  "actions": {
+    "open": "Open"
+  },
+  "common": {
+    "rowActions": "Row actions",
+    "noResults": "No results.",
+    "clearFilters": "Clear filters",
+    "retry": "Try again",
+    "pagination": "Pagination"
+  },
+  "outcomes": {
+    "SELECT": "Select"
+  },
+  "aggregateTypes": {
+    "INVENTORY_RESERVATION": "Reservation",
+    "INVENTORY_RECEIPT": "Receipt",
+    "INVENTORY_RECEIPT_LINE": "Receipt line",
+    "INVENTORY_DELIVERY": "Delivery",
+    "INVENTORY_DELIVERY_LINE": "Delivery line"
+  },
+  "explanations": {
+    "WITHIN_TOLERANCE": "Received quantity is within the configured over-receipt tolerance.",
+    "PARTIAL_STOCK_AVAILABLE": "Available stock covered part of the request; partial reservation was selected.",
+    "INSUFFICIENT_AVAILABLE": "Insufficient available stock; remaining units were placed on backorder.",
+    "NEGATIVE_ALLOWED_FOR_STORE": "Store negative-stock policy allowed posting below zero.",
+    "SERIAL_COUNT_MATCHED": "Serialized unit count matched the order line tolerance.",
+    "SERIALIZED_NEGATIVE_FORBIDDEN": "Serialized products cannot enter a negative stock balance.",
+    "FULL_RESERVATION_OK": "Full requested quantity was reserved from available stock.",
+    "OVER_RECEIPT_LIMIT_EXCEEDED": "Receipt quantity exceeded the maximum over-receipt tolerance and was blocked.",
+    "RESERVATION_PARTIAL_ALLOWED": "Partial reservation is allowed when available stock is short.",
+    "RESERVATION_BACKORDER_ALLOWED": "Backorder is allowed when available stock is short.",
+    "NEGATIVE_STOCK_ALLOWED": "Negative stock balance is allowed by policy.",
+    "OVER_RECEIPT_EXCEEDS_TOLERANCE": "Received quantity exceeds the configured over-receipt tolerance."
+  },
+  "serials": {
+    "tableLabel": "Serial units",
+    "searchPlaceholder": "Scan or type a serial number",
+    "itemLabel": "Item",
+    "itemHint": "Show the serials of one product.",
+    "steps": {
+      "label": "Filter by state",
+      "hint": "Filter the serial numbers by state",
+      "all": "All"
+    },
+    "cols": {
+      "serial": "Serial",
+      "item": "Item",
+      "state": "State",
+      "node": "Node",
+      "lastChange": "Last change",
+      "actions": "Actions"
+    },
+    "actions": {
+      "copySerial": "Copy serial"
+    },
+    "empty": {
+      "all": "No serial units recorded yet.",
+      "serial": "No unit has this serial number."
+    }
+  },
+  "serialModal": {
+    "title": "Serial unit",
+    "itemHint": "The product this serial belongs to.",
+    "currentNode": "Current node",
+    "currentNodeHint": "Empty once the unit has left stock.",
+    "currentReservation": "Current reservation",
+    "currentReservationHint": "The reservation holding this unit, if any.",
+    "copyReservation": "Copy reservation id",
+    "lastChange": "Last change",
+    "lastChangeHint": "When this serial unit last changed state.",
+    "lifecycle": "Lifecycle",
+    "emptyLifecycle": "No lifecycle events recorded.",
+    "openMovement": "Open movement",
+    "copyOperationKey": "Copy operation key",
+    "limitNote": "Showing the first 500 events."
+  },
+  "decisions": {
+    "tableLabel": "Policy decisions",
+    "searchPlaceholder": "Search by record id",
+    "invalidRecordId": "Enter a full record id.",
+    "companyScope": "Company",
+    "steps": {
+      "label": "Filter by policy",
+      "hint": "Filter the decisions by policy",
+      "all": "All",
+      "reservation": "Reservation shortage",
+      "negative": "Negative stock",
+      "overReceipt": "Over-receipt"
+    },
+    "cols": {
+      "evaluated": "Evaluated",
+      "decision": "Decision",
+      "outcome": "Outcome",
+      "explanation": "Explanation",
+      "record": "Record",
+      "branch": "Branch",
+      "actions": "Actions"
+    },
+    "actions": {
+      "copyCorrelation": "Copy correlation id"
+    },
+    "empty": {
+      "all": "No policy decisions recorded yet."
+    }
+  },
+  "decisionModal": {
+    "title": "Policy decision",
+    "outcome": "Outcome",
+    "outcomeHint": "What the policy decided.",
+    "evaluatedAt": "Evaluated at",
+    "evaluatedAtHint": "When the policy was evaluated.",
+    "explanation": "Explanation",
+    "explanationHint": "Translated from the explanation code; the original text is shown under it.",
+    "originalExplanation": "Original server explanation",
+    "matchedRules": "Matched rules",
+    "matchedRulesHint": "Policy rules that produced this outcome.",
+    "policyVersions": "Policy versions",
+    "policyVersionsHint": "The exact published policy version used.",
+    "record": "Record",
+    "recordHint": "The inventory record this decision belongs to.",
+    "copyRecord": "Copy record id",
+    "correlationId": "Correlation id",
+    "correlationIdHint": "Give this to support to trace the request.",
+    "copyCorrelation": "Copy correlation id",
+    "noRecordPage": "This record type has no page yet."
+  }
+}

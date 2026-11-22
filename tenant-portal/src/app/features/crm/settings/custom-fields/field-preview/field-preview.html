@@ -1,0 +1,279 @@
+<div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-10">
+  <div class="flex items-center justify-between gap-8">
+    <span class="text-12 font-medium text-text">{{ 'customFields.modal.previewTitle' | transloco }}</span>
+    <span class="inline-flex items-center gap-4 text-11 text-text-muted">
+      <span
+        class="inline-flex size-icon-tile-sm items-center justify-center rounded-8 text-on-icon"
+        [class]="ownerLook[ownerType()].tile"
+      >
+        <ng-icon [name]="ownerLook[ownerType()].icon" size="14" aria-hidden="true" />
+      </span>
+      <span>{{ ('customFields.ownerTypes.' + ownerType()) | transloco }}</span>
+    </span>
+  </div>
+
+  <div #previewCard class="rounded-10 border border-border bg-surface p-10 shadow-card">
+    @switch (type()) {
+      @case ('TEXTAREA') {
+        <ui-field
+          size="multiline"
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-textarea'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <textarea
+            [id]="uid + '-textarea'"
+            rows="2"
+            readonly
+            tabindex="-1"
+            [attr.aria-describedby]="uid + '-textarea-hint'"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="displayPlaceholder()"
+          ></textarea>
+        </ui-field>
+      }
+      @case ('NUMBER') {
+        <ui-field
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-number'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <input
+            [id]="uid + '-number'"
+            type="number"
+            dir="ltr"
+            readonly
+            tabindex="-1"
+            [attr.aria-describedby]="uid + '-number-hint'"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="displayPlaceholder()"
+          />
+        </ui-field>
+      }
+      @case ('DATE') {
+        <ui-field
+          [bare]="true"
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-date'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <ui-date-field
+            tabindex="-1"
+            [id]="uid + '-date'"
+            [ariaLabel]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+            [attr.aria-describedby]="uid + '-date-hint'"
+            [placeholder]="displayPlaceholder() || ('customFields.modal.previewDatePlaceholder' | transloco)"
+            [todayLabel]="'customFields.values.today' | transloco"
+            [prevMonthLabel]="'customFields.values.prevMonth' | transloco"
+            [nextMonthLabel]="'customFields.values.nextMonth' | transloco"
+            [(value)]="previewDate"
+          />
+        </ui-field>
+      }
+      @case ('DATETIME') {
+        <ui-field
+          [bare]="true"
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-datetime'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <div class="flex items-center gap-6" [attr.aria-describedby]="uid + '-datetime-hint'">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              tabindex="-1"
+              [id]="uid + '-datetime'"
+              [ariaLabel]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+              [attr.aria-describedby]="uid + '-datetime-hint'"
+              [placeholder]="displayPlaceholder() || ('customFields.modal.previewDatePlaceholder' | transloco)"
+              [todayLabel]="'customFields.values.today' | transloco"
+              [prevMonthLabel]="'customFields.values.prevMonth' | transloco"
+              [nextMonthLabel]="'customFields.values.nextMonth' | transloco"
+              [(value)]="previewDate"
+            />
+            <ui-time-field
+              class="shrink-0"
+              tabindex="-1"
+              [ariaLabel]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+              [attr.aria-describedby]="uid + '-datetime-hint'"
+              [hourLabel]="'customFields.values.hour' | transloco"
+              [minuteLabel]="'customFields.values.minute' | transloco"
+              [(value)]="previewTime"
+            />
+          </div>
+        </ui-field>
+      }
+      @case ('BOOLEAN') {
+        <ui-field
+          [bare]="true"
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-boolean'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              tabindex="-1"
+              [(checked)]="previewBool"
+              [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+            />
+            <span class="text-12 text-text">{{ (previewBool() ? 'settings.common.yes' : 'settings.common.no') | transloco }}</span>
+          </div>
+        </ui-field>
+      }
+      @case ('SELECT') {
+        <ui-field
+          [bare]="true"
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-select'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            tabindex="-1"
+            [options]="selectOptions()"
+            [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+            [describedBy]="uid + '-select-hint'"
+            [(value)]="previewSelect"
+          />
+        </ui-field>
+      }
+      @case ('MULTI_SELECT') {
+        <ui-field
+          [bare]="true"
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-multi'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          @if (activeOptions().length) {
+            <div
+              [id]="uid + '-multi'"
+              role="group"
+              [attr.aria-label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+              [attr.aria-describedby]="uid + '-multi-hint'"
+              class="flex flex-wrap gap-4"
+            >
+              @for (opt of activeOptions(); track opt.key + '-' + $index) {
+                @let key = opt.key || opt.nameEn || opt.nameAr;
+                @let selected = previewMulti().includes(key);
+                <button
+                  type="button"
+                  tabindex="-1"
+                  class="inline-flex h-chip cursor-pointer items-center gap-4 rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="selected ? 'border-brand bg-brand-soft text-on-brand-soft' : 'border-border bg-neutral-soft text-text hover:bg-row-hover'"
+                  [attr.aria-pressed]="selected"
+                  (click)="toggleMulti(key)"
+                >
+                  @if (selected) {
+                    <ng-icon name="tablerCheck" size="11" aria-hidden="true" />
+                  }
+                  <span>{{ optionLabel(opt) }}</span>
+                </button>
+              }
+            </div>
+          } @else {
+            <p [id]="uid + '-multi'" [attr.aria-describedby]="uid + '-multi-hint'" class="text-11 text-text-placeholder">
+              {{ 'customFields.modal.previewMultiPlaceholder' | transloco }}
+            </p>
+          }
+        </ui-field>
+      }
+      @case ('URL') {
+        <ui-field
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-url'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <ng-icon name="tablerLink" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            [id]="uid + '-url'"
+            type="url"
+            dir="ltr"
+            readonly
+            tabindex="-1"
+            [attr.aria-describedby]="uid + '-url-hint'"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="displayPlaceholder() || ('customFields.values.examples.url' | transloco)"
+          />
+        </ui-field>
+      }
+      @case ('EMAIL') {
+        <ui-field
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-email'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <ng-icon name="tablerMail" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            [id]="uid + '-email'"
+            type="email"
+            dir="ltr"
+            readonly
+            tabindex="-1"
+            [attr.aria-describedby]="uid + '-email-hint'"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="displayPlaceholder() || ('customFields.values.examples.email' | transloco)"
+          />
+        </ui-field>
+      }
+      @case ('PHONE') {
+        <ui-field
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-phone'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <ng-icon name="tablerPhone" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            [id]="uid + '-phone'"
+            type="tel"
+            dir="ltr"
+            readonly
+            tabindex="-1"
+            [attr.aria-describedby]="uid + '-phone-hint'"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="displayPlaceholder() || ('customFields.values.examples.phone' | transloco)"
+          />
+        </ui-field>
+      }
+      @default {
+        <ui-field
+          [label]="displayLabel() || ('customFields.modal.previewEmpty' | transloco)"
+          [for]="uid + '-text'"
+          [hint]="displayHint()"
+          [required]="requiredOnCreate()"
+        >
+          <input
+            [id]="uid + '-text'"
+            type="text"
+            readonly
+            tabindex="-1"
+            [attr.aria-describedby]="uid + '-text-hint'"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="displayPlaceholder()"
+          />
+        </ui-field>
+      }
+    }
+
+    <div class="mt-8 flex items-center justify-between gap-6 border-t border-border pt-6 text-11 text-text-muted">
+      <span class="inline-flex items-center gap-4">
+        <ng-icon [name]="typeIcons[type()]" size="12" aria-hidden="true" />
+        <span>{{ ('customFields.types.' + type()) | transloco }}</span>
+      </span>
+      @if (fieldKey().trim()) {
+        <span dir="ltr" class="rounded-6 bg-neutral-soft px-6 py-2 font-medium text-on-neutral-soft tabular-nums">
+          {{ fieldKey().trim() }}
+        </span>
+      }
+    </div>
+  </div>
+</div>

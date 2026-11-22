@@ -1,0 +1,238 @@
+<div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (activeView() === 'subscriptions' && canManage()) {
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      class="shrink-0"
+      (click)="openNewSubscription()"
+    >
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'webhooks.toolbar.newSubscription' | transloco }}
+    </button>
+  }
+
+  @if (activeView() === 'subscriptions') {
+    <div
+      role="search"
+      class="flex h-field min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      <span class="inline-flex shrink-0 text-text-muted">
+        <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+      </span>
+      <input
+        type="text"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'webhooks.toolbar.searchSubscriptions' | transloco"
+        [attr.aria-label]="'webhooks.toolbar.searchSubscriptions' | transloco"
+        [value]="searchText()"
+        (input)="onSearchInput($event)"
+        (keydown.escape)="clearSearch()"
+      />
+      @if (searchText()) {
+        <button
+          type="button"
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'webhooks.common.clearSearch' | transloco"
+          (click)="clearSearch()"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-8">
+      <div class="w-org-card-w shrink-0">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [label]="'webhooks.deliveries.filters.subscription' | transloco"
+          [options]="subscriptionFilterOptions()"
+          [value]="deliverySubFilter()"
+          (valueChange)="onDeliverySubFilterChange($event)"
+        />
+      </div>
+
+      <div class="w-modal-alert shrink-0">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [label]="'webhooks.deliveries.filters.event' | transloco"
+          [options]="eventFilterOptions()"
+          [value]="deliveryEventFilter()"
+          (valueChange)="onDeliveryEventFilterChange($event)"
+        />
+      </div>
+
+      <div class="flex min-w-0 items-center gap-4">
+        <div class="w-modal-alert">
+          <ui-date-range
+            [months]="1"
+            [withTime]="true"
+            [ariaLabel]="'webhooks.deliveries.filters.dateRange' | transloco"
+            [placeholder]="'webhooks.deliveries.filters.dateRangePlaceholder' | transloco"
+            [value]="deliveryDateRange()"
+            (valueChange)="onDeliveryDateRangeChange($event)"
+          />
+        </div>
+        @if (deliveryDateRange()) {
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'webhooks.common.clearDateRange' | transloco"
+            [title]="'webhooks.common.clearDateRange' | transloco"
+            (click)="onDeliveryDateRangeChange(null)"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+    [disabled]="activeView() === 'subscriptions' ? subscriptionsLoading() : deliveriesLoading()"
+    [attr.aria-label]="'webhooks.toolbar.reload' | transloco"
+    [title]="'webhooks.toolbar.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon
+      name="tablerRefresh"
+      size="15"
+      [class.animate-spin]="activeView() === 'subscriptions' ? subscriptionsLoading() : deliveriesLoading()"
+      aria-hidden="true"
+    />
+  </button>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <span [id]="uid + '-view-hint'" class="sr-only">{{ 'webhooks.view.hint' | transloco }}</span>
+  <ui-segmented
+    class="shrink-0"
+    [label]="'webhooks.view.label' | transloco"
+    [describedBy]="uid + '-view-hint'"
+    [options]="viewOptions()"
+    [value]="activeView()"
+    (valueChange)="onViewChange($event)"
+  />
+
+  <app-scope-chip class="shrink-0" [scope]="scopeTarget()" />
+</div>
+
+@if (isBranchScope()) {
+  <div
+    role="status"
+    class="flex shrink-0 items-center gap-8 rounded-10 border border-border bg-brand-soft px-10 py-8 text-12 leading-18 text-on-brand-soft"
+  >
+    <ng-icon name="tablerInfoCircle" size="16" class="shrink-0" aria-hidden="true" />
+    <span>{{ 'webhooks.branchNotice' | transloco }}</span>
+  </div>
+}
+
+@if (activeView() === 'subscriptions') {
+  <app-subscriptions-table
+    [rows]="pagedSubscriptions()"
+    [loading]="subscriptionsLoading()"
+    [loadFailed]="subscriptionsFailed()"
+    [hasSearch]="searchText().trim().length > 0"
+    [canManage]="canManage()"
+    [busyId]="busySubscriptionId()"
+    [pendingIds]="pendingSecretIds()"
+    (open)="openSubscription($event)"
+    (sendTest)="onSendTestRow($event)"
+    (toggleStatus)="onToggleStatusRow($event)"
+    (rotateSecret)="openRotateSecret($event)"
+    (create)="openNewSubscription()"
+    (retry)="loadSubscriptions()"
+    (clearSearch)="clearSearch()"
+  />
+
+  @if (!subscriptionsFailed() && filteredSubscriptions().length > 0) {
+    <footer class="mt-auto border-t border-border pt-8">
+      <ui-pagination
+        [total]="filteredSubscriptions().length"
+        [pageSizes]="pageSizes"
+        [label]="'webhooks.subscriptions.pagination' | transloco"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
+    </footer>
+  }
+} @else {
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="deliverySteps()"
+    [label]="'webhooks.deliveries.steps.label' | transloco"
+    [hint]="'webhooks.deliveries.steps.hint' | transloco"
+    [value]="deliveryStatus()"
+    (valueChange)="onDeliveryStatusChange($event)"
+  />
+
+  <app-deliveries-table
+    [rows]="deliveries()"
+    [loading]="deliveriesLoading()"
+    [loadFailed]="deliveriesFailed()"
+    [hasFilters]="hasDeliveryFilters()"
+    (open)="openDelivery($event)"
+    (retry)="loadDeliveries(true)"
+    (clearFilters)="clearDeliveryFilters()"
+  />
+
+  @if (!deliveriesFailed() && (deliveriesLoading() ? deliveriesTotal() > 0 : deliveries().length > 0)) {
+    <footer class="mt-auto border-t border-border pt-8">
+      <ui-pagination
+        [total]="deliveriesTotal()"
+        [pageSizes]="pageSizes"
+        [label]="'webhooks.deliveries.pagination' | transloco"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
+    </footer>
+  }
+}
+
+@if (subscriptionModalOpen()) {
+  <app-subscription-modal
+    class="contents"
+    [subscriptionId]="activeSubscriptionId()"
+    [eventsCatalogue]="eventsCatalogue()"
+    [scopeTarget]="scopeTarget()"
+    [canManage]="canManage()"
+    [canTest]="canTest()"
+    [openRotateOnLoad]="openRotateForId() !== null && openRotateForId() === activeSubscriptionId()"
+    (closed)="onSubscriptionModalClosed()"
+    (saved)="onSubscriptionModalSaved($event)"
+    (openDelivery)="onOpenDeliveryFromSubModal($event)"
+  />
+}
+
+@if (deliveryModalOpen()) {
+  <app-delivery-modal
+    class="contents"
+    [deliveryId]="activeDeliveryId()"
+    [subscriptionStatus]="activeDeliverySubscriptionStatus()"
+    [canReplay]="canReplay()"
+    (closed)="onDeliveryModalClosed()"
+    (retried)="onDeliveryRetried($event)"
+  />
+}
+
+<app-conflict-dialog
+  #rowConflictDialog
+  class="contents"
+  [title]="'webhooks.conflict.title' | transloco"
+  [text]="'webhooks.conflict.text' | transloco"
+  [reloadLabel]="'webhooks.conflict.reload' | transloco"
+  [keepLabel]="'webhooks.conflict.keep' | transloco"
+  (reload)="onRowConflictReload()"
+  (keep)="onRowConflictKeep()"
+/>

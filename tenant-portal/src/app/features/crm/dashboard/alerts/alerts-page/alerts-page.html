@@ -1,0 +1,204 @@
+@if (!allowed()) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'alerts.forbidden.title' | transloco"
+    [text]="'alerts.forbidden.text' | transloco"
+    [actionLabel]="'analytics.common.back' | transloco"
+    (action)="goHome()"
+  />
+} @else {
+  <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+    <button type="button" uiButton variant="primary" class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'alerts.new' | transloco }}
+    </button>
+
+    <div
+      class="flex h-field min-w-preset flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      <span class="inline-flex shrink-0 text-text-muted">
+        <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+      </span>
+      <input
+        #searchInput
+        type="text"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'alerts.search' | transloco"
+        [attr.aria-label]="'alerts.search' | transloco"
+        [value]="search()"
+        (input)="onSearchInput($event)"
+        (keydown.escape)="search.set('')"
+      />
+      @if (search()) {
+        <button
+          type="button"
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'alerts.clearSearch' | transloco"
+          (click)="search.set(''); searchInput.focus()"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </div>
+
+    <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+    <ui-field
+      size="bare"
+      [label]="'alerts.filters.state' | transloco"
+      [hint]="'alerts.filters.stateHint' | transloco"
+    >
+      <ui-segmented
+        class="self-start"
+        [options]="stateOptions()"
+        [label]="'alerts.filters.state' | transloco"
+        [value]="stateFilter()"
+        (valueChange)="setStateFilter($event)"
+      />
+    </ui-field>
+
+    <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+    <button
+      type="button"
+      class="inline-flex h-btn shrink-0 cursor-pointer items-center gap-6 rounded-8 border px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        mineOnly()
+          ? 'border-brand bg-brand-soft text-on-brand-soft'
+          : 'border-border-field bg-surface text-text hover:bg-row-hover'
+      "
+      [attr.aria-pressed]="mineOnly()"
+      [title]="'alerts.filters.mineHint' | transloco"
+      (click)="toggleMineOnly()"
+    >
+      <ng-icon name="tablerUser" size="14" aria-hidden="true" />
+      <span>{{ 'alerts.filters.mineOnly' | transloco }}</span>
+    </button>
+
+    <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+      [disabled]="loading()"
+      [attr.aria-label]="'alerts.reload' | transloco"
+      [title]="'alerts.reload' | transloco"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+    </button>
+  </div>
+
+  @if (loadError()) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'analytics.common.loadFailed' | transloco"
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="reload()"
+    />
+  } @else if (showEmptyState()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon" aria-hidden="true">
+        <ng-icon name="tablerBellRinging" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'alerts.empty' | transloco }}</p>
+    </div>
+  } @else {
+    <ui-data-table
+      [columns]="columns()"
+      [rows]="visibleAlerts()"
+      [rowKey]="rowKey"
+      [loading]="loading()"
+      [rowClickable]="true"
+      [emptyText]="'analytics.common.noResults' | transloco"
+      [label]="'alerts.table.label' | transloco"
+      [(sort)]="sort"
+      (rowClick)="openEdit($event)"
+    >
+      <ng-template uiCell="name" let-row>
+        <span class="truncate font-medium" [title]="row.name">{{ row.name }}</span>
+      </ng-template>
+
+      <ng-template uiCell="metric" let-row>
+        @let mLabel = metricLabel(row);
+        <span class="truncate text-12 text-text" [title]="mLabel">{{ mLabel }}</span>
+      </ng-template>
+
+      <ng-template uiCell="condition" let-row>
+        @let cond = conditionPhrase(row);
+        <span class="truncate text-12 text-text">
+          {{ cond.before }}<bdi dir="ltr" class="tabular-nums font-medium">{{ cond.value }}</bdi>{{ cond.after }}
+        </span>
+      </ng-template>
+
+      <ng-template uiCell="schedule" let-row>
+        @let sched = schedulePhrase(row);
+        <span class="truncate text-12 text-text">
+          {{ sched.before }}<bdi dir="ltr" class="tabular-nums">{{ sched.value }}</bdi>{{ sched.after }}
+        </span>
+      </ng-template>
+
+      <ng-template uiCell="state" let-row>
+        <ui-badge [tone]="stateTone(row.state)" [attr.title]="suspendedTooltip(row)">
+          {{ 'alerts.states.' + row.state | transloco }}
+        </ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="lastEvaluatedAt" let-row>
+        <bdi dir="ltr" class="truncate text-12 tabular-nums text-text-muted">
+          {{ formatTimestamp(row.lastEvaluatedAt) }}
+        </bdi>
+      </ng-template>
+
+      <ng-template uiCell="nextEvaluationAt" let-row>
+        <bdi dir="ltr" class="truncate text-12 tabular-nums text-text-muted">
+          {{ formatTimestamp(row.nextEvaluationAt) }}
+        </bdi>
+      </ng-template>
+
+      <ng-template uiCell="actions" let-row>
+        <div class="flex w-full justify-end" (click)="$event.stopPropagation()">
+          <ui-actions-menu
+            [items]="rowActions(row)"
+            [label]="'alerts.actions.label' | transloco"
+            (selected)="onRowAction(row, $event)"
+          />
+        </div>
+      </ng-template>
+    </ui-data-table>
+
+    @if (hasMore()) {
+      <div class="flex shrink-0 justify-center pb-8">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'alerts.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+
+  <app-alert-modal
+    [metrics]="catalogMetrics()"
+    (saved)="onAlertSaved($event)"
+    (reloaded)="onAlertReloaded($event)"
+    (deleteRequested)="requestDelete($event)"
+  />
+
+  <app-evaluations-modal />
+
+  <ui-confirm-dialog
+    #deleteDialog
+    tone="danger"
+    [title]="'alerts.delete.title' | transloco"
+    [text]="'alerts.delete.text' | transloco: { name: pendingDeleteRule()?.name ?? '' }"
+    [confirmLabel]="'analytics.common.delete' | transloco"
+    [cancelLabel]="'analytics.common.cancel' | transloco"
+  />
+}

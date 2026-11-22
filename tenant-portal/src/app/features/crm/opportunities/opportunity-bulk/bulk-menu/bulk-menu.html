@@ -1,0 +1,9 @@
+@if (resolvedCount() > 0 && actions().length > 0) {
+  <app-record-bulk-menu
+    [count]="resolvedCount()"
+    [actions]="actions()"
+    [disabled]="isDisabled()"
+    [busyReason]="resolvedBusyReason()"
+    (run)="onRun($event)"
+  />
+}

@@ -1,0 +1,7 @@
+<app-record-bulk-menu
+  [count]="resolvedCount()"
+  [actions]="actions()"
+  [disabled]="disabled()"
+  [busyReason]="disabledReason()"
+  (run)="onRun($event)"
+/>

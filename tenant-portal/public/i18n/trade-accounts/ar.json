@@ -1,0 +1,183 @@
+{
+  "title": "الحسابات التجارية",
+  "toolbar": {
+    "new": "حساب جديد",
+    "searchLabel": "البحث في الحسابات",
+    "searchPlaceholder": "ابحث باسم الطرف أو رمزه",
+    "reload": "إعادة التحميل",
+    "visibleToBranch": "عرض الحسابات المرئية لفرع {{branch}}"
+  },
+  "filters": {
+    "role": "تصفية حسب الدور",
+    "roleHint": "اعرض الحسابات ذات الدور المختار فقط، مثل العميل أو المورد",
+    "all": "الكل",
+    "customers": "العملاء",
+    "suppliers": "الموردون",
+    "status": "تصفية حسب الحالة",
+    "allStatuses": "جميع الحالات"
+  },
+  "sort": {
+    "label": "ترتيب حسب",
+    "created": "الأحدث أولًا",
+    "name": "اسم الطرف",
+    "limit": "حد الائتمان"
+  },
+  "views": {
+    "switcher": "طريقة العرض",
+    "cards": "بطاقات",
+    "table": "جدول"
+  },
+  "pagination": "ترقيم صفحات الحسابات",
+  "table": {
+    "selectPage": "تحديد جميع الحسابات في هذه الصفحة",
+    "selectRow": "تحديد {{name}}",
+    "party": "الطرف",
+    "role": "الدور",
+    "creditLimit": "حد الائتمان",
+    "priceBook": "قائمة الأسعار",
+    "status": "الحالة",
+    "updated": "آخر تحديث",
+    "actions": "الإجراءات"
+  },
+  "empty": {
+    "title": "لا توجد حسابات بعد.",
+    "filtered": "لا توجد حسابات تطابق هذه المرشّحات."
+  },
+  "error": {
+    "loadFailed": "تعذّر تحميل الحسابات."
+  },
+  "partyType": {
+    "ORGANIZATION": "شركة",
+    "INDIVIDUAL": "فرد"
+  },
+  "unlimited": "غير محدود",
+  "none": "بلا",
+  "actions": {
+    "block": "حظر الحساب",
+    "unblock": "إلغاء حظر الحساب",
+    "create": "إنشاء الحساب",
+    "checkCredit": "فحص الائتمان"
+  },
+  "modal": {
+    "newTitle": "حساب جديد",
+    "loadingTitle": "الحساب",
+    "loadFailed": "تعذّر تحميل هذا الحساب.",
+    "alreadyHasCustomer": " — لديه حساب عميل بالفعل",
+    "alreadyHasSupplier": " — لديه حساب مورد بالفعل",
+    "selectParty": "اختر طرفًا"
+  },
+  "sections": {
+    "commercialTerms": "الشروط التجارية",
+    "branchRule": "قاعدة الفرع",
+    "branchRuleCaption": "قاعدة لفرع {{branch}}. بدّل الفرع من الشريط العلوي لتعديل فرع آخر.",
+    "creditCheck": "فحص الائتمان"
+  },
+  "fields": {
+    "role": "الدور",
+    "roleHint": "العملاء يشترون من الشركة، والموردون يبيعون لها.",
+    "party": "الطرف",
+    "partyHint": "الشخص أو الشركة من دليل مساحة العمل.",
+    "blockReason": "سبب الحظر",
+    "blockReasonHint": "السبب المسجَّل عند حظر هذا الحساب.",
+    "creditLimit": "حد الائتمان",
+    "creditLimitHint": "أعلى مبلغ مفتوح مسموح به، واتركه فارغًا لعدم وضع حد.",
+    "creditLimitSupplierHint": "لا يوجد حد ائتمان للموردين.",
+    "creditCurrency": "عملة الائتمان",
+    "creditCurrencyHint": "عملة حد الائتمان.",
+    "priceBook": "قائمة الأسعار",
+    "priceBookHint": "الأسعار المستخدمة لهذا الحساب قبل القائمة الافتراضية للشركة.",
+    "creditPolicy": "سياسة الائتمان",
+    "creditPolicyHint": "السياسة المنشورة التي تُسجَّل مع كل فحص ائتمان.",
+    "orderingHold": "إيقاف الطلبات",
+    "orderingHoldHint": "عند تفعيله تُمنع الطلبات الجديدة لهذا الحساب.",
+    "allowedCurrencies": "العملات المسموح بها",
+    "allowedCurrenciesHint": "العملات التي يجوز لهذا الحساب استخدامها، وتركها فارغة يعني عملة الائتمان فقط.",
+    "branchCreditLimit": "حد ائتمان الفرع",
+    "branchCreditLimitHint": "حد أقل لهذا الفرع فقط.",
+    "branchOrderingHold": "إيقاف طلبات الفرع",
+    "branchOrderingHoldHint": "يمنع الطلبات الجديدة من هذا الفرع، ولا تملك القاعدة إلا إضافة الإيقاف.",
+    "branchCurrencies": "عملات الفرع",
+    "branchCurrenciesHint": "جزء من عملات الحساب.",
+    "ruleActive": "القاعدة نشطة",
+    "ruleActiveHint": "أوقفه لإيقاف تطبيق القاعدة.",
+    "checkAmount": "المبلغ",
+    "checkAmountHint": "مبلغ الطلب المراد فحصه.",
+    "checkCurrency": "العملة",
+    "checkCurrencyHint": "يجري الفحص بعملة ائتمان الحساب.",
+    "summaryLimit": "الحد",
+    "balanceOwed": "الرصيد المستحق",
+    "balanceOwedHint": "الرصيد غير المسدد المُبلَّغ عنه حاليًا من المحاسبة.",
+    "outcome": "النتيجة",
+    "outcomeHint": "ما إذا كان الطلب المقترح مسموحًا به أم محظورًا.",
+    "reason": "السبب",
+    "reasonHint": "القاعدة أو الحالة التي أدت إلى هذه النتيجة.",
+    "effectiveLimit": "الحد الفعلي",
+    "effectiveLimitHint": "حد الائتمان المطبَّق بعد مراعاة قاعدة الفرع.",
+    "currentExposure": "الانكشاف الحالي",
+    "currentExposureHint": "الرصيد المفتوح من المحاسبة.",
+    "openOrders": "الطلبات المفتوحة",
+    "openOrdersHint": "الطلبات غير المفوترة المفتوحة حاليًا لهذا الحساب.",
+    "thisAmount": "هذا المبلغ",
+    "thisAmountHint": "مبلغ الطلب المقترح الذي جرى فحصه.",
+    "remaining": "المتبقي",
+    "remainingHint": "الائتمان المتاح المتبقي بعد الانكشاف والطلبات المفتوحة.",
+    "asOf": "بتاريخ",
+    "asOfHint": "وقت احتساب بيانات الانكشاف من المحاسبة."
+  },
+  "branchRules": {
+    "others": "الفروع الأخرى",
+    "othersHint": "قواعد الفروع الأخرى للعرض فقط؛ بدّل الفرع من الشريط العلوي لتعديلها.",
+    "hold": "إيقاف الطلبات",
+    "noHold": "بلا إيقاف",
+    "retired": "موقوفة"
+  },
+  "credit": {
+    "summary": "الموقف الائتماني",
+    "stale": "بيانات المحاسبة أقدم من 5 دقائق، وقد تكون الأرقام تغيّرت.",
+    "saveFirst": "احفظ تغييراتك أولًا.",
+    "allowed": "مسموح",
+    "blocked": "محظور",
+    "exposureUnavailable": "بيانات الائتمان من المحاسبة غير محدَّثة، فأعد المحاولة بعد بضع دقائق.",
+    "reason": {
+      "ACCOUNT_BLOCKED": "الحساب محظور.",
+      "ACCOUNT_NOT_ACTIVE": "الحساب غير نشط.",
+      "BRANCH_ORDERING_HOLD": "الطلبات موقوفة لهذا الفرع.",
+      "ACCOUNT_ORDERING_HOLD": "الطلبات موقوفة لهذا الحساب.",
+      "CURRENCY_NOT_ALLOWED": "هذه العملة غير مسموح بها للحساب.",
+      "ACCOUNTING_ORDERING_HOLD": "أوقفت المحاسبة الطلبات.",
+      "ACCOUNT_ACTIVE_UNLIMITED": "ليس للحساب حد ائتمان.",
+      "CREDIT_LIMIT_EXCEEDED": "المبلغ يتجاوز حد الائتمان.",
+      "CREDIT_WITHIN_LIMIT": "المبلغ ضمن حد الائتمان."
+    }
+  },
+  "statusDialog": {
+    "blockTitle": "حظر الحساب",
+    "unblockTitle": "إلغاء حظر الحساب",
+    "blockText": "ستُمنع الطلبات الجديدة لهذا الحساب حتى يُلغى حظره.",
+    "unblockText": "يمكن للحساب إنشاء طلبات من جديد.",
+    "evidenceLabel": "مرجع الإثبات",
+    "evidenceHint": "رقم مستند أو طلب يدعم القرار، حتى 240 حرفًا."
+  },
+  "validation": {
+    "invalidDecimal": "أدخل رقمًا موجبًا صالحًا بحد أقصى 8 منازل عشرية.",
+    "currencyRequiredWithLimit": "اختر عملة الائتمان عند تحديد حد الائتمان.",
+    "limitRequiredWithCurrency": "أدخل حد الائتمان عند تحديد عملة الائتمان.",
+    "allowedMustIncludeCreditCurrency": "يجب أن تتضمن العملات المسموح بها {{currency}}.",
+    "branchCurrenciesSubset": "يجب أن تكون عملات الفرع جزءًا من عملات الحساب."
+  },
+  "warnings": {
+    "branchRulesWider": "توجد قواعد فروع أوسع من الشروط الجديدة: {{branches}}"
+  },
+  "toast": {
+    "created": "تم إنشاء الحساب.",
+    "saved": "تم حفظ الحساب.",
+    "blocked": "تم حظر الحساب.",
+    "unblocked": "تم إلغاء حظر الحساب."
+  },
+  "unsaved": {
+    "title": "حفظ التغييرات؟",
+    "text": "لديك تغييرات غير محفوظة، هل تريد حفظها قبل الإغلاق؟",
+    "save": "حفظ",
+    "discard": "تجاهل"
+  }
+}

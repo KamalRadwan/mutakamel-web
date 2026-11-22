@@ -1,0 +1,162 @@
+@switch (block()) {
+  @case ('loading') {
+    <div class="flex w-full max-w-modal-alert flex-col items-center gap-8" aria-busy="true">
+      <span class="size-icon-tile-lg animate-pulse rounded-8 bg-neutral-soft"></span>
+      <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+      <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+    </div>
+  }
+
+  @case ('notConfigured') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerServer" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.notConfigured.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.notConfigured.line' | transloco }}
+    </p>
+  }
+
+  @case ('connecting') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerPlugConnectedX" size="18" aria-hidden="true" />
+    </span>
+    <div class="flex items-center justify-center gap-6">
+      <ng-icon name="tablerLoader2" size="16" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+      <p class="text-13 leading-18 font-medium text-text">
+        {{ 'phoneCalls.states.connecting.title' | transloco }}
+      </p>
+    </div>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.connecting.line' | transloco: phone.server() }}
+    </p>
+  }
+
+  @case ('registrationFailed') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerPlugConnectedX" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.registrationFailed.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.registrationFailed.line' | transloco }}
+    </p>
+    <button type="button" uiButton variant="primary" (click)="phone.retry()">
+      {{ 'phoneCalls.states.registrationFailed.action' | transloco }}
+    </button>
+  }
+
+  @case ('offline') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerWifiOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.offline.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.offline.line' | transloco }}
+    </p>
+    <button type="button" uiButton variant="secondary" (click)="phone.retry()">
+      {{ 'phoneCalls.states.offline.action' | transloco }}
+    </button>
+  }
+
+  @case ('requiresHttps') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.requiresHttps.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.requiresHttps.line' | transloco }}
+    </p>
+  }
+
+  @case ('unsupported') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerPhoneOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.unsupported.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.unsupported.line' | transloco }}
+    </p>
+  }
+
+  @case ('micBlocked') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerMicrophoneOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.micBlocked.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.micBlocked.line' | transloco }}
+    </p>
+    <button type="button" uiButton variant="secondary" (click)="phone.setTab('settings')">
+      {{ 'phoneCalls.states.micBlocked.action' | transloco }}
+    </button>
+  }
+
+  @case ('noMicrophone') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerMicrophone2" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.noMicrophone.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.noMicrophone.line' | transloco }}
+    </p>
+    <button type="button" uiButton variant="secondary" (click)="phone.requestMicPermission()">
+      {{ 'phoneCalls.states.noMicrophone.action' | transloco }}
+    </button>
+  }
+
+  @case ('paused') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.paused.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.paused.line' | transloco }}
+    </p>
+  }
+
+  @case ('suspended') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerCreditCard" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.suspended.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.suspended.line' | transloco }}
+    </p>
+    <button type="button" uiButton variant="secondary" (click)="phone.retry()">
+      {{ 'phoneCalls.states.suspended.action' | transloco }}
+    </button>
+  }
+
+  @case ('scopeMismatch') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon">
+      <ng-icon name="tablerBuilding" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 font-medium text-text">
+      {{ 'phoneCalls.states.scopeMismatch.title' | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'phoneCalls.states.scopeMismatch.line' | transloco }}
+    </p>
+    <button type="button" uiButton variant="primary" (click)="reloadPage()">
+      {{ 'phoneCalls.states.scopeMismatch.action' | transloco }}
+    </button>
+  }
+}

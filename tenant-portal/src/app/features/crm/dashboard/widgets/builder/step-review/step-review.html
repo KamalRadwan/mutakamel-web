@@ -1,0 +1,155 @@
+<div class="flex flex-col gap-10">
+  <div class="flex items-center justify-between gap-8">
+    <h2 class="min-w-0 truncate text-14 leading-20 font-medium text-text">
+      {{ 'builder2.review.summary' | transloco }}
+    </h2>
+
+    @if (canPublish) {
+      <button
+        uiButton
+        type="button"
+        [variant]="state.publishReady() ? 'primary' : 'secondary'"
+        [loading]="publishingFlow()"
+        [disabled]="publishingFlow()"
+        (click)="onPublish()"
+      >
+        <ng-icon name="tablerSend" size="15" aria-hidden="true" />
+        <span>{{ 'builder2.review.publish' | transloco }}</span>
+      </button>
+    }
+  </div>
+
+  <dl class="grid grid-cols-1 gap-8 rounded-10 border border-border bg-surface-muted p-8">
+    @for (row of summaryRows(); track row.key) {
+      <div class="flex flex-col gap-2">
+        <dt class="flex h-label items-center gap-4 text-12 text-text-muted">
+          <span class="truncate">{{ row.label }}</span>
+          <span
+            #hintTrigger
+            class="relative inline-flex shrink-0 items-center text-accent"
+            tabindex="0"
+            (mouseenter)="showHint(row.key, hintTrigger, hintTip)"
+            (focus)="showHint(row.key, hintTrigger, hintTip)"
+            (blur)="hideHint()"
+            (keydown.escape)="hideHint()"
+            [attr.aria-describedby]="'review-summary-' + row.key + '-hint'"
+            (mouseleave)="hideHint()"
+          >
+            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+            <span
+              #hintTip
+              [id]="'review-summary-' + row.key + '-hint'"
+              role="tooltip"
+              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+              [class.invisible]="!(tipPlaced() && activeHint() === row.key)"
+              [style.top.px]="tooltipPlace().top"
+              [style.inset-inline-start.px]="tooltipPlace().start"
+            >
+              {{ row.hint }}
+            </span>
+          </span>
+        </dt>
+        <dd
+          [attr.aria-describedby]="'review-summary-' + row.key + '-hint'"
+          class="text-12 leading-18 font-medium text-text"
+        >
+          {{ row.value }}
+        </dd>
+      </div>
+    }
+  </dl>
+
+  <div class="flex flex-col gap-6" aria-describedby="review-validation-hint">
+    <div class="flex h-label items-center gap-4 text-12 text-text-muted">
+      <span>{{ 'builder2.review.validationTitle' | transloco }}</span>
+      <span
+        #valHintTrigger
+        class="relative inline-flex shrink-0 items-center text-accent"
+        tabindex="0"
+        (mouseenter)="showHint('validation', valHintTrigger, valHintTip)"
+        (focus)="showHint('validation', valHintTrigger, valHintTip)"
+        (blur)="hideHint()"
+        (keydown.escape)="hideHint()"
+        aria-describedby="review-validation-hint"
+        (mouseleave)="hideHint()"
+      >
+        <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+        <span
+          #valHintTip
+          id="review-validation-hint"
+          role="tooltip"
+          class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+          [class.invisible]="!(tipPlaced() && activeHint() === 'validation')"
+          [style.top.px]="tooltipPlace().top"
+          [style.inset-inline-start.px]="tooltipPlace().start"
+        >
+          {{ 'builder2.review.validationHint' | transloco }}
+        </span>
+      </span>
+    </div>
+
+    <div class="flex flex-col gap-6">
+      @for (row of validationRows(); track row.id) {
+        <div class="flex h-table-row items-center justify-between gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+          <div class="flex min-w-0 items-center gap-8">
+            <span class="truncate text-13 font-medium text-text">{{ row.label }}</span>
+            <ui-badge [tone]="row.valid ? 'success' : 'danger'">
+              {{ (row.valid ? 'builder2.review.valid' : 'builder2.review.hasErrors') | transloco }}
+            </ui-badge>
+          </div>
+
+          <button
+            uiButton
+            type="button"
+            variant="ghost"
+            size="small"
+            (click)="goToStep(row.id)"
+          >
+            <span>{{ 'builder2.review.goToStep' | transloco }}</span>
+            <ng-icon name="tablerArrowRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+
+  <ui-field
+    for="review-change-summary"
+    size="multiline"
+    [label]="'builder2.review.changeSummary' | transloco"
+    [hint]="'builder2.review.changeSummaryHint' | transloco"
+    [max]="500"
+    [count]="changeSummaryValue().length"
+  >
+    <textarea
+      #changeSummaryInput
+      id="review-change-summary"
+      rows="3"
+      class="min-h-textarea w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'builder2.review.changeSummaryPlaceholder' | transloco"
+      [value]="changeSummaryValue()"
+      (input)="onChangeSummaryInput(changeSummaryInput.value)"
+    ></textarea>
+  </ui-field>
+
+  <ui-field
+    for="review-internal-notes"
+    size="multiline"
+    [label]="'builder2.review.internalNotes' | transloco"
+    [hint]="'builder2.review.internalNotesHint' | transloco"
+    [max]="1000"
+    [count]="internalNotesValue().length"
+  >
+    <textarea
+      #internalNotesInput
+      id="review-internal-notes"
+      rows="3"
+      class="min-h-textarea w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'builder2.review.internalNotesPlaceholder' | transloco"
+      [value]="internalNotesValue()"
+      (input)="onInternalNotesInput(internalNotesInput.value)"
+    ></textarea>
+  </ui-field>
+</div>
+
+<app-publish-modal #publishModal />

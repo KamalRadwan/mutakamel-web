@@ -1,0 +1,223 @@
+<app-settings-frame
+  [addLabel]="'opportunityStages.new' | transloco"
+  [addDisabled]="atLimit()"
+  [addHint]="atLimit() ? ('opportunityStages.limitHint' | transloco: { max: maxStages }) : null"
+  [searchPlaceholder]="'opportunityStages.search' | transloco"
+  [loading]="loading()"
+  [showAdd]="canManage"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="load()"
+>
+  <app-settings-notice notices tone="info">
+    {{ 'opportunityStages.notice' | transloco }}
+  </app-settings-notice>
+
+  @if (failed() && !loading()) {
+    <div class="flex flex-col items-center gap-8 p-16 text-center" role="alert">
+      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="load()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'opportunityStages.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumnsClass"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'settings.common.nameAr' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.nameEn' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'opportunityStages.table.meaning' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'opportunityStages.table.category' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.status' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'opportunityStages.table.usedIn' | transloco }}
+          </span>
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading() && !stages().length) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumnsClass"
+              aria-hidden="true"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-skeleton-line w-3/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-3/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-3/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border"></span>
+              }
+            </div>
+          }
+        } @else {
+          @for (stage of filteredStages(); track stage.id) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumnsClass"
+              (click)="openEdit(stage)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <button
+                  type="button"
+                  class="cursor-pointer truncate text-start font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="openEdit(stage); $event.stopPropagation()"
+                >
+                  {{ stage.nameAr }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate">{{ stage.nameEn }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+                  {{ 'opportunityStages.flags.' + stage.flag | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium"
+                  [class]="categoryClass(stage.category)"
+                >
+                  {{ 'opportunityStages.categories.' + stage.category | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="stage.isActive ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                >
+                  {{ (stage.isActive ? 'settings.common.active' : 'settings.common.inactive') | transloco }}
+                </span>
+                @if (stage.isSystem) {
+                  <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+                    <ng-icon name="tablerLock" size="12" aria-hidden="true" />
+                    {{ 'settings.common.system' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (usedInText(stage); as usedNames) {
+                  <span class="truncate text-12 text-text" [title]="usedNames">{{ usedNames }}</span>
+                } @else {
+                  <span class="text-12 text-text-muted">—</span>
+                }
+              </span>
+
+              @if (canManage) {
+                <span
+                  role="cell"
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="actions(stage)"
+                    [label]="'settings.common.actions' | transloco"
+                    (selected)="act(stage, $event)"
+                  />
+                </span>
+              }
+            </div>
+          } @empty {
+            <div role="row" class="p-16 text-center text-12 text-text-muted">
+              <span role="cell">
+                {{ (search().trim() ? 'settings.common.noResults' : 'opportunityStages.empty') | transloco }}
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <div footer class="flex flex-wrap items-center justify-between gap-8">
+    <span>{{ 'opportunityStages.footer.count' | transloco: { count: stages().length } }}</span>
+    <a
+      routerLink="/crm/settings/pipelines"
+      class="rounded-4 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    >
+      {{ 'opportunityStages.footer.openPipelines' | transloco }}
+    </a>
+  </div>
+</app-settings-frame>
+
+<app-opportunity-stage-modal
+  [canManage]="canManage"
+  (saved)="onSaved($event)"
+  (failed)="onSaveFailed($event)"
+  (deleteRequested)="confirmDelete($event)"
+/>
+
+<ui-confirm-dialog
+  [title]="'opportunityStages.delete.title' | transloco"
+  [text]="'opportunityStages.delete.text' | transloco: { name: deletingName() }"
+  [confirmLabel]="'settings.common.delete' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #inUseModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'opportunityStages.inUse.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'opportunityStages.inUse.text' | transloco: { names: inUsePipelineNames() } }}
+  </p>
+
+  @if (inUsePipelines().length) {
+    <button modal-footer type="button" uiButton (click)="openInUsePipelines()">
+      {{ 'opportunityStages.actions.openPipelines' | transloco }}
+    </button>
+  }
+  <button modal-footer type="button" uiButton variant="secondary" (click)="inUseModal.close()">
+    {{ 'settings.common.close' | transloco }}
+  </button>
+</ui-modal>

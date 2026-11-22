@@ -1,0 +1,86 @@
+{
+  "subscription": {
+    "title": "Subscription",
+    "billingCycle": "Billing cycle",
+    "currentPeriod": "Current period",
+    "renewsOn": "Renews on",
+    "trialEnds": "Trial ends",
+    "recurringTotal": "Recurring total",
+    "viewAction": "View subscription",
+    "accessText": {
+      "DUNNING": "Payments are overdue; pay the open invoice to keep full access.",
+      "READ_ONLY": "Your workspace is in read-only mode until the overdue invoice is paid.",
+      "BLOCKED": "Workspace access is blocked until overdue invoices are settled."
+    }
+  },
+  "wallet": {
+    "title": "Wallet",
+    "available": "Available",
+    "balance": "Balance",
+    "reserved": "Reserved",
+    "reservedHint": "Held for payments in progress",
+    "topUpDisabled": {
+      "FROZEN": "Your wallet is frozen and cannot be topped up.",
+      "CLOSED": "Your wallet is closed and cannot be topped up."
+    }
+  },
+  "due": {
+    "title": "Amount due",
+    "outstanding": "Outstanding",
+    "invoiceNumber": "Invoice",
+    "dueDate": "Due date",
+    "viewInvoice": "View invoice",
+    "nothingToPay": "Nothing to pay right now"
+  },
+  "tabs": {
+    "label": "Billing activity",
+    "payments": "Payments",
+    "wallet": "Wallet activity"
+  },
+  "payments": {
+    "cols": {
+      "date": "Date",
+      "purpose": "Purpose",
+      "provider": "Provider",
+      "amount": "Amount",
+      "appliedUsd": "Applied in USD",
+      "status": "Status",
+      "invoice": "Invoice"
+    },
+    "openInvoice": "Open invoice",
+    "empty": "No payments yet",
+    "loadFailed": "We could not load payments.",
+    "pagination": "Payments pagination"
+  },
+  "ledger": {
+    "cols": {
+      "date": "Date",
+      "reason": "Reason",
+      "direction": "Amount",
+      "sourceAmount": "Source amount",
+      "balanceAfter": "Balance after",
+      "note": "Note"
+    },
+    "empty": "No wallet activity yet",
+    "loadFailed": "We could not load wallet activity.",
+    "pagination": "Wallet activity pagination"
+  },
+  "topup": {
+    "title": "Top up wallet",
+    "amountLabel": "Amount",
+    "amountPlaceholder": "100.00",
+    "amountHint": "The amount to add, in the currency you choose",
+    "amountRequired": "Enter an amount from 1 with up to 4 decimals",
+    "amountInvalid": "Enter an amount from 1 with up to 4 decimals",
+    "currencyLabel": "Currency",
+    "currencyHint": "You pay in this currency; the wallet is kept in USD",
+    "continue": "Continue to payment",
+    "done": "Done",
+    "waiting": "Waiting for the payment to finish…",
+    "openPaymentPage": "Open payment page",
+    "popupBlockedTitle": "Payment window was blocked",
+    "popupBlockedText": "Use \"Open payment page\" in the dialog to continue.",
+    "successToast": "Wallet topped up",
+    "timeoutToast": "We have not received the payment yet. The balance updates when it arrives."
+  }
+}

@@ -1,0 +1,90 @@
+<div
+  class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-10"
+  [attr.aria-label]="'phoneCalls.log.ariaLabel' | transloco"
+  [attr.aria-busy]="loading()"
+  (scroll)="onScroll($event)"
+>
+  @if (loading()) {
+    @for (row of skeletonRows; track row) {
+      <div
+        class="flex h-table-row shrink-0 items-center gap-8 rounded-10 border border-border bg-surface px-8"
+        aria-hidden="true"
+      >
+        <span class="size-icon-tile-sm shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+    }
+  } @else if (failed()) {
+    <div class="flex h-full flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'phoneCalls.log.error' | transloco }}</p>
+      <button type="button" uiButton variant="primary" size="small" (click)="reload()">
+        {{ 'phoneCalls.actions.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (items().length === 0) {
+    <div class="flex h-full flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerHistory" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'phoneCalls.log.empty' | transloco }}</p>
+    </div>
+  } @else {
+    @for (group of groups(); track group.key) {
+      <div class="px-2 pt-4 text-11 leading-16 font-medium text-text-muted first:pt-0">
+        {{ ('phoneCalls.days.' + group.key) | transloco }}
+      </div>
+      <div role="list" class="flex flex-col gap-6">
+        @for (item of group.items; track item.id) {
+          <div role="listitem">
+            <app-call-log-row
+              [item]="item"
+              variant="card"
+              [canCallBack]="true"
+              [callBackDisabled]="phone.busy()"
+              (callBack)="onCallBack($event)"
+            />
+          </div>
+        }
+      </div>
+    }
+
+    @if (loadingMore()) {
+      <div
+        class="flex h-table-row shrink-0 items-center gap-8 rounded-10 border border-border bg-surface px-8"
+        aria-live="polite"
+      >
+        <span class="size-icon-tile-sm shrink-0 animate-pulse rounded-8 bg-neutral-soft" aria-hidden="true"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-2">
+          <span class="text-12 leading-18 text-text-muted">{{ 'phoneCalls.log.loadingMore' | transloco }}</span>
+          <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+        </div>
+      </div>
+    }
+  }
+</div>
+
+<footer class="flex h-table-head shrink-0 items-center justify-between gap-8 border-t border-border px-10">
+  <button type="button" uiButton variant="secondary" size="small" (click)="openHistory()">
+    <ng-icon name="tablerHistory" size="14" aria-hidden="true" />
+    <span>{{ 'phoneCalls.actions.viewAll' | transloco }}</span>
+  </button>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source disabled:hover:bg-transparent"
+    [disabled]="loading()"
+    [attr.aria-label]="'phoneCalls.actions.refresh' | transloco"
+    [title]="'phoneCalls.actions.refresh' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+  </button>
+</footer>
+
+<app-call-history #historyModal />

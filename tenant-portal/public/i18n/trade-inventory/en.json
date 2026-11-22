@@ -1,0 +1,151 @@
+{
+  "common": {
+    "node": "Node",
+    "item": "Item",
+    "uom": "Unit",
+    "baseUom": "Base unit",
+    "quantity": "Quantity",
+    "lot": "Lot",
+    "serials": "Serial numbers",
+    "status": "Status",
+    "updated": "Updated",
+    "effectiveAt": "Effective date",
+    "reason": "Reason",
+    "version": "Version",
+    "none": "—",
+    "copy": "Copy",
+    "copied": "Copied",
+    "openRecord": "Open record",
+    "advisory": "Advisory figure",
+    "canManageOff": "You can view this page but not change it.",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "badge": {
+    "negative": "Negative",
+    "nodeStatus": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive"
+    },
+    "nodeType": {
+      "WAREHOUSE": "Warehouse",
+      "STORE": "Store",
+      "VIRTUAL": "Virtual"
+    },
+    "period": {
+      "OPEN": "Open",
+      "CLOSED": "Closed"
+    },
+    "uom": {
+      "DRAFT": "Draft",
+      "PUBLISHED": "Published",
+      "RETIRED": "Retired"
+    },
+    "serial": {
+      "ON_HAND": "On hand",
+      "RESERVED": "Reserved",
+      "DELIVERED": "Delivered",
+      "VOIDED": "Voided"
+    },
+    "serialEvent": {
+      "OPENING": "Opening",
+      "RECEIPT": "Receipt",
+      "RESERVATION": "Reservation",
+      "RELEASE": "Release",
+      "EXPIRY": "Expiry",
+      "DELIVERY": "Delivery",
+      "RECEIPT_REVERSAL": "Receipt reversal",
+      "DELIVERY_REVERSAL": "Delivery reversal"
+    },
+    "movement": {
+      "OPENING_BALANCE": "Opening",
+      "PURCHASE_RECEIPT": "Receipt",
+      "SALES_DELIVERY": "Delivery",
+      "PURCHASE_RECEIPT_REVERSAL": "Receipt reversal",
+      "SALES_DELIVERY_REVERSAL": "Delivery reversal"
+    },
+    "outcome": {
+      "ALLOW": "Allow",
+      "PARTIAL": "Partial",
+      "BACKORDER": "Backorder",
+      "REJECT": "Reject"
+    },
+    "decision": {
+      "INVENTORY_RESERVATION": "Reservation shortage",
+      "INVENTORY_NEGATIVE": "Negative stock",
+      "INVENTORY_TOLERANCE": "Over-receipt tolerance",
+      "INVENTORY_OVER_RECEIPT": "Over-receipt tolerance"
+    },
+    "source": {
+      "DRAFT": "Draft",
+      "POSTED": "Posted",
+      "PARTIALLY_REVERSED": "Partially reversed",
+      "REVERSED": "Reversed"
+    }
+  },
+  "conflict": {
+    "title": "This record changed",
+    "text": "This record was changed by someone else. Reload it to see the latest version.",
+    "reload": "Reload"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "network": "Cannot reach the server.",
+    "permission": "You do not have permission for this.",
+    "TRADE_VALIDATION_FAILED": "Some values are not valid.",
+    "TRADE_CONCURRENCY_STALE_VERSION": "This record was changed by someone else. Reload it to see the latest version.",
+    "TRADE_IDEMPOTENCY_KEY_MISSING": "Request key missing. Try again.",
+    "TRADE_IDEMPOTENCY_MISMATCH": "This request was already sent with different values.",
+    "TRADE_INVENTORY_NODE_CONFLICT": "A node with this code already exists.",
+    "TRADE_INVENTORY_NODE_IN_USE": "This node has reserved stock and cannot be changed that way.",
+    "TRADE_INVENTORY_NODE_NOT_FOUND": "This node is not available in the current branch.",
+    "TRADE_INVENTORY_SCOPE_INVALID": "Choose at least one valid branch for this node.",
+    "TRADE_INVENTORY_PERIOD_NOT_FOUND": "Inventory period not found.",
+    "TRADE_INVENTORY_PERIOD_CLOSED": {
+      "default": "This period cannot be saved or changed.",
+      "INVALID_RANGE": "End date cannot be earlier than start date.",
+      "OVERLAPPING_PERIOD": "These dates overlap another inventory period.",
+      "TRANSITION_NOT_ALLOWED": "This period cannot change status right now.",
+      "OVERLAPPING_OPEN_PERIOD": "Another open period already covers these dates."
+    },
+    "TRADE_INVENTORY_PERIOD_CONFLICT": {
+      "default": "The effective date does not fall in an open period.",
+      "PERIOD_MISSING": "No inventory period covers this date.",
+      "PERIOD_CLOSED": "The period covering this date is closed.",
+      "FUTURE_DATE": "Effective date cannot be in the future.",
+      "BACKDATE_LIMIT": "The date is older than this period allows."
+    },
+    "TRADE_INVENTORY_UOM_CONVERSION_NOT_FOUND": "Unit conversion not found.",
+    "TRADE_INVENTORY_UOM_CONVERSION_INVALID": {
+      "default": "This unit conversion is not valid.",
+      "IDENTITY_NOT_REQUIRED": "Source and target units cannot be the same.",
+      "UOM_NOT_REGISTERED_FOR_ITEM": "Use units registered on this item.",
+      "TRANSITION_NOT_ALLOWED": "This conversion cannot change status right now.",
+      "FUTURE_REPLACEMENT_UNSUPPORTED": "Cannot replace a live conversion with one effective in the future.",
+      "EFFECTIVE_FROM_NOT_AFTER_PREDECESSOR": "Effective date must be after the active conversion.",
+      "NON_EXACT_RESULT": "This quantity does not convert exactly to the base unit."
+    },
+    "TRADE_INVENTORY_UOM_CONVERSION_UNAVAILABLE": "This unit has no published conversion to the base unit.",
+    "TRADE_INVENTORY_TRACKING_REQUIRED": "Lot or serial tracking details are missing or do not match the quantity.",
+    "TRADE_INVENTORY_SERIAL_CONFLICT": "One of these serial numbers already exists.",
+    "TRADE_INVENTORY_SERIAL_NOT_FOUND": "Serial number not found.",
+    "TRADE_INVENTORY_QUANTITY_CONFLICT": "An opening balance already exists for this item and node.",
+    "TRADE_INVENTORY_QUANTITY_INVALID": {
+      "default": "Quantity or unit selection is not valid.",
+      "UOM_REQUIRED_FOR_AMBIGUOUS_BALANCE": "Choose a unit to check this balance."
+    },
+    "TRADE_INVENTORY_REVERSAL_NOT_ALLOWED": "Nothing left to reverse, or a selected serial was already reversed.",
+    "TRADE_INVENTORY_POLICY_REJECTED": "A policy blocked this action.",
+    "TRADE_REASON_NOT_FOUND": "This reason no longer exists. Pick another one.",
+    "TRADE_REASON_INACTIVE": "This reason is no longer active. Pick another one.",
+    "TRADE_REASON_KIND_INVALID": "This reason does not belong to this action.",
+    "TRADE_INVENTORY_MOVEMENT_NOT_FOUND": "Movement not found.",
+    "TRADE_INVENTORY_RECEIPT_NOT_FOUND": "Receipt not found.",
+    "TRADE_INVENTORY_DELIVERY_NOT_FOUND": "Delivery not found.",
+    "TRADE_INVENTORY_DECISION_NOT_FOUND": "Policy decision not found.",
+    "TRADE_INVENTORY_PERIOD_CODE_TAKEN": "Another inventory period already uses this code.",
+    "TRADE_INVENTORY_SCOPE_NOT_FOUND": "This record was not found in the current company.",
+    "TRADE_INVENTORY_ITEM_NOT_STOCK_TRACKED": "This item is not active or does not track stock.",
+    "TRADE_INVENTORY_TRACKING_UNSUPPORTED": "This item does not use lot or serial tracking of this kind."
+  }
+}

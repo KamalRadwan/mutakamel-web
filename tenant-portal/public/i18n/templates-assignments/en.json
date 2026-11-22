@@ -1,0 +1,230 @@
+{
+  "toolbar": {
+    "newAssignment": "New assignment",
+    "testSelection": "Test selection",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "scopeLabel": "Scope",
+    "scopeHint": "Select the tenant, company, or branch whose template assignments you want to inspect.",
+    "reload": "Reload"
+  },
+  "scopes": {
+    "tenant": "Whole workspace",
+    "company": "Company",
+    "branch": "Branch"
+  },
+  "documents": {
+    "QUOTATION": "Quotation",
+    "CRM_OUTBOUND_EMAIL": "CRM email",
+    "PURCHASE_QUOTATION": "Purchase quotation",
+    "SALES_ORDER": "Sales order",
+    "PURCHASE_ORDER": "Purchase order",
+    "INVOICE": "Invoice",
+    "CONTRACT": "Contract",
+    "LETTER": "Business letter"
+  },
+  "adapters": {
+    "TRADE_QUOTATION_PRINT_V1": "Quotation",
+    "CRM_LEAD_OUTBOUND_EMAIL_V1": "Lead email",
+    "CRM_CUSTOMER_OUTBOUND_EMAIL_V1": "Customer email",
+    "CRM_OPPORTUNITY_OUTBOUND_EMAIL_V1": "Opportunity email",
+    "TRADE_PURCHASE_QUOTATION_PRINT_V1": "Purchase quotation",
+    "TRADE_SALES_ORDER_PRINT_V1": "Sales order",
+    "TRADE_PURCHASE_ORDER_PRINT_V1": "Purchase order",
+    "TRADE_INVOICE_PRINT_V1": "Invoice",
+    "TRADE_CONTRACT_PRINT_V1": "Contract",
+    "CORE_BUSINESS_LETTER_PRINT_V1": "Business letter"
+  },
+  "locales": {
+    "all": "All languages",
+    "any": "Any language",
+    "en-US": "English",
+    "ar-EG": "Arabic"
+  },
+  "status": {
+    "all": "All statuses",
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive"
+  },
+  "chips": {
+    "document": "Document: {{value}}",
+    "language": "Language: {{value}}",
+    "status": "Status: {{value}}",
+    "effectiveAt": "Effective at: {{value}}",
+    "remove": "Remove filter"
+  },
+  "table": {
+    "ariaLabel": "Template assignments",
+    "template": "Template",
+    "document": "Document",
+    "language": "Language",
+    "scope": "Scope",
+    "version": "Version",
+    "priority": "Priority",
+    "default": "Default",
+    "effective": "Effective",
+    "status": "Status",
+    "actions": "Actions",
+    "defaultYes": "Default assignment",
+    "defaultNo": "Not default",
+    "unknownTemplate": "Unavailable template"
+  },
+  "actions": {
+    "open": "Open",
+    "deactivate": "Deactivate",
+    "deactivateAlreadyInactive": "Already inactive",
+    "deactivateNoPermission": "You do not have permission to deactivate assignments.",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "backToHome": "Back to home",
+    "retry": "Try again",
+    "clearFilters": "Clear filters",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "undoChanges": "Undo changes",
+    "unsavedChanges": "Unsaved changes",
+    "reload": "Reload",
+    "keepMyChanges": "Keep my changes",
+    "clearDate": "Clear date",
+    "clearDateTime": "Clear date and time"
+  },
+  "filtersModal": {
+    "title": "Filter assignments",
+    "documentTypeLabel": "Document",
+    "documentTypeHint": "Filter by document or CRM email adapter.",
+    "allDocuments": "All documents",
+    "languageLabel": "Language",
+    "languageHint": "Filter by exact language or default (All languages).",
+    "statusLabel": "Status",
+    "statusHint": "Show active or inactive assignments.",
+    "effectiveAtLabel": "Effective at",
+    "effectiveAtHint": "Show assignments active on a specific date.",
+    "effectiveAtPlaceholder": "Any date"
+  },
+  "modal": {
+    "createTitle": "New assignment",
+    "editTitle": "Template assignment",
+    "templateLabel": "Template",
+    "templateHint": "Choose an active template with a published version.",
+    "templateLockedHint": "The template definition cannot be changed after creating the assignment.",
+    "selectTemplate": "Select template",
+    "templateRequired": "Select a template.",
+    "versionLabel": "Published version",
+    "versionHint": "Select which published version of this template is used.",
+    "selectVersion": "Select version",
+    "versionRequired": "Select a published version.",
+    "versionOption": "v{{number}}",
+    "documentTypeLabel": "Document type",
+    "documentTypeHint": "Derived from the selected template definition.",
+    "adapterLabel": "Adapter",
+    "adapterHint": "Derived from the selected template data source.",
+    "languageLabel": "Language",
+    "languageHint": "Match the template language or apply to all languages as a default.",
+    "languageLockedHint": "Language is locked after creation.",
+    "scopeLabel": "Scope",
+    "scopeHint": "Company-owned templates can only be assigned to that company or its branches.",
+    "scopeLockedHint": "Scope is locked after creation.",
+    "priorityLabel": "Priority",
+    "priorityHint": "Higher number wins when multiple assignments match (0 to 1000).",
+    "priorityError": "Enter an integer between 0 and 1000.",
+    "defaultLabel": "Default assignment",
+    "defaultHint": "Use this assignment for automatic template selection.",
+    "effectiveFromLabel": "Effective from",
+    "effectiveFromHint": "Start date when this assignment becomes active.",
+    "effectiveFromPlaceholder": "Select start date",
+    "effectiveFromRequired": "Select a start date.",
+    "effectiveToLabel": "Effective to",
+    "effectiveToHint": "Optional end date; leave empty for no end date.",
+    "effectiveToPlaceholder": "No end date",
+    "effectiveToRangeError": "End date must be on or after the start date.",
+    "statusLabel": "Status",
+    "statusHint": "Whether this assignment is currently active or inactive.",
+    "noEligibleTemplates": "No published templates eligible for assignment",
+    "noPublishedVersions": "No published versions available"
+  },
+  "testModal": {
+    "title": "Test selection",
+    "run": "Run test",
+    "documentLabel": "Document",
+    "documentHint": "Select the document or email adapter to resolve.",
+    "languageLabel": "Language",
+    "languageHint": "Requested document language.",
+    "scopeLabel": "Scope",
+    "scopeHint": "Target workspace, company, or branch for resolution.",
+    "businessTimeLabel": "Business time",
+    "businessTimeHint": "Optional date and time (UTC) to evaluate effective windows against.",
+    "businessTimePlaceholder": "Current time",
+    "resultTitle": "Selection result",
+    "chosenVersion": "Chosen template version",
+    "matchedScope": "Matched scope",
+    "languageMatch": "Language match",
+    "matchExact": "Exact match",
+    "matchDefault": "Default (All languages)",
+    "candidateCount": "Candidate count",
+    "noMatchTitle": "No matching assignment",
+    "noMatchDescription": "No active default assignment matches this scope, document, language, and time."
+  },
+  "confirmDeactivate": {
+    "title": "Deactivate assignment?",
+    "text": "Documents at this scope will no longer select “{{name}}” ({{version}}). History is preserved.",
+    "confirm": "Deactivate"
+  },
+  "unsaved": {
+    "title": "Save changes?",
+    "text": "You have unsaved changes to this assignment.",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
+  "conflict": {
+    "title": "Assignment changed elsewhere",
+    "text": "Another user saved newer changes while you were editing. Reload to get the latest version or keep your edits.",
+    "reload": "Reload",
+    "keep": "Keep my changes"
+  },
+  "datePicker": {
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "timePicker": {
+    "hour": "Hour",
+    "minute": "Minutes"
+  },
+  "toasts": {
+    "created": "Assignment created.",
+    "saved": "Assignment updated.",
+    "deactivated": "Assignment deactivated."
+  },
+  "states": {
+    "emptyTitle": "No assignments for this scope",
+    "emptyDescription": "Assign a published template version so documents use it here.",
+    "filteredEmptyTitle": "No assignments match these filters",
+    "filteredEmptyDescription": "Change or clear your filters to see assignments.",
+    "loadFailedTitle": "Could not load assignments",
+    "loadFailedDescription": "An unexpected error occurred while loading template assignments.",
+    "supportReference": "Support reference: {{correlationId}}",
+    "forbiddenTitle": "Access denied",
+    "forbiddenDescription": "You do not have permission to view template assignments.",
+    "featureDisabledTitle": "Template Designer unavailable",
+    "featureDisabledDescription": "Template Designer is unavailable for this workspace."
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "CORE.TEMPLATE.ASSIGNMENT.CONFLICT": "An overlapping default assignment already exists for this scope, language, and priority.",
+    "ASSIGNMENT.CONFLICT": "An overlapping default assignment already exists for this scope, language, and priority.",
+    "CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID": "Company templates can only be assigned to that company or its branches.",
+    "CORE.TEMPLATE.ASSIGNMENT.VERSION_INCOMPATIBLE": "The selected version is not published or is incompatible with this document.",
+    "CORE.TEMPLATE.CONCURRENCY.STALE_REVISION": "This assignment was updated elsewhere. Reload and try again.",
+    "CORE.TEMPLATE.PERMISSION.DENIED": "You do not have permission for this action.",
+    "CORE.TEMPLATE.FEATURE.DISABLED": "Template Designer is unavailable for this workspace.",
+    "CORE.TEMPLATE.NOT_FOUND": "This assignment no longer exists or is outside your scope.",
+    "CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE": "The template service is temporarily unavailable.",
+    "CORE.TEMPLATE.ASSIGNMENT.OWNER_RUNTIME_UNAVAILABLE": "This document cannot be assigned yet because its owning app is not available to render it."
+  },
+  "disabledReasons": {
+    "OWNER_RUNTIME_UNAVAILABLE": "Not available yet"
+  }
+}

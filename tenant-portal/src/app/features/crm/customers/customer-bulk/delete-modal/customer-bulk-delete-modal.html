@@ -1,0 +1,58 @@
+<app-bulk-run-modal
+  size="form"
+  icon="tablerTrash"
+  tile="bg-icon-red"
+  tone="danger"
+  [title]="'customerBulk.delete.title' | transloco"
+  [count]="displayCount()"
+  [summary]="('customerBulk.count' | pluralKey: displayCount()) | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="canSubmit()"
+  [dismissable]="false"
+  [typedConfirm]="typedConfirmFrom"
+  [submitLabel]="'customerBulk.delete.go' | transloco: { n: displayCount() }"
+  (submit)="submit()"
+  (closed)="onModalClosed()"
+>
+  @if (requestError(); as err) {
+    <div
+      role="alert"
+      class="flex items-start gap-8 rounded-8 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
+    >
+      <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'customerBulk.delete.leads' | transloco }}
+  </p>
+
+  @if (blacklistedCount() > 0) {
+    <p class="flex items-center gap-6 text-12 leading-18 text-warning-text tabular-nums">
+      <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+      <span>{{ 'customerBulk.delete.blacklisted' | transloco: { b: blacklistedCount() } }}</span>
+    </p>
+  }
+
+  <ui-field
+    size="multiline"
+    [label]="'customerBulk.delete.reason' | transloco"
+    [for]="uid + '-reason'"
+    [hint]="'customerBulk.delete.reasonHint' | transloco"
+    [count]="reasonLength()"
+    [max]="maxReasonLength"
+    [error]="reasonError()"
+  >
+    <textarea
+      [id]="uid + '-reason'"
+      rows="2"
+      [attr.maxlength]="maxReasonLength"
+      class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [value]="reason()"
+      [attr.aria-invalid]="reasonError() ? 'true' : null"
+      (input)="onReasonInput($event)"
+    ></textarea>
+  </ui-field>
+</app-bulk-run-modal>

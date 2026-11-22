@@ -1,0 +1,59 @@
+<dialog
+  #dialog
+  tabindex="-1"
+  class="z-modal m-auto outline-none rounded-14 border border-border bg-surface p-0 text-text shadow-modal backdrop:bg-overlay"
+  [class]="dialogClass()"
+  [style.height]="dialogHeight()"
+  [style.max-height]="dialogMaxHeight()"
+  [attr.aria-labelledby]="title() ? titleId : null"
+  [attr.aria-label]="title() ? null : (ariaLabel() || null)"
+  (cancel)="onCancel($event)"
+  (keydown.escape)="onEscape($event)"
+  (click)="onBackdropClick($event)"
+  (close)="onNativeClose()"
+>
+  <div
+    class="flex h-full flex-col"
+    [class.min-h-0]="isRecord()"
+    [class.overflow-hidden]="isRecord()"
+    [style.max-height]="isRecord() ? '100%' : 'calc(100vh - 2 * var(--space-16))'"
+  >
+    @if (title()) {
+      <header class="flex shrink-0 items-center gap-8 border-b border-border px-10 py-8">
+        @if (icon()) {
+          <span
+            class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="tileClass()"
+          >
+            <ng-icon [name]="icon()" size="15" aria-hidden="true" />
+          </span>
+        }
+        <div class="min-w-0 flex-1">
+          <h2 [id]="titleId" class="truncate text-15 leading-22 font-medium text-text">{{ title() }}</h2>
+          @if (subtitle()) {
+            <p dir="auto" class="truncate text-12 leading-18 text-text-muted">{{ subtitle() }}</p>
+          }
+        </div>
+        <ng-content select="[modal-header-end]" />
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="closeLabel()"
+          (click)="onHeaderClose()"
+        >
+          <ng-icon name="tablerX" size="15" aria-hidden="true" />
+        </button>
+      </header>
+    }
+
+    <div #body [class]="'min-h-0 flex-1 ' + (bodyClass() || 'overflow-y-auto p-10')">
+      <ng-content />
+    </div>
+
+    @if (hasFooter()) {
+      <footer class="flex shrink-0 items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+        <ng-content select="[modal-footer]" />
+      </footer>
+    }
+  </div>
+</dialog>

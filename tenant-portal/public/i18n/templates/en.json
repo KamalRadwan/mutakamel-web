@@ -1,0 +1,200 @@
+{
+  "pages": {
+    "library": {
+      "title": "Templates"
+    },
+    "template": {
+      "title": "Template design"
+    },
+    "assets": {
+      "title": "Template assets"
+    },
+    "assignments": {
+      "title": "Template assignments"
+    }
+  },
+  "families": {
+    "QUOTATION": "Quotation",
+    "PURCHASE_QUOTATION": "Purchase quotation",
+    "SALES_ORDER": "Sales order",
+    "PURCHASE_ORDER": "Purchase order",
+    "INVOICE": "Invoice",
+    "CONTRACT": "Contract",
+    "LETTER": "Business letter",
+    "CRM_OUTBOUND_EMAIL": "CRM email"
+  },
+  "channels": {
+    "PRINT": "Print",
+    "EMAIL": "Email"
+  },
+  "layouts": {
+    "HYBRID_DOCUMENT": "Hybrid document",
+    "FLOW_DOCUMENT": "Flow document",
+    "FIXED_CANVAS": "Fixed canvas",
+    "EMAIL_FLOW": "Email flow"
+  },
+  "layoutsShort": {
+    "HYBRID_DOCUMENT": "Hybrid",
+    "FLOW_DOCUMENT": "Flow",
+    "FIXED_CANVAS": "Fixed canvas",
+    "EMAIL_FLOW": "Email"
+  },
+  "layoutDescriptions": {
+    "HYBRID_DOCUMENT": "Fixed header and footer, flowing body",
+    "FLOW_DOCUMENT": "Content flows across pages",
+    "FIXED_CANVAS": "Every object at an exact position",
+    "EMAIL_FLOW": "Responsive email column layout"
+  },
+  "validationStates": {
+    "PASSED": "Passed",
+    "FAILED": "Failed",
+    "STALE": "Changed",
+    "NOT_VALIDATED": "Not checked"
+  },
+  "lifecycle": {
+    "ACTIVE": "Active",
+    "ARCHIVED": "Archived",
+    "INACTIVE": "Inactive",
+    "PUBLISHED": "Published",
+    "RETIRED": "Retired",
+    "notPublished": "Not published"
+  },
+  "locales": {
+    "en-US": "English",
+    "ar-EG": "Arabic",
+    "all": "All languages"
+  },
+  "directions": {
+    "AUTO": "Automatic",
+    "LTR": "Left to right",
+    "RTL": "Right to left"
+  },
+  "tabs": {
+    "label": "Template sections",
+    "overview": "Overview",
+    "design": "Design",
+    "preview": "Preview",
+    "validation": "Validation",
+    "versions": "Versions",
+    "recovery": "Recovery"
+  },
+  "actions": {
+    "newTemplate": "New template",
+    "open": "Open",
+    "save": "Save",
+    "undoChanges": "Undo changes",
+    "validate": "Validate",
+    "publish": "Publish",
+    "preview": "Preview",
+    "duplicate": "Duplicate",
+    "createConvertedCopy": "Create converted copy",
+    "archive": "Archive",
+    "restore": "Restore",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "close": "Close",
+    "retry": "Try again",
+    "clearFilters": "Clear filters",
+    "reload": "Reload",
+    "keepMyChanges": "Keep my changes",
+    "upload": "Upload",
+    "retire": "Retire",
+    "testSelection": "Test selection",
+    "newAssignment": "New assignment",
+    "deactivate": "Deactivate",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "states": {
+    "unsavedChanges": "Unsaved changes",
+    "saved": "Saved",
+    "saving": "Saving...",
+    "saveFirst": "Save changes before validating or previewing.",
+    "emptyFirstUse": {
+      "title": "No templates yet",
+      "description": "Create your first print or email template to get started."
+    },
+    "emptyFiltered": {
+      "title": "No templates match these filters",
+      "description": "Change or clear your filters to see templates."
+    },
+    "emptyAssets": {
+      "title": "No assets yet",
+      "description": "Upload logos, backgrounds or images for your templates."
+    },
+    "emptyAssignments": {
+      "title": "No assignments for this scope",
+      "description": "Assign a published template version so documents use it here."
+    },
+    "emptyVersions": {
+      "title": "No published versions yet",
+      "description": "Validate and publish the working draft to create version 1."
+    },
+    "emptyRecovery": {
+      "title": "No recovery snapshots",
+      "description": "Snapshots are created automatically during schema migrations and fixed-page conversions."
+    },
+    "loadFailed": {
+      "title": "Could not load templates",
+      "description": "An unexpected error occurred while loading data.",
+      "reference": "Support reference: {{correlationId}}"
+    },
+    "notFound": {
+      "title": "Template not found",
+      "description": "This template does not exist or is outside your current scope."
+    },
+    "forbidden": {
+      "title": "Access denied",
+      "description": "You do not have permission to view this section."
+    },
+    "featureDisabled": {
+      "title": "Template Designer unavailable",
+      "description": "Template Designer is unavailable for this workspace."
+    },
+    "readOnly": {
+      "title": "View only",
+      "description": "You can review published templates, but editing is disabled."
+    },
+    "conflict": {
+      "title": "Template changed elsewhere",
+      "description": "Another user saved newer changes while you were editing. Reload to get the latest version or keep your edits."
+    },
+    "offline": {
+      "message": "You are offline. Changes will be saved when the connection returns."
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "network": "Could not reach the server.",
+    "CORE.TEMPLATE.FEATURE.DISABLED": "Template Designer is unavailable for this workspace.",
+    "CORE.TEMPLATE.PERMISSION.DENIED": "You do not have permission for this action.",
+    "CORE.TEMPLATE.NOT_FOUND": "This item no longer exists or is outside your scope.",
+    "CORE.TEMPLATE.CODE.CONFLICT": "This template code is already in use.",
+    "CORE.TEMPLATE.CONCURRENCY.STALE_REVISION": "This record was updated elsewhere. Reload and try again.",
+    "CORE.TEMPLATE.CONCURRENCY.PRECONDITION_REQUIRED": "This change needs the record's current version. Reload the page and try again.",
+    "CORE.TEMPLATE.DEFINITION.ARCHIVED": "Archived templates cannot be edited. Restore the template first.",
+    "CORE.TEMPLATE.DEFINITION.REFERENCED": "Published or assigned templates cannot be deleted.",
+    "CORE.TEMPLATE.DEFINITION.SYSTEM_PROTECTED": "System templates cannot be modified or archived.",
+    "CORE.TEMPLATE.VALIDATION.FAILED": "Fix the validation errors before continuing.",
+    "CORE.TEMPLATE.PUBLISH.NOT_VALIDATED": "Validate the current draft before publishing.",
+    "CORE.TEMPLATE.PUBLISH.VALIDATION_STALE": "The draft changed since the last check. Validate again before publishing.",
+    "CORE.TEMPLATE.PUBLISH.NO_CHANGES": "No changes to publish since the current version.",
+    "CORE.TEMPLATE.ASSET.IN_USE": "This asset is used by a published version and cannot be retired.",
+    "CORE.TEMPLATE.ASSIGNMENT.CONFLICT": "An overlapping default assignment already exists for this scope and priority.",
+    "CORE.TEMPLATE.ASSIGNMENT.SCOPE_INVALID": "Company templates can only be assigned to that company or its branches.",
+    "CORE.TEMPLATE.PREVIEW.TOO_MANY_ACTIVE": "You already have three PDF previews running. Wait for one to finish, then try again.",
+    "CORE.TEMPLATE.PREVIEW.ARTIFACT_EXPIRED": "This PDF preview has expired. Generate it again.",
+    "CORE.TEMPLATE.DEPENDENCY.UNAVAILABLE": "The template service is temporarily unavailable.",
+    "CORE.TEMPLATE.CONCURRENCY.SCHEMA_CHANGED": "The data source fields for this draft changed. Reload the draft before saving.",
+    "CORE.TEMPLATE.IDEMPOTENCY.CONFLICT": "This request was already used for a different action. Try again.",
+    "CORE.TEMPLATE.IDEMPOTENCY.IN_FLIGHT": "The same request is still being processed. Wait a moment, then check the result.",
+    "CORE.TEMPLATE.IDEMPOTENCY.MISMATCH": "This request does not match the one sent before. Reload the page and try again.",
+    "CORE.TEMPLATE.DRAFT.RECOVERY_SNAPSHOT_UNAVAILABLE": "This recovery snapshot is not available. Choose another snapshot.",
+    "CORE.TEMPLATE.COMPILER.FAILED": "The template could not be prepared for output. Check the design and validate again."
+  },
+  "fixtures": {
+    "salesStandardEn": "Standard quotation (English)",
+    "salesStandardAr": "Standard quotation (Arabic)",
+    "salesLong48En": "Long quotation · 48 items (English)"
+  }
+}

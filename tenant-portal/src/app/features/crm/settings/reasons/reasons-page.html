@@ -1,0 +1,257 @@
+<div
+  role="tablist"
+  class="mx-12 mt-12 flex h-tab shrink-0 items-stretch overflow-x-auto border-b border-border text-12 leading-18 no-scrollbar"
+  [attr.aria-label]="'reasons.tabs.label' | transloco"
+  (keydown)="onTabKeydown($event)"
+>
+  @for (kind of visibleKinds(); track kind) {
+    <button
+      #tabBtn
+      type="button"
+      role="tab"
+      [id]="uid + '-tab-' + kind"
+      [attr.aria-selected]="activeKind() === kind"
+      [attr.aria-controls]="uid + '-panel'"
+      [tabIndex]="activeKind() === kind ? 0 : -1"
+      class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="activeKind() === kind ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+      (click)="activeKind.set(kind)"
+    >
+      <ng-icon [name]="kindTabs[kind].icon" size="14" aria-hidden="true" />
+      <span>{{ kindTabs[kind].labelKey | transloco }}</span>
+      <span
+        dir="ltr"
+        class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-4 text-11 leading-16 font-medium text-on-neutral-soft tabular-nums"
+      >
+        {{ kindCounts()[kind] }}
+      </span>
+    </button>
+  }
+</div>
+
+<div
+  role="tabpanel"
+  class="flex min-h-0 flex-1 flex-col"
+  [id]="uid + '-panel'"
+  [attr.aria-labelledby]="uid + '-tab-' + activeKind()"
+>
+  <app-settings-frame
+    [addLabel]="'reasons.new' | transloco"
+    [addDisabled]="atLimit()"
+    [addHint]="atLimit() ? ('reasons.limitHint' | transloco) : null"
+    [searchPlaceholder]="'reasons.search' | transloco"
+    [loading]="loading()"
+    [showAdd]="canManage"
+    [(search)]="search"
+    (add)="openCreate()"
+    (reload)="load()"
+  >
+    <div notices class="flex items-center justify-end gap-6">
+      <ui-field
+        size="bare"
+        [label]="'reasons.showInactive' | transloco"
+        [for]="uid + '-show-inactive'"
+        [hint]="'reasons.showInactiveHint' | transloco"
+      >
+        <ui-switch
+          [id]="uid + '-show-inactive'"
+          [label]="'reasons.showInactive' | transloco"
+          [describedBy]="uid + '-show-inactive-hint'"
+          [(checked)]="showInactive"
+        />
+      </ui-field>
+    </div>
+
+    @if (failed()) {
+      <div
+        class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+        role="alert"
+      >
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'settings.common.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="load()">
+          {{ 'settings.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="min-w-doc-table-min"
+          [attr.aria-label]="'reasons.columns.ariaLabel' | transloco"
+          [attr.aria-busy]="loading()"
+        >
+          <div
+            role="row"
+            class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+            [class]="gridColumnsClass()"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'reasons.columns.code' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'reasons.columns.name' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'reasons.columns.definition' | transloco }}
+            </span>
+            @if (isActivityOutcome()) {
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'reasons.columns.polarity' | transloco }}
+              </span>
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'reasons.columns.activityType' | transloco }}
+              </span>
+            }
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'reasons.columns.order' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'settings.common.status' | transloco }}
+            </span>
+            @if (canManage) {
+              <span role="columnheader" class="border-s border-on-nav-line">
+                <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+              </span>
+            }
+          </div>
+
+          @if (loading() && reasons().length === 0) {
+            @for (row of skeletonRows; track row) {
+              <div
+                role="row"
+                aria-hidden="true"
+                class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+                [class]="gridColumnsClass()"
+              >
+                <span role="cell" class="px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                @if (isActivityOutcome()) {
+                  <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                  <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                }
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                <span role="cell" class="border-s border-border px-10"><span class="block h-skeleton-line rounded-4 bg-neutral-soft"></span></span>
+                @if (canManage) {
+                  <span role="cell" class="border-s border-border px-10"></span>
+                }
+              </div>
+            }
+          } @else {
+            @for (reason of visibleReasons(); track reason.id) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+                [class]="gridColumnsClass()"
+                (click)="openEdit(reason)"
+              >
+                <span role="cell" class="flex min-w-0 items-center px-10">
+                  <code
+                    dir="ltr"
+                    class="inline-flex h-badge max-w-full items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text"
+                    [title]="reason.code"
+                  >
+                    <span class="truncate">{{ reason.code }}</span>
+                  </code>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <button
+                    type="button"
+                    class="flex min-w-0 flex-1 cursor-pointer flex-col rounded-4 text-start outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    (click)="openEdit(reason); $event.stopPropagation()"
+                  >
+                    <span dir="auto" class="truncate text-12 leading-16 font-medium text-text">{{ primaryName(reason) }}</span>
+                    <span dir="auto" class="truncate text-11 leading-16 text-text-muted">{{ secondaryName(reason) }}</span>
+                  </button>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (definitionText(reason); as def) {
+                    <span dir="auto" class="truncate text-12 text-text-muted" [title]="def">{{ def }}</span>
+                  } @else {
+                    <span class="text-12 text-text-muted">—</span>
+                  }
+                </span>
+
+                @if (isActivityOutcome()) {
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    @if (reason.polarity; as polarity) {
+                      <span
+                        class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                        [class]="polarityClass(polarity)"
+                      >
+                        {{ 'reasons.polarities.' + polarity | transloco }}
+                      </span>
+                    }
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <span class="truncate text-12 text-text">
+                      {{ reason.activityType ? ('reasons.activityTypes.' + reason.activityType | transloco) : ('reasons.allTypes' | transloco) }}
+                    </span>
+                  </span>
+                }
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span dir="ltr" class="text-12 text-text tabular-nums">{{ reason.sortOrder }}</span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
+                  <span
+                    class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                    [class]="reason.isActive ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                  >
+                    {{ (reason.isActive ? 'settings.common.active' : 'settings.common.inactive') | transloco }}
+                  </span>
+                  @if (reason.isSystem) {
+                    <span class="inline-flex h-badge items-center gap-3 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+                      <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+                      {{ 'settings.common.system' | transloco }}
+                    </span>
+                  }
+                </span>
+
+                @if (canManage) {
+                  <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
+                    <ui-actions-menu
+                      [items]="rowActions(reason)"
+                      [label]="'settings.common.actions' | transloco"
+                      (selected)="handleAction(reason, $event)"
+                    />
+                  </span>
+                }
+              </div>
+            } @empty {
+              <div role="row" class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+                @if (search().trim()) {
+                  <span role="cell" class="text-12 text-text-muted">{{ 'settings.common.noResults' | transloco }}</span>
+                  <button type="button" uiButton variant="ghost" size="small" (click)="clearSearch()">
+                    {{ 'settings.common.clearSearch' | transloco }}
+                  </button>
+                } @else {
+                  <span role="cell" class="text-12 text-text-muted">{{ 'reasons.empty' | transloco }}</span>
+                  @if (canManage && !atLimit()) {
+                    <button type="button" uiButton variant="ghost" size="small" (click)="openCreate()">
+                      {{ 'reasons.new' | transloco }}
+                    </button>
+                  }
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+
+    <div footer class="flex flex-wrap items-center justify-between gap-8 text-12 text-text-muted">
+      <span class="tabular-nums">{{ 'reasons.countAllKinds' | transloco: { count: reasons().length, max: limits.maxCount } }}</span>
+      <span>{{ 'reasons.footerHint' | transloco }}</span>
+    </div>
+  </app-settings-frame>
+</div>
+
+<app-reason-modal [canManage]="canManage" (saved)="onReasonSaved($event)" (reloaded)="onReasonSaved($event)" />

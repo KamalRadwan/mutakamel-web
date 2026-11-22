@@ -1,0 +1,530 @@
+<!-- 1. Payment terms -->
+<div class="col-span-2 min-w-0">
+  <ui-field
+    size="bare"
+    [label]="'tset.select.paymentLabel' | transloco"
+    [for]="fieldId('payment')"
+    [hint]="paymentHintKey() | transloco"
+    [required]="paymentRequired()"
+    [error]="paymentErrorKey() ? (paymentErrorKey()! | transloco) : null"
+  >
+    <div [class]="singleTriggerClasses('payment', !!paymentErrorKey())">
+      <button
+        #paymentTrigger
+        type="button"
+        [id]="fieldId('payment')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openDropdown() === 'payment'"
+        [attr.aria-invalid]="paymentErrorKey() ? 'true' : null"
+        [disabled]="disabled()"
+        class="flex min-w-0 flex-1 cursor-pointer items-center gap-6 bg-transparent text-start outline-none disabled:cursor-not-allowed"
+        (click)="toggleSingleDropdown('payment')"
+      >
+        @if (selectedPaymentTerm(); as term) {
+          <span class="min-w-0 flex-1 truncate">
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ term.code }}</bdi>
+            <span aria-hidden="true"> · </span>
+            <span>{{ termName(term) }}</span>
+          </span>
+          @if (paymentInactive()) {
+            <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+              {{ 'tset.select.inactive' | transloco }}
+            </span>
+          }
+        } @else if (paymentInactive()) {
+          <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+            {{ 'tset.select.inactive' | transloco }}
+          </span>
+          <span class="min-w-0 flex-1"></span>
+        } @else {
+          <span class="min-w-0 flex-1 truncate text-text-placeholder">{{ 'tset.select.placeholder' | transloco }}</span>
+        }
+      </button>
+
+      @if (!paymentRequired() && value().paymentTermId !== null && !disabled()) {
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tset.select.clear' | transloco"
+          [title]="'tset.select.clear' | transloco"
+          (click)="clearSingle('payment', $event)"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      }
+
+      <span class="pointer-events-none inline-flex shrink-0 text-text-muted" aria-hidden="true">
+        <ng-icon name="tablerChevronDown" size="14" />
+      </span>
+    </div>
+  </ui-field>
+
+  @if (termText(selectedPaymentTerm()); as preview) {
+    <p
+      class="mt-4 text-12 leading-18 text-text-muted"
+      [class]="isPreviewExpanded('payment') ? 'whitespace-pre-line' : 'line-clamp-2'"
+    >
+      {{ preview }}
+    </p>
+    @if (canExpandPreview(preview)) {
+      <button
+        type="button"
+        class="mt-2 inline-flex cursor-pointer items-center rounded-4 text-11 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="togglePreview('payment')"
+      >
+        {{ (isPreviewExpanded('payment') ? 'tset.select.showLess' : 'tset.select.showAll') | transloco }}
+      </button>
+    }
+  }
+</div>
+
+<!-- 2. Delivery terms -->
+<div class="col-span-2 min-w-0">
+  <ui-field
+    size="bare"
+    [label]="'tset.select.deliveryLabel' | transloco"
+    [for]="fieldId('delivery')"
+    [hint]="'tset.select.deliveryHint' | transloco"
+    [error]="deliveryErrorKey() ? (deliveryErrorKey()! | transloco) : null"
+  >
+    <div [class]="singleTriggerClasses('delivery', !!deliveryErrorKey())">
+      <button
+        #deliveryTrigger
+        type="button"
+        [id]="fieldId('delivery')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openDropdown() === 'delivery'"
+        [attr.aria-invalid]="deliveryErrorKey() ? 'true' : null"
+        [disabled]="disabled()"
+        class="flex min-w-0 flex-1 cursor-pointer items-center gap-6 bg-transparent text-start outline-none disabled:cursor-not-allowed"
+        (click)="toggleSingleDropdown('delivery')"
+      >
+        @if (selectedDeliveryTerm(); as term) {
+          <span class="min-w-0 flex-1 truncate">
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ term.code }}</bdi>
+            <span aria-hidden="true"> · </span>
+            <span>{{ termName(term) }}</span>
+          </span>
+          @if (term.incotermCode) {
+            <bdi dir="ltr" class="shrink-0 text-11 text-text-muted">{{ term.incotermCode }}</bdi>
+          }
+          @if (deliveryInactive()) {
+            <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+              {{ 'tset.select.inactive' | transloco }}
+            </span>
+          }
+        } @else if (deliveryInactive()) {
+          <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+            {{ 'tset.select.inactive' | transloco }}
+          </span>
+          <span class="min-w-0 flex-1"></span>
+        } @else {
+          <span class="min-w-0 flex-1 truncate text-text-placeholder">{{ 'tset.select.placeholder' | transloco }}</span>
+        }
+      </button>
+
+      @if (value().deliveryTermId !== null && !disabled()) {
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tset.select.clear' | transloco"
+          [title]="'tset.select.clear' | transloco"
+          (click)="clearSingle('delivery', $event)"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      }
+
+      <span class="pointer-events-none inline-flex shrink-0 text-text-muted" aria-hidden="true">
+        <ng-icon name="tablerChevronDown" size="14" />
+      </span>
+    </div>
+  </ui-field>
+
+  @if (termText(selectedDeliveryTerm()); as preview) {
+    <p
+      class="mt-4 text-12 leading-18 text-text-muted"
+      [class]="isPreviewExpanded('delivery') ? 'whitespace-pre-line' : 'line-clamp-2'"
+    >
+      {{ preview }}
+    </p>
+    @if (canExpandPreview(preview)) {
+      <button
+        type="button"
+        class="mt-2 inline-flex cursor-pointer items-center rounded-4 text-11 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="togglePreview('delivery')"
+      >
+        {{ (isPreviewExpanded('delivery') ? 'tset.select.showLess' : 'tset.select.showAll') | transloco }}
+      </button>
+    }
+  }
+</div>
+
+<!-- 3. Warranty terms -->
+<div class="col-span-2 min-w-0">
+  <ui-field
+    size="bare"
+    [label]="'tset.select.warrantyLabel' | transloco"
+    [for]="fieldId('warranty')"
+    [hint]="'tset.select.warrantyHint' | transloco"
+    [error]="warrantyErrorKey() ? (warrantyErrorKey()! | transloco) : null"
+  >
+    <div [class]="singleTriggerClasses('warranty', !!warrantyErrorKey())">
+      <button
+        #warrantyTrigger
+        type="button"
+        [id]="fieldId('warranty')"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openDropdown() === 'warranty'"
+        [attr.aria-invalid]="warrantyErrorKey() ? 'true' : null"
+        [disabled]="disabled()"
+        class="flex min-w-0 flex-1 cursor-pointer items-center gap-6 bg-transparent text-start outline-none disabled:cursor-not-allowed"
+        (click)="toggleSingleDropdown('warranty')"
+      >
+        @if (selectedWarrantyTerm(); as term) {
+          <span class="min-w-0 flex-1 truncate">
+            <bdi dir="ltr" class="font-medium tabular-nums">{{ term.code }}</bdi>
+            <span aria-hidden="true"> · </span>
+            <span>{{ termName(term) }}</span>
+          </span>
+          @if (warrantyInactive()) {
+            <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+              {{ 'tset.select.inactive' | transloco }}
+            </span>
+          }
+        } @else if (warrantyInactive()) {
+          <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+            {{ 'tset.select.inactive' | transloco }}
+          </span>
+          <span class="min-w-0 flex-1"></span>
+        } @else {
+          <span class="min-w-0 flex-1 truncate text-text-placeholder">{{ 'tset.select.placeholder' | transloco }}</span>
+        }
+      </button>
+
+      @if (value().warrantyTermId !== null && !disabled()) {
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tset.select.clear' | transloco"
+          [title]="'tset.select.clear' | transloco"
+          (click)="clearSingle('warranty', $event)"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      }
+
+      <span class="pointer-events-none inline-flex shrink-0 text-text-muted" aria-hidden="true">
+        <ng-icon name="tablerChevronDown" size="14" />
+      </span>
+    </div>
+  </ui-field>
+
+  @if (termText(selectedWarrantyTerm()); as preview) {
+    <p
+      class="mt-4 text-12 leading-18 text-text-muted"
+      [class]="isPreviewExpanded('warranty') ? 'whitespace-pre-line' : 'line-clamp-2'"
+    >
+      {{ preview }}
+    </p>
+    @if (canExpandPreview(preview)) {
+      <button
+        type="button"
+        class="mt-2 inline-flex cursor-pointer items-center rounded-4 text-11 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="togglePreview('warranty')"
+      >
+        {{ (isPreviewExpanded('warranty') ? 'tset.select.showLess' : 'tset.select.showAll') | transloco }}
+      </button>
+    }
+  }
+</div>
+
+<!-- 4. Terms and conditions (clauses multi-select) -->
+<div class="col-span-2 min-w-0">
+  <ui-field
+    size="bare"
+    [label]="'tset.select.clausesLabel' | transloco"
+    [for]="fieldId('clauses')"
+    [hint]="'tset.select.clausesHint' | transloco"
+    [count]="value().clauseIds.length"
+    [max]="maxClauses"
+    [error]="clausesErrorKey() ? (clausesErrorKey()! | transloco) : null"
+  >
+    <div #clausesFieldBox [class]="clausesBoxClasses()" (click)="onClausesFieldClick()">
+      @for (clauseId of value().clauseIds; track $index; let idx = $index) {
+        @let inactive = isSelectionInactive(clauseId);
+        @let chipLabel = clauseChipLabel(clauseId);
+        <span
+          class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 px-6 text-11 font-medium"
+          [class]="inactive ? 'bg-neutral-soft text-text-muted' : 'bg-brand-soft text-on-brand-soft'"
+        >
+          <bdi dir="ltr" class="shrink-0 tabular-nums">{{ idx + 1 }}</bdi>
+          <span aria-hidden="true">·</span>
+          @if (inactive) {
+            @if (chipLabel !== clauseId) {
+              <span class="truncate">{{ chipLabel }}</span>
+              <span aria-hidden="true">·</span>
+            }
+            <span class="shrink-0">{{ 'tset.select.inactive' | transloco }}</span>
+          } @else {
+            <span class="truncate">{{ chipLabel }}</span>
+          }
+
+          @if (!disabled()) {
+            <button
+              type="button"
+              class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              aria-haspopup="menu"
+              [attr.aria-expanded]="chipMenu()?.index === idx"
+              [attr.aria-label]="'tset.select.clauseMenu' | transloco: { name: chipLabel }"
+              [title]="'tset.select.clauseMenu' | transloco: { name: chipLabel }"
+              (click)="openChipMenu(idx, $event)"
+            >
+              <ng-icon name="tablerDots" size="12" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'tset.select.removeClause' | transloco: { name: chipLabel }"
+              [title]="'tset.select.removeClause' | transloco: { name: chipLabel }"
+              (click)="removeClauseAt(idx, $event)"
+            >
+              <ng-icon name="tablerX" size="12" aria-hidden="true" />
+            </button>
+          }
+        </span>
+      }
+
+      <input
+        #clausesInput
+        type="text"
+        role="combobox"
+        autocomplete="off"
+        aria-autocomplete="list"
+        class="h-chip min-w-time-dd flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [attr.id]="fieldId('clauses')"
+        [attr.aria-expanded]="openDropdown() === 'clauses'"
+        [attr.aria-activedescendant]="activeOptionId('clauses')"
+        [attr.aria-invalid]="clausesErrorKey() ? 'true' : null"
+        [disabled]="disabled()"
+        [readOnly]="clausesAtMax()"
+        [attr.title]="!disabled() && clausesAtMax() ? ('tset.select.maxReached' | transloco: { max: maxClauses }) : null"
+        [placeholder]="!disabled() && value().clauseIds.length === 0 ? ('tset.select.clausesPlaceholder' | transloco) : ''"
+        [value]="clausesQuery()"
+        (input)="onClausesInput($event)"
+        (keydown)="onClausesKeydown($event)"
+      />
+    </div>
+  </ui-field>
+</div>
+
+<!-- Single-select searchable popover (Payment / Delivery / Warranty) -->
+@if (openDropdown() === 'payment' || openDropdown() === 'delivery' || openDropdown() === 'warranty') {
+  @let slot = openDropdown() === 'payment' ? 'payment' : openDropdown() === 'delivery' ? 'delivery' : 'warranty';
+  @let selectedId = singleValueId(slot);
+  <div
+    #singleMenu
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+    [class.invisible]="!popoverPlaced()"
+    [style.top.px]="popoverPlace().top"
+    [style.inset-inline-start.px]="popoverPlace().start"
+    [style.min-width.px]="popoverPlace().width"
+    [style.max-height.px]="popoverPlace().maxHeight"
+    (keydown)="onSingleMenuKeydown($event, slot)"
+  >
+    <div class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8">
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #searchInput
+        type="text"
+        role="combobox"
+        autocomplete="off"
+        aria-autocomplete="list"
+        [attr.aria-expanded]="true"
+        [attr.aria-activedescendant]="activeOptionId(slot)"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'tset.select.searchPlaceholder' | transloco"
+        [attr.aria-label]="'tset.select.searchLabel' | transloco"
+        [value]="dropdownQuery()"
+        (input)="onSearchInput($event)"
+      />
+    </div>
+
+    <ul role="listbox" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scrollbar-thin">
+      @if (loading()) {
+        <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
+          <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+          <span>{{ 'tset.select.loading' | transloco }}</span>
+        </li>
+      } @else if (loadError()) {
+        <li role="presentation" class="flex items-center justify-between gap-8 px-8 py-6 text-12">
+          <span class="text-danger-text">{{ 'tset.select.loadFailed' | transloco }}</span>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
+            <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+            {{ 'tset.select.retry' | transloco }}
+          </button>
+        </li>
+      } @else if (filteredSingleOptions().length === 0) {
+        <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+          {{ 'tset.select.noMatches' | transloco }}
+        </li>
+      } @else {
+        @for (term of filteredSingleOptions(); track term.id; let idx = $index) {
+          <li
+            [id]="optionId(slot, idx)"
+            role="option"
+            [attr.aria-selected]="selectedId === term.id"
+            class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+            [class]="optionRowClasses(selectedId === term.id, idx)"
+            (mouseenter)="activeIndex.set(idx)"
+            (click)="chooseSingle(slot, term.id)"
+          >
+            <span class="flex min-w-0 flex-1 items-center gap-6 truncate">
+              <bdi dir="ltr" class="shrink-0 font-medium tabular-nums">{{ term.code }}</bdi>
+              <span aria-hidden="true" class="shrink-0">·</span>
+              <span class="min-w-0 truncate">{{ termName(term) }}</span>
+            </span>
+            @if (slot === 'delivery' && term.incotermCode) {
+              <bdi dir="ltr" class="shrink-0 text-11 text-text-muted">{{ term.incotermCode }}</bdi>
+            }
+            @if (selectedId === term.id) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </li>
+        }
+      }
+    </ul>
+  </div>
+}
+
+<!-- Multi-select grouped popover (Terms and conditions) -->
+@if (openDropdown() === 'clauses' && !disabled()) {
+  <ul
+    #clausesMenu
+    role="listbox"
+    aria-multiselectable="true"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover scrollbar-thin"
+    [class.invisible]="!popoverPlaced()"
+    [style.top.px]="popoverPlace().top"
+    [style.inset-inline-start.px]="popoverPlace().start"
+    [style.min-width.px]="popoverPlace().width"
+    [style.max-height.px]="popoverPlace().maxHeight"
+    (mousedown)="$event.preventDefault()"
+  >
+    @if (loading()) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
+        <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+        <span>{{ 'tset.select.loading' | transloco }}</span>
+      </li>
+    } @else if (loadError()) {
+      <li role="presentation" class="flex items-center justify-between gap-8 px-8 py-6 text-12">
+        <span class="text-danger-text">{{ 'tset.select.loadFailed' | transloco }}</span>
+        <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
+          <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+          {{ 'tset.select.retry' | transloco }}
+        </button>
+      </li>
+    } @else if (flatClauseOptions().length === 0) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+        {{ 'tset.select.noMatches' | transloco }}
+      </li>
+    } @else {
+      @if (filteredReturns().length > 0) {
+        <li role="presentation" class="px-8 pt-6 pb-2 text-11 font-medium text-text-muted">
+          {{ 'tset.select.groupReturns' | transloco }}
+        </li>
+        @for (term of filteredReturns(); track term.id; let idx = $index) {
+          @let selected = isClauseSelected(term.id);
+          @let disabledAdd = !selected && clausesAtMax();
+          <li
+            [id]="optionId('clauses', idx)"
+            role="option"
+            [attr.aria-selected]="selected"
+            [attr.aria-disabled]="disabledAdd ? 'true' : null"
+            class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+            [class]="optionRowClasses(selected, idx, disabledAdd)"
+            (mouseenter)="activeIndex.set(idx)"
+            (click)="!disabledAdd && toggleClause(term)"
+          >
+            <span class="flex min-w-0 flex-1 items-center gap-6 truncate">
+              <bdi dir="ltr" class="shrink-0 font-medium tabular-nums">{{ term.code }}</bdi>
+              <span aria-hidden="true" class="shrink-0">·</span>
+              <span class="min-w-0 truncate">{{ termName(term) }}</span>
+            </span>
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </li>
+        }
+      }
+
+      @if (filteredGeneral().length > 0) {
+        <li role="presentation" class="px-8 pt-6 pb-2 text-11 font-medium text-text-muted">
+          {{ 'tset.select.groupGeneral' | transloco }}
+        </li>
+        @for (term of filteredGeneral(); track term.id; let idx = $index) {
+          @let flatIdx = generalOptionIndex(idx);
+          @let selected = isClauseSelected(term.id);
+          @let disabledAdd = !selected && clausesAtMax();
+          <li
+            [id]="optionId('clauses', flatIdx)"
+            role="option"
+            [attr.aria-selected]="selected"
+            [attr.aria-disabled]="disabledAdd ? 'true' : null"
+            class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+            [class]="optionRowClasses(selected, flatIdx, disabledAdd)"
+            (mouseenter)="activeIndex.set(flatIdx)"
+            (click)="!disabledAdd && toggleClause(term)"
+          >
+            <span class="flex min-w-0 flex-1 items-center gap-6 truncate">
+              <bdi dir="ltr" class="shrink-0 font-medium tabular-nums">{{ term.code }}</bdi>
+              <span aria-hidden="true" class="shrink-0">·</span>
+              <span class="min-w-0 truncate">{{ termName(term) }}</span>
+            </span>
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </li>
+        }
+      }
+    }
+  </ul>
+}
+
+<!-- Small chip reorder menu -->
+@if (chipMenu(); as menu) {
+  @let isFirst = menu.index === 0;
+  @let isLast = menu.index >= value().clauseIds.length - 1;
+  <div
+    #chipMenu
+    role="menu"
+    class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!menu.placed"
+    [style.top.px]="menu.top"
+    [style.inset-inline-start.px]="menu.start"
+    (keydown)="onChipMenuKeydown($event)"
+  >
+    <button
+      type="button"
+      role="menuitem"
+      class="flex h-menu-item w-full items-center gap-8 rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="isFirst ? 'cursor-not-allowed text-text-placeholder opacity-drag-source' : 'cursor-pointer text-text hover:bg-row-hover'"
+      [disabled]="isFirst"
+      (click)="moveClause(menu.index, -1)"
+    >
+      <ng-icon name="tablerChevronLeft" size="14" class="shrink-0 rtl:-scale-x-100" aria-hidden="true" />
+      <span>{{ 'tset.select.moveEarlier' | transloco }}</span>
+    </button>
+    <button
+      type="button"
+      role="menuitem"
+      class="flex h-menu-item w-full items-center gap-8 rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="isLast ? 'cursor-not-allowed text-text-placeholder opacity-drag-source' : 'cursor-pointer text-text hover:bg-row-hover'"
+      [disabled]="isLast"
+      (click)="moveClause(menu.index, 1)"
+    >
+      <ng-icon name="tablerChevronRight" size="14" class="shrink-0 rtl:-scale-x-100" aria-hidden="true" />
+      <span>{{ 'tset.select.moveLater' | transloco }}</span>
+    </button>
+  </div>
+}

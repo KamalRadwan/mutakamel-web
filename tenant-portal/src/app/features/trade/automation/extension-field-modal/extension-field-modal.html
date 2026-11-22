@@ -1,0 +1,858 @@
+<ng-template #fieldGrid>
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+    <ui-field
+      class="col-span-2"
+      [for]="uid + '-key'"
+      [label]="'extensions.field.key.label' | transloco"
+      [hint]="'extensions.field.key.hint' | transloco"
+      [required]="true"
+      [error]="keyError()"
+    >
+      <input
+        [id]="uid + '-key'"
+        type="text"
+        dir="ltr"
+        autocomplete="off"
+        class="h-full w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'extensions.field.key.placeholder' | transloco"
+        [value]="fieldKey()"
+        (input)="onKeyInput($event)"
+        (blur)="onKeyBlur()"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [for]="uid + '-visibility'"
+      [label]="'extensions.field.visibility.label' | transloco"
+      [hint]="'extensions.field.visibility.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-visibility'"
+        [label]="'extensions.field.visibility.label' | transloco"
+        [options]="visibilityOptions()"
+        [value]="visibility()"
+        (valueChange)="visibility.set($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-3"
+      [for]="uid + '-kind'"
+      [label]="'extensions.field.kind.label' | transloco"
+      [hint]="'extensions.field.kind.hint' | transloco"
+    >
+      <ui-segmented
+        [id]="uid + '-kind'"
+        [label]="'extensions.field.kind.label' | transloco"
+        [options]="kindOptions()"
+        [value]="valueKind()"
+        (valueChange)="onKindChange($event)"
+      />
+    </ui-field>
+
+    @if (showScalarOrCollection()) {
+      <ui-field
+        class="col-span-1"
+        [for]="uid + '-type'"
+        [label]="'extensions.field.type.label' | transloco"
+        [hint]="'extensions.field.type.hint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-type'"
+          [label]="'extensions.field.type.label' | transloco"
+          [options]="scalarTypeOptions()"
+          [value]="scalarType()"
+          (valueChange)="onScalarTypeChange($event)"
+        />
+      </ui-field>
+
+      @if (showMaxItems()) {
+        <ui-field
+          class="col-span-1"
+          [for]="uid + '-max-items'"
+          [label]="'extensions.field.maxItems.label' | transloco"
+          [hint]="'extensions.field.maxItems.hint' | transloco"
+          [required]="true"
+          [error]="maxItemsError()"
+        >
+          <input
+            [id]="uid + '-max-items'"
+            type="text"
+            dir="ltr"
+            inputmode="numeric"
+            autocomplete="off"
+            class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [placeholder]="'extensions.field.maxItems.placeholder' | transloco"
+            [value]="maxItemsText()"
+            (input)="onTextInput(maxItemsText, $event)"
+          />
+        </ui-field>
+      } @else if (showMaxLength()) {
+        <ui-field
+          class="col-span-1"
+          [for]="uid + '-max-length'"
+          [label]="'extensions.field.maxLength.label' | transloco"
+          [hint]="'extensions.field.maxLength.hint' | transloco"
+          [error]="maxLengthError()"
+        >
+          <input
+            [id]="uid + '-max-length'"
+            type="text"
+            dir="ltr"
+            inputmode="numeric"
+            autocomplete="off"
+            class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [placeholder]="'extensions.field.maxLength.placeholder' | transloco"
+            [value]="maxLengthText()"
+            (input)="onTextInput(maxLengthText, $event)"
+          />
+        </ui-field>
+      } @else if (showDecimalExtras()) {
+        <ui-field
+          class="col-span-1"
+          [for]="uid + '-decimal-scale'"
+          [label]="'extensions.field.decimalScale.label' | transloco"
+          [hint]="'extensions.field.decimalScale.hint' | transloco"
+          [error]="decimalScaleError()"
+        >
+          <input
+            [id]="uid + '-decimal-scale'"
+            type="text"
+            dir="ltr"
+            inputmode="numeric"
+            autocomplete="off"
+            class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [value]="decimalScaleText()"
+            (input)="onTextInput(decimalScaleText, $event)"
+          />
+        </ui-field>
+      }
+
+      <ui-field
+        class="col-span-1"
+        [for]="uid + '-default-strategy'"
+        [label]="'extensions.field.default.label' | transloco"
+        [hint]="'extensions.field.default.hint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-default-strategy'"
+          [label]="'extensions.field.default.label' | transloco"
+          [options]="defaultStrategyOptions()"
+          [value]="defaultStrategy()"
+          (valueChange)="onDefaultStrategyChange($event)"
+        />
+      </ui-field>
+
+      @if (showMaxItems() && showMaxLength()) {
+        <ui-field
+          class="col-span-1"
+          [for]="uid + '-max-length'"
+          [label]="'extensions.field.maxLength.label' | transloco"
+          [hint]="'extensions.field.maxLength.hint' | transloco"
+          [error]="maxLengthError()"
+        >
+          <input
+            [id]="uid + '-max-length'"
+            type="text"
+            dir="ltr"
+            inputmode="numeric"
+            autocomplete="off"
+            class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [placeholder]="'extensions.field.maxLength.placeholder' | transloco"
+            [value]="maxLengthText()"
+            (input)="onTextInput(maxLengthText, $event)"
+          />
+        </ui-field>
+      }
+
+      @if (showDecimalExtras()) {
+        @if (showMaxItems()) {
+          <ui-field
+            class="col-span-1"
+            [for]="uid + '-decimal-scale'"
+            [label]="'extensions.field.decimalScale.label' | transloco"
+            [hint]="'extensions.field.decimalScale.hint' | transloco"
+            [error]="decimalScaleError()"
+          >
+            <input
+              [id]="uid + '-decimal-scale'"
+              type="text"
+              dir="ltr"
+              inputmode="numeric"
+              autocomplete="off"
+              class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+              [value]="decimalScaleText()"
+              (input)="onTextInput(decimalScaleText, $event)"
+            />
+          </ui-field>
+        }
+
+        <ui-field
+          class="col-span-1"
+          [for]="uid + '-min-value'"
+          [label]="'extensions.field.minValue.label' | transloco"
+          [hint]="'extensions.field.minValue.hint' | transloco"
+          [error]="minError()"
+        >
+          <input
+            [id]="uid + '-min-value'"
+            type="text"
+            dir="ltr"
+            inputmode="decimal"
+            autocomplete="off"
+            class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [placeholder]="'extensions.field.minValue.placeholder' | transloco"
+            [value]="minText()"
+            (input)="onTextInput(minText, $event)"
+          />
+        </ui-field>
+
+        <ui-field
+          class="col-span-1"
+          [for]="uid + '-max-value'"
+          [label]="'extensions.field.maxValue.label' | transloco"
+          [hint]="'extensions.field.maxValue.hint' | transloco"
+          [error]="maxError()"
+        >
+          <input
+            [id]="uid + '-max-value'"
+            type="text"
+            dir="ltr"
+            inputmode="decimal"
+            autocomplete="off"
+            class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [placeholder]="'extensions.field.maxValue.placeholder' | transloco"
+            [value]="maxText()"
+            (input)="onTextInput(maxText, $event)"
+          />
+        </ui-field>
+      }
+
+      @if (showChoices()) {
+        <ui-field
+          [class]="showDefaultValue() && valueKind() === 'SCALAR' ? 'col-span-2' : 'col-span-3'"
+          [for]="uid + '-choices'"
+          [label]="'extensions.field.choices.label' | transloco"
+          [hint]="'extensions.field.choices.hint' | transloco"
+          [required]="true"
+          [error]="choicesError()"
+        >
+          <ui-tag-picker
+            [inputId]="uid + '-choices'"
+            [label]="'extensions.field.choices.label' | transloco"
+            [options]="choiceTagOptions()"
+            [canCreate]="true"
+            [max]="limits.enumValues"
+            [createTag]="createChoiceFn"
+            [value]="choices()"
+            (valueChange)="onChoicesChange($event)"
+          />
+        </ui-field>
+      }
+
+      @if (showDefaultValue()) {
+        @if (valueKind() === 'COLLECTION') {
+          <ui-field
+            class="col-span-3"
+            [for]="uid + '-default-list'"
+            [label]="'extensions.field.defaultValue.label' | transloco"
+            [hint]="'extensions.field.defaultValue.hint' | transloco"
+            [required]="true"
+            [error]="defaultValueError()"
+          >
+            <ui-tag-picker
+              [inputId]="uid + '-default-list'"
+              [label]="'extensions.field.defaultValue.label' | transloco"
+              [options]="defaultListTagOptions()"
+              [canCreate]="scalarType() !== 'ENUM' && scalarType() !== 'BOOLEAN'"
+              [max]="limits.maxItems"
+              [createTag]="scalarType() !== 'ENUM' && scalarType() !== 'BOOLEAN' ? createDefaultListItemFn : null"
+              [value]="defaultListValues()"
+              (valueChange)="defaultListValues.set($event)"
+            />
+          </ui-field>
+        } @else {
+          @switch (scalarType()) {
+            @case ('ENUM') {
+              <ui-field
+                class="col-span-1"
+                [for]="uid + '-default-enum'"
+                [label]="'extensions.field.defaultValue.label' | transloco"
+                [hint]="'extensions.field.defaultValue.hint' | transloco"
+                [required]="true"
+                [error]="defaultValueError()"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  size="field"
+                  [id]="uid + '-default-enum'"
+                  [label]="'extensions.field.defaultValue.label' | transloco"
+                  [options]="choiceDropdownOptions()"
+                  [disabled]="choices().length === 0"
+                  [value]="defaultScalarText()"
+                  (valueChange)="defaultScalarText.set($event)"
+                />
+              </ui-field>
+            }
+            @case ('BOOLEAN') {
+              <ui-field
+                class="col-span-1"
+                [for]="uid + '-default-bool'"
+                [label]="'extensions.field.defaultValue.label' | transloco"
+                [hint]="'extensions.field.defaultValue.hint' | transloco"
+                [required]="true"
+                [error]="defaultValueError()"
+              >
+                <ui-segmented
+                  [id]="uid + '-default-bool'"
+                  [label]="'extensions.field.defaultValue.label' | transloco"
+                  [options]="booleanOptions()"
+                  [value]="defaultBoolStr()"
+                  (valueChange)="defaultBoolStr.set($event)"
+                />
+              </ui-field>
+            }
+            @case ('DATE') {
+              <ui-field
+                class="col-span-1"
+                [for]="uid + '-default-date'"
+                [label]="'extensions.field.defaultValue.label' | transloco"
+                [hint]="'extensions.field.defaultValue.hint' | transloco"
+                [required]="true"
+                [error]="defaultValueError()"
+              >
+                <ui-date-field
+                  [id]="uid + '-default-date'"
+                  [ariaLabel]="'extensions.field.defaultValue.label' | transloco"
+                  [placeholder]="'extensions.field.defaultValue.datePlaceholder' | transloco"
+                  [todayLabel]="'extensions.field.defaultValue.today' | transloco"
+                  [prevMonthLabel]="'extensions.field.defaultValue.prevMonth' | transloco"
+                  [nextMonthLabel]="'extensions.field.defaultValue.nextMonth' | transloco"
+                  [invalid]="!!defaultValueError()"
+                  [value]="defaultDateStr()"
+                  (valueChange)="defaultDateStr.set($event)"
+                />
+              </ui-field>
+            }
+            @default {
+              <ui-field
+                class="col-span-2"
+                [for]="uid + '-default-text'"
+                [label]="'extensions.field.defaultValue.label' | transloco"
+                [hint]="'extensions.field.defaultValue.hint' | transloco"
+                [required]="true"
+                [error]="defaultValueError()"
+              >
+                <input
+                  [id]="uid + '-default-text'"
+                  type="text"
+                  [attr.dir]="scalarType() === 'STRING' ? 'auto' : 'ltr'"
+                  [attr.inputmode]="scalarType() === 'DECIMAL' ? 'decimal' : 'text'"
+                  autocomplete="off"
+                  class="h-full w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                  [placeholder]="
+                    scalarType() === 'DECIMAL'
+                      ? ('extensions.field.defaultValue.decimalPlaceholder' | transloco)
+                      : scalarType() === 'UUID'
+                        ? ('extensions.field.defaultValue.uuidPlaceholder' | transloco)
+                        : ('extensions.field.defaultValue.placeholder' | transloco)
+                  "
+                  [value]="defaultScalarText()"
+                  (input)="onTextInput(defaultScalarText, $event)"
+                />
+              </ui-field>
+            }
+          }
+        }
+      }
+    } @else {
+      <div class="col-span-3 flex flex-col gap-8">
+        <ui-field
+          size="bare"
+          [for]="uid + '-prop-0-key'"
+          [label]="'extensions.field.group.label' | transloco"
+          [hint]="'extensions.field.group.hint' | transloco"
+          [required]="true"
+          [error]="groupError()"
+        >
+          <div class="flex flex-col gap-6">
+            @for (prop of properties(); track prop.id; let pIdx = $index) {
+              @let kErr = propKeyError(prop);
+              @let maxLenErr = propMaxLengthError(prop);
+              @let scaleErr = propDecimalScaleError(prop);
+              @let minErr = propMinError(prop);
+              @let maxErr = propMaxError(prop);
+              @let choicesErr = propChoicesError(prop);
+              <div class="flex flex-col gap-6 rounded-8 border border-border bg-surface-muted p-8">
+                <div class="flex items-start gap-8">
+                  <div class="min-w-0 flex-1">
+                    @if (pIdx === 0) {
+                      <ui-field
+                        [for]="uid + '-prop-0-key'"
+                        [label]="'extensions.field.group.propKey' | transloco"
+                        [hint]="'extensions.field.group.propKeyHint' | transloco"
+                        [required]="true"
+                        [error]="kErr"
+                      >
+                        <input
+                          [id]="uid + '-prop-0-key'"
+                          type="text"
+                          dir="ltr"
+                          autocomplete="off"
+                          class="h-full w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                          [placeholder]="'extensions.field.group.propKeyPlaceholder' | transloco"
+                          [value]="prop.key"
+                          (input)="onPropKeyInput(prop.id, $event)"
+                        />
+                      </ui-field>
+                    } @else {
+                      <input
+                        type="text"
+                        dir="ltr"
+                        autocomplete="off"
+                        class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                        [class]="kErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+                        [attr.aria-label]="'extensions.field.group.propKey' | transloco"
+                        [placeholder]="'extensions.field.group.propKeyPlaceholder' | transloco"
+                        [value]="prop.key"
+                        (input)="onPropKeyInput(prop.id, $event)"
+                      />
+                      @if (kErr) {
+                        <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                          <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                          {{ kErr }}
+                        </p>
+                      }
+                    }
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    @if (pIdx === 0) {
+                      <ui-field
+                        [for]="uid + '-prop-0-type'"
+                        [label]="'extensions.field.group.propType' | transloco"
+                        [hint]="'extensions.field.group.propTypeHint' | transloco"
+                      >
+                        <ui-dropdown
+                          class="w-full"
+                          size="field"
+                          [id]="uid + '-prop-0-type'"
+                          [label]="'extensions.field.group.propType' | transloco"
+                          [options]="scalarTypeOptions()"
+                          [value]="prop.scalarType"
+                          (valueChange)="updatePropType(prop.id, $event)"
+                        />
+                      </ui-field>
+                    } @else {
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [label]="'extensions.field.group.propType' | transloco"
+                        [options]="scalarTypeOptions()"
+                        [value]="prop.scalarType"
+                        (valueChange)="updatePropType(prop.id, $event)"
+                      />
+                    }
+                  </div>
+
+                  <div class="shrink-0">
+                    @if (pIdx === 0) {
+                      <ui-field
+                        [for]="uid + '-prop-0-req'"
+                        [label]="'extensions.field.group.propRequired' | transloco"
+                        [hint]="'extensions.field.group.propRequiredHint' | transloco"
+                      >
+                        <div class="flex h-field items-center">
+                          <ui-switch
+                            [id]="uid + '-prop-0-req'"
+                            [label]="'extensions.field.group.propRequired' | transloco"
+                            [checked]="prop.isRequired"
+                            (checkedChange)="updatePropRequired(prop.id, $event)"
+                          />
+                        </div>
+                      </ui-field>
+                    } @else {
+                      <div class="flex h-field items-center">
+                        <ui-switch
+                          [label]="'extensions.field.group.propRequired' | transloco"
+                          [describedBy]="uid + '-prop-0-req-hint'"
+                          [checked]="prop.isRequired"
+                          (checkedChange)="updatePropRequired(prop.id, $event)"
+                        />
+                      </div>
+                    }
+                  </div>
+
+                  <div class="shrink-0" [class]="pIdx === 0 ? 'pt-16' : ''">
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+                      [disabled]="properties().length <= 1"
+                      [attr.aria-label]="'extensions.field.group.removeProperty' | transloco"
+                      [title]="'extensions.field.group.removeProperty' | transloco"
+                      (click)="removeProperty(prop.id)"
+                    >
+                      <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+
+                @if (prop.scalarType === 'STRING') {
+                  @let showConstraintLabels = isFirstPropOfKind(pIdx, 'STRING');
+                  <div class="grid grid-cols-3 gap-x-10 gap-y-6">
+                    @if (showConstraintLabels) {
+                      <ui-field
+                        class="col-span-1"
+                        [for]="uid + '-prop-' + prop.id + '-maxlen'"
+                        [label]="'extensions.field.group.propMaxLength' | transloco"
+                        [hint]="'extensions.field.group.propMaxLengthHint' | transloco"
+                        [error]="maxLenErr"
+                      >
+                        <input
+                          [id]="uid + '-prop-' + prop.id + '-maxlen'"
+                          type="text"
+                          dir="ltr"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                          [placeholder]="'extensions.field.maxLength.placeholder' | transloco"
+                          [value]="prop.maxLengthText"
+                          (input)="onPropTextInput(prop.id, 'maxLengthText', $event)"
+                        />
+                      </ui-field>
+                    } @else {
+                      <div class="col-span-1">
+                        <input
+                          type="text"
+                          dir="ltr"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                          [class]="maxLenErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+                          [attr.aria-label]="'extensions.field.group.propMaxLength' | transloco"
+                          [placeholder]="'extensions.field.maxLength.placeholder' | transloco"
+                          [value]="prop.maxLengthText"
+                          (input)="onPropTextInput(prop.id, 'maxLengthText', $event)"
+                        />
+                        @if (maxLenErr) {
+                          <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                            <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                            {{ maxLenErr }}
+                          </p>
+                        }
+                      </div>
+                    }
+                  </div>
+                } @else if (prop.scalarType === 'DECIMAL') {
+                  @let showConstraintLabels = isFirstPropOfKind(pIdx, 'DECIMAL');
+                  <div class="grid grid-cols-3 gap-x-10 gap-y-6">
+                    @if (showConstraintLabels) {
+                      <ui-field
+                        [for]="uid + '-prop-' + prop.id + '-scale'"
+                        [label]="'extensions.field.group.propDecimalScale' | transloco"
+                        [hint]="'extensions.field.group.propDecimalScaleHint' | transloco"
+                        [error]="scaleErr"
+                      >
+                        <input
+                          [id]="uid + '-prop-' + prop.id + '-scale'"
+                          type="text"
+                          dir="ltr"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none"
+                          [value]="prop.decimalScaleText"
+                          (input)="onPropTextInput(prop.id, 'decimalScaleText', $event)"
+                        />
+                      </ui-field>
+                      <ui-field
+                        [for]="uid + '-prop-' + prop.id + '-min'"
+                        [label]="'extensions.field.group.propMin' | transloco"
+                        [hint]="'extensions.field.group.propMinHint' | transloco"
+                        [error]="minErr"
+                      >
+                        <input
+                          [id]="uid + '-prop-' + prop.id + '-min'"
+                          type="text"
+                          dir="ltr"
+                          inputmode="decimal"
+                          autocomplete="off"
+                          class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                          [placeholder]="'extensions.field.minValue.placeholder' | transloco"
+                          [value]="prop.minText"
+                          (input)="onPropTextInput(prop.id, 'minText', $event)"
+                        />
+                      </ui-field>
+                      <ui-field
+                        [for]="uid + '-prop-' + prop.id + '-max'"
+                        [label]="'extensions.field.group.propMax' | transloco"
+                        [hint]="'extensions.field.group.propMaxHint' | transloco"
+                        [error]="maxErr"
+                      >
+                        <input
+                          [id]="uid + '-prop-' + prop.id + '-max'"
+                          type="text"
+                          dir="ltr"
+                          inputmode="decimal"
+                          autocomplete="off"
+                          class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                          [placeholder]="'extensions.field.maxValue.placeholder' | transloco"
+                          [value]="prop.maxText"
+                          (input)="onPropTextInput(prop.id, 'maxText', $event)"
+                        />
+                      </ui-field>
+                    } @else {
+                      <div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text tabular-nums outline-none transition-colors duration-fast"
+                          [class]="scaleErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+                          [attr.aria-label]="'extensions.field.group.propDecimalScale' | transloco"
+                          [value]="prop.decimalScaleText"
+                          (input)="onPropTextInput(prop.id, 'decimalScaleText', $event)"
+                        />
+                        @if (scaleErr) {
+                          <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                            <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                            {{ scaleErr }}
+                          </p>
+                        }
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          inputmode="decimal"
+                          autocomplete="off"
+                          class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                          [class]="minErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+                          [attr.aria-label]="'extensions.field.group.propMin' | transloco"
+                          [placeholder]="'extensions.field.minValue.placeholder' | transloco"
+                          [value]="prop.minText"
+                          (input)="onPropTextInput(prop.id, 'minText', $event)"
+                        />
+                        @if (minErr) {
+                          <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                            <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                            {{ minErr }}
+                          </p>
+                        }
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          inputmode="decimal"
+                          autocomplete="off"
+                          class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                          [class]="maxErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+                          [attr.aria-label]="'extensions.field.group.propMax' | transloco"
+                          [placeholder]="'extensions.field.maxValue.placeholder' | transloco"
+                          [value]="prop.maxText"
+                          (input)="onPropTextInput(prop.id, 'maxText', $event)"
+                        />
+                        @if (maxErr) {
+                          <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                            <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                            {{ maxErr }}
+                          </p>
+                        }
+                      </div>
+                    }
+                  </div>
+                } @else if (prop.scalarType === 'ENUM') {
+                  @let showConstraintLabels = isFirstPropOfKind(pIdx, 'ENUM');
+                  <div class="grid grid-cols-3 gap-x-10 gap-y-6">
+                    @if (showConstraintLabels) {
+                      <ui-field
+                        class="col-span-1"
+                        [for]="uid + '-prop-' + prop.id + '-maxlen'"
+                        [label]="'extensions.field.group.propMaxLength' | transloco"
+                        [hint]="'extensions.field.group.propMaxLengthHint' | transloco"
+                        [error]="maxLenErr"
+                      >
+                        <input
+                          [id]="uid + '-prop-' + prop.id + '-maxlen'"
+                          type="text"
+                          dir="ltr"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          class="h-full w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                          [placeholder]="'extensions.field.maxLength.placeholder' | transloco"
+                          [value]="prop.maxLengthText"
+                          (input)="onPropTextInput(prop.id, 'maxLengthText', $event)"
+                        />
+                      </ui-field>
+                      <ui-field
+                        class="col-span-2"
+                        [for]="uid + '-prop-' + prop.id + '-choices'"
+                        [label]="'extensions.field.group.propChoices' | transloco"
+                        [hint]="'extensions.field.group.propChoicesHint' | transloco"
+                        [required]="true"
+                        [error]="choicesErr"
+                      >
+                        <ui-tag-picker
+                          [inputId]="uid + '-prop-' + prop.id + '-choices'"
+                          [label]="'extensions.field.group.propChoices' | transloco"
+                          [options]="propChoiceOptions(prop)"
+                          [canCreate]="true"
+                          [max]="limits.enumValues"
+                          [createTag]="propChoiceCreator(prop.id)"
+                          [value]="prop.choices"
+                          (valueChange)="updatePropChoices(prop.id, $event)"
+                        />
+                      </ui-field>
+                    } @else {
+                      <div class="col-span-1 pt-16">
+                        <input
+                          type="text"
+                          dir="ltr"
+                          inputmode="numeric"
+                          autocomplete="off"
+                          class="h-field w-full rounded-8 border bg-surface-field px-8 text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder transition-colors duration-fast"
+                          [class]="maxLenErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field hover:border-border-field-hover focus:border-focus-ring focus:ring-3 focus:ring-focus-halo'"
+                          [attr.aria-label]="'extensions.field.group.propMaxLength' | transloco"
+                          [placeholder]="'extensions.field.maxLength.placeholder' | transloco"
+                          [value]="prop.maxLengthText"
+                          (input)="onPropTextInput(prop.id, 'maxLengthText', $event)"
+                        />
+                        @if (maxLenErr) {
+                          <p class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                            <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+                            {{ maxLenErr }}
+                          </p>
+                        }
+                      </div>
+                      <ui-field
+                        class="col-span-2"
+                        [for]="uid + '-prop-' + prop.id + '-choices'"
+                        [label]="'extensions.field.group.propChoices' | transloco"
+                        [hint]="'extensions.field.group.propChoicesHint' | transloco"
+                        [required]="true"
+                        [error]="choicesErr"
+                      >
+                        <ui-tag-picker
+                          [inputId]="uid + '-prop-' + prop.id + '-choices'"
+                          [label]="'extensions.field.group.propChoices' | transloco"
+                          [options]="propChoiceOptions(prop)"
+                          [canCreate]="true"
+                          [max]="limits.enumValues"
+                          [createTag]="propChoiceCreator(prop.id)"
+                          [value]="prop.choices"
+                          (valueChange)="updatePropChoices(prop.id, $event)"
+                        />
+                      </ui-field>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <div class="flex items-center justify-between gap-8">
+              <button
+                type="button"
+                uiButton
+                size="small"
+                variant="secondary"
+                [disabled]="properties().length >= limits.objectProperties"
+                [attr.title]="
+                  properties().length >= limits.objectProperties
+                    ? ('extensions.field.group.maxReached' | transloco: { max: limits.objectProperties })
+                    : null
+                "
+                (click)="addProperty()"
+              >
+                <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                {{ 'extensions.field.group.addProperty' | transloco }}
+              </button>
+
+              <span class="text-11 leading-16 text-text-muted tabular-nums">
+                <bdi dir="ltr">{{ properties().length }} / {{ limits.objectProperties }}</bdi>
+              </span>
+            </div>
+          </div>
+        </ui-field>
+      </div>
+    }
+
+    <ui-field
+      class="col-span-1"
+      [for]="uid + '-required'"
+      [label]="'extensions.field.required.label' | transloco"
+      [hint]="'extensions.field.required.hint' | transloco"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-required'"
+          [label]="'extensions.field.required.label' | transloco"
+          [checked]="isRequired()"
+          (checkedChange)="isRequired.set($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      [for]="uid + '-searchable'"
+      [label]="'extensions.field.searchable.label' | transloco"
+      [hint]="'extensions.field.searchable.hint' | transloco"
+      [hintText]="!isItemTarget() ? ('extensions.field.searchable.itemsOnly' | transloco) : null"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-searchable'"
+          [label]="'extensions.field.searchable.label' | transloco"
+          [disabled]="!isItemTarget()"
+          [checked]="isSearchable()"
+          (checkedChange)="isSearchable.set($event)"
+        />
+      </div>
+    </ui-field>
+
+    <div class="col-span-3 flex items-center gap-6 text-11 leading-16 text-text-muted">
+      <ng-icon name="tablerUsers" size="14" class="shrink-0" aria-hidden="true" />
+      <span>{{ 'extensions.field.makerCheckerCaption' | transloco }}</span>
+    </div>
+  </div>
+</ng-template>
+
+@if (inline()) {
+  <ng-container *ngTemplateOutlet="fieldGrid" />
+} @else {
+  <ui-modal
+    size="wide"
+    icon="tablerPuzzle"
+    tile="bg-icon-violet"
+    [title]="modalTitle()"
+    [closeLabel]="'extensions.field.close' | transloco"
+    (closed)="onModalClosed()"
+  >
+    <ng-container *ngTemplateOutlet="fieldGrid" />
+
+    <button modal-footer type="button" uiButton variant="primary" (click)="submitModal()">
+      {{ submitLabel() }}
+    </button>
+    <button modal-footer type="button" uiButton variant="secondary" (click)="requestClose()">
+      {{ 'extensions.field.cancel' | transloco }}
+    </button>
+  </ui-modal>
+
+  <ui-confirm-dialog
+    #discardDialog
+    tone="warning"
+    [title]="'extensions.field.discard.title' | transloco"
+    [text]="'extensions.field.discard.text' | transloco"
+    [confirmLabel]="'extensions.field.discard.confirm' | transloco"
+    [cancelLabel]="'extensions.field.cancel' | transloco"
+  />
+}

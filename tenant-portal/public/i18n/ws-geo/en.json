@@ -1,0 +1,54 @@
+{
+  "tabs": {
+    "label": "Geography sections",
+    "countries": "Countries",
+    "states": "States",
+    "cities": "Cities",
+    "districts": "Villages and districts",
+    "zones": "Zones"
+  },
+  "readOnly": "Read only",
+  "countries": {
+    "note": "Countries come with the platform and cannot be edited.",
+    "search": "Search by name, ISO code or dial code",
+    "cols": {
+      "name": "Country",
+      "nameAr": "Arabic name",
+      "iso": "ISO code",
+      "dial": "Dial code",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "empty": "No countries.",
+    "count": "Countries: {{count}}"
+  },
+  "states": {
+    "note": "States come with the platform and cannot be edited.",
+    "country": "Country",
+    "countryHint": "Shows the states of this country.",
+    "search": "Search states",
+    "cols": {
+      "name": "State",
+      "nameAr": "Arabic name",
+      "code": "Code",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "empty": "No states for this country.",
+    "count": "States: {{count}}"
+  },
+  "actions": {
+    "viewStates": "View states",
+    "viewCities": "View cities"
+  },
+  "active": "Active",
+  "inactive": "Inactive",
+  "of": "{{count}} of {{max}}",
+  "noResults": "No matches.",
+  "clearSearch": "Clear search",
+  "loadFailed": "Could not load the list.",
+  "retry": "Try again",
+  "errors": {
+    "GEO_COUNTRY_NOT_FOUND": "This country no longer exists."
+  }
+}

@@ -1,0 +1,185 @@
+{
+  "question": {
+    "title": "Price question",
+    "purpose": {
+      "label": "Purpose",
+      "hint": "Choose whether you are checking a selling price or a buying price.",
+      "sales": "Sales price",
+      "purchase": "Purchase price"
+    },
+    "item": {
+      "label": "Item",
+      "hint": "Search by item name or code to check its price."
+    },
+    "unit": {
+      "label": "Unit",
+      "hint": "Unit of measure for this price check; defaults to the item's sales or purchase unit.",
+      "placeholder": "Select unit"
+    },
+    "quantity": {
+      "label": "Quantity",
+      "hint": "Positive quantity with up to 8 decimals to match quantity tiers and promotions.",
+      "placeholder": "Enter quantity"
+    },
+    "currency": {
+      "label": "Currency",
+      "hint": "Currency of the price evaluation.",
+      "placeholder": "Select currency"
+    },
+    "priceAsOf": {
+      "label": "Price as of",
+      "hint": "Date and time for checking scheduled versions and time-limited promotions. Leave empty for now.",
+      "now": "Now",
+      "clear": "Clear date and time",
+      "dateAria": "Price as of date",
+      "timePlaceholder": "Time",
+      "hour": "Hour",
+      "minute": "Minute",
+      "today": "Today",
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month"
+    },
+    "account": {
+      "customerLabel": "Customer account",
+      "supplierLabel": "Supplier account",
+      "hint": "Its price book and its promotions apply.",
+      "placeholder": "Search account by name or code",
+      "clear": "Clear account",
+      "loading": "Searching accounts...",
+      "empty": "No matching accounts"
+    },
+    "branch": {
+      "label": "Branch",
+      "hint": "Target branch for branch-specific promotions. Uses the current branch when empty.",
+      "current": "Current branch"
+    },
+    "channel": {
+      "label": "Channel",
+      "hint": "Channel for channel-specific promotions. Uses the current channel when empty.",
+      "current": "Current channel"
+    },
+    "priceBook": {
+      "label": "Price book",
+      "hint": "Override automatic selection with a specific active book for this purpose and currency.",
+      "auto": "Chosen automatically (account, then company default)"
+    },
+    "version": {
+      "label": "Version",
+      "hint": "Test the live version or preview a Draft or Tested version of the selected price book.",
+      "live": "Live version",
+      "option": "Version {{number}} ({{status}})"
+    },
+    "calculate": "Calculate",
+    "calculating": "Calculating...",
+    "recentTitle": "Recent questions"
+  },
+  "versionStatuses": {
+    "DRAFT": "Draft",
+    "TESTED": "Tested",
+    "SCHEDULED": "Scheduled",
+    "PUBLISHED": "Published",
+    "RETIRED": "Retired"
+  },
+  "validation": {
+    "itemRequired": "Select an item.",
+    "uomRequired": "Select a unit.",
+    "quantityRequired": "Enter a quantity.",
+    "quantityInvalid": "Enter a positive quantity with at most 8 decimal places.",
+    "currencyRequired": "Select a currency."
+  },
+  "answer": {
+    "title": "Answer",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "emptyTitle": "Fill in the question and press Calculate.",
+    "loading": "Calculating price...",
+    "perUnitAfterPromotions": "per {{unit}}, after promotions",
+    "unitFallback": "unit",
+    "fields": {
+      "basePrice": "Base price",
+      "promotionRow": "Promotion {{code}}",
+      "floorPrice": "Floor price",
+      "priceBook": "Price book",
+      "priceBookValue": "{{name}} · Version {{version}}",
+      "chosenBy": "Chosen by",
+      "matchedLine": "Matched line"
+    },
+    "matchedLineSummary": "{{uom}}, {{range}}, priority {{priority}}",
+    "matchedLineNoUom": "{{range}}, priority {{priority}}",
+    "range": {
+      "between": "{{min}} to {{max}}",
+      "from": "{{min}} and more"
+    },
+    "source": {
+      "EXPLICIT": "Your choice",
+      "ACCOUNT_SALES": "Customer account",
+      "ACCOUNT_PURCHASE": "Supplier account",
+      "COMPANY_DEFAULT": "Company default"
+    },
+    "previewBadge": {
+      "DRAFT": "Preview of a Draft version",
+      "TESTED": "Preview of a Tested version"
+    },
+    "rejectedPromotionsTitle": "Promotions not applied",
+    "rejectReasons": {
+      "EXCLUSIVE_PROMOTION_APPLIED": "An exclusive promotion was applied first",
+      "SELECTOR_MISMATCH": "Its conditions did not match",
+      "ACCOUNT_REQUIRED": "Needs a customer or supplier account",
+      "STACK_GROUP_LOWER_PRECEDENCE": "Lower in its stack group",
+      "MINIMUM_PRICE_GUARD": "Would go below the floor price"
+    },
+    "rejectedCandidatesTitle": "Other candidate lines",
+    "candidateLowerPrecedence": "Lower precedence",
+    "footer": {
+      "calculated": "Calculated {{dateTime}}",
+      "fingerprintPrefix": "fp",
+      "copyAria": "Copy input fingerprint",
+      "copied": "Copied",
+      "copyFailed": "Could not copy to clipboard."
+    },
+    "errors": {
+      "noEligiblePriceTitle": "No eligible price",
+      "noEligiblePrice": "No price line covers this item, unit and quantity on that date.",
+      "ambiguousRulesTitle": "Conflicting pricing rules",
+      "ambiguousRules": "Two lines or promotions tie. Give them different priorities.",
+      "defaultBookNotFoundTitle": "No applicable price book",
+      "defaultBookNotFound": "No price book applies: choose one, or set a company default.",
+      "defaultBookIncompatibleTitle": "Incompatible default price book",
+      "defaultBookIncompatible": "The applicable price book does not match this purpose, currency, or active status.",
+      "bookInvalidTitle": "Invalid price book",
+      "bookInvalid": "The selected price book does not match this purpose, currency, or active status.",
+      "bookNotFoundTitle": "Price version not found",
+      "bookNotFound": "The selected price version no longer exists. Choose another version, then try again.",
+      "entryInvalidTitle": "Invalid price line parameters",
+      "entryInvalid": "Check the item, unit, account, branch and channel: one of them is inactive or not allowed for this purpose.",
+      "openPriceBooks": "Open price books",
+      "changeQuestion": "Change the question"
+    }
+  },
+  "errors": {
+    "unexpectedTitle": "Could not calculate price",
+    "unexpected": "An unexpected error occurred while evaluating the price."
+  },
+  "priceErrors": {
+    "TRADE.PRICE.BOOK_IN_USE": "Choose another company default before deactivating this price book.",
+    "TRADE.PRICE.BOOK_IN_USE.mapped_as_company_default": "Choose another company default before deactivating this price book.",
+    "TRADE.PRICE.BOOK_INVALID.version_not_in_book": "The chosen version does not belong to the chosen price book.",
+    "TRADE.PRICE.BOOK_INVALID.preview_status_invalid": "A retired version cannot be previewed. Choose another version.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_tested": "Run a passing test on this version before publishing it.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_editable": "Only draft or tested versions can be changed. Create a new version instead.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_live": "Only published or scheduled versions can be retired.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.retroactive_supersession": "A replacement must start now or later. Choose a future start date.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.predecessor_invalid": "The version to replace must be live or scheduled, start earlier, and still apply when this version starts.",
+    "TRADE.PRICE.TEST_NOT_ALLOWED.not_editable": "Only draft or tested versions can be tested.",
+    "TRADE.PRICE.ENTRY_INVALID.operations_required": "Add, change, or delete at least one price line before saving.",
+    "TRADE.PRICE.ENTRY_INVALID.duplicate_operation": "Each price line can be changed only once in one save.",
+    "TRADE.PRICE.ENTRY_INVALID.entry_not_in_version": "Some price lines no longer exist in this version. Reload and try again.",
+    "TRADE.PRICE.ENTRY_INVALID.row_limit_exceeded": "A version can hold up to 10,000 price lines.",
+    "TRADE.PRICE.RULE_INVALID.operations_required": "Add, change, or delete at least one promotion before saving.",
+    "TRADE.PRICE.RULE_INVALID.duplicate_operation": "Each promotion can be changed only once in one save.",
+    "TRADE.PRICE.RULE_INVALID.entry_not_in_version": "Some promotions no longer exist in this version. Reload and try again.",
+    "TRADE.PRICE.RULE_INVALID.operation_limit_exceeded": "Save up to 500 promotion changes at a time.",
+    "TRADE.PRICE.RULE_INVALID.row_limit_exceeded": "A version can hold up to 500 promotions.",
+    "TRADE.PRICE.RULE_INVALID.equal_precedence": "Give promotions in the same stack group different priorities."
+  }
+}

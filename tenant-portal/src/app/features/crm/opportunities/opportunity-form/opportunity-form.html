@@ -1,0 +1,187 @@
+@if (layout() === 'modal') {
+  <div class="flex h-full min-h-0 flex-1 overflow-hidden">
+    <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-y-10 overflow-y-auto px-16 py-10">
+      <section data-section="deal" class="flex flex-col gap-8">
+        <ui-section-bar tone="navy" icon="tablerTarget" [title]="'oppForm.sections.deal' | transloco" />
+        <app-opp-deal-section
+          layout="modal"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+        />
+      </section>
+
+      <section data-section="customer" class="flex flex-col gap-8">
+        <ui-section-bar tone="blue" icon="tablerUsers" [title]="'oppForm.sections.customer' | transloco" />
+        <app-opp-customer-section
+          layout="modal"
+          [mode]="mode()"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [row]="row()"
+        />
+      </section>
+
+      @if (hasOtherCustomFields()) {
+        <section data-section="custom" class="flex flex-col gap-8">
+          <ui-section-bar tone="violet" icon="tablerForms" [title]="'oppForm.sections.custom' | transloco" />
+          <app-record-custom-fields
+            scope="others"
+            layout="modal"
+            [fields]="lookups.customFields()"
+            [values]="draft().customFields"
+            (valuesChange)="onOtherCustomFieldsChange($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode() === 'create' ? 'create' : 'edit'"
+            [countries]="countries()"
+          />
+        </section>
+      }
+
+      @if (showClosing()) {
+        <section data-section="closing" class="flex flex-col gap-8">
+          <ui-section-bar tone="navy" icon="tablerFlag" [title]="'oppForm.sections.closing' | transloco" />
+          <app-opp-closing-section layout="modal" [row]="row()!" />
+        </section>
+      }
+
+      <section data-section="more" class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="blue"
+          icon="tablerDots"
+          [title]="(moreOpen() ? 'oppForm.sections.moreOpen' : 'oppForm.sections.more') | transloco"
+          [expandable]="true"
+          [(expanded)]="moreOpen"
+          [controls]="moreOpen() ? uid + '-more-panel' : null"
+        />
+        @if (moreOpen()) {
+          <div [id]="uid + '-more-panel'" class="flex flex-col gap-y-10 pt-2">
+            <app-opp-more-section layout="modal" [mode]="mode()" [row]="row()" />
+          </div>
+        }
+      </section>
+    </div>
+
+    <aside
+      data-section="classification"
+      class="flex h-full min-h-0 w-record-side shrink-0 flex-col gap-y-8 overflow-y-auto border-s border-border bg-surface-muted px-16 py-10"
+    >
+      <ui-section-bar tone="gradient" icon="tablerCategory" [title]="'oppForm.sections.classification' | transloco" />
+      <app-opp-classification-section
+        layout="modal"
+        [mode]="mode()"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [row]="row()"
+        [updating]="updating()"
+        [countries]="countries()"
+        (rate)="rate.emit($event)"
+        (recolor)="recolor.emit($event)"
+        (moveStage)="moveStage.emit($event)"
+      />
+    </aside>
+  </div>
+} @else {
+  <div class="flex flex-col gap-10">
+    <section
+      id="opp-classification"
+      data-section="classification"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="gradient" icon="tablerCategory" [title]="'oppForm.sections.classification' | transloco" />
+      <app-opp-classification-section
+        layout="page"
+        [mode]="mode()"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [row]="row()"
+        [updating]="updating()"
+        [countries]="countries()"
+        (rate)="rate.emit($event)"
+        (recolor)="recolor.emit($event)"
+        (moveStage)="moveStage.emit($event)"
+      />
+    </section>
+
+    <section
+      id="opp-deal"
+      data-section="deal"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="navy" icon="tablerTarget" [title]="'oppForm.sections.deal' | transloco" />
+      <app-opp-deal-section
+        layout="page"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+      />
+    </section>
+
+    <section
+      id="opp-customer"
+      data-section="customer"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="blue" icon="tablerUsers" [title]="'oppForm.sections.customer' | transloco" />
+      <app-opp-customer-section
+        layout="page"
+        [mode]="mode()"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [row]="row()"
+      />
+    </section>
+
+    @if (hasOtherCustomFields()) {
+      <section
+        id="opp-custom"
+        data-section="custom"
+        class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+      >
+        <ui-section-bar tone="violet" icon="tablerForms" [title]="'oppForm.sections.custom' | transloco" />
+        <app-record-custom-fields
+          scope="others"
+          layout="page"
+          [fields]="lookups.customFields()"
+          [values]="draft().customFields"
+          (valuesChange)="onOtherCustomFieldsChange($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode() === 'create' ? 'create' : 'edit'"
+          [countries]="countries()"
+        />
+      </section>
+    }
+
+    @if (showClosing()) {
+      <section
+        id="opp-closing"
+        data-section="closing"
+        class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+      >
+        <ui-section-bar tone="navy" icon="tablerFlag" [title]="'oppForm.sections.closing' | transloco" />
+        <app-opp-closing-section layout="page" [row]="row()!" />
+      </section>
+    }
+
+    <section
+      id="opp-more"
+      data-section="more"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="blue" icon="tablerDots" [title]="'oppForm.sections.more' | transloco" />
+      <app-opp-more-section layout="page" [mode]="mode()" [row]="row()" />
+    </section>
+  </div>
+}

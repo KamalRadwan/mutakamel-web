@@ -1,0 +1,87 @@
+{
+  "title": "Companies",
+  "add": "Add company",
+  "search": "Search companies",
+  "filters": {
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "sort": {
+    "name": "Name",
+    "code": "Code",
+    "newest": "Newest"
+  },
+  "cols": {
+    "code": "Code",
+    "name": "Company",
+    "tax": "Tax number",
+    "currency": "Currency",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "modal": {
+    "new": "New company",
+    "title": "Company"
+  },
+  "fields": {
+    "code": "Code",
+    "codeHint": "Letters A-Z, digits, \"_\" and \"-\", up to 32. Can't be changed later.",
+    "codeLocked": "Can't be changed after creation.",
+    "name": "Name",
+    "nameHint": "The name your team uses, up to 120 characters.",
+    "legalName": "Legal name",
+    "legalNameHint": "As registered, up to 200 characters.",
+    "tax": "Tax number",
+    "taxHint": "Up to 64 characters.",
+    "currency": "Currency",
+    "currencyHint": "The company's default currency. Only active workspace currencies are listed.",
+    "currencyDefault": "Workspace default",
+    "active": "Active",
+    "activeHelp": "Inactive companies can't receive new branches or users."
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "addBranch": "Add branch",
+    "viewBranches": "View branches",
+    "viewUsers": "View users",
+    "activation": "Application activation",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "inactiveCompanyReason": "Activate the company first to add a branch."
+  },
+  "confirm": {
+    "deleteTitle": "Delete {{name}}?",
+    "deleteText": "A company that still has branches or users cannot be deleted.",
+    "deactivateTitle": "Deactivate {{name}}?",
+    "deactivateText": "Its branches must be inactive first, and no users can be placed in it.",
+    "activateTitle": "Activate {{name}}?",
+    "activateText": "This company will be able to receive branches and users again.",
+    "discardTitle": "Discard unsaved changes?",
+    "discardText": "Your changes to this company have not been saved.",
+    "discardConfirm": "Discard"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters.",
+    "codePattern": "Use only uppercase letters A-Z, digits, \"_\" and \"-\", up to 32 characters."
+  },
+  "toast": {
+    "created": "Company created.",
+    "saved": "Changes saved.",
+    "deleted": "Company deleted."
+  },
+  "save": "Save",
+  "undo": "Undo changes",
+  "unsaved": "Unsaved changes",
+  "cancel": "Cancel",
+  "close": "Close",
+  "delete": "Delete",
+  "empty": "No companies yet.",
+  "noResults": "No matching results",
+  "loadFailed": "Could not load companies.",
+  "retry": "Try again"
+}

@@ -1,0 +1,259 @@
+<div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (can.manage) {
+    <button
+      type="button"
+      uiButton
+      class="shrink-0"
+      [disabled]="tenantBlocked()"
+      (click)="openCreate()"
+    >
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      <span>{{ 'imports.mappings.toolbar.new' | transloco }}</span>
+    </button>
+  }
+
+  <div
+    class="flex h-field min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      #searchInput
+      type="text"
+      autocomplete="off"
+      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'imports.mappings.toolbar.searchPlaceholder' | transloco"
+      [attr.aria-label]="'imports.mappings.toolbar.searchPlaceholder' | transloco"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+      (keydown.escape)="clearSearch()"
+    />
+    @if (search()) {
+      <button
+        type="button"
+        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'settings.common.clearSearch' | transloco"
+        (click)="clearSearch(); searchInput.focus()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <div class="flex shrink-0 items-center gap-4">
+    <button
+      type="button"
+      class="inline-flex h-filter-chip cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="statusFilter() === 'DRAFT' ? 'bg-brand text-on-brand' : 'bg-brand-soft text-on-brand-soft hover:bg-brand hover:text-on-brand'"
+      [attr.aria-pressed]="statusFilter() === 'DRAFT'"
+      (click)="toggleStatus('DRAFT')"
+    >
+      {{ 'imports.mappings.toolbar.filterDraft' | transloco }}
+    </button>
+    <button
+      type="button"
+      class="inline-flex h-filter-chip cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="statusFilter() === 'ACTIVE' ? 'bg-brand text-on-brand' : 'bg-brand-soft text-on-brand-soft hover:bg-brand hover:text-on-brand'"
+      [attr.aria-pressed]="statusFilter() === 'ACTIVE'"
+      (click)="toggleStatus('ACTIVE')"
+    >
+      {{ 'imports.mappings.toolbar.filterActive' | transloco }}
+    </button>
+  </div>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="refreshing() || tenantBlocked()"
+    [attr.aria-label]="'imports.mappings.toolbar.reload' | transloco"
+    [title]="'imports.mappings.toolbar.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="refreshing()" aria-hidden="true" />
+  </button>
+
+  <app-scope-chip [scope]="scopeTarget()" />
+</div>
+
+@if (tenantBlocked()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerBuilding" size="18" aria-hidden="true" />
+    </span>
+    <p class="max-w-modal-confirm text-13 leading-18 text-text-muted">
+      {{ 'imports.scopeGate.tenantBlocked' | transloco }}
+    </p>
+  </div>
+} @else if (failed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 text-text-muted">{{ 'imports.mappings.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      <span>{{ 'imports.common.retry' | transloco }}</span>
+    </button>
+  </div>
+} @else if (!loading() && visibleMappings().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+    </span>
+    @if (hasFilters()) {
+      <p class="text-13 leading-18 font-medium text-text">{{ 'imports.mappings.empty.filtered' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="clearAllFilters()">
+        {{ 'imports.common.clearFilters' | transloco }}
+      </button>
+    } @else {
+      <p class="text-13 leading-18 font-medium text-text">{{ 'imports.mappings.empty.title' | transloco }}</p>
+      @if (can.manage) {
+        <button type="button" uiButton variant="primary" (click)="openCreate()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          <span>{{ 'imports.mappings.toolbar.new' | transloco }}</span>
+        </button>
+      }
+    }
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'imports.mappings.table.label' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav grid-cols-auto-import-mapping-row-actions"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'imports.mappings.table.code' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'imports.mappings.table.target' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'imports.mappings.table.scope' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'imports.mappings.table.status' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'imports.mappings.table.published' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'imports.mappings.table.updated' | transloco }}
+        </span>
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'imports.mappings.table.actions' | transloco }}</span>
+        </span>
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card grid-cols-auto-import-mapping-row-actions"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="size-icon-tile-sm shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 animate-pulse rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-1/2 animate-pulse rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-btn-h-sm animate-pulse rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (mapping of visibleMappings(); track mapping.id) {
+          <div
+            role="row"
+            tabindex="0"
+            class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong grid-cols-auto-import-mapping-row-actions"
+            (click)="openMapping(mapping)"
+            (keydown)="onRowKeydown($event, mapping)"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+                <ng-icon name="tablerTable" size="14" aria-hidden="true" />
+              </span>
+              <bdi dir="ltr" class="truncate text-13 font-medium text-text">{{ mapping.code }}</bdi>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-13">
+              <span class="truncate">{{ targetName(mapping.targetCode) }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-13 text-text-muted">
+              <span class="truncate">{{ scopeLabel(mapping) }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <app-automation-badge kind="mapping" [value]="mapping.status" />
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10 text-12 text-text-muted">
+              @if (mapping.currentPublishedVersionId) {
+                <span class="truncate font-medium text-text">{{ 'imports.common.yes' | transloco }}</span>
+              } @else {
+                <span>{{ 'imports.common.none' | transloco }}</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted">
+              <span class="truncate">{{ formatUpdatedDate(mapping.updatedAt) }}</span>
+            </span>
+
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border"
+              (click)="$event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+            >
+              <ui-actions-menu
+                [items]="menuActions(mapping)"
+                [label]="'imports.mappings.table.actions' | transloco"
+                (selected)="onMenuSelected(mapping, $event)"
+              />
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (!tenantBlocked() && !failed() && total() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [pageSizes]="pageSizes"
+      [label]="'imports.mappings.paginationLabel' | transloco"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  </footer>
+}
+
+<app-import-mapping-modal #createModal class="contents" (created)="onCreated($event)" />

@@ -1,0 +1,228 @@
+{
+  "title": "الهاتف",
+  "common": {
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "retry": "إعادة المحاولة"
+  },
+  "tabs": {
+    "phone": "الهاتف",
+    "calls": "المكالمات",
+    "settings": "الإعدادات"
+  },
+  "launcher": {
+    "label": "الهاتف، {{status}}",
+    "registered": "مسجّل",
+    "connecting": "جارٍ الاتصال",
+    "error": "خطأ",
+    "offline": "غير متصل",
+    "paused": "متوقف مؤقتاً",
+    "incomingFrom": "مكالمة واردة من {{name}}",
+    "answerShortcutHint": "اضغط Alt+Shift+A للرد."
+  },
+  "header": {
+    "extPrefix": "تحويلة",
+    "extStatus": "تحويلة {{ext}} · {{status}}",
+    "devices": "الأجهزة",
+    "retry": "إعادة محاولة الاتصال",
+    "collapse": "طيّ الهاتف"
+  },
+  "bar": {
+    "openLabel": "فتح الهاتف، {{status}}",
+    "openInCall": "فتح الهاتف، في مكالمة مع {{name}}، {{time}}",
+    "openConference": "فتح الهاتف، مكالمة جماعية من {{n}} أشخاص، {{time}}",
+    "missed": "{{n}} فائتة"
+  },
+  "pill": {
+    "calling": "جارٍ الاتصال…",
+    "consult": "مكالمتان · {{time}}",
+    "conference": "جماعية · {{n}} · {{time}}",
+    "mute": "كتم الميكروفون",
+    "unmute": "إلغاء كتم الميكروفون",
+    "hangupWith": "إنهاء المكالمة مع {{name}}"
+  },
+  "dialer": {
+    "number": "الرقم",
+    "numberHint": "اكتب الرقم أو الصقه، وتُحذف المسافات والشرطات تلقائياً.",
+    "phoneNumber": "رقم الهاتف",
+    "enterNumber": "أدخل الرقم",
+    "deleteDigit": "حذف الرقم الأخير",
+    "copyNumber": "نسخ الرقم",
+    "clearSource": "إزالة السجل",
+    "call": "اتصال",
+    "autoAnswer": "رد تلقائي",
+    "autoAnswerHint": "يُجيب عن المكالمات الواردة تلقائياً بعد لحظة قصيرة.",
+    "dnd": "عدم الإزعاج",
+    "dndHint": "تتلقى المكالمات الواردة إشارة انشغال ما دام هذا الخيار مفعّلاً."
+  },
+  "inCall": {
+    "calling": "جارٍ الاتصال…",
+    "ringing": "يرن الآن…",
+    "onHold": "قيد التعليق",
+    "mute": "كتم",
+    "unmute": "إلغاء الكتم",
+    "hold": "تعليق",
+    "resume": "استئناف",
+    "keypad": "لوحة الأرقام",
+    "hideKeypad": "إخفاء لوحة الأرقام",
+    "transfer": "تحويل",
+    "add": "إضافة",
+    "addPerson": "إضافة شخص",
+    "addPersonHint": "ينضم الشخص إلى هذه المكالمة عند الرد.",
+    "speaker": "السماعة",
+    "unmuteSpeaker": "تشغيل السماعة",
+    "hangup": "إنهاء"
+  },
+  "audio": {
+    "muteSpeaker": "كتم السماعة",
+    "unmuteSpeaker": "تشغيل السماعة",
+    "muteMic": "كتم الميكروفون",
+    "unmuteMic": "إلغاء كتم الميكروفون",
+    "speakerVolume": "مستوى صوت السماعة",
+    "micVolume": "مستوى صوت الميكروفون"
+  },
+  "statusLine": {
+    "buttonLabel": "حالة الهاتف وجودة المكالمة",
+    "connecting": "جارٍ الاتصال…",
+    "server": "الخادم {{index}} من {{count}} · {{name}}"
+  },
+  "mediaNotice": {
+    "requiresHttps": "يلزم اتصال HTTPS للصوت",
+    "unavailable": "جهاز الصوت غير متاح",
+    "permissionDenied": "الميكروفون محظور: اسمح به من رمز القفل",
+    "noMicrophone": "لم يُعثر على ميكروفون",
+    "stopped": "فُصل الميكروفون",
+    "muted": "الميكروفون مكتوم",
+    "clickToAllow": "انقر للسماح بتشغيل الصوت",
+    "speakerUnavailable": "جهاز السماعة غير متاح",
+    "fix": "إصلاح"
+  },
+  "quality": {
+    "title": "جودة المكالمة",
+    "measuring": "جارٍ القياس",
+    "good": "جيدة",
+    "fair": "مقبولة",
+    "poor": "ضعيفة",
+    "packetLoss": "فقد الحزم",
+    "jitterBuffer": "مخزن التذبذب",
+    "roundTrip": "زمن الذهاب والعودة",
+    "mos": "MOS (تقديري)",
+    "estimatedNote": "قيمة تقديرية من الفقد والتأخير، وليست قياساً مباشراً."
+  },
+  "transfer": {
+    "type": "نوع التحويل",
+    "typeHint": "ينقل «مباشر» المكالمة فوراً، ويتيح «التحدث أولاً» أن تكلم الطرف الآخر قبل تسليم المكالمة.",
+    "talkFirst": "التحدث أولاً",
+    "direct": "مباشر",
+    "target": "تحويل إلى",
+    "targetHint": "الرقم أو التحويلة التي ستتسلم المكالمة.",
+    "callTarget": "اتصال بـ {{target}}",
+    "transferNow": "تحويل",
+    "transferring": "جارٍ التحويل…"
+  },
+  "callRows": {
+    "onHold": "قيد التعليق",
+    "talking": "يتحدث",
+    "ringing": "يرن",
+    "left": "غادر",
+    "removeFromCall": "إخراج {{name}} من المكالمة",
+    "cancel": "إلغاء",
+    "talkTo": "التحدث إلى {{name}}"
+  },
+  "consult": {
+    "swap": "تبديل",
+    "completeTransfer": "إتمام التحويل",
+    "transferWaitHint": "يمكنك التحويل بعد أن يجيب.",
+    "cancelConsult": "إلغاء الاستشارة",
+    "merge": "دمج",
+    "hangupWith": "إنهاء مع {{name}}"
+  },
+  "conference": {
+    "header": "مكالمة جماعية · {{n}} أشخاص",
+    "holdAll": "تعليق الجميع",
+    "resumeAll": "استئناف الجميع",
+    "sendTonesTo": "إرسال النغمات إلى",
+    "sendTonesToHint": "تُرسل النغمات إلى شخص واحد، مثل قائمة آلية.",
+    "addPerson": "إضافة شخص",
+    "maxPartiesHint": "حتى 4 أشخاص في المكالمة",
+    "endForAll": "إنهاء للجميع",
+    "confirmEndTitle": "إنهاء المكالمة للجميع؟",
+    "confirmEndText": "سيؤدي هذا إلى إنهاء المكالمة الجماعية لجميع المشاركين."
+  },
+  "ended": {
+    "reasons": {
+      "ended": "انتهت المكالمة",
+      "declined": "تم الرفض",
+      "busy": "الخط مشغول",
+      "noAnswer": "لا يوجد رد",
+      "failed": "فشلت المكالمة",
+      "transferred": "تم التحويل",
+      "transferredTo": "حُوّلت إلى {{name}}",
+      "dropped": "انقطعت المكالمة",
+      "conferenceEnded": "انتهت المكالمة الجماعية",
+      "tabClosed": "انقطعت المكالمة"
+    },
+    "loggedTo": "سُجّلت لدى {{type}} {{name}}",
+    "redial": "إعادة الاتصال"
+  },
+  "incoming": {
+    "title": "مكالمة واردة",
+    "answer": "رد",
+    "decline": "رفض",
+    "silence": "كتم الرنين",
+    "answerAndTransfer": "رد ثم تحويل",
+    "answerInPhoneTab": "أجب من تبويب الهاتف",
+    "answerInPhoneTabHint": "استخدم إشعار النظام أو انتقل إلى تبويب الهاتف النشط للرد."
+  },
+  "status": {
+    "idle": "خامل",
+    "loadingPhone": "جارٍ تحميل الهاتف",
+    "disabled": "معطّل",
+    "ready": "جاهز",
+    "notConfigured": "غير مُهيّأ",
+    "unavailable": "غير متاح",
+    "connecting": "جارٍ الاتصال",
+    "socketConnected": "تم الاتصال بالخادم",
+    "registering": "جارٍ التسجيل",
+    "registered": "مسجّل",
+    "registrationFailed": "فشل التسجيل",
+    "failingOver": "جارٍ التبديل إلى خادم آخر",
+    "disconnected": "انقطع الاتصال",
+    "connectFailed": "فشل الاتصال",
+    "incomingCall": "مكالمة واردة",
+    "calling": "جارٍ الاتصال بالرقم",
+    "ringing": "يرن الآن",
+    "startingCall": "جارٍ بدء المكالمة",
+    "callEnded": "انتهت المكالمة",
+    "declined": "تم الرفض",
+    "callFailed": "فشلت المكالمة",
+    "transferring": "جارٍ التحويل",
+    "transferFailed": "تعذّر التحويل",
+    "inCall": "في مكالمة"
+  },
+  "toast": {
+    "notConnected": "الهاتف غير متصل",
+    "transferFailed": "تعذّر التحويل",
+    "consultFailed": "تعذّر الاتصال بـ {{name}}",
+    "partyFailed": "تعذّر انضمام {{name}}",
+    "conferenceFailed": "تعذّر بدء المكالمة الجماعية",
+    "headsetGone": "فُصلت سماعة الرأس، وسيُستخدم الجهاز الافتراضي.",
+    "allowNotifications": "اسمح بالإشعارات حتى لا تفوتك أي مكالمة.",
+    "callLostTitle": "انقطعت المكالمة",
+    "callLost": "انتهت المكالمة مع {{name}} ({{duration}}) لأن تبويبها أُغلق.",
+    "callLostNoTime": "انتهت المكالمة مع {{name}} لأن تبويبها أُغلق.",
+    "copied": "نُسخ الرقم",
+    "callFailed": "فشلت المكالمة"
+  },
+  "notify": {
+    "title": "مكالمة واردة",
+    "body": "{{name}} · {{number}}"
+  },
+  "source": {
+    "LEAD": "عميل محتمل",
+    "CUSTOMER_PROFILE": "عميل",
+    "OPPORTUNITY": "فرصة",
+    "PARTY": "جهة اتصال"
+  }
+}

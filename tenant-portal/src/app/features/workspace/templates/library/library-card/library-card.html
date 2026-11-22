@@ -1,0 +1,111 @@
+<article
+  role="link"
+  tabindex="0"
+  [attr.aria-label]="row().name"
+  class="flex h-full cursor-pointer flex-col rounded-10 border border-border bg-surface p-8 shadow-popover outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  (click)="open.emit(row())"
+  (keydown.enter)="onCardKeydown($event)"
+  (keydown.space)="onCardKeydown($event)"
+>
+  <div class="mb-8 flex h-tpl-preview items-center justify-center overflow-hidden rounded-8 border border-border bg-surface-muted p-6">
+    @switch (thumbState()) {
+      @case ('READY') {
+        @if (thumbUrl(); as src) {
+          <img [src]="src" [alt]="row().name" class="h-full w-auto max-w-full rounded-4 object-contain shadow-card" />
+        }
+      }
+      @case ('LOADING') {
+        <div class="flex h-full w-full animate-pulse flex-col items-center justify-center gap-6 rounded-6 bg-neutral-soft p-8 text-center">
+          <span class="h-skeleton-line w-1/2 rounded-4 bg-border"></span>
+          <span class="h-skeleton-line w-2/3 rounded-4 bg-border"></span>
+        </div>
+      }
+      @case ('PENDING') {
+        <div class="flex h-full w-full animate-pulse flex-col items-center justify-center gap-6 rounded-6 bg-neutral-soft p-8 text-center">
+          <span class="text-11 leading-16 text-text-muted">{{ 'templatesLibrary.cards.thumbnailPending' | transloco }}</span>
+        </div>
+      }
+      @case ('UNAVAILABLE') {
+        <div class="flex h-full w-full flex-col items-center justify-center gap-6 rounded-6 bg-neutral-soft p-8 text-center">
+          <ng-icon name="tablerPhoto" size="20" class="text-text-muted" aria-hidden="true" />
+          <span class="text-11 leading-16 text-text-muted">{{ 'templatesLibrary.cards.thumbnailUnavailable' | transloco }}</span>
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [loading]="retryingThumb()"
+            (click)="retryThumb($event)"
+          >
+            <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+            {{ 'templatesLibrary.cards.retryThumbnail' | transloco }}
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="flex items-center gap-8">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="familyLook().tile"
+      [title]="'templates.families.' + row().documentType | transloco"
+    >
+      <ng-icon [name]="familyLook().icon" size="15" aria-hidden="true" />
+    </span>
+
+    <div class="flex min-w-0 flex-1 flex-col justify-center">
+      <span class="min-h-label truncate text-13 leading-18 font-medium text-text">{{ row().name }}</span>
+      <bdi dir="ltr" class="min-h-label-h-compact truncate text-11 leading-16 text-text-muted">{{ row().code }}</bdi>
+    </div>
+
+    <div class="shrink-0" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+      <ui-actions-menu
+        [items]="actions()"
+        [label]="'templatesLibrary.row.actions.label' | transloco"
+        (selected)="actionSelected.emit({ row: row(), selection: $event })"
+      />
+    </div>
+  </div>
+
+  <div class="mt-6 flex flex-wrap items-center gap-4 text-12 leading-18 text-text-muted">
+    <span>{{ ('templates.families.' + row().documentType) | transloco }}</span>
+    <span aria-hidden="true">·</span>
+    <span>{{ ('templates.layoutsShort.' + row().layoutMode) | transloco }}</span>
+    <span aria-hidden="true">·</span>
+    <span>{{ ('templates.locales.' + row().locale) | transloco }}</span>
+  </div>
+
+  <div class="flex-1" aria-hidden="true"></div>
+  <div class="my-8 h-border bg-border" aria-hidden="true"></div>
+
+  <div class="flex flex-wrap items-center gap-6">
+    @if (row().currentPublishedVersion; as pub) {
+      <span
+        class="inline-flex h-badge items-center gap-4 rounded-8 px-8 text-12 font-medium"
+        [class]="pub.status === 'RETIRED' ? 'bg-neutral-soft text-on-neutral-soft' : 'bg-success text-on-success'"
+      >
+        <bdi dir="ltr">v{{ pub.versionNumber }}</bdi>
+        @if (pub.status === 'RETIRED') {
+          <span>· {{ 'templates.lifecycle.RETIRED' | transloco }}</span>
+        }
+      </span>
+    } @else {
+      <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+        {{ 'templatesLibrary.table.notPublished' | transloco }}
+      </span>
+    }
+
+    @if (row().lifecycleStatus === 'ARCHIVED') {
+      <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+        {{ 'templatesLibrary.table.archived' | transloco }}
+      </span>
+    }
+
+    <span class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium" [class]="validationClass()">
+      {{ ('templates.validationStates.' + row().draft.validationState) | transloco }}
+    </span>
+
+    <span class="ms-auto text-11 leading-16 text-text-muted">{{ updatedDate() }}</span>
+  </div>
+</article>

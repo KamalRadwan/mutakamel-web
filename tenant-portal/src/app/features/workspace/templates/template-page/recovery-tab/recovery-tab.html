@@ -1,0 +1,186 @@
+@if (service.snapshots().length === 0) {
+  <section class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+      <ng-icon name="tablerHistory" size="18" aria-hidden="true" />
+    </span>
+    <h2 class="text-14 leading-20 font-medium text-text">
+      {{ 'templates.states.emptyRecovery.title' | transloco }}
+    </h2>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'templates.states.emptyRecovery.description' | transloco }}
+    </p>
+  </section>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-tpl-table"
+      [attr.aria-label]="'templatesPage.recovery.table.ariaLabel' | transloco"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav grid-cols-tpl-recovery-row"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'templatesPage.recovery.table.capturedAt' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.recovery.table.reason' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.recovery.table.sourceRevision' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.recovery.table.expiresAt' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.recovery.table.state' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center border-s border-on-nav-line px-10">
+          <span class="sr-only">{{ 'templatesPage.recovery.table.actions' | transloco }}</span>
+        </span>
+      </div>
+
+      @for (row of service.snapshots(); track row.snapshotId) {
+        @let state = stateOf(row);
+        @let allowed = canRestore(row);
+        <div
+          role="row"
+          class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover grid-cols-tpl-recovery-row"
+        >
+          <span role="cell" class="flex min-w-0 items-center px-10 text-12 text-text tabular-nums">
+            <span class="truncate">{{ service.formatDateTime(row.createdAt, language()) }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+            <span class="truncate">{{ ('templatesPage.recovery.reasons.' + row.captureReason) | transloco }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="inline-flex h-badge items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+              <bdi dir="ltr">r{{ row.sourceDraftRevision }}</bdi>
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+            <span class="truncate">{{ service.formatDate(row.expiresAt, language()) }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span
+              class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+              [class]="stateBadgeClass(state)"
+            >
+              {{ ('templatesPage.recovery.states.' + state) | transloco }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [disabled]="!allowed"
+              [title]="disabledReason(row) || ''"
+              (click)="openRestoreModal(row)"
+            >
+              <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+              {{ 'templatesPage.recovery.restoreAction' | transloco }}
+            </button>
+          </span>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<!-- One-time recovery snapshot restore modal (520) -->
+<ui-modal
+  #restoreModal
+  size="form"
+  icon="tablerArrowBackUp"
+  tile="bg-icon-teal"
+  [title]="'templatesPage.recovery.restoreModal.title' | transloco"
+  [subtitle]="restoringTarget() ? ('templatesPage.recovery.restoreModal.subtitle' | transloco: { revision: restoringTarget()!.sourceDraftRevision }) : ''"
+  [closeLabel]="'templates.actions.close' | transloco"
+  [dismissable]="!restoring()"
+>
+  @if (restoringTarget(); as snap) {
+    <div class="flex flex-col gap-10">
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <ui-field
+          [for]="uid + '-source-rev'"
+          [label]="'templatesPage.recovery.restoreModal.sourceRevisionLabel' | transloco"
+          [hint]="'templatesPage.recovery.restoreModal.sourceRevisionHint' | transloco"
+        >
+          <input
+            [id]="uid + '-source-rev'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+            [value]="'r' + snap.sourceDraftRevision"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-captured-at'"
+          [label]="'templatesPage.recovery.restoreModal.capturedAtLabel' | transloco"
+          [hint]="'templatesPage.recovery.restoreModal.capturedAtHint' | transloco"
+        >
+          <input
+            [id]="uid + '-captured-at'"
+            type="text"
+            readonly
+            class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+            [value]="service.formatDateTime(snap.createdAt, language())"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        size="multiline"
+        [for]="uid + '-reason'"
+        [label]="'templatesPage.recovery.restoreModal.reasonLabel' | transloco"
+        [hint]="'templatesPage.recovery.restoreModal.reasonHint' | transloco"
+        [required]="true"
+        [count]="reason().length"
+        [max]="500"
+        [error]="reasonError()"
+      >
+        <textarea
+          [id]="uid + '-reason'"
+          rows="3"
+          maxlength="500"
+          class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'templatesPage.recovery.restoreModal.reasonPlaceholder' | transloco"
+          [value]="reason()"
+          (input)="onReasonInput($event)"
+        ></textarea>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-discard'"
+        [label]="'templatesPage.recovery.restoreModal.discardLabel' | transloco"
+        [hint]="'templatesPage.recovery.restoreModal.discardHint' | transloco"
+        [required]="true"
+        [error]="discardError()"
+      >
+        <ui-checkbox [checked]="discardCurrentDraft()" (checkedChange)="onDiscardCheckedChange($event)">
+          {{ 'templatesPage.recovery.restoreModal.discardCheckbox' | transloco }}
+        </ui-checkbox>
+      </ui-field>
+    </div>
+  }
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton [loading]="restoring()" (click)="submitRestore()">
+      {{ 'templatesPage.recovery.restoreModal.confirm' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="restoring()" (click)="restoreModal.close()">
+      {{ 'templates.actions.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

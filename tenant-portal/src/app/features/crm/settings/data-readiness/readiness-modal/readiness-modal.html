@@ -1,0 +1,602 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerActivityHeartbeat"
+  tile="bg-icon-teal"
+  [title]="sourceKey()"
+  [closeLabel]="'readiness.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (detail(); as d) {
+    <ui-badge
+      modal-header-end
+      [tone]="uiStateTone(d.uiState)"
+      [attr.title]="'analytics.readiness.' + d.status | transloco"
+    >
+      {{ 'analytics.readinessUi.' + d.uiState | transloco }}
+    </ui-badge>
+  }
+
+  @if (loading() && !detail()) {
+    <div class="flex flex-col gap-12" aria-busy="true">
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        @for (row of skeletonFields; track row) {
+          <div class="flex flex-col gap-4">
+            <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+            <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+          </div>
+        }
+      </div>
+      <div class="border-t border-border"></div>
+      <div class="flex flex-col gap-6">
+        <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+        <span class="h-table-row w-full rounded-10 bg-neutral-soft" aria-hidden="true"></span>
+        <span class="h-table-row w-full rounded-10 bg-neutral-soft" aria-hidden="true"></span>
+      </div>
+    </div>
+  } @else if (detail(); as d) {
+    <div class="flex flex-col gap-12">
+      <dl class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <!-- Status -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #statusRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.status' | transloco">
+              {{ 'readiness.modal.fields.status' | transloco }}
+            </span>
+            <span
+              #statusTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-status-hint'"
+              (mouseenter)="placeHint('status', statusTrigger, statusRow, statusTip)"
+              (focus)="placeHint('status', statusTrigger, statusRow, statusTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #statusTip
+                [id]="uid + '-status-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'status' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.statusHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-status-hint'">
+            {{ 'analytics.readiness.' + d.status | transloco }}
+          </dd>
+        </div>
+
+        <!-- Shown to users as (uiState) -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #uiStateRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.uiState' | transloco">
+              {{ 'readiness.modal.fields.uiState' | transloco }}
+            </span>
+            <span
+              #uiStateTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-uiState-hint'"
+              (mouseenter)="placeHint('uiState', uiStateTrigger, uiStateRow, uiStateTip)"
+              (focus)="placeHint('uiState', uiStateTrigger, uiStateRow, uiStateTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #uiStateTip
+                [id]="uid + '-uiState-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'uiState' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.uiStateHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="flex min-w-0 items-center text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-uiState-hint'">
+            <ui-badge [tone]="uiStateTone(d.uiState)">
+              {{ 'analytics.readinessUi.' + d.uiState | transloco }}
+            </ui-badge>
+          </dd>
+        </div>
+
+        <!-- Reason -->
+        <div class="col-span-2 flex min-w-0 flex-col gap-2">
+          <dt #reasonRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.reason' | transloco">
+              {{ 'readiness.modal.fields.reason' | transloco }}
+            </span>
+            <span
+              #reasonTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-reason-hint'"
+              (mouseenter)="placeHint('reason', reasonTrigger, reasonRow, reasonTip)"
+              (focus)="placeHint('reason', reasonTrigger, reasonRow, reasonTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #reasonTip
+                [id]="uid + '-reason-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'reason' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.reasonHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-reason-hint'">
+            {{ reasonText(d.reasonCode) }}
+          </dd>
+        </div>
+
+        <!-- Family -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #familyRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.family' | transloco">
+              {{ 'readiness.modal.fields.family' | transloco }}
+            </span>
+            <span
+              #familyTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-family-hint'"
+              (mouseenter)="placeHint('family', familyTrigger, familyRow, familyTip)"
+              (focus)="placeHint('family', familyTrigger, familyRow, familyTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #familyTip
+                [id]="uid + '-family-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'family' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.familyHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-family-hint'">
+            {{ familyKey(d.sourceFamily) | transloco }}
+          </dd>
+        </div>
+
+        <!-- Owner module -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #ownerModuleRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.ownerModule' | transloco">
+              {{ 'readiness.modal.fields.ownerModule' | transloco }}
+            </span>
+            <span
+              #ownerModuleTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-ownerModule-hint'"
+              (mouseenter)="placeHint('ownerModule', ownerModuleTrigger, ownerModuleRow, ownerModuleTip)"
+              (focus)="placeHint('ownerModule', ownerModuleTrigger, ownerModuleRow, ownerModuleTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #ownerModuleTip
+                [id]="uid + '-ownerModule-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'ownerModule' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.ownerModuleHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 truncate text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-ownerModule-hint'">
+            <bdi dir="ltr">{{ d.ownerModule }}</bdi>
+          </dd>
+        </div>
+
+        <!-- Capture source -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #captureSourceRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.captureSource' | transloco">
+              {{ 'readiness.modal.fields.captureSource' | transloco }}
+            </span>
+            <span
+              #captureSourceTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-captureSource-hint'"
+              (mouseenter)="placeHint('captureSource', captureSourceTrigger, captureSourceRow, captureSourceTip)"
+              (focus)="placeHint('captureSource', captureSourceTrigger, captureSourceRow, captureSourceTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #captureSourceTip
+                [id]="uid + '-captureSource-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'captureSource' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.captureSourceHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 truncate text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-captureSource-hint'">
+            <bdi dir="ltr">{{ d.captureSourceKey }}</bdi>
+          </dd>
+        </div>
+
+        <!-- Lag & freshness target -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #lagRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.lag' | transloco">
+              {{ 'readiness.modal.fields.lag' | transloco }}
+            </span>
+            <span
+              #lagTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-lag-hint'"
+              (mouseenter)="placeHint('lag', lagTrigger, lagRow, lagTip)"
+              (focus)="placeHint('lag', lagTrigger, lagRow, lagTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #lagTip
+                [id]="uid + '-lag-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'lag' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.lagHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="flex min-w-0 flex-wrap items-center gap-6 text-12 leading-18 text-text" [attr.aria-describedby]="uid + '-lag-hint'">
+            <span>{{ formatLag(d.lagSeconds) }}</span>
+            @if (d.stale) {
+              <ui-badge tone="warning">{{ 'readiness.stale' | transloco }}</ui-badge>
+            }
+            @if (formatTarget(d.freshnessSloSeconds); as targetText) {
+              <span class="text-text-muted">({{ targetText }})</span>
+            }
+          </dd>
+        </div>
+
+        <!-- Watermark -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #watermarkRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.watermark' | transloco">
+              {{ 'readiness.modal.fields.watermark' | transloco }}
+            </span>
+            <span
+              #watermarkTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-watermark-hint'"
+              (mouseenter)="placeHint('watermark', watermarkTrigger, watermarkRow, watermarkTip)"
+              (focus)="placeHint('watermark', watermarkTrigger, watermarkRow, watermarkTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #watermarkTip
+                [id]="uid + '-watermark-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'watermark' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.watermarkHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-watermark-hint'">
+            {{ formatTimestamp(d.watermarkAt) }}
+          </dd>
+        </div>
+
+        <!-- Pinned watermark -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #pinnedWatermarkRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.pinnedWatermark' | transloco">
+              {{ 'readiness.modal.fields.pinnedWatermark' | transloco }}
+            </span>
+            <span
+              #pinnedWatermarkTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-pinnedWatermark-hint'"
+              (mouseenter)="placeHint('pinnedWatermark', pinnedWatermarkTrigger, pinnedWatermarkRow, pinnedWatermarkTip)"
+              (focus)="placeHint('pinnedWatermark', pinnedWatermarkTrigger, pinnedWatermarkRow, pinnedWatermarkTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #pinnedWatermarkTip
+                [id]="uid + '-pinnedWatermark-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'pinnedWatermark' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.pinnedWatermarkHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="flex min-w-0 flex-wrap items-center gap-6 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-pinnedWatermark-hint'">
+            @if (d.watermarkPinned; as pinned) {
+              <span>{{ formatTimestamp(pinned.watermark) }}</span>
+              <span class="text-text-muted">({{ 'readiness.modal.firstSeen' | transloco: { date: formatTimestamp(pinned.firstSeenAt) } }})</span>
+            } @else {
+              <span>{{ formatTimestamp(null) }}</span>
+            }
+          </dd>
+        </div>
+
+        <!-- Coverage started -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #coverageStartedRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.coverageStarted' | transloco">
+              {{ 'readiness.modal.fields.coverageStarted' | transloco }}
+            </span>
+            <span
+              #coverageStartedTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-coverageStarted-hint'"
+              (mouseenter)="placeHint('coverageStarted', coverageStartedTrigger, coverageStartedRow, coverageStartedTip)"
+              (focus)="placeHint('coverageStarted', coverageStartedTrigger, coverageStartedRow, coverageStartedTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #coverageStartedTip
+                [id]="uid + '-coverageStarted-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'coverageStarted' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.coverageStartedHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-coverageStarted-hint'">
+            {{ formatTimestamp(d.coverageStartedAt) }}
+          </dd>
+        </div>
+
+        <!-- Backfill floor -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #backfillFloorRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.backfillFloor' | transloco">
+              {{ 'readiness.modal.fields.backfillFloor' | transloco }}
+            </span>
+            <span
+              #backfillFloorTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-backfillFloor-hint'"
+              (mouseenter)="placeHint('backfillFloor', backfillFloorTrigger, backfillFloorRow, backfillFloorTip)"
+              (focus)="placeHint('backfillFloor', backfillFloorTrigger, backfillFloorRow, backfillFloorTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #backfillFloorTip
+                [id]="uid + '-backfillFloor-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'backfillFloor' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.backfillFloorHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-backfillFloor-hint'">
+            {{ formatTimestamp(d.backfillFloorAt) }}
+          </dd>
+        </div>
+
+        <!-- Last confirmed -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #lastConfirmedRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.lastConfirmed' | transloco">
+              {{ 'readiness.modal.fields.lastConfirmed' | transloco }}
+            </span>
+            <span
+              #lastConfirmedTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-lastConfirmed-hint'"
+              (mouseenter)="placeHint('lastConfirmed', lastConfirmedTrigger, lastConfirmedRow, lastConfirmedTip)"
+              (focus)="placeHint('lastConfirmed', lastConfirmedTrigger, lastConfirmedRow, lastConfirmedTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #lastConfirmedTip
+                [id]="uid + '-lastConfirmed-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'lastConfirmed' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.lastConfirmedHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-lastConfirmed-hint'">
+            {{ formatTimestamp(d.lastConfirmedAt) }}
+          </dd>
+        </div>
+
+        <!-- Last checked -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #lastCheckedRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.lastChecked' | transloco">
+              {{ 'readiness.modal.fields.lastChecked' | transloco }}
+            </span>
+            <span
+              #lastCheckedTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-lastChecked-hint'"
+              (mouseenter)="placeHint('lastChecked', lastCheckedTrigger, lastCheckedRow, lastCheckedTip)"
+              (focus)="placeHint('lastChecked', lastCheckedTrigger, lastCheckedRow, lastCheckedTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #lastCheckedTip
+                [id]="uid + '-lastChecked-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'lastChecked' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.lastCheckedHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-lastChecked-hint'">
+            {{ formatTimestamp(d.lastCheckedAt) }}
+          </dd>
+        </div>
+
+        <!-- Status changed -->
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt #statusChangedRow class="flex h-label min-w-0 items-center gap-4 text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="'readiness.modal.fields.statusChanged' | transloco">
+              {{ 'readiness.modal.fields.statusChanged' | transloco }}
+            </span>
+            <span
+              #statusChangedTrigger
+              class="relative inline-flex shrink-0 items-center rounded-full text-accent outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-statusChanged-hint'"
+              (mouseenter)="placeHint('statusChanged', statusChangedTrigger, statusChangedRow, statusChangedTip)"
+              (focus)="placeHint('statusChanged', statusChangedTrigger, statusChangedRow, statusChangedTip)"
+              (mouseleave)="hideHint()"
+              (blur)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #statusChangedTip
+                [id]="uid + '-statusChanged-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="activeHintKey() === 'statusChanged' ? 'visible' : 'invisible'"
+                [style.top.px]="hintPlace().top"
+                [style.inset-inline-start.px]="hintPlace().start"
+              >
+                {{ 'readiness.modal.fields.statusChangedHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd class="min-w-0 text-12 leading-18 text-text tabular-nums" [attr.aria-describedby]="uid + '-statusChanged-hint'">
+            {{ formatTimestamp(d.statusChangedAt) }}
+          </dd>
+        </div>
+      </dl>
+
+      <div class="border-t border-border"></div>
+
+      <section class="flex flex-col gap-8">
+        <h3 class="text-13 leading-18 font-medium text-text">
+          {{ 'readiness.dependsOn' | transloco }}
+        </h3>
+
+        <ui-data-table
+          [columns]="affectedColumns()"
+          [rows]="affected()"
+          [rowKey]="affectedRowKey"
+          [emptyText]="'readiness.affected.empty' | transloco"
+          [label]="'readiness.dependsOn' | transloco"
+        >
+          <ng-template uiCell="kind" let-row>
+            <ui-badge tone="tag">{{ 'readiness.kinds.' + row.kind | transloco }}</ui-badge>
+          </ng-template>
+
+          <ng-template uiCell="name" let-row>
+            <span class="min-w-0 truncate text-12 leading-18 text-text" [title]="row.name">{{ row.name }}</span>
+          </ng-template>
+
+          <ng-template uiCell="action" let-row>
+            @if (row.kind === 'REPORT') {
+              <a
+                uiButton
+                variant="ghost"
+                size="small"
+                [routerLink]="['/crm/reports/catalogue', row.id, 'overview']"
+                (click)="onNavigateToReport($event)"
+              >
+                {{ 'readiness.open' | transloco }}
+              </a>
+            }
+          </ng-template>
+        </ui-data-table>
+
+        @if (pageInfo()?.hasMore && pageInfo()?.nextCursor) {
+          <div class="flex justify-center">
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [loading]="loadingMore()"
+              (click)="loadMore()"
+            >
+              {{ 'readiness.loadMore' | transloco }}
+            </button>
+          </div>
+        }
+      </section>
+    </div>
+  }
+
+  <button modal-footer type="button" uiButton variant="secondary" (click)="close()">
+    {{ 'readiness.close' | transloco }}
+  </button>
+</ui-modal>

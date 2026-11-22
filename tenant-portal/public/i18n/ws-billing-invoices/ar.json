@@ -1,0 +1,103 @@
+{
+  "list": {
+    "tableLabel": "الفواتير",
+    "legacy": "قديمة",
+    "empty": "لا توجد فواتير بعد",
+    "cols": {
+      "number": "الرقم",
+      "status": "الحالة",
+      "purpose": "الغرض",
+      "issued": "الإصدار",
+      "due": "الاستحقاق",
+      "period": "الفترة",
+      "total": "الإجمالي",
+      "paid": "المدفوع",
+      "outstanding": "المستحق",
+      "actions": "الإجراءات"
+    },
+    "pagination": "ترقيم صفحات الفواتير"
+  },
+  "detail": {
+    "detailsTitle": "تفاصيل الفاتورة",
+    "linesTitle": "بنود الفاتورة",
+    "fields": {
+      "issued": "تاريخ الإصدار",
+      "issuedHint": "التاريخ الذي أُصدرت فيه الفاتورة.",
+      "due": "تاريخ الاستحقاق",
+      "dueHint": "الموعد النهائي لسداد هذه الفاتورة.",
+      "paidOn": "تاريخ السداد",
+      "paidOnHint": "التاريخ الذي سُدّدت فيه الفاتورة بالكامل.",
+      "periodFrom": "بداية الفترة",
+      "periodFromHint": "تاريخ بداية فترة الفوترة المشمولة.",
+      "periodTo": "نهاية الفترة",
+      "periodToHint": "تاريخ نهاية فترة الفوترة المشمولة.",
+      "currency": "العملة",
+      "currencyHint": "العملة التي أُصدرت بها الفاتورة.",
+      "settlementCurrency": "عملة التسوية",
+      "settlementCurrencyHint": "العملة المستخدمة لتسوية هذه الفاتورة."
+    },
+    "totals": {
+      "subtotal": "المجموع الفرعي",
+      "tax": "الضريبة",
+      "total": "الإجمالي",
+      "settlementSubtotal": "المجموع الفرعي للتسوية",
+      "settlementTax": "ضريبة التسوية",
+      "settlementTotal": "إجمالي التسوية",
+      "paid": "المدفوع"
+    }
+  },
+  "lines": {
+    "tableLabel": "بنود الفاتورة",
+    "cols": {
+      "description": "الوصف",
+      "seats": "المقاعد",
+      "cycle": "الدورة",
+      "quantity": "الكمية",
+      "unitPrice": "سعر الوحدة",
+      "lineTotal": "إجمالي البند"
+    },
+    "expand": "عرض شرائح التسعير",
+    "collapse": "إخفاء شرائح التسعير",
+    "bracketRange": "{{min}}–{{max}} مستخدم",
+    "bracketOpen": "{{min}} مستخدم فأكثر",
+    "charged": "المحتسب: {{count}}",
+    "noBrackets": "لا يتوفر تفصيل للشرائح.",
+    "empty": "لا توجد بنود في هذه الفاتورة."
+  },
+  "pay": {
+    "title": "دفع الفاتورة",
+    "loading": "جارٍ التحقق من حالة الدفع…",
+    "loadFailed": "تعذّر التحقق من حالة الدفع.",
+    "currency": "العملة",
+    "currencyHint": "العملة التي تدفع بها",
+    "getAmount": "احسب المبلغ",
+    "getNewAmount": "احسب مبلغًا جديدًا",
+    "outstanding": "المبلغ المستحق",
+    "fromWallet": "من المحفظة",
+    "toPayNow": "المطلوب دفعه الآن",
+    "youPay": "المبلغ المطلوب",
+    "rateLabel": "سعر الصرف",
+    "rateValue": "1 دولار أمريكي = {{rate}} {{currency}}",
+    "walletCoversAll": "يغطي رصيد محفظتك المبلغ بالكامل.",
+    "validFor": "صالح لمدة {{time}}",
+    "expired": "انتهت صلاحية هذا المبلغ",
+    "payAmount": "ادفع {{amount}}",
+    "payFromWallet": "الدفع من المحفظة",
+    "inProgress": "توجد عملية دفع قيد التنفيذ.",
+    "continuePayment": "متابعة الدفع",
+    "openPaymentPage": "فتح صفحة الدفع",
+    "checking": "جارٍ التحقق من الدفع…",
+    "checkAgain": "التحقق مرة أخرى",
+    "underReview": "عملية الدفع قيد المراجعة. سنُحدّث الفاتورة فور تأكيدها.",
+    "expiresAt": "تنتهي صلاحيته في {{time}}"
+  },
+  "toast": {
+    "paid": "تم سداد الفاتورة",
+    "popupBlockedTitle": "تم حظر النافذة المنبثقة",
+    "popupBlockedText": "اختر «فتح صفحة الدفع» للمتابعة.",
+    "failed": "فشلت عملية الدفع. يمكنك المحاولة مرة أخرى.",
+    "expired": "انتهت صلاحية صفحة الدفع. احصل على مبلغ جديد.",
+    "stillWaiting": "ما زلنا بانتظار تأكيد الدفع. تحقّق مرة أخرى لاحقًا.",
+    "quoteChanged": "تغيّر المبلغ. احصل على مبلغ جديد."
+  }
+}

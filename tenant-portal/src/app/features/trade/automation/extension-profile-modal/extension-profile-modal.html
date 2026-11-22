@@ -1,0 +1,116 @@
+<ui-modal
+  size="wide"
+  icon="tablerPuzzle"
+  tile="bg-icon-violet"
+  [title]="'extensions.create.title' | transloco"
+  [closeLabel]="'extensions.create.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-12">
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      <ui-field
+        class="col-span-2"
+        [for]="uid + '-code'"
+        [label]="'extensions.create.code.label' | transloco"
+        [hint]="'extensions.create.code.hint' | transloco"
+        [required]="true"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          class="h-full w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'extensions.create.code.placeholder' | transloco"
+          [value]="code()"
+          (input)="onCodeInput($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="col-span-1"
+        [for]="uid + '-target'"
+        [label]="'extensions.create.target.label' | transloco"
+        [hint]="'extensions.create.target.hint' | transloco"
+        [hintText]="targetHintText()"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-target'"
+          [label]="'extensions.create.target.label' | transloco"
+          [options]="targetOptions()"
+          [value]="targetCode()"
+          (valueChange)="onTargetChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="col-span-3"
+        [for]="uid + '-scope'"
+        [label]="'extensions.create.scope.label' | transloco"
+        [hint]="'extensions.create.scope.hint' | transloco"
+        [error]="scopeError()"
+      >
+        <input
+          [id]="uid + '-scope'"
+          type="text"
+          [readOnly]="true"
+          class="h-full w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="scopeDisplay()"
+        />
+      </ui-field>
+    </div>
+
+    <div class="flex flex-col gap-8 border-t border-border pt-10">
+      <div class="flex flex-col gap-2">
+        <h3 class="text-13 leading-18 font-medium text-text">
+          {{ 'extensions.create.firstFieldTitle' | transloco }}
+        </h3>
+        <p class="text-11 leading-16 text-text-muted">
+          {{ 'extensions.create.firstFieldCaption' | transloco }}
+        </p>
+      </div>
+
+      <app-extension-field-modal
+        [inline]="true"
+        [targetCode]="targetCode()"
+        [existingKeys]="[]"
+      />
+    </div>
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="saving()"
+    [disabled]="isBranchScope()"
+    (click)="submit()"
+  >
+    {{ 'extensions.create.submit' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="saving()"
+    (click)="requestClose()"
+  >
+    {{ 'extensions.create.cancel' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'extensions.create.discard.title' | transloco"
+  [text]="'extensions.create.discard.text' | transloco"
+  [confirmLabel]="'extensions.create.discard.confirm' | transloco"
+  [cancelLabel]="'extensions.create.cancel' | transloco"
+/>

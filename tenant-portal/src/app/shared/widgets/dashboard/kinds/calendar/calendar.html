@@ -1,0 +1,50 @@
+@if (days().length > 0) {
+  <div class="flex flex-col gap-4" role="group" [attr.aria-label]="title()">
+    <div
+      class="grid h-agenda-head grid-cols-7 overflow-hidden rounded-10 bg-nav-gradient text-11 font-medium text-on-nav"
+    >
+      @for (wd of weekdays(); track $index; let isFirst = $first) {
+        <span
+          class="flex items-center justify-center truncate px-4"
+          [class.border-s]="!isFirst"
+          [class.border-on-nav-line]="!isFirst"
+        >
+          {{ wd }}
+        </span>
+      }
+    </div>
+
+    <div class="grid grid-cols-7 gap-2">
+      @for (day of days(); track day.iso) {
+        @if (day.count > 0) {
+          <button
+            type="button"
+            class="flex min-h-agenda-cell-min cursor-pointer flex-col items-start justify-between rounded-6 border border-border bg-surface p-3 text-start outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [title]="day.tooltip"
+            [attr.aria-label]="day.ariaLabel"
+            (click)="pointClick.emit({ pointKey: day.iso })"
+          >
+            <span
+              class="inline-flex size-badge items-center justify-center rounded-full text-11 tabular-nums"
+              [class]="day.inMonth ? 'text-text' : 'text-text-placeholder'"
+            >
+              <bdi dir="ltr">{{ day.dayNumber }}</bdi>
+            </span>
+            <span class="self-end">
+              <ui-badge tone="count">{{ day.count }}</ui-badge>
+            </span>
+          </button>
+        } @else {
+          <div class="flex min-h-agenda-cell-min flex-col items-start justify-between rounded-6 border border-border bg-surface p-3">
+            <span
+              class="inline-flex size-badge items-center justify-center rounded-full text-11 tabular-nums"
+              [class]="day.inMonth ? 'text-text' : 'text-text-placeholder'"
+            >
+              <bdi dir="ltr">{{ day.dayNumber }}</bdi>
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}

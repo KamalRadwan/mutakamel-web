@@ -1,0 +1,44 @@
+{
+  "toolbar": {
+    "appFilterLabel": "Filter by application",
+    "allApplications": "All applications",
+    "reload": "Reload"
+  },
+  "badges": {
+    "subscribed": "Subscribed",
+    "current": "Current"
+  },
+  "tier": {
+    "rank": "Tier {{rank}}",
+    "lowerTier": "Lower tier"
+  },
+  "addons": {
+    "title": "Add-ons"
+  },
+  "price": {
+    "fromPrefix": "From",
+    "perUserMonth": "/ user / month",
+    "perUserYear": "/ user / year",
+    "unavailable": "Price not available"
+  },
+  "actions": {
+    "upgrade": "Upgrade",
+    "upgradeTier": "Upgrade tier",
+    "addToPlan": "Add to plan",
+    "prices": "Prices"
+  },
+  "empty": {
+    "title": "No applications are available yet"
+  },
+  "modal": {
+    "title": "{{app}} · {{item}} prices",
+    "cycleLabel": "Billing cycle",
+    "cycleHint": "Show the per-user prices for monthly or yearly billing",
+    "tableLabel": "Price brackets",
+    "colUsers": "Users",
+    "colPricePerUser": "Price per user",
+    "rangeOpen": "{{min}} and more",
+    "notConfigured": "Prices are not set for this cycle.",
+    "bracketNote": "Each user is charged at the price of their bracket."
+  }
+}

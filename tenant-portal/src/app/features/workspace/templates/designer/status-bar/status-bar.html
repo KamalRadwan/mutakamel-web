@@ -1,0 +1,69 @@
+<div
+  role="status"
+  class="flex h-btn items-center gap-8 rounded-10 border border-border bg-surface px-10 text-12 leading-18 text-text-muted"
+>
+  @if (layoutFacts()) {
+    <span class="inline-flex h-filter-chip shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+      {{ layoutFacts() }}
+    </span>
+  }
+
+  @if (showPrintableCheck()) {
+    @let outsideCount = outsideNodeIds().length;
+    @if (outsideCount === 0) {
+      <span class="inline-flex items-center gap-4 whitespace-nowrap text-success-text">
+        <ng-icon name="tablerCircleCheck" size="14" class="shrink-0 text-success-text" aria-hidden="true" />
+        <span>{{ 'tplTools.status.inside' | transloco }}</span>
+      </span>
+    } @else {
+      <button
+        type="button"
+        class="inline-flex cursor-pointer items-center gap-4 rounded-4 whitespace-nowrap text-warning-text underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="selectOutsideNodes()"
+      >
+        <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0 text-warning-text" aria-hidden="true" />
+        <span>
+          {{
+            (outsideCount === 1 ? 'tplTools.status.outsideOne' : 'tplTools.status.outside')
+              | transloco: { n: outsideCount }
+          }}
+        </span>
+      </button>
+    }
+  }
+
+  <span class="whitespace-nowrap tabular-nums">
+    @let totalObjects = objectCount();
+    {{ (totalObjects === 1 ? 'tplTools.status.objectsOne' : 'tplTools.status.objects') | transloco: { n: totalObjects } }}
+  </span>
+
+  @if (isFixedCanvas() && state.pageCount() >= 1) {
+    <div class="ms-auto flex shrink-0 items-center gap-4">
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-surface-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+        [disabled]="state.pageIndex() <= 0"
+        [attr.aria-label]="'tplTools.status.prevPage' | transloco"
+        [title]="'tplTools.status.prevPage' | transloco"
+        (click)="goPrevPage()"
+      >
+        <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="px-4 text-12 whitespace-nowrap tabular-nums text-text">
+        {{ 'tplTools.status.page' | transloco: { i: state.pageIndex() + 1, n: state.pageCount() } }}
+      </span>
+
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-surface-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+        [disabled]="state.pageIndex() >= state.pageCount() - 1"
+        [attr.aria-label]="'tplTools.status.nextPage' | transloco"
+        [title]="'tplTools.status.nextPage' | transloco"
+        (click)="goNextPage()"
+      >
+        <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+    </div>
+  }
+</div>

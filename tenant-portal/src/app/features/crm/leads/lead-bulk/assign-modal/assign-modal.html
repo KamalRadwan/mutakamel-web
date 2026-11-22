@@ -1,0 +1,144 @@
+<app-bulk-run-modal
+  size="form"
+  icon="tablerUserShare"
+  tile="bg-icon-blue"
+  [title]="'leadBulk.assign.title' | transloco"
+  [count]="displayCount()"
+  [summary]="'leadBulk.leadsCount' | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="canSubmit()"
+  [dismissable]="!submitting()"
+  [submitLabel]="'leadBulk.assign.go' | transloco: { n: actionableRows().length }"
+  (submit)="submit()"
+  (cancel)="closeOwnerMenu()"
+  (closed)="onModalClosed()"
+>
+  <ui-field
+    size="bare"
+    [label]="'leadBulk.assign.owner' | transloco"
+    [for]="uid + '-owner'"
+    [hint]="'leadBulk.assign.ownerHint' | transloco"
+    [required]="true"
+    [error]="ownerFieldError()"
+  >
+    <div class="relative inline-flex w-full">
+      <button
+        #ownerTrigger
+        type="button"
+        [id]="uid + '-owner'"
+        class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+        [class]="
+          ownerFieldError()
+            ? 'border-danger-border ring-2 ring-danger-halo'
+            : ownerMenuOpen()
+              ? 'border-focus-ring ring-3 ring-focus-halo'
+              : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="ownerMenuOpen()"
+        [attr.aria-label]="'leadBulk.assign.owner' | transloco"
+        [attr.aria-describedby]="
+          ownerFieldError() ? uid + '-owner-hint ' + uid + '-owner-error' : uid + '-owner-hint'
+        "
+        [attr.aria-invalid]="ownerFieldError() ? 'true' : null"
+        [disabled]="ownersLoading() || owners().length === 0"
+        (click)="toggleOwnerMenu()"
+      >
+        <span class="flex min-w-0 items-center gap-6">
+          @if (selectedOwner(); as owner) {
+            @if (owner.avatarUrl) {
+              <img [src]="owner.avatarUrl" alt="" class="size-avatar shrink-0 rounded-full object-cover" />
+            } @else {
+              <span
+                class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                aria-hidden="true"
+              >
+                {{ initials(owner.displayName) }}
+              </span>
+            }
+            <span class="truncate">{{ owner.displayName }}</span>
+          } @else {
+            <span class="truncate text-text-placeholder">—</span>
+          }
+        </span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+
+      @if (ownerMenuOpen()) {
+        <div
+          #ownerPanel
+          class="fixed z-dropdown flex flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+          [class.invisible]="!ownerMenuPlaced()"
+          [style.top.px]="ownerMenuPlace().top"
+          [style.inset-inline-start.px]="ownerMenuPlace().start"
+          [style.width.px]="ownerMenuPlace().width"
+          [style.max-height.px]="ownerMenuPlace().maxHeight"
+          (keydown)="onOwnerPanelKeydown($event)"
+        >
+          <div
+            class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+          >
+            <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            <input
+              #ownerSearchInput
+              type="text"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [value]="ownerSearch()"
+              [attr.aria-label]="'leadBulk.assign.owner' | transloco"
+              (input)="onOwnerSearchInput($event)"
+            />
+          </div>
+
+          <ul
+            role="listbox"
+            class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto"
+            [attr.aria-label]="'leadBulk.assign.owner' | transloco"
+          >
+            @for (owner of filteredOwners(); track owner.id) {
+              <li role="option" [attr.aria-selected]="selectedOwnerId() === owner.id">
+                <button
+                  type="button"
+                  class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="
+                    selectedOwnerId() === owner.id
+                      ? 'bg-brand-soft text-on-brand-soft'
+                      : 'text-text hover:bg-row-hover'
+                  "
+                  (click)="selectOwner(owner.id)"
+                >
+                  <span class="flex min-w-0 items-center gap-6">
+                    @if (owner.avatarUrl) {
+                      <img [src]="owner.avatarUrl" alt="" class="size-avatar shrink-0 rounded-full object-cover" />
+                    } @else {
+                      <span
+                        class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                        aria-hidden="true"
+                      >
+                        {{ initials(owner.displayName) }}
+                      </span>
+                    }
+                    <span class="truncate">{{ owner.displayName }}</span>
+                  </span>
+                  @if (selectedOwnerId() === owner.id) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                  }
+                </button>
+              </li>
+            } @empty {
+              <li class="px-8 py-6 text-center text-12 text-text-muted">
+                {{ 'leadBulk.assign.noMatch' | transloco }}
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </div>
+  </ui-field>
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'leadBulk.assign.preview' | transloco: previewParams() }}
+  </p>
+</app-bulk-run-modal>

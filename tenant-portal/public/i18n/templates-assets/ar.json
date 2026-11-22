@@ -1,0 +1,151 @@
+{
+  "toolbar": {
+    "searchPlaceholder": "البحث باسم الملف",
+    "clearSearch": "مسح البحث",
+    "viewSwitcher": "طريقة العرض",
+    "views": {
+      "cards": "بطاقات",
+      "table": "جدول"
+    },
+    "filters": {
+      "typeLabel": "النوع",
+      "typeAll": "كل الأنواع",
+      "deliveryLabel": "التسليم",
+      "deliveryAll": "كل طرق التسليم",
+      "statusLabel": "الحالة",
+      "statusAll": "كل الحالات",
+      "scopeLabel": "النطاق",
+      "scopeAll": "كل النطاقات",
+      "templateLabel": "القالب",
+      "templateAll": "اختر قالباً",
+      "sortLabel": "الترتيب"
+    }
+  },
+  "scopes": {
+    "ALL_AUTHORIZED": "كل النطاقات",
+    "REUSABLE": "قابل لإعادة الاستخدام",
+    "DEFINITION": "قالب محدد",
+    "reusableBadge": "قابل لإعادة الاستخدام"
+  },
+  "types": {
+    "IMAGE": "صورة",
+    "LOGO": "شعار",
+    "BACKGROUND": "خلفية"
+  },
+  "delivery": {
+    "PRIVATE_ONLY": "خاص",
+    "EMAIL_PUBLIC": "عام للبريد"
+  },
+  "emailRendition": {
+    "READY": "جاهز",
+    "NOT_REQUESTED": "غير مطلوب"
+  },
+  "sort": {
+    "createdAt:desc": "الأحدث أولاً",
+    "createdAt:asc": "الأقدم أولاً",
+    "fileName:asc": "اسم الملف (أ–ي)",
+    "fileName:desc": "اسم الملف (ي–أ)"
+  },
+  "table": {
+    "asset": "الأصل",
+    "scope": "النطاق",
+    "type": "النوع",
+    "delivery": "التسليم",
+    "specs": "الصيغة والحجم",
+    "status": "الحالة",
+    "updated": "آخر تحديث",
+    "actions": "الإجراءات"
+  },
+  "actions": {
+    "open": "فتح",
+    "retire": "إيقاف",
+    "alreadyRetiredReason": "هذا الأصل موقوف بالفعل."
+  },
+  "uploadModal": {
+    "title": "رفع أصل",
+    "scopeLabel": "النطاق",
+    "scopeHint": "اختر ما إذا كان هذا الأصل قابلاً لإعادة الاستخدام عبر القوالب أو مرتبطاً بقالب واحد.",
+    "templateLabel": "القالب",
+    "templateHint": "اختر القالب الذي يملك هذا الأصل.",
+    "templatePlaceholder": "اختر قالباً",
+    "typeLabel": "نوع الأصل",
+    "typeHint": "صنّف الأصل كشعار أو صورة أو خلفية صفحة.",
+    "deliveryLabel": "فئة التسليم",
+    "deliveryHint": "الأصول الخاصة تتطلب تسجيل الدخول؛ بينما تنشئ أصول البريد العام نسخة عامة للبريد الإلكتروني.",
+    "deliveryPlaceholder": "اختر فئة التسليم",
+    "confirmPublicLabel": "التسليم العام للبريد الإلكتروني",
+    "confirmPublicHint": "تحمّل برامج البريد الصور دون تسجيل دخول، لذلك ستتم استضافة نسخة عامة من الصورة.",
+    "confirmPublicText": "أؤكد إمكانية إتاحة هذا الأصل بشكل عام في رسائل البريد الصادرة.",
+    "fileLabel": "ملف الصورة",
+    "fileHint": "اختر صورة بصيغة PNG أو JPEG بحد أقصى 5 ميجابايت. يحسب المتصفح بصمة SHA-256 للملف.",
+    "dropTitle": "أفلت الصورة هنا",
+    "dropHint": "PNG أو JPEG، حتى 5 ميجابايت",
+    "browse": "استعراض",
+    "removeFile": "إزالة الملف",
+    "hashing": "جارٍ حساب بصمة SHA-256…",
+    "sha256Label": "بصمة SHA-256"
+  },
+  "detailModal": {
+    "title": "تفاصيل الأصل",
+    "fileNameLabel": "اسم الملف",
+    "fileNameHint": "اسم الملف الأصلي المسجّل عند رفع هذا الأصل.",
+    "scopeLabel": "النطاق",
+    "scopeHint": "ما إذا كان الأصل قابلاً لإعادة الاستخدام عبر القوالب أو مرتبطاً بقالب محدد.",
+    "typeLabel": "نوع الأصل",
+    "typeHint": "دور الأصل المعروض عند إدراج الصور في مصمم القوالب.",
+    "formatLabel": "الصيغة المخزنة",
+    "formatHint": "صيغة الصورة المعيارية المخزنة في الخادم (PNG أو JPEG).",
+    "dimensionsLabel": "الأبعاد",
+    "dimensionsHint": "عرض وارتفاع الصورة المخزنة بالبكسل.",
+    "sizeLabel": "حجم الملف",
+    "sizeHint": "حجم ملف الصورة المخزن.",
+    "deliveryLabel": "فئة التسليم",
+    "deliveryHint": "قاعدة الوصول لعرض هذا الأصل في قوالب الطباعة أو البريد الإلكتروني.",
+    "emailRenditionLabel": "نسخة البريد الإلكتروني",
+    "emailRenditionHint": "حالة النسخة العامة المستخدمة في معاينات ورسائل البريد الصادرة.",
+    "updatedLabel": "آخر تحديث",
+    "updatedHint": "تاريخ إنشاء هذا الأصل أو آخر تعديل عليه.",
+    "checksumLabel": "بصمة SHA-256",
+    "checksumHint": "البصمة الرقمية SHA-256 لمحتوى الأصل المخزن.",
+    "previewUnavailable": "المعاينة غير متاحة للأصل الموقوف"
+  },
+  "retireConfirm": {
+    "title": "إيقاف الأصل؟",
+    "text": "سيتم إيقاف {{name}} ولن يكون متاحاً للإضافة في المسودات."
+  },
+  "discardConfirm": {
+    "title": "تجاهل الرفع؟",
+    "text": "لم يتم رفع الملف والإعدادات التي اخترتها.",
+    "confirm": "تجاهل"
+  },
+  "validation": {
+    "required": "هذا الحقل مطلوب.",
+    "confirmPublicRequired": "أكّد التسليم العام للبريد الإلكتروني قبل الرفع.",
+    "fileRequired": "اختر ملف صورة لرفعه.",
+    "fileType": "يُدعم فقط ملفات الصور بصيغة PNG وJPEG.",
+    "fileSize": "يجب ألا يتجاوز حجم الملف 5 ميجابايت."
+  },
+  "toasts": {
+    "uploaded": "تم رفع الأصل",
+    "retired": "تم إيقاف الأصل"
+  },
+  "states": {
+    "emptyFiltered": {
+      "title": "لا توجد أصول تطابق عوامل التصفية",
+      "description": "عدّل عوامل التصفية أو امسحها لعرض الأصول."
+    },
+    "loadFailed": {
+      "title": "تعذّر تحميل الأصول",
+      "description": "حدث خطأ غير متوقع أثناء تحميل أصول القوالب."
+    },
+    "backToHome": "العودة إلى الرئيسية"
+  },
+  "errors": {
+    "CORE.TEMPLATE.ASSET.IN_USE": "هذا الأصل مستخدم في إصدار منشور ولا يمكن إيقافه.",
+    "CORE.TEMPLATE.ASSET.UPLOAD_INVALID": "طلب رفع الأصل غير صالح.",
+    "CORE.TEMPLATE.ASSET.EMAIL_PUBLIC_NOT_ALLOWED": "يجب تأكيد التسليم العام للبريد الإلكتروني للأصول العامة.",
+    "CORE.TEMPLATE.ASSET.CHECKSUM_MISMATCH": "لم تتطابق بصمة الملف. اختر الملف وحاول مرة أخرى.",
+    "CORE.TEMPLATE.ASSET.INVALID": "تعذّرت معالجة ملف الصورة.",
+    "CORE.TEMPLATE.ASSET.STORAGE_UNAVAILABLE": "خدمة تخزين الأصول غير متاحة مؤقتاً."
+  }
+}

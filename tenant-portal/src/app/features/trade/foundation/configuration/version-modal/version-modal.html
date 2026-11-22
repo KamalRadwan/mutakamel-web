@@ -1,0 +1,154 @@
+<ui-modal
+  size="form"
+  icon="tablerPlus"
+  tile="bg-icon-green"
+  [title]="'tradeConfig.versionModal.title' | transloco"
+  [subtitle]="subtitle()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (definition(); as def) {
+    <div class="flex flex-col gap-10">
+      <app-config-value-editor
+        [schema]="def.valueSchema"
+        [idPrefix]="uid + '-val'"
+        [rootLabel]="'tradeConfig.versionModal.valueLabel' | transloco"
+        [rootHint]="valueHint()"
+        [errors]="valueErrors()"
+        [disabled]="saving()"
+        [value]="value()"
+        (valueChange)="onValueChange($event)"
+      />
+
+      <div class="grid grid-cols-1 gap-8">
+        <ui-field
+          size="bare"
+          [label]="'tradeConfig.versionModal.effectiveFrom' | transloco"
+          [for]="uid + '-from'"
+          [required]="true"
+          [hint]="'tradeConfig.versionModal.effectiveFromHint' | transloco"
+          [error]="fromError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-from'"
+              [ariaLabel]="'tradeConfig.versionModal.effectiveFrom' | transloco"
+              [describedBy]="fromDescribedBy()"
+              [todayLabel]="'tradeConfig.versionModal.today' | transloco"
+              [prevMonthLabel]="'tradeConfig.versionModal.prevMonth' | transloco"
+              [nextMonthLabel]="'tradeConfig.versionModal.nextMonth' | transloco"
+              [invalid]="!!fromError()"
+              [disabled]="saving()"
+              [(value)]="fromDate"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-from-time'"
+              [ariaLabel]="'tradeConfig.versionModal.effectiveFrom' | transloco"
+              [describedBy]="fromDescribedBy()"
+              [hourLabel]="'tradeConfig.versionModal.hour' | transloco"
+              [minuteLabel]="'tradeConfig.versionModal.minute' | transloco"
+              [invalid]="!!fromError()"
+              [disabled]="saving()"
+              [(value)]="fromTime"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'tradeConfig.versionModal.effectiveTo' | transloco"
+          [for]="uid + '-to'"
+          [hint]="'tradeConfig.versionModal.effectiveToHint' | transloco"
+          [error]="toError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-to'"
+              [ariaLabel]="'tradeConfig.versionModal.effectiveTo' | transloco"
+              [describedBy]="toDescribedBy()"
+              [todayLabel]="'tradeConfig.versionModal.today' | transloco"
+              [prevMonthLabel]="'tradeConfig.versionModal.prevMonth' | transloco"
+              [nextMonthLabel]="'tradeConfig.versionModal.nextMonth' | transloco"
+              [min]="fromDate()"
+              [invalid]="!!toError()"
+              [disabled]="saving()"
+              [value]="toDate()"
+              (valueChange)="onToDateChange($event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-to-time'"
+              [ariaLabel]="'tradeConfig.versionModal.effectiveTo' | transloco"
+              [describedBy]="toDescribedBy()"
+              [hourLabel]="'tradeConfig.versionModal.hour' | transloco"
+              [minuteLabel]="'tradeConfig.versionModal.minute' | transloco"
+              [invalid]="!!toError()"
+              [disabled]="saving()"
+              [value]="toTime()"
+              (valueChange)="onToTimeChange($event)"
+            />
+            @if (hasEnd()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                [attr.aria-label]="'tradeConfig.versionModal.clearEnd' | transloco"
+                [title]="'tradeConfig.versionModal.clearEnd' | transloco"
+                [disabled]="saving()"
+                (click)="clearEnd()"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <p class="text-11 leading-16 text-text-muted">
+        {{ 'tradeConfig.versionModal.draftNote' | transloco }}
+      </p>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      (click)="submit()"
+    >
+      {{ 'tradeConfig.versionModal.create' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tradeShared.discard.title' | transloco"
+  [text]="'tradeShared.discard.text' | transloco"
+  [confirmLabel]="'tradeShared.discard.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'tradeShared.conflict.title' | transloco"
+  [text]="'tradeShared.conflict.text' | transloco"
+  [confirmLabel]="'tradeShared.conflict.reload' | transloco"
+  [cancelLabel]="'tradeShared.conflict.keepMine' | transloco"
+/>

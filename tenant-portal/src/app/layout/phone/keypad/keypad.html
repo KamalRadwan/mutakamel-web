@@ -1,0 +1,13 @@
+<div dir="ltr" class="auto-rows-phone-key grid grow shrink-0 grid-cols-3 gap-6">
+  @for (key of keys; track key.digit) {
+    <button
+      type="button"
+      class="press-scale flex min-h-table-row cursor-pointer flex-col items-center justify-center rounded-10 border border-border bg-surface-muted leading-16 outline-none transition duration-fast hover:border-border-field hover:bg-row-hover active:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (pointerdown)="onPointerDown($event, key.digit)"
+      (keydown)="onKeydown($event, key.digit)"
+    >
+      <span class="text-16 leading-18 font-medium text-text">{{ key.digit }}</span>
+      <span class="mt-3 text-11 leading-16 font-normal text-text-muted">{{ key.letters || '\u00A0' }}</span>
+    </button>
+  }
+</div>

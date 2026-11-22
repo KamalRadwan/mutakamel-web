@@ -1,0 +1,62 @@
+<div class="flex h-table-head shrink-0 items-center gap-8 bg-nav-gradient ps-10 pe-6 text-on-nav">
+  @if (phone.tab() === 'settings') {
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-on-nav-muted outline-none transition-colors duration-fast hover:bg-nav-glass focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'webPhone.common.back' | transloco"
+      [title]="'webPhone.common.back' | transloco"
+      (click)="phone.setTab('phone')"
+    >
+      <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+
+    <span class="min-w-0 flex-1 truncate text-13 leading-18 font-medium">
+      {{ 'webPhone.header.devices' | transloco }}
+    </span>
+  } @else {
+    <span class="size-unread-dot shrink-0 rounded-full" [class]="dotClass()" aria-hidden="true"></span>
+
+    <div class="min-w-0 flex-1 truncate">
+      <span class="text-13 leading-18 font-medium">
+        {{ phone.identity().displayName || ('webPhone.title' | transloco) }}
+      </span>
+      @if (phone.identity().extension; as ext) {
+        <span class="text-11 leading-16 text-on-nav-muted">
+          · {{ 'webPhone.header.extPrefix' | transloco }} <bdi dir="ltr">{{ ext }}</bdi>
+        </span>
+      }
+    </div>
+
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-on-nav-muted outline-none transition-colors duration-fast hover:bg-nav-glass focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'webPhone.header.devices' | transloco"
+      [title]="'webPhone.header.devices' | transloco"
+      (click)="phone.setTab('settings')"
+    >
+      <ng-icon name="tablerAdjustments" size="15" aria-hidden="true" />
+    </button>
+
+    @if (phone.connection() === 'error') {
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-on-nav-muted outline-none transition-colors duration-fast hover:bg-nav-glass focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'webPhone.header.retry' | transloco"
+        [title]="'webPhone.header.retry' | transloco"
+        (click)="phone.retry()"
+      >
+        <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      </button>
+    }
+  }
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-on-nav-muted outline-none transition-colors duration-fast hover:bg-nav-glass focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [attr.aria-label]="'webPhone.header.collapse' | transloco"
+    [title]="'webPhone.header.collapse' | transloco"
+    (click)="phone.close()"
+  >
+    <ng-icon name="tablerChevronDown" size="15" aria-hidden="true" />
+  </button>
+</div>

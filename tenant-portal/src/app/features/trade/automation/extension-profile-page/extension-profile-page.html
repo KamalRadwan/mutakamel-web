@@ -1,0 +1,480 @@
+<header class="shrink-0 overflow-hidden rounded-10 border border-border bg-surface shadow-card">
+  @if (loading()) {
+    <div aria-busy="true">
+      <div class="flex items-center gap-8 px-10 py-8">
+        <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-bp-form-1col max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 border-t border-border px-10">
+        @for (item of [1, 2, 3]; track item) {
+          <span class="inline-flex h-tab shrink-0 items-center px-10">
+            <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+          </span>
+        }
+      </div>
+    </div>
+  } @else if (notFound() || loadFailed()) {
+    <div class="flex items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'extensions.profile.back' | transloco"
+        [title]="'extensions.profile.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+        <ng-icon name="tablerPuzzle" size="15" aria-hidden="true" />
+      </span>
+    </div>
+  } @else if (profile(); as p) {
+    <div class="flex flex-wrap items-center gap-8 px-10 py-8">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'extensions.profile.back' | transloco"
+        [title]="'extensions.profile.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+        <ng-icon name="tablerPuzzle" size="15" aria-hidden="true" />
+      </span>
+
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-8">
+          <h1 class="truncate text-16 leading-24 font-medium text-text">
+            <bdi dir="ltr" class="tabular-nums">{{ p.code }}</bdi>
+          </h1>
+
+          @if (serverDraft(); as draft) {
+            <span
+              class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+              [class]="
+                draft.status === 'TESTED'
+                  ? 'bg-neutral-soft text-on-neutral-soft'
+                  : 'bg-warning text-on-warning'
+              "
+            >
+              {{
+                (draft.status === 'TESTED'
+                  ? 'extensions.profile.testedBadge'
+                  : 'extensions.profile.draftBadge'
+                ) | transloco: { version: draft.versionNumber }
+              }}
+            </span>
+          } @else {
+            <app-automation-badge kind="profile" [value]="p.status" />
+          }
+        </div>
+
+        <p class="truncate text-11 leading-16 text-text-muted">{{ subtitleText() }}</p>
+      </div>
+
+      <span class="flex-1"></span>
+
+      <div class="flex flex-wrap items-center gap-8">
+        @if (canManage && dirty()) {
+          <span class="text-12 leading-18 text-text-muted">{{ 'extensions.profile.unsaved' | transloco }}</span>
+
+          <button type="button" uiButton variant="ghost" [disabled]="busy()" (click)="undoChanges()">
+            <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+            {{ 'extensions.profile.undo' | transloco }}
+          </button>
+
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [loading]="busy()"
+            (click)="saveDraft()"
+          >
+            <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+            {{ 'extensions.profile.saveDraft' | transloco }}
+          </button>
+        }
+
+        @if (canTest && hasEditableDraft()) {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="busy() || dirty() || !serverDraft()"
+            [attr.title]="validateDisabledReason()"
+            (click)="runValidate()"
+          >
+            <ng-icon name="tablerCheck" size="15" aria-hidden="true" />
+            {{ 'extensions.profile.validate' | transloco }}
+          </button>
+        }
+
+        @if (canPublish && hasEditableDraft()) {
+          <button
+            type="button"
+            uiButton
+            [variant]="publishIsPrimary() ? 'primary' : 'secondary'"
+            [disabled]="busy() || !!publishDisabledReason()"
+            [attr.title]="publishDisabledReason()"
+            [attr.aria-describedby]="publishDisabledReason() ? uid + '-publish-hint' : null"
+            (click)="runPublish()"
+          >
+            <ng-icon name="tablerSend" size="15" aria-hidden="true" />
+            {{ 'extensions.profile.publish' | transloco }}
+          </button>
+          @if (publishDisabledReason(); as pubReason) {
+            <span [id]="uid + '-publish-hint'" class="sr-only">{{ pubReason }}</span>
+          }
+        }
+      </div>
+    </div>
+
+    <div
+      role="tablist"
+      class="flex items-center gap-4 overflow-x-auto border-t border-border px-10 no-scrollbar"
+      [attr.aria-label]="'extensions.profile.tabs.label' | transloco"
+    >
+      @for (tab of tabsDef; track tab.id; let idx = $index) {
+        @let active = activeTab() === tab.id;
+        @let count = tabCount(tab.id);
+        <button
+          #tabBtn
+          type="button"
+          role="tab"
+          [id]="uid + '-tab-' + tab.id"
+          class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="active ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+          [attr.tabindex]="active ? 0 : -1"
+          [attr.aria-selected]="active"
+          [attr.aria-controls]="uid + '-panel-' + tab.id"
+          (click)="selectTab(tab.id)"
+          (keydown)="onTabKeydown($event, idx)"
+        >
+          <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+          <span>{{ tab.labelKey | transloco }}</span>
+          @if (count > 0) {
+            <span
+              class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-full px-4 text-11 leading-16 font-medium tabular-nums"
+              [class]="active ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text-muted'"
+            >
+              {{ count }}
+            </span>
+          }
+        </button>
+      }
+    </div>
+  }
+</header>
+
+<div class="min-h-0 min-w-0 flex-1 overflow-y-auto">
+  @if (loading()) {
+    <div class="flex flex-col gap-6 pt-4" aria-busy="true">
+      @for (row of [1, 2, 3, 4, 5]; track row) {
+        <div class="h-table-row animate-pulse rounded-10 border border-border bg-surface shadow-card"></div>
+      }
+    </div>
+  } @else if (notFound()) {
+    <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerPuzzle" size="18" aria-hidden="true" />
+      </span>
+      <h2 class="text-15 leading-22 font-medium text-text">{{ 'extensions.profile.notFound.title' | transloco }}</h2>
+      <p class="text-12 leading-18 text-text-muted">{{ 'extensions.profile.notFound.text' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="goBack()">
+        {{ 'extensions.profile.notFound.back' | transloco }}
+      </button>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 text-text-muted">{{ 'extensions.profile.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="primary" (click)="retryLoad()">
+        <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+        {{ 'extensions.profile.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (profile(); as p) {
+    <div
+      role="tabpanel"
+      [id]="uid + '-panel-fields'"
+      [attr.aria-labelledby]="uid + '-tab-fields'"
+      [class]="activeTab() === 'fields' ? 'flex flex-col gap-8' : 'hidden'"
+    >
+      @if (!hasEditableDraft()) {
+        <div class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8">
+          <span class="text-12 leading-18 text-text-muted">
+            {{ 'extensions.profile.noDraftNotice' | transloco }}
+          </span>
+          @if (canManage) {
+            <button type="button" uiButton variant="primary" size="small" (click)="startChangeFields()">
+              <ng-icon name="tablerEdit" size="14" aria-hidden="true" />
+              {{ 'extensions.profile.changeFields' | transloco }}
+            </button>
+          }
+        </div>
+      }
+
+      <app-extension-fields-table
+        [fields]="displayedFields()"
+        [targetCode]="p.targetCode"
+        [readonly]="fieldsTabReadonly()"
+        [diagnostics]="diagnosticsByField()"
+        [showAddButton]="hasEditableDraft()"
+        (addField)="openAddField()"
+        (editField)="openEditField($event)"
+        (removeField)="requestRemoveField($event)"
+        (toggleRequired)="onToggleRequired($event)"
+        (toggleSearchable)="onToggleSearchable($event)"
+      />
+    </div>
+
+    <div
+      role="tabpanel"
+      [id]="uid + '-panel-versions'"
+      [attr.aria-labelledby]="uid + '-tab-versions'"
+      [class]="activeTab() === 'versions' ? 'flex flex-col gap-8' : 'hidden'"
+    >
+      @if (versionsFailed()) {
+        <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+          <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+            <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+          </span>
+          <p class="text-13 leading-18 text-text-muted">{{ 'extensions.profile.versions.loadFailed' | transloco }}</p>
+          <button type="button" uiButton variant="primary" (click)="retryVersions()">
+            <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+            {{ 'extensions.profile.versions.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (!versionsLoading() && versions().length === 0) {
+        <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+          <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+            <ng-icon name="tablerHistory" size="18" aria-hidden="true" />
+          </span>
+          <p class="text-13 leading-18 text-text-muted">{{ 'extensions.profile.versions.empty' | transloco }}</p>
+        </div>
+      } @else {
+        <div class="overflow-x-auto pb-4">
+          <div
+            role="table"
+            class="min-w-doc-table-min"
+            [attr.aria-label]="'extensions.profile.versions.label' | transloco"
+            [attr.aria-busy]="versionsLoading()"
+          >
+            <div
+              role="row"
+              class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav grid-cols-auto-ext-version-row-actions"
+            >
+              <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                {{ 'extensions.profile.versions.version' | transloco }}
+              </span>
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'extensions.profile.versions.status' | transloco }}
+              </span>
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'extensions.profile.versions.publishedAt' | transloco }}
+              </span>
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'extensions.profile.versions.publishedBy' | transloco }}
+              </span>
+              <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                {{ 'extensions.profile.versions.fieldsCount' | transloco }}
+              </span>
+              <span role="columnheader" class="border-s border-on-nav-line">
+                <span class="sr-only">{{ 'extensions.profile.versions.actions' | transloco }}</span>
+              </span>
+            </div>
+
+            @if (versionsLoading()) {
+              @for (item of [1, 2, 3]; track item) {
+                <div
+                  role="row"
+                  class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card grid-cols-auto-ext-version-row-actions"
+                >
+                  <span role="cell" class="flex items-center px-10">
+                    <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-10">
+                    <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-10">
+                    <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-10">
+                    <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-10">
+                    <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center justify-center border-s border-border">
+                    <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+                  </span>
+                </div>
+              }
+            } @else {
+              @for (ver of versions(); track ver.id) {
+                @let expanded = expandedVersionId() === ver.id;
+                @let detail = versionDetails()[ver.id];
+                @let verLoading = versionLoading()[ver.id];
+                @let verFailed = versionErrors()[ver.id];
+
+                <div
+                  role="row"
+                  class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover grid-cols-auto-ext-version-row-actions"
+                  (click)="toggleVersionExpand(ver)"
+                >
+                  <span role="cell" class="flex min-w-0 items-center px-10">
+                    <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums">
+                      {{ 'extensions.profile.versions.versionTag' | transloco: { version: ver.versionNumber } }}
+                    </bdi>
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <app-automation-badge kind="profileVersion" [value]="ver.status" />
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <bdi class="truncate text-13 leading-18 text-text-muted tabular-nums">
+                      {{ dateText(ver.publishedAt) }}
+                    </bdi>
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <span class="truncate text-13 leading-18 text-text">
+                      {{ publishedByName(ver) }}
+                    </span>
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <bdi dir="ltr" class="truncate text-13 leading-18 text-text-muted tabular-nums">
+                      {{ versionFieldCount(ver) }}
+                    </bdi>
+                  </span>
+
+                  <span
+                    role="cell"
+                    class="flex items-center justify-center border-s border-border"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [attr.aria-expanded]="expanded"
+                      [attr.aria-label]="
+                        (expanded ? 'extensions.profile.versions.collapse' : 'extensions.profile.versions.expand')
+                          | transloco: { version: ver.versionNumber }
+                      "
+                      (click)="toggleVersionExpand(ver)"
+                    >
+                      <ng-icon
+                        [name]="expanded ? 'tablerChevronDown' : 'tablerChevronRight'"
+                        size="14"
+                        [class]="expanded ? '' : 'rtl:-scale-x-100'"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </span>
+                </div>
+
+                @if (expanded) {
+                  <div role="row" class="mt-4">
+                    <div role="cell" class="rounded-10 border border-border bg-surface-muted p-10">
+                      @if (verLoading) {
+                        <div class="flex items-center gap-8 text-12 text-text-muted" aria-busy="true">
+                          <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+                          <span>{{ 'extensions.profile.versions.loading' | transloco }}</span>
+                        </div>
+                      } @else if (verFailed) {
+                        <div class="flex items-center justify-between gap-8 text-12 text-danger-text">
+                          <span>{{ 'extensions.profile.versions.loadFailed' | transloco }}</span>
+                          <button type="button" uiButton size="small" variant="secondary" (click)="retryVersionDetail(ver.id)">
+                            {{ 'extensions.profile.versions.retry' | transloco }}
+                          </button>
+                        </div>
+                      } @else if (detail) {
+                        <app-extension-fields-table
+                          [fields]="detail.fields ?? []"
+                          [targetCode]="p.targetCode"
+                          [readonly]="true"
+                          [showAddButton]="false"
+                        />
+                      }
+                    </div>
+                  </div>
+                }
+              }
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div
+      role="tabpanel"
+      [id]="uid + '-panel-published'"
+      [attr.aria-labelledby]="uid + '-tab-published'"
+      [class]="activeTab() === 'published' ? 'flex flex-col gap-8' : 'hidden'"
+    >
+      @if (publishedVersion(); as pub) {
+        <app-extension-fields-table
+          [fields]="pub.fields ?? []"
+          [targetCode]="p.targetCode"
+          [readonly]="true"
+          [showAddButton]="false"
+        />
+      } @else {
+        <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+          <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+            <ng-icon name="tablerEye" size="18" aria-hidden="true" />
+          </span>
+          <p class="text-13 leading-18 text-text-muted">{{ 'extensions.profile.published.empty' | transloco }}</p>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<app-extension-field-modal (saved)="onFieldModalSaved($event)" />
+
+<ui-confirm-dialog
+  #testedResetDialog
+  tone="warning"
+  [title]="'extensions.profile.testedResetConfirm.title' | transloco"
+  [text]="'extensions.profile.testedResetConfirm.text' | transloco"
+  [confirmLabel]="'extensions.profile.testedResetConfirm.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #removeFieldDialog
+  tone="danger"
+  [title]="'extensions.profile.removeFieldConfirm.title' | transloco"
+  [text]="'extensions.profile.removeFieldConfirm.text' | transloco: { key: removingKey() }"
+  [confirmLabel]="'extensions.profile.removeFieldConfirm.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'extensions.profile.unsavedDialog.title' | transloco"
+  [text]="'extensions.profile.unsavedDialog.text' | transloco"
+  [saveLabel]="'extensions.profile.unsavedDialog.save' | transloco"
+  [discardLabel]="'extensions.profile.unsavedDialog.discard' | transloco"
+  [cancelLabel]="'extensions.profile.unsavedDialog.cancel' | transloco"
+/>
+
+<app-conflict-dialog
+  [title]="'tradeShared.conflict.title' | transloco"
+  [text]="'tradeShared.conflict.text' | transloco"
+  [reloadLabel]="'tradeShared.conflict.reload' | transloco"
+  [keepLabel]="'tradeShared.conflict.keepMine' | transloco"
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>

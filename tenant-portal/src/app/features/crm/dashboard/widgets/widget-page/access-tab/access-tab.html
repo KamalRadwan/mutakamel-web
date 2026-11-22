@@ -1,0 +1,66 @@
+<div class="flex flex-col gap-10">
+  @if (canManage()) {
+    <div class="flex items-center justify-end gap-8">
+      <button type="button" uiButton variant="secondary" (click)="openShareModal()">
+        <ng-icon name="tablerShare" size="15" aria-hidden="true" />
+        {{ 'widgetPage.access.manageAccess' | transloco }}
+      </button>
+    </div>
+  }
+
+  @if (loadFailed()) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'widgetPage.access.loadError' | transloco"
+      [text]="'analytics.common.loadFailed' | transloco"
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="retry()"
+    />
+  } @else {
+    <ui-data-table
+      [columns]="columns()"
+      [rows]="shares()"
+      [rowKey]="rowKey"
+      [loading]="loading()"
+      [label]="'widgetPage.access.tableLabel' | transloco"
+      [emptyText]="'widgetPage.access.empty' | transloco"
+    >
+      <ng-template uiCell="name" let-row>
+        <div class="flex min-w-0 items-center gap-8" [title]="row.subjectEmail || row.subjectName || row.subjectId">
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="row.subjectType === 'TEAM' ? 'bg-icon-green' : 'bg-icon-blue'"
+            aria-hidden="true"
+          >
+            <ng-icon [name]="row.subjectType === 'TEAM' ? 'tablerUsers' : 'tablerUser'" size="14" />
+          </span>
+          <span class="truncate">{{ row.subjectName || row.subjectId }}</span>
+        </div>
+      </ng-template>
+
+      <ng-template uiCell="type" let-row>
+        <ui-badge tone="tag">
+          {{ (row.subjectType === 'TEAM' ? 'widgetPage.access.team' : 'widgetPage.access.user') | transloco }}
+        </ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="access" let-row>
+        <ui-badge [tone]="row.effectiveAccessLevel === 'EDIT' ? 'brand' : 'tag'">
+          {{ ('analytics.access.' + row.effectiveAccessLevel) | transloco }}
+        </ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="expires" let-row>
+        <bdi dir="ltr" class="truncate tabular-nums">{{ formatExpiry(row.expiresAt) }}</bdi>
+      </ng-template>
+
+      <ng-template uiCell="sharedBy" let-row>
+        <span class="truncate text-text-muted">{{ sharedByName(row.sharedByUserId) }}</span>
+      </ng-template>
+    </ui-data-table>
+  }
+</div>
+
+<div #shareHost class="contents">
+  <app-share-modal />
+</div>

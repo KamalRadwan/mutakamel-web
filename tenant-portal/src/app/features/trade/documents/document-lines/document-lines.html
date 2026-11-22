@@ -1,0 +1,548 @@
+<div class="overflow-x-auto pb-4">
+  <div
+    role="table"
+    [class.min-w-doc-table-wide]="kind() === 'sales-order' || kind() === 'purchase-order'"
+    [class.min-w-doc-table-min]="kind() !== 'sales-order' && kind() !== 'purchase-order'"
+    [attr.aria-label]="'tdlines.tableLabel' | transloco"
+    [attr.aria-busy]="pricingLoading()"
+  >
+    <div
+      role="row"
+      class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+      [style.grid-template-columns]="gridColumns()"
+    >
+      @if (canModifyRows()) {
+        <span role="columnheader" class="flex items-center justify-center">
+          <span class="sr-only">{{ 'tdlines.dragHandle' | transloco }}</span>
+        </span>
+      }
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center justify-center px-10"
+        [class.border-s]="canModifyRows()"
+        [class.border-on-nav-line]="canModifyRows()"
+      >
+        #
+      </span>
+      @for (col of visibleColumns(); track col) {
+        <span
+          role="columnheader"
+          class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+          [class.justify-end]="isNumericColumn(col)"
+        >
+          {{ 'tdlines.columns.' + col | transloco }}
+        </span>
+      }
+      @if (canModifyRows()) {
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'tdlines.actions' | transloco }}</span>
+        </span>
+      }
+    </div>
+
+    <div
+      cdkDropList
+      [cdkDropListDisabled]="!canModifyRows()"
+      (cdkDropListDropped)="onDrop($event)"
+    >
+      @for (line of lines(); track line.clientLineId; let index = $index) {
+        @let computedRow = computedRows()[index];
+        @let rowDragDisabled = !canModifyRows() || line.locked;
+
+        <div
+          role="row"
+          cdkDrag
+          [cdkDragDisabled]="rowDragDisabled"
+          class="mt-6 grid min-h-table-row items-stretch rounded-10 border border-border bg-surface text-13 leading-18 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+          [style.grid-template-columns]="gridColumns()"
+        >
+          <ng-template cdkDragPlaceholder>
+            <div class="mt-6 h-0 border-t-2 border-dashed border-brand"></div>
+          </ng-template>
+
+          <ng-template cdkDragPreview matchSize>
+            <div class="flex h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 text-13 text-text shadow-drag">
+              <span class="text-12 text-text-muted tabular-nums">{{ index + 1 }}</span>
+              <span class="min-w-0 flex-1 truncate font-medium">{{ line.itemLabel || ('tdlines.columns.item' | transloco) }}</span>
+              <bdi dir="ltr" class="shrink-0 font-medium tabular-nums">
+                {{ formatMoney(currencyCode(), displayLineTotal(line, computedRow)) }}
+              </bdi>
+            </div>
+          </ng-template>
+
+          @if (canModifyRows()) {
+            <span role="cell" class="flex items-center justify-center text-text-muted">
+              @if (line.locked) {
+                <ng-icon name="tablerLock" size="14" aria-hidden="true" />
+              } @else {
+                <span
+                  cdkDragHandle
+                  class="inline-flex cursor-grab items-center justify-center rounded-4 text-text-muted active:cursor-grabbing"
+                  [title]="'tdlines.dragHandle' | transloco"
+                >
+                  <ng-icon name="tablerGripVertical" size="14" aria-hidden="true" />
+                </span>
+              }
+            </span>
+          }
+
+          <span
+            role="cell"
+            class="flex min-w-0 items-center justify-center px-10 text-12 text-text-muted tabular-nums"
+            [class.border-s]="canModifyRows()"
+            [class.border-border]="canModifyRows()"
+          >
+            {{ index + 1 }}
+          </span>
+
+          @for (col of visibleColumns(); track col) {
+            <span
+              role="cell"
+              class="flex min-w-0 flex-col justify-center border-s border-border px-10 py-3"
+            >
+              @switch (col) {
+                @case ('item') {
+                  @let itemErr = errorFor(line, 'item');
+                  <app-item-cell
+                    [itemId]="line.itemId"
+                    [itemLabel]="line.itemLabel"
+                    [purpose]="itemPurpose()"
+                    [context]="tradeCtx()"
+                    [editable]="editable() && !structureLocked() && !line.locked"
+                    [disabled]="structureLocked() || line.locked"
+                    [showTaxDefault]="isOrder()"
+                    [taxDefault]="taxDefaultFor(line)"
+                    [id]="cellId(line, 'item')"
+                    [describedBy]="itemErr ? errorId(line, 'item') : null"
+                    [invalid]="!!(itemErr)"
+                    (picked)="onItemPicked(index, $event)"
+                  />
+                  @if (itemErr) {
+                    <p [id]="errorId(line, 'item')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                      <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                      <span>{{ itemErr }}</span>
+                    </p>
+                  }
+                }
+
+                @case ('description') {
+                  @let descErr = errorFor(line, 'description');
+                  @if (editable() && !line.locked) {
+                    <div
+                      class="flex h-field items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                      [class]="
+                        descErr
+                          ? 'border-danger-border ring-2 ring-danger-halo'
+                          : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                      "
+                    >
+                      <input
+                        [id]="cellId(line, 'description')"
+                        type="text"
+                        [attr.maxlength]="maxDescriptionLength"
+                        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                        [attr.aria-label]="'tdlines.columns.description' | transloco"
+                        [attr.aria-invalid]="descErr ? 'true' : null"
+                        [attr.aria-describedby]="descErr ? errorId(line, 'description') : null"
+                        [value]="line.description"
+                        (input)="onDescriptionInput(index, $event)"
+                        (blur)="markCellTouched(line, 'description')"
+                      />
+                    </div>
+                    @if (descErr) {
+                      <p [id]="errorId(line, 'description')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ descErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <span class="truncate text-13 leading-18 text-text" [title]="line.description">
+                      {{ line.description || '—' }}
+                    </span>
+                  }
+                }
+
+                @case ('quantity') {
+                  @let qtyErr = errorFor(line, 'quantity');
+                  @if (editable() && !structureLocked() && !line.locked) {
+                    <div
+                      class="flex h-field items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                      [class]="
+                        qtyErr
+                          ? 'border-danger-border ring-2 ring-danger-halo'
+                          : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                      "
+                    >
+                      <input
+                        [id]="cellId(line, 'quantity')"
+                        type="text"
+                        inputmode="decimal"
+                        dir="ltr"
+                        class="min-w-0 flex-1 bg-transparent text-end text-12 text-text outline-none tabular-nums placeholder:text-text-placeholder"
+                        [attr.aria-label]="'tdlines.columns.quantity' | transloco"
+                        [attr.aria-invalid]="qtyErr ? 'true' : null"
+                        [attr.aria-describedby]="qtyErr ? errorId(line, 'quantity') : null"
+                        [value]="line.quantity"
+                        (input)="onQuantityInput(index, $event)"
+                        (blur)="markCellTouched(line, 'quantity')"
+                      />
+                    </div>
+                    @if (qtyErr) {
+                      <p [id]="errorId(line, 'quantity')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ qtyErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <bdi dir="ltr" class="block w-full text-end text-13 leading-18 text-text tabular-nums">
+                      {{ formatQty(line.quantity) }}
+                    </bdi>
+                  }
+                }
+
+                @case ('unit') {
+                  @let unitErr = errorFor(line, 'unit');
+                  @if (editable() && !structureLocked() && !line.locked) {
+                    <app-trade-uom-picker
+                      [value]="line.uomId"
+                      [id]="cellId(line, 'unit')"
+                      [describedBy]="unitErr ? errorId(line, 'unit') : null"
+                      [invalid]="!!(unitErr)"
+                      [disabled]="false"
+                      (valueChange)="onUnitChange(index, $event)"
+                    />
+                    @if (unitErr) {
+                      <p [id]="errorId(line, 'unit')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ unitErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <span class="truncate text-13 leading-18 text-text" [title]="uomLabel(line.uomId)">
+                      {{ uomLabel(line.uomId) }}
+                    </span>
+                  }
+                }
+
+                @case ('price') {
+                  <div class="flex w-full items-center justify-end gap-4">
+                    @if (pricingLoading() && isLineComplete(line) && kind() !== 'purchase-quotation') {
+                      <ng-icon
+                        name="tablerLoader2"
+                        size="12"
+                        class="shrink-0 animate-spin text-text-muted"
+                        aria-hidden="true"
+                      />
+                    }
+                    @if (kind() === 'purchase-quotation' && line.unitPrice === null) {
+                      <span class="text-12 leading-18 text-text-muted">
+                        {{ 'tdlines.priceOnSave' | transloco }}
+                      </span>
+                    } @else {
+                      <bdi dir="ltr" class="truncate text-end text-13 leading-18 text-text tabular-nums">
+                        {{ line.unitPrice !== null ? formatUnitPrice(currencyCode(), line.unitPrice) : '—' }}
+                      </bdi>
+                    }
+                  </div>
+                }
+
+                @case ('discount') {
+                  @if (kind() === 'quotation' && discountMode() === 'line' && editable() && !line.locked) {
+                    @let discErr = errorFor(line, 'discount');
+                    @let discType = discountType(line);
+                    <div class="flex min-w-0 items-center gap-4">
+                      <div
+                        role="radiogroup"
+                        class="inline-flex h-field shrink-0 items-center rounded-8 border border-border-field bg-neutral-soft p-2"
+                        [attr.aria-label]="'tdlines.discountType' | transloco"
+                      >
+                        <button
+                          type="button"
+                          role="radio"
+                          class="flex h-full cursor-pointer items-center rounded-6 px-4 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                          [class]="discType === 'PERCENT' ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'"
+                          [attr.aria-checked]="discType === 'PERCENT'"
+                          [tabIndex]="discType === 'PERCENT' ? 0 : -1"
+                          (click)="onDiscountTypeChange(index, 'PERCENT')"
+                          (keydown)="onDiscountTypeKeydown(index, $event, discType)"
+                        >
+                          %
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          class="flex h-full cursor-pointer items-center rounded-6 px-4 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                          [class]="discType === 'AMOUNT' ? 'bg-surface text-text shadow-card' : 'text-text-muted hover:text-text'"
+                          [attr.aria-checked]="discType === 'AMOUNT'"
+                          [tabIndex]="discType === 'AMOUNT' ? 0 : -1"
+                          (click)="onDiscountTypeChange(index, 'AMOUNT')"
+                          (keydown)="onDiscountTypeKeydown(index, $event, discType)"
+                        >
+                          {{ currencyCode() }}
+                        </button>
+                      </div>
+
+                      <div
+                        class="flex h-field min-w-0 flex-1 items-center gap-4 rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+                        [class]="
+                          discErr
+                            ? 'border-danger-border ring-2 ring-danger-halo'
+                            : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                        "
+                      >
+                        <input
+                          [id]="cellId(line, 'discount')"
+                          type="text"
+                          inputmode="decimal"
+                          dir="ltr"
+                          class="min-w-0 flex-1 bg-transparent text-end text-12 text-text outline-none tabular-nums placeholder:text-text-placeholder"
+                          [attr.aria-label]="'tdlines.columns.discount' | transloco"
+                          [attr.aria-invalid]="discErr ? 'true' : null"
+                          [attr.aria-describedby]="discErr ? errorId(line, 'discount') : null"
+                          [value]="discountValueInput(line)"
+                          (input)="onDiscountValueInput(index, $event)"
+                          (blur)="markCellTouched(line, 'discount')"
+                        />
+                        <span class="shrink-0 text-11 text-text-muted">
+                          {{ discType === 'PERCENT' ? '%' : currencyCode() }}
+                        </span>
+                      </div>
+                    </div>
+                    @if (discErr) {
+                      <p [id]="errorId(line, 'discount')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ discErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <bdi dir="ltr" class="block w-full text-end text-13 leading-18 text-text tabular-nums">
+                      {{ formatMoney(currencyCode(), computedRow.discountTotal) }}
+                    </bdi>
+                  }
+                }
+
+                @case ('charge') {
+                  @let chargeErr = errorFor(line, 'charge');
+                  @if (editable() && !line.locked) {
+                    <div
+                      class="flex h-field items-center gap-4 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                      [class]="
+                        chargeErr
+                          ? 'border-danger-border ring-2 ring-danger-halo'
+                          : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                      "
+                    >
+                      <input
+                        [id]="cellId(line, 'charge')"
+                        type="text"
+                        inputmode="decimal"
+                        dir="ltr"
+                        class="min-w-0 flex-1 bg-transparent text-end text-12 text-text outline-none tabular-nums placeholder:text-text-placeholder"
+                        [attr.aria-label]="'tdlines.columns.charge' | transloco"
+                        [attr.aria-invalid]="chargeErr ? 'true' : null"
+                        [attr.aria-describedby]="chargeErr ? errorId(line, 'charge') : null"
+                        [value]="line.chargeTotal"
+                        (input)="onChargeInput(index, $event)"
+                        (blur)="markCellTouched(line, 'charge')"
+                      />
+                    </div>
+                    @if (chargeErr) {
+                      <p [id]="errorId(line, 'charge')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ chargeErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <bdi dir="ltr" class="block w-full text-end text-13 leading-18 text-text tabular-nums">
+                      {{ formatMoney(currencyCode(), line.chargeTotal) }}
+                    </bdi>
+                  }
+                }
+
+                @case ('taxCategory') {
+                  @let taxCatErr = errorFor(line, 'taxCategory');
+                  @if (editable() && !line.locked) {
+                    @if (line.taxLocked && line.tax) {
+                      <div
+                        class="flex h-field w-full items-center justify-between gap-4 rounded-8 border border-border bg-neutral-soft px-8 text-12 text-text-muted"
+                        [title]="'tdlines.taxLocked' | transloco"
+                      >
+                        <span class="truncate">{{ 'tdlines.tax.' + line.tax.category | transloco }}</span>
+                        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                      </div>
+                    } @else {
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [id]="cellId(line, 'taxCategory')"
+                        [label]="'tdlines.columns.taxCategory' | transloco"
+                        [describedBy]="taxCatErr ? errorId(line, 'taxCategory') : null"
+                        [options]="taxCategoryOptions()"
+                        [value]="line.tax?.category ?? null"
+                        (valueChange)="onTaxCategoryChange(index, $event)"
+                      />
+                    }
+                    @if (taxCatErr) {
+                      <p [id]="errorId(line, 'taxCategory')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ taxCatErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <span class="truncate text-13 leading-18 text-text">
+                      {{ line.tax ? ('tdlines.tax.' + line.tax.category | transloco) : '—' }}
+                    </span>
+                  }
+                }
+
+                @case ('taxRate') {
+                  @let rateErr = errorFor(line, 'taxRate');
+                  @if (editable() && !line.locked) {
+                    @if (line.taxLocked || line.tax?.category !== 'STANDARD') {
+                      <div
+                        class="flex h-field w-full items-center justify-between gap-4 rounded-8 border border-border bg-neutral-soft px-8 text-12 text-text-muted"
+                        [title]="line.taxLocked ? ('tdlines.taxLocked' | transloco) : null"
+                      >
+                        @if (line.taxLocked) {
+                          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                        }
+                        <bdi dir="ltr" class="ms-auto tabular-nums">{{ taxRateDisplay(line) }} %</bdi>
+                      </div>
+                    } @else {
+                      <div
+                        class="flex h-field items-center gap-4 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                        [class]="
+                          rateErr
+                            ? 'border-danger-border ring-2 ring-danger-halo'
+                            : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                        "
+                      >
+                        <input
+                          [id]="cellId(line, 'taxRate')"
+                          type="text"
+                          inputmode="decimal"
+                          dir="ltr"
+                          class="min-w-0 flex-1 bg-transparent text-end text-12 text-text outline-none tabular-nums placeholder:text-text-placeholder"
+                          [attr.aria-label]="'tdlines.columns.taxRate' | transloco"
+                          [attr.aria-invalid]="rateErr ? 'true' : null"
+                          [attr.aria-describedby]="rateErr ? errorId(line, 'taxRate') : null"
+                          [value]="taxRateInputValue(line)"
+                          (input)="onTaxRateInput(index, $event)"
+                          (blur)="onTaxRateBlur(index)"
+                        />
+                        <span class="shrink-0 text-11 text-text-muted">%</span>
+                      </div>
+                    }
+                    @if (rateErr) {
+                      <p [id]="errorId(line, 'taxRate')" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+                        <span>{{ rateErr }}</span>
+                      </p>
+                    }
+                  } @else {
+                    <bdi dir="ltr" class="block w-full text-end text-13 leading-18 text-text tabular-nums">
+                      {{ taxRateDisplay(line) }} %
+                    </bdi>
+                  }
+                }
+
+                @case ('taxAmount') {
+                  <bdi dir="ltr" class="block w-full text-end text-13 leading-18 text-text tabular-nums">
+                    {{ formatMoney(currencyCode(), line.unitPrice === null ? null : computedRow.taxTotal) }}
+                  </bdi>
+                }
+
+                @case ('expectedDate') {
+                  @if (editable() && !line.locked) {
+                    <ui-date-field
+                      [id]="cellId(line, 'expectedDate')"
+                      [value]="line.expectedDate"
+                      [ariaLabel]="'tdlines.columns.expectedDate' | transloco"
+                      [describedBy]="cellId(line, 'expectedDate') + '-hint'"
+                      [placeholder]="'tdlines.pickDate' | transloco"
+                      [todayLabel]="'tdlines.date.today' | transloco"
+                      [prevMonthLabel]="'tdlines.date.prevMonth' | transloco"
+                      [nextMonthLabel]="'tdlines.date.nextMonth' | transloco"
+                      (valueChange)="onExpectedDateChange(index, $event)"
+                    />
+                    <span [id]="cellId(line, 'expectedDate') + '-hint'" class="sr-only">{{ 'tdlines.date.expectedHint' | transloco }}</span>
+                  } @else {
+                    <span class="truncate text-13 leading-18 text-text">
+                      {{ line.expectedDate ? formatDate(line.expectedDate, lang.current()) : '—' }}
+                    </span>
+                  }
+                }
+
+                @case ('receivingNode') {
+                  <span class="truncate text-13 leading-18 text-text">
+                    {{ line.receivingNodeId || '—' }}
+                  </span>
+                }
+
+                @case ('total') {
+                  <bdi dir="ltr" class="block w-full text-end text-13 leading-18 font-medium text-text tabular-nums">
+                    {{ formatMoney(currencyCode(), displayLineTotal(line, computedRow)) }}
+                  </bdi>
+                }
+              }
+            </span>
+          }
+
+          @if (canModifyRows()) {
+            <span role="cell" class="flex items-center justify-center gap-4 border-s border-border px-6">
+              <ui-menu
+                variant="icon"
+                align="end"
+                [items]="rowMenuItems(index)"
+                [label]="'tdlines.rowActions' | transloco"
+                (selected)="onRowMenuAction(index, $event)"
+              >
+                <ng-icon name="tablerDots" size="14" aria-hidden="true" />
+              </ui-menu>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                [disabled]="line.locked"
+                [attr.aria-label]="'tdlines.remove' | transloco"
+                [title]="'tdlines.remove' | transloco"
+                (click)="removeLine(index)"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            </span>
+          }
+        </div>
+      } @empty {
+        <div role="row" class="mt-6 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+          <span role="cell" class="text-12 text-text-muted">{{ 'tdlines.empty' | transloco }}</span>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+@if (canModifyRows() || kind() === 'quotation') {
+  <div class="flex flex-wrap items-center justify-between gap-8">
+    @if (canModifyRows()) {
+      <span [title]="atLineLimit() ? ('tdlines.limitReached' | transloco: { max: maxLines }) : null">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="atLineLimit()"
+          (click)="addLine()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'tdlines.addItem' | transloco }}
+        </button>
+      </span>
+    }
+
+    @if (kind() === 'quotation') {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'tdlines.noTaxOnQuotation' | transloco }}
+      </p>
+    }
+  </div>
+}

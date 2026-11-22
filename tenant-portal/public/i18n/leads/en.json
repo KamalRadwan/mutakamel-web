@@ -1,0 +1,167 @@
+{
+  "title": "Leads",
+  "viewSwitcher": "Leads view",
+  "views": {
+    "board": "Board",
+    "cards": "Cards",
+    "table": "Table"
+  },
+  "search": "Search leads",
+  "new": "New lead",
+  "notReady": "This action comes in the next step",
+  "noResults": "No leads match this search",
+  "loadFailed": "Leads could not be loaded",
+  "fields": {
+    "lead": "Lead",
+    "tag": "Tag",
+    "email": "Email",
+    "phone": "Phone/Mobile",
+    "status": "Status",
+    "stageFlag": "Stage flag",
+    "leadType": "Lead type",
+    "stage": "Stage",
+    "source": "Source"
+  },
+  "presets": {
+    "mine": "My leads",
+    "unassigned": "Unassigned",
+    "overdue": "Overdue follow-up",
+    "hot": "Hot leads"
+  },
+  "statuses": {
+    "OPEN": "Open",
+    "ON_HOLD": "On hold",
+    "CONVERTED": "Converted",
+    "DISQUALIFIED": "Disqualified"
+  },
+  "stageFlags": {
+    "NEW": "New",
+    "CONTACTED": "Contacted",
+    "QUALIFYING": "Qualifying",
+    "QUALIFIED": "Qualified",
+    "NURTURING": "Nurturing",
+    "ON_HOLD": "On hold",
+    "DISQUALIFIED": "Disqualified",
+    "CONVERTED": "Converted"
+  },
+  "profile": {
+    "INDIVIDUAL": "Individual",
+    "CORPORATE": "Company"
+  },
+  "due": {
+    "OVERDUE": "Overdue",
+    "TODAY": "Today",
+    "FUTURE": "Upcoming",
+    "NONE": "No activity"
+  },
+  "board": {
+    "add": "Add a lead to {{stage}}",
+    "empty": "No leads in this stage",
+    "emptyHelp": "Drag a lead here or add a new one.",
+    "allShown": "All leads are shown"
+  },
+  "card": {
+    "actions": "Lead actions",
+    "view": "View lead",
+    "rating": "Rating {{value}} of 3",
+    "rate": "Rate {{value}} of 3",
+    "clearRating": "Clear rating",
+    "noOwner": "No owner"
+  },
+  "actions": {
+    "open": "Open",
+    "openDescription": "View the lead and its details",
+    "edit": "Edit",
+    "editDescription": "Change the lead's information",
+    "activities": "Activities",
+    "activitiesText": "Plan and follow up activities",
+    "color": "Change color",
+    "colorDescription": "Mark the card with a color",
+    "move": "Move to",
+    "moveDescription": "Move the lead to another stage",
+    "delete": "Delete",
+    "deleteDescription": "Delete the lead permanently"
+  },
+  "color": {
+    "none": "No color",
+    "failed": "The color could not be saved",
+    "RED": "Red",
+    "ORANGE": "Orange",
+    "AMBER": "Amber",
+    "YELLOW": "Yellow",
+    "GREEN": "Green",
+    "TEAL": "Teal",
+    "BLUE": "Blue",
+    "INDIGO": "Indigo",
+    "PURPLE": "Purple",
+    "PINK": "Pink",
+    "SLATE": "Slate"
+  },
+  "delete": {
+    "title": "Delete lead?",
+    "text": "{{name}} will be deleted. This cannot be undone.",
+    "done": "Lead deleted",
+    "failed": "The lead could not be deleted"
+  },
+  "rate": {
+    "failed": "The rating could not be saved"
+  },
+  "details": {
+    "companyPhone": "Company phone",
+    "companyEmail": "Company email",
+    "contactPhone": "Primary contact phone",
+    "contactEmail": "Primary contact email",
+    "phone": "Phone",
+    "email": "Email",
+    "location": "Location"
+  },
+  "table": {
+    "lead": "Lead",
+    "contact": "Primary contact",
+    "phone": "Phone",
+    "country": "Country",
+    "stage": "Stage",
+    "source": "Source",
+    "owner": "Owner",
+    "followUp": "Follow-up",
+    "rating": "Rating",
+    "actions": "Actions",
+    "selectPage": "Select all leads on this page",
+    "selectRow": "Select {{name}}",
+    "showInTable": "Show in table"
+  },
+  "move": {
+    "done": "Moved to {{stage}}",
+    "failed": "The lead could not be moved",
+    "convertRequired": "Use Convert to move a lead to {{stage}}",
+    "reasonRequired": "Choose a disqualification reason to move a lead to {{stage}}",
+    "errors": {
+      "LEAD_CONVERSION_REQUIRED": "Use Convert to move a lead to {{stage}}",
+      "CRM_REASON_REQUIRED": "Choose a disqualification reason to move a lead to {{stage}}",
+      "LEAD_ALREADY_CONVERTED": "A converted lead cannot be moved",
+      "LEAD_STAGE_INVALID": "This stage is no longer available",
+      "CRM_REASON_KIND_MISMATCH": "The selected reason does not apply to this move",
+      "CRM_REASON_UNAVAILABLE": "The selected reason is no longer available"
+    }
+  },
+  "stageFilter": {
+    "label": "Filter by stage",
+    "hint": "Show only the leads in the chosen stage",
+    "all": "All"
+  },
+  "advancedSearch": "Advanced search",
+  "pagination": "Leads pagination",
+  "search.lockedByDraft": "Apply or discard the advanced changes first.",
+  "search.advancedToggle": "Advanced search",
+  "search.invalid": "The search could not run. Check the conditions.",
+  "sameParty": "Same party",
+  "disqualify": {
+    "title": "Disqualify lead",
+    "reason": "Disqualification reason",
+    "reasonHint": "Why this lead is disqualified. Only active disqualification reasons from CRM settings are listed.",
+    "choose": "Choose a reason",
+    "noReasons": "There are no active disqualification reasons. Add one in CRM settings, then try again.",
+    "confirm": "Disqualify",
+    "close": "Close"
+  }
+}

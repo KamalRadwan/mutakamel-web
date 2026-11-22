@@ -1,0 +1,54 @@
+{
+  "search": "ابحث بالاسم أو الرمز",
+  "clearSearch": "مسح البحث",
+  "matches": "المطابقات: {{n}}",
+  "showInactive": "إظهار غير النشط",
+  "showInactiveHint": "إظهار الشركات والفروع والأقسام والفرق غير النشطة في الشجرة أيضًا.",
+  "expand": "توسيع",
+  "collapse": "طي",
+  "expandAll": "توسيع الكل",
+  "collapseAll": "طي الكل",
+  "reload": "إعادة التحميل",
+  "views": {
+    "rows": "صفوف البطاقات",
+    "columns": "الأعمدة",
+    "chart": "المخطط التنظيمي",
+    "label": "طريقة العرض"
+  },
+  "summary": "الشركات: {{c}} · الفروع: {{b}} · الإدارات: {{d}} · الفرق: {{t}}",
+  "type": {
+    "company": "شركة",
+    "branch": "فرع",
+    "department": "إدارة",
+    "team": "فريق"
+  },
+  "children": {
+    "branches": "الفروع: {{n}}",
+    "departments": "الإدارات: {{n}}",
+    "teams": "الفرق: {{n}}"
+  },
+  "columns": {
+    "companies": "الشركات",
+    "branches": "الفروع",
+    "departments": "الإدارات",
+    "teams": "الفرق",
+    "chooseCompany": "اختر شركة",
+    "chooseBranch": "اختر فرعًا",
+    "chooseDepartment": "اختر إدارة"
+  },
+  "actions": {
+    "open": "فتح",
+    "edit": "تعديل",
+    "addBranch": "إضافة فرع",
+    "addDepartment": "إضافة إدارة",
+    "addTeam": "إضافة فريق",
+    "viewUsers": "عرض المستخدمين"
+  },
+  "addCompany": "إضافة شركة",
+  "hiddenByPermission": "مخفي وفق صلاحياتك",
+  "empty": "لا توجد شركات بعد.",
+  "tooLarge": "الهيكل أكبر من أن يُعرض هنا، فاستخدم صفحتي الشركات والفروع.",
+  "openCompanies": "فتح الشركات",
+  "loadFailed": "تعذّر تحميل الهيكل.",
+  "retry": "حاول مرة أخرى"
+}

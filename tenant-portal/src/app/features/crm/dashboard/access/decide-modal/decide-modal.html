@@ -1,0 +1,211 @@
+<ui-modal
+  size="form"
+  icon="tablerClipboardCheck"
+  tile="bg-icon-blue"
+  [title]="'access.decide.title' | transloco"
+  [subtitle]="request()?.requestNumber ?? ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  @if (request(); as req) {
+    <div class="flex flex-col gap-10">
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface-muted p-8">
+        <ui-field
+          size="bare"
+          [label]="'access.fields.requester' | transloco"
+          [hint]="'access.fields.requesterHint' | transloco"
+        >
+          <span class="truncate text-12 leading-18 font-medium text-text">{{ requesterLabel() }}</span>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.fields.resource' | transloco"
+          [hint]="'access.fields.resourceHint' | transloco"
+        >
+          <div class="flex min-w-0 items-center gap-6">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="req.resourceType === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+              aria-hidden="true"
+            >
+              <ng-icon
+                [name]="req.resourceType === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                size="14"
+              />
+            </span>
+            <span class="truncate text-12 leading-18 font-medium text-text">{{ resourceLabel() }}</span>
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.fields.requestedLevel' | transloco"
+          [hint]="'access.fields.requestedLevelHint' | transloco"
+        >
+          <div class="flex items-center">
+            <ui-badge tone="tag">{{ 'access.level.' + req.requestedLevel | transloco }}</ui-badge>
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.fields.heldNow' | transloco"
+          [hint]="'access.fields.heldNowHint' | transloco"
+        >
+          <div class="flex items-center">
+            <ui-badge tone="tag">{{ 'analytics.access.' + req.heldLevelAtRequest | transloco }}</ui-badge>
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.fields.waitingUntil' | transloco"
+          [hint]="'access.fields.waitingUntilHint' | transloco"
+        >
+          <span class="text-12 leading-18 text-text">{{ waitingUntilText() }}</span>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          class="col-span-2"
+          [label]="'access.fields.purpose' | transloco"
+          [hint]="'access.fields.purposeHint' | transloco"
+        >
+          <p class="text-12 leading-18 text-text break-words">{{ req.purpose }}</p>
+        </ui-field>
+      </div>
+
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <ui-field
+          size="bare"
+          class="col-span-2"
+          [label]="'access.decide.decision' | transloco"
+          [for]="uid + '-decision'"
+          [hint]="'access.decide.decisionHint' | transloco"
+          [required]="true"
+        >
+          <div>
+            <ui-segmented
+              [id]="uid + '-decision'"
+              [options]="decisionOptions()"
+              [label]="'access.decide.decision' | transloco"
+              [describedBy]="uid + '-decision-hint'"
+              [value]="decision()"
+              (valueChange)="onDecisionChange($event)"
+            />
+          </div>
+        </ui-field>
+
+        @if (decision() === 'APPROVED') {
+          <ui-field
+            size="bare"
+            [label]="'access.decide.grantedLevel' | transloco"
+            [for]="uid + '-granted-level'"
+            [hint]="'access.decide.grantedLevelHint' | transloco"
+            [required]="true"
+            [error]="grantedLevelError()"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-granted-level'"
+              [label]="'access.decide.grantedLevel' | transloco"
+              [describedBy]="uid + '-granted-level-hint'"
+              [options]="grantedLevelOptions()"
+              [value]="grantedLevel()"
+              (valueChange)="onGrantedLevelChange($event)"
+            />
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [label]="'access.decide.expires' | transloco"
+            [for]="uid + '-expires'"
+            [hint]="'access.decide.expiresHint' | transloco"
+            [error]="expiresError()"
+          >
+            <div class="flex items-center gap-4">
+              <ui-date-field
+                class="min-w-0 flex-1"
+                [id]="uid + '-expires'"
+                [ariaLabel]="'access.decide.expires' | transloco"
+                [describedBy]="
+                  expiresError()
+                    ? uid + '-expires-hint ' + uid + '-expires-error'
+                    : uid + '-expires-hint'
+                "
+                [min]="minExpiryDate"
+                [placeholder]="'access.fields.noExpiry' | transloco"
+                [todayLabel]="'access.date.today' | transloco"
+                [prevMonthLabel]="'access.date.prevMonth' | transloco"
+                [nextMonthLabel]="'access.date.nextMonth' | transloco"
+                [invalid]="!!expiresError()"
+                [value]="grantedExpiresAt()"
+                (valueChange)="onExpiresChange($event)"
+              />
+              @if (grantedExpiresAt()) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'access.actions.clearDate' | transloco"
+                  [title]="'access.actions.clearDate' | transloco"
+                  (click)="clearExpires()"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </ui-field>
+        }
+
+        <ui-field
+          size="multiline"
+          class="col-span-2"
+          [label]="'access.decide.note' | transloco"
+          [for]="uid + '-note'"
+          [hint]="(decision() === 'REJECTED' ? 'access.decide.noteHintReject' : 'access.decide.noteHintApprove') | transloco"
+          [required]="decision() === 'REJECTED'"
+          [count]="note().length"
+          [max]="500"
+          [error]="noteError()"
+        >
+          <textarea
+            [id]="uid + '-note'"
+            rows="3"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [value]="note()"
+            [placeholder]="'access.decide.notePlaceholder' | transloco"
+            [attr.aria-invalid]="noteError() ? 'true' : null"
+            (input)="onNoteInput($event)"
+          ></textarea>
+        </ui-field>
+      </div>
+    </div>
+  }
+
+  <ng-container modal-footer>
+    @if (decision() === 'APPROVED') {
+      <button type="button" uiButton variant="primary" [loading]="submitting()" (click)="submit()">
+        {{ 'access.decide.approve' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="secondary" [loading]="submitting()" (click)="submit()">
+        {{ 'access.decide.reject' | transloco }}
+      </button>
+    }
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'analytics.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'analytics.common.conflictTitle' | transloco"
+  [text]="'analytics.common.conflictText' | transloco"
+  [confirmLabel]="'analytics.common.reload' | transloco"
+  [cancelLabel]="'analytics.common.keepMine' | transloco"
+/>

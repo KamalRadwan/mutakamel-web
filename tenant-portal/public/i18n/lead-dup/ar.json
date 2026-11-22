@@ -1,0 +1,31 @@
+{
+  "title": "تكرارات محتملة ({{count}})",
+  "showAll": "عرض الكل ({{count}})",
+  "showLess": "عرض أقل",
+  "collapse": "إخفاء التكرارات",
+  "expand": "إظهار التكرارات",
+  "otherBranch": "جهة اتصال في فرع آخر",
+  "restrictedHint": "بعض التفاصيل مخفية لأنها تتبع فرعًا آخر أو عملاء محتملين لا يمكنك عرضهم.",
+  "leads": "العملاء المحتملون: {{count}}",
+  "openLead": "فتح العميل المحتمل",
+  "allLeads": "كل العملاء المحتملين ({{count}})",
+  "leadItem": "عميل محتمل · {{stage}}",
+  "useCompany": "استخدام هذه الشركة",
+  "match": {
+    "PHONE": "الهاتف",
+    "EMAIL": "البريد الإلكتروني",
+    "NAME": "الاسم",
+    "TAX_NUMBER": "الرقم الضريبي",
+    "COMMERCIAL_REGISTRATION": "رقم السجل التجاري"
+  },
+  "stage": {
+    "NEW": "جديد",
+    "CONTACTED": "تم التواصل",
+    "QUALIFYING": "قيد التأهيل",
+    "QUALIFIED": "مؤهل",
+    "NURTURING": "قيد المتابعة",
+    "ON_HOLD": "معلّق",
+    "DISQUALIFIED": "غير مؤهل",
+    "CONVERTED": "تم التحويل"
+  }
+}

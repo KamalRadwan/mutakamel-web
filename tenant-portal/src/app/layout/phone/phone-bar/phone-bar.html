@@ -1,0 +1,119 @@
+<div
+  class="flex h-phone-bar w-phone-bar-w cursor-pointer items-center gap-8 rounded-t-12 ps-10 pe-6 shadow-popover transition-colors duration-fast"
+  [class]="phone.ringing() ? 'bg-success text-on-success' : 'bg-nav-gradient text-on-nav'"
+  (click)="onOpen()"
+>
+  <button
+    #btn
+    type="button"
+    class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-6 rounded-6 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="phone.panelOpen()"
+    [attr.aria-label]="ariaLabel()"
+    [title]="ariaLabel()"
+    (click)="onOpen($event)"
+  >
+    <span class="size-unread-dot shrink-0 rounded-full" [class]="dotClass()" aria-hidden="true"></span>
+
+    @if (phone.ringing(); as incoming) {
+      <span class="shrink-0 whitespace-nowrap text-12 leading-18 font-medium">{{ 'webPhone.incoming.title' | transloco }}</span>
+      <span class="min-w-0 flex-1 truncate text-11 leading-16">
+        ·
+        @if (incoming.displayName) {
+          {{ incoming.displayName }}
+        } @else {
+          <bdi dir="ltr">{{ incoming.number }}</bdi>
+        }
+      </span>
+    } @else if (phone.busy()) {
+      @if (isConference()) {
+        <span class="min-w-0 truncate text-12 leading-18 font-medium">{{ conferenceLabel() }}</span>
+      } @else {
+        <span class="min-w-0 truncate text-12 leading-18 font-medium">
+          @if (peerHasName()) {
+            {{ peerName() }}
+          } @else {
+            <bdi dir="ltr">{{ peerName() }}</bdi>
+          }
+        </span>
+        @if (phone.identity().extension; as ext) {
+          <span dir="ltr" class="shrink-0 text-11 leading-16 text-on-nav-muted">{{ ext }}</span>
+        }
+      }
+      <span class="ms-auto flex shrink-0 items-center gap-6">
+        @if (isCallingOrRinging()) {
+          <ng-icon name="tablerLoader2" size="16" class="shrink-0 animate-spin text-on-nav-muted" aria-hidden="true" />
+          <span class="shrink-0 whitespace-nowrap text-11 leading-16 text-on-nav-muted">{{ 'webPhone.pill.calling' | transloco }}</span>
+        } @else {
+          <span dir="ltr" class="shrink-0 text-12 leading-18 font-medium tabular-nums">{{ formattedTime() }}</span>
+        }
+      </span>
+    } @else if (endedInfo(); as ended) {
+      <span class="min-w-0 truncate text-12 leading-18 font-medium">
+        @if (ended.name) {
+          {{ ended.name }}
+        } @else {
+          <bdi dir="ltr">{{ ended.number }}</bdi>
+        }
+      </span>
+      <span class="ms-auto shrink-0 whitespace-nowrap text-11 leading-16 text-on-nav-muted">{{ endedWord() }}</span>
+    } @else {
+      <span class="min-w-0 truncate text-12 leading-18 font-medium">
+        {{ phone.identity().displayName || ('webPhone.title' | transloco) }}
+      </span>
+      @if (phone.identity().extension; as ext) {
+        <span dir="ltr" class="shrink-0 text-11 leading-16 text-on-nav-muted">{{ ext }}</span>
+      }
+      <span class="ms-auto flex shrink-0 items-center gap-6">
+        @if (phone.missedCount() > 0) {
+          <span
+            class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-8 bg-danger px-4 text-11 leading-16 font-medium text-on-danger"
+          >
+            {{ badgeText() }}
+          </span>
+          <span class="shrink-0 whitespace-nowrap text-11 leading-16 text-on-nav-muted">
+            {{ 'webPhone.bar.missed' | transloco: { n: phone.missedCount() } }}
+          </span>
+        } @else {
+          <span class="shrink-0 whitespace-nowrap text-11 leading-16 text-on-nav-muted">{{ statusWord() }}</span>
+        }
+      </span>
+    }
+  </button>
+
+  @if (phone.busy() && !phone.ringing()) {
+    @if (!isCallingOrRinging()) {
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-nav-glass focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-pressed]="phone.muted()"
+        [attr.aria-label]="(phone.muted() ? 'webPhone.pill.unmute' : 'webPhone.pill.mute') | transloco"
+        [title]="(phone.muted() ? 'webPhone.pill.unmute' : 'webPhone.pill.mute') | transloco"
+        (click)="onToggleMute($event)"
+      >
+        <ng-icon [name]="phone.muted() ? 'tablerMicrophoneOff' : 'tablerMicrophone'" size="14" aria-hidden="true" />
+      </button>
+    }
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 bg-danger text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="hangupLabel()"
+      [title]="hangupLabel()"
+      (click)="onHangup($event)"
+    >
+      <ng-icon name="tablerPhoneEnd" size="14" aria-hidden="true" />
+    </button>
+  }
+
+  <ng-icon name="tablerChevronUp" size="14" class="shrink-0" aria-hidden="true" />
+</div>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="danger"
+  [title]="'webPhone.conference.confirmEndTitle' | transloco"
+  [text]="'webPhone.conference.confirmEndText' | transloco"
+  [confirmLabel]="'webPhone.conference.endForAll' | transloco"
+  [cancelLabel]="'webPhone.common.cancel' | transloco"
+/>

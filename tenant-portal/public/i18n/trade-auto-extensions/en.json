@@ -1,0 +1,371 @@
+{
+  "targets": {
+    "CATALOG_ITEM": "Items",
+    "QUOTATION": "Quotations",
+    "SALES_ORDER": "Sales orders",
+    "PURCHASE_ORDER": "Purchase orders"
+  },
+  "targetHints": {
+    "CATALOG_ITEM": "Extra fields on catalog items; supports search indexing.",
+    "QUOTATION": "Extra fields stored on sales quotations.",
+    "SALES_ORDER": "Extra fields stored on sales orders.",
+    "PURCHASE_ORDER": "Extra fields stored on purchase orders."
+  },
+  "kinds": {
+    "SCALAR": "Single value",
+    "COLLECTION": "List",
+    "OBJECT": "Group"
+  },
+  "scalarTypes": {
+    "STRING": "Text",
+    "BOOLEAN": "Yes/No",
+    "DECIMAL": "Decimal",
+    "DATE": "Date",
+    "UUID": "ID",
+    "ENUM": "Choice list"
+  },
+  "typeBadge": {
+    "listOf": "List of {{type}}",
+    "groupOf": "Group ({{count}})"
+  },
+  "visibility": {
+    "INTERNAL": "Internal",
+    "USER": "Users",
+    "EXTERNAL_SAFE": "External (safe)"
+  },
+  "defaultStrategy": {
+    "NONE": "None",
+    "LITERAL": "Fixed value"
+  },
+  "scope": {
+    "TENANT": "Tenant level",
+    "COMPANY": "Company level",
+    "BRANCH": "Branch level"
+  },
+  "list": {
+    "newProfile": "New profile",
+    "searchPlaceholder": "Search by profile code…",
+    "clearSearch": "Clear search",
+    "reload": "Reload",
+    "statusFilterLabel": "Status filter",
+    "statusDraft": "Draft",
+    "statusActive": "Active",
+    "steps": {
+      "label": "Filter by target",
+      "hint": "Show only the extension profiles for the chosen target",
+      "all": "All"
+    },
+    "table": {
+      "label": "Extension profiles",
+      "code": "Code",
+      "target": "Target",
+      "status": "Status",
+      "liveVersion": "Live version",
+      "draft": "Draft",
+      "updated": "Updated",
+      "actions": "Actions",
+      "versionTag": "v{{version}}",
+      "none": "—"
+    },
+    "actions": {
+      "menuLabel": "Actions for {{code}}",
+      "open": "Open",
+      "edit": "Edit"
+    },
+    "empty": {
+      "title": "No extension profiles yet.",
+      "filtered": "No extension profiles match your filters.",
+      "clearFilters": "Clear filters"
+    },
+    "error": {
+      "loadFailed": "Could not load extension profiles.",
+      "retry": "Try again"
+    },
+    "paginationLabel": "Extension profiles pages"
+  },
+  "create": {
+    "title": "New extension profile",
+    "close": "Close",
+    "code": {
+      "label": "Code",
+      "hint": "Uppercase letters, digits, and underscores (2–80 characters, starting with a letter).",
+      "placeholder": "ITEM_EXTRA"
+    },
+    "target": {
+      "label": "Target",
+      "hint": "Record type where these custom fields appear."
+    },
+    "scope": {
+      "label": "Scope",
+      "hint": "Determined by your current working context."
+    },
+    "branchForbidden": "Extension profiles are set at company or tenant level.",
+    "firstFieldTitle": "First field",
+    "firstFieldCaption": "At least one field is required when creating a profile.",
+    "submit": "Create profile",
+    "cancel": "Cancel",
+    "errors": {
+      "codeRequired": "Code is required.",
+      "codePattern": "Use 2–80 uppercase letters, digits, or underscores, starting with a letter.",
+      "codeConflict": "An extension profile with this code already exists for this target."
+    },
+    "discard": {
+      "title": "Discard changes?",
+      "text": "The new extension profile has not been created yet.",
+      "confirm": "Discard"
+    },
+    "toastCreated": "Extension profile created."
+  },
+  "profile": {
+    "back": "Back to extension profiles",
+    "subtitleLive": "{{target}} · {{scope}} · live version {{version}}",
+    "subtitleNoLive": "{{target}} · {{scope}} · no live version",
+    "draftBadge": "Draft {{version}}",
+    "testedBadge": "Tested {{version}}",
+    "saveDraft": "Save draft",
+    "validate": "Validate",
+    "publish": "Publish",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "changeFields": "Change fields",
+    "noDraftNotice": "Showing the currently published fields. Start editing to create the next draft version.",
+    "validateFirst": "Validate first.",
+    "saveBeforeValidate": "Save your draft changes before validating.",
+    "saveBeforePublish": "Save your draft changes before publishing.",
+    "tabs": {
+      "label": "Profile sections",
+      "fields": "Fields",
+      "versions": "Versions",
+      "published": "Published fields"
+    },
+    "versions": {
+      "label": "Profile versions",
+      "version": "Version",
+      "status": "Status",
+      "publishedAt": "Published at",
+      "publishedBy": "Published by",
+      "fieldsCount": "Fields",
+      "actions": "Details",
+      "versionTag": "v{{version}}",
+      "none": "—",
+      "empty": "No versions yet.",
+      "expand": "Show fields for version {{version}}",
+      "collapse": "Hide fields for version {{version}}",
+      "loading": "Loading version fields…",
+      "loadFailed": "Could not load version fields.",
+      "retry": "Try again"
+    },
+    "published": {
+      "empty": "No version has been published yet."
+    },
+    "notFound": {
+      "title": "Extension profile not found",
+      "text": "This extension profile does not exist or is no longer available.",
+      "back": "Back to extension profiles"
+    },
+    "loadFailed": "Could not load the extension profile.",
+    "retry": "Try again",
+    "testedResetConfirm": {
+      "title": "Save changes to tested draft?",
+      "text": "Saving changes resets this draft from Tested back to Draft. You will need to validate again before publishing.",
+      "confirm": "Save draft"
+    },
+    "removeFieldConfirm": {
+      "title": "Remove field?",
+      "text": "Remove “{{key}}” from the local draft? You can still undo before saving.",
+      "confirm": "Remove"
+    },
+    "unsavedDialog": {
+      "title": "Save draft changes?",
+      "text": "You have unsaved changes to this extension profile.",
+      "save": "Save draft",
+      "discard": "Discard",
+      "cancel": "Cancel"
+    },
+    "toasts": {
+      "draftSaved": "Draft saved.",
+      "validatedPassed": "Validation passed. Ready to publish.",
+      "validatedFailed": "Validation found issues. Review the highlighted fields.",
+      "published": "Extension profile published.",
+      "atLeastOneField": "At least one field is required."
+    }
+  },
+  "fields": {
+    "tableLabel": "Extension fields",
+    "key": "Key",
+    "type": "Type",
+    "required": "Required",
+    "searchable": "Searchable",
+    "visibility": "Visibility",
+    "default": "Default",
+    "actions": "Actions",
+    "menuLabel": "Actions for {{key}}",
+    "edit": "Edit",
+    "remove": "Remove",
+    "addField": "Add field",
+    "maxReached": "Maximum of {{max}} fields per profile reached.",
+    "empty": "No fields defined yet.",
+    "searchableItemsOnly": "Searchable is only supported for Items profiles.",
+    "requiredFor": "Required for {{key}}",
+    "searchableFor": "Searchable for {{key}}",
+    "minOneField": "At least one field is required in a profile.",
+    "none": "—",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "diagnostics": {
+    "REQUIRED_FIELD_NEEDS_MIGRATION_OR_DEFAULT": "Required fields need a default value so existing records stay valid.",
+    "fallback": "Validation failed ({{code}})."
+  },
+  "field": {
+    "createTitle": "New field",
+    "editTitle": "Edit field",
+    "addSubmit": "Add field",
+    "saveSubmit": "Save field",
+    "cancel": "Cancel",
+    "close": "Close",
+    "key": {
+      "label": "Key",
+      "hint": "Lowercase namespace and name separated by a dot (e.g. pkg.shelf_life_days). Reserved system names cannot be used.",
+      "placeholder": "pkg.shelf_life_days"
+    },
+    "visibility": {
+      "label": "Visibility",
+      "hint": "Controls who can read this field across internal services, users, and external portals."
+    },
+    "kind": {
+      "label": "Kind",
+      "hint": "Single value, a list of values, or a nested group of properties."
+    },
+    "type": {
+      "label": "Type",
+      "hint": "Data type stored for this field or each item in the list."
+    },
+    "maxLength": {
+      "label": "Max length",
+      "hint": "Optional maximum character length, from 1 to 4096.",
+      "placeholder": "40"
+    },
+    "maxItems": {
+      "label": "Max items",
+      "hint": "Maximum number of values in the list, from 1 to 100.",
+      "placeholder": "10"
+    },
+    "decimalScale": {
+      "label": "Decimal places",
+      "hint": "Number of fractional digits allowed, from 0 to 8 (default 8)."
+    },
+    "minValue": {
+      "label": "Minimum",
+      "hint": "Optional minimum signed decimal value.",
+      "placeholder": "0"
+    },
+    "maxValue": {
+      "label": "Maximum",
+      "hint": "Optional maximum signed decimal value.",
+      "placeholder": "9999"
+    },
+    "choices": {
+      "label": "Choices",
+      "hint": "Type a choice and press Enter to add it (1 to 100 unique choices)."
+    },
+    "default": {
+      "label": "Default",
+      "hint": "Whether new or existing records get a fixed default value."
+    },
+    "defaultValue": {
+      "label": "Default value",
+      "hint": "Fixed value applied when no value is provided.",
+      "placeholder": "Enter default value",
+      "decimalPlaceholder": "0.00",
+      "uuidPlaceholder": "00000000-0000-0000-0000-000000000000",
+      "datePlaceholder": "Select date",
+      "today": "Today",
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "yes": "Yes",
+      "no": "No",
+      "emptyChoices": "Add at least one choice first."
+    },
+    "required": {
+      "label": "Required",
+      "hint": "Require this field when saving records. Needs a default value to pass validation."
+    },
+    "searchable": {
+      "label": "Searchable",
+      "hint": "Index this field for catalog search (Items only).",
+      "itemsOnly": "Only available for Items profiles."
+    },
+    "makerCheckerCaption": "A required field means another person must publish this profile.",
+    "group": {
+      "label": "Group properties",
+      "hint": "Define 1 to 50 nested properties inside this group.",
+      "addProperty": "Add property",
+      "maxReached": "Maximum of {{max}} properties reached.",
+      "removeProperty": "Remove property",
+      "propKey": "Property key",
+      "propKeyHint": "Lowercase identifier starting with a letter (up to 64 characters).",
+      "propKeyPlaceholder": "weight_kg",
+      "propType": "Type",
+      "propTypeHint": "Data type of this property.",
+      "propRequired": "Required",
+      "propRequiredHint": "Whether this property is required inside the group.",
+      "propMaxLength": "Max length",
+      "propMaxLengthHint": "Optional character limit (1–4096).",
+      "propDecimalScale": "Decimals",
+      "propDecimalScaleHint": "Fractional digits (0–8).",
+      "propMin": "Min",
+      "propMinHint": "Optional minimum decimal value.",
+      "propMax": "Max",
+      "propMaxHint": "Optional maximum decimal value.",
+      "propChoices": "Choices",
+      "propChoicesHint": "Allowed choice values (1–100 unique).",
+      "emptyError": "Add at least one property to the group."
+    },
+    "errors": {
+      "keyRequired": "Key is required.",
+      "keyPattern": "Use lowercase namespace.key format (letters, digits, underscores).",
+      "keyReserved": "“{{segment}}” is reserved by the system. Choose another name.",
+      "keyDuplicate": "This key is already used in this profile.",
+      "maxLengthRange": "Enter a whole number from 1 to 4096.",
+      "maxItemsRange": "Enter a whole number from 1 to 100.",
+      "decimalScaleRange": "Enter a whole number from 0 to 8.",
+      "decimalInvalid": "Enter a valid signed decimal number.",
+      "minGreaterThanMax": "Minimum must be less than or equal to maximum.",
+      "choicesRequired": "Add at least one choice.",
+      "choicesMax": "Maximum of 100 choices allowed.",
+      "choiceTooLong": "Each choice must fit within the maximum length.",
+      "defaultRequired": "Default value is required.",
+      "defaultInvalidDecimal": "Enter a valid signed decimal number.",
+      "defaultDecimalScale": "Use at most {{scale}} decimal places.",
+      "defaultOutOfRange": "Value is outside the minimum/maximum range.",
+      "defaultInvalidUuid": "Enter a valid UUID (e.g. 550e8400-e29b-41d4-a716-446655440000).",
+      "defaultInvalidDate": "Choose a valid date.",
+      "defaultInvalidBoolean": "Choose Yes or No.",
+      "defaultTooLong": "Default value exceeds the maximum length.",
+      "defaultChoiceMissing": "Default value must be one of the defined choices.",
+      "defaultTooManyItems": "Default list cannot exceed max items ({{max}}).",
+      "propKeyRequired": "Property key is required.",
+      "propKeyPattern": "Use 1–64 lowercase letters, digits, or underscores, starting with a letter.",
+      "propKeyDuplicate": "Property key must be unique in this group."
+    },
+    "discard": {
+      "title": "Discard field changes?",
+      "text": "Your changes to this field will be lost.",
+      "confirm": "Discard"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "network": "Cannot reach the server.",
+    "TRADE.EXTENSION.DEFINITION_CONFLICT": "An extension profile with this code already exists for this target.",
+    "TRADE.EXTENSION.DEFINITION_INVALID": "Check the profile fields, types, and constraints and try again.",
+    "TRADE.EXTENSION.RESERVED_FIELD": "A reserved system field name cannot be used.",
+    "TRADE.EXTENSION.PROFILE_INCOMPATIBLE": "Validate this draft successfully before publishing.",
+    "TRADE.EXTENSION.PROFILE_INCOMPATIBLE.profile_retired": "This profile is retired; it can no longer be changed or published.",
+    "TRADE.EXTENSION.DEFINITION_NOT_FOUND": "This extension profile was not found.",
+    "TRADE.EXTENSION.PROFILE_CONFLICT": "This profile has no draft to check or publish. Reload the profile.",
+    "TRADE.APPROVAL.MAKER_CHECKER_REQUIRED": "Another person must publish this profile: it has a required field and you created this draft or last saved its fields.",
+    "TRADE.CONCURRENCY.STALE_VERSION": "Someone else updated this profile. Reload before saving again."
+  }
+}

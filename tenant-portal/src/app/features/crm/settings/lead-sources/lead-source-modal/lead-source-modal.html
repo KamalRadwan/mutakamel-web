@@ -1,0 +1,176 @@
+<ui-modal
+  size="form"
+  icon="tablerTrendingUp"
+  tile="bg-icon-teal"
+  [title]="(mode() === 'create' ? 'leadSources.modal.createTitle' : 'leadSources.modal.editTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving() && !uploadingIcon()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-2">
+      @if (mode() === 'edit') {
+        <div #iconSection>
+          <ui-field
+            size="bare"
+            [for]="uid + '-icon'"
+            [label]="'leadSources.icon.label' | transloco"
+            [hint]="'leadSources.icon.hint' | transloco"
+          >
+            <div class="flex items-center gap-10">
+              <!-- Reuses --table-row-h (40px) via size-table-row for the 40x40 icon preview box. -->
+              <div class="relative flex size-table-row shrink-0 items-center justify-center overflow-hidden rounded-8 border border-border bg-surface-muted text-text-muted">
+                @if (uploadingIcon()) {
+                  <ng-icon name="tablerLoader2" size="16" class="animate-spin text-accent" aria-hidden="true" />
+                } @else if (baseSource()?.iconUrl; as iconUrl) {
+                  <img [src]="iconUrl" alt="" class="size-full object-cover" />
+                } @else {
+                  <ng-icon name="tablerTrendingUp" size="16" aria-hidden="true" />
+                }
+              </div>
+
+              <ui-file-drop
+                class="min-w-0 flex-1"
+                [accept]="iconAccept"
+                [maxBytes]="iconMaxBytes"
+                [title]="'leadSources.icon.dropTitle' | transloco"
+                [hint]="'leadSources.icon.dropHint' | transloco"
+                [disabled]="!canManage() || uploadingIcon()"
+                (picked)="onIconPicked($event)"
+                (rejected)="onIconRejected($event)"
+              />
+            </div>
+          </ui-field>
+        </div>
+      } @else {
+        <app-settings-notice tone="info">
+          {{ 'leadSources.icon.createHint' | transloco }}
+        </app-settings-notice>
+      }
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name-ar'"
+        [label]="'settings.common.nameAr' | transloco"
+        [hint]="'leadSources.modal.nameArHint' | transloco"
+        [required]="true"
+        [count]="nameArCount()"
+        [max]="nameMax"
+        [error]="errorOf('nameAr')"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="sourceForm.nameAr"
+          [attr.aria-invalid]="errorOf('nameAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-ar-hint' + (errorOf('nameAr') ? ' ' + uid + '-name-ar-error' : '')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name-en'"
+        [label]="'settings.common.nameEn' | transloco"
+        [hint]="'leadSources.modal.nameEnHint' | transloco"
+        [required]="true"
+        [count]="nameEnCount()"
+        [max]="nameMax"
+        [error]="errorOf('nameEn')"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="sourceForm.nameEn"
+          [attr.aria-invalid]="errorOf('nameEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-en-hint' + (errorOf('nameEn') ? ' ' + uid + '-name-en-error' : '')"
+        />
+      </ui-field>
+    </div>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-active'"
+          [label]="'settings.common.active' | transloco"
+          [hint]="'leadSources.modal.activeHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [formField]="sourceForm.isActive"
+              [label]="'settings.common.active' | transloco"
+            />
+          </div>
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || uploadingIcon() || (mode() === 'edit' && !dirty())"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving() || uploadingIcon()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving() || uploadingIcon()"
+        (click)="requestClose()"
+      >
+        {{ (mode() === 'create' ? 'settings.common.cancel' : 'settings.common.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [disabled]="saving() || uploadingIcon()"
+          (click)="requestDelete()"
+        >
+          {{ 'settings.common.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'leadSources.discard.title' | transloco"
+  [text]="'leadSources.discard.text' | transloco"
+  [confirmLabel]="'leadSources.discard.confirm' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

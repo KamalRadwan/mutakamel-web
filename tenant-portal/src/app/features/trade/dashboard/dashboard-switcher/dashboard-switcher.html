@@ -1,0 +1,111 @@
+<div class="flex min-w-0 items-center gap-4">
+  <h1 class="min-w-0 text-14 leading-20 font-medium text-text" dir="auto">
+    <!-- tabindex -1: the chevron button is the keyboard stop for the same toggle -->
+    <button
+      type="button"
+      tabindex="-1"
+      class="block max-w-full cursor-pointer truncate text-start outline-none"
+      aria-haspopup="dialog"
+      [attr.aria-expanded]="open()"
+      [title]="currentName()"
+      (click)="toggle()"
+    >
+      {{ currentName() }}
+    </button>
+  </h1>
+
+  <button
+    #chevronBtn
+    type="button"
+    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class.bg-neutral-soft]="open()"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="'tradeDashboard.switcher.trigger' | transloco"
+    [title]="'tradeDashboard.switcher.trigger' | transloco"
+    (click)="toggle()"
+  >
+    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+  </button>
+</div>
+
+@if (open()) {
+  <div
+    #panel
+    role="dialog"
+    aria-modal="false"
+    class="fixed z-dropdown flex w-notif max-w-notif flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [attr.aria-label]="'tradeDashboard.switcher.trigger' | transloco"
+  >
+    <ui-tabs
+      [tabs]="tabs()"
+      [label]="'tradeDashboard.switcher.tabsLabel' | transloco"
+      [active]="activeTab()"
+      (activeChange)="onTabChange($event)"
+    />
+
+    @if (showSearch()) {
+      <div class="flex h-field items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo">
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          #searchInput
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="search()"
+          [placeholder]="'tradeDashboard.switcher.search' | transloco"
+          [attr.aria-label]="'tradeDashboard.switcher.search' | transloco"
+          (input)="onSearchInput($event)"
+        />
+      </div>
+    }
+
+    <div
+      role="tabpanel"
+      [id]="tabPanelId(activeTab())"
+      [attr.aria-labelledby]="tabButtonId(activeTab())"
+      class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto scrollbar-thin"
+    >
+      @if (visibleItems().length === 0) {
+        <p class="px-8 py-6 text-12 leading-18 text-text-muted">
+          {{ 'tradeDashboard.switcher.empty' | transloco }}
+        </p>
+      } @else {
+        @for (item of visibleItems(); track item.id) {
+          <button
+            #rowBtn
+            type="button"
+            class="flex h-menu-item w-full cursor-pointer items-center gap-6 rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              item.id === currentId()
+                ? 'bg-brand-soft font-medium text-on-brand-soft'
+                : 'text-text hover:bg-row-hover'
+            "
+            [attr.aria-current]="item.id === currentId() ? 'true' : null"
+            (click)="selectItem(item.id)"
+          >
+            <span class="min-w-0 flex-1 truncate text-start" dir="auto" [title]="item.name">
+              {{ item.name }}
+            </span>
+
+            @if (item.accessLevel !== 'OWNER' && item.ownerName) {
+              <span class="max-w-preset shrink-0 truncate text-11 leading-16 text-text-muted" dir="auto" [title]="item.ownerName">
+                {{ item.ownerName }}
+              </span>
+            }
+
+            @if (item.isDefault) {
+              <ui-badge tone="tag">{{ 'tradeDashboard.switcher.default' | transloco }}</ui-badge>
+            }
+
+            @if (item.id === currentId()) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        }
+      }
+    </div>
+  </div>
+}

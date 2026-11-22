@@ -1,0 +1,68 @@
+<div
+  role="region"
+  [attr.aria-label]="'oppBulk.bar.label' | transloco"
+  class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+>
+  <div class="flex min-w-0 flex-wrap items-center gap-6">
+    @if (canOfferSelectAll()) {
+      <span class="font-medium tabular-nums">
+        {{ 'oppBulk.bar.pageAllSelected' | transloco: { n: pageRows().length } }}
+      </span>
+      <button
+        uiButton
+        variant="ghost"
+        size="small"
+        type="button"
+        [loading]="selection.selectingAll()"
+        [disabled]="tooMany() || selection.selectingAll()"
+        [attr.title]="tooMany() ? ('oppBulk.bar.tooMany' | transloco) : null"
+        (click)="selectAllMatching()"
+      >
+        {{ 'oppBulk.bar.selectAll' | transloco: { total: total() } }}
+      </button>
+      @if (tooMany()) {
+        <span class="text-text-muted">{{ 'oppBulk.bar.tooMany' | transloco }}</span>
+      }
+    } @else if (selection.mode() === 'all') {
+      <span class="font-medium tabular-nums">
+        {{ ('oppBulk.bar.selected' | pluralKey: selection.count()) | transloco: { n: selection.count() } }}
+      </span>
+      <span class="tabular-nums">
+        {{ ('oppBulk.bar.allSelected' | pluralKey: allTotal()) | transloco: { total: allTotal() } }}
+      </span>
+      <button
+        uiButton
+        variant="ghost"
+        size="small"
+        type="button"
+        (click)="selectOnlyPage()"
+      >
+        {{ 'oppBulk.bar.onlyPage' | transloco }}
+      </button>
+    } @else {
+      <span class="font-medium tabular-nums">
+        {{ ('oppBulk.bar.selected' | pluralKey: selection.count()) | transloco: { n: selection.count() } }}
+      </span>
+      @if (selection.truncated()) {
+        <span class="text-text-muted">{{ 'oppBulk.bar.truncated' | transloco }}</span>
+      }
+    }
+
+    @if (hidden() > 0) {
+      <span class="text-text-muted tabular-nums">
+        {{ 'oppBulk.bar.hidden' | transloco: { h: hidden() } }}
+      </span>
+    }
+  </div>
+
+  <button
+    uiButton
+    variant="ghost"
+    size="small"
+    type="button"
+    class="shrink-0"
+    (click)="clear()"
+  >
+    {{ 'oppBulk.bar.clear' | transloco }}
+  </button>
+</div>

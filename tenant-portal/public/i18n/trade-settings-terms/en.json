@@ -1,0 +1,130 @@
+{
+  "new": "New term",
+  "search": "Search terms",
+  "showInactive": "Show inactive",
+  "showInactiveHint": "Include inactive terms in the list.",
+  "tabs": {
+    "label": "Term types"
+  },
+  "filters": {
+    "sideLabel": "Applies to",
+    "sideHint": "Show only the terms that apply to sales, to purchases, or all terms.",
+    "all": "All"
+  },
+  "columns": {
+    "ariaLabel": "Terms",
+    "code": "Code",
+    "name": "Name",
+    "text": "Text",
+    "side": "Applies to",
+    "dueDays": "Due days",
+    "incoterm": "Incoterm",
+    "default": "Default",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "defaultBadge": "Default",
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "makeDefault": "Make default",
+    "alreadyDefault": "Already the default",
+    "inactiveCannotBeDefault": "Inactive terms cannot be the default",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "deleteDefaultDisabled": "Choose another default first."
+  },
+  "deleteConfirm": {
+    "title": "Delete this term?",
+    "text": "Documents that already use it keep their copy.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  },
+  "footer": "One default per side. Documents keep a copy of the terms they used, so changing a term never changes an issued document.",
+  "states": {
+    "empty": "No {{type}} yet",
+    "noResults": "No matching terms",
+    "clearSearch": "Clear search",
+    "clearFilter": "Show all",
+    "loadFailed": "This page could not be loaded.",
+    "retry": "Retry"
+  },
+  "modal": {
+    "newTitle": "New term",
+    "save": "Save",
+    "undo": "Undo",
+    "unsaved": "Unsaved changes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "incotermNone": "None",
+    "fields": {
+      "code": "Code",
+      "side": "Applies to",
+      "dueDays": "Due days",
+      "incoterm": "Incoterm",
+      "nameAr": "Arabic name",
+      "nameEn": "English name",
+      "sortOrder": "Order",
+      "textAr": "Arabic text",
+      "textEn": "English text",
+      "defaultFor": {
+        "SALES": "Default for Sales",
+        "PURCHASE": "Default for Purchase",
+        "BOTH": "Default for Both"
+      },
+      "active": "Active"
+    },
+    "placeholders": {
+      "code": "NET30",
+      "dueDays": "30"
+    },
+    "hints": {
+      "code": "Letters, digits, - and _. It cannot change later.",
+      "side": "Controls whether this term appears on sales documents, purchase documents, or both.",
+      "dueDays": "Days after the invoice date when payment is due.",
+      "incoterm": "Optional Incoterms 2020 code printed alongside delivery terms.",
+      "nameAr": "Short Arabic display name (up to 120 characters) shown in pickers and lists.",
+      "nameEn": "Short English display name (up to 120 characters) shown in pickers and lists.",
+      "sortOrder": "Whole number that sets the display order within this tab (lower appears first).",
+      "textAr": "Printed on Arabic documents (up to 400 characters).",
+      "textEn": "Printed on English documents (up to 400 characters).",
+      "default": "Pre-selects this term on new documents for the chosen side. Turning it on replaces the current default.",
+      "defaultInactive": "Turn Active on before making this term the default.",
+      "defaultAlready": "This term is currently the default for this side. Make another term default to change it.",
+      "active": "Controls whether this term can be chosen on new documents."
+    }
+  },
+  "validation": {
+    "required": "This field is required.",
+    "codePattern": "Start with A–Z and use 2 to 40 letters, digits, - or _.",
+    "maxLength": "At most {{max}} characters.",
+    "dueDaysRange": "Enter a whole number from {{min}} to {{max}}.",
+    "sortOrderRange": "Enter a whole number from {{min}} to {{max}}."
+  },
+  "conflict": {
+    "title": "Term changed",
+    "text": "Someone else changed this term. Reload to see the latest version, or keep your changes to save them.",
+    "reload": "Reload",
+    "keepMine": "Keep my changes"
+  },
+  "unsavedDialog": {
+    "title": "Unsaved changes",
+    "text": "You have unsaved changes. Save them before closing?",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Keep editing"
+  },
+  "toasts": {
+    "created": "Term created",
+    "updated": "Term updated",
+    "madeDefault": "Default term updated",
+    "activated": "Term activated",
+    "deactivated": "Term deactivated",
+    "deleted": "Term deleted"
+  }
+}

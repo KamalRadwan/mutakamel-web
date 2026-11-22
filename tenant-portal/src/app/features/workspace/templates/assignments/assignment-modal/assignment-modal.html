@@ -1,0 +1,422 @@
+<ui-modal
+  #assignmentModal
+  size="wide"
+  icon="tablerRoute"
+  tile="bg-icon-violet"
+  [title]="(mode() === 'create' ? 'assignments.modal.createTitle' : 'assignments.modal.editTitle') | transloco"
+  [subtitle]="mode() === 'edit' ? lockedTemplateLabel() : ''"
+  [closeLabel]="'assignments.actions.close' | transloco"
+  [dismissable]="!saving() && !deactivating() && !guardBusy() && !conflictOpen()"
+  (closed)="onModalClosed()"
+>
+  @if (mode() === 'edit' && baseAssignment(); as base) {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+      [class]="base.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+    >
+      {{ ('assignments.status.' + base.status) | transloco }}
+    </span>
+  }
+
+  @if (loading()) {
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8" aria-busy="true">
+      <div class="col-span-2 flex flex-col gap-4">
+        <div class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></div>
+        <div class="h-field rounded-8 bg-neutral-soft"></div>
+      </div>
+      <div class="col-span-1 flex flex-col gap-4">
+        <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></div>
+        <div class="h-field rounded-8 bg-neutral-soft"></div>
+      </div>
+      <div class="col-span-1 flex flex-col gap-4">
+        <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></div>
+        <div class="h-field rounded-8 bg-neutral-soft"></div>
+      </div>
+      <div class="col-span-2 flex flex-col gap-4">
+        <div class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></div>
+        <div class="h-field rounded-8 bg-neutral-soft"></div>
+      </div>
+      <div class="col-span-1 flex flex-col gap-4">
+        <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></div>
+        <div class="h-field rounded-8 bg-neutral-soft"></div>
+      </div>
+      <div class="col-span-2 flex flex-col gap-4">
+        <div class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></div>
+        <div class="h-field rounded-8 bg-neutral-soft"></div>
+      </div>
+    </div>
+  } @else {
+    <form [id]="uid + '-form'" class="grid grid-cols-3 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+      <div class="col-span-2 min-w-0">
+        @if (mode() === 'create') {
+          <ui-field
+            size="bare"
+            [for]="uid + '-template'"
+            [label]="'assignments.modal.templateLabel' | transloco"
+            [hint]="'assignments.modal.templateHint' | transloco"
+            [required]="true"
+            [error]="templateError()"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-template'"
+              [options]="templateOptions()"
+              [formField]="assignmentForm.templateId"
+              [label]="'assignments.modal.templateLabel' | transloco"
+              [describedBy]="uid + '-template-hint' + (templateError() ? ' ' + uid + '-template-error' : '')"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            [for]="uid + '-template'"
+            [label]="'assignments.modal.templateLabel' | transloco"
+            [hint]="'assignments.modal.templateLockedHint' | transloco"
+          >
+            <input
+              [id]="uid + '-template'"
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="lockedTemplateLabel()"
+            />
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </ui-field>
+        }
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          size="bare"
+          [for]="uid + '-version'"
+          [label]="'assignments.modal.versionLabel' | transloco"
+          [hint]="'assignments.modal.versionHint' | transloco"
+          [required]="true"
+          [error]="versionError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-version'"
+            [options]="versionOptions()"
+            [formField]="assignmentForm.versionId"
+            [label]="'assignments.modal.versionLabel' | transloco"
+            [describedBy]="uid + '-version-hint' + (versionError() ? ' ' + uid + '-version-error' : '')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          [for]="uid + '-doc-type'"
+          [label]="'assignments.modal.documentTypeLabel' | transloco"
+          [hint]="'assignments.modal.documentTypeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-doc-type'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="derivedDocumentTypeLabel()"
+          />
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2 min-w-0">
+        <ui-field
+          [for]="uid + '-adapter'"
+          [label]="'assignments.modal.adapterLabel' | transloco"
+          [hint]="'assignments.modal.adapterHint' | transloco"
+        >
+          <input
+            [id]="uid + '-adapter'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="derivedAdapterLabel()"
+          />
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        @if (mode() === 'create') {
+          <ui-field
+            size="bare"
+            [for]="uid + '-locale'"
+            [label]="'assignments.modal.languageLabel' | transloco"
+            [hint]="'assignments.modal.languageHint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-locale'"
+              [options]="languageOptions()"
+              [formField]="assignmentForm.localeChoice"
+              [label]="'assignments.modal.languageLabel' | transloco"
+              [describedBy]="uid + '-locale-hint'"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            [for]="uid + '-locale'"
+            [label]="'assignments.modal.languageLabel' | transloco"
+            [hint]="'assignments.modal.languageLockedHint' | transloco"
+          >
+            <input
+              [id]="uid + '-locale'"
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="lockedLanguageLabel()"
+            />
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </ui-field>
+        }
+      </div>
+
+      <div class="col-span-2 min-w-0">
+        @if (mode() === 'create') {
+          <ui-field
+            size="bare"
+            [for]="uid + '-scope'"
+            [label]="'assignments.modal.scopeLabel' | transloco"
+            [hint]="'assignments.modal.scopeHint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-scope'"
+              [options]="scopeDropdownOptions()"
+              [formField]="assignmentForm.scopeKey"
+              [label]="'assignments.modal.scopeLabel' | transloco"
+              [describedBy]="uid + '-scope-hint'"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            [for]="uid + '-scope'"
+            [label]="'assignments.modal.scopeLabel' | transloco"
+            [hint]="'assignments.modal.scopeLockedHint' | transloco"
+          >
+            <input
+              [id]="uid + '-scope'"
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="lockedScopeLabel()"
+            />
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </ui-field>
+        }
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          [for]="uid + '-priority'"
+          [label]="'assignments.modal.priorityLabel' | transloco"
+          [hint]="'assignments.modal.priorityHint' | transloco"
+          [required]="true"
+          [error]="priorityError()"
+        >
+          <input
+            [id]="uid + '-priority'"
+            type="text"
+            inputmode="numeric"
+            dir="ltr"
+            class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [formField]="assignmentForm.priority"
+            [attr.aria-invalid]="priorityError() ? 'true' : null"
+            [attr.aria-describedby]="uid + '-priority-hint' + (priorityError() ? ' ' + uid + '-priority-error' : '')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          size="bare"
+          [for]="uid + '-effective-from'"
+          [label]="'assignments.modal.effectiveFromLabel' | transloco"
+          [hint]="'assignments.modal.effectiveFromHint' | transloco"
+          [required]="true"
+          [error]="effectiveFromError()"
+        >
+          <ui-date-field
+            [id]="uid + '-effective-from'"
+            [ariaLabel]="'assignments.modal.effectiveFromLabel' | transloco"
+            [describedBy]="uid + '-effective-from-hint' + (effectiveFromError() ? ' ' + uid + '-effective-from-error' : '')"
+            [placeholder]="'assignments.modal.effectiveFromPlaceholder' | transloco"
+            [todayLabel]="'assignments.datePicker.today' | transloco"
+            [prevMonthLabel]="'assignments.datePicker.prevMonth' | transloco"
+            [nextMonthLabel]="'assignments.datePicker.nextMonth' | transloco"
+            [invalid]="!!effectiveFromError()"
+            [disabled]="assignmentForm.effectiveFrom().disabled()"
+            [value]="assignmentForm.effectiveFrom().value()"
+            (valueChange)="onDateFieldChange('effectiveFrom', $event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          size="bare"
+          [for]="uid + '-effective-to'"
+          [label]="'assignments.modal.effectiveToLabel' | transloco"
+          [hint]="'assignments.modal.effectiveToHint' | transloco"
+          [error]="effectiveToError()"
+        >
+          <div class="flex items-center gap-4">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-effective-to'"
+              [ariaLabel]="'assignments.modal.effectiveToLabel' | transloco"
+              [describedBy]="uid + '-effective-to-hint' + (effectiveToError() ? ' ' + uid + '-effective-to-error' : '')"
+              [placeholder]="'assignments.modal.effectiveToPlaceholder' | transloco"
+              [todayLabel]="'assignments.datePicker.today' | transloco"
+              [prevMonthLabel]="'assignments.datePicker.prevMonth' | transloco"
+              [nextMonthLabel]="'assignments.datePicker.nextMonth' | transloco"
+              [min]="draft().effectiveFrom"
+              [invalid]="!!effectiveToError()"
+              [disabled]="assignmentForm.effectiveTo().disabled()"
+              [value]="assignmentForm.effectiveTo().value()"
+              (valueChange)="onDateFieldChange('effectiveTo', $event)"
+            />
+            @if (canManage() && draft().effectiveTo) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'assignments.actions.clearDate' | transloco"
+                [title]="'assignments.actions.clearDate' | transloco"
+                [disabled]="saving()"
+                (click)="clearEffectiveTo()"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="col-span-1 min-w-0">
+        <ui-field
+          size="bare"
+          [for]="uid + '-default'"
+          [label]="'assignments.modal.defaultLabel' | transloco"
+          [hint]="'assignments.modal.defaultHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [id]="uid + '-default'"
+              [label]="'assignments.modal.defaultLabel' | transloco"
+              [describedBy]="uid + '-default-hint'"
+              [formField]="assignmentForm.isDefault"
+            />
+          </div>
+        </ui-field>
+      </div>
+    </form>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || deactivating() || loading() || (mode() === 'edit' && !dirty())"
+      >
+        {{ 'assignments.actions.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving() || deactivating()"
+          (click)="undoChanges()"
+        >
+          {{ 'assignments.actions.undoChanges' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'assignments.actions.unsavedChanges' | transloco }}</span>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving() || deactivating()"
+        (click)="requestClose()"
+      >
+        {{ (mode() === 'create' ? 'assignments.actions.cancel' : 'assignments.actions.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && baseAssignment()?.status === 'ACTIVE') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [loading]="deactivating()"
+          [disabled]="saving() || deactivating() || loading()"
+          (click)="requestDeactivate()"
+        >
+          {{ 'assignments.actions.deactivate' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'assignments.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'assignments.unsaved.title' | transloco"
+  [text]="'assignments.unsaved.text' | transloco"
+  [saveLabel]="'assignments.unsaved.save' | transloco"
+  [discardLabel]="'assignments.unsaved.discard' | transloco"
+  [cancelLabel]="'assignments.unsaved.cancel' | transloco"
+/>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'assignments.conflict.title' | transloco"
+  [closeLabel]="'assignments.actions.close' | transloco"
+  [dismissable]="false"
+  (closed)="onConflictClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'assignments.conflict.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="reloadFromConflict()">
+      {{ 'assignments.conflict.reload' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="keepChangesAfterConflict()">
+      {{ 'assignments.conflict.keep' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #deactivateConfirm
+  tone="danger"
+  [title]="'assignments.confirmDeactivate.title' | transloco"
+  [text]="
+    'assignments.confirmDeactivate.text'
+      | transloco: { name: deactivateTargetName(), version: deactivateTargetVersion() }
+  "
+  [confirmLabel]="'assignments.confirmDeactivate.confirm' | transloco"
+  [cancelLabel]="'assignments.actions.cancel' | transloco"
+/>

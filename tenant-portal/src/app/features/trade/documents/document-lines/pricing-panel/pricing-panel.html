@@ -1,0 +1,96 @@
+<div class="flex flex-col gap-8">
+  <ui-field
+    size="bare"
+    [for]="uid + '-mode'"
+    [label]="'tdlines.pricing.mode' | transloco"
+    [hint]="(!canApplyDiscount() ? 'tdlines.pricing.noPermission' : 'tdlines.pricing.modeHint') | transloco"
+  >
+    <div [title]="!canApplyDiscount() ? ('tdlines.pricing.noPermission' | transloco) : null">
+      <ui-segmented
+        [id]="uid + '-mode'"
+        [label]="'tdlines.pricing.mode' | transloco"
+        [describedBy]="uid + '-mode-hint'"
+        [options]="modeOptions()"
+        [value]="intent().mode"
+        (valueChange)="onModeChange($event)"
+      />
+    </div>
+  </ui-field>
+
+  @if (intent().mode === 'DISCOUNT') {
+    <ui-field
+      size="bare"
+      [for]="uid + '-scope'"
+      [label]="'tdlines.pricing.scope' | transloco"
+      [hint]="'tdlines.pricing.scopeHint' | transloco"
+    >
+      <ui-segmented
+        [id]="uid + '-scope'"
+        [label]="'tdlines.pricing.scope' | transloco"
+        [describedBy]="uid + '-scope-hint'"
+        [options]="scopeOptions()"
+        [value]="effectiveScope()"
+        (valueChange)="onScopeChange($event)"
+      />
+    </ui-field>
+
+    @if (effectiveScope() === 'DOCUMENT') {
+      <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-type'"
+          [label]="'tdlines.pricing.type' | transloco"
+          [hint]="'tdlines.pricing.typeHint' | transloco"
+        >
+          <ui-segmented
+            [id]="uid + '-type'"
+            [label]="'tdlines.pricing.type' | transloco"
+            [describedBy]="uid + '-type-hint'"
+            [options]="typeOptions()"
+            [value]="effectiveType()"
+            (valueChange)="onTypeChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-value'"
+          [label]="'tdlines.pricing.value' | transloco"
+          [hint]="'tdlines.pricing.valueHint' | transloco"
+          [required]="true"
+          [error]="valueError()"
+        >
+          <input
+            [id]="uid + '-value'"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            class="min-w-0 flex-1 bg-transparent text-end text-12 text-text outline-none tabular-nums placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+            [disabled]="disabled()"
+            [value]="intent().value ?? ''"
+            [attr.aria-invalid]="valueError() ? 'true' : null"
+            (input)="onValueInput($event)"
+            (blur)="valueTouched.set(true)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @if (maxPercentText(); as max) {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'tdlines.pricing.limit' | transloco: { max } }}
+      </p>
+    }
+
+    @if (showReasonField()) {
+      <app-trade-reason-picker
+        kind="DOCUMENT_DISCOUNT"
+        [showNote]="reasonRequiresNote()"
+        [idPrefix]="uid + '-reason'"
+        [disabled]="disabled()"
+        [showErrors]="reasonTouched()"
+        [value]="reasonPickerValue()"
+        (valueChange)="onReasonPick($event)"
+      />
+    }
+  }
+</div>

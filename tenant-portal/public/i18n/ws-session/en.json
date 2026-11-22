@@ -1,0 +1,5 @@
+{
+  "failedTitle": "Could not load your session",
+  "failedText": "We could not load your account details, so this page cannot check what you can do. Try again.",
+  "retry": "Retry"
+}

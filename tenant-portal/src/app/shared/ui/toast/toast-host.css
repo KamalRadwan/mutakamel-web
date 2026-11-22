@@ -1,0 +1,49 @@
+.toast {
+  animation: toast-in var(--duration-base) var(--ease-enter);
+}
+
+.countdown {
+  animation-name: countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+:host-context([dir='rtl']) .countdown {
+  transform-origin: right;
+}
+
+:host-context([dir='ltr']) .countdown {
+  transform-origin: left;
+}
+
+.toast:hover .countdown,
+.toast:focus-within .countdown {
+  animation-play-state: paused;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes countdown {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation-duration: var(--duration-fast);
+  }
+}
+
+/* Reset the browser popover defaults (zero specificity, so the position utilities still win). */
+:where(section[popover]) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}

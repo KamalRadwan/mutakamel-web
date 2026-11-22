@@ -1,0 +1,13 @@
+<p class="shrink-0 text-12 leading-18 text-text-muted">
+  {{ 'partyCalls.header' | transloco: { type: (('partyCalls.types.' + partyType()) | transloco) } }}
+</p>
+
+<app-call-log-table
+  [load]="loadCalls()"
+  [columns]="columns"
+  [canCallBack]="phone.visible()"
+  [callBackDisabled]="phone.busy()"
+  [reloadToken]="reloadToken()"
+  [errorText]="errorText"
+  (callBack)="onCallBack($event)"
+/>

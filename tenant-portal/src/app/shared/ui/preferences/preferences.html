@@ -1,0 +1,17 @@
+<ui-dropdown
+  icon="tablerLanguage"
+  [options]="languages"
+  [(value)]="language.current"
+  [label]="'preferences.language' | transloco"
+  [tone]="tone()"
+/>
+
+<button
+  type="button"
+  class="inline-flex size-btn cursor-pointer items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  [class]="tone() === 'nav' ? 'bg-nav-glass text-on-nav' : 'border border-border-field bg-surface text-text hover:border-border-field-hover'"
+  [attr.aria-label]="(theme.current() === 'light' ? 'preferences.darkMode' : 'preferences.lightMode') | transloco"
+  (click)="toggleTheme()"
+>
+  <ng-icon [name]="theme.current() === 'light' ? 'tablerMoon' : 'tablerSun'" size="15" aria-hidden="true" />
+</button>

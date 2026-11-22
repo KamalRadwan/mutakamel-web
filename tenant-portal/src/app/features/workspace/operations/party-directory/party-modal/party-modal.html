@@ -1,0 +1,286 @@
+<ui-modal
+  #modal
+  size="wide"
+  [title]="''"
+  [ariaLabel]="headerTitle()"
+  [hasFooter]="false"
+  [bodyClass]="'flex min-h-0 flex-1 flex-col overflow-hidden p-0'"
+  [dismissable]="!busy()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden" style="height: calc(100vh - 4 * var(--space-16))">
+    <header class="flex shrink-0 items-center gap-8 border-b border-border px-10 py-8">
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="headerTileClass()"
+        aria-hidden="true"
+      >
+        <ng-icon [name]="headerIcon()" size="15" />
+      </span>
+
+      <div class="min-w-0 flex-1">
+        <h2 class="min-w-0 truncate text-15 leading-22 font-medium text-text">{{ headerTitle() }}</h2>
+        @if (mode() === 'edit' && party(); as p) {
+          <div class="mt-2 flex items-center gap-6">
+            <span
+              class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+              [class]="statusBadgeClasses[p.status]"
+            >
+              {{ 'wsParty.status.' + p.status | transloco }}
+            </span>
+          </div>
+        }
+      </div>
+
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'wsPartyModal.common.close' | transloco"
+        [disabled]="busy()"
+        (click)="requestClose()"
+      >
+        <ng-icon name="tablerX" size="15" aria-hidden="true" />
+      </button>
+    </header>
+
+    @if (tabs().length > 0) {
+      <div
+        role="tablist"
+        class="flex shrink-0 items-center gap-4 overflow-x-auto border-b border-border bg-surface px-10 no-scrollbar"
+        [attr.aria-label]="headerTitle()"
+      >
+        @for (tab of tabs(); track tab.id; let idx = $index) {
+          <button
+            #tabBtn
+            type="button"
+            role="tab"
+            [id]="uid + '-tab-' + tab.id"
+            class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="activeTab() === tab.id ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+            [attr.tabindex]="activeTab() === tab.id ? 0 : -1"
+            [attr.aria-selected]="activeTab() === tab.id"
+            [attr.aria-controls]="activeTab() === tab.id ? uid + '-panel-' + tab.id : null"
+            (click)="selectTab(tab.id)"
+            (keydown)="onTabKeydown($event, idx)"
+          >
+            <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+            <span>{{ tab.labelKey | transloco }}</span>
+            @if (tab.count !== null) {
+              <span
+                class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-4 text-11 font-medium text-text-muted"
+              >
+                <bdi dir="ltr">{{ tab.count }}</bdi>
+              </span>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    @if (mode() === 'edit' && loading()) {
+      <div class="flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto p-10" aria-busy="true">
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          @for (item of skeletonRows; track item) {
+            <div class="flex flex-col gap-4">
+              <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              <span class="h-field w-full rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </div>
+          }
+        </div>
+      </div>
+    } @else if (mode() === 'edit' && loadFailed()) {
+      <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
+        <span
+          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+          aria-hidden="true"
+        >
+          <ng-icon name="tablerCloudOff" size="20" />
+        </span>
+        <p class="text-12 text-danger-text">{{ 'wsPartyModal.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
+          {{ 'wsPartyModal.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (isOpen() && mode() === 'create') {
+      <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <app-party-details-tab
+          #detailsTab
+          mode="create"
+          [partyType]="partyType()"
+          [party]="null"
+          [branches]="branches()"
+          [limits]="limits()"
+          [readonly]="false"
+          (created)="onPartyCreated($event)"
+        />
+      </div>
+    } @else if (party(); as p) {
+      <div
+        role="tabpanel"
+        [id]="uid + '-panel-' + activeTab()"
+        [attr.aria-labelledby]="uid + '-tab-' + activeTab()"
+        class="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        @switch (activeTab()) {
+          @case ('details') {
+            <app-party-details-tab
+              #detailsTab
+              mode="edit"
+              [partyType]="p.partyType"
+              [party]="p"
+              [branches]="branches()"
+              [limits]="limits()"
+              [readonly]="detailsReadonly()"
+              (saved)="onPartyUpdated($event)"
+              (imageChanged)="onPartyUpdated($event)"
+              (deletedRemotely)="onDeletedRemotely()"
+            />
+          }
+          @case ('contacts') {
+            <app-party-contacts-tab
+              #contactsTab
+              [party]="p"
+              [maxContacts]="limits().maxContactMethodsPerParty"
+              [readonly]="contactsReadonly()"
+              (partyUpdated)="onPartyUpdated($event)"
+              (deletedRemotely)="onDeletedRemotely()"
+            />
+          }
+          @case ('addresses') {
+            <app-party-addresses-tab
+              #addressesTab
+              [party]="p"
+              [maxAddresses]="limits().maxAddressesPerParty"
+              [readonly]="addressesReadonly()"
+              (partyUpdated)="onPartyUpdated($event)"
+              (deletedRemotely)="onDeletedRemotely()"
+            />
+          }
+          @case ('roles') {
+            <app-party-roles-tab
+              [party]="p"
+              [branches]="branches()"
+              (partyUpdated)="onPartyUpdated($event)"
+              (deletedRemotely)="onDeletedRemotely()"
+            />
+          }
+          @case ('people') {
+            <app-party-people-tab
+              [party]="p"
+              [readonly]="peopleReadonly()"
+              (openPerson)="openLinkedPerson($event)"
+              (changed)="onPeopleChanged()"
+            />
+          }
+        }
+      </div>
+    }
+
+    <footer class="flex shrink-0 flex-wrap items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+      @if (mode() === 'create' || (activeTab() === 'details' && party() && !detailsReadonly())) {
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [loading]="detailsSaving()"
+          [disabled]="busy() || (mode() === 'edit' && !detailsDirty())"
+          (click)="saveDetails()"
+        >
+          {{ 'wsPartyModal.common.save' | transloco }}
+        </button>
+
+        @if (detailsDirty()) {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="busy()"
+            (click)="undoDetails()"
+          >
+            {{ 'wsPartyModal.common.undo' | transloco }}
+          </button>
+          <span class="text-12 leading-18 text-text-muted">
+            {{ 'wsPartyModal.common.unsaved' | transloco }}
+          </span>
+        }
+      }
+
+      <button type="button" uiButton variant="ghost" [disabled]="busy()" (click)="requestClose()">
+        {{ (mode() === 'create' ? 'wsPartyModal.common.cancel' : 'wsPartyModal.common.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && party() && canManageCurrentParty()) {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [loading]="deleting()"
+          [disabled]="busy()"
+          (click)="requestDelete()"
+        >
+          {{ 'wsPartyModal.common.delete' | transloco }}
+        </button>
+      }
+    </footer>
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'wsPartyModal.unsaved.title' | transloco"
+  [text]="'wsPartyModal.unsaved.text' | transloco"
+  [saveLabel]="'wsPartyModal.common.save' | transloco"
+  [discardLabel]="'wsPartyModal.common.discard' | transloco"
+  [cancelLabel]="'wsPartyModal.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'wsPartyModal.delete.title' | transloco"
+  [text]="'wsPartyModal.delete.text' | transloco: { name: party()?.displayName ?? '' }"
+  [confirmLabel]="'wsPartyModal.delete.confirm' | transloco"
+  [cancelLabel]="'wsPartyModal.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #inUseModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'wsPartyModal.inUse.title' | transloco"
+  [closeLabel]="'wsPartyModal.common.close' | transloco"
+  [dismissable]="!settingInactive()"
+>
+  <p class="text-12 leading-18 text-text-muted">
+    {{
+      (party()?.status === 'INACTIVE' ? 'wsPartyModal.inUse.alreadyInactive' : 'wsPartyModal.inUse.text')
+        | transloco
+    }}
+  </p>
+
+  @if (party()?.status !== 'INACTIVE') {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="settingInactive()"
+      [disabled]="settingInactive()"
+      (click)="setInactiveFromAlert()"
+    >
+      {{ 'wsPartyModal.inUse.setInactive' | transloco }}
+    </button>
+  }
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="settingInactive()"
+    (click)="inUseModal.close()"
+  >
+    {{ 'wsPartyModal.common.close' | transloco }}
+  </button>
+</ui-modal>

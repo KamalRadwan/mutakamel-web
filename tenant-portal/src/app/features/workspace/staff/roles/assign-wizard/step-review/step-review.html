@@ -1,0 +1,68 @@
+<p class="text-12 leading-18 text-text-muted">
+  {{ 'perm.s3.intro' | transloco }}
+</p>
+
+<div class="flex flex-col gap-6">
+  @for (item of items(); track item.branchId) {
+    <article class="flex flex-col gap-4 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <div class="flex flex-wrap items-center gap-8">
+        <ng-icon name="tablerMapPin" size="14" class="shrink-0 text-icon-red" aria-hidden="true" />
+        <span class="text-13 leading-18 font-medium text-text">{{ item.branchName }}</span>
+        @if (item.companyName) {
+          <span class="text-12 leading-18 text-text-muted">{{ item.companyName }}</span>
+        }
+        <span
+          class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+          [class]="item.status === 'removed' ? 'bg-danger-soft text-on-danger-soft' : 'bg-brand-soft text-on-brand-soft'"
+        >
+          {{ item.chip }}
+        </span>
+        @if (!readonly() && item.status !== 'removed') {
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            size="small"
+            class="ms-auto"
+            (click)="editBranch.emit(item.branchId)"
+          >
+            {{ 'perm.s3.edit' | transloco }}
+          </button>
+        }
+      </div>
+
+      @if (item.status === 'removed') {
+        <p class="text-12 leading-18 text-danger-text">
+          {{ 'perm.s3.removed' | transloco }}
+        </p>
+      } @else if (item.status === 'new') {
+        <p class="text-12 leading-18 text-text-muted">
+          {{ ('perm.s3.newProfilePlural' | pluralKey: item.permissionCount) | transloco: { n: item.permissionCount } }}
+        </p>
+      } @else {
+        <p class="text-12 leading-18 text-text-muted">
+          {{ 'perm.s3.diff' | transloco: { a: item.added, r: item.removed, u: item.unchanged } }}
+        </p>
+      }
+
+      @if (item.status !== 'removed' && item.permissionCount === 0) {
+        <p class="text-12 leading-18 text-warning-text">
+          {{ 'perm.s3.empty' | transloco }}
+        </p>
+      }
+    </article>
+  }
+</div>
+
+<div class="flex flex-col gap-4 rounded-10 border border-border bg-surface-muted p-8">
+  <div class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+    <ng-icon name="tablerInfoCircle" size="14" class="shrink-0" aria-hidden="true" />
+    <span>{{ 'perm.s3.info' | transloco }}</span>
+  </div>
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ ('perm.s3.holdersPlural' | pluralKey: holderCount()) | transloco: { n: holderCount() } }}
+  </p>
+
+  <ng-content />
+</div>

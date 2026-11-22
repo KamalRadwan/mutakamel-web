@@ -1,0 +1,384 @@
+<ui-modal
+  size="wide"
+  icon="tablerAdjustmentsHorizontal"
+  tile="bg-icon-navy"
+  [title]="title()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-1 gap-10 desktop:grid-cols-5">
+    <div class="flex flex-col gap-8 desktop:col-span-3">
+      @if (editingField(); as current) {
+        <div class="flex flex-wrap items-center gap-6 rounded-8 border border-border bg-surface-muted px-8 py-6">
+          <span class="inline-flex items-center gap-6 text-12 font-medium text-text">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="ownerLook[current.ownerType].tile"
+            >
+              <ng-icon [name]="ownerLook[current.ownerType].icon" size="14" aria-hidden="true" />
+            </span>
+            <span>{{ ('customFields.ownerTypes.' + current.ownerType) | transloco }}</span>
+          </span>
+
+          <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+            <ng-icon [name]="typeIcons[current.type]" size="14" aria-hidden="true" />
+            <span>{{ ('customFields.types.' + current.type) | transloco }}</span>
+          </span>
+        </div>
+      }
+
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <ui-field
+          [label]="'settings.common.nameAr' | transloco"
+          [for]="uid + '-name-ar'"
+          [hint]="'customFields.modal.nameArHint' | transloco"
+          [required]="true"
+          [count]="draft().nameAr.trim().length"
+          [max]="maxNameLen"
+          [error]="nameArError()"
+        >
+          <input
+            [id]="uid + '-name-ar'"
+            type="text"
+            dir="rtl"
+            [attr.maxlength]="maxNameLen"
+            [readonly]="!canManage()"
+            [value]="draft().nameAr"
+            [attr.aria-invalid]="nameArError() ? 'true' : null"
+            [attr.aria-describedby]="(nameArError() ? uid + '-name-ar-error ' : '') + uid + '-name-ar-hint'"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            (input)="onNameArInput($any($event.target).value)"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'settings.common.nameEn' | transloco"
+          [for]="uid + '-name-en'"
+          [hint]="'customFields.modal.nameEnHint' | transloco"
+          [required]="true"
+          [count]="draft().nameEn.trim().length"
+          [max]="maxNameLen"
+          [error]="nameEnError()"
+        >
+          <input
+            [id]="uid + '-name-en'"
+            type="text"
+            dir="ltr"
+            [attr.maxlength]="maxNameLen"
+            [readonly]="!canManage()"
+            [value]="draft().nameEn"
+            [attr.aria-invalid]="nameEnError() ? 'true' : null"
+            [attr.aria-describedby]="(nameEnError() ? uid + '-name-en-error ' : '') + uid + '-name-en-hint'"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            (input)="onNameEnInput($any($event.target).value)"
+          />
+        </ui-field>
+      </div>
+
+      @if (!isEdit()) {
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <ui-field
+            [bare]="true"
+            [label]="'customFields.modal.ownerType' | transloco"
+            [for]="uid + '-owner-type'"
+            [hint]="'customFields.modal.ownerTypeHint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [options]="ownerTypeOptions()"
+              [value]="draft().ownerType"
+              [label]="'customFields.modal.ownerType' | transloco"
+              [describedBy]="uid + '-owner-type-hint'"
+              [disabled]="!canManage()"
+              (valueChange)="onOwnerTypeChange($event)"
+            />
+          </ui-field>
+
+          <div #typePicker class="relative flex flex-col" (keydown)="onTypeMenuKeydown($event)">
+            <ui-field
+              [bare]="true"
+              [label]="'customFields.modal.type' | transloco"
+              [for]="uid + '-type'"
+              [hint]="'customFields.modal.typeHint' | transloco"
+              [required]="true"
+            >
+              <button
+                #typeTrigger
+                [id]="uid + '-type'"
+                type="button"
+                aria-haspopup="listbox"
+                [attr.aria-expanded]="typeMenuOpen()"
+                [attr.aria-describedby]="uid + '-type-hint'"
+                [disabled]="!canManage()"
+                class="flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo disabled:cursor-not-allowed"
+                (click)="toggleTypeMenu()"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  <ng-icon [name]="typeIcons[draft().type]" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                  <span class="truncate">{{ ('customFields.types.' + draft().type) | transloco }}</span>
+                </span>
+                <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              </button>
+            </ui-field>
+
+            @if (typeMenuOpen()) {
+              <ul
+                #typeListEl
+                role="listbox"
+                class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+                [style.top.px]="typeMenuPlace().top"
+                [style.inset-inline-start.px]="typeMenuPlace().start"
+                [style.width.px]="typeMenuPlace().width"
+                [attr.aria-label]="'customFields.modal.type' | transloco"
+              >
+                @for (item of fieldTypes; track item) {
+                  <li role="option" [attr.aria-selected]="draft().type === item">
+                    <button
+                      type="button"
+                      class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [class]="draft().type === item ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                      (click)="selectFieldType(item)"
+                    >
+                      <span class="flex min-w-0 items-center gap-6">
+                        <ng-icon [name]="typeIcons[item]" size="14" class="shrink-0" aria-hidden="true" />
+                        <span class="truncate">{{ ('customFields.types.' + item) | transloco }}</span>
+                      </span>
+                      @if (draft().type === item) {
+                        <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <ui-field
+            [label]="'customFields.modal.key' | transloco"
+            [for]="uid + '-key'"
+            [hint]="'customFields.modal.keyHint' | transloco"
+            [required]="true"
+            [error]="keyError()"
+          >
+            <input
+              [id]="uid + '-key'"
+              type="text"
+              dir="ltr"
+              [attr.maxlength]="maxKeyLen"
+              [readonly]="!canManage()"
+              [value]="draft().fieldKey"
+              [attr.aria-invalid]="keyError() ? 'true' : null"
+              [attr.aria-describedby]="(keyError() ? uid + '-key-error ' : '') + uid + '-key-hint'"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+              (input)="onKeyInput($any($event.target).value)"
+              (blur)="onKeyBlur()"
+            />
+          </ui-field>
+        </div>
+      } @else {
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <ui-field
+            [label]="'customFields.modal.key' | transloco"
+            [for]="uid + '-key'"
+            [hint]="'customFields.modal.keyHint' | transloco"
+            [required]="true"
+            [error]="keyError()"
+          >
+            <input
+              [id]="uid + '-key'"
+              type="text"
+              dir="ltr"
+              [attr.maxlength]="maxKeyLen"
+              [readonly]="!canManage()"
+              [value]="draft().fieldKey"
+              [attr.aria-invalid]="keyError() ? 'true' : null"
+              [attr.aria-describedby]="(keyError() ? uid + '-key-error ' : '') + uid + '-key-hint'"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+              (input)="onKeyInput($any($event.target).value)"
+              (blur)="onKeyBlur()"
+            />
+          </ui-field>
+
+          <ui-field
+            [bare]="true"
+            [label]="'customFields.modal.activeLabel' | transloco"
+            [for]="uid + '-active'"
+            [hint]="'customFields.modal.activeHint' | transloco"
+          >
+            <div
+              class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+            >
+              <span
+                class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+                [class]="draft().isActive ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+              >
+                {{ (draft().isActive ? 'settings.common.active' : 'settings.common.archived') | transloco }}
+              </span>
+              <ui-switch
+                [checked]="draft().isActive"
+                [disabled]="!canManage()"
+                [label]="'customFields.modal.activeLabel' | transloco"
+                (checkedChange)="onActiveChange($event)"
+              />
+            </div>
+          </ui-field>
+        </div>
+      }
+
+      @if (hasOptions()) {
+        <app-options-editor
+          [options]="draftOptions()"
+          [readOnly]="!canManage()"
+          [showErrors]="revealErrors()"
+          [inUseOptionKeys]="inUseOptionKeys()"
+          (optionsChange)="onOptionsModelChange($event)"
+          (restoreRemoved)="restoreRemovedOptions()"
+        />
+      }
+
+      <div class="flex flex-col gap-6 rounded-8 border border-border bg-surface-muted p-8">
+        <button
+          type="button"
+          class="flex h-btn w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-4 text-12 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-expanded]="moreOpen()"
+          (click)="moreOpen.set(!moreOpen())"
+        >
+          <span>{{ 'customFields.modal.moreSettings' | transloco }}</span>
+          <span class="inline-flex text-text-muted transition-transform duration-fast" [class.rotate-180]="moreOpen()">
+            <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+          </span>
+        </button>
+
+        @if (moreOpen()) {
+          <div class="flex flex-col gap-8 pt-4">
+            <ui-field
+              [label]="'customFields.modal.placeholderAr' | transloco"
+              [for]="uid + '-ph-ar'"
+              [hint]="'customFields.modal.placeholderArHint' | transloco"
+              [count]="draft().placeholderAr.trim().length"
+              [max]="maxPlaceholderLen"
+              [error]="placeholderArError()"
+            >
+              <input
+                [id]="uid + '-ph-ar'"
+                type="text"
+                dir="rtl"
+                [attr.maxlength]="maxPlaceholderLen"
+                [readonly]="!canManage()"
+                [value]="draft().placeholderAr"
+                [attr.aria-invalid]="placeholderArError() ? 'true' : null"
+                [attr.aria-describedby]="(placeholderArError() ? uid + '-ph-ar-error ' : '') + uid + '-ph-ar-hint'"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                (input)="onPlaceholderChange('placeholderAr', $any($event.target).value)"
+              />
+            </ui-field>
+
+            <ui-field
+              [label]="'customFields.modal.placeholderEn' | transloco"
+              [for]="uid + '-ph-en'"
+              [hint]="'customFields.modal.placeholderEnHint' | transloco"
+              [count]="draft().placeholderEn.trim().length"
+              [max]="maxPlaceholderLen"
+              [error]="placeholderEnError()"
+            >
+              <input
+                [id]="uid + '-ph-en'"
+                type="text"
+                dir="ltr"
+                [attr.maxlength]="maxPlaceholderLen"
+                [readonly]="!canManage()"
+                [value]="draft().placeholderEn"
+                [attr.aria-invalid]="placeholderEnError() ? 'true' : null"
+                [attr.aria-describedby]="(placeholderEnError() ? uid + '-ph-en-error ' : '') + uid + '-ph-en-hint'"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                (input)="onPlaceholderChange('placeholderEn', $any($event.target).value)"
+              />
+            </ui-field>
+
+            <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+              <ui-field
+                [label]="'customFields.modal.sortOrder' | transloco"
+                [for]="uid + '-sort-order'"
+                [hint]="'customFields.modal.sortOrderHint' | transloco"
+                [error]="sortOrderError()"
+              >
+                <input
+                  [id]="uid + '-sort-order'"
+                  type="number"
+                  dir="ltr"
+                  [readonly]="!canManage()"
+                  [value]="sortOrderValue()"
+                  [attr.aria-invalid]="sortOrderError() ? 'true' : null"
+                  [attr.aria-describedby]="(sortOrderError() ? uid + '-sort-order-error ' : '') + uid + '-sort-order-hint'"
+                  class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                  (input)="onSortOrderChange($any($event.target).value)"
+                />
+              </ui-field>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="desktop:col-span-2">
+      <app-field-preview
+        [nameAr]="draft().nameAr"
+        [nameEn]="draft().nameEn"
+        [fieldKey]="draft().fieldKey"
+        [ownerType]="currentOwnerType()"
+        [type]="currentType()"
+        [placeholderAr]="draft().placeholderAr"
+        [placeholderEn]="draft().placeholderEn"
+        [options]="draftOptions()"
+        [requiredOnCreate]="requiredOnCreate()"
+      />
+    </div>
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center justify-between gap-8">
+    @if (canManage()) {
+      <div class="flex flex-wrap items-center gap-8">
+        <button
+          type="button"
+          uiButton
+          [loading]="saving()"
+          [disabled]="saving() || (isEdit() && !dirty())"
+          (click)="save()"
+        >
+          {{ 'settings.common.save' | transloco }}
+        </button>
+
+        @if (dirty()) {
+          <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
+            <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+            {{ 'settings.common.undo' | transloco }}
+          </button>
+          <span class="text-12 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        }
+      </div>
+
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="close()">
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    } @else {
+      <div class="flex flex-1 items-center justify-end">
+        <button type="button" uiButton variant="ghost" (click)="close()">
+          {{ 'settings.common.close' | transloco }}
+        </button>
+      </div>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'customFields.discard.title' | transloco"
+  [text]="'customFields.discard.text' | transloco"
+  [confirmLabel]="'customFields.discard.confirm' | transloco"
+  [cancelLabel]="'customFields.discard.keep' | transloco"
+/>

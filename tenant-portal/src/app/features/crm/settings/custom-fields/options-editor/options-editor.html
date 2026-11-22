@@ -1,0 +1,180 @@
+<div class="flex items-center justify-between gap-8">
+  <div class="flex items-center gap-6">
+    <span class="text-12 font-medium text-text">{{ 'customFields.options.title' | transloco }}</span>
+    <span class="text-11 text-text-muted tabular-nums">
+      {{ 'settings.common.of' | transloco: { count: options().length, max: maxOptions } }}
+    </span>
+  </div>
+  @if (!readOnly()) {
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      size="small"
+      [disabled]="options().length >= maxOptions"
+      (click)="addOption()"
+    >
+      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+      {{ 'customFields.options.add' | transloco }}
+    </button>
+  }
+</div>
+
+@if (inUseOptionKeys().length) {
+  <div role="alert" class="flex flex-col gap-6 rounded-8 border border-danger-border bg-danger-soft p-8 text-12 text-on-danger-soft">
+    <div class="flex items-start gap-6">
+      <ng-icon name="tablerAlertTriangle" size="14" class="mt-2 shrink-0 text-danger-text" aria-hidden="true" />
+      <span>{{ 'customFields.options.inUseNotice' | transloco: { keys: inUseOptionKeys().join(', ') } }}</span>
+    </div>
+    @if (!readOnly()) {
+      <div>
+        <button type="button" uiButton variant="secondary" size="small" (click)="restoreRemoved.emit()">
+          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+          {{ 'customFields.options.restoreRemoved' | transloco }}
+        </button>
+      </div>
+    }
+  </div>
+}
+
+@if (options().length === 0) {
+  <div
+    class="rounded-8 border border-dashed p-10 text-center text-12"
+    [class]="showErrors() ? 'border-danger-border text-danger-text' : 'border-border-field text-text-muted'"
+  >
+    {{ 'customFields.options.empty' | transloco }}
+  </div>
+} @else {
+  <div class="flex flex-col gap-6">
+    @for (option of options(); track option.uid) {
+      @let err = errorsFor(option);
+      <div class="flex flex-col gap-8 rounded-8 border border-border bg-surface-muted p-8">
+        <div class="grid grid-cols-12 items-start gap-x-10 gap-y-8">
+          <div class="col-span-5">
+            <ui-field
+              [label]="'customFields.options.key' | transloco"
+              [for]="'opt-key-' + option.uid"
+              [hint]="'customFields.options.keyHint' | transloco"
+              [required]="true"
+              [error]="err.key"
+            >
+              <input
+                [id]="'opt-key-' + option.uid"
+                type="text"
+                dir="ltr"
+                [attr.maxlength]="maxKeyLen"
+                [readonly]="option.isSaved || readOnly()"
+                [value]="option.key"
+                [attr.aria-invalid]="err.key ? 'true' : null"
+                [attr.aria-describedby]="(err.key ? 'opt-key-' + option.uid + '-error ' : '') + 'opt-key-' + option.uid + '-hint'"
+                class="w-full bg-transparent text-12 tabular-nums outline-none placeholder:text-text-placeholder"
+                [class]="option.isSaved ? 'cursor-not-allowed text-text-muted' : 'text-text'"
+                (input)="updateText(option.uid, 'key', $any($event.target).value)"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-3">
+            <ui-field
+              [label]="'customFields.options.order' | transloco"
+              [for]="'opt-order-' + option.uid"
+              [hint]="'customFields.options.orderHint' | transloco"
+              [required]="true"
+              [error]="err.sortOrder"
+            >
+              <input
+                [id]="'opt-order-' + option.uid"
+                type="number"
+                min="1"
+                dir="ltr"
+                [readonly]="readOnly()"
+                [value]="orderValue(option.sortOrder)"
+                [attr.aria-invalid]="err.sortOrder ? 'true' : null"
+                [attr.aria-describedby]="(err.sortOrder ? 'opt-order-' + option.uid + '-error ' : '') + 'opt-order-' + option.uid + '-hint'"
+                class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                (input)="updateOrder(option.uid, $any($event.target).value)"
+              />
+            </ui-field>
+          </div>
+
+          <div class="col-span-4">
+            <ui-field
+              [bare]="true"
+              [label]="'customFields.options.active' | transloco"
+              [for]="'opt-active-' + option.uid"
+              [hint]="'customFields.options.activeHint' | transloco"
+            >
+              <div class="flex h-field items-center justify-between gap-4">
+                <ui-switch
+                  [checked]="option.isActive"
+                  [disabled]="readOnly()"
+                  [label]="'customFields.options.active' | transloco"
+                  (checkedChange)="updateActive(option.uid, $event)"
+                />
+                @if (!option.isSaved && !readOnly()) {
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [attr.aria-label]="'customFields.options.remove' | transloco"
+                    [title]="'customFields.options.remove' | transloco"
+                    (click)="removeOption(option.uid)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                }
+              </div>
+            </ui-field>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-8">
+          <ui-field
+            [label]="'customFields.options.nameAr' | transloco"
+            [for]="'opt-ar-' + option.uid"
+            [hint]="'customFields.options.nameArHint' | transloco"
+            [required]="true"
+            [count]="option.nameAr.trim().length"
+            [max]="maxNameLen"
+            [error]="err.nameAr"
+          >
+            <input
+              [id]="'opt-ar-' + option.uid"
+              type="text"
+              dir="rtl"
+              [attr.maxlength]="maxNameLen"
+              [readonly]="readOnly()"
+              [value]="option.nameAr"
+              [attr.aria-invalid]="err.nameAr ? 'true' : null"
+              [attr.aria-describedby]="(err.nameAr ? 'opt-ar-' + option.uid + '-error ' : '') + 'opt-ar-' + option.uid + '-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              (input)="updateText(option.uid, 'nameAr', $any($event.target).value)"
+            />
+          </ui-field>
+
+          <ui-field
+            [label]="'customFields.options.nameEn' | transloco"
+            [for]="'opt-en-' + option.uid"
+            [hint]="'customFields.options.nameEnHint' | transloco"
+            [required]="true"
+            [count]="option.nameEn.trim().length"
+            [max]="maxNameLen"
+            [error]="err.nameEn"
+          >
+            <input
+              [id]="'opt-en-' + option.uid"
+              type="text"
+              dir="ltr"
+              [attr.maxlength]="maxNameLen"
+              [readonly]="readOnly()"
+              [value]="option.nameEn"
+              [attr.aria-invalid]="err.nameEn ? 'true' : null"
+              [attr.aria-describedby]="(err.nameEn ? 'opt-en-' + option.uid + '-error ' : '') + 'opt-en-' + option.uid + '-hint'"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              (input)="updateText(option.uid, 'nameEn', $any($event.target).value)"
+            />
+          </ui-field>
+        </div>
+      </div>
+    }
+  </div>
+}

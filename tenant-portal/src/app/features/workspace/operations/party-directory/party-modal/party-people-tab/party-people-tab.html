@@ -1,0 +1,407 @@
+<div class="min-h-0 flex-1 overflow-y-auto p-10">
+  @if (!readonly() && !linking() && !loadFailed() && contacts().length > 0) {
+    <div class="mb-8 flex justify-end">
+      <button type="button" uiButton variant="secondary" size="small" (click)="openLinkForm()">
+        <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+        <span>{{ 'wsPartyModal.people.link' | transloco }}</span>
+      </button>
+    </div>
+  }
+
+  @if (linking() && !readonly()) {
+    <article class="mb-10 flex flex-col gap-8 rounded-10 border border-brand bg-surface p-8 shadow-card">
+      <div class="flex items-center justify-between gap-8">
+        <span class="text-12 leading-18 font-medium text-text">
+          {{ 'wsPartyModal.people.link' | transloco }}
+        </span>
+        <div class="flex items-center gap-6">
+          <button
+            type="submit"
+            [attr.form]="uid + '-link-form'"
+            uiButton
+            variant="primary"
+            size="small"
+            [loading]="savingLink()"
+            [disabled]="savingLink()"
+          >
+            <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+            <span>{{ 'wsPartyModal.common.save' | transloco }}</span>
+          </button>
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+            [disabled]="savingLink()"
+            [attr.aria-label]="'wsPartyModal.common.cancel' | transloco"
+            [title]="'wsPartyModal.common.cancel' | transloco"
+            (click)="cancelLinkForm()"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <form [id]="uid + '-link-form'" class="grid grid-cols-2 items-start gap-x-10 gap-y-8" novalidate (submit)="saveLink($event)">
+        <ui-field
+          size="bare"
+          [for]="uid + '-person'"
+          [label]="'wsPartyModal.people.person' | transloco"
+          [hint]="'wsPartyModal.people.personHint' | transloco"
+          [required]="true"
+          [error]="personError()"
+        >
+          <button
+            #pickerTrigger
+            type="button"
+            [id]="uid + '-person'"
+            class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+            [class]="
+              personError()
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : pickerOpen()
+                  ? 'border-focus-ring ring-3 ring-focus-halo'
+                  : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+            "
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="pickerOpen()"
+            [attr.aria-label]="'wsPartyModal.people.person' | transloco"
+            [attr.aria-describedby]="uid + '-person-hint' + (personError() ? ' ' + uid + '-person-error' : '')"
+            [attr.aria-invalid]="personError() ? 'true' : null"
+            [disabled]="savingLink()"
+            (click)="togglePicker()"
+          >
+            <span class="min-w-0 truncate">
+              @if (selectedPerson(); as person) {
+                <span>{{ person.displayName }}</span>
+              } @else {
+                <span class="text-text-placeholder">{{ 'wsPartyModal.people.personPlaceholder' | transloco }}</span>
+              }
+            </span>
+            <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </button>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-relationship'"
+          [label]="'wsPartyModal.people.relationship' | transloco"
+          [hint]="'wsPartyModal.people.relationshipHint' | transloco"
+          [required]="true"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-relationship'"
+            [describedBy]="uid + '-relationship-hint'"
+            [options]="relationshipOptions()"
+            [value]="relationshipType()"
+            [label]="'wsPartyModal.people.relationship' | transloco"
+            [disabled]="savingLink()"
+            (valueChange)="relationshipType.set($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-rel-label'"
+          [label]="'wsPartyModal.people.label' | transloco"
+          [hint]="'wsPartyModal.people.labelHint' | transloco"
+          [count]="relationshipLabel().length"
+          [max]="limits.relationshipLabel"
+          [error]="labelError()"
+        >
+          <input
+            [id]="uid + '-rel-label'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="relationshipLabel()"
+            [readOnly]="savingLink()"
+            [attr.aria-invalid]="labelError() ? 'true' : null"
+            (input)="onLabelInput($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-rel-primary'"
+          [label]="'wsPartyModal.people.isPrimary' | transloco"
+          [hint]="'wsPartyModal.people.isPrimaryHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-checkbox [(checked)]="isPrimary">
+              <span>{{ 'wsPartyModal.people.isPrimary' | transloco }}</span>
+            </ui-checkbox>
+          </div>
+        </ui-field>
+      </form>
+    </article>
+  }
+
+  @if (pickerOpen()) {
+    <div
+      #pickerPanel
+      class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 overflow-hidden rounded-10 border border-border bg-surface p-4 shadow-popover"
+      [class.invisible]="!pickerPlaced()"
+      [style.top.px]="pickerPlace().top"
+      [style.inset-inline-start.px]="pickerPlace().start"
+      [style.min-width.px]="pickerPlace().width"
+      [style.max-height.px]="pickerPlace().maxHeight"
+    >
+      <div
+        class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+      >
+        @if (pickerSearching()) {
+          <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+        } @else {
+          <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+        <input
+          #pickerSearchInput
+          type="text"
+          dir="auto"
+          autocomplete="off"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'wsPartyModal.people.personSearch' | transloco"
+          [attr.aria-label]="'wsPartyModal.people.personSearch' | transloco"
+          [value]="pickerSearch()"
+          (input)="onPickerSearchInput($event)"
+        />
+      </div>
+
+      <ul
+        role="listbox"
+        class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+        [attr.aria-label]="'wsPartyModal.people.person' | transloco"
+      >
+        @for (person of pickerOptions(); track person.id) {
+          @let contactHint = contactHintOf(person);
+          <li role="presentation">
+            <button
+              type="button"
+              role="option"
+              [attr.aria-selected]="selectedPerson()?.id === person.id"
+              class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="selectedPerson()?.id === person.id ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+              (click)="selectPerson(person)"
+            >
+              <span class="flex min-w-0 items-center gap-6">
+                <span class="truncate font-medium">{{ person.displayName }}</span>
+                @if (contactHint) {
+                  <span dir="ltr" class="truncate text-11 text-text-muted">{{ contactHint }}</span>
+                }
+              </span>
+              @if (selectedPerson()?.id === person.id) {
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              }
+            </button>
+          </li>
+        } @empty {
+          @if (!pickerSearching()) {
+            <li class="flex h-menu-item items-center justify-center px-8 text-12 text-text-muted">
+              {{ 'wsPartyModal.common.noResults' | transloco }}
+            </li>
+          }
+        }
+      </ul>
+    </div>
+  }
+
+  @if (loadFailed() && !loading()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCloudOff" size="20" />
+      </span>
+      <p class="text-12 text-danger-text">{{ 'wsPartyModal.people.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'wsPartyModal.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (!loading() && contacts().length === 0) {
+    @if (!linking()) {
+      <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span
+          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+          aria-hidden="true"
+        >
+          <ng-icon name="tablerUsers" size="18" />
+        </span>
+        <p class="text-12 text-text-muted">{{ 'wsPartyModal.people.empty' | transloco }}</p>
+        @if (!readonly()) {
+          <button type="button" uiButton variant="secondary" size="small" (click)="openLinkForm()">
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'wsPartyModal.people.link' | transloco }}</span>
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-modal-form"
+        [attr.aria-label]="'wsPartyModal.tabs.people' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'wsPartyModal.people.cols.name' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsPartyModal.people.cols.relationship' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsPartyModal.people.cols.label' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsPartyModal.people.cols.mobile' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsPartyModal.people.cols.email' | transloco }}
+          </span>
+          @if (!readonly()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'wsPartyModal.people.cols.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns()"
+              aria-hidden="true"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              @if (!readonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (row of contacts(); track row.relationshipId) {
+            @let phone = phoneOf(row);
+            <div
+              role="row"
+              tabindex="0"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="gridColumns()"
+              (click)="openPerson.emit(row.partyId)"
+              (keydown)="onRowKeydown($event, row.partyId)"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-6 px-10">
+                <button
+                  type="button"
+                  class="min-w-0 cursor-pointer truncate font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="$event.stopPropagation(); openPerson.emit(row.partyId)"
+                >
+                  {{ row.displayName }}
+                </button>
+                @if (row.isPrimary) {
+                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft whitespace-nowrap">
+                    {{ 'wsPartyModal.common.primary' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12">{{ 'wsParty.relationshipTypes.' + row.relationshipType | transloco }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span dir="auto" class="truncate text-12 text-text-muted">
+                  {{ row.relationshipLabel || '—' }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12" (click)="$event.stopPropagation()">
+                @if (phone) {
+                  <app-phone-actions [phone]="phone" [source]="phoneSourceOf(row)" />
+                } @else {
+                  <span class="text-text-muted">—</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12" (click)="$event.stopPropagation()">
+                @if (row.email) {
+                  <a
+                    dir="ltr"
+                    [href]="'mailto:' + row.email"
+                    class="truncate text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  >
+                    {{ row.email }}
+                  </a>
+                } @else {
+                  <span class="text-text-muted">—</span>
+                }
+              </span>
+
+              @if (!readonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                    [disabled]="unlinkingId() === row.relationshipId"
+                    [attr.aria-label]="'wsPartyModal.people.unlink' | transloco"
+                    [title]="'wsPartyModal.people.unlink' | transloco"
+                    (click)="unlink(row)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                </span>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      @if (hasNext()) {
+        <div class="mt-8 text-center">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [loading]="loadingMore()"
+            [disabled]="loading() || loadingMore()"
+            (click)="loadMore()"
+          >
+            {{ 'wsPartyModal.common.loadMore' | transloco }}
+          </button>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<ui-confirm-dialog
+  #unlinkConfirm
+  tone="danger"
+  [title]="'wsPartyModal.people.unlinkTitle' | transloco"
+  [text]="'wsPartyModal.people.unlinkText' | transloco: { name: unlinkingName() }"
+  [confirmLabel]="'wsPartyModal.people.unlink' | transloco"
+  [cancelLabel]="'wsPartyModal.common.cancel' | transloco"
+/>

@@ -1,0 +1,235 @@
+<div class="flex items-center gap-4">
+  <button
+    #trigger
+    type="button"
+    class="flex h-field min-w-0 flex-1 cursor-pointer items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 outline-none transition-colors duration-fast hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+    [class.border-focus-ring]="open()"
+    [class.ring-3]="open()"
+    [class.ring-focus-halo]="open()"
+    [attr.id]="id() || null"
+    [attr.aria-label]="ariaLabel() || null"
+    [attr.aria-describedby]="describedBy() || null"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="open()"
+    [disabled]="disabled()"
+    (click)="toggle()"
+  >
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerCalendar" size="14" aria-hidden="true" />
+    </span>
+    <span class="min-w-0 flex-1 truncate text-start" [class]="!disabled() && displayValue() ? 'text-text' : 'text-text-placeholder'">
+      {{ displayValue() || placeholder() }}
+    </span>
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+    </span>
+  </button>
+
+  @if (hasValue() && !disabled()) {
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'templatesLibrary.dateRange.clear' | transloco"
+      [title]="'templatesLibrary.dateRange.clear' | transloco"
+      (click)="clearValue($event)"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+  }
+</div>
+
+@if (open()) {
+  <div
+    #popover
+    role="dialog"
+    aria-modal="false"
+    class="fixed z-dropdown flex w-picker-w-single overflow-hidden rounded-12 border border-border bg-surface shadow-popover"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [attr.aria-label]="ariaLabel() || monthLabel()"
+  >
+    <aside class="flex w-preset shrink-0 flex-col gap-2 overflow-y-auto border-e border-border p-6">
+      @for (preset of presets; track preset) {
+        <button
+          type="button"
+          class="flex h-field w-full shrink-0 cursor-pointer items-center truncate rounded-6 px-6 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="activePreset() === preset ? 'bg-brand-soft font-medium text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+          (click)="choosePreset(preset)"
+        >
+          {{ ('templatesLibrary.dateRange.presets.' + preset) | transloco }}
+        </button>
+      }
+    </aside>
+
+    <div class="flex min-w-0 flex-1 flex-col gap-6 p-8">
+      <div class="flex h-btn items-center justify-between gap-4">
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'templatesLibrary.dateRange.prevMonth' | transloco"
+          (click)="shiftMonth(-1)"
+        >
+          <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+
+        <span class="truncate text-13 leading-18 font-medium text-text">{{ monthLabel() }}</span>
+
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'templatesLibrary.dateRange.nextMonth' | transloco"
+          (click)="shiftMonth(1)"
+        >
+          <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div role="grid" [attr.aria-label]="monthLabel()" class="flex flex-col gap-2">
+        <div role="row" class="grid h-badge grid-cols-7 items-center text-center text-11 leading-16 text-text-muted">
+          @for (weekday of weekdays(); track $index) {
+            <span role="columnheader">{{ weekday }}</span>
+          }
+        </div>
+
+        @for (week of weeks(); track $index) {
+          <div role="row" class="grid grid-cols-7 justify-items-center">
+            @for (day of week; track day.iso) {
+              <div
+                role="gridcell"
+                [attr.aria-selected]="day.isStart || day.isEnd"
+                class="relative flex size-cal-cell-single items-center justify-center"
+              >
+                @if (day.inRange) {
+                  <span class="pointer-events-none absolute inset-x-0 h-cal-mark bg-brand-soft" aria-hidden="true"></span>
+                } @else if (day.isStart && day.hasRange) {
+                  <span class="pointer-events-none absolute inset-y-0 end-0 my-auto h-cal-mark w-1/2 bg-brand-soft" aria-hidden="true"></span>
+                } @else if (day.isEnd && day.hasRange) {
+                  <span class="pointer-events-none absolute inset-y-0 start-0 my-auto h-cal-mark w-1/2 bg-brand-soft" aria-hidden="true"></span>
+                }
+
+                <button
+                  type="button"
+                  class="relative inline-flex size-cal-mark cursor-pointer items-center justify-center rounded-full text-12 leading-18 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="dayMarkClasses(day)"
+                  [attr.data-iso]="day.iso"
+                  [attr.tabindex]="day.iso === effectiveFocusedIso() ? 0 : -1"
+                  [attr.aria-label]="day.ariaLabel"
+                  [attr.aria-pressed]="day.isStart || day.isEnd"
+                  [attr.aria-current]="day.isToday ? 'date' : null"
+                  (focus)="focusedIso.set(day.iso)"
+                  (click)="selectDay(day)"
+                  (keydown)="onDayKeydown($event, day)"
+                >
+                  {{ day.label }}
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div dir="ltr" class="flex items-center justify-between gap-4 border-t border-border pt-6">
+        <div class="flex items-center gap-2">
+          <button
+            #startHourBtn
+            type="button"
+            class="inline-flex h-field w-time-dd cursor-pointer items-center justify-between rounded-6 border border-border-field bg-surface-field px-4 text-12 tabular-nums text-text outline-none hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo"
+            [attr.aria-label]="('templatesLibrary.dateRange.startTime' | transloco) + ' ' + ('templatesLibrary.dateRange.hour' | transloco)"
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openTimeMenu() === 'startHour'"
+            (click)="toggleTimeMenu('startHour', startHourBtn)"
+          >
+            <span>{{ draftStartHour() }}</span>
+            <ng-icon name="tablerChevronDown" size="11" class="text-text-muted" aria-hidden="true" />
+          </button>
+          <span class="text-12 text-text-muted" aria-hidden="true">:</span>
+          <button
+            #startMinBtn
+            type="button"
+            class="inline-flex h-field w-time-dd cursor-pointer items-center justify-between rounded-6 border border-border-field bg-surface-field px-4 text-12 tabular-nums text-text outline-none hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo"
+            [attr.aria-label]="('templatesLibrary.dateRange.startTime' | transloco) + ' ' + ('templatesLibrary.dateRange.minute' | transloco)"
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openTimeMenu() === 'startMin'"
+            (click)="toggleTimeMenu('startMin', startMinBtn)"
+          >
+            <span>{{ draftStartMin() }}</span>
+            <ng-icon name="tablerChevronDown" size="11" class="text-text-muted" aria-hidden="true" />
+          </button>
+        </div>
+
+        <span class="text-12 text-text-muted" aria-hidden="true">–</span>
+
+        <div class="flex items-center gap-2">
+          <button
+            #endHourBtn
+            type="button"
+            class="inline-flex h-field w-time-dd cursor-pointer items-center justify-between rounded-6 border border-border-field bg-surface-field px-4 text-12 tabular-nums text-text outline-none hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo"
+            [attr.aria-label]="('templatesLibrary.dateRange.endTime' | transloco) + ' ' + ('templatesLibrary.dateRange.hour' | transloco)"
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openTimeMenu() === 'endHour'"
+            (click)="toggleTimeMenu('endHour', endHourBtn)"
+          >
+            <span>{{ draftEndHour() }}</span>
+            <ng-icon name="tablerChevronDown" size="11" class="text-text-muted" aria-hidden="true" />
+          </button>
+          <span class="text-12 text-text-muted" aria-hidden="true">:</span>
+          <button
+            #endMinBtn
+            type="button"
+            class="inline-flex h-field w-time-dd cursor-pointer items-center justify-between rounded-6 border border-border-field bg-surface-field px-4 text-12 tabular-nums text-text outline-none hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo"
+            [attr.aria-label]="('templatesLibrary.dateRange.endTime' | transloco) + ' ' + ('templatesLibrary.dateRange.minute' | transloco)"
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openTimeMenu() === 'endMin'"
+            (click)="toggleTimeMenu('endMin', endMinBtn)"
+          >
+            <span>{{ draftEndMin() }}</span>
+            <ng-icon name="tablerChevronDown" size="11" class="text-text-muted" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-6 border-t border-border pt-6">
+        <span class="truncate text-11 text-text-muted">
+          @if (selectedDaysCount() === 1) {
+            {{ 'templatesLibrary.dateRange.oneDay' | transloco }}
+          } @else if (selectedDaysCount() > 1) {
+            {{ 'templatesLibrary.dateRange.daysCount' | transloco: { count: selectedDaysCount() } }}
+          }
+        </span>
+
+        <div class="flex shrink-0 items-center gap-4">
+          <button type="button" uiButton variant="secondary" size="small" (click)="close()">
+            {{ 'templatesLibrary.dateRange.cancel' | transloco }}
+          </button>
+          <button type="button" uiButton size="small" (click)="applyRange()">
+            {{ 'templatesLibrary.dateRange.apply' | transloco }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    @if (openTimeMenu()) {
+      <ul
+        #timeList
+        role="listbox"
+        dir="ltr"
+        class="fixed z-dropdown flex max-h-time-list-max w-time-dd flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+        [style.top.px]="timeMenuPlace().top"
+        [style.inset-inline-start.px]="timeMenuPlace().start"
+      >
+        @for (item of timeOptions(); track item) {
+          <li role="option" [attr.aria-selected]="item === selectedTimeOption()">
+            <button
+              type="button"
+              class="flex h-field w-full cursor-pointer items-center justify-center rounded-6 text-12 tabular-nums outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="item === selectedTimeOption() ? 'bg-brand-soft font-medium text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+              (click)="chooseTimeOption(item)"
+            >
+              {{ item }}
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}

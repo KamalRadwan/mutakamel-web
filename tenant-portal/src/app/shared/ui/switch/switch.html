@@ -1,0 +1,17 @@
+<button
+  type="button"
+  role="switch"
+  class="inline-flex h-switch-h w-switch-w shrink-0 cursor-pointer items-center rounded-full p-2 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+  [class]="checked() ? 'bg-brand' : 'bg-border'"
+  [attr.id]="id() || null"
+  [attr.aria-checked]="checked()"
+  [attr.aria-label]="label() || null"
+  [attr.aria-describedby]="describedBy() || null"
+  [disabled]="disabled()"
+  (click)="toggle()"
+>
+  <span
+    class="size-switch-knob rounded-full bg-surface shadow-card transition-transform duration-fast"
+    [class]="checked() ? 'ltr:translate-x-12 rtl:-translate-x-12' : 'translate-x-0'"
+  ></span>
+</button>

@@ -1,0 +1,194 @@
+<app-settings-frame
+  addLabel=""
+  [showAdd]="false"
+  [searchPlaceholder]="'wsGeo.states.search' | transloco"
+  [loading]="loading()"
+  [(search)]="search"
+  (reload)="reload()"
+>
+  <div notices class="flex flex-wrap items-end justify-between gap-10">
+    <ui-field
+      class="w-modal-alert shrink-0"
+      size="bare"
+      [for]="uid + '-country'"
+      [label]="'wsGeo.states.country' | transloco"
+      [hint]="'wsGeo.states.countryHint' | transloco"
+    >
+      <div class="flex items-center gap-6">
+        @if (selectedCountry(); as country) {
+          <img
+            [ngSrc]="flagUrl(country.iso2)"
+            alt=""
+            width="16"
+            height="12"
+            class="h-12 w-16 shrink-0 rounded-2 object-cover"
+          />
+        }
+        <ui-dropdown
+          class="min-w-0 flex-1"
+          size="field"
+          [id]="uid + '-country'"
+          [options]="countryOptions()"
+          [value]="selectedCountryId()"
+          [label]="'wsGeo.states.country' | transloco"
+          [describedBy]="uid + '-country-hint'"
+          [disabled]="countries().length === 0"
+          (valueChange)="onCountryChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <div class="flex h-field min-w-0 items-center gap-8">
+      <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+        <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+        {{ 'wsGeo.readOnly' | transloco }}
+      </span>
+      <span class="text-12 leading-18 text-text-muted">{{ 'wsGeo.states.note' | transloco }}</span>
+    </div>
+  </div>
+
+  @if (failed() && !loading()) {
+    <div
+      role="alert"
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    >
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'wsGeo.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="primary" (click)="reload()">
+        {{ 'wsGeo.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto overflow-y-hidden pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'wsGeo.tabs.states' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid grid-cols-geo-state-row-actions h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'wsGeo.states.cols.name' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsGeo.states.cols.nameAr' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsGeo.states.cols.code' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsGeo.states.cols.status' | transloco }}
+          </span>
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'wsGeo.states.cols.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid grid-cols-geo-state-row-actions h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-1/2 rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-time-dd rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (state of filteredStates(); track state.id) {
+            <div
+              role="row"
+              class="mt-6 grid grid-cols-geo-state-row-actions h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              (click)="viewCities(state)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <button
+                  type="button"
+                  dir="ltr"
+                  class="min-w-0 cursor-pointer truncate rounded-4 text-start font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="$event.stopPropagation(); viewCities(state)"
+                >
+                  {{ state.nameEn }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span dir="rtl" class="truncate">{{ state.nameAr }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  dir="ltr"
+                  class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft tabular-nums"
+                >
+                  {{ state.code }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <!-- The API lists active rows only and sends no isActive field. -->
+                <span class="inline-flex h-badge items-center rounded-8 bg-success px-8 text-12 font-medium whitespace-nowrap text-on-success">
+                  {{ 'wsGeo.active' | transloco }}
+                </span>
+              </span>
+
+              <span
+                role="cell"
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="rowActions()"
+                  [label]="'wsGeo.states.cols.actions' | transloco"
+                  (selected)="onRowAction(state, $event)"
+                />
+              </span>
+            </div>
+          } @empty {
+            <div role="row">
+              <div role="cell" class="flex flex-col items-center gap-8 p-16 text-center">
+                <span class="text-12 text-text-muted">
+                  {{ (search().trim() ? 'wsGeo.noResults' : 'wsGeo.states.empty') | transloco }}
+                </span>
+                @if (search().trim()) {
+                  <button type="button" uiButton variant="secondary" size="small" (click)="search.set('')">
+                    {{ 'wsGeo.clearSearch' | transloco }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  @if (!loading() && !failed()) {
+    <span footer class="tabular-nums">
+      @if (search().trim()) {
+        {{ 'wsGeo.of' | transloco: { count: filteredStates().length, max: states().length } }}
+      } @else {
+        {{ 'wsGeo.states.count' | transloco: { count: states().length } }}
+      }
+    </span>
+  }
+</app-settings-frame>

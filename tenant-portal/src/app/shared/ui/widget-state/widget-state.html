@@ -1,0 +1,78 @@
+@switch (kind()) {
+  @case ('loading') {
+    <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+    <div class="h-skeleton-line w-11/12 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+    <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+    <div class="h-skeleton-line w-4/5 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+    @if (text()) {
+      <span class="sr-only" role="status">{{ text() }}</span>
+    }
+  }
+  @case ('empty') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerChartBarOff" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    @if (text()) {
+      <p class="max-w-modal-alert text-12 leading-16 text-text-muted">{{ text() }}</p>
+    }
+  }
+  @case ('timeout') {
+    @if (text()) {
+      <p role="status" aria-live="polite" class="max-w-modal-alert text-12 leading-16 text-text-muted">{{ text() }}</p>
+    }
+    @if (actionLabel()) {
+      <button uiButton type="button" variant="secondary" size="small" (click)="action.emit()">
+        <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+        <span>{{ actionLabel() }}</span>
+      </button>
+    }
+  }
+  @case ('failed') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerRefresh" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    @if (text()) {
+      <p role="status" aria-live="polite" class="max-w-modal-alert text-12 leading-16 text-text-muted">{{ text() }}</p>
+    }
+    @if (actionLabel()) {
+      <button uiButton type="button" variant="secondary" size="small" (click)="action.emit()">
+        <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+        <span>{{ actionLabel() }}</span>
+      </button>
+    }
+  }
+  @case ('unavailable') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerDatabaseOff" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    @if (text()) {
+      <p role="status" aria-live="polite" class="max-w-modal-alert text-12 leading-16 text-text-muted">{{ text() }}</p>
+    }
+    @if (secondaryLabel()) {
+      <button uiButton type="button" variant="ghost" size="small" (click)="secondary.emit()">
+        {{ secondaryLabel() }}
+      </button>
+    }
+  }
+  @case ('denied') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerLock" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    @if (text()) {
+      <p role="status" aria-live="polite" class="max-w-modal-alert text-12 leading-16 text-text-muted">{{ text() }}</p>
+    }
+  }
+  @case ('retired') {
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerArchive" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    @if (text()) {
+      <p class="max-w-modal-alert text-12 leading-16 text-text-muted">{{ text() }}</p>
+    }
+    @if (actionLabel()) {
+      <button uiButton type="button" variant="secondary" size="small" (click)="action.emit()">
+        {{ actionLabel() }}
+      </button>
+    }
+  }
+}

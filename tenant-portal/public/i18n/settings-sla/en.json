@@ -1,0 +1,266 @@
+{
+  "page": {
+    "title": "Response policies",
+    "newPolicy": "New policy",
+    "searchPlaceholder": "Search policies by name...",
+    "empty": "No response policies match the current filters.",
+    "loadMore": "Load more",
+    "clearFilters": "Clear filters",
+    "forbiddenTitle": "Access restricted",
+    "forbiddenText": "You do not have permission to view response policies.",
+    "loadFailedTitle": "Could not load response policies",
+    "loadFailedText": "Something went wrong while loading response policies. Try again."
+  },
+  "filters": {
+    "kind": "Kind",
+    "kindHint": "Filter policies by response or cadence type.",
+    "record": "Applies to",
+    "recordHint": "Filter by the CRM record type covered by the policy.",
+    "branch": "Branch",
+    "branchHint": "Filter by tenant default or a specific branch override.",
+    "state": "State",
+    "stateHint": "Filter between active and retired policy versions.",
+    "all": "All",
+    "tenantDefault": "Tenant default"
+  },
+  "table": {
+    "name": "Name",
+    "kind": "Kind",
+    "record": "Applies to",
+    "branch": "Branch",
+    "target": "Target",
+    "version": "Version",
+    "effective": "Effective",
+    "state": "State",
+    "allBranchesDefault": "All branches (default)",
+    "now": "now"
+  },
+  "kind": {
+    "FIRST_RESPONSE": "First response",
+    "FOLLOW_UP_CADENCE": "Follow-up cadence",
+    "NEXT_STEP": "Next step"
+  },
+  "record": {
+    "LEAD": "Lead",
+    "OPPORTUNITY": "Opportunity"
+  },
+  "clockKind": {
+    "WORKING_MINUTES": "Working minutes",
+    "CALENDAR_MINUTES": "Calendar minutes"
+  },
+  "unit": {
+    "minutes": "Minutes",
+    "hours": "Hours",
+    "days": "Days"
+  },
+  "targetFormat": {
+    "workingMinutes": {
+      "zero": "{{n}} working minutes",
+      "one": "{{n}} working minute",
+      "two": "{{n}} working minutes",
+      "few": "{{n}} working minutes",
+      "many": "{{n}} working minutes",
+      "other": "{{n}} working minutes"
+    },
+    "workingHours": {
+      "zero": "{{n}} working hours",
+      "one": "{{n}} working hour",
+      "two": "{{n}} working hours",
+      "few": "{{n}} working hours",
+      "many": "{{n}} working hours",
+      "other": "{{n}} working hours"
+    },
+    "workingDays": {
+      "zero": "{{n}} working days",
+      "one": "{{n}} working day",
+      "two": "{{n}} working days",
+      "few": "{{n}} working days",
+      "many": "{{n}} working days",
+      "other": "{{n}} working days"
+    },
+    "calendarMinutes": {
+      "zero": "{{n}} calendar minutes",
+      "one": "{{n}} calendar minute",
+      "two": "{{n}} calendar minutes",
+      "few": "{{n}} calendar minutes",
+      "many": "{{n}} calendar minutes",
+      "other": "{{n}} calendar minutes"
+    },
+    "calendarHours": {
+      "zero": "{{n}} calendar hours",
+      "one": "{{n}} calendar hour",
+      "two": "{{n}} calendar hours",
+      "few": "{{n}} calendar hours",
+      "many": "{{n}} calendar hours",
+      "other": "{{n}} calendar hours"
+    },
+    "calendarDays": {
+      "zero": "{{n}} calendar days",
+      "one": "{{n}} calendar day",
+      "two": "{{n}} calendar days",
+      "few": "{{n}} calendar days",
+      "many": "{{n}} calendar days",
+      "other": "{{n}} calendar days"
+    },
+    "cadencePrefix": {
+      "zero": "{{touches}} touches in {{duration}}",
+      "one": "{{touches}} touch in {{duration}}",
+      "two": "{{touches}} touches in {{duration}}",
+      "few": "{{touches}} touches in {{duration}}",
+      "many": "{{touches}} touches in {{duration}}",
+      "other": "{{touches}} touches in {{duration}}"
+    },
+    "cadenceMinutes": {
+      "zero": "{{n}} minutes",
+      "one": "{{n}} minute",
+      "two": "{{n}} minutes",
+      "few": "{{n}} minutes",
+      "many": "{{n}} minutes",
+      "other": "{{n}} minutes"
+    },
+    "cadenceHours": {
+      "zero": "{{n}} hours",
+      "one": "{{n}} hour",
+      "two": "{{n}} hours",
+      "few": "{{n}} hours",
+      "many": "{{n}} hours",
+      "other": "{{n}} hours"
+    },
+    "cadenceDays": {
+      "zero": "{{n}} days",
+      "one": "{{n}} day",
+      "two": "{{n}} days",
+      "few": "{{n}} days",
+      "many": "{{n}} days",
+      "other": "{{n}} days"
+    }
+  },
+  "touchBy": {
+    "OWNER": "Owner",
+    "ANYONE": "Anyone"
+  },
+  "activityType": {
+    "CALL": "Call",
+    "EMAIL": "Email",
+    "FOLLOW_UP": "Follow-up",
+    "MEETING": "Meeting",
+    "NOTE": "Note",
+    "VISIT": "Field visit",
+    "TODO": "Task",
+    "OTHER": "Other"
+  },
+  "direction": {
+    "INBOUND": "Inbound",
+    "OUTBOUND": "Outbound",
+    "INTERNAL": "Internal",
+    "NONE": "None"
+  },
+  "touchSource": {
+    "CRM_ACTIVITY": "CRM activity",
+    "CORE_ACTIVITY": "Core activity"
+  },
+  "startEvent": {
+    "ASSIGNMENT": "Assignment",
+    "STAGE_ENTRY": "Stage entry"
+  },
+  "qualifyingFact": {
+    "TOUCH": "Touch",
+    "PLANNED_ACTIVITY": "Planned activity"
+  },
+  "state": {
+    "ACTIVE": "Active",
+    "RETIRED": "Retired"
+  },
+  "modal": {
+    "createTitle": "New response policy",
+    "editTitle": "Response policy",
+    "publishVersion": "Publish version",
+    "publishedToast": "Response policy version published.",
+    "discardTitle": "Discard unsaved changes?",
+    "discardText": "You have unpublished changes to this policy. Closing now will discard them.",
+    "discardConfirm": "Discard changes",
+    "discardKeep": "Keep editing"
+  },
+  "form": {
+    "nameEn": "Name (English)",
+    "nameEnHint": "English display name shown in policy lists and SLA reports (1 to 120 characters).",
+    "nameEnPlaceholder": "e.g. Standard first response",
+    "nameAr": "Name (Arabic)",
+    "nameArHint": "Arabic display name shown when the portal language is Arabic (1 to 120 characters).",
+    "nameArPlaceholder": "مثال: الاستجابة الأولى القياسية",
+    "kind": "Kind",
+    "kindHint": "First response and follow-up cadence apply to leads; next step applies to leads or opportunities.",
+    "record": "Applies to",
+    "recordHint": "Record type evaluated by this policy. Opportunities support next step only.",
+    "branch": "Branch",
+    "branchHint": "Tenant default applies to all branches unless a branch-specific override exists.",
+    "clockKind": "Clock",
+    "clockKindHint": "Working minutes follow the branch working calendar; follow-up cadence always uses calendar minutes.",
+    "target": "Target",
+    "targetHint": "Response threshold duration. Working days equal 8 working hours (480 minutes); calendar days equal 24 hours.",
+    "targetUnit": "Target unit",
+    "requiredTouchCount": "Required touches",
+    "requiredTouchCountHint": "Number of qualifying touches required within the cadence window (1 to 50).",
+    "compliancePct": "Compliance %",
+    "compliancePctHint": "Minimum percentage of records meeting the cadence requirement (greater than 0 up to 100).",
+    "qualifyingTouchBy": "Counted touches by",
+    "qualifyingTouchByHint": "Choose whether only the record owner's actions count or actions by any team member.",
+    "activityTypes": "Activity types",
+    "activityTypesHint": "Select activity types that satisfy this policy. Leave empty to allow all types.",
+    "directions": "Directions",
+    "directionsHint": "Select activity directions that qualify. Leave empty to allow any direction.",
+    "touchSources": "Touch sources",
+    "touchSourcesHint": "Select the event sources counted toward this policy. Leave empty to allow all sources.",
+    "effectiveFrom": "Effective from",
+    "effectiveFromHint": "Date when this version takes effect. Policies cannot be backdated before today.",
+    "state": "State",
+    "stateHint": "Active policies are evaluated on new records; retired policies stop new evaluations.",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minute"
+  },
+  "meta": {
+    "version": "Version",
+    "versionHint": "Sequential version number inside this policy lineage.",
+    "startEvent": "Starts at",
+    "startEventHint": "Record event that starts the SLA timer.",
+    "qualifyingFact": "Counts",
+    "qualifyingFactHint": "Evidence type that satisfies this policy.",
+    "supersedes": "Supersedes",
+    "supersedesHint": "Previous version replaced when this version is published.",
+    "firstVersion": "First version"
+  },
+  "clock": {
+    "sectionTitle": "Try the clock",
+    "branch": "Branch",
+    "branchHint": "Branch whose published working calendar is used to compute the deadline.",
+    "from": "From",
+    "fromHint": "Start date and 24-hour time for the clock simulation.",
+    "minutes": "Minutes",
+    "minutesHint": "Positive number of working minutes to add from the start instant.",
+    "deadline": "Deadline",
+    "deadlineHint": "Computed due date and time, or the reason the branch calendar cannot compute it.",
+    "calculate": "Calculate"
+  },
+  "missing": {
+    "CALENDAR_UNAVAILABLE": "No working calendar for this branch",
+    "CALENDAR_HOURS_MISSING": "Working hours are missing for this branch",
+    "DEADLINE_BEYOND_HORIZON": "Calculated deadline exceeds the calendar horizon"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "nameMax": "Must be at most {{max}} characters.",
+    "targetRange": "Converted target must be between 1 and {{max}} minutes.",
+    "touchesRange": "Enter a whole number between 1 and 50.",
+    "complianceRange": "Enter a percentage greater than 0 and up to 100.",
+    "backdated": "Effective date cannot be in the past.",
+    "minutesInvalid": "Enter a positive whole number of minutes.",
+    "fromInvalid": "Select a valid start date and time.",
+    "minutesRange": "Enter a whole number from 1 to {{max}}."
+  },
+  "errors": {
+    "qualifierUnknown": "One of the selected activity types, directions or touch sources is not recognised. Reload the page and try again."
+  }
+}

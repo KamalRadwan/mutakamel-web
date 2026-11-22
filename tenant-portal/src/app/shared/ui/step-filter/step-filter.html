@@ -1,0 +1,65 @@
+<div class="inline-flex items-center">
+  @for (step of steps(); track step.id; let index = $index; let first = $first) {
+    @let selected = step.id === value();
+    @let tone = this.tone(step);
+    <button
+      #stepBtn
+      type="button"
+      role="radio"
+      class="relative inline-flex h-btn shrink-0 cursor-pointer items-center ps-16 pe-12 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-focus-halo-strong rtl:-scale-x-100"
+      [class]="
+        (first ? 'step-first ' : '-ms-6 step-next ') +
+        (selected ? tone.on : tone.off)
+      "
+      [attr.aria-checked]="selected"
+      [attr.aria-describedby]="hint().trim() ? hintId : null"
+      [tabIndex]="index === activeIndex() ? 0 : -1"
+      (click)="value.set(step.id)"
+      (keydown)="onKeydown($event, index)"
+    >
+      <span class="inline-flex items-center gap-4 rtl:-scale-x-100">
+        <span>{{ step.label }}</span>
+        @if (step.count !== null && step.count !== undefined) {
+          <span
+            class="inline-flex h-counter min-w-counter items-center justify-center rounded-full px-4 text-11 leading-16 font-medium"
+            [class]="selected ? tone.count : 'bg-surface text-text'"
+          >
+            {{ step.count }}
+          </span>
+        }
+      </span>
+    </button>
+  }
+  @if (hint().trim()) {
+    <span
+      #hintTrigger
+      class="relative ms-6 inline-flex shrink-0 items-center text-accent"
+      (mouseenter)="onHintHover(hintTrigger, true)"
+      (mouseleave)="onHintHover(hintTrigger, false)"
+    >
+      <button
+        type="button"
+        class="inline-flex cursor-help items-center rounded-full text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        [attr.aria-label]="label() || null"
+        [attr.aria-describedby]="hintId"
+        (focus)="onHintFocus(hintTrigger, true)"
+        (blur)="onHintFocus(hintTrigger, false)"
+        (keydown.escape)="onHintEscape($event)"
+      >
+        <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+      </button>
+      <span
+        #tooltip
+        [id]="hintId"
+        role="tooltip"
+        class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+        [class]="tipPlaced() ? 'visible' : 'invisible'"
+        [style.top.px]="tooltipPlace().top"
+        [style.inset-inline-start.px]="tooltipPlace().start"
+        (keydown.escape)="onHintEscape($event)"
+      >
+        {{ hint() }}
+      </span>
+    </span>
+  }
+</div>

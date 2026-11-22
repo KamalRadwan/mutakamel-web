@@ -1,0 +1,271 @@
+{
+  "title": "العملاء",
+  "record": "عميل",
+  "new": "عميل جديد",
+  "statuses": {
+    "PROSPECT": "عميل مرتقب",
+    "ACTIVE_CUSTOMER": "عميل نشط",
+    "INACTIVE": "غير نشط",
+    "BLACKLISTED": "في القائمة السوداء"
+  },
+  "types": {
+    "INDIVIDUAL": "فرد",
+    "CORPORATE": "شركة"
+  },
+  "activeHint": "تُضبط تلقائيًا عند الفوز بفرصة.",
+  "placeholder": "هذه الصفحة قيد الإنشاء.",
+  "toolbar": {
+    "search": "ابحث في العملاء",
+    "lockedByDraft": "طبّق البحث المتقدم أو امسحه أولًا",
+    "advancedSearch": "البحث المتقدم",
+    "viewSwitcher": "طريقة عرض العملاء"
+  },
+  "views": {
+    "board": "لوحة",
+    "cards": "بطاقات",
+    "table": "جدول"
+  },
+  "statusFilter": {
+    "label": "التصفية حسب الحالة",
+    "hint": "اعرض العملاء ذوي الحالة المختارة فقط",
+    "all": "الكل"
+  },
+  "board": {
+    "loadMore": "تحميل المزيد ({{shown}} من {{total}})",
+    "add": "إضافة عميل إلى {{status}}",
+    "empty": "لا يوجد عملاء في هذه الحالة",
+    "emptyHelp": "اسحب عميلًا إلى هنا أو أضف عميلًا جديدًا.",
+    "allShown": "تم عرض جميع العملاء",
+    "deniedStatus": "لا يمكنك تغيير حالات العملاء.",
+    "moved": "تم النقل إلى {{status}}",
+    "moveFailed": "تعذّر تغيير حالة العميل.",
+    "concurrentUpdate": "عدّل شخص آخر هذا العميل. حدّث الصفحة لرؤية آخر نسخة.",
+    "blacklistConfirm": {
+      "title": "إدراج {{name}} في القائمة السوداء؟",
+      "body": "لا يمكن إضافة عمل جديد لعميل في القائمة السوداء، ولا يمكن حذفه.",
+      "confirm": "إدراج في القائمة السوداء"
+    }
+  },
+  "table": {
+    "columns": {
+      "name": "الاسم",
+      "status": "الحالة",
+      "primaryContact": "جهة الاتصال الرئيسية",
+      "phone": "الهاتف",
+      "email": "البريد الإلكتروني",
+      "city": "المدينة",
+      "owner": "المسؤول",
+      "source": "المصدر",
+      "tags": "الوسوم",
+      "rating": "التقييم",
+      "nextActivity": "النشاط التالي",
+      "createdAt": "تاريخ الإنشاء",
+      "updatedAt": "آخر تحديث",
+      "actions": "الإجراءات"
+    },
+    "columnsChooser": "اختيار الأعمدة",
+    "sortBy": "الترتيب حسب {{column}}",
+    "pagination": "ترقيم صفحات العملاء"
+  },
+  "card": {
+    "actions": "إجراءات العميل",
+    "view": "عرض العميل",
+    "menu": {
+      "open": "فتح",
+      "edit": "تعديل",
+      "color": "تغيير اللون",
+      "delete": "حذف",
+      "deleteBlacklistedReason": "لا يمكن حذف عميل في القائمة السوداء."
+    }
+  },
+  "details": {
+    "phone": "الهاتف",
+    "email": "البريد الإلكتروني",
+    "city": "المدينة"
+  },
+  "color": {
+    "none": "بلا لون",
+    "failed": "تعذّر حفظ اللون.",
+    "RED": "أحمر",
+    "ORANGE": "برتقالي",
+    "AMBER": "كهرماني",
+    "YELLOW": "أصفر",
+    "GREEN": "أخضر",
+    "TEAL": "أزرق مخضر",
+    "BLUE": "أزرق",
+    "INDIGO": "نيلي",
+    "PURPLE": "بنفسجي",
+    "PINK": "وردي",
+    "SLATE": "رمادي مزرق"
+  },
+  "rate": {
+    "failed": "تعذّر حفظ التقييم."
+  },
+  "delete": {
+    "title": "حذف {{name}}؟",
+    "text": "لا يمكن التراجع عن هذا الإجراء.",
+    "textFromLead": "سيُعاد فتح العميل المحتمل الذي نشأ منه هذا العميل.",
+    "done": "تم حذف العميل.",
+    "failed": "تعذّر حذف العميل."
+  },
+  "due": {
+    "OVERDUE": "متأخر",
+    "TODAY": "اليوم",
+    "FUTURE": "قادم",
+    "NONE": "لا يوجد نشاط"
+  },
+  "empty": {
+    "noMatches": "لا يوجد عملاء يطابقون هذا البحث.",
+    "clearSearch": "مسح البحث",
+    "noCustomers": "لا يوجد عملاء بعد.",
+    "loadFailed": "تعذّر تحميل العملاء.",
+    "retry": "إعادة المحاولة"
+  },
+  "search": {
+    "advanced": "متقدم",
+    "advancedCount": "عدد الشروط: {{n}}",
+    "me": "أنا",
+    "textReplaces": "يستبدل البحث النصي الحالي.",
+    "invalid": "تعذّر تنفيذ البحث. راجع الشروط.",
+    "groups": {
+      "contactAndText": "الاتصال والنص",
+      "classification": "التصنيف",
+      "people": "الأشخاص",
+      "dates": "التواريخ",
+      "tags": "الوسوم"
+    },
+    "presets": {
+      "mine": "عملائي",
+      "active": "العملاء النشطون"
+    },
+    "rejected": {
+      "CONTRADICTION": "يتعارض هذا مع شرط حالي على {{field}}.",
+      "ROOT_ONLY": "ينطبق {{field}} على جميع النتائج ولا يمكن وضعه داخل مجموعة «أو».",
+      "EXCLUSIVE": "يمكن استخدام حقل بحث نصي واحد فقط في كل مرة.",
+      "SINGLETON": "يمكن استخدام {{field}} مرة واحدة فقط.",
+      "UNSUPPORTED": "تعذّر تطبيق شرط {{field}}."
+    },
+    "nullLabels": {
+      "ownerUserId": {
+        "isNull": "غير مُسند",
+        "isNotNull": "مُسند"
+      },
+      "acquisitionSourceId": {
+        "isNull": "بلا مصدر",
+        "isNotNull": "له مصدر"
+      },
+      "cardColor": {
+        "isNull": "بلا لون",
+        "isNotNull": "له لون"
+      }
+    },
+    "fields": {
+      "customer": {
+        "label": "العميل",
+        "hint": "يطابق اسم العميل واسم الشركة وجهات الاتصال المرتبطة."
+      },
+      "email": {
+        "label": "البريد الإلكتروني",
+        "hint": "يطابق أي بريد إلكتروني للعميل أو لجهات اتصاله."
+      },
+      "phone": {
+        "label": "الهاتف",
+        "hint": "يطابق أرقام الجوال والهاتف بالأرقام فقط."
+      },
+      "status": {
+        "label": "الحالة",
+        "hint": "عميل مرتقب أو عميل نشط أو غير نشط أو في القائمة السوداء."
+      },
+      "profileType": {
+        "label": "نوع العميل",
+        "hint": "فرد أو شركة."
+      },
+      "ownerUserId": {
+        "label": "المسؤول",
+        "hint": "الشخص المسؤول عن هذا العميل."
+      },
+      "acquisitionSourceId": {
+        "label": "المصدر",
+        "hint": "الجهة التي جاء منها العميل."
+      },
+      "tags": {
+        "label": "الوسوم",
+        "hint": "العملاء الذين يحملون وسمًا واحدًا على الأقل من الوسوم المختارة."
+      },
+      "rating": {
+        "label": "التقييم",
+        "hint": "من 0 إلى 3 نجوم."
+      },
+      "cardColor": {
+        "label": "لون البطاقة",
+        "hint": "اللون المحدد على بطاقة العميل."
+      },
+      "createdAt": {
+        "label": "تاريخ الإنشاء",
+        "hint": "تعتمد التواريخ على المنطقة الزمنية لمساحة العمل."
+      },
+      "updatedAt": {
+        "label": "تاريخ آخر تحديث",
+        "hint": "تعتمد التواريخ على المنطقة الزمنية لمساحة العمل."
+      },
+      "description": {
+        "label": "الوصف",
+        "hint": "بحث نصي داخل وصف العميل، وقد يكون بطيئًا في القوائم الكبيرة."
+      },
+      "fromLead": {
+        "label": "محوَّل من عميل محتمل",
+        "hint": "نعم = أُنشئ عبر تحويل عميل محتمل. لا = أُضيف مباشرةً كعميل."
+      }
+    }
+  },
+  "errors": {
+    "CUSTOMER_PROFILE_NOT_FOUND": "لم يعد هذا العميل موجودًا.",
+    "CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE": "عدّل شخص آخر بيانات هذا العميل. أعِد التحميل لعرض التغييرات.",
+    "CUSTOMER_PROFILE_HAS_ACTIVE_OPPORTUNITIES": "لدى هذا العميل فرص مفتوحة. أغلِقها أو انقلها قبل الحذف.",
+    "CUSTOMER_PROFILE_SOURCE_LEAD_CONFLICT": "يتعارض ربط هذا العميل بالعميل المحتمل الذي نشأ منه مع سجل آخر.",
+    "CUSTOMER_PROFILE_REOPEN_STAGE_UNAVAILABLE": "لا تتوفر مرحلة لإعادة فتح العميل المحتمل المرتبط.",
+    "CRM_SCOPED_PERMISSION_DENIED": "ليست لديك صلاحية الوصول إلى هذا العميل أو تعديله في هذا الفرع.",
+    "CUSTOMER_PROFILE_CORPORATE_FIELDS_FORBIDDEN": "لا يمكن حفظ بيانات الشركة لعميل فردي.",
+    "CUSTOMER_PROFILE_BLACKLISTED": "لا يمكن حذف عميل مدرج في القائمة السوداء.",
+    "CUSTOMER_PROFILE_STATUS_MANAGE_REQUIRED": "ليست لديك صلاحية تغيير حالة العميل.",
+    "CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON": "يصبح العميل نشطًا تلقائيًا عند الفوز بفرصة.",
+    "CUSTOMER_PROFILE_PRIMARY_CONTACT_FORBIDDEN": "تُستخدم بيانات جهة الاتصال الرئيسية المباشرة للعميل الفردي فقط.",
+    "CUSTOMER_PROFILE_CONTACT_NAME_REQUIRED": "يجب إدخال اسم لكل جهة اتصال.",
+    "CUSTOMER_PROFILE_CONTACT_PRIMARY_INVALID": "اختر جهة اتصال رئيسية واحدة بالضبط.",
+    "CUSTOMER_PROFILE_DISPLAY_NAME_REQUIRED": "أدخل اسم العميل.",
+    "CUSTOMER_PROFILE_PARTY_MANAGE_REQUIRED": "ليست لديك صلاحية إدارة سجل الطرف المرتبط.",
+    "CUSTOMER_PROFILE_REFERENCE_CONFLICT": "هذا العميل مرتبط بسجلات أخرى ولا يمكن تعديله.",
+    "CUSTOMER_PROFILE_LINKED_LEAD_LIMIT": "بلغ هذا العميل الحد الأقصى لعدد العملاء المحتملين المرتبطين.",
+    "CUSTOMER_PROFILE_LINKED_LEADS_CHANGED": "تغيّرت سجلات العملاء المحتملين المرتبطة أثناء الإجراء. حاول مرة أخرى.",
+    "CUSTOMER_PROFILE_DISQUALIFY_STAGE_UNAVAILABLE": "لا تتوفر مرحلة عدم تأهيل للعميل المحتمل المرتبط.",
+    "PARTY_CONTACT_INVALID": "بيانات جهة الاتصال غير صالحة أو تجاوزت الحد المسموح به.",
+    "CRM_CONTACT_CHANGE_CONFLICT": "أرسِل تغييرًا واحدًا لجهة اتصال أو قائمة جهات الاتصال كاملة، وليس كليهما.",
+    "CRM_CONTACT_NOT_LINKED": "جهة الاتصال هذه غير مرتبطة بهذا العميل.",
+    "CRM_RECORD_TAG_ALREADY_ATTACHED": "واحد أو أكثر من الوسوم مرتبط بالفعل بهذا السجل.",
+    "CRM_TAG_NOT_FOUND": "الوسم غير موجود.",
+    "CRM_VALIDATION_FAILED": "تعذّر التحقق من البيانات المُدخلة. راجع الحقول وحاول مرة أخرى.",
+    "CRM_ACQUISITION_SOURCE_NOT_FOUND": "مصدر الاكتساب غير موجود.",
+    "GW.IDEM.MISSING": "تعذّر تنفيذ الطلب لأن مفتاح منع التكرار مفقود. حاول مرة أخرى.",
+    "GW.IDEM.MISMATCH": "استُخدم مفتاح منع التكرار نفسه مع طلب مختلف. حاول مرة أخرى.",
+    "PARTY_DUPLICATE_CONTACT_METHOD": "وسيلة التواصل هذه مستخدمة بالفعل في سجل آخر.",
+    "PARTY_CONTACT_LIMIT_EXCEEDED": "لا يمكن إرسال أكثر من 20 جهة اتصال للشركة.",
+    "PARTY_CONTACT_METHOD_REPEATED": "أُدخلت وسيلة التواصل نفسها أكثر من مرة.",
+    "LEAD_DUPLICATE_CHECK_EMPTY": "أدخل الاسم أو الهاتف أو البريد الإلكتروني أو الرقم الضريبي أو رقم السجل التجاري لفحص التكرار.",
+    "CRM_SETTINGS_MISSING": "إعدادات إدارة علاقات العملاء غير متاحة. يُرجى التواصل مع الدعم.",
+    "CUSTOMER_PROFILE_SELECTION_TOO_LARGE": "اختر 10,000 عميل كحدٍّ أقصى.",
+    "CRM_RECORD_TAG_NOT_FOUND": "هذا الوسم غير مرتبط بالعميل.",
+    "CRM_TAG_UNKNOWN": "لم يعد أحد الوسوم موجودًا، فاحذفه وحاول مرة أخرى.",
+    "CRM_ACQUISITION_SOURCE_INACTIVE": "المصدر المختار غير نشط.",
+    "LEAD_ADDRESS_GEO_INVALID": "مكان العنوان غير صالح، فاختره مرة أخرى.",
+    "LEAD_ADDRESS_GEO_INCOMPLETE": "اختر كل مستوى من العنوان قبل المستوى الذي يليه.",
+    "BRANCH_CONTEXT_REQUIRED": "هذا العميل غير متاح، وربما حُذف.",
+    "BRANCH_PERMISSION_DENIED": "ليست لديك صلاحية على العملاء في هذا الفرع.",
+    "BRANCH_ACCESS_DENIED": "هذا الفرع خارج نطاق وصولك.",
+    "PARTY_DUPLICATE_CONTACT": "اختيرت جهة الاتصال نفسها أكثر من مرة.",
+    "PARTY_NOT_FOUND": "لم تعد إحدى جهات الاتصال المختارة موجودة.",
+    "INVALID_FIELD": "حقل التصفية أو الترتيب هذا غير مدعوم.",
+    "INVALID_OPERATOR_VALUE": "إحدى قيم التصفية غير صالحة، فراجعها وحاول مرة أخرى.",
+    "CRM_LEADS_DISABLED": "العملاء المحتملون غير مفعّلين لهذه الشركة.",
+    "LEAD_PHONE_INVALID": "أدخل رقم هاتف من 5 أرقام على الأقل."
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "list": {
+    "tableLabel": "Invoices",
+    "legacy": "Legacy",
+    "empty": "No invoices yet",
+    "cols": {
+      "number": "Number",
+      "status": "Status",
+      "purpose": "Purpose",
+      "issued": "Issued",
+      "due": "Due",
+      "period": "Period",
+      "total": "Total",
+      "paid": "Paid",
+      "outstanding": "Outstanding",
+      "actions": "Actions"
+    },
+    "pagination": "Invoices pagination"
+  },
+  "detail": {
+    "detailsTitle": "Invoice details",
+    "linesTitle": "Invoice lines",
+    "fields": {
+      "issued": "Issued",
+      "issuedHint": "Date the invoice was issued.",
+      "due": "Due",
+      "dueHint": "Payment due date for this invoice.",
+      "paidOn": "Paid on",
+      "paidOnHint": "Date the invoice was fully paid.",
+      "periodFrom": "Period from",
+      "periodFromHint": "Start date of the billing period covered.",
+      "periodTo": "Period to",
+      "periodToHint": "End date of the billing period covered.",
+      "currency": "Currency",
+      "currencyHint": "Currency in which the invoice was issued.",
+      "settlementCurrency": "Settlement currency",
+      "settlementCurrencyHint": "Currency used to settle this invoice."
+    },
+    "totals": {
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "total": "Total",
+      "settlementSubtotal": "Settlement subtotal",
+      "settlementTax": "Settlement tax",
+      "settlementTotal": "Settlement total",
+      "paid": "Paid"
+    }
+  },
+  "lines": {
+    "tableLabel": "Invoice line items",
+    "cols": {
+      "description": "Description",
+      "seats": "Seats",
+      "cycle": "Cycle",
+      "quantity": "Quantity",
+      "unitPrice": "Unit price",
+      "lineTotal": "Line total"
+    },
+    "expand": "Show pricing brackets",
+    "collapse": "Hide pricing brackets",
+    "bracketRange": "{{min}}–{{max}} users",
+    "bracketOpen": "{{min}} and more users",
+    "charged": "{{count}} charged",
+    "noBrackets": "No bracket breakdown available.",
+    "empty": "No line items on this invoice."
+  },
+  "pay": {
+    "title": "Pay invoice",
+    "loading": "Checking payment status…",
+    "loadFailed": "Could not check the payment status.",
+    "currency": "Currency",
+    "currencyHint": "The currency you pay in",
+    "getAmount": "Get amount",
+    "getNewAmount": "Get a new amount",
+    "outstanding": "Outstanding",
+    "fromWallet": "From wallet",
+    "toPayNow": "To pay now",
+    "youPay": "You pay",
+    "rateLabel": "Exchange rate",
+    "rateValue": "1 USD = {{rate}} {{currency}}",
+    "walletCoversAll": "Your wallet covers the full amount.",
+    "validFor": "Valid for {{time}}",
+    "expired": "This amount expired",
+    "payAmount": "Pay {{amount}}",
+    "payFromWallet": "Pay from wallet",
+    "inProgress": "A payment is in progress.",
+    "continuePayment": "Continue payment",
+    "openPaymentPage": "Open payment page",
+    "checking": "Checking the payment…",
+    "checkAgain": "Check again",
+    "underReview": "The payment is under review. We will update the invoice when it is confirmed.",
+    "expiresAt": "Expires at {{time}}"
+  },
+  "toast": {
+    "paid": "Invoice paid",
+    "popupBlockedTitle": "Pop-up blocked",
+    "popupBlockedText": "Select \"Open payment page\" to continue.",
+    "failed": "The payment failed. You can try again.",
+    "expired": "The payment page expired. Get a new amount.",
+    "stillWaiting": "We are still waiting for the payment. Check again later.",
+    "quoteChanged": "The amount changed. Get a new amount."
+  }
+}

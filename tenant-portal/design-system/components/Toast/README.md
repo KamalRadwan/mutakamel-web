@@ -1,0 +1,1 @@
+Transient message. Every error except field validation is a toast. White card, round status icon, title, one line of text and a countdown bar. Position: bottom start corner, bottom-left in English and bottom-right in Arabic. Success and info last 4s, warning 8s, error stays until closed. You provide the type, title and text.

@@ -1,0 +1,99 @@
+<ui-field
+  size="bare"
+  [for]="firstInputId()"
+  [label]="label()"
+  [hint]="fullHint()"
+  [required]="required()"
+  [error]="error()"
+  [count]="charCount()"
+  [max]="maxChars()"
+>
+  <div class="flex items-center gap-4">
+    <div
+      class="no-scrollbar flex h-field min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+      [class]="
+        error()
+          ? 'border-danger-border ring-2 ring-danger-halo'
+          : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+      "
+      (click)="onBoxClick($event)"
+    >
+      @for (text of texts(); track $index; let last = $last) {
+        <span
+          class="inline-grid max-w-full shrink-0 items-center"
+          [class.flex-1]="last"
+          [class.min-w-16]="last"
+          [class.min-w-4]="!last"
+        >
+          <span
+            class="invisible col-start-1 row-start-1 whitespace-pre px-2 text-12"
+            aria-hidden="true"
+          >{{ text }}&#8203;</span>
+          <input
+            #segInput
+            type="text"
+            [attr.id]="$first ? firstInputId() : null"
+            [value]="text"
+            [readonly]="readOnly()"
+            [attr.aria-label]="segmentAriaLabel($index)"
+            [attr.aria-invalid]="error() ? 'true' : null"
+            class="col-start-1 row-start-1 w-full min-w-4 bg-transparent px-2 text-12 text-text outline-none"
+            (focus)="rememberCaret($index, $event)"
+            (click)="rememberCaret($index, $event)"
+            (keyup)="rememberCaret($index, $event)"
+            (select)="rememberCaret($index, $event)"
+            (input)="onSlotInput($index, $event)"
+            (keydown)="onSlotKeydown($index, $event)"
+          />
+        </span>
+
+        @if ($index < bindings().length) {
+          @let binding = bindings()[$index];
+          <span
+            class="inline-flex h-chip shrink-0 items-center gap-2 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft"
+          >
+            @if (!readOnly()) {
+              <button
+                type="button"
+                class="cursor-pointer truncate outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.title]="binding.path"
+                (mousedown)="$event.preventDefault()"
+                (click)="onEditChip($index, $event)"
+              >
+                «{{ fieldLabel(binding.path) }}»
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-counter shrink-0 cursor-pointer items-center justify-center rounded-4 text-on-brand-soft outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'tplEmail.removeField' | transloco: { name: fieldLabel(binding.path) }"
+                [attr.title]="'tplEmail.removeField' | transloco: { name: fieldLabel(binding.path) }"
+                (mousedown)="$event.preventDefault()"
+                (click)="onRemoveChip($index, $event)"
+              >
+                <ng-icon name="tablerX" size="11" aria-hidden="true" />
+              </button>
+            } @else {
+              <span [attr.title]="binding.path">«{{ fieldLabel(binding.path) }}»</span>
+            }
+          </span>
+        }
+      }
+    </div>
+
+    @if (!readOnly()) {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        size="small"
+        class="shrink-0"
+        [disabled]="!canAddField()"
+        [attr.title]="addFieldTitle()"
+        (mousedown)="$event.preventDefault()"
+        (click)="onAddField($event)"
+      >
+        {{ 'tplEmail.addField' | transloco }}
+      </button>
+    }
+  </div>
+</ui-field>

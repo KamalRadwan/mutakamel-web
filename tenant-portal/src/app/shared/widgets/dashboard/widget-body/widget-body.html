@@ -1,0 +1,170 @@
+@let mode = displayMode();
+<!-- One loading state for loading and retrying, so its role="status" element persists and the change is announced. -->
+@if (mode === 'loading' || mode === 'retrying') {
+  <ui-widget-state
+    kind="loading"
+    [text]="
+      (mode === 'retrying' ? 'dashboardWidgets.state.retrying' : 'dashboardWidgets.state.loading')
+        | transloco
+    "
+  />
+} @else {
+  @switch (mode) {
+    @case ('ready') {
+      @let exec = execution()!;
+      @if (showTable() && exactTable(); as table) {
+        <app-widget-table [table]="table" [label]="title()" />
+      } @else if (chartKind(); as cKind) {
+        @defer (on viewport) {
+          <ui-chart
+            [kind]="cKind"
+            [execution]="exec"
+            [ariaLabel]="title()"
+            (pointClick)="pointClick.emit($event)"
+          />
+        } @placeholder {
+          <ui-widget-state kind="loading" [text]="'dashboardWidgets.state.loading' | transloco" />
+        }
+      } @else {
+        @switch (kind()) {
+          @case ('METRIC_CARD') {
+            <app-kind-metric-card
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('MULTI_KPI') {
+            <app-kind-multi-kpi
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('PROGRESS_CARD') {
+            <app-kind-progress-card
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('TABLE') {
+            <app-kind-table
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('LEADERBOARD') {
+            <app-kind-leaderboard
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('SCORECARD') {
+            <app-kind-scorecard
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('ALERT_LIST') {
+            <app-kind-alert-list
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('ACTIVITY_FEED') {
+            <app-kind-activity-feed
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('TIMELINE') {
+            <app-kind-timeline
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+          @case ('CALENDAR') {
+            <app-kind-calendar
+              [execution]="exec"
+              [title]="title()"
+              (pointClick)="pointClick.emit($event)"
+              (openRecord)="openRecord.emit($event)"
+            />
+          }
+        }
+      }
+    }
+    @case ('empty') {
+      <ui-widget-state kind="empty" [text]="'dashboardWidgets.state.empty' | transloco" />
+    }
+    @case ('timeout') {
+      <ui-widget-state
+        kind="timeout"
+        [text]="'dashboardWidgets.state.timeout' | transloco"
+        [actionLabel]="'dashboardWidgets.retry' | transloco"
+        (action)="retry.emit()"
+      />
+    }
+    @case ('busy') {
+      <ui-widget-state
+        kind="timeout"
+        [text]="'dashboardWidgets.state.busy' | transloco"
+        [actionLabel]="'dashboardWidgets.retry' | transloco"
+        (action)="retry.emit()"
+      />
+    }
+    @case ('failed') {
+      <ui-widget-state
+        kind="failed"
+        [text]="'dashboardWidgets.state.failed' | transloco"
+        [actionLabel]="'dashboardWidgets.retry' | transloco"
+        (action)="retry.emit()"
+      />
+    }
+    @case ('unavailable') {
+      <ui-widget-state
+        kind="unavailable"
+        [text]="reasonTranslationKey() | transloco"
+        [secondaryLabel]="
+          readinessSourceKey() ? ('dashboardWidgets.dataReadiness' | transloco) : ''
+        "
+        (secondary)="onOpenReadiness()"
+      />
+    }
+    @case ('denied') {
+      <ui-widget-state
+        kind="denied"
+        [text]="
+          (view().reasonCode === 'SOURCE_PERMISSION_REQUIRED'
+            ? reasonTranslationKey()
+            : 'dashboardWidgets.state.denied'
+          ) | transloco
+        "
+      />
+    }
+    @case ('retired') {
+      <ui-widget-state
+        kind="retired"
+        [text]="'dashboardWidgets.state.retired' | transloco"
+        [actionLabel]="canEdit() ? ('dashboardWidgets.openBuilder' | transloco) : ''"
+        (action)="openBuilder.emit()"
+      />
+    }
+  }
+}

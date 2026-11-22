@@ -1,0 +1,34 @@
+{
+  "title": "Possible duplicates ({{count}})",
+  "showAll": "Show all {{count}}",
+  "showLess": "Show less",
+  "collapse": "Hide duplicates",
+  "expand": "Show duplicates",
+  "otherBranch": "Contact in another branch",
+  "restrictedHint": "Some details are hidden because they belong to another branch or to records you cannot view.",
+  "leads": "Leads: {{count}}",
+  "openLead": "Open lead",
+  "openCustomer": "Open customer",
+  "openRecord": "Open record",
+  "allLeads": "All leads ({{count}})",
+  "leadItem": "Lead · {{stage}}",
+  "useCompany": "Use this company",
+  "match": {
+    "PHONE": "Phone",
+    "EMAIL": "Email",
+    "NAME": "Name",
+    "TAX_NUMBER": "Tax number",
+    "COMMERCIAL_REGISTRATION": "CR number"
+  },
+  "stage": {
+    "NEW": "New",
+    "CONTACTED": "Contacted",
+    "QUALIFYING": "Qualifying",
+    "QUALIFIED": "Qualified",
+    "NURTURING": "Nurturing",
+    "ON_HOLD": "On hold",
+    "DISQUALIFIED": "Disqualified",
+    "CONVERTED": "Converted"
+  },
+  "wouldBlock": "Saving may be rejected: a matching record already uses this contact under the duplicate policy."
+}

@@ -1,0 +1,89 @@
+<div
+  #dialog
+  role="dialog"
+  aria-modal="false"
+  [attr.aria-label]="'webPhone.title' | transloco"
+  class="phone-panel-enter flex w-phone-panel flex-col overflow-hidden rounded-t-12 border border-b-0 border-border bg-surface text-text shadow-popover"
+  (keydown.escape)="onEscape($event)"
+>
+  <app-phone-header />
+
+  @if (phone.tab() !== 'settings') {
+    <div class="border-b border-border bg-surface-muted px-10 py-6">
+      <div
+        role="tablist"
+        class="flex items-center gap-2 rounded-10 bg-neutral-soft p-3"
+        [attr.aria-label]="'webPhone.title' | transloco"
+      >
+        @for (tabItem of tabs; track tabItem.id; let idx = $index) {
+          @let active = phone.tab() === tabItem.id;
+          <button
+            #tabBtn
+            type="button"
+            role="tab"
+            [attr.aria-selected]="active"
+            [attr.tabindex]="active ? 0 : -1"
+            class="inline-flex h-field flex-1 cursor-pointer items-center justify-center gap-6 rounded-8 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="active ? 'bg-surface font-medium text-text shadow-card' : 'text-text-muted hover:text-text'"
+            (click)="selectTab(tabItem.id)"
+            (keydown)="onTabKeydown($event, idx)"
+          >
+            <ng-icon [name]="tabItem.icon" size="14" aria-hidden="true" />
+            <span>{{ ('webPhone.tabs.' + tabItem.id) | transloco }}</span>
+            @if (tabItem.id === 'calls' && phone.missedCount() > 0) {
+              <span
+                class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-8 bg-danger px-4 text-11 leading-16 font-medium text-on-danger"
+              >
+                {{ missedBadge() }}
+              </span>
+            }
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @switch (phone.tab()) {
+    @case ('phone') {
+      <div #panelBody class="scrollbar-thin flex h-phone-body flex-col gap-8 overflow-y-auto p-10">
+        <app-dial-display />
+        @if (phone.block(); as block) {
+          <app-phone-state [block]="block" />
+        } @else if (phone.ringing()) {
+          <app-incoming-call [floating]="false" (answerAndTransfer)="onAnswerAndTransfer()" />
+        } @else if (phone.mode() === 'consult') {
+          <app-consult-call />
+        } @else if (phone.mode() === 'conference') {
+          <app-conference />
+        } @else if (showInCall() && transferOpen()) {
+          <app-transfer (cancelled)="transferOpen.set(false)" />
+        } @else {
+          <app-dialer (openTransfer)="transferOpen.set(true)" />
+        }
+      </div>
+    }
+
+    @case ('calls') {
+      <div #panelBody class="flex h-phone-body flex-col overflow-hidden">
+        @if (phone.ringing()) {
+          <div class="shrink-0 border-b border-border p-10">
+            <app-incoming-call [floating]="false" [embedded]="true" (answerAndTransfer)="onAnswerAndTransfer()" />
+          </div>
+        }
+        <app-call-log class="flex min-h-0 flex-1 flex-col" />
+      </div>
+    }
+
+    @case ('settings') {
+      <div
+        #panelBody
+        class="phone-settings-body scrollbar-thin flex flex-col gap-8 overflow-y-auto p-10"
+      >
+        @if (phone.ringing()) {
+          <app-incoming-call [floating]="false" [embedded]="true" (answerAndTransfer)="onAnswerAndTransfer()" />
+        }
+        <app-phone-devices />
+      </div>
+    }
+  }
+</div>

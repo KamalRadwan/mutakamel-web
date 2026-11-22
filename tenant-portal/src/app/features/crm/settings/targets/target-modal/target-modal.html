@@ -1,0 +1,611 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerTarget"
+  tile="bg-icon-red"
+  [title]="(isEdit() ? 'targets.form.editTitle' : 'targets.form.createTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (editingTarget(); as target) {
+    <ui-badge modal-header-end [tone]="stateTone(target.approvalState)">
+      {{ 'targets.states.' + target.approvalState | transloco }}
+    </ui-badge>
+  }
+
+  <form class="grid grid-cols-3 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); save()">
+    <div class="col-span-1">
+      @if (isEdit()) {
+        <ui-field
+          [label]="'targets.form.subjectType' | transloco"
+          [for]="uid + '-subject-type'"
+          [hint]="'targets.form.subjectTypeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-subject-type'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="editSubjectTypeLabel()"
+            [readOnly]="true"
+            [attr.aria-readonly]="'true'"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [label]="'targets.form.subjectType' | transloco"
+          [for]="uid + '-subject-type'"
+          [hint]="'targets.form.subjectTypeHint' | transloco"
+          [required]="true"
+        >
+          <ui-dropdown
+            [id]="uid + '-subject-type'"
+            size="field"
+            class="w-full"
+            [label]="'targets.form.subjectType' | transloco"
+            [options]="subjectTypeOptions()"
+            [value]="subjectType()"
+            [describedBy]="uid + '-subject-type-hint'"
+            (valueChange)="onSubjectTypeChange($event)"
+          />
+        </ui-field>
+      }
+    </div>
+
+    @if (subjectType() === 'TEAM_SET') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'targets.form.teams' | transloco"
+          [for]="uid + '-teams'"
+          [hint]="'targets.form.teamsHint' | transloco"
+          [required]="!isEdit()"
+          [error]="teamsError()"
+        >
+          @if (isEdit()) {
+            <div
+              [id]="uid + '-teams'"
+              class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border border-border-field bg-surface-field px-8 py-2"
+              [attr.aria-describedby]="uid + '-teams-hint'"
+            >
+              @for (chip of selectedTeamChips(); track chip.id) {
+                <span class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                  {{ chip.label }}
+                </span>
+              }
+            </div>
+          } @else {
+            <div
+              #teamsBox
+              class="flex min-h-field w-full cursor-pointer flex-wrap items-center gap-4 rounded-8 border bg-surface-field px-8 py-2 text-12 transition-colors duration-fast"
+              [class]="
+                teamsError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : teamsOpen()
+                    ? 'border-focus-ring ring-3 ring-focus-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+              "
+              (click)="onTeamsBoxClick($event)"
+            >
+              @for (chip of selectedTeamChips(); track chip.id) {
+                <span class="inline-flex h-chip items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                  <span class="truncate">{{ chip.label }}</span>
+                  <button
+                    type="button"
+                    data-remove-team
+                    tabindex="-1"
+                    class="inline-flex cursor-pointer items-center rounded-4 hover:bg-neutral-soft"
+                    [attr.aria-label]="'settings.common.delete' | transloco"
+                    (click)="removeTeam(chip.id, $event)"
+                  >
+                    <ng-icon name="tablerX" size="11" aria-hidden="true" />
+                  </button>
+                </span>
+              }
+
+              <button
+                #teamsTrigger
+                [id]="uid + '-teams'"
+                type="button"
+                class="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-6 bg-transparent text-start text-12 outline-none"
+                aria-haspopup="listbox"
+                [attr.aria-expanded]="teamsOpen()"
+                [attr.aria-label]="'targets.form.teams' | transloco"
+                [attr.aria-invalid]="teamsError() ? 'true' : null"
+                [attr.aria-describedby]="uid + '-teams-hint' + (teamsError() ? ' ' + uid + '-teams-error' : '')"
+                (click)="toggleTeamsMenu()"
+              >
+                <span class="truncate" [class]="selectedTeamChips().length === 0 ? 'text-text-placeholder' : 'sr-only'">
+                  {{
+                    selectedTeamChips().length === 0
+                      ? ('targets.form.selectTeams' | transloco)
+                      : ('targets.form.teamsSelected' | transloco: { count: selectedTeamChips().length })
+                  }}
+                </span>
+                <span class="ms-auto inline-flex shrink-0 text-text-muted">
+                  <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                </span>
+              </button>
+            </div>
+
+            @if (teamsOpen()) {
+              <ul
+                #teamsPanel
+                role="listbox"
+                aria-multiselectable="true"
+                class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+                [class.invisible]="!teamsPlaced()"
+                [style.top.px]="teamsPlace().top"
+                [style.inset-inline-start.px]="teamsPlace().start"
+                [style.min-width.px]="teamsPlace().width"
+                [style.max-height.px]="teamsPlace().maxHeight"
+                [attr.aria-label]="'targets.form.teams' | transloco"
+              >
+                @for (team of teamChoices(); track team.id) {
+                  <li role="option" [attr.aria-selected]="isTeamSelected(team.id)">
+                    <button
+                      type="button"
+                      class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [class]="isTeamSelected(team.id) ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                      (click)="toggleTeam(team.id)"
+                    >
+                      <span class="flex min-w-0 items-center gap-6 truncate">
+                        <span class="truncate">{{ team.label }}</span>
+                        @if (team.branchLabel) {
+                          <span class="text-11 text-text-muted">· {{ team.branchLabel }}</span>
+                        }
+                      </span>
+                      @if (isTeamSelected(team.id)) {
+                        <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                      }
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        </ui-field>
+      </div>
+    } @else if (subjectType() === 'BRANCH') {
+      <div class="col-span-2">
+        @if (isEdit()) {
+          <ui-field
+            [label]="'targets.form.branch' | transloco"
+            [for]="uid + '-branch'"
+            [hint]="'targets.form.branchHint' | transloco"
+          >
+            <input
+              [id]="uid + '-branch'"
+              type="text"
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="editBranchLabel()"
+              [readOnly]="true"
+              [attr.aria-readonly]="'true'"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'targets.form.branch' | transloco"
+            [for]="uid + '-branch'"
+            [hint]="'targets.form.branchHint' | transloco"
+            [required]="true"
+            [error]="subjectError()"
+          >
+            <ui-dropdown
+              [id]="uid + '-branch'"
+              size="field"
+              class="w-full"
+              [label]="'targets.form.branch' | transloco"
+              [options]="branchOptions()"
+              [value]="branchId()"
+              [describedBy]="uid + '-branch-hint' + (subjectError() ? ' ' + uid + '-branch-error' : '')"
+              (valueChange)="onBranchChange($event)"
+            />
+          </ui-field>
+        }
+      </div>
+    } @else {
+      <div class="col-span-1">
+        @if (isEdit()) {
+          <ui-field
+            [label]="'targets.form.branch' | transloco"
+            [for]="uid + '-branch'"
+            [hint]="'targets.form.branchHint' | transloco"
+          >
+            <input
+              [id]="uid + '-branch'"
+              type="text"
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="editBranchLabel()"
+              [readOnly]="true"
+              [attr.aria-readonly]="'true'"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'targets.form.branch' | transloco"
+            [for]="uid + '-branch'"
+            [hint]="'targets.form.branchHint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              [id]="uid + '-branch'"
+              size="field"
+              class="w-full"
+              [label]="'targets.form.branch' | transloco"
+              [options]="branchOptions()"
+              [value]="branchId()"
+              [describedBy]="uid + '-branch-hint'"
+              (valueChange)="onBranchChange($event)"
+            />
+          </ui-field>
+        }
+      </div>
+
+      <div class="col-span-1">
+        @if (isEdit()) {
+          <ui-field
+            [label]="'targets.form.subject' | transloco"
+            [for]="uid + '-subject'"
+            [hint]="'targets.form.subjectHint' | transloco"
+          >
+            <input
+              [id]="uid + '-subject'"
+              type="text"
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="editSubjectLabel()"
+              [readOnly]="true"
+              [attr.aria-readonly]="'true'"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'targets.form.subject' | transloco"
+            [for]="uid + '-subject'"
+            [hint]="'targets.form.subjectHint' | transloco"
+            [required]="true"
+            [error]="subjectError()"
+          >
+            <ui-dropdown
+              [id]="uid + '-subject'"
+              size="field"
+              class="w-full"
+              [label]="'targets.form.subject' | transloco"
+              [options]="subjectOptions()"
+              [value]="subjectId()"
+              [describedBy]="uid + '-subject-hint' + (subjectError() ? ' ' + uid + '-subject-error' : '')"
+              (valueChange)="onSubjectChange($event)"
+            />
+          </ui-field>
+        }
+      </div>
+    }
+
+    <div class="col-span-2">
+      @if (isEdit()) {
+        <ui-field
+          [label]="'targets.form.metric' | transloco"
+          [for]="uid + '-metric'"
+          [hint]="'targets.form.metricHint' | transloco"
+        >
+          <input
+            [id]="uid + '-metric'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="editMetricLabel()"
+            [readOnly]="true"
+            [attr.aria-readonly]="'true'"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [label]="'targets.form.metric' | transloco"
+          [for]="uid + '-metric'"
+          [hint]="'targets.form.metricHint' | transloco"
+          [required]="true"
+          [error]="metricError()"
+        >
+          <ui-dropdown
+            [id]="uid + '-metric'"
+            size="field"
+            class="w-full"
+            [label]="'targets.form.metric' | transloco"
+            [options]="metricOptions()"
+            [value]="metricKey()"
+            [describedBy]="uid + '-metric-hint' + (metricError() ? ' ' + uid + '-metric-error' : '')"
+            (valueChange)="onMetricChange($event)"
+          />
+        </ui-field>
+      }
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'targets.form.measure' | transloco"
+        [for]="uid + '-measure'"
+        [hint]="'targets.form.measureHint' | transloco"
+      >
+        <input
+          [id]="uid + '-measure'"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="measureLabel()"
+          [readOnly]="true"
+          [attr.aria-readonly]="'true'"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      @if (isEdit()) {
+        <ui-field
+          [label]="'targets.form.periodGrain' | transloco"
+          [for]="uid + '-grain'"
+          [hint]="'targets.form.periodGrainHint' | transloco"
+        >
+          <input
+            [id]="uid + '-grain'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="editGrainLabel()"
+            [readOnly]="true"
+            [attr.aria-readonly]="'true'"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [label]="'targets.form.periodGrain' | transloco"
+          [for]="uid + '-grain'"
+          [hint]="'targets.form.periodGrainHint' | transloco"
+          [required]="true"
+        >
+          <ui-dropdown
+            [id]="uid + '-grain'"
+            size="field"
+            class="w-full"
+            [label]="'targets.form.periodGrain' | transloco"
+            [options]="grainOptions()"
+            [value]="periodGrain()"
+            [describedBy]="uid + '-grain-hint'"
+            (valueChange)="onGrainChange($event)"
+          />
+        </ui-field>
+      }
+    </div>
+
+    <div class="col-span-2">
+      @if (isEdit()) {
+        <ui-field
+          [label]="'targets.form.periodStart' | transloco"
+          [for]="uid + '-period'"
+          [hint]="'targets.form.periodStartHint' | transloco"
+        >
+          <input
+            [id]="uid + '-period'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="editPeriodLabel()"
+            [readOnly]="true"
+            [attr.aria-readonly]="'true'"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [label]="'targets.form.periodStart' | transloco"
+          [for]="uid + '-period'"
+          [hint]="'targets.form.periodStartHint' | transloco"
+          [required]="true"
+          [error]="periodError()"
+        >
+          @if (periodGrain() === 'YEAR') {
+            <ui-dropdown
+              [id]="uid + '-period'"
+              size="field"
+              class="w-full"
+              [label]="'targets.form.year' | transloco"
+              [options]="yearOptions()"
+              [value]="periodYear()"
+              [describedBy]="uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')"
+              (valueChange)="onYearChange($event)"
+            />
+          } @else {
+            <div class="grid grid-cols-2 gap-6">
+              <ui-dropdown
+                [id]="uid + '-period'"
+                size="field"
+                class="w-full"
+                [label]="(periodGrain() === 'QUARTER' ? 'targets.form.quarterLabel' : 'targets.form.month') | transloco"
+                [options]="monthOptions()"
+                [value]="periodMonth()"
+                [describedBy]="uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')"
+                (valueChange)="onMonthChange($event)"
+              />
+              <ui-dropdown
+                [id]="uid + '-period-year'"
+                size="field"
+                class="w-full"
+                [label]="'targets.form.year' | transloco"
+                [options]="yearOptions()"
+                [value]="periodYear()"
+                [describedBy]="uid + '-period-hint' + (periodError() ? ' ' + uid + '-period-error' : '')"
+                (valueChange)="onYearChange($event)"
+              />
+            </div>
+          }
+        </ui-field>
+      }
+    </div>
+
+    @if (activeMeasureKind() === 'MONEY') {
+      <div class="col-span-1">
+        @if (isEdit()) {
+          <ui-field
+            [label]="'targets.form.currency' | transloco"
+            [for]="uid + '-currency'"
+            [hint]="'targets.form.currencyHint' | transloco"
+          >
+            <input
+              [id]="uid + '-currency'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="currencyCode()"
+              [readOnly]="true"
+              [attr.aria-readonly]="'true'"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [label]="'targets.form.currency' | transloco"
+            [for]="uid + '-currency'"
+            [hint]="'targets.form.currencyHint' | transloco"
+            [required]="true"
+            [error]="currencyError()"
+          >
+            <ui-dropdown
+              [id]="uid + '-currency'"
+              size="field"
+              class="w-full"
+              [label]="'targets.form.currency' | transloco"
+              [options]="currencyOptions()"
+              [value]="currencyCode()"
+              [describedBy]="uid + '-currency-hint' + (currencyError() ? ' ' + uid + '-currency-error' : '')"
+              (valueChange)="onCurrencyChange($event)"
+            />
+          </ui-field>
+        }
+      </div>
+    }
+
+    <div [class]="activeMeasureKind() === 'MONEY' ? 'col-span-2' : 'col-span-3'">
+      <ui-field
+        [label]="'targets.form.targetValue' | transloco"
+        [for]="uid + '-value'"
+        [hint]="targetValueHint()"
+        [required]="canEditValue()"
+        [error]="valueError()"
+      >
+        @if (activeMeasureKind() === 'MONEY') {
+          <span dir="ltr" class="shrink-0 text-12 font-medium tabular-nums text-text-muted">
+            {{ currencyCode() }}
+          </span>
+        }
+        <input
+          [id]="uid + '-value'"
+          type="text"
+          inputmode="decimal"
+          dir="ltr"
+          class="w-full min-w-0 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'targets.form.targetValuePlaceholder' | transloco"
+          [value]="valueInput()"
+          [readOnly]="!canEditValue()"
+          [attr.aria-readonly]="!canEditValue() ? 'true' : null"
+          [attr.aria-invalid]="valueError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-value-hint' + (valueError() ? ' ' + uid + '-value-error' : '')"
+          (input)="onValueInput($event)"
+          (blur)="onValueBlur()"
+        />
+        @if (activeMeasureKind() === 'RATE') {
+          <span class="shrink-0 text-12 font-medium text-text-muted">%</span>
+        }
+      </ui-field>
+    </div>
+
+    @if (isEdit() && editingTarget()?.reviewNote; as note) {
+      <div class="col-span-3">
+        <ui-field
+          [label]="'targets.form.reviewNote' | transloco"
+          [for]="uid + '-review-note'"
+          [hint]="'targets.form.reviewNoteHint' | transloco"
+        >
+          <input
+            [id]="uid + '-review-note'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="note"
+            [readOnly]="true"
+            [attr.aria-readonly]="'true'"
+          />
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canEditValue()) {
+      <button
+        type="button"
+        uiButton
+        [loading]="saving()"
+        [disabled]="isEdit() ? !dirty() : false"
+        (click)="save()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+    }
+
+    @if (isEdit() && canEditValue() && dirty()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="undo()"
+      >
+        {{ 'settings.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ (canEditValue() ? 'settings.common.cancel' : 'settings.common.close') | transloco }}
+    </button>
+
+    @if (isEdit() && canManage() && editingTarget(); as target) {
+      @if (target.approvalState !== 'SUBMITTED') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [disabled]="saving()"
+          (click)="deleteRequested.emit(target)"
+        >
+          {{ 'settings.common.delete' | transloco }}
+        </button>
+      }
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'targets.discard.title' | transloco"
+  [text]="'targets.discard.text' | transloco"
+  [saveLabel]="'targets.discard.save' | transloco"
+  [discardLabel]="'targets.discard.discard' | transloco"
+  [cancelLabel]="'targets.discard.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'analytics.common.conflictTitle' | transloco"
+  [text]="'analytics.common.conflictText' | transloco"
+  [confirmLabel]="'analytics.common.reload' | transloco"
+  [cancelLabel]="'analytics.common.keepMine' | transloco"
+/>

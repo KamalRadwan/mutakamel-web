@@ -1,0 +1,415 @@
+<div class="rounded-10 bg-brand-soft" [class.pb-4]="frameError()">
+  <div class="flex h-bulk-bar flex-nowrap items-center gap-8 overflow-x-auto px-10 no-scrollbar">
+    @if (singleNode(); as node) {
+      @let visual = singleVisual();
+      <!-- Object tile and name -->
+      <div class="flex min-w-0 items-center gap-8">
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="visual.tile"
+        >
+          <ng-icon [name]="visual.icon" size="14" aria-hidden="true" />
+        </span>
+        <span class="max-w-tpl-node-name truncate text-12 leading-18 font-medium text-on-brand-soft" [title]="singleName()">
+          {{ singleName() }}
+        </span>
+      </div>
+
+      @if (state.readOnly()) {
+        <span class="flex-1"></span>
+        <button type="button" uiButton variant="secondary" size="small" (click)="openProperties(node.id)">
+          <ng-icon name="tablerAdjustmentsHorizontal" size="14" aria-hidden="true" />
+          {{ 'tplTools.bar.properties' | transloco }}
+        </button>
+      } @else {
+        @if (node.layout.kind === 'ABSOLUTE') {
+          <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+          <div
+            class="flex shrink-0 flex-nowrap items-center gap-8"
+            role="group"
+            [attr.aria-label]="'tplTools.bar.position' | transloco"
+          >
+              <!-- X -->
+              <ui-field
+                size="bare"
+                class="shrink-0 items-center gap-4"
+                [style.display]="'flex'"
+                [for]="uid + '-x'"
+                [label]="'tplTools.bar.x' | transloco"
+                [hint]="'tplTools.bar.xHint' | transloco"
+              >
+              <div
+                dir="ltr"
+                class="inline-flex h-field-h-compact w-tpl-frame-field shrink-0 items-center gap-3 rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  invalidField() === 'x'
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-x'"
+                  type="text"
+                  inputmode="decimal"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
+                  [readOnly]="node.locked"
+                  [attr.aria-invalid]="invalidField() === 'x' ? 'true' : null"
+                  [attr.aria-errormessage]="invalidField() === 'x' ? uid + '-frame-error' : null"
+                  [value]="draftX()"
+                  (input)="onFrameInput('x', $event)"
+                  (keydown.enter)="commitFrame('x', $event)"
+                  (keydown.escape)="revertFrame('x', $event)"
+                  (blur)="commitFrame('x')"
+                />
+                <span class="shrink-0 text-11 text-text-muted">{{ 'tplTools.bar.mm' | transloco }}</span>
+              </div>
+              </ui-field>
+
+              <!-- Y -->
+              <ui-field
+                size="bare"
+                class="shrink-0 items-center gap-4"
+                [style.display]="'flex'"
+                [for]="uid + '-y'"
+                [label]="'tplTools.bar.y' | transloco"
+                [hint]="'tplTools.bar.yHint' | transloco"
+              >
+              <div
+                dir="ltr"
+                class="inline-flex h-field-h-compact w-tpl-frame-field shrink-0 items-center gap-3 rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  invalidField() === 'y'
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-y'"
+                  type="text"
+                  inputmode="decimal"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
+                  [readOnly]="node.locked"
+                  [attr.aria-invalid]="invalidField() === 'y' ? 'true' : null"
+                  [attr.aria-errormessage]="invalidField() === 'y' ? uid + '-frame-error' : null"
+                  [value]="draftY()"
+                  (input)="onFrameInput('y', $event)"
+                  (keydown.enter)="commitFrame('y', $event)"
+                  (keydown.escape)="revertFrame('y', $event)"
+                  (blur)="commitFrame('y')"
+                />
+                <span class="shrink-0 text-11 text-text-muted">{{ 'tplTools.bar.mm' | transloco }}</span>
+              </div>
+              </ui-field>
+
+              <!-- W -->
+              <ui-field
+                size="bare"
+                class="shrink-0 items-center gap-4"
+                [style.display]="'flex'"
+                [for]="uid + '-w'"
+                [label]="'tplTools.bar.w' | transloco"
+                [hint]="'tplTools.bar.wHint' | transloco"
+              >
+              <div
+                dir="ltr"
+                class="inline-flex h-field-h-compact w-tpl-frame-field shrink-0 items-center gap-3 rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  invalidField() === 'width'
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-w'"
+                  type="text"
+                  inputmode="decimal"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
+                  [readOnly]="node.locked"
+                  [attr.aria-invalid]="invalidField() === 'width' ? 'true' : null"
+                  [attr.aria-errormessage]="invalidField() === 'width' ? uid + '-frame-error' : null"
+                  [value]="draftW()"
+                  (input)="onFrameInput('width', $event)"
+                  (keydown.enter)="commitFrame('width', $event)"
+                  (keydown.escape)="revertFrame('width', $event)"
+                  (blur)="commitFrame('width')"
+                />
+                <span class="shrink-0 text-11 text-text-muted">{{ 'tplTools.bar.mm' | transloco }}</span>
+              </div>
+              </ui-field>
+
+              <!-- H -->
+              <ui-field
+                size="bare"
+                class="shrink-0 items-center gap-4"
+                [style.display]="'flex'"
+                [for]="uid + '-h'"
+                [label]="'tplTools.bar.h' | transloco"
+                [hint]="'tplTools.bar.hHint' | transloco"
+              >
+              <div
+                dir="ltr"
+                class="inline-flex h-field-h-compact w-tpl-frame-field shrink-0 items-center gap-3 rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  invalidField() === 'height'
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-h'"
+                  type="text"
+                  inputmode="decimal"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
+                  [readOnly]="node.locked"
+                  [attr.aria-invalid]="invalidField() === 'height' ? 'true' : null"
+                  [attr.aria-errormessage]="invalidField() === 'height' ? uid + '-frame-error' : null"
+                  [value]="draftH()"
+                  (input)="onFrameInput('height', $event)"
+                  (keydown.enter)="commitFrame('height', $event)"
+                  (keydown.escape)="revertFrame('height', $event)"
+                  (blur)="commitFrame('height')"
+                />
+                <span class="shrink-0 text-11 text-text-muted">{{ 'tplTools.bar.mm' | transloco }}</span>
+              </div>
+              </ui-field>
+
+              <!-- Rotation -->
+              <ui-field
+                size="bare"
+                class="shrink-0 items-center gap-4"
+                [style.display]="'flex'"
+                [for]="uid + '-rotation'"
+                [label]="'tplTools.bar.rotation' | transloco"
+                [hint]="'tplTools.bar.rotationHint' | transloco"
+              >
+              <div
+                dir="ltr"
+                class="inline-flex h-field-h-compact w-tpl-rot-field shrink-0 items-center gap-3 rounded-8 border bg-surface-field px-6 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  invalidField() === 'rotationDeg'
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-rotation'"
+                  type="text"
+                  inputmode="numeric"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 font-medium tabular-nums text-text outline-none read-only:text-text-muted"
+                  [readOnly]="node.locked"
+                  [attr.aria-invalid]="invalidField() === 'rotationDeg' ? 'true' : null"
+                  [attr.aria-errormessage]="invalidField() === 'rotationDeg' ? uid + '-frame-error' : null"
+                  [value]="draftRot()"
+                  (input)="onFrameInput('rotationDeg', $event)"
+                  (keydown.enter)="commitFrame('rotationDeg', $event)"
+                  (keydown.escape)="revertFrame('rotationDeg', $event)"
+                  (blur)="commitFrame('rotationDeg')"
+                />
+                <span class="shrink-0 text-11 text-text-muted">°</span>
+              </div>
+              </ui-field>
+          </div>
+
+          <!-- Lock toggle -->
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              node.locked
+                ? 'border-border-field bg-surface text-accent'
+                : 'border-transparent text-text-muted hover:bg-surface hover:text-text'
+            "
+            [attr.aria-pressed]="node.locked"
+            [attr.aria-label]="'tplTools.bar.lock' | transloco"
+            [title]="'tplTools.bar.lock' | transloco"
+            (click)="toggleLock(node)"
+          >
+            <ng-icon [name]="node.locked ? 'tablerLock' : 'tablerLockOpen'" size="14" aria-hidden="true" />
+          </button>
+        } @else {
+          <!-- FLOW node move up/down -->
+          <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+          @let flowState = flowSiblingsState();
+          <div class="flex items-center gap-4">
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="!flowState.canUp"
+              [attr.aria-label]="'tplTools.bar.moveUp' | transloco"
+              [title]="'tplTools.bar.moveUp' | transloco"
+              (click)="moveFlow(node, -1)"
+            >
+              <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="!flowState.canDown"
+              [attr.aria-label]="'tplTools.bar.moveDown' | transloco"
+              [title]="'tplTools.bar.moveDown' | transloco"
+              (click)="moveFlow(node, 1)"
+            >
+              <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+            </button>
+          </div>
+        }
+
+        <span class="flex-1"></span>
+
+        <!-- Type-specific action + Properties + Visibility + Duplicate + Delete -->
+        <div class="flex shrink-0 flex-nowrap items-center gap-6">
+          @if (typeAction(); as action) {
+            <button type="button" uiButton variant="secondary" size="small" (click)="runTypeAction(node.id, action.kind)">
+              <ng-icon [name]="action.icon" size="14" aria-hidden="true" />
+              {{ action.labelKey | transloco }}
+            </button>
+          }
+
+          <button type="button" uiButton variant="secondary" size="small" (click)="openProperties(node.id)">
+            <ng-icon name="tablerAdjustmentsHorizontal" size="14" aria-hidden="true" />
+            {{ 'tplTools.bar.properties' | transloco }}
+          </button>
+
+          <button type="button" uiButton variant="secondary" size="small" (click)="openVisibility(node.id)">
+            <ng-icon name="tablerEyeOff" size="14" aria-hidden="true" />
+            {{ 'tplTools.bar.visibility' | transloco }}
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+            [disabled]="node.locked || state.readOnly()"
+            [attr.aria-label]="'tplTools.bar.duplicate' | transloco"
+            [title]="'tplTools.bar.duplicate' | transloco"
+            (click)="duplicateSelected()"
+          >
+            <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+            [disabled]="node.locked || state.readOnly()"
+            [attr.aria-label]="'tplTools.bar.delete' | transloco"
+            [title]="'tplTools.bar.delete' | transloco"
+            (click)="removeSelected()"
+          >
+            <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+          </button>
+        </div>
+      }
+    } @else if (selectedNodes().length > 1) {
+      <!-- Multiple selection -->
+      <div class="flex shrink-0 items-center gap-8">
+        <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+          <ng-icon name="tablerStack2" size="14" aria-hidden="true" />
+        </span>
+        <span class="text-12 leading-18 font-medium whitespace-nowrap text-on-brand-soft">
+          {{ 'tplTools.bar.many' | transloco: { n: selectedNodes().length } }}
+        </span>
+      </div>
+
+      @if (!state.readOnly()) {
+        @if (hasAbsoluteInMulti()) {
+          <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+          @let alignDisabled = !hasUnlockedAbsoluteInMulti();
+          <div class="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="alignDisabled"
+              [attr.aria-label]="'tplTools.align.start' | transloco"
+              [title]="'tplTools.align.start' | transloco"
+              (click)="alignSelected('START')"
+            >
+              <ng-icon name="tablerLayoutAlignLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="alignDisabled"
+              [attr.aria-label]="'tplTools.align.centerH' | transloco"
+              [title]="'tplTools.align.centerH' | transloco"
+              (click)="alignSelected('CENTER_H')"
+            >
+              <ng-icon name="tablerLayoutAlignCenter" size="14" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="alignDisabled"
+              [attr.aria-label]="'tplTools.align.end' | transloco"
+              [title]="'tplTools.align.end' | transloco"
+              (click)="alignSelected('END')"
+            >
+              <ng-icon name="tablerLayoutAlignRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="alignDisabled"
+              [attr.aria-label]="'tplTools.align.top' | transloco"
+              [title]="'tplTools.align.top' | transloco"
+              (click)="alignSelected('TOP')"
+            >
+              <ng-icon name="tablerLayoutAlignTop" size="14" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="alignDisabled"
+              [attr.aria-label]="'tplTools.align.centerV' | transloco"
+              [title]="'tplTools.align.centerV' | transloco"
+              (click)="alignSelected('CENTER_V')"
+            >
+              <ng-icon name="tablerLayoutAlignMiddle" size="14" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+              [disabled]="alignDisabled"
+              [attr.aria-label]="'tplTools.align.bottom' | transloco"
+              [title]="'tplTools.align.bottom' | transloco"
+              (click)="alignSelected('BOTTOM')"
+            >
+              <ng-icon name="tablerLayoutAlignBottom" size="14" aria-hidden="true" />
+            </button>
+          </div>
+        }
+
+        <span class="flex-1"></span>
+
+        <div class="flex shrink-0 items-center gap-6">
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text outline-none transition-colors duration-fast hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+            [disabled]="allSelectedLocked()"
+            [attr.aria-label]="'tplTools.bar.duplicate' | transloco"
+            [title]="'tplTools.bar.duplicate' | transloco"
+            (click)="duplicateSelected()"
+          >
+            <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+            [disabled]="allSelectedLocked()"
+            [attr.aria-label]="'tplTools.bar.delete' | transloco"
+            [title]="'tplTools.bar.delete' | transloco"
+            (click)="removeSelected()"
+          >
+            <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+          </button>
+        </div>
+      }
+    }
+  </div>
+  @if (frameError(); as err) {
+    <p [id]="uid + '-frame-error'" role="alert" class="mt-2 flex items-center gap-3 px-10 text-11 leading-16 text-danger-text">
+      <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+      <span>{{ err }}</span>
+    </p>
+  }
+</div>

@@ -1,0 +1,310 @@
+<ui-modal
+  size="wide"
+  icon="tablerShare"
+  tile="bg-icon-blue"
+  [title]="'tradeDashboardModals.share.title' | transloco"
+  [subtitle]="dashboardName()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!submitting() && !revokingId()"
+  [preventDismiss]="pendingRows().length > 0 && !submitting() && !revokingId()"
+  (dismiss)="onAttemptDismiss()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-12">
+    <section class="flex flex-col gap-8">
+      <ui-section-bar
+        tone="blue"
+        icon="tablerPlus"
+        [title]="'tradeDashboardModals.share.addSection' | transloco"
+        [headingLevel]="3"
+      />
+
+      <ui-field
+        [for]="uid + '-find'"
+        [label]="'tradeDashboardModals.share.findLabel' | transloco"
+        [hint]="'tradeDashboardModals.share.findHint' | transloco"
+      >
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          #findInput
+          [id]="uid + '-find'"
+          type="search"
+          autocomplete="off"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tradeDashboardModals.share.findPlaceholder' | transloco"
+          [value]="searchText()"
+          [disabled]="submitting()"
+          (input)="onSearchInput(findInput.value)"
+        />
+        @if (searchText()) {
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'tradeDashboardModals.share.clearSearch' | transloco"
+            [title]="'tradeDashboardModals.share.clearSearch' | transloco"
+            (click)="clearSearch()"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        }
+      </ui-field>
+
+      <div class="flex max-h-time-list-max flex-col gap-6 overflow-y-auto p-2 scrollbar-thin">
+        @if (loadingTargets()) {
+          <div class="px-8 py-6 text-12 leading-18 text-text-muted">
+            {{ 'tradeDashboardModals.share.searching' | transloco }}
+          </div>
+        } @else if (targets().length === 0) {
+          <div class="px-8 py-6 text-12 leading-18 text-text-muted">
+            {{ 'tradeDashboardModals.share.noTargets' | transloco }}
+          </div>
+        } @else {
+          @for (target of targets(); track target.subjectType + ':' + target.subjectId) {
+            @let added = isPending(target);
+            <div class="flex min-h-table-row shrink-0 items-center gap-8 rounded-10 border border-border bg-surface px-10 py-6 shadow-card">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="target.subjectType === 'TEAM' ? 'bg-icon-teal' : 'bg-icon-blue'"
+                aria-hidden="true"
+              >
+                <ng-icon [name]="target.subjectType === 'TEAM' ? 'tablerUsersGroup' : 'tablerUser'" size="14" />
+              </span>
+              <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text" dir="auto">
+                {{ targetName(target) }}
+              </span>
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [disabled]="added || submitting()"
+                (click)="addTarget(target)"
+              >
+                {{ (added ? 'tradeDashboardModals.share.added' : 'tradeDashboardModals.share.add') | transloco }}
+              </button>
+            </div>
+          }
+        }
+      </div>
+
+      @if (pendingRows().length > 0) {
+        <div class="flex flex-col gap-8">
+          @for (row of pendingRows(); track row.key) {
+            <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+              <div class="flex items-center gap-8">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="row.subjectType === 'TEAM' ? 'bg-icon-teal' : 'bg-icon-blue'"
+                  aria-hidden="true"
+                >
+                  <ng-icon [name]="row.subjectType === 'TEAM' ? 'tablerUsersGroup' : 'tablerUser'" size="14" />
+                </span>
+                <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text" dir="auto">
+                  {{ row.name }}
+                </span>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'tradeDashboardModals.share.removePending' | transloco: { name: row.name }"
+                  [disabled]="submitting()"
+                  (click)="removePending(row.key)"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div class="flex flex-wrap items-start gap-8">
+                <ui-field
+                  class="shrink-0"
+                  [for]="accessFieldId(row)"
+                  [bare]="true"
+                  [label]="'tradeDashboardModals.share.access' | transloco"
+                  [hint]="'tradeDashboardModals.share.accessHint' | transloco"
+                >
+                  <ui-segmented
+                    [id]="accessFieldId(row)"
+                    [describedBy]="accessFieldId(row) + '-hint'"
+                    [label]="'tradeDashboardModals.share.access' | transloco"
+                    [options]="accessOptions()"
+                    [value]="row.accessLevel"
+                    (valueChange)="onRowAccessChange(row.key, $event)"
+                  />
+                </ui-field>
+
+                <ui-field
+                  class="min-w-0 flex-1"
+                  [for]="expiresFieldId(row)"
+                  [bare]="true"
+                  [label]="'tradeDashboardModals.share.expiresOn' | transloco"
+                  [hint]="'tradeDashboardModals.share.expiresOnHint' | transloco"
+                  [error]="row.expiryError"
+                >
+                  <div class="flex items-center gap-4">
+                    <ui-date-field
+                      class="min-w-0 flex-1"
+                      [id]="expiresFieldId(row)"
+                      [describedBy]="expiresDescribedBy(row)"
+                      [min]="tomorrowIso()"
+                      [ariaLabel]="'tradeDashboardModals.share.expiresOn' | transloco"
+                      [placeholder]="'tradeDashboardModals.noEnd' | transloco"
+                      [todayLabel]="'tradeDashboardModals.share.today' | transloco"
+                      [prevMonthLabel]="'tradeDashboardModals.share.prevMonth' | transloco"
+                      [nextMonthLabel]="'tradeDashboardModals.share.nextMonth' | transloco"
+                      [invalid]="!!row.expiryError"
+                      [disabled]="submitting()"
+                      [value]="row.expiresOn"
+                      (valueChange)="onRowExpiryChange(row.key, $event)"
+                    />
+                    @if (row.expiresOn) {
+                      <button
+                        type="button"
+                        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [attr.aria-label]="'tradeDashboardModals.share.clearExpiry' | transloco"
+                        [title]="'tradeDashboardModals.share.clearExpiry' | transloco"
+                        [disabled]="submitting()"
+                        (click)="clearRowExpiry(row.key)"
+                      >
+                        <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                      </button>
+                    }
+                  </div>
+                </ui-field>
+              </div>
+            </div>
+          }
+
+          <div class="flex justify-end">
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [loading]="submitting()"
+              [disabled]="submitting()"
+              (click)="submitShares()"
+            >
+              {{ 'tradeDashboardModals.share.shareAction' | transloco }}
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+
+    <section class="flex flex-col gap-8">
+      <ui-section-bar
+        tone="navy"
+        icon="tablerUsers"
+        [title]="'tradeDashboardModals.share.sharedWithSection' | transloco"
+        [headingLevel]="3"
+      />
+
+      @if (loadingShares()) {
+        <div class="flex flex-col gap-6" [attr.aria-busy]="true">
+          <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+          <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+          <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+          <span class="sr-only" role="status">{{ 'tradeDashboardModals.share.loadingShares' | transloco }}</span>
+        </div>
+      } @else if (sharesLoadFailed()) {
+        <div class="flex flex-col items-center justify-center gap-8 py-8 text-center">
+          <p class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.loadFailed' | transloco }}</p>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retryShares()">
+            {{ 'tradeShared.common.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (shares().length === 0) {
+        <div class="px-8 py-8 text-center text-12 leading-18 text-text-muted">
+          {{ 'tradeDashboardModals.share.empty' | transloco }}
+        </div>
+      } @else {
+        <div class="flex flex-col gap-6">
+          @for (share of shares(); track share.id) {
+            @let expired = share.status === 'EXPIRED';
+            <div
+              class="flex min-h-table-row flex-wrap items-center gap-8 rounded-10 border border-border px-10 py-6"
+              [class]="expired ? 'bg-surface-muted text-text-muted' : 'bg-surface text-text shadow-card'"
+            >
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="share.subjectType === 'TEAM' ? 'bg-icon-teal' : 'bg-icon-blue'"
+                aria-hidden="true"
+              >
+                <ng-icon [name]="share.subjectType === 'TEAM' ? 'tablerUsersGroup' : 'tablerUser'" size="14" />
+              </span>
+
+              <span
+                class="min-w-0 flex-1 truncate text-12 leading-18 font-medium"
+                [class]="expired ? 'text-text-muted' : 'text-text'"
+                dir="auto"
+              >
+                {{ share.subjectName }}
+              </span>
+
+              <ui-badge [tone]="share.accessLevel === 'EDIT' ? 'brand' : 'tag'">
+                {{ 'tradeDashboardModals.access.' + share.accessLevel | transloco }}
+              </ui-badge>
+
+              @if (share.expiresAt; as expiry) {
+                <span class="shrink-0 text-12 leading-18 text-text-muted">
+                  <bdi dir="ltr">{{ formatExpiry(expiry) }}</bdi>
+                </span>
+              } @else {
+                <span class="shrink-0 text-12 leading-18 text-text-muted">
+                  {{ 'tradeDashboardModals.noEnd' | transloco }}
+                </span>
+              }
+
+              @if (expired) {
+                <ui-badge tone="none">
+                  {{ 'tradeDashboardModals.expired' | transloco }}
+                </ui-badge>
+              }
+
+              <button
+                type="button"
+                class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 px-8 text-11 font-medium whitespace-nowrap text-danger-text outline-none transition-colors duration-fast hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                [disabled]="revokingId() === share.id || submitting()"
+                (click)="revokeRow(share)"
+              >
+                {{ 'tradeDashboardModals.share.revoke' | transloco }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'tradeDashboardModals.share.widgetNote' | transloco }}
+    </p>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting() || !!revokingId()"
+      (click)="requestClose()"
+    >
+      {{ 'tradeShared.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="danger"
+  [title]="'tradeDashboardModals.share.revokeTitle' | transloco"
+  [text]="'tradeDashboardModals.share.revokeText' | transloco: { name: revokingTarget()?.subjectName ?? '' }"
+  [confirmLabel]="'tradeDashboardModals.share.revoke' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  class="contents"
+  [title]="'tradeDashboardModals.share.unsavedTitle' | transloco"
+  [text]="'tradeDashboardModals.share.unsavedText' | transloco"
+  [saveLabel]="'tradeDashboardModals.share.shareAction' | transloco"
+  [discardLabel]="'tradeDashboardModals.share.discard' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

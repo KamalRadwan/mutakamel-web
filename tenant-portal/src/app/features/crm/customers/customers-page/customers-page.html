@@ -1,0 +1,179 @@
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canCreate()) {
+    <button type="button" uiButton class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'customers.new' | transloco }}
+    </button>
+  }
+
+  @if (current() === 'table' && canUseBulk() && selection.count() > 0) {
+    <app-customer-bulk-menu [capabilities]="capabilities()" (action)="onBulkAction($event)" />
+  }
+
+  <div
+    class="min-w-0 flex-1"
+    [attr.title]="store.draftDirty() ? ('customers.toolbar.lockedByDraft' | transloco) : null"
+  >
+    <fieldset
+      class="min-w-0"
+      [disabled]="store.draftDirty()"
+      [attr.inert]="store.draftDirty() ? '' : null"
+    >
+      <ui-facet-search
+        [fields]="fields()"
+        [presets]="presets()"
+        [placeholder]="'customers.toolbar.search' | transloco"
+        [facets]="store.facets()"
+        (facetsChange)="setFacets($event)"
+        (chipClick)="onFacetChipClick($event)"
+      />
+    </fieldset>
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="advancedOpen() ? 'bg-brand-soft text-on-brand-soft' : 'text-text-muted hover:bg-neutral-soft hover:text-text'"
+    [attr.aria-pressed]="advancedOpen()"
+    [attr.aria-expanded]="advancedOpen()"
+    aria-controls="customers-advanced-search"
+    [attr.aria-label]="'customers.toolbar.advancedSearch' | transloco"
+    [title]="'customers.toolbar.advancedSearch' | transloco"
+    (click)="toggleAdvanced()"
+  >
+    <ng-icon name="tablerAdjustmentsHorizontal" size="15" aria-hidden="true" />
+  </button>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-view-switcher
+    [options]="views()"
+    [label]="'customers.toolbar.viewSwitcher' | transloco"
+    [value]="current()"
+    (valueChange)="show($event)"
+  />
+</div>
+
+@if (current() === 'table' && canUseBulk() && selection.count() > 0) {
+  <app-customer-selection-bar
+    [body]="effectiveBody()"
+    [sort]="sort()"
+    [pageRows]="tablePageRows()"
+    [total]="tableTotal()"
+    [visibleIds]="tableVisibleIds()"
+  />
+}
+
+@if (advancedVisible()) {
+  <ui-query-builder
+    panelId="customers-advanced-search"
+    [fields]="store.fields()"
+    [applied]="store.applied()"
+    [title]="'customers.toolbar.advancedSearch' | transloco"
+    [(expanded)]="advancedOpen"
+    (apply)="applyAdvanced($event)"
+    (clear)="clearAdvanced()"
+    (dirtyChange)="store.draftDirty.set($event)"
+  />
+}
+
+@if (current() !== 'board') {
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="statusSteps()"
+    [label]="'customers.statusFilter.label' | transloco"
+    [hint]="'customers.statusFilter.hint' | transloco"
+    [value]="status()"
+    (valueChange)="filterStatus($event)"
+  />
+}
+
+@switch (current()) {
+  @case ('board') {
+    <app-customer-board
+      [body]="store.body()"
+      [ready]="ready()"
+      [hasFilter]="hasSearch()"
+      [capabilities]="capabilities()"
+      (create)="openCreate($event)"
+      (view)="openCustomer($event)"
+      (activities)="openActivities($event)"
+      (clearSearch)="clearAllFilters()"
+      (countsLoaded)="onCountsLoaded($event)"
+    />
+  }
+  @case ('cards') {
+    <app-customer-cards
+      [body]="store.body()"
+      [ready]="ready()"
+      [status]="status()"
+      [hasFilter]="hasListFilter()"
+      [capabilities]="capabilities()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+      (view)="openCustomer($event)"
+      (activities)="openActivities($event)"
+      (create)="openCreate()"
+      (clearSearch)="clearAllFilters()"
+      (countsLoaded)="onCountsLoaded($event)"
+    />
+  }
+  @case ('table') {
+    <app-customer-table
+      [body]="store.body()"
+      [ready]="ready()"
+      [status]="status()"
+      [hasFilter]="hasListFilter()"
+      [capabilities]="capabilities()"
+      [selectionEnabled]="canUseBulk()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      [sort]="sort()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+      (sortChange)="setSort($event)"
+      (view)="openCustomer($event)"
+      (activities)="openActivities($event)"
+      (create)="openCreate()"
+      (clearSearch)="clearAllFilters()"
+      (countsLoaded)="onCountsLoaded($event)"
+    />
+  }
+}
+
+<app-customer-modal
+  class="absolute"
+  (saved)="onCustomerSaved($event)"
+  (changed)="onCustomerChanged($event)"
+  (deleted)="onCustomerDeleted($event)"
+  (openIdChange)="onModalOpenIdChange($event)"
+/>
+
+<app-record-activities class="absolute" (changed)="refreshActiveView()" />
+
+<app-customer-bulk-assign-modal
+  class="absolute"
+  [branchId]="branchId() ?? ''"
+  [capabilities]="capabilities()"
+  (submitted)="onBulkSubmitted()"
+/>
+<app-customer-bulk-status-modal
+  class="absolute"
+  [branchId]="branchId() ?? ''"
+  (submitted)="onBulkSubmitted()"
+/>
+<app-customer-bulk-activity-modal
+  class="absolute"
+  [branchId]="branchId() ?? ''"
+  [capabilities]="capabilities()"
+  (submitted)="onBulkSubmitted()"
+/>
+<app-customer-bulk-delete-modal
+  class="absolute"
+  [branchId]="branchId() ?? ''"
+  (submitted)="onBulkSubmitted()"
+/>

@@ -1,0 +1,113 @@
+{
+  "company": {
+    "label": "الشركة",
+    "hint": "يُضبط التفعيل لكل شركة على حدة.",
+    "placeholder": "اختر شركة"
+  },
+  "cols": {
+    "application": "التطبيق",
+    "status": "الحالة",
+    "activation": "التفعيل",
+    "activationHint": "يفعّل التطبيق أو يعطّله للشركة المحددة.",
+    "actions": "الإجراءات"
+  },
+  "status": {
+    "notCreated": "غير مهيّأ",
+    "on": "مفعّل",
+    "off": "معطّل",
+    "applying": "جارٍ التطبيق…",
+    "checkedBranches": "تم فحص {{n}} فرعًا",
+    "checkedBranchesPlural": {
+      "zero": "لم يُفحص أي فرع",
+      "one": "تم فحص فرع واحد",
+      "two": "تم فحص فرعين",
+      "few": "تم فحص {{n}} فروع",
+      "many": "تم فحص {{n}} فرعًا",
+      "other": "تم فحص {{n}} فرع"
+    }
+  },
+  "actions": {
+    "branches": "الفروع"
+  },
+  "reasons": {
+    "turnOnParentFirst": "فعّل {{app}} أولًا.",
+    "readOnly": "يمكنك عرض حالة التفعيل فقط."
+  },
+  "footerNote": "يُبقي إيقاف التطبيق مشترياته ومقاعده وسجله محفوظة.",
+  "states": {
+    "emptyTitle": "لم تُشترَ أي تطبيقات لمساحة العمل هذه بعد.",
+    "forbiddenTitle": "الوصول مقيّد",
+    "forbiddenText": "تحتاج إلى صلاحية عرض تفعيل التطبيقات لهذه الشركة.",
+    "loadFailed": "تعذّر تحميل حالة تفعيل التطبيقات.",
+    "supportRef": "مرجع الدعم",
+    "retry": "حاول مرة أخرى"
+  },
+  "reasonModal": {
+    "turnOnTitle": "تفعيل {{name}} لشركة {{company}}؟",
+    "turnOffTitle": "إيقاف {{name}} لشركة {{company}}؟",
+    "turnOnConfirm": "تفعيل",
+    "turnOffConfirm": "إيقاف",
+    "reasonLabel": "السبب",
+    "reasonHint": "يُحفظ في سجل التدقيق.",
+    "reasonPlaceholder": "اذكر سبب إجراء هذا التغيير"
+  },
+  "validation": {
+    "reasonRequired": "السبب مطلوب.",
+    "reasonMin": "أدخل {{min}} أحرف على الأقل.",
+    "reasonMax": "أدخل {{max}} حرفًا بحد أقصى.",
+    "reasonNoControlChars": "لا يُسمح بمحارف التحكّم."
+  },
+  "branchModal": {
+    "title": "{{addon}} في كل فرع من فروع {{company}}",
+    "colBranch": "الفرع",
+    "colMode": "الإعداد",
+    "colModeHint": "يتبع كل فرع إعداد الشركة أو تُعطَّل الإضافة فيه.",
+    "followCompany": "يتبع الشركة",
+    "off": "معطّل",
+    "companyAddonOff": "معطّل على مستوى الشركة بالكامل.",
+    "companyAppOff": "التطبيق معطّل على مستوى الشركة بالكامل، لذا لا يمكن للفرع اتباعه.",
+    "turnInheritTitle": "اتباع إعداد الشركة لإضافة {{addon}} في فرع {{branch}}؟",
+    "turnDisabledTitle": "إيقاف {{addon}} في فرع {{branch}}؟",
+    "turnInheritConfirm": "اتباع الشركة",
+    "turnDisabledConfirm": "إيقاف",
+    "empty": "لا توجد فروع لهذه الشركة بعد.",
+    "loadFailed": "تعذّر تحميل استثناءات الفروع.",
+    "branchLoadFailed": "تعذّر التحميل",
+    "forbidden": "ليست لديك صلاحية عرض فروع هذه الشركة.",
+    "toastSaved": "تم تحديث إعداد الفرع."
+  },
+  "toast": {
+    "turnedOn": "تم تفعيل {{name}}.",
+    "turnedOff": "تم إيقاف {{name}}."
+  },
+  "rejected": {
+    "SOURCE_CHANGED": "تغيّر الاشتراك أثناء التطبيق. حاول مرة أخرى.",
+    "AUTHORITY_CHANGED": "تغيّرت صلاحياتك أثناء التطبيق.",
+    "CONFIGURATION_REJECTED": "لم تُقبل إعدادات الإضافة."
+  },
+  "errors": {
+    "companyNotFound": "الشركة المذكورة في الرابط غير متاحة لك. تُعرض شركة أخرى.",
+    "addonNotAvailable": "هذه الإضافة غير متاحة للتفعيل بعد.",
+    "APPLICATION_ALLOWANCE_NOT_READY": "{{name}} غير جاهز للتفعيل حاليًا. تحقّق من الاشتراك أو حاول لاحقًا.",
+    "APPLICATION_ACTIVATION_REVISION_STALE": "تغيّرت هذه البيانات منذ فتحها. تم تحديث القائمة.",
+    "ADDON_REVISION_STALE": "تغيّرت هذه البيانات منذ فتحها. تم تحديث القائمة.",
+    "ADDON_CONFIGURATION_INVALID": "أعدّ إعدادات هذه الإضافة قبل تفعيلها.",
+    "ADDON_OPERATION_UNCERTAIN": "تغيير سابق لم تتأكد نتيجته بعد. أعد التحميل وحاول مرة أخرى.",
+    "ACCESS_POLICY_UNAVAILABLE": "سياسة الوصول للاشتراك غير متاحة مؤقتًا. حاول مرة أخرى بعد قليل.",
+    "ACCESS_POLICY_BLOCKED": "ليست لديك صلاحية لهذا الإجراء.",
+    "IDEMPOTENCY_BODY_MISMATCH": "يتعارض هذا الطلب مع إرسال سابق. حاول مرة أخرى.",
+    "CORE_VALIDATION_FAILED": "تحقّق من السبب وحاول مرة أخرى."
+  },
+  "apps": {
+    "accounting": "المحاسبة",
+    "crm": "إدارة العملاء",
+    "trade": "التجارة"
+  },
+  "addons": {
+    "crm": {
+      "homes": "العقارات (المنازل)",
+      "telephony": "الاتصالات الهاتفية"
+    },
+    "unknown": "إضافة {{key}}"
+  }
+}

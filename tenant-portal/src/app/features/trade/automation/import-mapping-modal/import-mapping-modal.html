@@ -1,0 +1,91 @@
+<ui-modal
+  size="form"
+  icon="tablerTable"
+  tile="bg-icon-teal"
+  [title]="'imports.mappingModal.title' | transloco"
+  [closeLabel]="'imports.common.close' | transloco"
+>
+  <form class="grid grid-cols-2 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      class="col-span-2"
+      [for]="uid + '-code'"
+      [label]="'imports.mappingModal.code' | transloco"
+      [hint]="'imports.mappingModal.codeHint' | transloco"
+      [required]="true"
+      [error]="codeError()"
+    >
+      <input
+        [id]="uid + '-code'"
+        type="text"
+        dir="ltr"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'imports.mappingModal.codePlaceholder' | transloco"
+        [value]="code()"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      size="bare"
+      [for]="uid + '-target'"
+      [label]="'imports.mappingModal.target' | transloco"
+      [hint]="'imports.mappingModal.targetHint' | transloco"
+      [hintText]="targetHintText()"
+      [required]="true"
+    >
+      <ui-dropdown
+        size="field"
+        [id]="uid + '-target'"
+        [describedBy]="uid + '-target-hint'"
+        [label]="'imports.mappingModal.target' | transloco"
+        [options]="targetOptions()"
+        [value]="targetCode()"
+        (valueChange)="targetCode.set($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      size="bare"
+      [for]="uid + '-level'"
+      [label]="'imports.mappingModal.level' | transloco"
+      [hint]="'imports.mappingModal.levelHint' | transloco"
+      [required]="true"
+    >
+      <div>
+        <ui-segmented
+          [id]="uid + '-level'"
+          [describedBy]="uid + '-level-hint'"
+          [label]="'imports.mappingModal.level' | transloco"
+          [options]="levelOptions()"
+          [value]="level()"
+          (valueChange)="onLevelChange($event)"
+        />
+      </div>
+    </ui-field>
+  </form>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="saving()"
+    (click)="submit()"
+  >
+    {{ 'imports.mappingModal.submit' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="saving()"
+    (click)="close()"
+  >
+    {{ 'imports.common.cancel' | transloco }}
+  </button>
+</ui-modal>

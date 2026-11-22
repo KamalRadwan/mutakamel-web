@@ -1,0 +1,301 @@
+<app-settings-frame
+  [addLabel]="'leadSources.new' | transloco"
+  [showAdd]="canManage"
+  [addDisabled]="atLimit()"
+  [addHint]="atLimit() ? ('leadSources.limitReached' | transloco: { max: maxSources }) : null"
+  [searchPlaceholder]="'leadSources.search' | transloco"
+  [loading]="loading()"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="reload()"
+>
+  @if (isSearching()) {
+    <app-settings-notice notices tone="info">
+      {{ 'settings.common.searching' | transloco }}
+    </app-settings-notice>
+  }
+
+  @if (loadFailed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'leadSources.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumnsClass"
+        >
+          @if (canManage) {
+            <span role="columnheader" class="flex items-center justify-center">
+              <span class="sr-only">{{ 'leadSources.dragHandle' | transloco }}</span>
+            </span>
+          }
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center justify-center px-10"
+            [class.border-s]="canManage"
+            [class.border-on-nav-line]="canManage"
+          >
+            {{ 'leadSources.table.order' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.nameAr' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.nameEn' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.status' | transloco }}
+          </span>
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumnsClass"
+              aria-hidden="true"
+            >
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center">
+                  <span class="h-skeleton-line w-12 rounded-4 bg-neutral-soft"></span>
+                </span>
+              }
+              <span role="cell" class="flex items-center justify-center px-10" [class.border-s]="canManage" [class.border-border]="canManage">
+                <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center gap-8 border-s border-border px-10">
+                <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+                <span class="h-skeleton-line flex-1 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line flex-1 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-time-dd rounded-8 bg-neutral-soft"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-icon-tile-sm rounded-6 bg-neutral-soft"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (source of visibleSources(); track source.id) {
+            <div
+              role="row"
+              [sourceRowDrag]="source.id"
+              [dragDisabled]="!canManage || isSearching() || reordering()"
+              [sourceRowDrop]="source.id"
+              [dropDisabled]="!canManage || isSearching() || reordering()"
+              #rowDrop="sourceRowDrop"
+              (dropped)="dropOnRow($event, source.id)"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text transition-colors duration-fast"
+              [class]="gridColumnsClass + (rowDrop.over() ? ' border-brand bg-brand-soft ring-2 ring-inset ring-brand' : ' border-border bg-surface shadow-card hover:bg-row-hover')"
+              (click)="onRowClick(source, $event)"
+            >
+              @if (canManage) {
+                <span
+                  role="cell"
+                  data-drag-handle
+                  class="flex items-center justify-center"
+                  [class]="isSearching() || reordering() ? 'cursor-not-allowed text-text-placeholder' : 'cursor-grab text-text-muted'"
+                  [title]="isSearching() ? ('settings.common.searching' | transloco) : reordering() ? ('leadSources.actions.moveReorderingReason' | transloco) : ('leadSources.dragHandle' | transloco)"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ng-icon name="tablerGripVertical" size="14" aria-hidden="true" />
+                </span>
+              }
+
+              <span
+                role="cell"
+                dir="ltr"
+                class="flex min-w-0 items-center justify-center px-10 text-12 tabular-nums text-text-muted"
+                [class.border-s]="canManage"
+                [class.border-border]="canManage"
+              >
+                {{ source.sortOrder }}
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+                @if (source.iconUrl; as iconUrl) {
+                  <img [src]="iconUrl" alt="" class="size-icon-tile-sm shrink-0 rounded-8 object-cover" />
+                } @else {
+                  <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+                    <ng-icon name="tablerTrendingUp" size="14" aria-hidden="true" />
+                  </span>
+                }
+
+                <button
+                  type="button"
+                  data-no-drag
+                  dir="rtl"
+                  class="min-w-0 cursor-pointer truncate rounded-4 font-medium text-start outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="openEdit(source); $event.stopPropagation()"
+                >
+                  {{ source.nameAr }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span dir="ltr" class="truncate">{{ source.nameEn }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="source.isActive ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                >
+                  {{ (source.isActive ? 'settings.common.active' : 'settings.common.inactive') | transloco }}
+                </span>
+              </span>
+
+              @if (canManage) {
+                <span
+                  role="cell"
+                  data-no-drag
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="actionsFor(source)"
+                    [label]="'settings.common.actions' | transloco"
+                    (selected)="onAction(source, $event)"
+                  />
+                </span>
+              }
+            </div>
+          } @empty {
+            <div role="row">
+              <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+                {{ (isSearching() ? 'settings.common.noResults' : 'leadSources.empty') | transloco }}
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  @if (!loading() && !loadFailed()) {
+    <span footer>{{ 'settings.common.of' | transloco: { count: sources().length, max: maxSources } }}</span>
+  }
+</app-settings-frame>
+
+<app-lead-source-modal
+  [canManage]="canManage"
+  (saved)="onModalSaved($event)"
+  (iconUpdated)="onIconUpdated($event)"
+  (deleteRequested)="requestDelete($event)"
+/>
+
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'leadSources.delete.title' | transloco"
+  [text]="'leadSources.delete.text' | transloco: { name: deletingSource() ? displayName(deletingSource()!) : '' }"
+  [confirmLabel]="'settings.common.delete' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #moveModal
+  size="confirm"
+  icon="tablerArrowsRightLeft"
+  tile="bg-icon-blue"
+  [title]="'leadSources.moveModal.title' | transloco"
+  [subtitle]="movingSource() ? displayName(movingSource()!) : ''"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!reordering()"
+>
+  <ui-field
+    size="bare"
+    [for]="uid + '-move-position'"
+    [label]="'settings.common.position' | transloco"
+    [hint]="'leadSources.moveModal.positionHint' | transloco"
+    [required]="true"
+  >
+    <ui-dropdown
+      class="w-full"
+      size="field"
+      [options]="positionOptions()"
+      [(value)]="targetPosition"
+      [label]="'settings.common.position' | transloco"
+      [describedBy]="uid + '-move-position-hint'"
+    />
+  </ui-field>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      [loading]="reordering()"
+      [disabled]="reordering() || targetPosition() === movingSource()?.sortOrder"
+      (click)="confirmMove()"
+    >
+      {{ 'settings.common.moveTo' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="reordering()"
+      (click)="moveModal.close()"
+    >
+      {{ 'settings.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-modal
+  #inUseModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'leadSources.inUse.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!makingInactive()"
+>
+  <p class="text-12 leading-18 text-text-muted">
+    {{ (inUseSource()?.isActive ? 'leadSources.inUse.text' : 'leadSources.inUse.textInactive') | transloco }}
+  </p>
+
+  <div modal-footer class="flex items-center gap-8">
+    @if (inUseSource()?.isActive) {
+      <button
+        type="button"
+        uiButton
+        [loading]="makingInactive()"
+        (click)="makeInUseInactive()"
+      >
+        {{ 'leadSources.inUse.makeInactive' | transloco }}
+      </button>
+    }
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="makingInactive()"
+      (click)="inUseModal.close()"
+    >
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

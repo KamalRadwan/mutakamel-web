@@ -1,0 +1,379 @@
+<app-settings-frame
+  [addLabel]="'wsTaxes.new' | transloco"
+  [showAdd]="canCreate()"
+  [searchPlaceholder]="'wsTaxes.search' | transloco"
+  [loading]="loading()"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="reload()"
+>
+  @if (companiesFailed()) {
+    <app-settings-notice notices tone="warning">
+      <div class="flex flex-wrap items-center justify-between gap-8">
+        <span>{{ 'wsTaxes.notices.companiesFailed' | transloco }}</span>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="companiesLoading()"
+          (click)="retryCompanies()"
+        >
+          {{ 'settings.common.retry' | transloco }}
+        </button>
+      </div>
+    </app-settings-notice>
+  }
+
+  <div notices class="rounded-10 border border-border bg-surface p-8 shadow-card">
+    <div class="flex flex-wrap items-end gap-x-10 gap-y-8">
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-filter-company'"
+        [label]="'wsTaxes.filters.company' | transloco"
+        [hint]="'wsTaxes.filters.companyHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-filter-company'"
+          [describedBy]="uid + '-filter-company-hint'"
+          [options]="companyOptions()"
+          [value]="companyFilter()"
+          [label]="'wsTaxes.filters.company' | transloco"
+          (valueChange)="onCompanyFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-filter-status'"
+        [label]="'wsTaxes.filters.status' | transloco"
+        [hint]="'wsTaxes.filters.statusHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-filter-status'"
+          [describedBy]="uid + '-filter-status-hint'"
+          [options]="statusOptions()"
+          [value]="statusFilter()"
+          [label]="'wsTaxes.filters.status' | transloco"
+          (valueChange)="onStatusFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-filter-inclusive'"
+        [label]="'wsTaxes.filters.inclusive' | transloco"
+        [hint]="'wsTaxes.filters.inclusiveHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-filter-inclusive'"
+          [describedBy]="uid + '-filter-inclusive-hint'"
+          [options]="inclusiveOptions()"
+          [value]="inclusiveFilter()"
+          [label]="'wsTaxes.filters.inclusive' | transloco"
+          (valueChange)="onInclusiveFilterChange($event)"
+        />
+      </ui-field>
+
+      @if (hasActiveFilters()) {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          size="small"
+          class="shrink-0"
+          (click)="clearFilters()"
+        >
+          {{ 'wsTaxes.filters.clear' | transloco }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (loadForbidden()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-text-muted">{{ 'settings.errors.permission' | transloco }}</p>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'wsTaxes.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns()"
+        >
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center px-10"
+            [attr.aria-sort]="ariaSortFor('code')"
+          >
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 cursor-pointer items-center justify-start gap-4 truncate rounded-4 text-start outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'wsTaxes.table.sortBy' | transloco: { column: ('wsTaxes.table.code' | transloco) }"
+              (click)="toggleSort('code')"
+            >
+              <span class="truncate">{{ 'wsTaxes.table.code' | transloco }}</span>
+              @if (sortBy() === 'code') {
+                <ng-icon
+                  [name]="sortDir() === 'ASC' ? 'tablerChevronUp' : 'tablerChevronDown'"
+                  size="12"
+                  class="shrink-0"
+                  aria-hidden="true"
+                />
+              }
+            </button>
+          </span>
+
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+            [attr.aria-sort]="ariaSortFor('name')"
+          >
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 cursor-pointer items-center justify-start gap-4 truncate rounded-4 text-start outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'wsTaxes.table.sortBy' | transloco: { column: ('wsTaxes.table.name' | transloco) }"
+              (click)="toggleSort('name')"
+            >
+              <span class="truncate">{{ 'wsTaxes.table.name' | transloco }}</span>
+              @if (sortBy() === 'name') {
+                <ng-icon
+                  [name]="sortDir() === 'ASC' ? 'tablerChevronUp' : 'tablerChevronDown'"
+                  size="12"
+                  class="shrink-0"
+                  aria-hidden="true"
+                />
+              }
+            </button>
+          </span>
+
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+            [attr.aria-sort]="ariaSortFor('rate')"
+          >
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 cursor-pointer items-center justify-end gap-4 truncate rounded-4 outline-none hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'wsTaxes.table.sortBy' | transloco: { column: ('wsTaxes.table.rate' | transloco) }"
+              (click)="toggleSort('rate')"
+            >
+              <span class="truncate">{{ 'wsTaxes.table.rate' | transloco }}</span>
+              @if (sortBy() === 'rate') {
+                <ng-icon
+                  [name]="sortDir() === 'ASC' ? 'tablerChevronUp' : 'tablerChevronDown'"
+                  size="12"
+                  class="shrink-0"
+                  aria-hidden="true"
+                />
+              }
+            </button>
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsTaxes.table.inclusive' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsTaxes.table.scope' | transloco }}
+          </span>
+
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'wsTaxes.table.status' | transloco }}
+          </span>
+
+          @if (showActionsColumn()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns()"
+            >
+              <span role="cell" class="flex items-center gap-8 px-10">
+                <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+                <span class="h-skeleton-line flex-1 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-time-dd rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-time-dd rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft"></span>
+              </span>
+              @if (showActionsColumn()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (tax of taxes(); track tax.id) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumns()"
+              (click)="onRowClick(tax, $event)"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+                  <ng-icon name="tablerReceiptTax" size="14" aria-hidden="true" />
+                </span>
+                <span dir="ltr" class="min-w-0 truncate font-medium">{{ tax.code }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <button
+                  type="button"
+                  class="min-w-0 cursor-pointer truncate rounded-4 font-medium text-start outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="openEdit(tax); $event.stopPropagation()"
+                >
+                  {{ tax.name }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+                <span dir="ltr" class="truncate tabular-nums">{{ formatRateValue(tax.rate) }}%</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="tax.isInclusive ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text-muted'"
+                >
+                  {{ (tax.isInclusive ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="min-w-0 truncate text-12 text-text-muted">{{ scopeLabel(tax) }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="tax.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                >
+                  {{ (tax.status === 'ACTIVE' ? 'settings.common.active' : 'settings.common.inactive') | transloco }}
+                </span>
+              </span>
+
+              @if (showActionsColumn()) {
+                <span
+                  role="cell"
+                  data-row-action
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  @if (canManageTax(tax)) {
+                    <ui-actions-menu
+                      [items]="actionsFor(tax)"
+                      [label]="'settings.common.actions' | transloco"
+                      (selected)="onAction(tax, $event)"
+                    />
+                  }
+                </span>
+              }
+            </div>
+          } @empty {
+            <div role="row" class="mt-6 flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+              <span role="cell" class="text-12 text-text-muted">
+                {{ (hasActiveFilters() ? 'wsTaxes.emptyFiltered' : 'wsTaxes.empty') | transloco }}
+              </span>
+              @if (hasActiveFilters()) {
+                <button type="button" uiButton variant="secondary" size="small" (click)="clearFilters()">
+                  {{ 'wsTaxes.filters.clear' | transloco }}
+                </button>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (displayTotal() > 0) {
+      <ui-pagination
+        [total]="displayTotal()"
+        [pageSizes]="pageSizes"
+        [label]="'wsTaxes.title' | transloco"
+        [(page)]="page"
+        [pageSize]="pageSize()"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
+    }
+  }
+</app-settings-frame>
+
+<app-tax-modal
+  [canManage]="modalCanManage()"
+  [companies]="companies()"
+  [tenantWideAllowed]="tenantWideAllowed()"
+  (saved)="onModalSaved()"
+  (notFound)="onModalNotFound()"
+/>
+
+<ui-confirm-dialog
+  #deactivateConfirm
+  tone="warning"
+  [title]="'wsTaxes.deactivate.title' | transloco: { name: deactivatingTax()?.name ?? '', code: deactivatingTax()?.code ?? '' }"
+  [text]="'wsTaxes.deactivate.text' | transloco: { rate: deactivatingTax() ? formatRateValue(deactivatingTax()!.rate) : '' }"
+  [confirmLabel]="'wsTaxes.deactivate.confirm' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #reactivateBlockerModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'wsTaxes.blocker.reactivateTitle' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'wsTaxes.errors.COMPANY_INVALID_REACTIVATE' | transloco }}
+  </p>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="reactivateBlockerModal.close()">
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

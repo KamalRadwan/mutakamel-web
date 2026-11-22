@@ -1,0 +1,291 @@
+<div class="flex flex-wrap items-end justify-between gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <div class="flex flex-wrap items-end gap-10">
+    <ui-field
+      class="w-modal-alert"
+      [bare]="true"
+      [label]="'pricing.compare.baselineLabel' | transloco"
+      [for]="uid + '-baseline'"
+      [hint]="'pricing.compare.baselineHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-baseline'"
+        [label]="'pricing.compare.baselineLabel' | transloco"
+        [describedBy]="uid + '-baseline-hint'"
+        [options]="primaryOptions()"
+        [value]="selectedPrimaryValue()"
+        (valueChange)="onPrimaryChange($event)"
+      />
+    </ui-field>
+
+    @if (showOtherBookPicker()) {
+      <ui-field
+        class="w-modal-confirm"
+        [bare]="true"
+        [label]="'pricing.compare.otherBookVersionLabel' | transloco"
+        [for]="uid + '-other-baseline'"
+        [hint]="'pricing.compare.otherBookVersionHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-other-baseline'"
+          [label]="'pricing.compare.otherBookVersionLabel' | transloco"
+          [describedBy]="uid + '-other-baseline-hint'"
+          [options]="otherBookVersionOptions()"
+          [disabled]="loadingOtherBooks() || otherBookVersionOptions().length === 0"
+          [value]="baselineId() ?? ''"
+          (valueChange)="onOtherBookVersionChange($event)"
+        />
+      </ui-field>
+    }
+  </div>
+
+  <p class="text-11 leading-16 text-text-muted">
+    {{ 'pricing.compare.helpLine' | transloco }}
+  </p>
+</div>
+
+@if (!effectiveBaselineId()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <p class="text-12 leading-18 text-text-muted">{{ 'pricing.compare.noBaselines' | transloco }}</p>
+  </div>
+} @else if (loadFailed()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'pricing.compare.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="retry()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'pricing.retry' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div class="grid grid-cols-2 gap-8 desktop:grid-cols-5">
+    @for (card of statCards(); track card.key) {
+      <ui-stat-card
+        [label]="card.labelKey | transloco"
+        [hint]="card.hintKey | transloco"
+        [value]="loading() ? '—' : countText(card.count)"
+        [chart]="card.chart"
+      />
+    }
+  </div>
+
+  <div class="flex flex-wrap items-center justify-between gap-8">
+    <span [id]="uid + '-filter-hint'" class="sr-only">{{ 'pricing.compare.filters.hint' | transloco }}</span>
+    <ui-segmented
+      [options]="filterOptions()"
+      [label]="'pricing.compare.filters.label' | transloco"
+      [describedBy]="uid + '-filter-hint'"
+      [value]="filter()"
+      (valueChange)="onFilterChange($event)"
+    />
+  </div>
+
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'pricing.compare.tableLabel' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [class]="entryGrid"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'pricing.compare.columns.item' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.compare.columns.unit' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.compare.columns.minQty' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.compare.columns.baselinePrice' | transloco }}
+        </span>
+        <span role="columnheader" class="flex items-center justify-center border-s border-on-nav-line">
+          <span class="sr-only">{{ 'pricing.compare.columns.arrow' | transloco }}</span>
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.compare.columns.newPrice' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.compare.columns.change' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'pricing.compare.columns.status' | transloco }}
+        </span>
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+            [class]="entryGrid"
+          >
+            <span role="cell" class="flex items-center px-10">
+              <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-icon-sm rounded-4 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else if (filteredEntries().length === 0) {
+        <div class="mt-6 rounded-10 border border-border bg-surface p-16 text-center text-12 text-text-muted shadow-card">
+          {{ 'pricing.compare.emptyFilter' | transloco }}
+        </div>
+      } @else {
+        @for (entry of filteredEntries(); track entryKey(entry)) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+            [class]="entryGrid"
+          >
+            <span role="cell" class="flex min-w-0 items-center justify-between gap-8 px-10">
+              <span class="min-w-0 truncate text-12 font-medium text-text">{{ itemDisplayName(entry) }}</span>
+              <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ entry.itemCode }}</bdi>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+              <span class="truncate">{{ uomDisplayName(entry) }}</span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text tabular-nums">
+              <bdi dir="ltr" class="truncate">{{ formatQtyValue(entry.minimumQuantity) }}</bdi>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+              <bdi dir="ltr" class="truncate">{{ formatPriceValue(entry.baselineUnitPrice) }}</bdi>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border text-text-muted">
+              <ng-icon name="tablerArrowRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 font-medium text-text tabular-nums">
+              <bdi dir="ltr" class="truncate">{{ formatPriceValue(entry.targetUnitPrice) }}</bdi>
+            </span>
+            <span
+              role="cell"
+              class="flex min-w-0 items-center border-s border-border px-10 text-12 tabular-nums"
+              [class]="deltaClass(entry.changeType)"
+            >
+              <bdi dir="ltr" class="truncate">{{ deltaText(entry) }}</bdi>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span
+                class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                [class]="entryBadgeClass(entry.changeType)"
+              >
+                {{ 'pricing.compare.changes.' + entry.changeType | transloco }}
+              </span>
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-8 pt-4">
+    <h3 class="text-13 leading-18 font-medium text-text">
+      {{ 'pricing.compare.promotionsHeading' | transloco }}
+    </h3>
+
+    @if (!loading() && (diff()?.promotions.length ?? 0) === 0) {
+      <div class="rounded-10 border border-border bg-surface p-16 text-center text-12 text-text-muted shadow-card">
+        {{ 'pricing.compare.noPromotions' | transloco }}
+      </div>
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="min-w-doc-table-min"
+          [attr.aria-label]="'pricing.compare.promotionsTableLabel' | transloco"
+        >
+          <div
+            role="row"
+            class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+            [class]="promoGrid"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'pricing.compare.promoColumns.code' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'pricing.compare.promoColumns.status' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'pricing.compare.promoColumns.benefit' | transloco }}
+            </span>
+          </div>
+
+          @if (loading()) {
+            @for (row of [0, 1]; track row) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+                [class]="promoGrid"
+              >
+                <span role="cell" class="flex items-center px-10">
+                  <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-badge w-1/2 rounded-8 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                </span>
+              </div>
+            }
+          } @else {
+            @for (promo of promotions(); track promo.code) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+                [class]="promoGrid"
+              >
+                <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                  <bdi dir="ltr" class="shrink-0 text-12 font-medium text-text tabular-nums">{{ promo.code }}</bdi>
+                  <span class="min-w-0 truncate text-12 text-text-muted">{{ promo.name }}</span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                    [class]="promoBadgeClass(promo.changeType)"
+                  >
+                    {{ 'pricing.compare.changes.' + promo.changeType | transloco }}
+                  </span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10 text-12 tabular-nums">
+                  <bdi dir="ltr" class="text-text-muted">{{ formatBenefit(promo.baselineBenefit) }}</bdi>
+                  <ng-icon name="tablerArrowRight" size="14" class="shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true" />
+                  <bdi dir="ltr" class="font-medium text-text">{{ formatBenefit(promo.targetBenefit) }}</bdi>
+                </span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </div>
+}

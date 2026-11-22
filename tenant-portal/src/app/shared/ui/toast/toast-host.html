@@ -1,0 +1,53 @@
+<!-- Persistent live regions outside the popover: a region that is created together with its text is often not announced. -->
+<div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ polite() }}</div>
+<div class="sr-only" role="alert" aria-live="assertive" aria-atomic="true">{{ assertive() }}</div>
+
+<section
+  #region
+  popover="manual"
+  class="fixed top-auto end-auto bottom-toast-edge start-toast-edge z-toast flex flex-col gap-8"
+  [attr.aria-label]="'toast.region' | transloco"
+>
+  @for (toast of notify.toasts(); track toast.id) {
+    <div
+      class="toast relative flex w-toast items-start gap-8 overflow-hidden rounded-10 border border-border bg-surface px-10 py-8 shadow-popover"
+      (mouseenter)="notify.pause(toast.id)"
+      (mouseleave)="notify.resume(toast.id)"
+      (focusin)="notify.pause(toast.id)"
+      (focusout)="notify.resume(toast.id)"
+    >
+      <span class="flex size-icon-tile-sm shrink-0 items-center justify-center rounded-full" [class]="look[toast.type].circle">
+        <ng-icon [name]="look[toast.type].icon" size="14" aria-hidden="true" />
+      </span>
+
+      <div class="min-w-0 flex-1">
+        <p class="flex items-center gap-4 text-13 leading-18 font-medium text-text">
+          {{ toast.title }}
+          @if (toast.count > 1) {
+            <span class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-4 text-11 leading-16 text-on-neutral-soft">
+              {{ toast.count }}
+            </span>
+          }
+        </p>
+        @if (toast.text) {
+          <p class="text-12 leading-18 text-text-muted">{{ toast.text }}</p>
+        }
+      </div>
+
+      <button
+        type="button"
+        class="flex size-icon-tile-sm shrink-0 items-center justify-center rounded-6 text-text-muted hover:bg-neutral-soft cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'toast.close' | transloco"
+        (click)="notify.close(toast.id)"
+      >
+        <ng-icon name="tablerX" size="14" aria-hidden="true" />
+      </button>
+
+      @if (notify.durationOf(toast); as duration) {
+        <i class="countdown absolute bottom-0 start-0 h-countdown w-full" [class]="look[toast.type].bar" [style.animation-duration.ms]="duration"></i>
+      } @else {
+        <i class="absolute bottom-0 start-0 h-countdown w-full" [class]="look[toast.type].bar"></i>
+      }
+    </div>
+  }
+</section>

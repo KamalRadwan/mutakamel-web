@@ -1,0 +1,119 @@
+<section
+  class="flex shrink-0 flex-wrap items-end gap-10 rounded-10 bg-surface p-8 shadow-card"
+  [attr.aria-label]="'tradeConfig.title' | transloco"
+>
+  <ui-field
+    size="bare"
+    class="shrink-0"
+    [label]="'tradeConfig.page.scopeLabel' | transloco"
+    [for]="uid + '-scope'"
+    [hint]="'tradeConfig.page.scopeHint' | transloco"
+  >
+    <ui-segmented
+      [id]="uid + '-scope'"
+      [describedBy]="uid + '-scope-hint'"
+      [label]="'tradeConfig.page.scopeLabel' | transloco"
+      [options]="scopeOptions()"
+      [value]="scopeTarget()"
+      (valueChange)="onScopeChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    class="min-w-0 flex-1"
+    [label]="'tradeConfig.page.showingLabel' | transloco"
+    [for]="uid + '-showing'"
+    [hint]="'tradeConfig.page.showingHint' | transloco"
+  >
+    <input
+      [id]="uid + '-showing'"
+      type="text"
+      readonly
+      [value]="showingLabel()"
+      class="w-full bg-transparent text-12 text-text outline-none"
+    />
+  </ui-field>
+
+  @if (canManage) {
+    <span
+      class="ms-auto inline-flex shrink-0"
+      [attr.title]="scopeTarget() !== 'TENANT' ? ('tradeConfig.page.newDefinitionDisabled' | transloco) : null"
+    >
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        class="shrink-0"
+        [disabled]="scopeTarget() !== 'TENANT'"
+        (click)="openCreateDefinition()"
+      >
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        {{ 'tradeConfig.page.newDefinition' | transloco }}
+      </button>
+    </span>
+  }
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-surface-muted hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class.ms-auto]="!canManage"
+    [attr.aria-label]="'tradeShared.common.reload' | transloco"
+    [title]="'tradeShared.common.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+  </button>
+</section>
+
+@if (loadFailed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeConfig.page.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      {{ 'tradeShared.common.retry' | transloco }}
+    </button>
+  </div>
+} @else {
+  <app-config-definitions-table
+    [items]="items()"
+    [loading]="initialLoading()"
+    [scopeTarget]="scopeTarget()"
+    [canManage]="canManage"
+    (openDefinition)="openDefinition($event)"
+    (createVersion)="openCreateVersion($event)"
+  />
+
+  @if (initialLoading() ? total() > 0 : items().length > 0) {
+    <footer class="mt-auto border-t border-border pt-8">
+      <ui-pagination
+        [total]="total()"
+        [pageSizes]="pageSizes"
+        [label]="'tradeConfig.page.pagination' | transloco"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)"
+      />
+    </footer>
+  }
+}
+
+<app-config-definition-modal
+  [scopeTarget]="scopeTarget()"
+  [canManage]="canManage"
+  [canPublish]="canPublish"
+  (newVersionRequested)="onModalNewVersionRequested($event)"
+  (changed)="onDefinitionChanged()"
+/>
+
+<app-config-version-modal
+  [ctx]="ctx()"
+  [scopeTarget]="scopeTarget()"
+  [scopeLabel]="scopeSubtitle()"
+  (created)="onVersionCreated()"
+  (reloadRequested)="onVersionReloadRequested()"
+/>
+
+<app-config-definition-create-modal (created)="onDefinitionCreated()" />

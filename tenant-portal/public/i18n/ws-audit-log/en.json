@@ -1,0 +1,204 @@
+{
+  "tableLabel": "Audit log events",
+  "forbidden": {
+    "title": "Audit access required",
+    "text": "You need audit access to see the audit log."
+  },
+  "filters": {
+    "dateRange": "Date range",
+    "dateRangeHint": "Required period between start and end date (up to 92 days).",
+    "dateRangePlaceholder": "Select a period",
+    "show": "Show",
+    "showHint": "Switch between all events and deleted records.",
+    "showAll": "All events",
+    "showDeleted": "Deleted records",
+    "deletedPrefix": "Record name starts with",
+    "deletedPrefixHint": "Matches the beginning of the deleted record's name.",
+    "deletedPrefixPlaceholder": "For example Nile",
+    "app": "App",
+    "appHint": "Filter by the application or service that emitted the event.",
+    "allApps": "All apps",
+    "outcome": "Outcome",
+    "outcomeHint": "Filter by whether the operation succeeded or failed.",
+    "allOutcomes": "All outcomes",
+    "sensitivity": "Sensitivity",
+    "sensitivityHint": "Filter by the event sensitivity level.",
+    "allSensitivities": "All sensitivities",
+    "user": "User",
+    "userHint": "Filter by the user who performed the action.",
+    "allUsers": "All users",
+    "branch": "Branch",
+    "branchHint": "Filter by the branch associated with the event.",
+    "allBranches": "All branches",
+    "entityType": "Record type",
+    "entityTypeHint": "For example Party or Lead",
+    "entityTypePlaceholder": "For example Party or Lead",
+    "action": "Action",
+    "actionHint": "The exact action code, for example LEAD_STAGE_CHANGED",
+    "actionPlaceholder": "For example LEAD_STAGE_CHANGED",
+    "includeRequests": "Include request records",
+    "includeRequestsHint": "Shows the raw request evidence that is hidden by default.",
+    "correlationChipLabel": "Related correlation:",
+    "clearCorrelation": "Clear correlation filter",
+    "apply": "Apply",
+    "clear": "Clear filters",
+    "reload": "Reload"
+  },
+  "validation": {
+    "rangeRequired": "Choose a date range to view the audit log.",
+    "rangeOrder": "Start date and time must be before end date and time.",
+    "rangeMaxDays": "Date range cannot exceed 92 days."
+  },
+  "apps": {
+    "CORE": "Core",
+    "CRM": "CRM",
+    "TRADE": "Trade",
+    "WORKER": "Worker",
+    "GATEWAY": "Gateway",
+    "REALTIME": "Realtime",
+    "ACCOUNTING": "Accounting",
+    "HR": "HR"
+  },
+  "sourceKinds": {
+    "HTTP_COMMAND": "HTTP request",
+    "DOMAIN_MUTATION": "Domain change",
+    "BROKER_CONSUMER": "Background message",
+    "CRON_JOB": "Scheduled job",
+    "DB_FALLBACK": "Database fallback",
+    "SECURITY_EVENT": "Security event"
+  },
+  "outcomes": {
+    "SUCCESS": "Succeeded",
+    "FAILURE": "Failed"
+  },
+  "sensitivities": {
+    "LOW": "Low",
+    "NORMAL": "Normal",
+    "HIGH": "High",
+    "HIGH_CHIP": "Sensitive"
+  },
+  "actor": {
+    "system": "System"
+  },
+  "cols": {
+    "time": "Time",
+    "user": "User",
+    "action": "Action",
+    "record": "Record",
+    "app": "App",
+    "outcome": "Outcome",
+    "sensitivity": "Sensitivity"
+  },
+  "paging": {
+    "showing": "Showing {{count}} events",
+    "loadMore": "Load more"
+  },
+  "empty": {
+    "text": "No events in this period",
+    "clearFilters": "Clear filters"
+  },
+  "failed": {
+    "title": "Could not load the audit log",
+    "supportRef": "Support reference",
+    "retry": "Try again"
+  },
+  "modal": {
+    "close": "Close",
+    "showRelated": "Show related events",
+    "noCorrelationHint": "This event has no correlation identifier.",
+    "copied": "Copied to clipboard",
+    "copyFailed": "Could not copy to clipboard",
+    "copyEntityId": "Copy record ID",
+    "copyCorrelationId": "Copy correlation ID",
+    "facts": {
+      "record": "Record",
+      "appKind": "App / source kind",
+      "outcome": "Outcome",
+      "sensitivity": "Sensitivity",
+      "branch": "Branch",
+      "onBehalfOf": "On behalf of",
+      "correlationId": "Correlation ID"
+    },
+    "changes": {
+      "title": "Changes",
+      "field": "Field",
+      "before": "Before",
+      "after": "After",
+      "empty": "No field changes recorded."
+    },
+    "technical": {
+      "title": "Technical details",
+      "ip": "IP address",
+      "userAgent": "User agent",
+      "requestId": "Request ID",
+      "operationId": "Operation ID",
+      "idempotencyKey": "Idempotency key",
+      "metadata": "Metadata"
+    }
+  },
+  "actions": {
+    "CREATE": "Created record",
+    "UPDATE": "Updated record",
+    "SOFT_DELETE": "Soft deleted record",
+    "DELETE": "Deleted record",
+    "RESTORE": "Restored record",
+    "LEAD_CREATED": "Lead created",
+    "LEAD_UPDATED": "Lead updated",
+    "LEAD_STAGE_CHANGED": "Lead stage changed",
+    "LEAD_CONVERTED": "Lead converted",
+    "LEAD_DISQUALIFIED": "Lead disqualified",
+    "LEAD_ASSIGNED": "Lead assigned",
+    "PARTY_CREATED": "Party created",
+    "PARTY_UPDATED": "Party updated",
+    "PARTY_MERGED": "Party merged",
+    "ACTIVITY_CREATED": "Activity created",
+    "ACTIVITY_UPDATED": "Activity updated",
+    "ACTIVITY_COMPLETED": "Activity completed",
+    "ACTIVITY_CANCELLED": "Activity cancelled",
+    "LOGIN_SUCCEEDED": "Signed in",
+    "LOGIN_FAILED": "Sign-in failed",
+    "LOGOUT": "Signed out",
+    "SESSION_REVOKED": "Session revoked",
+    "PASSWORD_CHANGED": "Password changed",
+    "USER_INVITED": "User invited",
+    "USER_UPDATED": "User updated",
+    "USER_SUSPENDED": "User suspended",
+    "USER_ACTIVATED": "User activated",
+    "ROLE_CREATED": "Role created",
+    "ROLE_UPDATED": "Role updated",
+    "ROLE_ASSIGNED": "Role assigned",
+    "ROLE_PERMISSIONS_UPDATED": "Role permissions updated",
+    "SEAT_ALLOCATED": "Seat allocated",
+    "SEAT_RELEASED": "Seat released",
+    "MODULE_ACTIVATED": "Application activated",
+    "QUOTATION_CREATED": "Quotation created",
+    "INVOICE_ISSUED": "Invoice issued",
+    "JOURNAL_POSTED": "Journal entry posted",
+    "NOTIFICATION_DISPATCHED": "Notification dispatched",
+    "HTTP_COMMAND_EXECUTED": "Request executed",
+    "HTTP_COMMAND_REJECTED": "Request rejected"
+  },
+  "entityTypes": {
+    "Party": "Party",
+    "Lead": "Lead",
+    "TenantUser": "User",
+    "Role": "Role",
+    "Activity": "Activity",
+    "CrmNote": "CRM note",
+    "Branch": "Branch",
+    "Company": "Company",
+    "Opportunity": "Opportunity",
+    "Quotation": "Quotation",
+    "Invoice": "Invoice",
+    "AddonSeat": "Add-on seat",
+    "Session": "Session",
+    "Template": "Template"
+  },
+  "errors": {
+    "AUDIT_QUERY_INVALID": "The audit query is invalid. Check the selected dates and filters.",
+    "AUDIT_EVENT_NOT_FOUND": "Audit event was not found or is outside your access scope.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission to view the audit log.",
+    "CORE_VALIDATION_FAILED": "Some filter values are invalid.",
+    "generic": "Could not load audit data. Try again."
+  }
+}

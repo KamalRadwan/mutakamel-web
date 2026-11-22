@@ -1,0 +1,12 @@
+<p class="shrink-0 text-12 leading-18 text-text-muted">
+  {{ 'users.calls.description' | transloco }}
+</p>
+
+<app-call-log-table
+  [load]="loader"
+  [columns]="columns"
+  [canCallBack]="false"
+  [reloadToken]="reloadToken()"
+  [errorText]="errorText()"
+  (openRecord)="onOpenRecord($event)"
+/>

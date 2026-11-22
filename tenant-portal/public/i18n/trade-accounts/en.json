@@ -1,0 +1,183 @@
+{
+  "title": "Commercial accounts",
+  "toolbar": {
+    "new": "New account",
+    "searchLabel": "Search accounts",
+    "searchPlaceholder": "Search by party name or code",
+    "reload": "Reload",
+    "visibleToBranch": "Showing accounts visible to {{branch}}"
+  },
+  "filters": {
+    "role": "Filter by account role",
+    "roleHint": "Show only the accounts with the chosen role, such as customer or supplier",
+    "all": "All",
+    "customers": "Customers",
+    "suppliers": "Suppliers",
+    "status": "Filter by status",
+    "allStatuses": "All statuses"
+  },
+  "sort": {
+    "label": "Sort by",
+    "created": "Newest first",
+    "name": "Party name",
+    "limit": "Credit limit"
+  },
+  "views": {
+    "switcher": "View mode",
+    "cards": "Cards",
+    "table": "Table"
+  },
+  "pagination": "Accounts pagination",
+  "table": {
+    "selectPage": "Select all accounts on this page",
+    "selectRow": "Select {{name}}",
+    "party": "Party",
+    "role": "Role",
+    "creditLimit": "Credit limit",
+    "priceBook": "Price book",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "empty": {
+    "title": "No accounts yet.",
+    "filtered": "No accounts match these filters."
+  },
+  "error": {
+    "loadFailed": "Accounts could not be loaded."
+  },
+  "partyType": {
+    "ORGANIZATION": "Company",
+    "INDIVIDUAL": "Individual"
+  },
+  "unlimited": "Unlimited",
+  "none": "None",
+  "actions": {
+    "block": "Block account",
+    "unblock": "Unblock account",
+    "create": "Create account",
+    "checkCredit": "Check credit"
+  },
+  "modal": {
+    "newTitle": "New account",
+    "loadingTitle": "Account",
+    "loadFailed": "This account could not be loaded.",
+    "alreadyHasCustomer": " — already has a customer account",
+    "alreadyHasSupplier": " — already has a supplier account",
+    "selectParty": "Select a party"
+  },
+  "sections": {
+    "commercialTerms": "Commercial terms",
+    "branchRule": "Branch rule",
+    "branchRuleCaption": "Rule for {{branch}}. Switch branch in the top bar to change another branch.",
+    "creditCheck": "Credit check"
+  },
+  "fields": {
+    "role": "Role",
+    "roleHint": "Customers buy from the company; suppliers sell to it.",
+    "party": "Party",
+    "partyHint": "The person or company from the workspace directory.",
+    "blockReason": "Block reason",
+    "blockReasonHint": "The reason recorded when this account was blocked.",
+    "creditLimit": "Credit limit",
+    "creditLimitHint": "Highest open amount allowed. Leave empty for no limit.",
+    "creditLimitSupplierHint": "Suppliers have no credit limit.",
+    "creditCurrency": "Credit currency",
+    "creditCurrencyHint": "The currency of the credit limit.",
+    "priceBook": "Price book",
+    "priceBookHint": "Prices used for this account before the company default.",
+    "creditPolicy": "Credit policy",
+    "creditPolicyHint": "The published policy recorded with each credit check.",
+    "orderingHold": "Ordering hold",
+    "orderingHoldHint": "When on, new orders for this account are blocked.",
+    "allowedCurrencies": "Allowed currencies",
+    "allowedCurrenciesHint": "Currencies this account may use. Empty means the credit currency only.",
+    "branchCreditLimit": "Branch credit limit",
+    "branchCreditLimitHint": "A lower limit for this branch only.",
+    "branchOrderingHold": "Branch ordering hold",
+    "branchOrderingHoldHint": "Blocks new orders from this branch. A rule can only add a hold.",
+    "branchCurrencies": "Branch currencies",
+    "branchCurrenciesHint": "A subset of the account currencies.",
+    "ruleActive": "Rule active",
+    "ruleActiveHint": "Turn off to stop applying this rule.",
+    "checkAmount": "Amount",
+    "checkAmountHint": "The order amount to check.",
+    "checkCurrency": "Currency",
+    "checkCurrencyHint": "Checks run in the account credit currency.",
+    "summaryLimit": "Limit",
+    "balanceOwed": "Balance owed",
+    "balanceOwedHint": "The unpaid balance currently reported by Accounting.",
+    "outcome": "Outcome",
+    "outcomeHint": "Whether the proposed order is allowed or blocked.",
+    "reason": "Reason",
+    "reasonHint": "The rule or condition that produced this outcome.",
+    "effectiveLimit": "Effective limit",
+    "effectiveLimitHint": "The credit limit applied after any branch rule.",
+    "currentExposure": "Current exposure",
+    "currentExposureHint": "The open balance from Accounting.",
+    "openOrders": "Open orders",
+    "openOrdersHint": "Unbilled orders currently open for this account.",
+    "thisAmount": "This amount",
+    "thisAmountHint": "The proposed order amount checked.",
+    "remaining": "Remaining",
+    "remainingHint": "Available credit remaining after exposure and open orders.",
+    "asOf": "As of",
+    "asOfHint": "When the accounting exposure data was calculated."
+  },
+  "branchRules": {
+    "others": "Other branches",
+    "othersHint": "Rules set for other branches (read-only). Switch branch in the top bar to edit them.",
+    "hold": "Ordering hold",
+    "noHold": "No hold",
+    "retired": "Retired"
+  },
+  "credit": {
+    "summary": "Credit position",
+    "stale": "Accounting data is older than 5 minutes; the figures may have changed.",
+    "saveFirst": "Save your changes first.",
+    "allowed": "Allowed",
+    "blocked": "Blocked",
+    "exposureUnavailable": "Credit data from Accounting is not up to date; try again in a few minutes.",
+    "reason": {
+      "ACCOUNT_BLOCKED": "The account is blocked.",
+      "ACCOUNT_NOT_ACTIVE": "The account is not active.",
+      "BRANCH_ORDERING_HOLD": "Orders are on hold for this branch.",
+      "ACCOUNT_ORDERING_HOLD": "Orders are on hold for this account.",
+      "CURRENCY_NOT_ALLOWED": "This currency is not allowed for the account.",
+      "ACCOUNTING_ORDERING_HOLD": "Accounting has put orders on hold.",
+      "ACCOUNT_ACTIVE_UNLIMITED": "The account has no credit limit.",
+      "CREDIT_LIMIT_EXCEEDED": "The amount goes over the credit limit.",
+      "CREDIT_WITHIN_LIMIT": "The amount is within the credit limit."
+    }
+  },
+  "statusDialog": {
+    "blockTitle": "Block account",
+    "unblockTitle": "Unblock account",
+    "blockText": "New orders for this account will be blocked until it is unblocked.",
+    "unblockText": "The account can place orders again.",
+    "evidenceLabel": "Evidence reference",
+    "evidenceHint": "A document or ticket number that supports the decision, up to 240 characters."
+  },
+  "validation": {
+    "invalidDecimal": "Enter a valid positive number with up to 8 decimals.",
+    "currencyRequiredWithLimit": "Choose a credit currency when setting a credit limit.",
+    "limitRequiredWithCurrency": "Enter a credit limit when a credit currency is set.",
+    "allowedMustIncludeCreditCurrency": "Allowed currencies must include {{currency}}.",
+    "branchCurrenciesSubset": "Branch currencies must be a subset of the account currencies."
+  },
+  "warnings": {
+    "branchRulesWider": "Some branch rules are wider than the new terms: {{branches}}"
+  },
+  "toast": {
+    "created": "Account created.",
+    "saved": "Account saved.",
+    "blocked": "Account blocked.",
+    "unblocked": "Account unblocked."
+  },
+  "unsaved": {
+    "title": "Save changes?",
+    "text": "You have unsaved changes. Save them before closing?",
+    "save": "Save",
+    "discard": "Discard"
+  }
+}

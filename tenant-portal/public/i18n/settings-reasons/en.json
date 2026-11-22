@@ -1,0 +1,117 @@
+{
+  "new": "New reason",
+  "search": "Search reasons",
+  "showInactive": "Show inactive",
+  "showInactiveHint": "Include reasons that are turned off.",
+  "empty": "No reasons in this category yet.",
+  "footerHint": "System reasons cannot be turned off.",
+  "countAllKinds": "{{count}} of {{max}} across all kinds",
+  "limitHint": "You can add up to 500 reasons.",
+  "allTypes": "All types",
+  "systemLocked": "System reasons stay active.",
+  "tabs": {
+    "label": "Reason categories",
+    "loss": "Loss reasons",
+    "win": "Win reasons",
+    "disqualification": "Disqualification reasons",
+    "activityOutcome": "Activity outcomes",
+    "contactRole": "Contact roles"
+  },
+  "columns": {
+    "ariaLabel": "Reasons",
+    "code": "Code",
+    "name": "Name",
+    "definition": "Definition",
+    "polarity": "Polarity",
+    "activityType": "Activity type",
+    "order": "Order"
+  },
+  "polarities": {
+    "POSITIVE": "Positive",
+    "NEUTRAL": "Neutral",
+    "NEGATIVE": "Negative"
+  },
+  "activityTypes": {
+    "ALL": "All types",
+    "CALL": "Call",
+    "MEETING": "Meeting",
+    "EMAIL": "Email",
+    "VISIT": "Visit",
+    "NOTE": "Note",
+    "FOLLOW_UP": "Follow-up",
+    "OTHER": "Other"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "activate": "Activate",
+    "deactivate": "Deactivate"
+  },
+  "fields": {
+    "kind": "Kind",
+    "code": "Code",
+    "polarity": "Polarity",
+    "activityType": "Activity type",
+    "definitionAr": "Arabic definition",
+    "definitionEn": "English definition",
+    "sortOrder": "Order"
+  },
+  "placeholders": {
+    "code": "PRICE_TOO_HIGH"
+  },
+  "hints": {
+    "kind": "Reason catalogue category selected from the active tab; fixed after opening so the reason belongs to this list.",
+    "code": "2 to 64 characters: starts with A–Z, then A–Z, 0–9 or _. Used in reports and APIs and cannot be changed later.",
+    "nameAr": "Required Arabic display name (up to 120 characters) shown to users when the interface language is Arabic.",
+    "nameEn": "Required English display name (up to 120 characters) shown to users when the interface language is English.",
+    "polarity": "Classifies the outcome as positive, neutral or negative for activity analytics; cannot be changed after creation.",
+    "activityType": "Limits this outcome to one activity type or makes it available for all types; cannot be changed after creation.",
+    "definitionAr": "Optional Arabic explanation (up to 500 characters) helping sales reps choose the right reason consistently.",
+    "definitionEn": "Optional English explanation (up to 500 characters) helping sales reps choose the right reason consistently.",
+    "sortOrder": "Whole number from 0 to 1,000,000 controlling the position of this reason in dropdowns and tables (lower appears first).",
+    "active": "Controls whether this reason can be selected on new records."
+  },
+  "modal": {
+    "createTitle": "New reason",
+    "editTitle": "Reason details"
+  },
+  "conflict": {
+    "title": "Reason changed",
+    "text": "Someone changed this reason. Reload to see the latest version, or keep your changes to save them.",
+    "reload": "Reload",
+    "keepMine": "Keep my changes"
+  },
+  "discard": {
+    "title": "Discard unsaved changes?",
+    "text": "Your changes have not been saved yet.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters.",
+    "range": "Must be a whole number between {{min}} and {{max}}.",
+    "reasonCode": "Start with A–Z and use only A–Z, 0–9 or _ (2 to 64 characters)."
+  },
+  "toasts": {
+    "reasonCreated": "Reason created",
+    "reasonUpdated": "Reason updated",
+    "reasonActivated": "Reason activated",
+    "reasonDeactivated": "Reason deactivated"
+  },
+  "errors": {
+    "CRM_VALIDATION_FAILED": "Please check the entered values and try again.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription is currently read-only.",
+    "CRM_SUBSCRIPTION_BLOCKED": "Your subscription does not allow changes right now.",
+    "CRM_REASON_CODE_TAKEN": "This code is already used in this reason kind.",
+    "CRM_REASON_KIND_MISMATCH": "Polarity and activity type are only allowed for activity outcomes.",
+    "CRM_REASON_SYSTEM_IMMUTABLE": "System reasons cannot be deactivated.",
+    "CRM_REASON_REVISION_STALE": "This reason was modified by someone else.",
+    "CRM_REASON_NOT_FOUND": "This reason no longer exists.",
+    "CRM_IDEMPOTENCY_KEY_REQUIRED": "A request idempotency key is required.",
+    "CRM_IDEMPOTENCY_KEY_INVALID": "The request idempotency key is invalid.",
+    "CRM_IDEMPOTENCY_KEY_REUSED": "This request key was already used with different data.",
+    "CRM_IDEMPOTENCY_IN_FLIGHT": "The same request is already being processed.",
+    "CRM_IDEMPOTENCY_KEY_IN_FLIGHT": "The same request is already being processed."
+  }
+}

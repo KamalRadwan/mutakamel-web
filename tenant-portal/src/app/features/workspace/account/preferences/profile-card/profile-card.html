@@ -1,0 +1,169 @@
+<app-account-section
+  icon="tablerUser"
+  tile="bg-icon-blue"
+  [title]="'wsAccPrefs.profile.title' | transloco"
+  [description]="'wsAccPrefs.profile.desc' | transloco"
+>
+  <div class="flex flex-col gap-10">
+    <div class="flex items-center gap-10">
+      <!-- theme.css has no avatar size token >= 48 (largest is size-avatar-nav at 28px), so size-icon-tile-lg (36px) is used. -->
+      <div
+        class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center overflow-hidden rounded-full bg-icon-blue text-13 font-medium text-on-icon select-none"
+      >
+        @if (avatarUrl(); as src) {
+          <img
+            [src]="src"
+            [alt]="'wsAccPrefs.profile.photoAlt' | transloco"
+            class="h-full w-full object-cover"
+          />
+        } @else {
+          <span aria-hidden="true">{{ initials() }}</span>
+        }
+      </div>
+
+      <div class="flex min-w-0 flex-col gap-4">
+        <div class="flex flex-wrap items-center gap-8">
+          <input
+            #fileInput
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            class="sr-only"
+            tabindex="-1"
+            [attr.aria-label]="'wsAccPrefs.profile.changePhoto' | transloco"
+            (change)="onFileSelected($event)"
+          />
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [loading]="uploadingPhoto()"
+            [disabled]="uploadingPhoto() || removingPhoto()"
+            (click)="pickPhoto()"
+          >
+            @if (!uploadingPhoto()) {
+              <ng-icon name="tablerPhoto" size="14" aria-hidden="true" />
+            }
+            {{ 'wsAccPrefs.profile.changePhoto' | transloco }}
+          </button>
+
+          @if (me().hasAvatar) {
+            <button
+              type="button"
+              uiButton
+              variant="ghost"
+              size="small"
+              [loading]="removingPhoto()"
+              [disabled]="uploadingPhoto() || removingPhoto()"
+              (click)="requestRemovePhoto()"
+            >
+              @if (!removingPhoto()) {
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              }
+              {{ 'wsAccPrefs.profile.removePhoto' | transloco }}
+            </button>
+          }
+        </div>
+
+        <p class="text-11 leading-16 text-text-muted">{{ 'wsAccPrefs.profile.photoRules' | transloco }}</p>
+      </div>
+    </div>
+
+    <form class="flex flex-col gap-8" novalidate (submit)="saveName($event)">
+      <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+        <ui-field
+          [for]="uid + '-first-name'"
+          [label]="'wsAccPrefs.profile.firstName' | transloco"
+          [hint]="'wsAccPrefs.profile.firstNameHint' | transloco"
+          [required]="true"
+          [count]="firstNameDraft().length"
+          [max]="nameMax"
+          [error]="firstNameError()"
+        >
+          <input
+            [id]="uid + '-first-name'"
+            type="text"
+            autocomplete="given-name"
+            dir="auto"
+            [attr.maxlength]="nameMax"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="firstNameDraft()"
+            [readOnly]="savingName()"
+            [attr.aria-invalid]="firstNameError() ? 'true' : null"
+            (input)="onFirstNameInput($event)"
+            (blur)="firstNameTouched.set(true)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-last-name'"
+          [label]="'wsAccPrefs.profile.lastName' | transloco"
+          [hint]="'wsAccPrefs.profile.lastNameHint' | transloco"
+          [required]="true"
+          [count]="lastNameDraft().length"
+          [max]="nameMax"
+          [error]="lastNameError()"
+        >
+          <input
+            [id]="uid + '-last-name'"
+            type="text"
+            autocomplete="family-name"
+            dir="auto"
+            [attr.maxlength]="nameMax"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="lastNameDraft()"
+            [readOnly]="savingName()"
+            [attr.aria-invalid]="lastNameError() ? 'true' : null"
+            (input)="onLastNameInput($event)"
+            (blur)="lastNameTouched.set(true)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-email'"
+          [label]="'wsAccPrefs.profile.email' | transloco"
+          [hint]="'wsAccPrefs.profile.emailHint' | transloco"
+        >
+          <input
+            [id]="uid + '-email'"
+            type="email"
+            dir="ltr"
+            readonly
+            aria-readonly="true"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="me().email"
+          />
+        </ui-field>
+      </div>
+
+      <div class="flex items-center justify-end gap-8">
+        @if (dirty()) {
+          <span class="me-auto text-12 leading-18 text-text-muted" role="status">
+            {{ 'wsAccPrefs.profile.unsaved' | transloco }}
+          </span>
+          <button type="button" uiButton variant="secondary" size="small" [disabled]="savingName()" (click)="undoName()">
+            {{ 'wsAccPrefs.profile.undo' | transloco }}
+          </button>
+        }
+        <button
+          type="submit"
+          uiButton
+          size="small"
+          [disabled]="!dirty() || !valid() || savingName()"
+          [loading]="savingName()"
+        >
+          {{ 'wsAccPrefs.profile.save' | transloco }}
+        </button>
+      </div>
+    </form>
+  </div>
+</app-account-section>
+
+<ui-confirm-dialog
+  #removePhotoDialog
+  tone="danger"
+  [title]="'wsAccPrefs.profile.removeTitle' | transloco"
+  [text]="'wsAccPrefs.profile.removeText' | transloco"
+  [confirmLabel]="'wsAccPrefs.profile.removeConfirm' | transloco"
+  [cancelLabel]="'wsAccPrefs.cancel' | transloco"
+/>

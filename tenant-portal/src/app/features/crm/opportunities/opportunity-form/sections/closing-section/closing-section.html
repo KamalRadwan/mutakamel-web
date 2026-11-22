@@ -1,0 +1,74 @@
+<div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+  <ui-field
+    size="bare"
+    [label]="'oppForm.closing.status' | transloco"
+    [for]="uid + '-status'"
+    [hint]="'oppForm.closing.statusHint' | transloco"
+  >
+    <div class="flex h-field w-full items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+      <span
+        class="size-unread-dot shrink-0 rounded-full"
+        [class]="isWon() ? 'bg-success' : 'bg-danger'"
+        aria-hidden="true"
+      ></span>
+      <input
+        [id]="uid + '-status'"
+        type="text"
+        readonly
+        class="w-full bg-transparent text-12 font-medium text-text outline-none"
+        [value]="statusLabel()"
+      />
+    </div>
+  </ui-field>
+
+  <ui-field
+    [label]="(isWon() ? 'oppForm.closing.wonAt' : 'oppForm.closing.lostAt') | transloco"
+    [for]="uid + '-closed-at'"
+    [hint]="(isWon() ? 'oppForm.closing.wonAtHint' : 'oppForm.closing.lostAtHint') | transloco"
+  >
+    <input
+      [id]="uid + '-closed-at'"
+      type="text"
+      readonly
+      class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      [value]="closedAtText()"
+    />
+  </ui-field>
+
+  @if (governedReason(); as reasonText) {
+    <ui-field
+      [label]="(isWon() ? 'oppForm.closing.winReason' : 'oppForm.closing.lossReason') | transloco"
+      [for]="uid + '-governed-reason'"
+      [hint]="(isWon() ? 'oppForm.closing.winReasonHint' : 'oppForm.closing.lossReasonHint') | transloco"
+    >
+      <input
+        [id]="uid + '-governed-reason'"
+        type="text"
+        readonly
+        dir="auto"
+        class="w-full bg-transparent text-12 text-text outline-none"
+        [value]="reasonText"
+      />
+    </ui-field>
+  }
+
+  @if (lossNote(); as note) {
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [label]="'oppForm.closing.lossNote' | transloco"
+        [for]="uid + '-loss-note'"
+        [hint]="'oppForm.closing.lossNoteHint' | transloco"
+      >
+        <textarea
+          [id]="uid + '-loss-note'"
+          rows="2"
+          readonly
+          dir="auto"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none"
+          [value]="note"
+        ></textarea>
+      </ui-field>
+    </div>
+  }
+</div>

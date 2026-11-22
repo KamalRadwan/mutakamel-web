@@ -1,0 +1,100 @@
+<ui-modal
+  size="form"
+  icon="tablerFileSettings"
+  tile="bg-icon-orange"
+  [title]="'profiles.modal.title' | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form class="grid grid-cols-2 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      [label]="'profiles.modal.codeLabel' | transloco"
+      [for]="uid + '-code'"
+      [required]="true"
+      [hint]="'profiles.modal.codeHint' | transloco"
+      [error]="codeError()"
+    >
+      <input
+        [id]="uid + '-code'"
+        type="text"
+        dir="ltr"
+        autocomplete="off"
+        class="h-full w-full bg-transparent text-12 text-text uppercase outline-none placeholder:normal-case placeholder:text-text-placeholder"
+        [placeholder]="'profiles.modal.codePlaceholder' | transloco"
+        [value]="code()"
+        [disabled]="saving()"
+        [attr.aria-invalid]="codeError() ? 'true' : null"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'profiles.modal.documentTypeLabel' | transloco"
+      [for]="uid + '-type'"
+      [required]="true"
+      [hint]="'profiles.modal.documentTypeHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-type'"
+        [describedBy]="uid + '-type-hint'"
+        [label]="'profiles.modal.documentTypeLabel' | transloco"
+        [options]="typeOptions()"
+        [disabled]="saving()"
+        [value]="documentType()"
+        (valueChange)="onTypeChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      [label]="'profiles.modal.scopeLabel' | transloco"
+      [for]="uid + '-scope'"
+      [hint]="'profiles.modal.scopeHint' | transloco"
+      [error]="scopeError()"
+    >
+      <input
+        [id]="uid + '-scope'"
+        type="text"
+        readonly
+        class="h-full w-full bg-transparent text-12 text-text outline-none"
+        [value]="scopeDisplay()"
+        [attr.aria-invalid]="scopeError() ? 'true' : null"
+      />
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="isBranchScope()"
+      (click)="submit()"
+    >
+      {{ 'profiles.modal.create' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'profiles.modal.discardTitle' | transloco"
+  [text]="'profiles.modal.discardText' | transloco"
+  [confirmLabel]="'profiles.modal.discardConfirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>

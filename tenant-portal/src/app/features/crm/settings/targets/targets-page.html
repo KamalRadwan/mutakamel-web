@@ -1,0 +1,614 @@
+@if (!canRead) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'targets.forbiddenTitle' | transloco"
+    [text]="'targets.forbiddenText' | transloco"
+    [actionLabel]="'targets.backHome' | transloco"
+    (action)="goHome()"
+  />
+} @else {
+  <app-settings-frame
+    [addLabel]="'targets.new' | transloco"
+    [searchPlaceholder]="'targets.search' | transloco"
+    [loading]="loading()"
+    [showAdd]="canManage"
+    [(search)]="search"
+    (add)="openNew()"
+    (reload)="load()"
+  >
+    <div notices class="flex flex-wrap items-center gap-6">
+      <button
+        #grainBtn
+        type="button"
+        class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          grainFilter()
+            ? 'border-brand bg-brand-soft text-on-brand-soft'
+            : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openMenu() === 'grain'"
+        (click)="toggleFilterMenu('grain', grainBtn, $event)"
+      >
+        <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
+        <span>
+          {{ 'targets.filters.grain' | transloco }}@if (grainFilter(); as g) {: {{ 'targets.grains.' + g | transloco }}}
+        </span>
+        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+      </button>
+
+      <button
+        #stateBtn
+        type="button"
+        class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          stateFilter()
+            ? 'border-brand bg-brand-soft text-on-brand-soft'
+            : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openMenu() === 'state'"
+        (click)="toggleFilterMenu('state', stateBtn, $event)"
+      >
+        <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
+        <span>
+          {{ 'targets.filters.state' | transloco }}@if (stateFilter(); as s) {: {{ 'targets.states.' + s | transloco }}}
+        </span>
+        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+      </button>
+
+      <button
+        #subjectBtn
+        type="button"
+        class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          subjectTypeFilter()
+            ? 'border-brand bg-brand-soft text-on-brand-soft'
+            : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openMenu() === 'subjectType'"
+        (click)="toggleFilterMenu('subjectType', subjectBtn, $event)"
+      >
+        <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
+        <span>
+          {{ 'targets.filters.subjectType' | transloco }}@if (subjectTypeFilter(); as st) {: {{ 'targets.subjectTypes.' + st | transloco }}}
+        </span>
+        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+      </button>
+
+      <button
+        #branchBtn
+        type="button"
+        class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          branchFilter()
+            ? 'border-brand bg-brand-soft text-on-brand-soft'
+            : 'border-border-field bg-surface text-text hover:border-border-field-hover hover:bg-row-hover'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openMenu() === 'branch'"
+        (click)="toggleFilterMenu('branch', branchBtn, $event)"
+      >
+        <ng-icon name="tablerFilter" size="12" aria-hidden="true" />
+        <span>
+          {{ 'targets.filters.branch' | transloco }}@if (branchFilter()) {: {{ branchFilterLabel() }}}
+        </span>
+        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+      </button>
+
+      <button
+        #sortBtn
+        type="button"
+        class="ms-auto inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border border-border-field bg-surface px-8 text-12 font-medium whitespace-nowrap text-text outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="openMenu() === 'sort'"
+        (click)="toggleFilterMenu('sort', sortBtn, $event)"
+      >
+        <ng-icon name="tablerArrowsSort" size="12" aria-hidden="true" />
+        <span>{{ 'targets.filters.sortOptions.' + activeSortKey() | transloco }}</span>
+        <ng-icon name="tablerChevronDown" size="12" aria-hidden="true" />
+      </button>
+
+      @if (hasActiveFilters()) {
+        <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
+          {{ 'targets.filters.clear' | transloco }}
+        </button>
+      }
+    </div>
+
+    @if (openMenu()) {
+      <ul
+        #filterMenuPanel
+        role="listbox"
+        class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+        [class.invisible]="!menuPlaced()"
+        [style.top.px]="menuPlace().top"
+        [style.inset-inline-start.px]="menuPlace().start"
+        [style.min-width.px]="menuPlace().minWidth"
+        [style.max-height.px]="menuPlace().maxHeight"
+        [attr.aria-label]="'targets.filters.' + openMenu()! | transloco"
+      >
+        @for (option of filterMenuOptions(); track option.value ?? '__all__') {
+          <li role="option" [attr.aria-selected]="isFilterOptionSelected(option.value)">
+            <button
+              type="button"
+              class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                isFilterOptionSelected(option.value)
+                  ? 'bg-brand-soft text-on-brand-soft'
+                  : 'text-text hover:bg-row-hover'
+              "
+              (click)="selectFilterOption(option.value)"
+            >
+              <span>{{ option.label }}</span>
+              @if (isFilterOptionSelected(option.value)) {
+                <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
+
+    @if (loadError()) {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'analytics.common.loadFailed' | transloco"
+        [actionLabel]="'analytics.common.retry' | transloco"
+        (action)="load()"
+      />
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div class="min-w-doc-table-min">
+          <ui-data-table
+            [columns]="columns()"
+            [rows]="targets()"
+            [rowKey]="rowKey"
+            [totals]="null"
+            [loading]="loading()"
+            [emptyText]="emptyText()"
+            [rowClickable]="true"
+            [label]="'targets.title' | transloco"
+            [sort]="tableSort()"
+            (sortChange)="onTableSortChange($event)"
+            (rowClick)="openTarget($event)"
+          >
+            <ng-template uiCell="subject" let-row>
+              <span class="flex min-w-0 items-center gap-8">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="subjectTile(row.subjectType)"
+                >
+                  <ng-icon [name]="subjectIcon(row.subjectType)" size="14" aria-hidden="true" />
+                </span>
+                <span class="truncate" [title]="subjectName(row)">{{ subjectName(row) }}</span>
+              </span>
+            </ng-template>
+
+            <ng-template uiCell="metricKey" let-row>
+              <span class="truncate" [title]="metricLabel(row.metricKey)">{{ metricLabel(row.metricKey) }}</span>
+            </ng-template>
+
+            <ng-template uiCell="periodStart" let-row>
+              <span class="truncate">{{ periodLabel(row) }}</span>
+            </ng-template>
+
+            <ng-template uiCell="targetValue" let-row>
+              {{ valueLabel(row) }}
+            </ng-template>
+
+            <ng-template uiCell="approvalState" let-row>
+              <ui-badge [tone]="stateTone(row.approvalState)">
+                {{ 'targets.states.' + row.approvalState | transloco }}
+              </ui-badge>
+            </ng-template>
+
+            <ng-template uiCell="release" let-row>
+              {{ row.latestRelease ? '#' + row.latestRelease.releaseNumber : dash }}
+            </ng-template>
+
+            <ng-template uiCell="actions" let-row>
+              <span class="inline-flex" (click)="$event.stopPropagation()">
+                <ui-actions-menu
+                  [items]="actionsFor(row)"
+                  [label]="'settings.common.actions' | transloco"
+                  (selected)="onRowAction(row, $event)"
+                />
+              </span>
+            </ng-template>
+          </ui-data-table>
+        </div>
+      </div>
+
+      @if (!loading() && total() > 0) {
+        <ui-pagination
+          class="shrink-0"
+          [total]="total()"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          [label]="'targets.title' | transloco"
+          (pageChange)="setPage($event)"
+          (pageSizeChange)="setPageSize($event)"
+        />
+      }
+    }
+  </app-settings-frame>
+
+  <app-target-modal
+    [canManage]="canManage"
+    [metrics]="metrics()"
+    (saved)="onTargetSaved()"
+    (reloaded)="load()"
+    (deleteRequested)="requestDelete($event)"
+  />
+
+  <app-releases-modal [metrics]="metrics()" />
+
+  <ui-confirm-dialog
+    #deleteDialog
+    tone="danger"
+    [title]="'targets.delete.title' | transloco"
+    [text]="'targets.delete.text' | transloco: { name: pendingDeleteLabel() }"
+    [confirmLabel]="'settings.common.delete' | transloco"
+    [cancelLabel]="'settings.common.cancel' | transloco"
+  />
+
+  <ui-confirm-dialog
+    #conflictDialog
+    tone="warning"
+    [title]="'analytics.common.conflictTitle' | transloco"
+    [text]="'analytics.common.conflictText' | transloco"
+    [confirmLabel]="'analytics.common.reload' | transloco"
+    [cancelLabel]="'analytics.common.keepMine' | transloco"
+  />
+
+  <ui-modal
+    #approveModal
+    size="form"
+    icon="tablerCheck"
+    tile="bg-icon-green"
+    [title]="'targets.approveModal.title' | transloco"
+    [closeLabel]="'settings.common.close' | transloco"
+    [dismissable]="!actionBusy()"
+    (closed)="onActionModalClosed()"
+  >
+    @if (activeActionTarget(); as target) {
+      <div class="flex flex-col gap-8">
+        <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12">
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.approveModal.subject' | transloco"
+              [for]="uid + '-approveModal-subject'"
+              [hint]="'targets.approveModal.subjectHint' | transloco"
+            >
+              <output
+                [id]="uid + '-approveModal-subject'"
+                [attr.aria-describedby]="uid + '-approveModal-subject' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ subjectName(target) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.approveModal.metric' | transloco"
+              [for]="uid + '-approveModal-metric'"
+              [hint]="'targets.approveModal.metricHint' | transloco"
+            >
+              <output
+                [id]="uid + '-approveModal-metric'"
+                [attr.aria-describedby]="uid + '-approveModal-metric' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ metricLabel(target.metricKey) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.approveModal.period' | transloco"
+              [for]="uid + '-approveModal-period'"
+              [hint]="'targets.approveModal.periodHint' | transloco"
+            >
+              <output
+                [id]="uid + '-approveModal-period'"
+                [attr.aria-describedby]="uid + '-approveModal-period' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ periodLabel(target) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.approveModal.target' | transloco"
+              [for]="uid + '-approveModal-target'"
+              [hint]="'targets.approveModal.targetHint' | transloco"
+            >
+              <output
+                [id]="uid + '-approveModal-target'"
+                [attr.aria-describedby]="uid + '-approveModal-target' + '-hint'"
+                class="block truncate font-medium text-text"
+                ><bdi dir="ltr" class="tabular-nums">{{ valueLabel(target) }}</bdi></output
+              >
+            </ui-field>
+          </div>
+        </div>
+
+        <ui-field
+          size="multiline"
+          [label]="'targets.approveModal.note' | transloco"
+          [for]="uid + '-approve-note'"
+          [hint]="'targets.approveModal.noteHint' | transloco"
+        >
+          <textarea
+            [id]="uid + '-approve-note'"
+            rows="2"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'targets.approveModal.notePlaceholder' | transloco"
+            [value]="approveNote()"
+            (input)="onApproveNoteInput($event)"
+          ></textarea>
+        </ui-field>
+      </div>
+    }
+
+    <div modal-footer class="flex flex-1 items-center gap-8">
+      <button type="button" uiButton [loading]="actionBusy()" (click)="confirmApprove()">
+        {{ 'targets.approveModal.confirm' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" [disabled]="actionBusy()" (click)="closeActionModals()">
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    </div>
+  </ui-modal>
+
+  <ui-modal
+    #rejectModal
+    size="form"
+    icon="tablerX"
+    tile="bg-icon-red"
+    [title]="'targets.rejectModal.title' | transloco"
+    [closeLabel]="'settings.common.close' | transloco"
+    [dismissable]="!actionBusy()"
+    (closed)="onActionModalClosed()"
+  >
+    @if (activeActionTarget(); as target) {
+      <div class="flex flex-col gap-8">
+        <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12">
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.rejectModal.subject' | transloco"
+              [for]="uid + '-rejectModal-subject'"
+              [hint]="'targets.rejectModal.subjectHint' | transloco"
+            >
+              <output
+                [id]="uid + '-rejectModal-subject'"
+                [attr.aria-describedby]="uid + '-rejectModal-subject' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ subjectName(target) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.rejectModal.metric' | transloco"
+              [for]="uid + '-rejectModal-metric'"
+              [hint]="'targets.rejectModal.metricHint' | transloco"
+            >
+              <output
+                [id]="uid + '-rejectModal-metric'"
+                [attr.aria-describedby]="uid + '-rejectModal-metric' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ metricLabel(target.metricKey) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.rejectModal.period' | transloco"
+              [for]="uid + '-rejectModal-period'"
+              [hint]="'targets.rejectModal.periodHint' | transloco"
+            >
+              <output
+                [id]="uid + '-rejectModal-period'"
+                [attr.aria-describedby]="uid + '-rejectModal-period' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ periodLabel(target) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.rejectModal.target' | transloco"
+              [for]="uid + '-rejectModal-target'"
+              [hint]="'targets.rejectModal.targetHint' | transloco"
+            >
+              <output
+                [id]="uid + '-rejectModal-target'"
+                [attr.aria-describedby]="uid + '-rejectModal-target' + '-hint'"
+                class="block truncate font-medium text-text"
+                ><bdi dir="ltr" class="tabular-nums">{{ valueLabel(target) }}</bdi></output
+              >
+            </ui-field>
+          </div>
+        </div>
+
+        <ui-field
+          size="multiline"
+          [label]="'targets.rejectModal.note' | transloco"
+          [for]="uid + '-reject-note'"
+          [hint]="'targets.rejectModal.noteHint' | transloco"
+          [required]="true"
+          [error]="rejectNoteError()"
+        >
+          <textarea
+            [id]="uid + '-reject-note'"
+            rows="2"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'targets.rejectModal.notePlaceholder' | transloco"
+            [value]="rejectNote()"
+            [attr.aria-invalid]="rejectNoteError() ? 'true' : null"
+            [attr.aria-describedby]="uid + '-reject-note-hint' + (rejectNoteError() ? ' ' + uid + '-reject-note-error' : '')"
+            (input)="onRejectNoteInput($event)"
+            (blur)="rejectTouched.set(true)"
+          ></textarea>
+        </ui-field>
+      </div>
+    }
+
+    <div modal-footer class="flex flex-1 items-center gap-8">
+      <button type="button" uiButton variant="secondary" [loading]="actionBusy()" (click)="confirmReject()">
+        {{ 'targets.rejectModal.confirm' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" [disabled]="actionBusy()" (click)="closeActionModals()">
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    </div>
+  </ui-modal>
+
+  <ui-modal
+    #correctModal
+    size="form"
+    icon="tablerEdit"
+    tile="bg-icon-orange"
+    [title]="'targets.correctModal.title' | transloco"
+    [closeLabel]="'settings.common.close' | transloco"
+    [dismissable]="!actionBusy()"
+    (closed)="onActionModalClosed()"
+  >
+    @if (activeActionTarget(); as target) {
+      <form class="flex flex-col gap-8" (submit)="$event.preventDefault(); confirmCorrect()">
+        <div class="grid grid-cols-2 gap-x-10 gap-y-6 rounded-8 border border-border bg-surface-muted p-8 text-12">
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.correctModal.subject' | transloco"
+              [for]="uid + '-correctModal-subject'"
+              [hint]="'targets.correctModal.subjectHint' | transloco"
+            >
+              <output
+                [id]="uid + '-correctModal-subject'"
+                [attr.aria-describedby]="uid + '-correctModal-subject' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ subjectName(target) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.correctModal.metric' | transloco"
+              [for]="uid + '-correctModal-metric'"
+              [hint]="'targets.correctModal.metricHint' | transloco"
+            >
+              <output
+                [id]="uid + '-correctModal-metric'"
+                [attr.aria-describedby]="uid + '-correctModal-metric' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ metricLabel(target.metricKey) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.correctModal.period' | transloco"
+              [for]="uid + '-correctModal-period'"
+              [hint]="'targets.correctModal.periodHint' | transloco"
+            >
+              <output
+                [id]="uid + '-correctModal-period'"
+                [attr.aria-describedby]="uid + '-correctModal-period' + '-hint'"
+                class="block truncate font-medium text-text"
+                >{{ periodLabel(target) }}</output
+              >
+            </ui-field>
+          </div>
+          <div class="min-w-0">
+            <ui-field
+              size="bare"
+              [label]="'targets.correctModal.currentValue' | transloco"
+              [for]="uid + '-correctModal-currentValue'"
+              [hint]="'targets.correctModal.currentValueHint' | transloco"
+            >
+              <output
+                [id]="uid + '-correctModal-currentValue'"
+                [attr.aria-describedby]="uid + '-correctModal-currentValue' + '-hint'"
+                class="block truncate font-medium text-text"
+                ><bdi dir="ltr" class="tabular-nums">{{ valueLabel(target) }}</bdi></output
+              >
+            </ui-field>
+          </div>
+        </div>
+
+        <ui-field
+          [label]="'targets.correctModal.newValue' | transloco"
+          [for]="uid + '-correct-value'"
+          [hint]="'targets.correctModal.newValueHint' | transloco"
+          [required]="true"
+          [error]="correctValueError()"
+        >
+          @if (target.measureKind === 'MONEY' && target.currencyCode) {
+            <span dir="ltr" class="shrink-0 text-12 font-medium tabular-nums text-text-muted">
+              {{ target.currencyCode }}
+            </span>
+          }
+          <input
+            [id]="uid + '-correct-value'"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            class="w-full min-w-0 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'targets.form.targetValuePlaceholder' | transloco"
+            [value]="correctValueInput()"
+            [attr.aria-invalid]="correctValueError() ? 'true' : null"
+            [attr.aria-describedby]="uid + '-correct-value-hint' + (correctValueError() ? ' ' + uid + '-correct-value-error' : '')"
+            (input)="onCorrectValueInput($event)"
+            (blur)="onCorrectValueBlur()"
+          />
+          @if (target.measureKind === 'RATE') {
+            <span class="shrink-0 text-12 font-medium text-text-muted">%</span>
+          }
+        </ui-field>
+
+        <ui-field
+          size="multiline"
+          [label]="'targets.correctModal.reason' | transloco"
+          [for]="uid + '-correct-reason'"
+          [hint]="'targets.correctModal.reasonHint' | transloco"
+          [required]="true"
+          [error]="correctReasonError()"
+        >
+          <textarea
+            [id]="uid + '-correct-reason'"
+            rows="2"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'targets.correctModal.reasonPlaceholder' | transloco"
+            [value]="correctReason()"
+            [attr.aria-invalid]="correctReasonError() ? 'true' : null"
+            [attr.aria-describedby]="uid + '-correct-reason-hint' + (correctReasonError() ? ' ' + uid + '-correct-reason-error' : '')"
+            (input)="onCorrectReasonInput($event)"
+            (blur)="correctTouched.update(c => ({ ...c, reason: true }))"
+          ></textarea>
+        </ui-field>
+      </form>
+    }
+
+    <div modal-footer class="flex flex-1 items-center gap-8">
+      <button type="button" uiButton [loading]="actionBusy()" (click)="confirmCorrect()">
+        {{ 'targets.correctModal.confirm' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" [disabled]="actionBusy()" (click)="closeActionModals()">
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    </div>
+  </ui-modal>
+}

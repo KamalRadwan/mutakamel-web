@@ -1,0 +1,174 @@
+{
+  "search": "البحث عن مكوّن (مثل crm.core)",
+  "filters": {
+    "risk": "الخطورة",
+    "riskHint": "يعرض التحديثات بهذا المستوى فقط.",
+    "backup": "النسخ الاحتياطي",
+    "backupHint": "يصفّي حسب اشتراط نسخة احتياطية.",
+    "maintenance": "نافذة الصيانة",
+    "maintenanceHint": "يصفّي حسب الحاجة إلى نافذة صيانة.",
+    "sort": "الترتيب حسب",
+    "sortHint": "الأحدث نشرًا أولًا افتراضيًا.",
+    "all": "الكل",
+    "required": "مطلوب",
+    "notRequired": "غير مطلوب",
+    "clear": "مسح التصفية",
+    "publishedAt": "تاريخ النشر"
+  },
+  "risk": {
+    "LOW": "منخفضة",
+    "MEDIUM": "متوسطة",
+    "HIGH": "عالية"
+  },
+  "total": "{{count}} تحديثًا",
+  "totalPlural": {
+    "zero": "لا تحديثات",
+    "one": "تحديث واحد",
+    "two": "تحديثان",
+    "few": "{{count}} تحديثات",
+    "many": "{{count}} تحديثًا",
+    "other": "{{count}} تحديث"
+  },
+  "selectedBadge": "{{count}} محدّد",
+  "selectedBadgePlural": {
+    "zero": "لا شيء محدّد",
+    "one": "تحديث واحد محدّد",
+    "two": "تحديثان محدّدان",
+    "few": "{{count}} تحديثات محدّدة",
+    "many": "{{count}} تحديثًا محدّدًا",
+    "other": "{{count}} تحديث محدّد"
+  },
+  "clearSelection": "إلغاء التحديد",
+  "applySelected": "تطبيق المحدد ({{count}})",
+  "table": {
+    "ariaLabel": "التحديثات المتاحة",
+    "component": "المكوّن",
+    "current": "الإصدار الحالي",
+    "available": "الإصدار المتاح",
+    "risk": "الخطورة",
+    "requirements": "المتطلبات",
+    "status": "الحالة",
+    "app": "التطبيق: {{app}}",
+    "notRecorded": "غير مسجّل",
+    "notRequired": "غير مطلوبة",
+    "backupRequired": "نسخة احتياطية مطلوبة",
+    "maintenanceRequired": "نافذة صيانة مطلوبة",
+    "selected": "محدّد",
+    "selectAll": "تحديد كل التحديثات المتاحة في الصفحة",
+    "showDetails": "عرض التفاصيل",
+    "hideDetails": "إخفاء التفاصيل"
+  },
+  "details": {
+    "schemaTarget": "هدف المخطط",
+    "checksum": "المجموع الاختباري"
+  },
+  "eligibility": {
+    "ELIGIBLE": "متاح",
+    "PLANNED": "مجدول",
+    "ADMIN_MANAGED": "يديره المسؤول",
+    "NEEDS_BACKUP_OR_MAINTENANCE": "يتطلب نسخة احتياطية أو صيانة (المسؤول)",
+    "INCOMPLETE_EVIDENCE": "غير متاح"
+  },
+  "empty": {
+    "title": "لا توجد تحديثات متاحة",
+    "text": "مكوّناتك المثبّتة على أحدث الإصدارات.",
+    "support": "إذا كنت تتوقع تحديثًا ولا يظهر، فتواصل مع الدعم."
+  },
+  "filteredEmpty": {
+    "title": "لا توجد تحديثات مطابقة",
+    "text": "لا توجد تحديثات تطابق التصفية الحالية."
+  },
+  "noPermission": {
+    "title": "يلزم إذن على مستوى مساحة العمل",
+    "text": "عرض التحديثات يتطلب إذن قراءة على مستوى مساحة العمل.",
+    "readOnly": "للعرض فقط. تطبيق التحديثات يتطلب إذن إدارة على مستوى مساحة العمل."
+  },
+  "loadFailed": {
+    "title": "تعذّر تحميل التحديثات",
+    "refreshFailed": "تعذّر تحديث القائمة وقد تكون قديمة."
+  },
+  "apply": {
+    "title": "تأكيد التحديثات",
+    "text": "ستبدأ التحديثات لهذه المكوّنات:",
+    "warnBackup": "يتطلب تحديث محدد نسخة احتياطية أو نافذة صيانة.",
+    "consent": "أفهم أن القبول يبدأ المعالجة ولا يكتمل فورًا.",
+    "consentLabel": "التأكيد",
+    "consentHint": "مطلوب قبل إرسال طلب التحديث.",
+    "confirm": "تأكيد وتطبيق ({{count}})",
+    "submitting": "جارٍ إرسال طلب التحديث…",
+    "staleTitle": "تغيّرت القائمة",
+    "nowVersion": "أصبح {{version}}",
+    "reload": "إعادة تحميل القائمة",
+    "blockedTitle": "لا يمكن بدء التحديثات الآن",
+    "refusedTitle": "يلزم إجراء من المسؤول",
+    "accepted": "تم قبول طلب التحديث",
+    "replayed": "تم استلام الطلب مسبقًا"
+  },
+  "ambiguous": {
+    "title": "لم يتأكد طلب التحديث",
+    "text": "انقطع الاتصال قبل التأكيد. أعد المحاولة بأمان دون تكرار الطلب.",
+    "retry": "إعادة إرسال الطلب"
+  },
+  "reconcile": {
+    "title": "تم استلام طلب التحديث",
+    "text": "قبِل الخادم الطلب لكن تعذّرت قراءة حالته. افحص الحالة.",
+    "check": "فحص الحالة"
+  },
+  "operation": {
+    "strip": "حالة التحديث: {{status}}",
+    "updated": "آخر تحديث {{time}}",
+    "title": "حالة التحديث",
+    "view": "عرض الحالة",
+    "refresh": "تحديث الحالة",
+    "loadFailed": "تعذّر تحميل حالة التحديث",
+    "lastConfirmed": "عرض آخر حالة مؤكدة.",
+    "progress": "اكتملت {{done}} من {{total}} خطوات ({{percent}}%)",
+    "addedAuto": "أُضيف تلقائيًا",
+    "autoStopped": "توقّف التحديث التلقائي. استخدم تحديث الحالة.",
+    "manualTitle": "يلزم إجراء من المسؤول",
+    "phase": "بانتظار المتطلبات المسبقة."
+  },
+  "status": {
+    "REQUESTED": "تم الطلب",
+    "PLANNING": "قيد الإعداد",
+    "QUEUED": "في الانتظار",
+    "RUNNING": "قيد التنفيذ",
+    "WAITING_RETRY": "بانتظار إعادة المحاولة",
+    "CANCEL_REQUESTED": "طُلب الإلغاء",
+    "SUCCEEDED": "اكتمل",
+    "FAILED_RETRYABLE": "فشل (قابل لإعادة المحاولة)",
+    "MANUAL_RECOVERY_REQUIRED": "يحتاج إلى مراجعة المسؤول",
+    "CANCELLED": "أُلغي",
+    "unknown": "حالة غير معروفة"
+  },
+  "guidance": {
+    "RUNNING": "تم قبول الطلب. التحديثات قيد التنفيذ.",
+    "WAITING_RETRY": "توقّف التنفيذ مؤقتًا وسيُستأنف.",
+    "CANCEL_REQUESTED": "يجري معالجة طلب الإلغاء.",
+    "SUCCEEDED": "اكتمل التحديث.",
+    "CANCELLED": "أُلغي طلب التحديث.",
+    "FAILED_RETRYABLE": "تعذّر إكمال التحديث. تواصل مع مسؤول النظام.",
+    "MANUAL_RECOVERY_REQUIRED": "يلزم تدخل يدوي من مسؤول النظام لإكمال التحديث."
+  },
+  "errors": {
+    "IDEMPOTENCY_KEY_REQUIRED": "تعذّر إرسال الطلب بأمان. أعد تحميل الصفحة وابدأ من جديد.",
+    "INVALID_IDEMPOTENCY_KEY": "تعذّر إرسال الطلب بأمان. أعد تحميل الصفحة وابدأ من جديد.",
+    "IDEMPOTENCY_BODY_MISMATCH": "تعذّر إرسال الطلب بأمان. أعد تحميل الصفحة وابدأ من جديد.",
+    "IDEMPOTENCY_KEY_REUSED": "تعذّر إرسال الطلب بأمان. أعد تحميل الصفحة وابدأ من جديد.",
+    "TENANT_PROVISIONING_UPDATE_SELECTION_INVALID": "التحديد غير صالح. حدّد من جديد.",
+    "TENANT_OPERATION_NOT_FOUND": "لم يُعثر على عملية التحديث.",
+    "TENANT_PROVISIONING_OPERATION_STATE_INVALID": "لا يمكن بدء التحديثات الآن. يجب أن تكون مساحة العمل نشطة وآخر عملية تجهيز مكتملة.",
+    "TENANT_PROVISIONING_UPDATE_SELECTION_STALE": "تغيّرت التحديثات المتاحة. أعد تحميل القائمة وراجعها.",
+    "TENANT_PROVISIONING_PLAN_STALE": "تغيّرت التحديثات المتاحة. أعد تحميل القائمة وراجعها.",
+    "TENANT_PROVISIONING_OPERATION_SUPERSEDED": "تغيّرت التحديثات المتاحة. أعد تحميل القائمة وراجعها.",
+    "TENANT_PROVISIONING_ADDON_REBIND_REQUIRED": "إضافة مرتبطة بمكوّن سيغيّره التحديث. يجب أن يعيد المسؤول ربطها.",
+    "TENANT_PROVISIONING_NO_SELF_SERVICE_UPDATES": "لا يطبّق أحد التحديثات المحددة إلا مسؤول المنصة، لأنه يُدار من المسؤول أو يتطلب نسخة احتياطية أو نافذة صيانة. أعد تحميل القائمة، أو تواصل مع مسؤول المنصة.",
+    "TENANT_PROVISIONING_UPDATE_INCOMPATIBLE": "التحديثات المحددة غير متوافقة مع بعضها أو مع المكوّنات المثبّتة.",
+    "TENANT_PROVISIONING_MODULE_SELECTION_INVALID": "خطة التحديث غير متاحة. تواصل مع الدعم.",
+    "TENANT_PROVISIONING_CATALOG_INVALID": "خطة التحديث غير متاحة. تواصل مع الدعم.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "ما زال الطلب الأصلي قيد المعالجة. أعد المحاولة بعد قليل.",
+    "STEP_FAILED": "لم تكتمل إحدى خطوات التحديث.",
+    "CORE_VALIDATION_FAILED": "بعض الحقول غير صحيحة، فراجعها وحاول مرة أخرى.",
+    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية لتنفيذ هذا الإجراء."
+  }
+}

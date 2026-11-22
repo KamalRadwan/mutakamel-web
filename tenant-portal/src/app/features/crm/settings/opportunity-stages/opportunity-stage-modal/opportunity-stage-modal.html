@@ -1,0 +1,238 @@
+<ui-modal
+  size="form"
+  icon="tablerLayoutRows"
+  tile="bg-icon-red"
+  [title]="(isEdit() ? 'opportunityStages.modal.editTitle' : 'opportunityStages.modal.createTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <ui-field
+      [for]="uid + '-name-ar'"
+      [label]="'settings.common.nameAr' | transloco"
+      [required]="true"
+      [hint]="'opportunityStages.modal.nameArHint' | transloco"
+      [count]="nameArCount()"
+      [max]="maxNameLength"
+      [error]="errorOf('nameAr')"
+    >
+      <input
+        [id]="uid + '-name-ar'"
+        type="text"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameAr()"
+        [readonly]="!canManage() || saving()"
+        [attr.aria-invalid]="errorOf('nameAr') ? 'true' : null"
+        [attr.aria-describedby]="errorOf('nameAr') ? uid + '-name-ar-error ' + uid + '-name-ar-hint' : uid + '-name-ar-hint'"
+        (input)="onNameInput('nameAr', $event)"
+        (blur)="markTouched('nameAr')"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="uid + '-name-en'"
+      [label]="'settings.common.nameEn' | transloco"
+      [required]="true"
+      [hint]="'opportunityStages.modal.nameEnHint' | transloco"
+      [count]="nameEnCount()"
+      [max]="maxNameLength"
+      [error]="errorOf('nameEn')"
+    >
+      <input
+        [id]="uid + '-name-en'"
+        type="text"
+        dir="ltr"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameEn()"
+        [readonly]="!canManage() || saving()"
+        [attr.aria-invalid]="errorOf('nameEn') ? 'true' : null"
+        [attr.aria-describedby]="errorOf('nameEn') ? uid + '-name-en-error ' + uid + '-name-en-hint' : uid + '-name-en-hint'"
+        (input)="onNameInput('nameEn', $event)"
+        (blur)="markTouched('nameEn')"
+      />
+    </ui-field>
+
+    @if (meaningLocked()) {
+      <ui-field
+        [for]="uid + '-meaning'"
+        [label]="'opportunityStages.modal.meaning' | transloco"
+        [required]="true"
+        [hint]="meaningHint()"
+      >
+        <input
+          [id]="uid + '-meaning'"
+          type="text"
+          readonly
+          class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="'opportunityStages.flags.' + flag() | transloco"
+          [attr.aria-describedby]="uid + '-meaning-hint'"
+        />
+        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      </ui-field>
+    } @else {
+      <ui-field
+        size="bare"
+        [label]="'opportunityStages.modal.meaning' | transloco"
+        [required]="true"
+        [hint]="meaningHint()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [options]="flagOptions()"
+          [value]="flag()"
+          [label]="'opportunityStages.modal.meaning' | transloco"
+          (valueChange)="setFlag($event)"
+        />
+      </ui-field>
+    }
+
+    @if (categoryLocked()) {
+      <ui-field
+        [for]="uid + '-category'"
+        [label]="'opportunityStages.modal.category' | transloco"
+        [required]="true"
+        [hint]="'opportunityStages.modal.categoryHint' | transloco"
+      >
+        <input
+          [id]="uid + '-category'"
+          type="text"
+          readonly
+          class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="'opportunityStages.categories.' + category() | transloco"
+          [attr.aria-describedby]="uid + '-category-hint'"
+        />
+        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      </ui-field>
+    } @else {
+      <ui-field
+        size="bare"
+        [label]="'opportunityStages.modal.category' | transloco"
+        [required]="true"
+        [hint]="'opportunityStages.modal.categoryHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [options]="categoryOptions()"
+          [value]="category()"
+          [label]="'opportunityStages.modal.category' | transloco"
+          (valueChange)="setCategory($event)"
+        />
+      </ui-field>
+    }
+
+    @if (isEdit()) {
+      <ui-field
+        size="bare"
+        [label]="'settings.common.active' | transloco"
+        [hint]="activeHintKey() | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [(checked)]="isActive"
+            [disabled]="activeLocked() || saving()"
+            [label]="'settings.common.active' | transloco"
+          />
+          <span class="text-12 text-text">{{ (isActive() ? 'settings.common.active' : 'settings.common.inactive') | transloco }}</span>
+        </div>
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-used-in'"
+        [label]="'opportunityStages.modal.usedIn' | transloco"
+        [hint]="'opportunityStages.modal.usedInHint' | transloco"
+      >
+        <input
+          [id]="uid + '-used-in'"
+          type="text"
+          readonly
+          class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="isUsed() ? usedInNames() : ('opportunityStages.modal.usedInNone' | transloco)"
+          [attr.aria-describedby]="uid + '-used-in-hint'"
+        />
+      </ui-field>
+    }
+  </div>
+
+  @if (canManage()) {
+    <ng-container ngProjectAs="[modal-footer]">
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [loading]="saving()"
+      [disabled]="saving() || (isEdit() && !dirty())"
+      (click)="save()"
+    >
+      {{ 'settings.common.save' | transloco }}
+    </button>
+
+    @if (isEdit() && dirty()) {
+      <button
+        modal-footer
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="undo()"
+      >
+        {{ 'settings.common.undo' | transloco }}
+      </button>
+      <span modal-footer class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+    }
+
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'settings.common.cancel' | transloco }}
+    </button>
+
+    @if (isEdit() && !isSystem()) {
+      <button
+        modal-footer
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [disabled]="saving() || isUsed()"
+        [attr.title]="isUsed() ? ('opportunityStages.actions.usedDeleteDesc' | transloco) : null"
+        [attr.aria-describedby]="isUsed() ? uid + '-delete-reason' : null"
+        (click)="requestDelete()"
+      >
+        {{ 'settings.common.delete' | transloco }}
+      </button>
+      @if (isUsed()) {
+        <span [id]="uid + '-delete-reason'" class="sr-only">
+          {{ 'opportunityStages.actions.usedDeleteDesc' | transloco }}
+        </span>
+      }
+    }
+    </ng-container>
+  } @else {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      variant="ghost"
+      (click)="close()"
+    >
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  }
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'opportunityStages.discard.title' | transloco"
+  [text]="'opportunityStages.discard.text' | transloco"
+  [confirmLabel]="'opportunityStages.discard.confirm' | transloco"
+  [cancelLabel]="'opportunityStages.discard.keep' | transloco"
+/>

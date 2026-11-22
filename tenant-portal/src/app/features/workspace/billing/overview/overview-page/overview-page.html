@@ -1,0 +1,320 @@
+@if (!isOwner()) {
+  <app-billing-forbidden />
+} @else if (loading() && !summary()) {
+  <section class="grid grid-cols-1 gap-12 desktop:grid-cols-3" aria-busy="true">
+    @for (card of skeletonCards; track card) {
+      <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <div class="flex items-center gap-8">
+          <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+        <div class="flex flex-col gap-6">
+          <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+        <div class="mt-auto border-t border-border pt-8">
+          <span class="inline-block h-btn-h-sm w-preset animate-pulse rounded-6 bg-neutral-soft"></span>
+        </div>
+      </div>
+    }
+  </section>
+
+  <div class="flex h-tab shrink-0 items-center gap-12 border-b border-border px-10" aria-hidden="true">
+    <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+    <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+  </div>
+
+  <div class="flex flex-col gap-6" aria-hidden="true">
+    <div class="h-table-head rounded-10 bg-neutral-soft"></div>
+    @for (row of [1, 2, 3, 4, 5]; track row) {
+      <div class="h-table-row rounded-10 border border-border bg-surface shadow-card"></div>
+    }
+  </div>
+} @else if (loadFailed() && !summary()) {
+  <app-billing-failed [correlationId]="correlationId()" (retry)="loadSummary()" />
+} @else if (summary(); as data) {
+  <section class="grid grid-cols-1 gap-12 desktop:grid-cols-3">
+    <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <header class="flex items-center gap-8">
+        <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+          <ng-icon name="tablerRepeat" size="15" aria-hidden="true" />
+        </span>
+        <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+          {{ 'bov.subscription.title' | transloco }}
+        </h2>
+      </header>
+
+      <div class="flex flex-wrap items-center gap-6">
+        @let subBadge = subscriptionStatusBadge(data.subscription.status);
+        <span [class]="subBadge.classes">{{ subBadge.labelKey | transloco }}</span>
+        @let modeBadge = accessModeBadge(data.subscription.accessMode);
+        <span [class]="modeBadge.classes">{{ modeBadge.labelKey | transloco }}</span>
+      </div>
+
+      @if (data.subscription.accessMode !== 'FULL') {
+        <p class="text-12 leading-18 text-text-muted">
+          {{ 'bov.subscription.accessText.' + data.subscription.accessMode | transloco }}
+        </p>
+      }
+
+      <dl class="flex flex-1 flex-col gap-6">
+        <div class="flex items-center justify-between gap-8 text-13 leading-18">
+          <dt class="text-12 text-text-muted">{{ 'bov.subscription.billingCycle' | transloco }}</dt>
+          <dd class="text-text">
+            @if (data.subscription.billingCycle; as cycle) {
+              {{ 'bill.cycle.' + cycle | transloco }}
+            } @else {
+              {{ 'bill.common.none' | transloco }}
+            }
+          </dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-8 text-13 leading-18">
+          <dt class="text-12 text-text-muted">{{ 'bov.subscription.currentPeriod' | transloco }}</dt>
+          <dd class="flex min-w-0 items-center gap-4 text-text">
+            @if (data.subscription.currentPeriodStart; as start) {
+              <span class="truncate">{{ formatDate(start) }}</span>
+              <ng-icon
+                name="tablerArrowRight"
+                size="14"
+                class="shrink-0 text-text-muted rtl:-scale-x-100"
+                aria-hidden="true"
+              />
+              <span class="truncate">{{ formatDate(data.subscription.currentPeriodEnd) }}</span>
+            } @else {
+              <span>{{ formatDate(data.subscription.currentPeriodEnd) }}</span>
+            }
+          </dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-8 text-13 leading-18">
+          <dt class="text-12 text-text-muted">{{ 'bov.subscription.renewsOn' | transloco }}</dt>
+          <dd class="text-text">{{ formatDate(data.subscription.currentPeriodEnd) }}</dd>
+        </div>
+
+        @if (data.subscription.trialEndsAt; as trialEnd) {
+          <div class="flex items-center justify-between gap-8 text-13 leading-18">
+            <dt class="text-12 text-text-muted">{{ 'bov.subscription.trialEnds' | transloco }}</dt>
+            <dd class="text-text">{{ formatDate(trialEnd) }}</dd>
+          </div>
+        }
+
+        <div class="flex items-center justify-between gap-8 text-13 leading-18">
+          <dt class="text-12 text-text-muted">{{ 'bov.subscription.recurringTotal' | transloco }}</dt>
+          <dd class="flex items-center gap-4 text-text">
+            <span dir="ltr" class="font-medium tabular-nums">{{ formatUsd(data.subscription.totalPriceUsd) }}</span>
+            @if (data.subscription.totalPriceUsd !== null && data.subscription.billingCycle) {
+              <span class="text-12 text-text-muted">
+                {{ (data.subscription.billingCycle === 'ANNUAL' ? 'bill.common.perYear' : 'bill.common.perMonth') | transloco }}
+              </span>
+            }
+          </dd>
+        </div>
+      </dl>
+
+      <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
+        <a uiButton variant="secondary" size="small" routerLink="/workspace/billing/subscription">
+          {{ 'bov.subscription.viewAction' | transloco }}
+        </a>
+      </footer>
+    </article>
+
+    <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <header class="flex items-center gap-8">
+        <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon">
+          <ng-icon name="tablerWallet" size="15" aria-hidden="true" />
+        </span>
+        <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+          {{ 'bov.wallet.title' | transloco }}
+        </h2>
+        @let walBadge = walletStatusBadge(data.wallet.status);
+        <span [class]="walBadge.classes">{{ walBadge.labelKey | transloco }}</span>
+      </header>
+
+      <div class="flex flex-col gap-2">
+        <span class="text-12 leading-18 text-text-muted">{{ 'bov.wallet.available' | transloco }}</span>
+        <span dir="ltr" class="text-20 leading-26 font-medium tabular-nums text-text">
+          {{ formatUsd(data.wallet.availableBalanceUsd) }}
+        </span>
+      </div>
+
+      <dl class="flex flex-1 flex-col gap-6">
+        <div class="flex items-center justify-between gap-8 text-13 leading-18">
+          <dt class="text-12 text-text-muted">{{ 'bov.wallet.balance' | transloco }}</dt>
+          <dd dir="ltr" class="font-medium tabular-nums text-text">
+            {{ formatUsd(data.wallet.balanceUsd) }}
+          </dd>
+        </div>
+
+        <div class="flex items-center justify-between gap-8 text-13 leading-18">
+          <dt class="flex items-center gap-4 text-12 text-text-muted">
+            <span>{{ 'bov.wallet.reserved' | transloco }}</span>
+            <span
+              #reservedTrigger
+              class="group relative inline-flex shrink-0 items-center text-accent"
+              (mouseenter)="placeReservedTip(reservedTrigger)"
+              (mouseleave)="hideReservedTip()"
+            >
+              <ng-icon
+                name="tablerExclamationCircle"
+                size="14"
+                class="cursor-help"
+                tabindex="-1"
+                aria-hidden="true"
+              />
+              <span
+                #reservedTip
+                [id]="uid + '-reserved-hint'"
+                role="tooltip"
+                class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class]="reservedTipPlaced() ? 'invisible group-hover:visible' : 'invisible'"
+                [style.top.px]="reservedTipPlace().top"
+                [style.inset-inline-start.px]="reservedTipPlace().start"
+              >
+                {{ 'bov.wallet.reservedHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd
+            dir="ltr"
+            class="tabular-nums text-text"
+            [attr.aria-describedby]="uid + '-reserved-hint'"
+          >
+            {{ formatUsd(data.wallet.reservedBalanceUsd) }}
+          </dd>
+        </div>
+      </dl>
+
+      <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
+        <span
+          class="inline-flex"
+          [title]="data.wallet.status !== 'ACTIVE' ? ('bov.wallet.topUpDisabled.' + data.wallet.status | transloco) : ''"
+        >
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            size="small"
+            [disabled]="data.wallet.status !== 'ACTIVE'"
+            (click)="openTopup()"
+          >
+            {{ 'bill.common.topUp' | transloco }}
+          </button>
+        </span>
+      </footer>
+    </article>
+
+    <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      @if (data.outstandingInvoice; as inv) {
+        <header class="flex items-center gap-8">
+          <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+            <ng-icon name="tablerFileInvoice" size="15" aria-hidden="true" />
+          </span>
+          <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+            {{ 'bov.due.title' | transloco }}
+          </h2>
+          @let invBadge = invoiceStatusBadge(inv.status);
+          <span [class]="invBadge.classes">{{ invBadge.labelKey | transloco }}</span>
+        </header>
+
+        <div class="flex flex-col gap-2">
+          <span class="text-12 leading-18 text-text-muted">{{ 'bov.due.outstanding' | transloco }}</span>
+          <span dir="ltr" class="text-20 leading-26 font-medium tabular-nums text-text">
+            {{ formatUsd(inv.outstandingUsd) }}
+          </span>
+        </div>
+
+        <dl class="flex flex-1 flex-col gap-6">
+          <div class="flex items-center justify-between gap-8 text-13 leading-18">
+            <dt class="text-12 text-text-muted">{{ 'bov.due.invoiceNumber' | transloco }}</dt>
+            <dd dir="ltr" class="font-medium tabular-nums text-text">{{ inv.number }}</dd>
+          </div>
+
+          <div class="flex items-center justify-between gap-8 text-13 leading-18">
+            <dt class="text-12 text-text-muted">{{ 'bov.due.dueDate' | transloco }}</dt>
+            <dd class="text-text">{{ formatDate(inv.dueAt) }}</dd>
+          </div>
+        </dl>
+
+        <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          @if (canPayInvoice(inv)) {
+            <a
+              uiButton
+              variant="secondary"
+              size="small"
+              [routerLink]="['/workspace/billing/invoices', inv.id]"
+              [queryParams]="{ pay: 1 }"
+            >
+              {{ 'bill.common.pay' | transloco }}
+            </a>
+          }
+          <a
+            uiButton
+            [variant]="canPayInvoice(inv) ? 'ghost' : 'secondary'"
+            size="small"
+            [routerLink]="['/workspace/billing/invoices', inv.id]"
+          >
+            {{ 'bov.due.viewInvoice' | transloco }}
+          </a>
+        </footer>
+      } @else {
+        <header class="flex items-center gap-8">
+          <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+            <ng-icon name="tablerCircleCheck" size="15" aria-hidden="true" />
+          </span>
+          <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+            {{ 'bov.due.title' | transloco }}
+          </h2>
+        </header>
+
+        <div class="flex flex-1 items-center">
+          <p class="text-13 leading-18 text-text-muted">{{ 'bov.due.nothingToPay' | transloco }}</p>
+        </div>
+      }
+    </article>
+  </section>
+
+  <div
+    role="tablist"
+    [attr.aria-label]="'bov.tabs.label' | transloco"
+    class="flex h-tab shrink-0 items-stretch overflow-x-auto border-b border-border text-12 leading-18 no-scrollbar"
+    (keydown)="onTabKeydown($event)"
+  >
+    @for (tab of tabs; track tab.id) {
+      @let active = activeTab() === tab.id;
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        [id]="uid + '-tab-' + tab.id"
+        [attr.aria-controls]="uid + '-panel'"
+        [attr.aria-selected]="active"
+        [tabIndex]="active ? 0 : -1"
+        class="inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="active ? 'font-medium text-accent subnav-active' : 'text-text-muted hover:text-text'"
+        (click)="selectTab(tab.id)"
+      >
+        <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+        <span>{{ tab.labelKey | transloco }}</span>
+      </button>
+    }
+  </div>
+
+  <div
+    [id]="uid + '-panel'"
+    role="tabpanel"
+    [attr.aria-labelledby]="uid + '-tab-' + activeTab()"
+    class="flex flex-1 shrink-0 flex-col"
+  >
+    @if (activeTab() === 'payments') {
+      <app-billing-payments-table [reloadToken]="tablesReloadToken()" />
+    } @else {
+      <app-billing-ledger-table [reloadToken]="tablesReloadToken()" />
+    }
+  </div>
+}
+
+@if (isOwner()) {
+  <app-topup-modal (completed)="onTopupCompleted()" />
+}

@@ -1,0 +1,104 @@
+<ui-modal
+  size="form"
+  icon="tablerEdit"
+  tile="bg-icon-blue"
+  [title]="'itemsBulk.action.SET_CAPABILITIES' | transloco"
+  [closeLabel]="'tradeShared.common.cancel' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <span
+    modal-header-end
+    class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft tabular-nums"
+  >
+    {{ 'itemsBulk.itemsCount' | transloco: { count: selectedCount() } }}
+  </span>
+
+  <div class="flex flex-col gap-10">
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.capabilitiesModal.canSell' | transloco"
+      [for]="uid + '-can-sell'"
+      [hint]="'itemsBulk.capabilitiesModal.canSellHint' | transloco"
+    >
+      <div class="flex flex-wrap items-center">
+        <ui-segmented
+          [id]="uid + '-can-sell'"
+          [label]="'itemsBulk.capabilitiesModal.canSell' | transloco"
+          [describedBy]="uid + '-can-sell-hint'"
+          [options]="choiceOptions()"
+          [value]="canSell()"
+          (valueChange)="onCanSellChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.capabilitiesModal.canPurchase' | transloco"
+      [for]="uid + '-can-purchase'"
+      [hint]="'itemsBulk.capabilitiesModal.canPurchaseHint' | transloco"
+    >
+      <div class="flex flex-wrap items-center">
+        <ui-segmented
+          [id]="uid + '-can-purchase'"
+          [label]="'itemsBulk.capabilitiesModal.canPurchase' | transloco"
+          [describedBy]="uid + '-can-purchase-hint'"
+          [options]="choiceOptions()"
+          [value]="canPurchase()"
+          (valueChange)="onCanPurchaseChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.capabilitiesModal.canPos' | transloco"
+      [for]="uid + '-can-pos'"
+      [hint]="'itemsBulk.capabilitiesModal.canPosHint' | transloco"
+      [error]="posError()"
+    >
+      <div class="flex flex-wrap items-center">
+        <ui-segmented
+          [id]="uid + '-can-pos'"
+          [label]="'itemsBulk.capabilitiesModal.canPos' | transloco"
+          [describedBy]="posDescribedBy()"
+          [options]="choiceOptions()"
+          [value]="canPos()"
+          (valueChange)="onCanPosChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'itemsBulk.capabilitiesModal.trackInventory' | transloco"
+      [for]="uid + '-track'"
+      [hint]="'itemsBulk.capabilitiesModal.trackInventoryHint' | transloco"
+    >
+      <div class="flex flex-wrap items-center">
+        <ui-segmented
+          [id]="uid + '-track'"
+          [label]="'itemsBulk.capabilitiesModal.trackInventory' | transloco"
+          [describedBy]="uid + '-track-hint'"
+          [options]="choiceOptions()"
+          [value]="trackInventory()"
+          (valueChange)="onTrackInventoryChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'itemsBulk.capabilitiesModal.note' | transloco }}
+    </p>
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton [loading]="submitting()" [disabled]="!canSubmit()" (click)="submit()">
+      {{ 'itemsBulk.run' | transloco: { count: selectedCount() } }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

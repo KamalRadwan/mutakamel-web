@@ -1,0 +1,116 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerMail"
+  tile="bg-icon-blue"
+  [title]="'tplEmail.settings.title' | transloco"
+  [closeLabel]="(readOnly() ? 'tplEmail.close' : 'tplEmail.cancel') | transloco"
+  [dismissable]="!busy()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+    <div class="col-span-2 min-w-0">
+      <app-tpl-text-template-input
+        [inputId]="uid + '-subject'"
+        [value]="subject()"
+        [maxChars]="subjectMaxChars"
+        [singleLine]="true"
+        [label]="'tplEmail.subject.label' | transloco"
+        [hint]="'tplEmail.subject.hint' | transloco"
+        [required]="true"
+        [error]="subjectError()"
+        [readOnly]="readOnly()"
+        [pickField]="pickField()"
+        (valueChange)="subject.set($event)"
+      />
+    </div>
+
+    <div class="col-span-2 min-w-0">
+      <app-tpl-text-template-input
+        [inputId]="uid + '-preheader'"
+        [value]="preheader()"
+        [maxChars]="preheaderMaxChars"
+        [singleLine]="true"
+        [label]="'tplEmail.preheader.label' | transloco"
+        [hint]="'tplEmail.preheader.hint' | transloco"
+        [required]="false"
+        [error]="preheaderError()"
+        [readOnly]="readOnly()"
+        [pickField]="pickField()"
+        (valueChange)="preheader.set($event)"
+      />
+    </div>
+
+    <div class="col-span-1 min-w-0">
+      <ui-field
+        [for]="uid + '-width'"
+        [label]="'tplEmail.width.label' | transloco"
+        [hint]="'tplEmail.width.hint' | transloco"
+        [required]="true"
+        [error]="widthError()"
+      >
+        <input
+          [id]="uid + '-width'"
+          type="number"
+          min="320"
+          max="800"
+          step="1"
+          dir="ltr"
+          [readonly]="readOnly()"
+          [value]="widthRaw()"
+          [attr.aria-invalid]="widthError() ? 'true' : null"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          (input)="onWidthInput($event)"
+          (blur)="onWidthBlur()"
+        />
+        <span class="shrink-0 text-11 text-text-muted" aria-hidden="true">{{ 'tplEmail.width.unit' | transloco }}</span>
+      </ui-field>
+    </div>
+
+    <div class="col-span-1 min-w-0">
+      <ui-field
+        [for]="uid + '-bg'"
+        [label]="'tplEmail.background.label' | transloco"
+        [hint]="'tplEmail.background.hint' | transloco"
+        [error]="backgroundError()"
+      >
+        <span
+          class="size-badge shrink-0 rounded-4 border border-border"
+          [class.bg-neutral-soft]="!validSwatchColor()"
+          [style.background-color]="validSwatchColor()"
+          aria-hidden="true"
+        ></span>
+        <input
+          [id]="uid + '-bg'"
+          type="text"
+          dir="ltr"
+          placeholder="#F5F7FA"
+          [readonly]="readOnly()"
+          [value]="backgroundRaw()"
+          [attr.aria-invalid]="backgroundError() ? 'true' : null"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          (input)="onBackgroundInput($event)"
+          (blur)="onBackgroundBlur()"
+        />
+      </ui-field>
+    </div>
+
+    <p class="col-span-2 text-11 leading-16 text-text-muted">
+      {{ 'tplEmail.plainText' | transloco }}
+    </p>
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (!readOnly()) {
+      <button type="submit" [attr.form]="uid + '-form'" uiButton variant="primary">
+        {{ 'tplEmail.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'tplEmail.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'tplEmail.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

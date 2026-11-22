@@ -1,0 +1,159 @@
+@if (tracker.jobs().length > 0) {
+  <button
+    type="button"
+    class="relative inline-flex size-nav-item cursor-pointer items-center justify-center rounded-8 text-on-nav outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="open() ? 'bg-nav-glass inset-ring inset-ring-nav-glass-ring' : 'hover:bg-nav-glass'"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="
+      tracker.activeCount() > 0
+        ? ('bulkJobs.indicator.label' | transloco: { n: tracker.activeCount() })
+        : ('bulkJobs.indicator.idleLabel' | transloco)
+    "
+    (click)="toggle()"
+  >
+    @if (tracker.activeCount() > 0) {
+      <svg
+        viewBox="0 0 28 28"
+        class="pointer-events-none absolute inset-0 size-full -rotate-90"
+        aria-hidden="true"
+      >
+        <circle cx="14" cy="14" r="12" fill="none" stroke-width="2" class="stroke-nav-glass-ring" />
+        <circle
+          cx="14"
+          cy="14"
+          r="12"
+          fill="none"
+          stroke-width="2"
+          stroke-linecap="round"
+          class="stroke-brand transition-all duration-base"
+          [attr.stroke-dasharray]="ringCircumference"
+          [attr.stroke-dashoffset]="ringDashOffset()"
+        />
+      </svg>
+    }
+    <ng-icon name="tablerStack2" size="17" aria-hidden="true" />
+    @if (tracker.activeCount() > 1) {
+      <span
+        class="pointer-events-none absolute -top-2 -end-2 inline-flex h-counter min-w-counter items-center justify-center rounded-8 bg-danger px-4 text-11 leading-16 font-medium text-on-danger"
+      >
+        {{ tracker.activeCount() }}
+      </span>
+    }
+  </button>
+
+  @if (open()) {
+    <section
+      role="dialog"
+      class="absolute top-full end-0 z-dropdown mt-4 flex w-modal-confirm flex-col overflow-hidden rounded-12 border border-border bg-surface text-text shadow-popover"
+      [attr.aria-label]="'bulkJobs.indicator.title' | transloco"
+    >
+      <div class="flex items-center justify-between gap-8 border-b border-border px-10 py-8">
+        <h2 class="text-13 leading-18 font-medium text-text">{{ 'bulkJobs.indicator.title' | transloco }}</h2>
+      </div>
+
+      <div class="flex max-h-notif-list-max flex-col gap-6 overflow-y-auto p-8">
+        @for (row of rows(); track row.job.app + ':' + row.job.id) {
+          <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-card">
+            @if (!row.ready) {
+              <div class="flex items-center gap-8">
+                <span class="size-icon-tile-sm shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+                <div class="flex flex-1 flex-col gap-4">
+                  <div class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></div>
+                  <div class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></div>
+                </div>
+              </div>
+            } @else {
+              <div class="flex items-center gap-8">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="row.tileClass"
+                >
+                  <ng-icon [name]="row.icon" size="14" aria-hidden="true" />
+                </span>
+                <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text">
+                  {{ row.title }}
+                </span>
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-11 leading-16 font-medium whitespace-nowrap"
+                  [class]="row.statusClass"
+                >
+                  {{ 'bulkJobs.status.' + row.job.status | transloco }}
+                </span>
+              </div>
+
+              <div
+                class="h-6 w-full overflow-hidden rounded-full bg-neutral-soft"
+                role="progressbar"
+                [attr.aria-valuenow]="row.job.processed"
+                [attr.aria-valuemin]="0"
+                [attr.aria-valuemax]="row.job.total"
+              >
+                <div
+                  class="h-full rounded-full bg-brand transition-all duration-fast ease-enter"
+                  [style.width.%]="row.percent"
+                ></div>
+              </div>
+
+              <div class="flex items-center justify-between gap-8">
+                <span class="text-11 leading-16 text-text-muted tabular-nums">
+                  {{ 'bulkJobs.progress' | transloco: { processed: row.job.processed, total: row.job.total } }}
+                </span>
+
+                @if (row.isStoppable) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    [loading]="row.isStopping"
+                    [disabled]="row.isStopping"
+                    (click)="requestStop(row.job, $event)"
+                  >
+                    {{ 'bulkJobs.stop' | transloco }}
+                  </button>
+                } @else if (row.isCancelling) {
+                  <button type="button" uiButton variant="secondary" size="small" [disabled]="true">
+                    {{ 'bulkJobs.stopping' | transloco }}
+                  </button>
+                } @else {
+                  <button type="button" uiButton variant="ghost" size="small" (click)="openReport(row.job)">
+                    {{ 'bulkJobs.viewReport' | transloco }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        } @empty {
+          <p class="p-16 text-center text-12 leading-18 text-text-muted">
+            {{ 'bulkJobs.indicator.empty' | transloco }}
+          </p>
+        }
+      </div>
+
+      <div class="flex items-center justify-center border-t border-border bg-surface-muted px-10 py-8">
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          size="small"
+          [loading]="loadingRecent()"
+          (click)="loadRecent()"
+        >
+          {{ 'bulkJobs.indicator.recent' | transloco }}
+        </button>
+      </div>
+    </section>
+  }
+
+  <ui-confirm-dialog
+    #stopConfirm
+    tone="warning"
+    [title]="'bulkJobs.stopConfirm.title' | transloco"
+    [text]="'bulkJobs.stopConfirm.text' | transloco"
+    [confirmLabel]="'bulkJobs.stop' | transloco"
+    [cancelLabel]="'bulkJobs.report.cancel' | transloco"
+  />
+}
+
+<app-bulk-job-report />

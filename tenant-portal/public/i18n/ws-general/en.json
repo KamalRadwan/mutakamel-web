@@ -1,0 +1,93 @@
+{
+  "bar": {
+    "save": "Save",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "reload": "Reload",
+    "readOnly": "Read only",
+    "readOnlyHint": "Only the workspace owner or a workspace-wide manager can change these settings."
+  },
+  "language": {
+    "title": "Language",
+    "line": "The language used by default across the workspace.",
+    "label": "Default language",
+    "hint": "Used when a user has not chosen a personal language, and for outgoing messages and documents.",
+    "en": "English",
+    "ar": "العربية"
+  },
+  "currency": {
+    "title": "Currency",
+    "line": "The base currency for reports and new documents.",
+    "manage": "Manage currencies",
+    "label": "Default currency",
+    "hint": "Used as the base currency for reports and new documents. Choose one of your active currencies. Once set, it can be changed but not cleared.",
+    "option": "{{name}} ({{code}} · {{symbol}})",
+    "notSet": "Not set",
+    "listFailed": "Could not load your currencies. Type the code instead or try again.",
+    "retry": "Retry",
+    "manualLabel": "Currency code",
+    "manualHint": "Three letters, for example EGP. It must be one of your active currencies.",
+    "invalidCode": "Enter a three-letter code."
+  },
+  "timezone": {
+    "title": "Time zone",
+    "line": "Used for reports and scheduled times.",
+    "localTime": "Local time: {{time}} ({{offset}})",
+    "label": "Time zone",
+    "hint": "Used for reports and scheduled times, for example Africa/Cairo.",
+    "searchLabel": "Find a time zone",
+    "searchHint": "Type part of a city or region name to narrow the list. Up to 50 matches are shown.",
+    "searchPlaceholder": "City or region",
+    "noMatch": "No time zone matches.",
+    "manualLabel": "Time zone name",
+    "manualHint": "Type the IANA name, up to 48 characters, for example Africa/Cairo.",
+    "required": "Choose a time zone."
+  },
+  "support": {
+    "title": "Support access",
+    "line": "Let the support team help inside this workspace.",
+    "label": "Allow support access",
+    "hint": "Lets the support team help troubleshoot issues in this workspace when needed. You can turn this off anytime.",
+    "on": "On",
+    "off": "Off"
+  },
+  "note": {
+    "lastWrite": "Changes you save replace the current saved values of the fields you edited. If someone else edited the same field in the meantime, their value is overwritten."
+  },
+  "states": {
+    "loadingLabel": "Loading workspace settings",
+    "notReadyTitle": "The workspace is still being prepared",
+    "notReadyLine": "Settings appear here once setup finishes. Try again in a moment.",
+    "forbiddenTitle": "No access to workspace settings",
+    "forbiddenLine": "Ask a workspace administrator to grant you access to view these settings.",
+    "failedTitle": "Could not load the settings",
+    "failedLine": "Check your connection and try again.",
+    "retry": "Try again"
+  },
+  "leave": {
+    "title": "Leave without saving?",
+    "text": "You have unsaved changes in the workspace settings.",
+    "save": "Save changes",
+    "discard": "Discard",
+    "cancel": "Keep editing"
+  },
+  "toast": {
+    "saved": "Workspace settings saved",
+    "failedTitle": "Could not save the settings"
+  },
+  "errors": {
+    "LANGUAGE_INVALID": "Choose English or Arabic.",
+    "CURRENCY_NOT_ENABLED": "This currency is not active. Choose one of your active currencies.",
+    "TIMEZONE_INVALID": "This time zone is not supported. Choose another one.",
+    "TENANT_NOT_READY": "The workspace is still being prepared. Try again in a moment.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Only the workspace owner or a workspace-wide manager can change these settings.",
+    "IDEM_MISSING": "The request could not be verified. Try again.",
+    "IDEM_BAD_VALUE": "The request could not be verified. Try again.",
+    "CORE_VALIDATION_FAILED": "Check the highlighted fields.",
+    "IDEM_MISMATCH": "This change no longer matches the earlier attempt. Save again.",
+    "IDEM_IN_FLIGHT": "Your previous save is still being processed. Wait a moment, then try again.",
+    "permission": "You do not have permission for this action.",
+    "network": "Could not reach the server. Check your connection.",
+    "generic": "Something went wrong. Try again."
+  }
+}

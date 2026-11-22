@@ -1,0 +1,244 @@
+{
+  "stepperLabel": "Widget builder steps",
+  "steps": {
+    "data": "Data",
+    "metrics": "Metrics",
+    "scope": "Scope and time",
+    "compare": "Compare",
+    "presentation": "Presentation",
+    "review": "Review"
+  },
+  "stepState": {
+    "done": "Completed",
+    "error": "Has errors",
+    "current": "Current step"
+  },
+  "footer": {
+    "next": "Next",
+    "previous": "Previous",
+    "saveDraft": "Save draft",
+    "save": "Save",
+    "refreshPreview": "Refresh preview"
+  },
+  "definitionLabel": "What this widget counts",
+  "definitionHint": "Plain-language summary of the active metric, time basis, grouping, and period.",
+  "definition": {
+    "empty": "Select a data source and at least one metric to see what this widget calculates.",
+    "sentence": "Counts {{metric}} ({{model}} · {{dateField}}) {{grouping}} for {{period}}.",
+    "overall": "as an overall total",
+    "groupedBy": "grouped by {{dimension}}",
+    "timeModel": {
+      "EVENT": "events in period",
+      "COHORT": "creation cohort",
+      "SNAPSHOT": "current snapshot",
+      "INTERVAL": "duration interval",
+      "CUSTOM": "custom model",
+      "UNKNOWN": "standard model"
+    },
+    "dateField": {
+      "CREATED_AT": "created date",
+      "CONVERTED_AT": "converted date",
+      "WON_AT": "won date",
+      "CLOSED_AT": "closed date",
+      "EXPECTED_CLOSE_AT": "expected close date",
+      "UPDATED_AT": "last updated date",
+      "FIRST_RESPONSE_AT": "first response time",
+      "STAGE_CHANGED_AT": "stage change date",
+      "COMPLETED_AT": "completed date",
+      "SCHEDULED_START_AT": "scheduled start time",
+      "OCCURRED_AT": "occurrence time",
+      "TRIGGERED_AT": "triggered time",
+      "PERIOD_END_AT": "period end date",
+      "DEFAULT": "record date"
+    },
+    "byGrain": {
+      "DAY": "daily",
+      "WEEK": "weekly",
+      "MONTH": "monthly",
+      "QUARTER": "quarterly",
+      "YEAR": "yearly"
+    },
+    "emptyShort": "Not defined yet"
+  },
+  "preview": {
+    "untitled": "Untitled widget",
+    "hint": "Live preview using your current scope and filters.",
+    "tableLabel": "Exact preview values"
+  },
+  "data": {
+    "source": "Source",
+    "sourceHint": "Choose the CRM record type this widget reads from.",
+    "sources": {
+      "leads": {
+        "name": "Leads",
+        "description": "New inquiries, sources, stages, and conversion cohorts."
+      },
+      "opportunities": {
+        "name": "Opportunities",
+        "description": "Open pipeline value, win rates, stage flow, and targets."
+      },
+      "activities": {
+        "name": "Activities",
+        "description": "Completed calls, meetings, schedules, and activity logs."
+      },
+      "customer_profiles": {
+        "name": "Customers",
+        "description": "Customer segments, account coverage, and profile health."
+      },
+      "documents": {
+        "name": "Commercial documents",
+        "description": "Quotations, orders, invoices, and commercial volume."
+      }
+    },
+    "startFrom": "Start from",
+    "startFromHint": "Optionally copy metrics, grouping, and display settings from a recipe or published widget.",
+    "startFromScratch": "Start from scratch",
+    "recipePrefix": "Recipe",
+    "widgetPrefix": "Widget"
+  },
+  "metrics": {
+    "chosen": "Chosen metrics",
+    "chosenHint": "Select 1 to 4 compatible metrics and arrange their display order.",
+    "addMetric": "Add a metric",
+    "addMetricHint": "Search available metrics for the selected source. Locked items show why they are unavailable.",
+    "searchPlaceholder": "Search metrics",
+    "add": "Add",
+    "added": "Added",
+    "noMetrics": "No metrics match the current source and search.",
+    "noSourceFirst": "Choose a source in the Data step to browse its metrics.",
+    "groupBy": "Group by",
+    "groupByHint": "Primary category or time dimension used to group the results.",
+    "grain": "Time grain",
+    "grainHint": "Time interval used when grouping by time.",
+    "grains": {
+      "DAY": "Day",
+      "WEEK": "Week",
+      "MONTH": "Month",
+      "QUARTER": "Quarter",
+      "YEAR": "Year"
+    },
+    "splitBy": "Split by",
+    "splitByHint": "Optional secondary dimension to break each group into series.",
+    "splitNone": "None",
+    "topN": "Top items",
+    "topNHint": "Maximum number of split categories to show (1 to 50).",
+    "groupRest": "Remainder grouping",
+    "groupRestHint": "Combine categories outside the top items into a single Other series.",
+    "groupRestOption": "Group the rest as Other",
+    "axis": "Axis",
+    "axisLeft": "First axis",
+    "axisRight": "Second axis",
+    "dragHandle": "Reorder metric",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove metric",
+    "timeModel": {
+      "EVENT": "event period",
+      "COHORT": "creation cohort",
+      "SNAPSHOT": "current snapshot",
+      "INTERVAL": "duration interval",
+      "CUSTOM": "custom model",
+      "UNKNOWN": "standard"
+    },
+    "noSourceShort": "No source selected",
+    "calculateWithOther": "Calculate with another metric",
+    "noCompatibleMetric": "No compatible metric",
+    "calcOperation": "Operation",
+    "calcRatio": "Ratio (÷)",
+    "calcDiff": "Difference (−)",
+    "calcRatioHint": "Sum of the first ÷ sum of the second, over the whole period.",
+    "calcDiffHint": "Sum of the first − sum of the second, over the whole period.",
+    "calcOperand": "Second metric",
+    "calcOperandHint": "Compatible metric used as the second operand in this calculation.",
+    "removeCalculation": "Remove calculation"
+  },
+  "scope": {
+    "period": "Period",
+    "periodHint": "Default date range used whenever this widget runs.",
+    "customRange": "Custom date range",
+    "customRangeHint": "Choose exact start and end dates for the custom period.",
+    "basis": "Basis",
+    "basisHint": "How records are anchored in time for the first selected metric.",
+    "dataScope": "Data scope",
+    "dataScopeHint": "Choose whether the widget follows the viewer's permissions or fixes specific branches.",
+    "viewerRelative": "Follows the viewer",
+    "fixedScope": "Fixed scope",
+    "scopeBranches": "Allowed branches",
+    "scopeBranchesHint": "Select at least one branch included in this fixed scope.",
+    "branch": "Branch",
+    "branchHint": "Optional branch filter applied by default to this widget.",
+    "allBranches": "All branches",
+    "pipeline": "Pipeline",
+    "pipelineHint": "Optional sales pipeline filter supported by this metric.",
+    "allPipelines": "All pipelines",
+    "pipelines": {
+      "standard": "Standard sales pipeline",
+      "corporate": "Corporate deals",
+      "renewals": "Account renewals"
+    },
+    "currency": "Currency",
+    "currencyHint": "Select a single currency so monetary figures are never mixed.",
+    "allCurrencies": "Split by currency",
+    "staleDays": "Stale threshold (days)",
+    "staleDaysHint": "Number of inactive days before a record counts as stale (1 to 365).",
+    "closingWindowDays": "Closing window (days)",
+    "closingWindowDaysHint": "Upcoming window in days used for expected close calculations (1 to 365).",
+    "filterRules": "Filter rules",
+    "filterRulesHint": "Additional record conditions combined into the widget query before aggregation.",
+    "opGreater": "more than",
+    "opLess": "less than"
+  },
+  "errors": {
+    "required": "This field is required.",
+    "tooLong": "Must be at most {{max}} characters.",
+    "range": "Enter a value between {{min}} and {{max}}.",
+    "seriesCount": "Choose between {{min}} and {{max}} metrics.",
+    "unitsMixed": "The selected chart does not support metrics with different units.",
+    "axisNotSupported": "The selected chart supports only the first axis.",
+    "grainRequired": "Choose a time grain when grouping by time.",
+    "grainDayRequired": "The selected metric requires daily time grain.",
+    "metricInvalid": "Choose a valid metric from the catalogue.",
+    "metricUnavailable": "This metric is retired or unavailable.",
+    "dimensionInvalid": "Choose a valid grouping supported by the selected metric.",
+    "dateRangeRequired": "Choose both start and end dates.",
+    "dateRangeOrder": "End date must be on or after the start date.",
+    "invalidUuid": "Choose a valid branch.",
+    "scopeCeilingRequired": "Select at least one branch for a fixed scope.",
+    "comparisonUnsupported": "This comparison mode is not supported by the chosen metrics or chart.",
+    "targetRequired": "The selected chart requires a target comparison.",
+    "targetPositive": "Enter a target value greater than zero.",
+    "datasetsCount": "Add 2 or 3 periods to compare.",
+    "datasetsTeamsCount": "Select 2 or 3 teams to compare.",
+    "teamsDistinct": "Each comparison row must use a distinct team.",
+    "labelRequired": "Enter a label.",
+    "labelTooLong": "Label must be at most {{max}} characters.",
+    "governedTargetRequired": "Select an approved target.",
+    "visualizationInvalid": "Choose a valid chart type.",
+    "shapeIncompatible": "The chosen chart does not support this metric shape.",
+    "filterTreeTooDeep": "Filter rules can nest at most 4 levels deep.",
+    "filterTreeTooLarge": "Filter rules exceed the allowed number of conditions or size limit.",
+    "filterOperatorUnsupported": "A rule uses an operator that cannot be saved. Change the operator of that rule.",
+    "filterTreeUnsupported": "Filter rules are not supported for the selected metrics.",
+    "calculationIncompatible": "The second metric must share unit, shape, time model, basis, and chart support.",
+    "referencesTooMany": "Add at most {{max}} reference values.",
+    "referenceSeriesUnique": "Each series can have at most one reference value.",
+    "referenceUnitMismatch": "The reference unit must match the selected series unit.",
+    "referenceValueMin": "Enter a non-negative reference value.",
+    "referenceLabelTooLong": "Reference label must be at most {{max}} characters.",
+    "topNNotAllowed": "Top items and the Other bucket are not available for this grouping (fixed lists such as stages or types)."
+  },
+  "loadError": {
+    "notFoundTitle": "Widget not found",
+    "notFoundText": "This widget does not exist or may have been deleted.",
+    "forbiddenTitle": "Access denied",
+    "forbiddenText": "You do not have permission to edit this widget.",
+    "failedTitle": "Could not load widget",
+    "failedText": "Something went wrong while loading the builder.",
+    "retry": "Try again"
+  },
+  "toasts": {
+    "draftSaved": "Draft saved.",
+    "conflictReloaded": "Reloaded the latest draft.",
+    "conflictKept": "Your changes were kept. Save again to replace the other version."
+  }
+}

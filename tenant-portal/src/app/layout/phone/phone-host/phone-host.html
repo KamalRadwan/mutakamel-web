@@ -1,0 +1,23 @@
+<audio #remoteAudio autoplay playsinline class="hidden"></audio>
+
+<div class="sr-only" aria-live="assertive" aria-atomic="true">{{ incomingAnnouncement() }}</div>
+
+<div #incomingPopover popover="manual" class="phone-incoming-popover fixed z-toast w-phone-popup">
+  @if (phone.visible() && showIncomingCard()) {
+    <app-incoming-call
+      [floating]="true"
+      (answerAndTransfer)="onFloatingAnswerAndTransfer()"
+      (dismissed)="onDismissFloating()"
+    />
+  }
+</div>
+
+<div #dockPopover popover="manual" class="phone-dock-popover fixed z-dropdown flex flex-col items-end gap-8">
+  @if (phone.visible()) {
+    @if (phone.panelOpen()) {
+      <app-phone-panel [(transferOpen)]="transferOpen" />
+    } @else if (showBar()) {
+      <app-phone-bar #bar />
+    }
+  }
+</div>

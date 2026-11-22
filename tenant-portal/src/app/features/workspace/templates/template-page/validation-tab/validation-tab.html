@@ -1,0 +1,219 @@
+@if (loadingRun()) {
+  <div class="flex flex-col gap-6" aria-busy="true">
+    @for (row of [1, 2, 3]; track row) {
+      <div
+        class="grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+        [class.grid-cols-tpl-validation-row-validate]="canValidate()"
+        [class.grid-cols-tpl-validation-row]="!canValidate()"
+      >
+        <span class="flex items-center px-10">
+          <span class="h-badge w-full animate-pulse rounded-8 bg-neutral-soft"></span>
+        </span>
+        <span class="flex items-center border-s border-border px-10">
+          <span class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </span>
+        <span class="flex items-center border-s border-border px-10">
+          <span class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        </span>
+        @if (canValidate()) {
+          <span class="flex items-center border-s border-border px-10">
+            <span class="h-btn-h-sm w-full animate-pulse rounded-6 bg-neutral-soft"></span>
+          </span>
+        }
+      </div>
+    }
+  </div>
+} @else if (loadError()) {
+  <section class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-14 leading-20 font-medium text-text">
+      {{ 'tplValidation.loadFailed' | transloco }}
+    </p>
+    @if (loadCorrelationId(); as corrId) {
+      <p class="text-11 leading-16 text-text-muted">
+        <bdi dir="ltr">{{ 'tplValidation.reference' | transloco: { id: corrId } }}</bdi>
+      </p>
+    }
+    <button type="button" uiButton variant="secondary" (click)="retryLoad()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'tplValidation.retry' | transloco }}
+    </button>
+  </section>
+} @else if (!activeRun()) {
+  <section class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+      <ng-icon name="tablerShieldCheck" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-14 leading-20 font-medium text-text">
+      {{ 'tplValidation.empty.title' | transloco }}
+    </p>
+    @if (canValidate()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="checkNowDisabled()"
+        [loading]="actions.running()"
+        [title]="service.dirty() ? ('tplValidation.saveFirst' | transloco) : ''"
+        (click)="runCheckNow()"
+      >
+        <ng-icon name="tablerShieldCheck" size="15" aria-hidden="true" />
+        {{ 'tplValidation.empty.check' | transloco }}
+      </button>
+    }
+  </section>
+} @else {
+  <!-- Summary strip -->
+  <section class="flex flex-wrap items-center gap-12 rounded-10 border border-border bg-surface p-8 text-12 leading-18 shadow-card">
+    <span
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+      [class]="validationBadge().badgeClasses"
+    >
+      {{ validationBadge().labelKey | transloco }}
+    </span>
+
+    <span class="text-text">
+      @for (seg of checkedSegments(); track $index) {
+        @if (seg.isolate === 'none') {
+          <span>{{ seg.text }}</span>
+        } @else {
+          <bdi [attr.dir]="seg.isolate === 'ltr' ? 'ltr' : null" class="tabular-nums">{{ seg.text }}</bdi>
+        }
+      }
+    </span>
+
+    @if (effectiveState() === 'STALE') {
+      <span class="text-text-muted">
+        @for (seg of changedSegments(); track $index) {
+          @if (seg.isolate === 'none') {
+            <span>{{ seg.text }}</span>
+          } @else {
+            <bdi [attr.dir]="seg.isolate === 'ltr' ? 'ltr' : null" class="tabular-nums">{{ seg.text }}</bdi>
+          }
+        }
+      </span>
+    }
+
+    <span class="ms-auto shrink-0 font-medium text-text-muted tabular-nums">
+      @for (seg of countsSegments(); track $index) {
+        @if (seg.isolate === 'none') {
+          <span>{{ seg.text }}</span>
+        } @else {
+          <bdi [attr.dir]="seg.isolate === 'ltr' ? 'ltr' : null">{{ seg.text }}</bdi>
+        }
+      }
+    </span>
+  </section>
+
+  @if (totalCount() === 0) {
+    <section class="flex items-center justify-center gap-6 rounded-10 border border-border bg-surface p-16 text-13 leading-20 text-text shadow-card">
+      <ng-icon name="tablerCircleCheck" size="16" class="shrink-0 text-success-text" aria-hidden="true" />
+      <span>{{ 'tplValidation.none' | transloco }}</span>
+    </section>
+  } @else {
+    <div class="flex items-center">
+      <ui-field
+        size="bare"
+        class="min-w-0 items-center gap-6"
+        [style.display]="'flex'"
+        [for]="uid + '-filter'"
+        [label]="'tplValidation.filter.label' | transloco"
+        [hint]="'tplValidation.filter.hint' | transloco"
+      >
+        <ui-segmented
+          [id]="uid + '-filter'"
+          [options]="filterOptions()"
+          [label]="'tplValidation.filter.label' | transloco"
+          [describedBy]="uid + '-filter-hint'"
+          [value]="severityFilter()"
+          (valueChange)="onFilterChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (filteredIssues().length === 0) {
+      <section class="flex items-center justify-center gap-6 rounded-10 border border-border bg-surface p-16 text-13 leading-20 text-text shadow-card">
+        <ng-icon name="tablerCircleCheck" size="16" class="shrink-0 text-success-text" aria-hidden="true" />
+        <span>{{ 'tplValidation.none' | transloco }}</span>
+      </section>
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="w-full"
+          [attr.aria-label]="'tplValidation.col.tableAria' | transloco"
+        >
+          <div
+            role="row"
+            class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+            [class.grid-cols-tpl-validation-row-validate]="canValidate()"
+            [class.grid-cols-tpl-validation-row]="!canValidate()"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'tplValidation.col.severity' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tplValidation.col.issue' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tplValidation.col.object' | transloco }}
+            </span>
+            @if (canValidate()) {
+              <span role="columnheader" class="border-s border-on-nav-line">
+                <span class="sr-only">{{ 'tplValidation.col.actions' | transloco }}</span>
+              </span>
+            }
+          </div>
+
+          @for (row of filteredIssues(); track row.key) {
+            <div
+              role="row"
+              class="mt-6 grid min-h-table-row rounded-10 border border-border bg-surface text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class.grid-cols-tpl-validation-row-validate]="canValidate()"
+              [class.grid-cols-tpl-validation-row]="!canValidate()"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10 py-4">
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="row.severity === 'ERROR' ? 'bg-danger text-on-danger' : 'bg-warning text-on-warning'"
+                >
+                  {{ ('tplValidation.severity.' + row.severity) | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-4 text-13 leading-18 text-text">
+                <span class="line-clamp-2" [title]="row.message">{{ row.message }}</span>
+              </span>
+
+              <span
+                role="cell"
+                class="flex min-w-0 items-center border-s border-border px-10 py-4 text-12 text-text"
+                [title]="row.jsonPointer"
+              >
+                <span class="truncate">{{ row.objectLabel }}</span>
+              </span>
+
+              @if (canValidate()) {
+                <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 py-4">
+                  @if (row.nodeId) {
+                    <button
+                      type="button"
+                      uiButton
+                      variant="secondary"
+                      size="small"
+                      (click)="showInDesign(row.nodeId)"
+                    >
+                      {{ 'tplValidation.showInDesign' | transloco }}
+                    </button>
+                  }
+                </span>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  }
+}

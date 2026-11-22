@@ -1,0 +1,382 @@
+<ui-modal
+  #textModal
+  [size]="modalSize()"
+  [icon]="modalIcon()"
+  tile="bg-icon-blue"
+  [title]="modalTitle()"
+  [closeLabel]="'tplFields.textContent.close' | transloco"
+>
+  @if (mode() === 'plain') {
+    <ui-field
+      size="multiline"
+      for="tpl-text-plain-area"
+      [label]="'tplFields.textContent.plainLabel' | transloco"
+      [hint]="'tplFields.textContent.plainHint' | transloco"
+      [count]="plainModel().text.length"
+      [max]="20000"
+      [error]="plainError()"
+    >
+      <textarea
+        id="tpl-text-plain-area"
+        rows="6"
+        class="min-h-textarea w-full resize-y bg-transparent text-12 leading-18 text-text outline-none"
+        [formField]="plainForm.text"
+      ></textarea>
+    </ui-field>
+  } @else {
+    <div class="flex flex-col gap-10">
+      <div class="flex max-h-tpl-list flex-col gap-8 overflow-y-auto scrollbar-thin">
+        @for (block of blocks(); track block.uid; let bIdx = $index) {
+          <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+            <div class="flex items-end gap-8">
+              <ui-field
+                size="bare"
+                class="min-w-0 flex-1"
+                [for]="'tpl-rt-type-' + block.uid"
+                [label]="'tplFields.textContent.blockType' | transloco"
+                [hint]="'tplFields.textContent.blockTypeHint' | transloco"
+                [error]="blockFieldError(bIdx, block)"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-rt-type-' + block.uid"
+                  size="field"
+                  [disabled]="state.readOnly()"
+                  [label]="'tplFields.textContent.blockType' | transloco"
+                  [options]="blockTypeOptions()"
+                  [value]="block.kind"
+                  (valueChange)="changeBlockKind(bIdx, $event)"
+                />
+              </ui-field>
+
+              @if (!state.readOnly()) {
+                <div class="flex items-center gap-4">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [disabled]="bIdx === 0"
+                    [title]="'tplFields.textContent.moveUp' | transloco"
+                    [attr.aria-label]="'tplFields.textContent.moveUp' | transloco"
+                    (click)="moveBlock(bIdx, -1)"
+                  >
+                    <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [disabled]="bIdx === blocks().length - 1"
+                    [title]="'tplFields.textContent.moveDown' | transloco"
+                    [attr.aria-label]="'tplFields.textContent.moveDown' | transloco"
+                    (click)="moveBlock(bIdx, 1)"
+                  >
+                    <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-danger-text outline-none hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [disabled]="blocks().length <= 1"
+                    [title]="'tplFields.textContent.deleteBlock' | transloco"
+                    [attr.aria-label]="'tplFields.textContent.deleteBlock' | transloco"
+                    (click)="deleteBlock(bIdx)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                </div>
+              }
+            </div>
+
+            @if (isListBlock(block)) {
+              <div class="flex flex-col gap-6">
+                @for (li of block.items; track li.uid; let liIdx = $index) {
+                  <div class="flex flex-col gap-4 rounded-8 border border-border bg-surface p-6">
+                    <div class="flex flex-col gap-4">
+                      @for (inl of li.inlines; track inl.uid; let iIdx = $index) {
+                        <div class="flex items-end gap-4">
+                          @if (inl.inline.type === 'text') {
+                            <ui-field
+                              class="min-w-0 flex-1"
+                              [for]="'tpl-rt-inl-' + inl.uid"
+                              [label]="'tplFields.textContent.plainLabel' | transloco"
+                              [hint]="'tplFields.textContent.plainHint' | transloco"
+                              [error]="inlineCharError()"
+                            >
+                              <input
+                                [id]="'tpl-rt-inl-' + inl.uid"
+                                type="text"
+                                class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+                                [class.underline]="hasMark(inl.inline, 'link')"
+                                [placeholder]="'tplFields.textContent.inlinePlaceholder' | transloco"
+                                [formField]="richForm.blocks[bIdx].items[liIdx].inlines[iIdx].text"
+                              />
+                            </ui-field>
+                            @if (linkHref(inl.inline); as href) {
+                              <span
+                                class="inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 bg-brand-soft text-on-brand-soft"
+                                [title]="href"
+                              >
+                                <ng-icon name="tablerLink" size="12" aria-hidden="true" />
+                              </span>
+                            }
+                            <button
+                              type="button"
+                              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [class]="hasMark(inl.inline, 'bold') ? 'border-brand bg-brand-soft text-brand-text' : 'border-border-field bg-surface text-text-muted'"
+                              [disabled]="state.readOnly()"
+                              [attr.aria-pressed]="hasMark(inl.inline, 'bold')"
+                              [attr.aria-label]="'tplFields.textContent.bold' | transloco"
+                              [title]="'tplFields.textContent.bold' | transloco"
+                              (click)="toggleMark(bIdx, liIdx, iIdx, 'bold')"
+                            >
+                              <ng-icon name="tablerBold" size="14" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [class]="hasMark(inl.inline, 'italic') ? 'border-brand bg-brand-soft text-brand-text' : 'border-border-field bg-surface text-text-muted'"
+                              [disabled]="state.readOnly()"
+                              [attr.aria-pressed]="hasMark(inl.inline, 'italic')"
+                              [attr.aria-label]="'tplFields.textContent.italic' | transloco"
+                              [title]="'tplFields.textContent.italic' | transloco"
+                              (click)="toggleMark(bIdx, liIdx, iIdx, 'italic')"
+                            >
+                              <ng-icon name="tablerItalic" size="14" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [class]="hasMark(inl.inline, 'underline') ? 'border-brand bg-brand-soft text-brand-text' : 'border-border-field bg-surface text-text-muted'"
+                              [disabled]="state.readOnly()"
+                              [attr.aria-pressed]="hasMark(inl.inline, 'underline')"
+                              [attr.aria-label]="'tplFields.textContent.underline' | transloco"
+                              [title]="'tplFields.textContent.underline' | transloco"
+                              (click)="toggleMark(bIdx, liIdx, iIdx, 'underline')"
+                            >
+                              <ng-icon name="tablerUnderline" size="14" aria-hidden="true" />
+                            </button>
+                          } @else if (inl.inline.type === 'variable') {
+                            <button
+                              type="button"
+                              class="inline-flex h-field min-w-0 flex-1 cursor-pointer items-center rounded-8 border border-brand bg-brand-soft px-8 text-start text-12 font-medium text-on-brand-soft outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [disabled]="state.readOnly()"
+                              (click)="editVariableInline(bIdx, liIdx, iIdx)"
+                            >
+                              <span class="truncate">«{{ state.fieldLabel(inl.inline.attrs.binding.path) }}»</span>
+                            </button>
+                          } @else {
+                            <span class="inline-flex h-field flex-1 items-center rounded-8 bg-neutral-soft px-8 text-11 text-text-muted">
+                              {{ 'tplFields.textContent.lineBreak' | transloco }}
+                            </span>
+                          }
+                          @if (!state.readOnly()) {
+                            <button
+                              type="button"
+                              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [attr.aria-label]="'tplFields.textContent.removePiece' | transloco"
+                              [title]="'tplFields.textContent.removePiece' | transloco"
+                              (click)="removeInline(bIdx, liIdx, iIdx)"
+                            >
+                              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                            </button>
+                          }
+                        </div>
+                      }
+                    </div>
+                    @if (!state.readOnly()) {
+                      <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex flex-wrap items-center gap-4">
+                          <button type="button" uiButton variant="secondary" size="small" (click)="addInlineText(bIdx, liIdx)">
+                            <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                            <span>{{ 'tplFields.textContent.addText' | transloco }}</span>
+                          </button>
+                          <button type="button" uiButton variant="secondary" size="small" (click)="addInlineField(bIdx, liIdx)">
+                            <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                            <span>{{ 'tplFields.textContent.addField' | transloco }}</span>
+                          </button>
+                          <button type="button" uiButton variant="secondary" size="small" (click)="addInlineBreak(bIdx, liIdx)">
+                            <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                            <span>{{ 'tplFields.textContent.addLineBreak' | transloco }}</span>
+                          </button>
+                        </div>
+                        @if (block.items.length > 1) {
+                          <button type="button" uiButton variant="ghost" size="small" (click)="removeListItem(bIdx, liIdx)">
+                            {{ 'tplFields.textContent.removeItem' | transloco }}
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+                @if (!state.readOnly()) {
+                  <div>
+                    <button
+                      type="button"
+                      uiButton
+                      variant="secondary"
+                      size="small"
+                      [disabled]="block.items.length >= 200"
+                      (click)="addListItem(bIdx)"
+                    >
+                      <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                      <span>{{ 'tplFields.textContent.addItem' | transloco }}</span>
+                    </button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="flex flex-col gap-4 rounded-8 border border-border bg-surface p-6">
+                @for (inl of block.inlines; track inl.uid; let iIdx = $index) {
+                  <div class="flex items-end gap-4">
+                    @if (inl.inline.type === 'text') {
+                      <ui-field
+                        class="min-w-0 flex-1"
+                        [for]="'tpl-rt-inl-' + inl.uid"
+                        [label]="'tplFields.textContent.plainLabel' | transloco"
+                        [hint]="'tplFields.textContent.plainHint' | transloco"
+                        [error]="inlineCharError()"
+                      >
+                        <input
+                          [id]="'tpl-rt-inl-' + inl.uid"
+                          type="text"
+                          class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+                          [class.underline]="hasMark(inl.inline, 'link')"
+                          [placeholder]="'tplFields.textContent.inlinePlaceholder' | transloco"
+                          [formField]="richForm.blocks[bIdx].inlines[iIdx].text"
+                        />
+                      </ui-field>
+                      @if (linkHref(inl.inline); as href) {
+                        <span
+                          class="inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 bg-brand-soft text-on-brand-soft"
+                          [title]="href"
+                        >
+                          <ng-icon name="tablerLink" size="12" aria-hidden="true" />
+                        </span>
+                      }
+                      <button
+                        type="button"
+                        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [class]="hasMark(inl.inline, 'bold') ? 'border-brand bg-brand-soft text-brand-text' : 'border-border-field bg-surface text-text-muted'"
+                        [disabled]="state.readOnly()"
+                        [attr.aria-pressed]="hasMark(inl.inline, 'bold')"
+                        [attr.aria-label]="'tplFields.textContent.bold' | transloco"
+                        [title]="'tplFields.textContent.bold' | transloco"
+                        (click)="toggleMark(bIdx, null, iIdx, 'bold')"
+                      >
+                        <ng-icon name="tablerBold" size="14" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [class]="hasMark(inl.inline, 'italic') ? 'border-brand bg-brand-soft text-brand-text' : 'border-border-field bg-surface text-text-muted'"
+                        [disabled]="state.readOnly()"
+                        [attr.aria-pressed]="hasMark(inl.inline, 'italic')"
+                        [attr.aria-label]="'tplFields.textContent.italic' | transloco"
+                        [title]="'tplFields.textContent.italic' | transloco"
+                        (click)="toggleMark(bIdx, null, iIdx, 'italic')"
+                      >
+                        <ng-icon name="tablerItalic" size="14" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [class]="hasMark(inl.inline, 'underline') ? 'border-brand bg-brand-soft text-brand-text' : 'border-border-field bg-surface text-text-muted'"
+                        [disabled]="state.readOnly()"
+                        [attr.aria-pressed]="hasMark(inl.inline, 'underline')"
+                        [attr.aria-label]="'tplFields.textContent.underline' | transloco"
+                        [title]="'tplFields.textContent.underline' | transloco"
+                        (click)="toggleMark(bIdx, null, iIdx, 'underline')"
+                      >
+                        <ng-icon name="tablerUnderline" size="14" aria-hidden="true" />
+                      </button>
+                    } @else if (inl.inline.type === 'variable') {
+                      <button
+                        type="button"
+                        class="inline-flex h-field min-w-0 flex-1 cursor-pointer items-center rounded-8 border border-brand bg-brand-soft px-8 text-start text-12 font-medium text-on-brand-soft outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [disabled]="state.readOnly()"
+                        (click)="editVariableInline(bIdx, null, iIdx)"
+                      >
+                        <span class="truncate">«{{ state.fieldLabel(inl.inline.attrs.binding.path) }}»</span>
+                      </button>
+                    } @else {
+                      <span class="inline-flex h-field flex-1 items-center rounded-8 bg-neutral-soft px-8 text-11 text-text-muted">
+                        {{ 'tplFields.textContent.lineBreak' | transloco }}
+                      </span>
+                    }
+                    @if (!state.readOnly()) {
+                      <button
+                        type="button"
+                        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [attr.aria-label]="'tplFields.textContent.removePiece' | transloco"
+                        [title]="'tplFields.textContent.removePiece' | transloco"
+                        (click)="removeInline(bIdx, null, iIdx)"
+                      >
+                        <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                      </button>
+                    }
+                  </div>
+                }
+
+                @if (!state.readOnly()) {
+                  <div class="flex flex-wrap items-center gap-4 pt-2">
+                    <button type="button" uiButton variant="secondary" size="small" (click)="addInlineText(bIdx, null)">
+                      <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                      <span>{{ 'tplFields.textContent.addText' | transloco }}</span>
+                    </button>
+                    <button type="button" uiButton variant="secondary" size="small" (click)="addInlineField(bIdx, null)">
+                      <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                      <span>{{ 'tplFields.textContent.addField' | transloco }}</span>
+                    </button>
+                    <button type="button" uiButton variant="secondary" size="small" (click)="addInlineBreak(bIdx, null)">
+                      <ng-icon name="tablerPlus" size="12" aria-hidden="true" />
+                      <span>{{ 'tplFields.textContent.addLineBreak' | transloco }}</span>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (!state.readOnly()) {
+        <div class="flex flex-wrap items-center gap-6">
+          <button type="button" uiButton variant="secondary" size="small" [disabled]="blocks().length >= 2000" (click)="addBlock('paragraph')">
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'tplFields.textContent.addParagraph' | transloco }}</span>
+          </button>
+          <button type="button" uiButton variant="secondary" size="small" [disabled]="blocks().length >= 2000" (click)="addBlock('heading1')">
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'tplFields.textContent.addHeading' | transloco }}</span>
+          </button>
+          <button type="button" uiButton variant="secondary" size="small" [disabled]="blocks().length >= 2000" (click)="addBlock('bulletList')">
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'tplFields.textContent.addList' | transloco }}</span>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    @if (mode() === 'rich') {
+      <span
+        class="me-auto text-11"
+        [class]="richOverLimit() ? 'text-danger-text' : 'text-text-muted'"
+      >
+        <bdi dir="ltr">{{ richCharCountNumber() }} / 100,000</bdi>
+        {{ ' ' }}{{ 'tplFields.textContent.charUnit' | transloco }}
+      </span>
+    }
+    @if (!state.readOnly()) {
+      <button type="button" uiButton variant="primary" [disabled]="!canApply()" (click)="apply()">
+        {{ 'tplFields.textContent.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplFields.textContent.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplFields.textContent.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

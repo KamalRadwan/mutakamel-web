@@ -1,0 +1,298 @@
+<div class="grid grid-cols-2 gap-x-10">
+  <ui-field
+    size="bare"
+    [for]="uid + '-country'"
+    [label]="'geoZones.picker.country' | transloco"
+    [hint]="'geoZones.picker.countryHint' | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      size="field"
+      [id]="uid + '-country'"
+      [options]="countryOptions()"
+      [value]="selectedCountryId()"
+      [label]="'geoZones.picker.country' | transloco"
+      [describedBy]="uid + '-country-hint'"
+      [disabled]="disabled()"
+      (valueChange)="onCountryChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    size="bare"
+    [for]="uid + '-state'"
+    [label]="'geoZones.picker.state' | transloco"
+    [hint]="'geoZones.picker.stateHint' | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      size="field"
+      [id]="uid + '-state'"
+      [options]="stateOptions()"
+      [value]="selectedStateId()"
+      [label]="'geoZones.picker.state' | transloco"
+      [describedBy]="uid + '-state-hint'"
+      [disabled]="disabled() || stateOptions().length === 0"
+      (valueChange)="onStateChange($event)"
+    />
+  </ui-field>
+</div>
+
+<div class="mt-8">
+  <ui-field
+    size="bare"
+    [for]="uid + '-search'"
+    [label]="'geoZones.picker.search' | transloco"
+    [hint]="'geoZones.picker.searchHint' | transloco"
+  >
+    <div
+      class="flex h-field items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      <span class="inline-flex shrink-0 text-text-muted">
+        <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+      </span>
+      <input
+        [id]="uid + '-search'"
+        type="text"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'geoZones.picker.search' | transloco"
+        [value]="searchInput()"
+        [disabled]="disabled() || !selectedStateId()"
+        (input)="onSearchInput($event)"
+        (keydown.escape)="onSearchEscape($event)"
+      />
+      @if (searchInput()) {
+        <button
+          type="button"
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'geoZones.clearSearch' | transloco"
+          (click)="clearSearch()"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </div>
+  </ui-field>
+</div>
+
+<div class="mt-8 grid grid-cols-2 gap-x-10">
+  <section class="flex min-w-0 flex-col gap-4">
+    <div class="flex h-label items-center justify-between gap-6">
+      <span [id]="uid + '-available-label'" class="truncate text-12 text-text-muted">{{ 'geoZones.picker.available' | transloco }}</span>
+      @if (!interactionLocked() && selectableOnPage().length > 0 && !atLimit()) {
+        <button
+          type="button"
+          class="shrink-0 cursor-pointer text-11 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          (click)="selectAllOnPage()"
+        >
+          {{ 'geoZones.picker.selectPage' | transloco }}
+        </button>
+      }
+    </div>
+
+    <div
+      class="flex max-h-kanban-col-min min-h-time-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4"
+    >
+      @if (!selectedStateId()) {
+        <p class="m-auto p-12 text-center text-12 text-text-muted">
+          {{ 'geoZones.picker.chooseState' | transloco }}
+        </p>
+      } @else if (loadingCities()) {
+        @for (row of skeletonRows; track row) {
+          <div class="flex h-menu-item items-center gap-6 px-6" aria-hidden="true">
+            <span class="size-checkbox-size shrink-0 rounded-4 bg-neutral-soft"></span>
+            <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+          </div>
+        }
+      } @else if (citiesFailed()) {
+        <div class="m-auto flex flex-col items-center gap-6 p-12 text-center">
+          <p class="text-12 text-danger-text">{{ 'geoZones.errors.generic' | transloco }}</p>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retryCities()">
+            {{ 'geoZones.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (availableCities().length === 0) {
+        <p class="m-auto p-12 text-center text-12 text-text-muted">
+          {{ 'geoZones.noResults' | transloco }}
+        </p>
+      } @else {
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          [attr.id]="listboxId() || null"
+          [attr.aria-labelledby]="availableLabelledBy()"
+          [attr.aria-describedby]="describedBy() || null"
+          class="flex flex-col gap-2"
+        >
+          @for (city of availableCities(); track city.id) {
+            @let selected = selectedSet().has(city.id);
+            @let rowDisabled = isRowDisabled(city);
+            @let otherZone = otherZoneName(city);
+            <div
+              role="option"
+              [attr.tabindex]="city.id === effectiveAvailableTabId() ? 0 : -1"
+              class="flex min-h-menu-item items-center gap-6 rounded-6 px-6 py-2 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                rowDisabled
+                  ? 'cursor-not-allowed opacity-drag-source'
+                  : 'cursor-pointer hover:bg-row-hover'
+              "
+              [attr.aria-selected]="selected"
+              [attr.aria-disabled]="rowDisabled ? 'true' : null"
+              [attr.title]="rowTitle(city)"
+              (focus)="activeAvailableId.set(city.id)"
+              (click)="toggleCity(city)"
+              (keydown)="onAvailableKeydown($event, city)"
+            >
+              <span
+                class="inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-4 border-check transition-colors duration-fast"
+                [class]="
+                  selected
+                    ? 'border-brand bg-brand text-on-brand'
+                    : 'border-border-field bg-surface-field'
+                "
+                aria-hidden="true"
+              >
+                @if (selected) {
+                  <ng-icon name="tablerCheck" size="12" />
+                }
+              </span>
+
+              <span class="min-w-0 flex-1 truncate text-text">
+                {{ cityLabel(city) }}
+                @if (activeStateLabel(); as stateName) {
+                  <span class="text-11 text-text-muted"> · {{ stateName }}</span>
+                }
+              </span>
+
+              @if (otherZone) {
+                <span class="inline-flex h-badge max-w-preset shrink-0 items-center truncate rounded-8 bg-neutral-soft px-8 text-11 font-medium text-text-muted">
+                  {{ 'geoZones.picker.inZone' | transloco: { zone: otherZone } }}
+                </span>
+              }
+            </div>
+          }
+        </div>
+
+        @if (nextCursor()) {
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            size="small"
+            class="mt-4 w-full shrink-0"
+            [loading]="loadingMore()"
+            (click)="loadMore()"
+          >
+            {{ 'geoZones.picker.loadMore' | transloco }}
+          </button>
+        }
+      }
+    </div>
+  </section>
+
+  <section class="flex min-w-0 flex-col gap-4">
+    <div class="flex h-label items-center justify-between gap-6">
+      <span [id]="uid + '-selected-label'" class="truncate text-12 text-text-muted">
+        {{ 'geoZones.picker.selected' | transloco: { count: value().length } }}
+      </span>
+      <div class="flex shrink-0 items-center gap-8">
+        <bdi
+          dir="ltr"
+          class="text-11 tabular-nums"
+          [class]="atLimit() ? 'font-medium text-warning-text' : 'text-text-muted'"
+          [attr.title]="atLimit() ? ('geoZones.picker.limitReached' | transloco) : null"
+        >
+          {{ 'geoZones.picker.limit' | transloco: { count: value().length, max: maxCities } }}
+        </bdi>
+        @if (!interactionLocked() && value().length > 0) {
+          <button
+            type="button"
+            class="cursor-pointer text-11 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="clearAll()"
+          >
+            {{ 'geoZones.picker.clearAll' | transloco }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div
+      class="flex max-h-kanban-col-min min-h-time-list-max flex-col gap-8 overflow-y-auto rounded-10 border border-border bg-surface p-8"
+    >
+      @if (groupedSelected().length > 0) {
+        <div
+          role="listbox"
+          aria-multiselectable="true"
+          [attr.aria-labelledby]="selectedLabelledBy()"
+          [attr.aria-describedby]="describedBy() || null"
+          class="flex flex-col gap-8"
+        >
+          @for (countryGroup of groupedSelected(); track countryGroup.countryIso2) {
+            <div class="flex flex-col gap-4">
+              @if (!countryGroup.hideHeader) {
+                <p class="truncate text-11 font-medium text-text-muted" aria-hidden="true">{{ countryGroup.countryLabel }}</p>
+              }
+              @for (stateGroup of countryGroup.states; track stateGroup.stateId) {
+                <div role="group" [attr.aria-label]="stateGroup.groupAriaLabel" class="flex flex-wrap items-center gap-4">
+                  @for (city of stateGroup.cities; track city.id) {
+                    @let conflict = conflicts().has(city.id);
+                    <div
+                      role="option"
+                      [attr.tabindex]="city.id === effectiveSelectedTabId() ? 0 : -1"
+                      aria-selected="true"
+                      class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 border px-6 text-11 font-medium outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [class]="
+                        conflict
+                          ? 'border-danger-border bg-danger-soft text-on-danger-soft ring-2 ring-danger-halo'
+                          : city.pending
+                            ? 'border-border bg-neutral-soft text-text-muted'
+                            : 'border-border bg-surface-muted text-text'
+                      "
+                      [attr.title]="conflictTitle(city.id)"
+                      (focus)="activeSelectedId.set(city.id)"
+                      (keydown)="onSelectedChipKeydown($event, city.id)"
+                    >
+                      @if (!city.unknown && !city.pending && city.countryIso2) {
+                        <img
+                          [src]="flagUrl(city.countryIso2)"
+                          alt=""
+                          class="h-12 w-16 shrink-0 rounded-2 object-cover"
+                        />
+                      }
+                      <span class="truncate">
+                        @if (city.pending) {
+                          …
+                        } @else if (city.unknown) {
+                          {{ cityLabel(city) }}
+                        } @else {
+                          {{ cityLabel(city) }} · {{ selectedCityStateLabel(city) }}
+                        }
+                      </span>
+                      @if (!interactionLocked()) {
+                        <button
+                          type="button"
+                          tabindex="-1"
+                          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                          [attr.aria-label]="'geoZones.picker.remove' | transloco: { name: cityLabel(city) }"
+                          (click)="$event.stopPropagation(); removeCity(city.id)"
+                        >
+                          <ng-icon name="tablerX" size="11" aria-hidden="true" />
+                        </button>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="m-auto p-12 text-center text-12 text-text-muted">
+          {{ 'geoZones.picker.noSelected' | transloco }}
+        </p>
+      }
+    </div>
+  </section>
+</div>

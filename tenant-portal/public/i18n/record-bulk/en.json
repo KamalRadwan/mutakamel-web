@@ -1,0 +1,14 @@
+{
+  "menu": {
+    "button": "Batch update ({{n}})",
+    "busy": "A batch update is already running."
+  },
+  "run": {
+    "count": "{{n}} records",
+    "resolving": "Preparing the selection…",
+    "submit": "Run",
+    "cancel": "Cancel",
+    "typeLabel": "Type DELETE to confirm",
+    "typeHint": "This protects against deleting many records by mistake."
+  }
+}

@@ -1,0 +1,50 @@
+<div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+  @for (mod of usage().modules; track mod.moduleKey) {
+    @let tile = tileOf(mod.moduleKey);
+    <div class="flex flex-col gap-4 rounded-8 border border-border bg-surface-muted px-8 py-6">
+      <div class="flex min-h-btn flex-wrap items-center gap-8">
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="tile.tile"
+        >
+          <ng-icon [name]="tile.icon" size="14" aria-hidden="true" />
+        </span>
+
+        <span class="min-w-0 text-13 leading-18 font-medium text-text">{{ moduleLabel(mod) }}</span>
+
+        @if (showGrace(mod)) {
+          <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium text-on-warning">
+            <ng-icon name="tablerClock" size="11" class="shrink-0" aria-hidden="true" />
+            <span>{{ 'seats.usage.grace' | transloco: { date: formatDate(mod.graceUntil!) } }}</span>
+          </span>
+        }
+
+        @if (mod.overCapacity > 0) {
+          <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-danger-soft px-8 text-12 font-medium text-on-danger-soft">
+            <ng-icon name="tablerAlertTriangle" size="11" class="shrink-0" aria-hidden="true" />
+            <span>{{ 'seats.usage.over' | transloco: { n: mod.overCapacity } }}</span>
+          </span>
+        }
+
+        <span dir="ltr" class="ms-auto shrink-0 text-12 leading-18 font-medium text-text-muted tabular-nums">
+          {{ 'seats.usage.row' | transloco: { used: mod.used, capacity: mod.capacity } }}
+        </span>
+      </div>
+
+      <div
+        role="progressbar"
+        [attr.aria-label]="moduleLabel(mod)"
+        [attr.aria-valuenow]="mod.used"
+        aria-valuemin="0"
+        [attr.aria-valuemax]="mod.capacity"
+        class="h-6 w-full overflow-hidden rounded-3 bg-neutral-soft"
+      >
+        <div
+          class="h-full rounded-3 transition-all duration-base ease-enter"
+          [class]="barTone(mod)"
+          [style.width.%]="barPercent(mod)"
+        ></div>
+      </div>
+    </div>
+  }
+</div>

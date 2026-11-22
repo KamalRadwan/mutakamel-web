@@ -1,0 +1,126 @@
+<div #fieldBox [class]="boxClasses()">
+  <input
+    #inputEl
+    [id]="inputId()"
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-autocomplete="list"
+    dir="auto"
+    class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+    [placeholder]="placeholder()"
+    [readonly]="disabled()"
+    [value]="query()"
+    [attr.aria-label]="label() || null"
+    [attr.aria-expanded]="dropdownVisible()"
+    [attr.aria-controls]="dropdownVisible() ? listboxId() : null"
+    [attr.aria-activedescendant]="activeDescendant()"
+    [attr.aria-invalid]="invalid() ? 'true' : null"
+    (focus)="onFocus()"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+  @if (!disabled() && (value() || query())) {
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'oppForm.customer.clear' | transloco"
+      [title]="'oppForm.customer.clear' | transloco"
+      (mousedown)="$event.preventDefault()"
+      (click)="clearSelection()"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+  }
+</div>
+
+@if (dropdownVisible()) {
+  <ul
+    #listRef
+    [id]="listboxId()"
+    role="listbox"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+    [class.invisible]="!menuPlaced()"
+    [style.top.px]="menuPlace().top"
+    [style.inset-inline-start.px]="menuPlace().start"
+    [style.min-width.px]="menuPlace().width"
+    [style.max-height.px]="menuPlace().maxHeight"
+    [attr.aria-label]="label() || null"
+  >
+    @if (loading()) {
+      <li
+        role="status"
+        class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted"
+      >
+        <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+        <span>{{ 'oppForm.customer.loading' | transloco }}</span>
+      </li>
+    } @else if (loadError()) {
+      <li
+        role="alert"
+        class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-danger-text"
+      >
+        <ng-icon name="tablerCircleX" size="14" class="shrink-0" aria-hidden="true" />
+        <span>{{ 'oppForm.customer.loadError' | transloco }}</span>
+      </li>
+    } @else {
+      @for (option of results(); track option.id; let idx = $index) {
+        @let blacklisted = isBlacklisted(option);
+        @let selected = value()?.id === option.id;
+        <li
+          [id]="optionId(idx)"
+          role="option"
+          [attr.aria-selected]="selected"
+          [attr.aria-disabled]="blacklisted ? 'true' : null"
+          [attr.aria-describedby]="blacklisted ? optionId(idx) + '-blacklisted' : null"
+          [attr.title]="blacklisted ? ('oppForm.customer.blacklistedTitle' | transloco) : null"
+          class="flex min-h-table-row shrink-0 items-center justify-between gap-8 rounded-6 px-8 py-4 transition-colors duration-fast"
+          [class]="optionRowClasses(option, idx)"
+          (mousedown)="$event.preventDefault()"
+          (mouseenter)="!blacklisted && activeIndex.set(idx)"
+          (click)="selectOption(option)"
+        >
+          <span class="flex min-w-0 flex-1 items-center gap-8">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="option.profileType === 'CORPORATE' ? 'bg-icon-navy' : 'bg-icon-blue'"
+              aria-hidden="true"
+            >
+              <ng-icon
+                [name]="option.profileType === 'CORPORATE' ? 'tablerBuilding' : 'tablerUser'"
+                size="14"
+              />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span dir="auto" class="truncate text-12 leading-18 font-medium">{{ option.displayName }}</span>
+              @if (option.phone || option.email) {
+                <span class="flex min-w-0 items-center gap-4 truncate text-11 leading-16 text-text-muted">
+                  @if (option.phone) {
+                    <bdi dir="ltr" class="tabular-nums">{{ option.phone }}</bdi>
+                  }
+                  @if (option.phone && option.email) {
+                    <span aria-hidden="true">·</span>
+                  }
+                  @if (option.email) {
+                    <bdi dir="ltr" class="truncate">{{ option.email }}</bdi>
+                  }
+                </span>
+              }
+            </span>
+          </span>
+
+          @if (blacklisted) {
+            <span [id]="optionId(idx) + '-blacklisted'" class="sr-only">{{ 'oppForm.customer.blacklistedTitle' | transloco }}</span>
+            <ng-icon name="tablerBan" size="14" class="shrink-0 text-danger-text" aria-hidden="true" />
+          } @else if (selected) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </li>
+      } @empty {
+        <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+          {{ 'oppForm.customer.noResults' | transloco }}
+        </li>
+      }
+    }
+  </ul>
+}

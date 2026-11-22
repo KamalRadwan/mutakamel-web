@@ -1,0 +1,63 @@
+<div
+  role="status"
+  class="flex items-center gap-8 rounded-10 border px-10 py-6 text-12 leading-18"
+  [class]="isOk() ? 'border-border bg-success-soft text-on-success-soft' : 'border-warning bg-surface-muted text-warning-text'"
+>
+  <ng-icon
+    [name]="isOk() ? 'tablerCircleCheck' : 'tablerAlertTriangle'"
+    size="14"
+    class="shrink-0"
+    aria-hidden="true"
+  />
+  <span class="min-w-0 flex-1 font-medium">
+    {{ (isOk() ? 'seats.dry.ok' : 'seats.dry.notOk') | transloco }}
+  </span>
+</div>
+
+<app-seat-impact [changes]="null" [staticPreview]="preview()" />
+
+@if (kind() === 'import' && importRows().length > 0) {
+  <div class="overflow-x-auto pb-4">
+    <div role="table" class="w-full" [attr.aria-label]="'seats.dry.tableLabel' | transloco">
+      <div role="row" class="grid grid-cols-12 h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav">
+        <span role="columnheader" class="col-span-2 flex min-w-0 items-center truncate px-10">
+          {{ 'seats.dry.cols.row' | transloco }}
+        </span>
+        <span role="columnheader" class="col-span-4 flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'seats.dry.cols.status' | transloco }}
+        </span>
+        <span role="columnheader" class="col-span-6 flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'seats.dry.cols.details' | transloco }}
+        </span>
+      </div>
+
+      @for (row of importRows(); track row.index) {
+        <div
+          role="row"
+          class="mt-6 grid min-h-table-row grid-cols-12 rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+        >
+          <span role="cell" dir="ltr" class="col-span-2 flex min-w-0 items-center px-10 text-12 font-medium tabular-nums">
+            {{ 'seats.dry.row' | transloco: { n: row.index } }}
+          </span>
+
+          <span role="cell" class="col-span-4 flex min-w-0 items-center border-s border-border px-10">
+            <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium" [class]="statusClass(row.status)">
+              {{ 'seats.dry.status.' + row.status | transloco }}
+            </span>
+          </span>
+
+          <span role="cell" class="col-span-6 flex min-w-0 flex-col justify-center gap-2 border-s border-border px-10 py-4 text-12 leading-18">
+            @if (row.code) {
+              <span class="text-danger-text">{{ codeMessage(row.code) }}</span>
+            }
+            @if (row.skippedRoles?.length) {
+              <span class="text-warning-text">
+                {{ skippedText(row.skippedRoles!) }}
+              </span>
+            }
+          </span>
+        </div>
+      }
+    </div>
+  </div>
+}

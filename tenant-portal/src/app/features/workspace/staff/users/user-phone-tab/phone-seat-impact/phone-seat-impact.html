@@ -1,0 +1,62 @@
+@if (visible()) {
+  @if (loading() && !seats()) {
+    <div class="flex min-h-btn items-center gap-8 rounded-10 border border-border bg-surface p-8" aria-busy="true">
+      <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+      <span class="text-12 leading-18 text-text-muted">{{ 'seats.impact.loading' | transloco }}</span>
+    </div>
+  } @else if (error()) {
+    <div class="flex min-h-btn items-center gap-6 rounded-10 border border-border bg-surface p-8 text-12 leading-18 text-warning-text" role="status">
+      <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+      <span>{{ 'seats.impact.error' | transloco }}</span>
+    </div>
+  } @else if (seats(); as s) {
+    <div
+      class="flex flex-col gap-4 rounded-10 border p-8"
+      [class]="isShort() ? 'border-warning bg-surface-muted' : 'border-border bg-surface'"
+    >
+      <div class="flex min-h-btn flex-wrap items-center gap-8">
+        <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+          <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+        </span>
+
+        <span class="min-w-0 text-12 leading-18 font-medium text-text tabular-nums">
+          {{ 'seats.impact.row' | transloco: { module: ('userPhone.seat.module' | transloco), usedAfter: usedAfter(), capacity: s.allowed } }}
+        </span>
+
+        <span
+          dir="ltr"
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium tabular-nums"
+          [class]="delta() > 0 ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-on-neutral-soft'"
+        >
+          {{ formattedDelta() }}
+        </span>
+      </div>
+
+      @if (isShort()) {
+        <div class="flex flex-wrap items-center gap-8 pt-2">
+          <span class="inline-flex items-center gap-4 text-12 leading-18 font-medium text-warning-text">
+            <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+            <span>{{ 'seats.impact.short' | transloco: { needed: 1, free: s.available } }}</span>
+          </span>
+          @if (canBuy()) {
+            <a uiButton variant="secondary" size="small" routerLink="/workspace/billing/subscription/seats">
+              {{ 'seats.impact.addSeats' | transloco }}
+            </a>
+          } @else {
+            <span class="text-12 leading-18 text-warning-text">{{ 'seats.impact.askOwner' | transloco }}</span>
+          }
+        </div>
+      }
+
+      @if (delta() === -1) {
+        <p class="text-11 leading-16 text-text-muted">{{ 'userPhone.seat.freedOnSave' | transloco }}</p>
+      }
+
+      @if (s.graceUntil; as grace) {
+        <p class="text-11 leading-16 text-warning-text">
+          {{ 'seats.usage.grace' | transloco: { date: formatDate(grace) } }}
+        </p>
+      }
+    </div>
+  }
+}

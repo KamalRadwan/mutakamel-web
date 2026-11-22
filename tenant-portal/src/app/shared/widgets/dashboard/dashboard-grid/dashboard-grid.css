@@ -1,0 +1,54 @@
+@import 'gridstack/dist/gridstack.min.css';
+
+app-dashboard-grid {
+  display: block;
+  min-width: 0;
+}
+
+app-dashboard-grid .grid-stack > .grid-stack-item > .grid-stack-item-content {
+  overflow: visible;
+}
+
+app-dashboard-grid .grid-stack-placeholder > .placeholder-content {
+  background: var(--brand-soft);
+  border: var(--border-w-strong) dashed var(--brand);
+  border-radius: var(--radius-10);
+}
+
+app-dashboard-grid .grid-stack:not(.dashboard-grid-editing) .grid-stack-item > .ui-resizable-handle,
+app-dashboard-grid .grid-stack.grid-stack-static .grid-stack-item > .ui-resizable-handle {
+  display: none;
+}
+
+app-dashboard-grid .dashboard-grid-editing .grid-stack-item > .ui-resizable-se,
+app-dashboard-grid .dashboard-grid-editing .grid-stack-item > .ui-resizable-sw {
+  background-image: none;
+  transform: none;
+  width: var(--timeline-dot);
+  height: var(--timeline-dot);
+  bottom: calc(var(--gs-item-margin-bottom) + var(--space-4));
+  border-bottom: var(--border-w-strong) solid var(--text-muted);
+}
+
+app-dashboard-grid .dashboard-grid-editing .grid-stack-item > .ui-resizable-se {
+  right: calc(var(--gs-item-margin-right) + var(--space-4));
+  border-right: var(--border-w-strong) solid var(--text-muted);
+  border-bottom-right-radius: var(--radius-3);
+}
+
+app-dashboard-grid .dashboard-grid-editing .grid-stack-item > .ui-resizable-sw {
+  left: calc(var(--gs-item-margin-left) + var(--space-4));
+  border-left: var(--border-w-strong) solid var(--text-muted);
+  border-bottom-left-radius: var(--radius-3);
+}
+
+app-dashboard-grid .grid-stack-item.ui-draggable-dragging,
+app-dashboard-grid .grid-stack-item.ui-resizable-resizing {
+  z-index: var(--z-sticky);
+}
+
+app-dashboard-grid .ui-draggable-dragging > .grid-stack-item-content,
+app-dashboard-grid .ui-resizable-resizing > .grid-stack-item-content {
+  box-shadow: var(--shadow-drag);
+  opacity: 1;
+}

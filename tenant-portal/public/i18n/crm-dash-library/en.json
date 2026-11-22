@@ -1,0 +1,102 @@
+{
+  "title": "Dashboards",
+  "newDashboard": "New dashboard",
+  "search": "Search dashboards",
+  "clearSearch": "Clear search",
+  "viewSwitcher": "Switch view",
+  "views": {
+    "table": "Table",
+    "cards": "Cards"
+  },
+  "kind": {
+    "label": "Kind",
+    "all": "All",
+    "dashboards": "Dashboards",
+    "reportTemplates": "Report templates",
+    "dashboard": "Dashboard",
+    "reportTemplate": "Report template"
+  },
+  "favourites": "Favourites",
+  "tabsLabel": "Dashboard categories",
+  "tabs": {
+    "all": "All",
+    "mine": "Mine",
+    "shared": "Shared with me",
+    "templates": "Templates"
+  },
+  "tableLabel": "Dashboards list",
+  "columns": {
+    "name": "Name",
+    "kind": "Kind",
+    "owner": "Owner",
+    "sharedCount": "Shared",
+    "updated": "Updated",
+    "default": "Default",
+    "actions": "Actions"
+  },
+  "sharedBadge": "Shared",
+  "defaultActive": "{{name}} is the default dashboard",
+  "setDefaultFor": "Set {{name}} as default dashboard",
+  "alreadyDefault": "Already the default dashboard",
+  "favouriteFor": "Add {{name}} to favourites",
+  "unfavouriteFor": "Remove {{name}} from favourites",
+  "actionsFor": "Actions for {{name}}",
+  "menu": {
+    "open": "Open",
+    "duplicate": "Duplicate",
+    "share": "Share",
+    "setDefault": "Set as default",
+    "favourite": "Add to favourites",
+    "unfavourite": "Remove from favourites",
+    "delete": "Delete"
+  },
+  "use": "Use",
+  "openTemplate": "Open",
+  "adopted": "Adopted",
+  "widgets": "{{count}} widgets",
+  "confirmTargetsTitle": "Confirm targets",
+  "confirmTargetsAction": "Confirm",
+  "targetsListLabel": "Proposed targets",
+  "branchLabel": "Branch",
+  "branchHint": "Choose the branch this template will track.",
+  "loadMore": "Load more",
+  "loadFailedTitle": "Could not load dashboards",
+  "forbiddenTitle": "No access to dashboards",
+  "empty": {
+    "mine": "You have no dashboards yet.",
+    "shared": "No dashboards have been shared with you.",
+    "templates": "No dashboard templates are available.",
+    "filtered": "No dashboards match your current filters."
+  },
+  "delete": {
+    "title": "Delete dashboard",
+    "text": "Delete \"{{name}}\"? This removes it for everyone it is shared with.",
+    "confirm": "Delete"
+  },
+  "toast": {
+    "deleted": "Dashboard deleted",
+    "duplicated": "Dashboard duplicated",
+    "defaultSet": "Default dashboard updated",
+    "favourited": "Added to favourites",
+    "unfavourited": "Removed from favourites",
+    "adopted": "Dashboard created from template",
+    "created": "Dashboard created"
+  },
+  "createModal": {
+    "createTitle": "Create dashboard",
+    "nameLabel": "Name",
+    "namePlaceholder": "Enter a dashboard name",
+    "nameHint": "A unique name shown in the dashboards list (up to 120 characters).",
+    "nameRequired": "Name is required.",
+    "nameTooLong": "Name must be 120 characters or fewer.",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Describe what this dashboard tracks",
+    "descriptionHint": "Optional summary of what this dashboard covers (up to 500 characters).",
+    "descriptionTooLong": "Description must be 500 characters or fewer.",
+    "startFrom": "Start from",
+    "startFromHint": "Start with a blank grid or adopt an available template.",
+    "blank": "Blank dashboard",
+    "create": "Create",
+    "cancel": "Cancel"
+  }
+}

@@ -1,0 +1,86 @@
+<app-record-card
+  [title]="item().displayName"
+  [subtitle]="cardSubtitle()"
+  [typeIcon]="cardTypeIcon()"
+  [typeTile]="cardTypeTile()"
+  [typeLabel]="'customers.types.' + item().profileType | transloco"
+  [color]="item().cardColor"
+  [rating]="item().rating"
+  [ratingEditable]="canUpdate()"
+  [dueBucket]="item().nextActivity?.bucket ?? null"
+  [owner]="cardOwner()"
+  [actions]="actions()"
+  [actionsLabel]="'customers.card.actions' | transloco"
+  [viewLabel]="'customers.card.view' | transloco"
+  [detailed]="detailed()"
+  [(expanded)]="expanded"
+  (open)="view.emit()"
+  (rate)="rate.emit($event)"
+  (recolor)="recolor.emit($event)"
+  (action)="act($event)"
+  (due)="activities.emit()"
+>
+  <ng-container cardBadges>
+    @if (detailed() || visibleTags().length > 0) {
+      <div class="flex flex-wrap items-center gap-4">
+        @if (detailed()) {
+          <span
+            class="inline-flex h-badge w-fit items-center rounded-8 px-8 font-medium whitespace-nowrap"
+            [class]="statusBadgeClass()"
+          >
+            {{ 'customers.statuses.' + item().status | transloco }}
+          </span>
+        }
+        @for (tag of visibleTags(); track tag.id) {
+          <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+          <span
+            class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+            [class]="tagBg(tag) ? '' : 'bg-neutral-soft text-text'"
+            [style.background-color]="tagBg(tag)"
+            [style.color]="tagText(tag)"
+            dir="auto"
+          >
+            {{ tag.name }}
+          </span>
+        }
+        @if (extraTagsCount() > 0) {
+          <span
+            class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft tabular-nums"
+            [title]="extraTagsTitle()"
+          >
+            <bdi dir="ltr">+{{ extraTagsCount() }}</bdi>
+          </span>
+        }
+      </div>
+    }
+  </ng-container>
+
+  <ng-container cardBody>
+    @if (detailed()) {
+      @if (rowPhone(); as phone) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'customers.details.phone' | transloco">
+            <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+          </span>
+          <app-phone-actions [phone]="phone" [crm]="true" [source]="phoneSource()" />
+        </div>
+      }
+      @if (rowEmail(); as email) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'customers.details.email' | transloco">
+            <ng-icon name="tablerMail" size="14" aria-hidden="true" />
+          </span>
+          <span class="truncate" dir="ltr" [title]="email">{{ email }}</span>
+        </div>
+      }
+      @if (rowCity(); as city) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'customers.details.city' | transloco">
+            <ng-icon name="tablerMapPin" size="14" aria-hidden="true" />
+          </span>
+          <span class="truncate" dir="auto" [title]="city">{{ city }}</span>
+        </div>
+      }
+    }
+  </ng-container>
+</app-record-card>

@@ -1,0 +1,72 @@
+{
+  "status": {
+    "title": "Phone for this user",
+    "enabled": "Enabled · Ext {{ext}}",
+    "disabled": "Disabled · username and password are kept",
+    "notSetUp": "Not set up yet",
+    "pausedBadge": "Paused: over the seat limit",
+    "enable": "Enable",
+    "enableHint": "When on, this user's phone signs in and takes one phone seat. When off, the phone stops and the seat is freed; the username and password are kept."
+  },
+  "sections": {
+    "sip": "SIP account",
+    "servers": "Servers",
+    "serversHint": "The phone tries these servers in order and moves to the next one if a server does not answer."
+  },
+  "fields": {
+    "extension": "Extension",
+    "extensionHint": "The internal number other users dial to reach this person. Letters, digits and * # + . _ - only.",
+    "sipUsername": "SIP username",
+    "sipUsernameHint": "The account name on your phone server (PBX). Your telephony provider gives it to you.",
+    "sipPassword": "SIP password",
+    "sipPasswordHint": "Stored encrypted and never shown again. Type a new one only to replace it.",
+    "displayName": "Display name",
+    "displayNameHint": "The name the other side sees. Leave it empty to use the user's name.",
+    "outboundCallerId": "Outbound caller ID",
+    "outboundCallerIdHint": "The number shown to people this user calls. Leave it empty to use the server's number."
+  },
+  "password": {
+    "set": "Set",
+    "notSet": "Not set",
+    "change": "Change",
+    "keepCurrent": "Keep current",
+    "show": "Show password",
+    "hide": "Hide password"
+  },
+  "servers": {
+    "add": "Add server",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "remove": "Remove {{name}}",
+    "emptyWarning": "This user cannot register without a server."
+  },
+  "seat": {
+    "module": "Phone",
+    "freedOnSave": "The seat becomes free when you save."
+  },
+  "validation": {
+    "extensionRequired": "Extension is required",
+    "sipUsernameRequired": "SIP username is required",
+    "extensionPattern": "Letters, digits and * # + . _ - only",
+    "extensionTaken": "Another user has this extension",
+    "sipUsernameTaken": "Another user has this username",
+    "passwordRequiredToEnable": "Set a password to enable the phone",
+    "callerIdPattern": "Digits and a leading + only",
+    "maxLength": "Up to {{max}} characters"
+  },
+  "toast": {
+    "seatLimitReached": "Not enough Phone seats: needs 1, {{free}} free.",
+    "moduleInactive": "Your Phone subscription is suspended. Changes are paused.",
+    "ownerHasExtension": "This user's phone was just set up by someone else.",
+    "saved": "Phone settings saved"
+  },
+  "states": {
+    "notPurchasedTitle": "Phone is not part of your subscription",
+    "viewPlans": "View plans",
+    "provisioningTitle": "Phone is being set up for your workspace",
+    "noServersTitle": "No phone servers yet",
+    "noServersLine": "Ask an administrator to add phone servers.",
+    "loadFailedTitle": "Could not load the phone settings",
+    "retry": "Retry"
+  }
+}

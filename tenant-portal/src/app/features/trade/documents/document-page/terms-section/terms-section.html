@@ -1,0 +1,341 @@
+<section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+  @if (isReadonly()) {
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-4">
+      <div class="desktop:col-span-2 min-w-0">
+        <ui-field
+          size="bare"
+          [label]="'tdpg.terms.paymentTerms' | transloco"
+          [hint]="(kind() === 'quotation' ? 'tdpg.terms.paymentTermsHintQuotation' : 'tdpg.terms.paymentTermsHint') | transloco"
+        >
+          <div class="flex min-h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+            <span class="min-w-0 flex-1 whitespace-pre-line">{{ snapshotView().payment || ('tdpg.terms.none' | transloco) }}</span>
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="desktop:col-span-2 min-w-0">
+        <ui-field
+          size="bare"
+          [label]="'tdpg.terms.deliveryTerms' | transloco"
+          [hint]="'tdpg.terms.deliveryTermsHint' | transloco"
+        >
+          <div class="flex min-h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+            <span class="min-w-0 flex-1 whitespace-pre-line">{{ snapshotView().delivery || ('tdpg.terms.none' | transloco) }}</span>
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="desktop:col-span-2 min-w-0">
+        <ui-field
+          size="bare"
+          [label]="'tdpg.terms.warrantyTerms' | transloco"
+          [hint]="'tdpg.terms.warrantyTermsHint' | transloco"
+        >
+          <div class="flex min-h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+            <span class="min-w-0 flex-1 whitespace-pre-line">{{ snapshotView().warranty || ('tdpg.terms.none' | transloco) }}</span>
+            <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="desktop:col-span-2 min-w-0">
+        <ui-field
+          size="bare"
+          [label]="'tdpg.terms.clauses' | transloco"
+          [hint]="'tdpg.terms.clausesHint' | transloco: { max: maxClauses }"
+        >
+          <div class="flex min-h-field items-start justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+            @if (snapshotView().clauses.length > 0) {
+              <ul class="flex min-w-0 flex-1 flex-col gap-4">
+                @for (clause of snapshotView().clauses; track $index) {
+                  <li>
+                    <span class="font-medium">{{ clause.title }}</span>
+                    @if (clause.body) {
+                      <span class="text-text-muted"> — {{ clause.body }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            } @else {
+              <span class="min-w-0 flex-1">{{ 'tdpg.terms.none' | transloco }}</span>
+            }
+            <ng-icon name="tablerLock" size="14" class="mt-2 shrink-0 text-text-muted" aria-hidden="true" />
+          </div>
+        </ui-field>
+      </div>
+    </div>
+  } @else if (useSelectiveConvertLayout()) {
+    <p class="text-12 leading-18 text-text-muted">
+      {{ (mode() === 'convert-quotation' ? 'tdpg.terms.convertQuotationNote' : 'tdpg.terms.convertPurchaseQuotationNote') | transloco }}
+    </p>
+
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-4">
+      <!-- Payment terms -->
+      <div class="desktop:col-span-2 min-w-0">
+        @if (paymentLocked()) {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.terms.paymentTerms' | transloco"
+            [hint]="'tdpg.terms.paymentTermsHint' | transloco"
+          >
+            <div class="flex min-h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+              <span class="min-w-0 flex-1 whitespace-pre-line">
+                {{ snapshotView().payment || termDisplayLabel(termSelections().paymentTermId!) }}
+              </span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-payment-dd'"
+            [label]="'tdpg.terms.paymentTerms' | transloco"
+            [hint]="'tdpg.terms.paymentTermsHint' | transloco"
+            [error]="paymentError()"
+          >
+            <div class="flex items-center gap-4">
+              <ui-dropdown
+                class="min-w-0 flex-1"
+                size="field"
+                [id]="uid + '-payment-dd'"
+                [label]="'tdpg.terms.paymentTerms' | transloco"
+                [options]="paymentDropdownOptions()"
+                [value]="termSelections().paymentTermId"
+                (valueChange)="setSingleSlot('paymentTermId', $event)"
+              />
+              @if (termSelections().paymentTermId) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'tdpg.fields.clear' | transloco"
+                  (click)="setSingleSlot('paymentTermId', null)"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+
+      <!-- Delivery terms -->
+      <div class="desktop:col-span-2 min-w-0">
+        @if (deliveryLocked()) {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.terms.deliveryTerms' | transloco"
+            [hint]="'tdpg.terms.deliveryTermsHint' | transloco"
+          >
+            <div class="flex min-h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+              <span class="min-w-0 flex-1 whitespace-pre-line">
+                {{ snapshotView().delivery || termDisplayLabel(termSelections().deliveryTermId!) }}
+              </span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-delivery-dd'"
+            [label]="'tdpg.terms.deliveryTerms' | transloco"
+            [hint]="'tdpg.terms.deliveryTermsHint' | transloco"
+          >
+            <div class="flex items-center gap-4">
+              <ui-dropdown
+                class="min-w-0 flex-1"
+                size="field"
+                [id]="uid + '-delivery-dd'"
+                [label]="'tdpg.terms.deliveryTerms' | transloco"
+                [options]="deliveryDropdownOptions()"
+                [value]="termSelections().deliveryTermId"
+                (valueChange)="setSingleSlot('deliveryTermId', $event)"
+              />
+              @if (termSelections().deliveryTermId) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'tdpg.fields.clear' | transloco"
+                  (click)="setSingleSlot('deliveryTermId', null)"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+
+      <!-- Warranty terms -->
+      <div class="desktop:col-span-2 min-w-0">
+        @if (warrantyLocked()) {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.terms.warrantyTerms' | transloco"
+            [hint]="'tdpg.terms.warrantyTermsHint' | transloco"
+          >
+            <div class="flex min-h-field items-center justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+              <span class="min-w-0 flex-1 whitespace-pre-line">
+                {{ snapshotView().warranty || termDisplayLabel(termSelections().warrantyTermId!) }}
+              </span>
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-warranty-dd'"
+            [label]="'tdpg.terms.warrantyTerms' | transloco"
+            [hint]="'tdpg.terms.warrantyTermsHint' | transloco"
+          >
+            <div class="flex items-center gap-4">
+              <ui-dropdown
+                class="min-w-0 flex-1"
+                size="field"
+                [id]="uid + '-warranty-dd'"
+                [label]="'tdpg.terms.warrantyTerms' | transloco"
+                [options]="warrantyDropdownOptions()"
+                [value]="termSelections().warrantyTermId"
+                (valueChange)="setSingleSlot('warrantyTermId', $event)"
+              />
+              @if (termSelections().warrantyTermId) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'tdpg.fields.clear' | transloco"
+                  (click)="setSingleSlot('warrantyTermId', null)"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+
+      <!-- Clauses -->
+      <div class="desktop:col-span-2 min-w-0">
+        @if (clausesLocked()) {
+          <ui-field
+            size="bare"
+            [label]="'tdpg.terms.clauses' | transloco"
+            [hint]="'tdpg.terms.clausesHint' | transloco: { max: maxClauses }"
+          >
+            <div class="flex min-h-field items-start justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-4 text-12 leading-18 text-text">
+              @if (snapshotView().clauses.length > 0) {
+                <ul class="flex min-w-0 flex-1 flex-col gap-4">
+                  @for (clause of snapshotView().clauses; track $index) {
+                    <li>
+                      <span class="font-medium">{{ clause.title }}</span>
+                      @if (clause.body) {
+                        <span class="text-text-muted"> — {{ clause.body }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <span class="min-w-0 flex-1">
+                  @for (cid of termSelections().clauseIds; track cid; let last = $last) {
+                    <span>{{ termDisplayLabel(cid) }}</span>@if (!last) {<span>, </span>}
+                  }
+                </span>
+              }
+              <ng-icon name="tablerLock" size="14" class="mt-2 shrink-0 text-text-muted" aria-hidden="true" />
+            </div>
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-clauses-dd'"
+            [label]="'tdpg.terms.clauses' | transloco"
+            [hint]="'tdpg.terms.clausesHint' | transloco: { max: maxClauses }"
+          >
+            <div class="flex flex-col gap-4">
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [attr.title]="clausesAtMax() ? ('tdpg.terms.maxReached' | transloco: { max: maxClauses }) : null"
+                [id]="uid + '-clauses-dd'"
+                [label]="'tdpg.terms.clauses' | transloco"
+                [disabled]="clausesAtMax() || availableClauseOptions().length === 0"
+                [options]="availableClauseOptions()"
+                [value]="clausePick()"
+                (valueChange)="addClause($event)"
+              />
+              @if (termSelections().clauseIds.length > 0) {
+                <div class="flex flex-wrap gap-4">
+                  @for (cid of termSelections().clauseIds; track cid; let idx = $index) {
+                    <span class="inline-flex h-chip items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                      <span class="truncate">{{ termDisplayLabel(cid) }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        [attr.aria-label]="'tdpg.terms.removeClause' | transloco: { name: termDisplayLabel(cid) }"
+                        (click)="removeClauseAt(idx)"
+                      >
+                        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                      </button>
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          </ui-field>
+        }
+      </div>
+    </div>
+  } @else {
+    <div
+      class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-4"
+      (pointerdown)="onUserSelectInteraction()"
+      (keydown)="onUserSelectInteraction()"
+      (click)="onUserSelectInteraction()"
+    >
+      <app-trade-terms-select
+        [documentType]="termDocumentType()"
+        [value]="termSelections()"
+        (valueChange)="onSelectValueChange($event)"
+        [paymentRequired]="kind() === 'quotation'"
+        [disabled]="false"
+        [idPrefix]="uid"
+        [showErrors]="showErrors() || !!(paymentError())"
+      />
+    </div>
+  }
+
+  @if (notesLocked()) {
+    <ui-field
+      size="bare"
+      [label]="'tdpg.terms.notes' | transloco"
+      [hint]="'tdpg.terms.notesHint' | transloco: { max: notesMaxLength() }"
+    >
+      <div class="flex min-h-textarea items-start justify-between gap-6 rounded-8 border border-border-field bg-surface-field px-8 py-6 text-12 leading-18 text-text">
+        <span class="min-w-0 flex-1 whitespace-pre-line">
+          {{ snapshotView().notes || ('tdpg.terms.none' | transloco) }}
+        </span>
+        <ng-icon name="tablerLock" size="14" class="mt-2 shrink-0 text-text-muted" aria-hidden="true" />
+      </div>
+    </ui-field>
+  } @else {
+    <ui-field
+      size="multiline"
+      [for]="uid + '-notes'"
+      [label]="'tdpg.terms.notes' | transloco"
+      [hint]="'tdpg.terms.notesHint' | transloco: { max: notesMaxLength() }"
+      [count]="notesLength()"
+      [max]="notesMaxLength()"
+      [error]="notesTooLong() ? ('tdpg.validation.notesMax' | transloco: { max: notesMaxLength() }) : notesError()"
+    >
+      <textarea
+        [id]="uid + '-notes'"
+        rows="2"
+        class="min-h-textarea w-full resize-y bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [attr.aria-invalid]="notesTooLong() || notesError() ? 'true' : null"
+        [placeholder]="'tdpg.terms.notesPlaceholder' | transloco"
+        [value]="notes()"
+        (input)="onNotesInput($event)"
+      ></textarea>
+    </ui-field>
+  }
+</section>

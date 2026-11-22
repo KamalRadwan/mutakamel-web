@@ -1,0 +1,407 @@
+<!-- 1. Activity type -->
+<div class="col-span-3">
+  <ui-field
+    size="bare"
+    [label]="'activities.form.type' | transloco"
+    [hint]="'activities.hints.type' | transloco"
+  >
+    <div
+      role="radiogroup"
+      [attr.aria-label]="'activities.form.type' | transloco"
+      class="grid grid-cols-7 gap-6"
+    >
+      @for (type of activityTypes; track type; let index = $index) {
+        <button
+          #typeBtn
+          type="button"
+          role="radio"
+          class="flex cursor-pointer flex-col items-center gap-4 rounded-8 border px-2 py-6 text-center text-11 leading-16 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            formValue().type === type
+              ? 'border-brand bg-brand-soft font-medium text-on-brand-soft'
+              : 'border-border bg-surface text-text hover:bg-row-hover'
+          "
+          [attr.aria-checked]="formValue().type === type"
+          [tabIndex]="formValue().type === type ? 0 : -1"
+          (click)="setType(type)"
+          (keydown)="onTypeKeydown($event, index)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="typeLook[type].tile"
+            aria-hidden="true"
+          >
+            <ng-icon [name]="typeLook[type].icon" size="14" />
+          </span>
+          <span class="max-w-full truncate">{{ 'activities.types.' + type | transloco }}</span>
+        </button>
+      }
+    </div>
+  </ui-field>
+</div>
+
+<!-- 2. Title & Assigned to -->
+<div class="col-span-2">
+  <ui-field
+    [label]="'activities.form.subject' | transloco"
+    [for]="uid + '-subject'"
+    [hint]="'activities.hints.subject' | transloco"
+    [required]="true"
+    [count]="subjectCount()"
+    [max]="limits.subject"
+    [error]="errorText('subject')"
+  >
+    <input
+      [id]="uid + '-subject'"
+      type="text"
+      class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'activities.form.subjectPlaceholder' | transloco"
+      [value]="formValue().subject"
+      [attr.aria-invalid]="errorText('subject') ? 'true' : null"
+      [attr.aria-describedby]="describedBy('subject')"
+      (input)="onTextInput('subject', $event)"
+      (blur)="markTouched('subject')"
+    />
+  </ui-field>
+</div>
+
+<div class="col-span-1 flex flex-col">
+  <ui-field
+    size="bare"
+    [label]="'activities.form.assignee' | transloco"
+    [hint]="'activities.hints.assignee' | transloco"
+  >
+    <ui-dropdown
+      class="w-full"
+      [options]="assigneeOptions()"
+      [value]="formValue().assigneeUserId"
+      [label]="'activities.form.assignee' | transloco"
+      (valueChange)="setAssignee($event)"
+    />
+  </ui-field>
+  @if (formValue().assigneeUserId !== currentUserId) {
+    <button
+      type="button"
+      class="mt-2 cursor-pointer self-start rounded-4 text-12 leading-16 text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="assignToMe()"
+    >
+      {{ 'activities.form.assignToMe' | transloco }}
+    </button>
+  }
+</div>
+
+<!-- 3. Schedule -->
+<div class="col-span-3">
+  <div class="flex items-end gap-10">
+    <div class="min-w-0 flex-1" (focusout)="onScheduleFocusOut('start', $event)">
+      <ui-field
+        size="bare"
+        [label]="(hasEnd() ? 'activities.form.start' : 'activities.form.due') | transloco"
+        [for]="uid + '-start-date'"
+        [required]="true"
+        [hint]="(hasEnd() ? 'activities.hints.start' : 'activities.hints.due') | transloco"
+      >
+        <div class="flex items-center gap-6">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            [id]="uid + '-start-date'"
+            [ariaLabel]="(hasEnd() ? 'activities.form.start' : 'activities.form.due') | transloco"
+            [todayLabel]="todayLabel()"
+            [value]="formValue().startDate"
+            [invalid]="!!errorText('start')"
+            [attr.aria-describedby]="describedBy('start', 'start-date')"
+            (valueChange)="onStartDateChange($event)"
+          />
+          <ui-time-field
+            class="shrink-0"
+            [id]="uid + '-start-time'"
+            [ariaLabel]="(hasEnd() ? 'activities.form.start' : 'activities.form.due') | transloco"
+            [hourLabel]="'activities.form.hour' | transloco"
+            [minuteLabel]="'activities.form.minute' | transloco"
+            [value]="formValue().startTime"
+            [invalid]="!!errorText('start')"
+            [attr.aria-describedby]="describedBy('start', 'start-date')"
+            (valueChange)="onStartTimeChange($event)"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    @if (showReminder()) {
+      <div class="flex shrink-0 flex-col">
+        <ui-field
+          size="bare"
+          [label]="'activities.form.reminder' | transloco"
+          [hint]="'activities.hints.reminder' | transloco"
+        >
+          <ui-dropdown
+            [options]="reminderOptions()"
+            [value]="formValue().reminder"
+            [label]="'activities.form.reminder' | transloco"
+            (valueChange)="setReminder($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @if (!hasEnd()) {
+      <button type="button" uiButton variant="primary" size="small" (click)="addEnd()">
+        <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+        {{ 'activities.form.addEnd' | transloco }}
+      </button>
+    }
+  </div>
+  @if (errorText('start'); as err) {
+    <p [id]="uid + '-start-date-error'" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+      <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+      {{ err }}
+    </p>
+  }
+</div>
+
+<div class="col-span-3 flex flex-wrap items-center gap-6">
+  @for (preset of schedulePresets(); track preset.id) {
+    <button
+      type="button"
+      class="h-btn-h-sm px-8 rounded-6 text-11 font-medium border bg-surface cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="preset.active ? typeLook[formValue().type].chipActive : typeLook[formValue().type].chip"
+      (click)="applyPreset(preset)"
+    >
+      {{ preset.label }}
+    </button>
+  }
+</div>
+
+@if (hasEnd()) {
+  <div class="col-span-3" (focusout)="onScheduleFocusOut('end', $event)">
+    <ui-field
+      size="bare"
+      [label]="'activities.form.end' | transloco"
+      [for]="uid + '-end-date'"
+      [hint]="'activities.hints.end' | transloco"
+      [error]="errorText('end')"
+    >
+      <div class="flex items-center gap-6">
+        <ui-date-field
+          class="min-w-0 flex-1"
+          [id]="uid + '-end-date'"
+          [ariaLabel]="'activities.form.end' | transloco"
+          [todayLabel]="todayLabel()"
+          [min]="formValue().startDate || null"
+          [value]="formValue().endDate || null"
+          [invalid]="!!errorText('end')"
+          [attr.aria-describedby]="describedBy('end', 'end-date')"
+          (valueChange)="onEndDateChange($event)"
+        />
+        <ui-time-field
+          class="shrink-0"
+          [id]="uid + '-end-time'"
+          [ariaLabel]="'activities.form.end' | transloco"
+          [hourLabel]="'activities.form.hour' | transloco"
+          [minuteLabel]="'activities.form.minute' | transloco"
+          [value]="formValue().endTime || null"
+          [invalid]="!!errorText('end')"
+          [attr.aria-describedby]="describedBy('end', 'end-date')"
+          (valueChange)="onEndTimeChange($event)"
+        />
+        @for (chip of durationChips(); track chip.minutes) {
+          <button
+            type="button"
+            class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center rounded-6 px-8 text-11 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="chip.active ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text hover:bg-row-hover'"
+            (click)="applyDuration(chip.minutes)"
+          >
+            {{ ('activities.form.' + chip.unit) | transloco: { count: chip.count } }}
+          </button>
+        }
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 bg-danger text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'activities.form.removeEnd' | transloco"
+          [title]="'activities.form.removeEnd' | transloco"
+          (click)="removeEnd()"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      </div>
+    </ui-field>
+  </div>
+}
+
+<!-- 4. Status (create only) -->
+@if (mode() === 'create') {
+  <div class="col-span-3">
+    <ui-field
+      size="bare"
+      [label]="'activities.form.status' | transloco"
+      [hint]="'activities.hints.status' | transloco"
+    >
+      <ui-segmented
+        class="self-start"
+        [options]="statusOptions()"
+        [label]="'activities.form.status' | transloco"
+        [value]="formValue().status"
+        (valueChange)="setStatus($event)"
+      />
+    </ui-field>
+  </div>
+}
+
+<!-- 5. Priority & Direction (CALL and EMAIL only) -->
+<div class="col-span-3 flex flex-wrap items-end gap-10">
+  <div>
+    <ui-field
+      size="bare"
+      [label]="'activities.form.priority' | transloco"
+      [hint]="'activities.hints.priority' | transloco"
+    >
+      <ui-segmented
+        class="self-start"
+        [options]="priorityOptions()"
+        [label]="'activities.form.priority' | transloco"
+        [value]="formValue().priority"
+        (valueChange)="setPriority($event)"
+      />
+    </ui-field>
+  </div>
+
+  @if (typeFields().direction) {
+    <div>
+      <ui-field
+        size="bare"
+        [label]="'activities.form.direction' | transloco"
+        [hint]="'activities.hints.direction' | transloco"
+      >
+        <ui-segmented
+          class="self-start"
+          [options]="directionOptions()"
+          [label]="'activities.form.direction' | transloco"
+          [value]="formValue().direction"
+          (valueChange)="setDirection($event)"
+        />
+      </ui-field>
+    </div>
+  }
+</div>
+
+<!-- 7. Location & Meeting link -->
+@if (typeFields().location) {
+  <div class="col-span-1">
+    <ui-field
+      [label]="'activities.form.location' | transloco"
+      [for]="uid + '-location'"
+      [hint]="'activities.hints.location' | transloco"
+      [count]="locationCount()"
+      [max]="limits.location"
+      [error]="errorText('location')"
+    >
+      <input
+        [id]="uid + '-location'"
+        type="text"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="formValue().location"
+        [attr.aria-invalid]="errorText('location') ? 'true' : null"
+        [attr.aria-describedby]="describedBy('location')"
+        (input)="onTextInput('location', $event)"
+        (blur)="markTouched('location')"
+      />
+    </ui-field>
+  </div>
+}
+
+@if (typeFields().meetingUrl) {
+  <div class="col-span-2">
+    <ui-field
+      [label]="'activities.form.meetingUrl' | transloco"
+      [for]="uid + '-meeting-url'"
+      [hint]="'activities.hints.meetingUrl' | transloco"
+      [error]="errorText('meetingUrl')"
+    >
+      <input
+        [id]="uid + '-meeting-url'"
+        type="url"
+        dir="ltr"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="formValue().meetingUrl"
+        [attr.aria-invalid]="errorText('meetingUrl') ? 'true' : null"
+        [attr.aria-describedby]="describedBy('meetingUrl', 'meeting-url')"
+        (input)="onTextInput('meetingUrl', $event)"
+        (blur)="markTouched('meetingUrl')"
+      />
+      @if (meetingLinkValid()) {
+        <ng-icon name="tablerCheck" size="12" class="shrink-0 text-success-text" aria-hidden="true" />
+      }
+    </ui-field>
+  </div>
+}
+
+<!-- 8. Notes and agenda -->
+<div class="col-span-3">
+  <ui-field
+    size="multiline"
+    [label]="'activities.form.description' | transloco"
+    [for]="uid + '-description'"
+    [hint]="'activities.hints.description' | transloco"
+    [count]="descriptionCount()"
+    [max]="limits.description"
+    [error]="errorText('description')"
+  >
+    <textarea
+      [id]="uid + '-description'"
+      rows="3"
+      class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [value]="formValue().description"
+      [attr.aria-invalid]="errorText('description') ? 'true' : null"
+      [attr.aria-describedby]="describedBy('description')"
+      (input)="onTextInput('description', $event)"
+      (blur)="markTouched('description')"
+    ></textarea>
+  </ui-field>
+</div>
+
+<!-- 9. Outcome (create with status Completed only) -->
+@if (mode() === 'create' && formValue().status === 'DONE') {
+  <div class="col-span-3">
+    <ui-field
+      size="multiline"
+      [label]="'activities.form.outcome' | transloco"
+      [for]="uid + '-outcome'"
+      [hint]="'activities.hints.outcome' | transloco"
+      [count]="outcomeCount()"
+      [max]="limits.outcome"
+      [error]="errorText('outcome')"
+    >
+      <textarea
+        [id]="uid + '-outcome'"
+        rows="3"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [value]="formValue().outcome"
+        [attr.aria-invalid]="errorText('outcome') ? 'true' : null"
+        [attr.aria-describedby]="describedBy('outcome')"
+        (input)="onTextInput('outcome', $event)"
+        (blur)="markTouched('outcome')"
+      ></textarea>
+    </ui-field>
+  </div>
+}
+
+<!-- 10. Edit mode metadata -->
+@if (mode() === 'edit' && currentBaseActivity(); as act) {
+  <div class="col-span-3 flex flex-col gap-4 border-t border-border pt-8">
+    @if (primaryTargetLabel(); as targetLabel) {
+      <div class="flex items-center gap-6 text-12 text-text">
+        <span class="text-text-muted">{{ 'activities.form.relatedTo' | transloco }}:</span>
+        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <span class="font-medium">{{ targetLabel }}</span>
+      </div>
+    }
+    <p class="text-11 leading-16 text-text-muted">
+      {{
+        'activities.meta.created'
+          | transloco: { date: formatMetaDate(act.createdAt), name: act.createdByName || act.createdByUserId }
+      }}
+      ·
+      {{ 'activities.meta.updated' | transloco: { date: formatMetaDate(act.updatedAt) } }}
+    </p>
+  </div>
+}

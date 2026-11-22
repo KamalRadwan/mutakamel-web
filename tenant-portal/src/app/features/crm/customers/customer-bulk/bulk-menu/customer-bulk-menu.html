@@ -1,0 +1,7 @@
+<app-record-bulk-menu
+  [count]="resolvedCount()"
+  [actions]="actions()"
+  [busyReasonKey]="isBusy() ? 'recordBulk.menu.busy' : null"
+  [disabled]="disabled()"
+  (run)="onRun($event)"
+/>

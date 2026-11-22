@@ -1,0 +1,106 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerUpload"
+  tile="bg-icon-teal"
+  [title]="'bov.topup.title' | transloco"
+  [closeLabel]="'bill.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  @if (phase() === 'form') {
+    <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-amount'"
+          [label]="'bov.topup.amountLabel' | transloco"
+          [hint]="'bov.topup.amountHint' | transloco"
+          [required]="true"
+          [error]="amountError()"
+        >
+          <input
+            [id]="uid + '-amount'"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            autocomplete="off"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'bov.topup.amountPlaceholder' | transloco"
+            [value]="amount()"
+            [readOnly]="submitting()"
+            [attr.aria-invalid]="amountError() ? 'true' : null"
+            (input)="onAmountInput($event)"
+            (blur)="amountTouched.set(true)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-currency'"
+          [label]="'bov.topup.currencyLabel' | transloco"
+          [hint]="'bov.topup.currencyHint' | transloco"
+          [required]="true"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-currency'"
+            [options]="currencyOptions()"
+            [value]="currencyCode()"
+            [label]="'bov.topup.currencyLabel' | transloco"
+            [disabled]="submitting() || currenciesLoading()"
+            [describedBy]="uid + '-currency-hint'"
+            (valueChange)="onCurrencyChange($event)"
+          />
+        </ui-field>
+      </div>
+    </form>
+
+    <ng-container ngProjectAs="[modal-footer]"><div modal-footer class="flex flex-1 items-center gap-8">
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="submitting()"
+        [disabled]="submitting()"
+      >
+        {{ 'bov.topup.continue' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="submitting()"
+        (click)="close()"
+      >
+        {{ 'bill.common.cancel' | transloco }}
+      </button>
+    </div></ng-container>
+  } @else {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="status" aria-live="polite">
+      <ng-icon name="tablerLoader2" size="16" class="animate-spin text-brand-text" aria-hidden="true" />
+      <p class="text-13 leading-18 text-text">{{ 'bov.topup.waiting' | transloco }}</p>
+      @if (popupBlocked() && checkoutUrl(); as url) {
+        <a
+          uiButton
+          variant="secondary"
+          size="small"
+          [href]="url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ 'bov.topup.openPaymentPage' | transloco }}
+        </a>
+      }
+    </div>
+
+    <ng-container ngProjectAs="[modal-footer]"><div modal-footer class="flex flex-1 items-center gap-8">
+      <button type="button" uiButton variant="secondary" (click)="close()">
+        {{ 'bov.topup.done' | transloco }}
+      </button>
+    </div></ng-container>
+  }
+</ui-modal>

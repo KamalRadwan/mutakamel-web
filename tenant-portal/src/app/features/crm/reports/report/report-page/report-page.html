@@ -1,0 +1,154 @@
+@if (state.error(); as errorKind) {
+  @switch (errorKind) {
+    @case ('not-found') {
+      <ui-full-state
+        kind="not-found"
+        [title]="'repReport.notFound' | transloco"
+        [text]="'repReport.notFoundText' | transloco"
+        [actionLabel]="'repReport.backToCatalogue' | transloco"
+        (action)="goToCatalogue()"
+      />
+    }
+    @case ('forbidden') {
+      <ui-full-state
+        kind="forbidden"
+        [title]="'repReport.forbidden' | transloco"
+        [text]="'repReport.forbiddenText' | transloco"
+        [actionLabel]="'repReport.backToCatalogue' | transloco"
+        (action)="goToCatalogue()"
+      />
+    }
+    @case ('load-failure') {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'repReport.loadFailed' | transloco"
+        [actionLabel]="'analytics.common.retry' | transloco"
+        (action)="retryLoad()"
+      />
+    }
+  }
+} @else if (state.manifest(); as manifest) {
+  <!-- Always rendered so the live region persists; out of the layout (sr-only) while it is empty. -->
+  <p role="status" class="text-12 leading-16 text-text-muted" [class.sr-only]="!state.retrying()">
+    @if (state.retrying()) {
+      {{ 'analytics.common.retrying' | transloco }}
+    }
+  </p>
+  <header class="flex flex-wrap items-center justify-between gap-8">
+    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerChartBar" size="15" />
+      </span>
+
+      <h1 class="min-w-0 truncate text-16 leading-24 font-medium text-text" [title]="reportTitle()">
+        {{ reportTitle() }}
+      </h1>
+
+      <ui-badge tone="tag">{{ 'analytics.domain.' + domain() | transloco }}</ui-badge>
+
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="favourite() ? 'text-icon-orange' : 'text-text-muted'"
+        [attr.aria-pressed]="favourite()"
+        [attr.aria-label]="(favourite() ? 'repReport.unfavourite' : 'repReport.favourite') | transloco"
+        [title]="(favourite() ? 'repReport.unfavourite' : 'repReport.favourite') | transloco"
+        (click)="toggleFavourite()"
+      >
+        <ng-icon [name]="favourite() ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-8">
+      @if (manifest.freshness.dataAsOf) {
+        <span class="inline-flex items-center gap-4 text-11 leading-16 text-text-muted tabular-nums">
+          <ng-icon name="tablerDatabase" size="14" aria-hidden="true" />
+          <span>{{ dataAsOfText() }}</span>
+        </span>
+      }
+
+      @if (manifest.freshness.stale) {
+        <ui-badge tone="warning" [attr.title]="staleTooltip() || null">
+          {{ 'repReport.stale' | transloco }}
+        </ui-badge>
+      }
+
+      @if (canPin()) {
+        <button type="button" uiButton variant="secondary" (click)="openPinModal()">
+          <ng-icon name="tablerPin" size="15" aria-hidden="true" />
+          <span>{{ 'repReport.addToDashboard' | transloco }}</span>
+        </button>
+      }
+
+      @if (canSchedule()) {
+        <button type="button" uiButton variant="secondary" (click)="goToSchedule()">
+          <ng-icon name="tablerCalendarTime" size="15" aria-hidden="true" />
+          <span>{{ 'repReport.schedule' | transloco }}</span>
+        </button>
+      }
+
+      @if (canExport()) {
+        <app-export-menu
+          [primary]="true"
+          [target]="{ reportKey: state.reportKey() }"
+          [period]="exportPeriod()"
+          [filters]="exportFilters()"
+        />
+      }
+    </div>
+  </header>
+
+  <ui-tabs
+    [tabs]="tabs()"
+    [label]="'repReport.tabs.label' | transloco"
+    [active]="activeTab()"
+    (activeChange)="onTabChange($event)"
+  />
+
+  <app-report-filters />
+
+  <div
+    class="min-h-0 flex-1"
+    role="tabpanel"
+    [id]="tabPanelId(activeTab())"
+    [attr.aria-labelledby]="tabButtonId(activeTab())"
+  >
+    @switch (activeTab()) {
+      @case ('overview') {
+        <app-report-overview-tab
+          (pinPanel)="openPinModal($event)"
+          (openRecords)="openRecordsTab($event)"
+          (openExplain)="openAboutExplain($event)"
+        />
+      }
+      @case ('records') {
+        <app-report-records-tab />
+      }
+      @case ('about') {
+        <app-report-about-tab />
+      }
+    }
+  </div>
+
+  <app-report-pin-modal />
+} @else {
+  <div class="flex flex-col gap-10" aria-busy="true">
+    <div class="flex items-center gap-8">
+      <span class="size-icon-tile rounded-8 bg-neutral-soft" aria-hidden="true"></span>
+      <span class="h-skeleton-line w-1/4 rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+      <span class="h-skeleton-line w-1/12 rounded-4 bg-neutral-soft" aria-hidden="true"></span>
+    </div>
+    <div class="grid grid-cols-2 gap-12 desktop:grid-cols-4">
+      @for (item of skeletonItems; track item) {
+        <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+          <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></div>
+          <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></div>
+        </div>
+      }
+    </div>
+    <span class="sr-only" role="status">{{ 'dashboardWidgets.state.loading' | transloco }}</span>
+  </div>
+}

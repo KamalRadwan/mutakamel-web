@@ -1,0 +1,299 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerTag"
+  tile="bg-icon-orange"
+  [title]="(isEdit() ? 'tags.form.editTitle' : 'tags.form.createTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form class="grid grid-cols-2 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); save()">
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tags.form.name' | transloco"
+        [for]="uid + '-name'"
+        [hint]="'tags.form.nameHint' | transloco"
+        [required]="true"
+        [count]="nameCount()"
+        [max]="maxNameLength"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tags.form.namePlaceholder' | transloco"
+          [value]="name()"
+          [attr.maxlength]="maxNameLength"
+          [readOnly]="!canManage()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-hint' + (nameError() ? ' ' + uid + '-name-error' : '')"
+          (input)="onNameInput($event)"
+          (blur)="markTouched('name')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [label]="'tags.form.preview' | transloco"
+        [for]="uid + '-preview'"
+        [hint]="'tags.form.previewHint' | transloco"
+      >
+        <div
+          [id]="uid + '-preview'"
+          role="img"
+          class="flex h-field items-center rounded-8 border border-border bg-surface-muted px-8"
+          [attr.aria-label]="'tags.form.preview' | transloco"
+          [attr.aria-describedby]="uid + '-preview-hint'"
+        >
+          @if (previewColors(); as colors) {
+            <!-- Approved data exception: tag chip preview uses user-chosen colours, bound inline. -->
+            <span
+              class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+              [style.background-color]="colors.bg"
+              [style.color]="colors.text"
+            >
+              {{ name().trim() || ('tags.form.previewPlaceholder' | transloco) }}
+            </span>
+          } @else {
+            <span
+              class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text"
+            >
+              {{ name().trim() || ('tags.form.previewPlaceholder' | transloco) }}
+            </span>
+          }
+        </div>
+      </ui-field>
+
+      @if (lowContrast()) {
+        <p class="mt-2 flex items-center gap-4 text-11 leading-16 text-warning-text" role="status">
+          <ng-icon name="tablerAlertTriangle" size="11" aria-hidden="true" />
+          <span>{{ 'tags.form.lowContrast' | transloco }}</span>
+        </p>
+      }
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [label]="'tags.form.colour' | transloco"
+        [for]="uid + '-colour'"
+        [hint]="'tags.form.colourHint' | transloco"
+      >
+        <div
+          [id]="uid + '-colour'"
+          role="group"
+          [attr.aria-label]="'tags.form.colour' | transloco"
+          [attr.aria-describedby]="uid + '-colour-hint'"
+        >
+          <div class="flex flex-wrap items-center gap-6">
+            <button
+              type="button"
+              class="inline-flex h-btn-h-sm items-center rounded-6 border px-8 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                (colorMode() === 'none'
+                  ? 'border-brand bg-brand-soft text-on-brand-soft'
+                  : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                ' ' +
+                (canManage() ? 'cursor-pointer' : 'cursor-default')
+              "
+              [attr.aria-pressed]="colorMode() === 'none'"
+              [attr.aria-disabled]="!canManage() ? 'true' : null"
+              (click)="selectNoColor()"
+            >
+              {{ 'tags.color.none' | transloco }}
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex h-btn-h-sm items-center rounded-6 border px-8 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                (colorMode() === 'custom'
+                  ? 'border-brand bg-brand-soft text-on-brand-soft'
+                  : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                ' ' +
+                (canManage() ? 'cursor-pointer' : 'cursor-default')
+              "
+              [attr.aria-pressed]="colorMode() === 'custom'"
+              [attr.aria-disabled]="!canManage() ? 'true' : null"
+              (click)="selectCustom()"
+            >
+              {{ 'tags.color.custom' | transloco }}
+            </button>
+          </div>
+
+          <div
+            role="group"
+            class="mt-8 grid w-fit grid-cols-10 gap-6"
+            [attr.aria-label]="'tags.color.presetsLabel' | transloco"
+          >
+            @for (preset of presets; track preset.key) {
+              <!-- Approved data exception: tag preset swatch colours come from tag data, bound inline. -->
+              <button
+                type="button"
+                class="inline-flex size-icon-tile-sm items-center justify-center rounded-full border border-border outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  (isPresetSelected(preset.key) ? 'ring-2 ring-brand ring-offset-2 ring-offset-surface' : '') +
+                  ' ' +
+                  (canManage() ? 'cursor-pointer' : 'cursor-default')
+                "
+                [style.background-color]="preset.bg"
+                [style.color]="preset.text"
+                [attr.aria-label]="'tags.presets.' + preset.key | transloco"
+                [attr.aria-pressed]="isPresetSelected(preset.key)"
+                [attr.aria-disabled]="!canManage() ? 'true' : null"
+                [title]="'tags.presets.' + preset.key | transloco"
+                (click)="selectPreset(preset.key)"
+              >
+                @if (isPresetSelected(preset.key)) {
+                  <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                }
+              </button>
+            }
+          </div>
+        </div>
+
+        <p class="mt-6 text-12 leading-18 text-text-muted">
+          @switch (colorMode()) {
+            @case ('none') {
+              {{ 'tags.color.none' | transloco }}
+            }
+            @case ('preset') {
+              {{ 'tags.presets.' + selectedPreset() | transloco }}
+            }
+            @case ('custom') {
+              {{ 'tags.color.custom' | transloco }}
+            }
+          }
+        </p>
+      </ui-field>
+    </div>
+
+    @if (colorMode() === 'custom') {
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tags.color.background' | transloco"
+          [for]="uid + '-bg'"
+          [hint]="'tags.color.backgroundHint' | transloco"
+          [required]="true"
+          [error]="hexError('bg')"
+        >
+          <!-- Approved data exception: tag colour preview comes from user-entered hex data, bound inline. -->
+          <span
+            class="size-16 shrink-0 rounded-4 border border-border"
+            [style.background-color]="validCustomBg() ?? 'transparent'"
+            aria-hidden="true"
+          ></span>
+          <input
+            [id]="uid + '-bg'"
+            type="text"
+            dir="ltr"
+            maxlength="7"
+            placeholder="#RRGGBB"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [value]="customBg()"
+            [readOnly]="!canManage()"
+            [attr.aria-readonly]="!canManage() ? 'true' : null"
+            [attr.aria-invalid]="hexError('bg') ? 'true' : null"
+            [attr.aria-describedby]="uid + '-bg-hint' + (hexError('bg') ? ' ' + uid + '-bg-error' : '')"
+            (input)="onHexInput('bg', $event)"
+            (blur)="onHexBlur('bg')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [label]="'tags.color.text' | transloco"
+          [for]="uid + '-text'"
+          [hint]="'tags.color.textHint' | transloco"
+          [required]="true"
+          [error]="hexError('text')"
+        >
+          <!-- Approved data exception: tag colour preview comes from user-entered hex data, bound inline. -->
+          <span
+            class="size-16 shrink-0 rounded-4 border border-border"
+            [style.background-color]="validCustomText() ?? 'transparent'"
+            aria-hidden="true"
+          ></span>
+          <input
+            [id]="uid + '-text'"
+            type="text"
+            dir="ltr"
+            maxlength="7"
+            placeholder="#RRGGBB"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [value]="customText()"
+            [readOnly]="!canManage()"
+            [attr.aria-readonly]="!canManage() ? 'true' : null"
+            [attr.aria-invalid]="hexError('text') ? 'true' : null"
+            [attr.aria-describedby]="uid + '-text-hint' + (hexError('text') ? ' ' + uid + '-text-error' : '')"
+            (input)="onHexInput('text', $event)"
+            (blur)="onHexBlur('text')"
+          />
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        [loading]="saving()"
+        [disabled]="isEdit() ? !dirty() : false"
+        (click)="save()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+    }
+    @if (isEdit() && canManage() && dirty()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="undo()"
+      >
+        {{ 'settings.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+    }
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ (canManage() ? 'settings.common.cancel' : 'settings.common.close') | transloco }}
+    </button>
+
+    @if (isEdit() && canManage() && editingTag(); as tag) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [disabled]="saving()"
+        (click)="deleteRequested.emit(tag)"
+      >
+        {{ 'settings.common.delete' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tags.discard.title' | transloco"
+  [text]="'tags.discard.text' | transloco"
+  [confirmLabel]="'tags.discard.confirm' | transloco"
+  [cancelLabel]="'tags.discard.keep' | transloco"
+/>

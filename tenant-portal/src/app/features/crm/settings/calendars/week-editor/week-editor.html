@@ -1,0 +1,95 @@
+<section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <ui-field
+    size="bare"
+    [label]="'calendars.week.workingDays' | transloco"
+    [for]="uid + '-weekdays'"
+    [hint]="'calendars.week.workingDaysHint' | transloco"
+  >
+    <div
+      [id]="uid + '-weekdays'"
+      role="group"
+      class="flex flex-wrap items-center gap-12 rounded-8 border border-border-field bg-surface-field px-10 py-6"
+      [attr.aria-label]="'calendars.week.workingDays' | transloco"
+      [attr.aria-describedby]="uid + '-weekdays-hint'"
+      [attr.inert]="readOnly() ? '' : null"
+    >
+      @for (day of weekdays; track day) {
+        <ui-checkbox
+          [checked]="isDayChecked(day)"
+          (checkedChange)="onDayToggle(day, $event)"
+        >
+          {{ 'chart.days.' + day | transloco }}
+        </ui-checkbox>
+      }
+    </div>
+  </ui-field>
+
+  <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 desktop:grid-cols-3">
+    <ui-field
+      size="bare"
+      [label]="'calendars.week.workingHours' | transloco"
+      [for]="uid + '-start'"
+      [hint]="'calendars.week.workingHoursHint' | transloco"
+      [error]="hoursError()"
+    >
+      <div class="flex items-center gap-6">
+        <ui-time-field
+          [id]="uid + '-start'"
+          [ariaLabel]="'calendars.week.startTime' | transloco"
+          [describedBy]="uid + '-start-hint' + (hoursError() ? ' ' + uid + '-start-error' : '')"
+          [hourLabel]="'calendars.week.hour' | transloco"
+          [minuteLabel]="'calendars.week.minute' | transloco"
+          [invalid]="!!hoursError()"
+          [disabled]="readOnly()"
+          [value]="startTimeText()"
+          (valueChange)="onStartTimeChange($event)"
+        />
+        <span class="text-12 text-text-muted" aria-hidden="true">–</span>
+        <ui-time-field
+          [id]="uid + '-end'"
+          [ariaLabel]="'calendars.week.endTime' | transloco"
+          [describedBy]="uid + '-start-hint' + (hoursError() ? ' ' + uid + '-start-error' : '')"
+          [hourLabel]="'calendars.week.hour' | transloco"
+          [minuteLabel]="'calendars.week.minute' | transloco"
+          [invalid]="!!hoursError()"
+          [disabled]="readOnly()"
+          [value]="endTimeText()"
+          (valueChange)="onEndTimeChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'calendars.week.timeZone' | transloco"
+      [for]="uid + '-tz'"
+      [hint]="'calendars.week.timeZoneHint' | transloco"
+    >
+      <ui-dropdown
+        [id]="uid + '-tz'"
+        size="field"
+        [label]="'calendars.week.timeZone' | transloco"
+        [describedBy]="uid + '-tz-hint'"
+        [options]="timeZoneOptions()"
+        [value]="timeZone()"
+        [disabled]="readOnly()"
+        (valueChange)="onTimeZoneChange($event)"
+      />
+    </ui-field>
+
+    @if (!readOnly()) {
+      <div class="flex flex-col items-start">
+        <span class="mb-2 h-label" aria-hidden="true"></span>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          (click)="applyPattern.emit()"
+        >
+          {{ 'calendars.week.applyPattern' | transloco }}
+        </button>
+      </div>
+    }
+  </div>
+</section>

@@ -1,0 +1,161 @@
+<app-account-section
+  icon="tablerDevices"
+  tile="bg-icon-blue"
+  [title]="'wsAccSessions.title' | transloco"
+  [description]="'wsAccSessions.desc' | transloco"
+>
+  <ng-container sectionEnd>
+    @if (!loading() && !loadFailed() && activeSessions().length > 0) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        size="small"
+        [loading]="signingOutAll()"
+        (click)="onSignOutAll()"
+      >
+        {{ 'wsAccSessions.signOutAll' | transloco }}
+      </button>
+    }
+  </ng-container>
+
+  <div [attr.aria-busy]="loading()">
+    @if (loading()) {
+      <div class="flex flex-col" aria-hidden="true">
+        @for (row of skeletonRows; track row; let first = $first) {
+          <div
+            class="flex items-center gap-8 py-6"
+            [class.border-t]="!first"
+            [class.border-border]="!first"
+          >
+            <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+            <div class="flex min-w-0 flex-1 flex-col gap-4">
+              <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              <span class="h-skeleton-line w-notif max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </div>
+            <span class="h-btn-h-sm w-stat-chart-w shrink-0 rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+          </div>
+        }
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex items-center justify-between gap-8 py-6" role="alert">
+        <p class="text-12 leading-18 text-text-muted">
+          {{ 'wsAccSessions.loadFailed' | transloco }}
+        </p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+          {{ 'wsAccSessions.retry' | transloco }}
+        </button>
+      </div>
+    } @else {
+      @if (activeSessions().length > 0) {
+        <ul class="m-0 list-none p-0">
+          @for (session of activeSessions(); track session.id; let first = $first) {
+            <li [class.border-t]="!first" [class.border-border]="!first">
+              <app-session-row
+                [session]="session"
+                [busy]="isRevoking(session.id)"
+                (end)="onEndSession(session)"
+              />
+            </li>
+          }
+        </ul>
+      }
+
+      @if (endedSessions().length > 0) {
+        <div [class]="activeSessions().length > 0 ? 'mt-8 border-t border-border pt-6' : ''">
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            size="small"
+            class="w-full"
+            [attr.aria-expanded]="historyOpen()"
+            [attr.aria-controls]="historyRegionId"
+            (click)="toggleHistory()"
+          >
+            <span class="flex w-full items-center gap-6">
+              <ng-icon
+                name="tablerChevronDown"
+                size="14"
+                class="shrink-0 transition-transform duration-fast motion-reduce:transition-none"
+                [class.rotate-180]="historyOpen()"
+                aria-hidden="true"
+              />
+              <span>{{ 'wsAccSessions.history' | transloco: { n: endedSessions().length + (hasMoreHistory() ? '+' : '') } }}</span>
+            </span>
+          </button>
+
+          @if (historyOpen()) {
+            <div [id]="historyRegionId" class="mt-4">
+              <ul class="m-0 list-none p-0">
+                @for (session of endedSessions(); track session.id) {
+                  <li class="flex items-center gap-8 py-4 text-11 leading-16">
+                    <ng-icon
+                      [name]="deviceIcon(session)"
+                      size="14"
+                      class="shrink-0 text-text-muted"
+                      aria-hidden="true"
+                    />
+                    <span class="min-w-0 truncate text-text" [title]="sessionLabel(session)">
+                      {{ sessionLabel(session) }}
+                    </span>
+                    @if (session.endedAt) {
+                      <span class="shrink-0 text-text-muted">
+                        {{ formatEndedDate(session.endedAt) }}
+                      </span>
+                    }
+                    <span class="ms-auto shrink-0 text-text-muted">
+                      {{ reasonKey(session.endReason) | transloco }}
+                    </span>
+                  </li>
+                }
+              </ul>
+
+              @if (hasMoreHistory()) {
+                <div class="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    uiButton
+                    variant="ghost"
+                    size="small"
+                    [loading]="loadingMore()"
+                    (click)="onLoadMore()"
+                  >
+                    {{ 'wsAccSessions.showMore' | transloco }}
+                  </button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</app-account-section>
+
+<ui-confirm-dialog
+  #allDialog
+  tone="danger"
+  [title]="'wsAccSessions.allTitle' | transloco"
+  [text]="'wsAccSessions.allText' | transloco"
+  [confirmLabel]="'wsAccSessions.allConfirm' | transloco"
+  [cancelLabel]="'wsAccSessions.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #endCurrentDialog
+  tone="warning"
+  [title]="'wsAccSessions.endCurrentTitle' | transloco"
+  [text]="'wsAccSessions.endCurrentText' | transloco"
+  [confirmLabel]="'wsAccSessions.endConfirm' | transloco"
+  [cancelLabel]="'wsAccSessions.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #endOtherDialog
+  tone="danger"
+  [title]="'wsAccSessions.endTitle' | transloco: { device: pendingRevokeDevice() }"
+  [text]="'wsAccSessions.endText' | transloco"
+  [confirmLabel]="'wsAccSessions.endConfirm' | transloco"
+  [cancelLabel]="'wsAccSessions.cancel' | transloco"
+/>

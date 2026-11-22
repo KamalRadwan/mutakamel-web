@@ -1,0 +1,444 @@
+<div class="grid shrink-0 grid-cols-2 gap-8 desktop:grid-cols-4">
+  @if (countsLoading()) {
+    @for (card of [0, 1, 2, 3]; track card) {
+      <div class="flex items-end justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <div class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></div>
+          <div class="h-field w-1/3 rounded-6 bg-neutral-soft"></div>
+          <div class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></div>
+        </div>
+        <div class="h-status-bar w-stat-chart-w shrink-0 rounded-2 bg-neutral-soft"></div>
+      </div>
+    }
+  } @else if (countsFailed()) {
+    <div
+      class="col-span-full flex items-center justify-between gap-8 rounded-10 border border-danger-border bg-surface p-8 text-13 leading-18 text-danger-text shadow-card"
+      role="alert"
+    >
+      <span>{{ 'tower.states.countsFailed' | transloco }}</span>
+      <button type="button" uiButton variant="ghost" size="small" (click)="reload()">
+        <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+        <span>{{ 'tower.common.retry' | transloco }}</span>
+      </button>
+    </div>
+  } @else {
+    @for (card of statCards(); track card.id) {
+      <div
+        class="flex h-full min-w-0 items-end justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+        role="group"
+        [attr.aria-label]="card.label"
+      >
+        <div class="flex min-w-0 flex-1 flex-col justify-center gap-2">
+          <div class="flex h-label min-w-0 items-center text-12 leading-18 text-text-muted">
+            <span class="min-w-0 truncate" [title]="card.label">{{ card.label }}</span>
+          </div>
+
+          <div class="min-w-0 truncate text-20 leading-26 font-medium text-text tabular-nums">
+            <bdi dir="ltr">{{ card.value }}</bdi>
+          </div>
+
+          <div class="min-w-0 truncate text-12 leading-18 text-text-muted" [title]="card.sub">
+            {{ card.sub }}
+          </div>
+        </div>
+
+        <div class="flex h-stat-chart-h w-stat-chart-w shrink-0 items-center" aria-hidden="true">
+          <div class="h-status-bar w-full overflow-hidden rounded-2 bg-neutral-soft">
+            <div
+              class="h-full rounded-2 transition-all duration-base"
+              [class]="card.barClass"
+              [style.width.%]="card.percent"
+            ></div>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>
+
+<div class="flex shrink-0 flex-wrap items-center justify-between gap-8">
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="stepOptions()"
+    [label]="'tower.steps.label' | transloco"
+    [hint]="'tower.steps.hint' | transloco"
+    [value]="statusFilter()"
+    (valueChange)="setStatus($event)"
+  />
+
+  <div class="flex flex-wrap items-end gap-8">
+    <ui-field
+      class="shrink-0"
+      size="bare"
+      [label]="'tower.filters.severity' | transloco"
+      [for]="uid + '-severity'"
+      [hint]="'tower.filters.severityHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-severity'"
+        [label]="'tower.filters.severity' | transloco"
+        [describedBy]="uid + '-severity-hint'"
+        [options]="severityOptions()"
+        [value]="severityFilter()"
+        (valueChange)="setSeverity($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="shrink-0"
+      size="bare"
+      [label]="'tower.filters.category' | transloco"
+      [for]="uid + '-category'"
+      [hint]="'tower.filters.categoryHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-category'"
+        [label]="'tower.filters.category' | transloco"
+        [describedBy]="uid + '-category-hint'"
+        [options]="categoryOptions()"
+        [value]="categoryFilter()"
+        (valueChange)="setCategory($event)"
+      />
+    </ui-field>
+
+    @if (showBranchFilter()) {
+      <ui-field
+        class="w-toast shrink-0"
+        size="bare"
+        [label]="'tower.filters.branch' | transloco"
+        [for]="uid + '-branch'"
+        [hint]="'tower.filters.branchHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-branch'"
+          [label]="'tower.filters.branch' | transloco"
+          [describedBy]="uid + '-branch-hint'"
+          [options]="branchOptions()"
+          [value]="branchFilter()"
+          (valueChange)="setBranch($event)"
+        />
+      </ui-field>
+    }
+
+    <ui-field
+      class="shrink-0"
+      size="bare"
+      [label]="'tower.filters.sort' | transloco"
+      [for]="uid + '-sort'"
+      [hint]="'tower.filters.sortHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-sort'"
+        [label]="'tower.filters.sort' | transloco"
+        [describedBy]="uid + '-sort-hint'"
+        [options]="sortOptions()"
+        [value]="sortFilter()"
+        (valueChange)="setSort($event)"
+      />
+    </ui-field>
+
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted transition-colors duration-fast outline-none hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="refreshing()"
+      [attr.aria-label]="'tower.filters.reload' | transloco"
+      [title]="'tower.filters.reload' | transloco"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="refreshing()" aria-hidden="true" />
+    </button>
+
+    <app-scope-chip class="shrink-0" [scope]="scopeTarget()" />
+  </div>
+</div>
+
+@if (canResolve && selectionCount() > 0) {
+  <app-tower-bulk-bar
+    [mode]="selectionModeValue()"
+    [selectedIds]="selectedIds()"
+    [excludedIds]="excludedIdsList()"
+    [count]="selectionCount()"
+    [hiddenCount]="hiddenSelectedCount()"
+    [total]="total()"
+    [canOfferSelectAll]="canOfferSelectAll()"
+    [needsCategory]="selectAllNeedsCategory()"
+    [filterQuery]="filterQuery()"
+    [allowedCodes]="bulkAllowedCodes()"
+    [context]="context()"
+    (selectAllMatching)="selectAllMatching()"
+    (selectOnlyPage)="selectOnlyPage()"
+    (clear)="clearSelection()"
+    (submitted)="onBulkSubmitted($event)"
+  />
+}
+
+@if (failed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 text-text-muted" role="alert">{{ loadFailedText() }}</p>
+    <button type="button" uiButton variant="primary" (click)="reload()">
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      <span>{{ 'tower.common.retry' | transloco }}</span>
+    </button>
+  </div>
+} @else if (!loading() && items().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    @if (hasSecondaryFilters()) {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerSearch" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'tower.states.emptyFiltered' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="clearFilters()">
+        {{ 'tower.common.clearFilters' | transloco }}
+      </button>
+    } @else if (statusFilter() === 'OPEN') {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-green text-on-icon">
+        <ng-icon name="tablerCircleCheck" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'tower.states.emptyOpen' | transloco }}</p>
+    } @else if (statusFilter() === 'ACTION_PENDING') {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'tower.states.emptyActionPending' | transloco }}</p>
+    } @else if (statusFilter() === 'QUARANTINED') {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'tower.states.emptyQuarantined' | transloco }}</p>
+    } @else {
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'tower.states.emptyResolved' | transloco }}</p>
+    }
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'tower.table.label' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+        [class]="gridCols()"
+      >
+        @if (canResolve) {
+          <span role="columnheader" class="flex items-center justify-center">
+            <span class="relative inline-flex size-checkbox-size items-center justify-center">
+              <ui-checkbox
+                #pageCb
+                [checked]="pageState() === 'all'"
+                [disabled]="selectablePageRows().length === 0"
+                [attr.aria-label]="'tower.table.selectPage' | transloco"
+                [attr.aria-checked]="pageState() === 'some' ? 'mixed' : (pageState() === 'all' ? 'true' : 'false')"
+                (checkedChange)="togglePage(pageCb)"
+              >
+                <span class="sr-only">{{ 'tower.table.selectPage' | transloco }}</span>
+              </ui-checkbox>
+              @if (pageState() === 'some') {
+                <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                  <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+                </span>
+              }
+            </span>
+          </span>
+        }
+
+        <span
+          role="columnheader"
+          class="flex min-w-0 items-center truncate px-10"
+          [class.border-s]="canResolve"
+          [class.border-on-nav-line]="canResolve"
+        >
+          {{ 'tower.table.columns.severity' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tower.table.columns.category' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tower.table.columns.source' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tower.table.columns.problem' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tower.table.columns.status' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'tower.table.columns.created' | transloco }}
+        </span>
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+            [class]="gridCols()"
+          >
+            @if (canResolve) {
+              <span role="cell" class="flex items-center justify-center">
+                <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+              </span>
+            }
+            <span
+              role="cell"
+              class="flex min-w-0 items-center px-10"
+              [class.border-s]="canResolve"
+              [class.border-border]="canResolve"
+            >
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (row of items(); track row.id) {
+          <div
+            role="row"
+            tabindex="0"
+            class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="gridCols() + (canResolve && isSelected(row.id) ? ' border-brand bg-brand-soft' : ' border-border bg-surface hover:bg-row-hover')"
+            (click)="openException(row)"
+            (keydown)="onRowKeydown($event, row)"
+          >
+            @if (canResolve) {
+              <span
+                role="cell"
+                class="flex items-center justify-center"
+                (click)="onSelectCellClick($event, row)"
+              >
+                @if (isRowSelectable(row)) {
+                  <ui-checkbox
+                    #rowCb
+                    [checked]="isSelected(row.id)"
+                    [attr.aria-label]="'tower.table.selectRow' | transloco: { label: sourceLabelText(row) }"
+                    (click)="onRowCheckboxClick($event)"
+                    (checkedChange)="onRowCheckedChange(row, rowCb)"
+                  >
+                    <span class="sr-only">{{ 'tower.table.selectRow' | transloco: { label: sourceLabelText(row) } }}</span>
+                  </ui-checkbox>
+                } @else {
+                  <span class="inline-flex" [title]="unselectableReason(row)" (click)="$event.stopPropagation()">
+                    <ui-checkbox
+                      [checked]="false"
+                      [disabled]="true"
+                      [aria-label]="unselectableReason(row)"
+                    >
+                      <span class="sr-only">{{ unselectableReason(row) }}</span>
+                    </ui-checkbox>
+                  </span>
+                }
+              </span>
+            }
+
+            <span
+              role="cell"
+              class="flex min-w-0 items-center px-10"
+              [class.border-s]="canResolve"
+              [class.border-border]="canResolve"
+            >
+              <app-automation-badge kind="severity" [value]="row.severity" />
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-13 leading-18 font-medium text-text">
+                {{ 'tower.categories.' + row.category | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-10">
+              <span class="truncate text-11 leading-16 text-text-muted">
+                {{ 'tower.sourceTypes.' + row.sourceType | transloco }}
+              </span>
+              @if (sourceLinkFor(row); as link) {
+                <a
+                  [href]="sourceHref(link)"
+                  class="truncate text-13 leading-18 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="onSourceClick($event, link)"
+                >
+                  <bdi dir="ltr" class="tabular-nums">{{ sourceLabelText(row) }}</bdi>
+                </a>
+              } @else {
+                <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums">
+                  {{ sourceLabelText(row) }}
+                </bdi>
+              }
+            </span>
+
+            <span
+              role="cell"
+              class="flex min-w-0 items-center border-s border-border px-10"
+              [title]="problemText(row.safeErrorCode)"
+            >
+              <span class="truncate text-13 leading-18 text-text">
+                {{ problemText(row.safeErrorCode) }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <app-automation-badge kind="exception" [value]="row.status" />
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <bdi class="truncate text-12 leading-18 text-text-muted tabular-nums">
+                {{ formatDateTime(row.createdAt) }}
+              </bdi>
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (!failed() && total() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [pageSizes]="pageSizes"
+      [label]="'tower.pagination.label' | transloco"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      (pageChange)="setPage($event)"
+      (pageSizeChange)="setPageSize($event)"
+    />
+  </footer>
+}
+
+@if (selectedExceptionId(); as activeId) {
+  <app-exception-modal
+    [exceptionId]="activeId"
+    [canResolve]="canResolve"
+    (closed)="onModalClosed()"
+    (resolved)="onExceptionResolved($event)"
+  />
+}

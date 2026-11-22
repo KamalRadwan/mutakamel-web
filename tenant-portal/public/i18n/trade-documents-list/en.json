@@ -1,0 +1,51 @@
+{
+  "search": {
+    "quotation": "Search by number, reference or customer",
+    "sales-order": "Search by number, reference or customer",
+    "purchase-order": "Search by number, reference or supplier",
+    "purchase-quotation": "Search by number, reference or supplier"
+  },
+  "clearSearch": "Clear search",
+  "clearFilters": "Clear filters",
+  "statusFilter": "Filter by status",
+  "statusFilterHint": "Filter the documents by status",
+  "pagination": "Pagination",
+  "showing": "Showing {{from}}–{{to}} of {{total}}",
+  "priceHoldEnded": "Price hold ended",
+  "columns": {
+    "number": "Number",
+    "customer": "Customer",
+    "supplier": "Supplier",
+    "status": "Status",
+    "approval": "Approval",
+    "dispatch": "Delivery",
+    "businessDate": "Business date",
+    "validUntil": "Valid until",
+    "grandTotal": "Grand total",
+    "lastUpdate": "Last update",
+    "actions": "Actions"
+  },
+  "table": {
+    "selectPage": "Select all on this page",
+    "selectRow": "Select {{name}}",
+    "sortBy": "Sort by {{column}}"
+  },
+  "view": {
+    "label": "View",
+    "table": "Table",
+    "cards": "Cards"
+  },
+  "menu": {
+    "label": "Document actions",
+    "open": "Open",
+    "edit": "Edit",
+    "print": "Print",
+    "printDisabled": "Not available for this status",
+    "convert": "Convert to sales order",
+    "createPo": "Convert to purchase order"
+  },
+  "empty": {
+    "title": "No {{kind}} yet",
+    "filtered": "No matching documents found"
+  }
+}

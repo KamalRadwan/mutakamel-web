@@ -1,0 +1,193 @@
+<ui-modal
+  #dialog
+  size="wide"
+  icon="tablerStack2"
+  tile="bg-icon-teal"
+  [title]="'invStock.check.title' | transloco"
+  [subtitle]="subtitle()"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (loading() && !availability() && !ambiguousUom()) {
+    <div class="flex flex-col gap-10" aria-busy="true">
+      <div class="grid grid-cols-3 gap-8">
+        @for (card of [0, 1, 2]; track card) {
+          <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-card">
+            <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></span>
+            <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+            <span class="h-status-bar w-full rounded-full bg-neutral-soft"></span>
+          </div>
+        }
+      </div>
+
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        @for (field of [0, 1]; track field) {
+          <div class="flex flex-col gap-4">
+            <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></span>
+            <span class="h-field w-full rounded-8 bg-neutral-soft"></span>
+          </div>
+        }
+      </div>
+    </div>
+  } @else if (nodeNotFound()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'invStock.check.nodeNotFound' | transloco }}</p>
+    </div>
+  } @else if (ambiguousUom() && !availability()) {
+    <div class="flex flex-col gap-10">
+      <p class="text-12 leading-18 text-text-muted">{{ 'invStock.check.ambiguousUnit' | transloco }}</p>
+      <ui-field
+        size="bare"
+        [for]="uid + '-pick-uom'"
+        [label]="'tradeInventory.common.uom' | transloco"
+        [required]="true"
+        [hint]="'invStock.check.chooseUnitHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-pick-uom'"
+          [describedBy]="uid + '-pick-uom-hint'"
+          [options]="uomOptions()"
+          [value]="selectedUomId()"
+          [disabled]="uomsLoading() || loading()"
+          [label]="'tradeInventory.common.uom' | transloco"
+          (valueChange)="onUomSelected($event)"
+        />
+      </ui-field>
+    </div>
+  } @else if (loadErrorKey() && !availability()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-danger-text">{{ loadErrorKey()! | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="refresh()">
+        {{ 'invStock.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (availability(); as avail) {
+    <div class="flex flex-col gap-10">
+      <div class="grid grid-cols-3 gap-8">
+        <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-card">
+          <ui-stat-card
+            [framed]="false"
+            [label]="'invStock.check.onHand' | transloco"
+            [hint]="'invStock.check.onHandHint' | transloco"
+            [value]="formatQty(avail.onHandQuantity)"
+          />
+          <div
+            class="h-status-bar w-full overflow-hidden rounded-full bg-neutral-soft"
+            role="progressbar"
+            [attr.aria-label]="'invStock.check.onHand' | transloco"
+            [attr.aria-valuenow]="onHandPercent()"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div class="h-full rounded-full bg-chart-1 transition-all duration-base" [style.width.%]="onHandPercent()"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-card">
+          <ui-stat-card
+            [framed]="false"
+            [label]="'invStock.check.reserved' | transloco"
+            [hint]="'invStock.check.reservedHint' | transloco"
+            [value]="formatQty(avail.reservedQuantity)"
+          />
+          <div
+            class="h-status-bar w-full overflow-hidden rounded-full bg-neutral-soft"
+            role="progressbar"
+            [attr.aria-label]="'invStock.check.reserved' | transloco"
+            [attr.aria-valuenow]="reservedPercent()"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div class="h-full rounded-full bg-chart-3 transition-all duration-base" [style.width.%]="reservedPercent()"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 shadow-card">
+          <ui-stat-card
+            [framed]="false"
+            [label]="'invStock.check.available' | transloco"
+            [hint]="'invStock.check.availableHint' | transloco"
+            [value]="formatQty(avail.availableQuantity)"
+          />
+          <div
+            class="h-status-bar w-full overflow-hidden rounded-full bg-neutral-soft"
+            role="progressbar"
+            [attr.aria-label]="'invStock.check.available' | transloco"
+            [attr.aria-valuenow]="availablePercent()"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div class="h-full rounded-full bg-chart-2 transition-all duration-base" [style.width.%]="availablePercent()"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <ui-field
+          [for]="uid + '-node'"
+          [label]="'tradeInventory.common.node' | transloco"
+          [hint]="'invStock.check.nodeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-node'"
+            type="text"
+            readonly
+            class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="nodeDisplay(avail)"
+            [attr.aria-describedby]="uid + '-node-hint'"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-base-uom'"
+          [label]="'tradeInventory.common.baseUom' | transloco"
+          [hint]="'invStock.check.baseUomHint' | transloco"
+        >
+          <input
+            [id]="uid + '-base-uom'"
+            type="text"
+            readonly
+            dir="ltr"
+            class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="avail.uomCode || ('tradeInventory.common.none' | transloco)"
+            [attr.aria-describedby]="uid + '-base-uom-hint'"
+          />
+        </ui-field>
+      </div>
+
+      <div class="flex items-start gap-6 text-12 leading-18 text-text-muted">
+        <ng-icon name="tablerInfoCircle" size="14" class="mt-2 shrink-0 text-accent" aria-hidden="true" />
+        <span [attr.title]="formatFullDateTime(avail.asOf)">
+          {{ 'invStock.check.advisory' | transloco: { time: formatAdvisoryTime(avail.asOf) } }}
+        </span>
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="loading()"
+      [disabled]="loading() || !request()"
+      (click)="refresh()"
+    >
+      @if (!loading()) {
+        <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      }
+      {{ 'invStock.check.refresh' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'tradeInventory.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
