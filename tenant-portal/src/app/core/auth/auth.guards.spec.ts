@@ -147,9 +147,9 @@ describe('authGuard & guestGuard', () => {
     const router = TestBed.inject(Router);
     expect(session.status()).toBe('unknown');
 
-    const result = await runGuestGuard({ returnUrl: '/crm/leads?view=cards' });
+    const result = await runGuestGuard();
     expect(result).toBeInstanceOf(UrlTree);
-    expect(router.serializeUrl(result as UrlTree)).toBe('/crm/leads?view=cards');
+    expect(router.serializeUrl(result as UrlTree)).toBe('/workspace/home');
     expect(session.status()).toBe('signed-in');
     expect(getMe).toHaveBeenCalledTimes(1);
     expect(refresh).not.toHaveBeenCalled();
@@ -199,7 +199,7 @@ describe('authGuard & guestGuard', () => {
     for (const bad of ['//evil.com', 'https://evil.com/steal', '/login', '/verify', '/tenant/accept-invite']) {
       const redirected = await runGuestGuard({ returnUrl: bad });
       expect(redirected, bad).toBeInstanceOf(UrlTree);
-      expect(router.serializeUrl(redirected as UrlTree), bad).toBe('/');
+      expect(router.serializeUrl(redirected as UrlTree), bad).toBe('/workspace/home');
     }
     expect(getMe).toHaveBeenCalledTimes(1);
   });

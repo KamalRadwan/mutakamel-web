@@ -23,6 +23,6 @@ export const guestGuard: CanActivateFn = async (route) => {
   if (await session.ensureLoaded('access-only') !== 'signed-in') {
     return true;
   }
-  const target = safeReturnUrl(route.queryParams['returnUrl']) ?? '/';
+  const target = safeReturnUrl(route.queryParams['returnUrl']) ?? '/workspace/home';
   return router.parseUrl(target);
 };
