@@ -1,0 +1,137 @@
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canManage) {
+    <button type="button" uiButton class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'tradeUnits.toolbar.new' | transloco }}
+    </button>
+  }
+
+  <div
+    class="flex h-field flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      #searchInput
+      type="text"
+      autocomplete="off"
+      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [attr.maxlength]="searchMax"
+      [placeholder]="'tradeUnits.toolbar.search' | transloco"
+      [attr.aria-label]="'tradeUnits.toolbar.search' | transloco"
+      [value]="searchInputText()"
+      (input)="onSearchInput($event)"
+      (keydown.escape)="clearSearch()"
+    />
+    @if (searchInputText()) {
+      <button
+        type="button"
+        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'tradeUnits.toolbar.clearSearch' | transloco"
+        (click)="clearSearch(true)"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="loading()"
+    [attr.aria-label]="'tradeUnits.toolbar.reload' | transloco"
+    [title]="'tradeUnits.toolbar.reload' | transloco"
+    (click)="load()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+  </button>
+</div>
+
+<ui-step-filter
+  class="shrink-0"
+  [steps]="statusSteps()"
+  [label]="'tradeUnits.filter.label' | transloco"
+  [hint]="'tradeUnits.filter.hint' | transloco"
+  [value]="statusFilter()"
+  (valueChange)="onStatusChange($event)"
+/>
+
+@if (failed() && !loading()) {
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    role="alert"
+  >
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="load()">
+      {{ 'tradeShared.common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (loading()) {
+  <app-units-table [units]="[]" [loading]="true" [canManage]="canManage" />
+} @else if (units().length === 0) {
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+  >
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+      <ng-icon name="tablerRuler2" size="18" aria-hidden="true" />
+    </span>
+    <h2 class="text-15 leading-22 font-medium text-text">{{ 'tradeUnits.empty.title' | transloco }}</h2>
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeUnits.empty.text' | transloco }}</p>
+    @if (canManage) {
+      <button type="button" uiButton (click)="openCreate()">
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        {{ 'tradeUnits.toolbar.new' | transloco }}
+      </button>
+    }
+  </div>
+} @else if (searchMatchedUoms().length === 0) {
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+  >
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'tradeUnits.empty.search' | transloco: { q: searchQuery().trim() } }}
+    </p>
+    <button type="button" uiButton variant="ghost" (click)="clearSearch(true)">
+      {{ 'tradeUnits.toolbar.clearSearch' | transloco }}
+    </button>
+  </div>
+} @else if (visibleUoms().length === 0) {
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+  >
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'tradeUnits.empty.filter' | transloco: { status: activeFilterStatusName() } }}
+    </p>
+  </div>
+} @else {
+  <app-units-table
+    [units]="visibleUoms()"
+    [loading]="false"
+    [canManage]="canManage"
+    [busyIds]="busyIds()"
+    (openUnit)="openUnit($event)"
+    (retireUnit)="onRetireRequested($event)"
+    (activateUnit)="onActivateRequested($event)"
+  />
+}
+
+<app-unit-modal
+  [canManage]="canManage"
+  (saved)="onUnitSaved($event)"
+  (reloaded)="onUnitReloaded($event)"
+/>
+
+<ui-confirm-dialog
+  #retireDialog
+  tone="warning"
+  [title]="'tradeUnits.retire.title' | transloco: { code: pendingRetireUnit()?.code ?? '' }"
+  [text]="'tradeUnits.retire.text' | transloco"
+  [confirmLabel]="'tradeUnits.retire.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

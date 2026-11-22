@@ -1,0 +1,107 @@
+<app-bulk-run-modal
+  size="form"
+  icon="tablerArrowsExchange"
+  [tile]="isDanger() ? 'bg-icon-red' : 'bg-icon-green'"
+  [tone]="isDanger() ? 'danger' : 'brand'"
+  [title]="'customerBulk.status.title' | transloco"
+  [count]="displayCount()"
+  [summary]="('customerBulk.count' | pluralKey: displayCount()) | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="canSubmit()"
+  [dismissable]="!submitting()"
+  [submitLabel]="'customerBulk.status.go' | transloco"
+  (submit)="submit()"
+  (closed)="onModalClosed()"
+>
+  @if (requestError(); as err) {
+    <div
+      role="alert"
+      class="flex items-start gap-8 rounded-8 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
+    >
+      <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+      <span>{{ err }}</span>
+    </div>
+  }
+
+  <ui-field
+    size="bare"
+    [label]="'customerBulk.status.field' | transloco"
+    [for]="uid + '-status-group'"
+    [hint]="'customerBulk.status.fieldHint' | transloco"
+    [required]="true"
+  >
+    <div
+      [id]="uid + '-status-group'"
+      role="radiogroup"
+      class="flex flex-col gap-6"
+      [attr.aria-label]="'customerBulk.status.field' | transloco"
+    >
+      @for (itemStatus of statuses; track itemStatus; let index = $index) {
+        @let isSelected = selectedStatus() === itemStatus;
+        @let dangerOption = itemStatus === 'BLACKLISTED';
+        <button
+          #statusOption
+          type="button"
+          role="radio"
+          class="flex h-field w-full cursor-pointer items-center justify-between gap-8 rounded-8 border px-10 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            isSelected
+              ? dangerOption
+                ? 'border-danger-border bg-danger-soft font-medium text-on-danger-soft'
+                : 'border-brand bg-brand-soft font-medium text-on-brand-soft'
+              : 'border-border bg-surface text-text hover:bg-row-hover'
+          "
+          [attr.aria-checked]="isSelected"
+          [attr.aria-describedby]="uid + '-status-group-hint'"
+          [tabIndex]="isSelected || (selectedStatus() === null && index === 0) ? 0 : -1"
+          (click)="selectStatus(itemStatus)"
+          (keydown)="onStatusKeydown($event, index)"
+        >
+          <span class="flex min-w-0 items-center gap-8">
+            <span
+              class="inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border-check"
+              [class]="
+                isSelected
+                  ? dangerOption
+                    ? 'border-danger bg-surface'
+                    : 'border-brand bg-surface'
+                  : 'border-border-field bg-surface-field'
+              "
+              aria-hidden="true"
+            >
+              @if (isSelected) {
+                <span
+                  class="size-radio-dot rounded-full"
+                  [class]="dangerOption ? 'bg-danger' : 'bg-brand'"
+                ></span>
+              }
+            </span>
+            <span
+              class="size-unread-dot shrink-0 rounded-full"
+              [class]="dotClass(itemStatus)"
+              aria-hidden="true"
+            ></span>
+            <span class="truncate">{{ 'customerBulk.status.' + itemStatus | transloco }}</span>
+          </span>
+        </button>
+      }
+    </div>
+  </ui-field>
+
+  @if (selectedStatus() !== null && unchangedCount() > 0) {
+    <p class="text-12 leading-18 text-text-muted tabular-nums">
+      {{ 'customerBulk.status.unchanged' | transloco: { u: unchangedCount() } }}
+    </p>
+  }
+
+  @if (selectedStatus() === 'BLACKLISTED') {
+    <div
+      role="note"
+      class="flex items-start gap-8 rounded-8 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
+    >
+      <ng-icon name="tablerAlertTriangle" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+      <span>{{ 'customerBulk.status.blacklistNote' | transloco }}</span>
+    </div>
+  }
+</app-bulk-run-modal>

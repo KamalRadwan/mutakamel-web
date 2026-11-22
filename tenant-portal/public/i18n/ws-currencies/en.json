@@ -1,0 +1,137 @@
+{
+  "new": "Add currency",
+  "search": "Search by code, name or symbol",
+  "base": {
+    "label": "Default currency",
+    "note": "Exchange rates show how many units of each currency equal 1 {{code}}.",
+    "unknown": "The default currency could not be loaded."
+  },
+  "filters": {
+    "show": "Show",
+    "showHint": "Filter by status or by default currency.",
+    "all": "All currencies",
+    "active": "Active",
+    "inactive": "Inactive",
+    "default": "Default only",
+    "nonDefault": "Non-default",
+    "clear": "Clear filters"
+  },
+  "table": {
+    "ariaLabel": "Currencies",
+    "code": "Code",
+    "name": "Currency",
+    "decimals": "Decimals",
+    "rate": "Rate per {{code}}",
+    "rateNoBase": "Exchange rate",
+    "status": "Status"
+  },
+  "empty": "No currencies yet. The first one you add becomes the default.",
+  "emptyFiltered": "No currencies match the filters.",
+  "badge": {
+    "default": "Default"
+  },
+  "actions": {
+    "setDefault": "Set as default",
+    "setDefaultDesc": "Make it the base for every rate.",
+    "setDefaultIsDefault": "Already the default currency.",
+    "setDefaultInactive": "Reactivate it first.",
+    "reactivate": "Reactivate",
+    "reactivateDesc": "Make it available again.",
+    "deactivate": "Deactivate",
+    "deactivateDesc": "Hide it from new records.",
+    "deactivateDefault": "The default currency can't be deactivated."
+  },
+  "modal": {
+    "createTitle": "New currency",
+    "editTitle": "Edit currency",
+    "reactivateTitle": "Reactivate currency",
+    "reactivate": "Reactivate",
+    "reactivateNote": "Enter an exchange rate to reactivate this currency."
+  },
+  "fields": {
+    "code": "Code",
+    "codeHint": "Three-letter ISO 4217 code, such as USD. Can't be changed later.",
+    "codePlaceholder": "USD",
+    "decimals": "Decimal places",
+    "decimalsHint": "Set by ISO 4217 for this currency. Can't be changed.",
+    "name": "Name",
+    "nameHint": "Up to 80 characters.",
+    "symbol": "Symbol",
+    "symbolHint": "Optional, up to 8 characters, such as $.",
+    "rate": "Exchange rate",
+    "rateHint": "Units of this currency per 1 unit of the default. Up to 8 decimals.",
+    "rateLocked": "The default currency's rate is always 1.",
+    "makeDefault": "Make default",
+    "makeDefaultHint": "A new default recalculates every other rate.",
+    "firstCurrency": "This is the first currency, so it becomes the default with a rate of 1.",
+    "rebaseWarning": "Every stored rate is recalculated against this currency. Issued documents are not changed."
+  },
+  "validation": {
+    "codeFormat": "Use a supported currency code of three letters, A to Z.",
+    "nameRequired": "Enter a name.",
+    "nameMax": "Use at most {{max}} characters.",
+    "symbolMax": "Use at most {{max}} characters.",
+    "rateInvalid": "Enter a number above 0 and up to 1,000,000,000, with at most 8 decimals."
+  },
+  "setDefault": {
+    "title": "Set {{code}} as the default currency?",
+    "text": "The default currency changes from {{old}} to {{code}}.",
+    "storedRate": "Current stored rate",
+    "rebase": "Every stored rate is recalculated against {{code}}. Issued documents keep their amounts.",
+    "noPreview": "The new rates can't be previewed. To go back, set the previous currency as default again.",
+    "confirm": "Set as default"
+  },
+  "deactivate": {
+    "title": "Deactivate {{name}} ({{code}})?",
+    "text": "It won't be offered for new records. Existing records keep it. You can reactivate it later.",
+    "confirm": "Deactivate"
+  },
+  "blocker": {
+    "title": {
+      "deactivate": "Can't deactivate this currency",
+      "setDefault": "Can't set as default",
+      "reactivate": "Can't reactivate this currency"
+    },
+    "record": "Currency: {{name}} ({{code}})",
+    "next": {
+      "CURRENCY_DEFAULT_DELETE": "Set another currency as default first.",
+      "CURRENCY_IN_USE": "Choose another default currency in General settings, then try again.",
+      "CURRENCY_COMPANY_IN_USE": "Move every active company that uses this currency to another currency first, then try again."
+    }
+  },
+  "toast": {
+    "created": "Currency {{code}} added.",
+    "updated": "Currency {{code}} updated.",
+    "defaultSet": "{{code}} is now the default currency.",
+    "deactivated": "{{code}} deactivated.",
+    "reactivated": "{{code}} reactivated."
+  },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "text": "You have unsaved changes. Save them before closing?",
+    "save": "Save changes",
+    "discard": "Discard"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "CORE_VALIDATION_FAILED": "Some values are not valid. Check the fields and try again.",
+    "CURRENCY_CODE_INVALID": "This is not a supported currency code. Use a valid ISO 4217 code.",
+    "CURRENCY_PRECISION_MISMATCH": "The decimal places don't match ISO 4217.",
+    "CURRENCY_EXCHANGE_RATE_REQUIRED": "An exchange rate is required for this currency.",
+    "CURRENCY_REBASE_OUT_OF_RANGE": "A recalculated rate falls outside the allowed range. Nothing was changed.",
+    "CURRENCY_REBASE_PRECISION_LOSS": "Recalculating would lose too much precision. Nothing was changed.",
+    "CURRENCY_CODE_TAKEN": "This currency already exists, active or not. Reactivate it instead.",
+    "CURRENCY_DEFAULT_DELETE": "The default currency can't be deactivated.",
+    "CURRENCY_IN_USE": "This is the workspace default currency, so it can't be deactivated.",
+    "CURRENCY_COMPANY_IN_USE": "Active companies still use this currency.",
+    "CURRENCY_INACTIVE_DEFAULT": "An inactive currency can't be the default.",
+    "CURRENCY_NOT_FOUND": "This currency no longer exists. Reload the list.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Changing currencies needs a workspace-wide permission.",
+    "IDEM_OTHER": "The request could not be processed. Try again.",
+    "IDEM_IN_FLIGHT": "The same request is already being processed.",
+    "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action."
+  }
+}

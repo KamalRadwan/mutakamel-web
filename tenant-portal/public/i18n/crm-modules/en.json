@@ -1,0 +1,11 @@
+{
+  "leads": {
+    "title": "Leads are turned off",
+    "text": "An administrator turned off leads for {{company}}. Existing leads are kept."
+  },
+  "opportunities": {
+    "title": "Opportunities are turned off",
+    "text": "An administrator turned off opportunities for {{company}}. Existing opportunities are kept."
+  },
+  "openSettings": "Open CRM settings"
+}

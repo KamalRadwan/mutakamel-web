@@ -1,0 +1,134 @@
+<ui-modal
+  size="form"
+  icon="tablerArrowsExchange"
+  tile="bg-icon-violet"
+  [title]="'oppMoves.transfer.title' | transloco"
+  [subtitle]="dialogSubtitle()"
+  [closeLabel]="'oppMoves.common.close' | transloco"
+  [dismissable]="!isSubmitting()"
+  [preventDismiss]="true"
+  (dismiss)="cancel()"
+  (closed)="onModalClosed()"
+>
+  @if (request()) {
+    <div class="flex flex-col gap-10">
+      <ui-field
+        size="bare"
+        [label]="'oppMoves.transfer.pipeline' | transloco"
+        [for]="pipelineId"
+        [hint]="'oppMoves.transfer.pipelineHint' | transloco"
+        [required]="true"
+        [error]="pipelineError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="pipelineId"
+          [label]="'oppMoves.transfer.pipeline' | transloco"
+          [describedBy]="pipelineDescribedBy()"
+          [options]="pipelineOptions()"
+          [value]="selectedPipelineId()"
+          [disabled]="isSubmitting() || availablePipelines().length === 0"
+          (valueChange)="onPipelineChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'oppMoves.transfer.stage' | transloco"
+        [for]="stageId"
+        [hint]="'oppMoves.transfer.stageHint' | transloco"
+        [required]="true"
+        [error]="stageError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="stageId"
+          [label]="'oppMoves.transfer.stage' | transloco"
+          [describedBy]="stageDescribedBy()"
+          [options]="stageOptions()"
+          [value]="selectedStageId()"
+          [disabled]="isSubmitting() || availableStages().length === 0"
+          (valueChange)="onStageChange($event)"
+        />
+      </ui-field>
+
+      @if (terminalKind() && !reasonsHidden()) {
+        <ui-field
+          size="bare"
+          [label]="reasonLabelKey() | transloco"
+          [for]="reasonsLoading() ? '' : reasonId"
+          [hint]="'oppMoves.close.reasonHint' | transloco"
+          [required]="reasonRequired()"
+          [error]="reasonError()"
+        >
+          @if (reasonsLoading()) {
+            <div class="flex h-field items-center" role="status" aria-busy="true">
+              <div class="h-skeleton-line w-full animate-pulse rounded-6 bg-neutral-soft"></div>
+            </div>
+          } @else {
+            <div class="block min-w-0" [attr.title]="selectedReasonDefinition()">
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="reasonId"
+                [label]="reasonLabelKey() | transloco"
+                [describedBy]="reasonDescribedBy()"
+                [options]="reasonOptions()"
+                [value]="selectedReasonId()"
+                [disabled]="isSubmitting()"
+                (valueChange)="onReasonChange($event)"
+              />
+            </div>
+          }
+        </ui-field>
+      }
+
+      <ui-field
+        size="multiline"
+        [label]="'oppMoves.close.note' | transloco"
+        [for]="noteId"
+        [hint]="noteHintKey() | transloco"
+        [required]="noteRequired()"
+        [count]="note().length"
+        [max]="maxNoteLength"
+        [error]="noteError()"
+      >
+        <textarea
+          [id]="noteId"
+          rows="3"
+          [attr.maxlength]="maxNoteLength"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [disabled]="isSubmitting()"
+          [value]="note()"
+          [attr.aria-describedby]="noteDescribedBy()"
+          [attr.aria-invalid]="noteError() ? 'true' : null"
+          (input)="onNoteInput($event)"
+        ></textarea>
+      </ui-field>
+    </div>
+  }
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="isSubmitting()"
+      [disabled]="isSubmitting() || reasonsLoading() || availablePipelines().length === 0"
+      (click)="submit()"
+    >
+      {{ 'oppMoves.transfer.submit' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="isSubmitting()"
+      (click)="cancel()"
+    >
+      {{ 'oppMoves.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

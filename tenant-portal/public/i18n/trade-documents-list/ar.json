@@ -1,0 +1,51 @@
+{
+  "search": {
+    "quotation": "ابحث بالرقم أو المرجع أو العميل",
+    "sales-order": "ابحث بالرقم أو المرجع أو العميل",
+    "purchase-order": "ابحث بالرقم أو المرجع أو المورد",
+    "purchase-quotation": "ابحث بالرقم أو المرجع أو المورد"
+  },
+  "clearSearch": "مسح البحث",
+  "clearFilters": "مسح عوامل التصفية",
+  "statusFilter": "التصفية حسب الحالة",
+  "statusFilterHint": "صفِّ المستندات حسب الحالة",
+  "pagination": "ترقيم الصفحات",
+  "showing": "عرض {{from}}–{{to}} من {{total}}",
+  "priceHoldEnded": "انتهى حجز الأسعار",
+  "columns": {
+    "number": "الرقم",
+    "customer": "العميل",
+    "supplier": "المورد",
+    "status": "الحالة",
+    "approval": "الموافقة",
+    "dispatch": "الإرسال",
+    "businessDate": "تاريخ المستند",
+    "validUntil": "صالح حتى",
+    "grandTotal": "الإجمالي",
+    "lastUpdate": "آخر تحديث",
+    "actions": "الإجراءات"
+  },
+  "table": {
+    "selectPage": "تحديد الكل في هذه الصفحة",
+    "selectRow": "تحديد {{name}}",
+    "sortBy": "الترتيب حسب {{column}}"
+  },
+  "view": {
+    "label": "طريقة العرض",
+    "table": "جدول",
+    "cards": "بطاقات"
+  },
+  "menu": {
+    "label": "إجراءات المستند",
+    "open": "فتح",
+    "edit": "تعديل",
+    "print": "طباعة",
+    "printDisabled": "غير متاح في هذه الحالة",
+    "convert": "تحويل إلى أمر بيع",
+    "createPo": "تحويل إلى أمر شراء"
+  },
+  "empty": {
+    "title": "لا توجد {{kind}} بعد",
+    "filtered": "لا توجد مستندات مطابقة"
+  }
+}

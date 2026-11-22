@@ -1,0 +1,44 @@
+<app-account-section
+  icon="tablerShieldCheck"
+  tile="bg-icon-green"
+  [title]="'wsAccSec.mfa.title' | transloco"
+  [description]="'wsAccSec.mfa.desc' | transloco"
+>
+  <button
+    sectionEnd
+    type="button"
+    uiButton
+    size="small"
+    [variant]="me()?.mfaEnabled ? 'secondary' : 'primary'"
+    [disabled]="!me()"
+    (click)="openModal()"
+  >
+    {{ (me()?.mfaEnabled ? 'wsAccSec.mfa.turnOff' : 'wsAccSec.mfa.turnOn') | transloco }}
+  </button>
+
+  <div class="flex items-center gap-8">
+    <span
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-6 text-11 font-medium whitespace-nowrap"
+      [class]="me()?.mfaEnabled ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+    >
+      {{ (me()?.mfaEnabled ? 'wsAccSec.mfa.on' : 'wsAccSec.mfa.off') | transloco }}
+    </span>
+
+    @if (me(); as current) {
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
+        @let explain = explainParts();
+        <p class="text-12 leading-18 text-text">
+          {{ explain.before }}@if (explain.hasEmail) {<bdi dir="ltr">{{ current.email }}</bdi>}{{ explain.after }}
+        </p>
+
+        @if (formattedUpdatedAt(); as date) {
+          <p class="text-11 leading-16 text-text-muted">
+            {{ 'wsAccSec.mfa.lastChanged' | transloco: { date } }}
+          </p>
+        }
+      </div>
+    }
+  </div>
+</app-account-section>
+
+<app-mfa-modal />

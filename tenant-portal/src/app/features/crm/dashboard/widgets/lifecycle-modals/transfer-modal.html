@@ -1,0 +1,221 @@
+<ui-modal
+  size="form"
+  icon="tablerUserShare"
+  tile="bg-icon-violet"
+  [title]="'widgets.transferModal.title' | transloco"
+  [subtitle]="widget()?.name ?? ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      size="bare"
+      [label]="'widgets.transferModal.newOwner' | transloco"
+      [for]="uid + '-owner'"
+      [hint]="'widgets.transferModal.newOwnerHint' | transloco"
+      [required]="true"
+      [error]="ownerError()"
+    >
+      <div class="relative inline-flex w-full">
+        <button
+          #ownerTrigger
+          type="button"
+          [id]="uid + '-owner'"
+          class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+          [class]="
+            ownerError()
+              ? 'border-danger-border ring-2 ring-danger-halo'
+              : ownerMenuOpen()
+                ? 'border-focus-ring ring-3 ring-focus-halo'
+                : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+          "
+          aria-haspopup="listbox"
+          [attr.aria-expanded]="ownerMenuOpen()"
+          [attr.aria-label]="'widgets.transferModal.newOwner' | transloco"
+          [attr.aria-describedby]="
+            ownerError() ? uid + '-owner-hint ' + uid + '-owner-error' : uid + '-owner-hint'
+          "
+          [attr.aria-invalid]="ownerError() ? 'true' : null"
+          [disabled]="submitting()"
+          (click)="toggleOwnerMenu()"
+        >
+          <span class="min-w-0 truncate">
+            @if (selectedTarget(); as chosen) {
+              {{ chosen.name }}
+            } @else {
+              <span class="text-text-placeholder">{{ 'widgets.transferModal.newOwnerPlaceholder' | transloco }}</span>
+            }
+          </span>
+          <span class="inline-flex shrink-0 text-text-muted">
+            @if (loadingTargets() && !ownerMenuOpen()) {
+              <ng-icon name="tablerLoader2" size="14" class="animate-spin" aria-hidden="true" />
+            } @else {
+              <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+            }
+          </span>
+        </button>
+
+        @if (ownerMenuOpen()) {
+          <div
+            #ownerPanel
+            class="fixed z-dropdown flex flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+            [class.invisible]="!ownerMenuPlaced()"
+            [style.top.px]="ownerMenuPlace().top"
+            [style.inset-inline-start.px]="ownerMenuPlace().start"
+            [style.width.px]="ownerMenuPlace().width"
+            [style.max-height.px]="ownerMenuPlace().maxHeight"
+            (keydown)="onOwnerPanelKeydown($event)"
+          >
+            <div
+              class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+            >
+              <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              <input
+                #ownerSearchInput
+                type="text"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="ownerSearch()"
+                [placeholder]="'widgets.transferModal.searchOwners' | transloco"
+                [attr.aria-label]="'widgets.transferModal.searchOwners' | transloco"
+                (input)="onOwnerSearchInput($event)"
+              />
+              @if (loadingTargets()) {
+                <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+              }
+            </div>
+
+            <ul
+              role="listbox"
+              class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto"
+              [attr.aria-label]="'widgets.transferModal.newOwner' | transloco"
+            >
+              @for (target of targets(); track target.id) {
+                <li role="option" [attr.aria-selected]="selectedTargetId() === target.id">
+                  <button
+                    type="button"
+                    class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="
+                      selectedTargetId() === target.id
+                        ? 'bg-brand-soft text-on-brand-soft'
+                        : 'text-text hover:bg-row-hover'
+                    "
+                    (click)="selectTarget(target.id)"
+                  >
+                    <span class="truncate">{{ target.name }}</span>
+                    @if (selectedTargetId() === target.id) {
+                      <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                    }
+                  </button>
+                </li>
+              } @empty {
+                <li class="px-8 py-6 text-center text-12 text-text-muted">
+                  {{ 'widgets.transferModal.noOwners' | transloco }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    </ui-field>
+
+    @if (selectedTargetId()) {
+      @if (loadingImpact()) {
+        <div class="grid grid-cols-2 gap-8" aria-busy="true">
+          <div class="h-skeleton-line w-3/4 rounded-4 bg-neutral-soft"></div>
+          <div class="h-skeleton-line w-3/4 rounded-4 bg-neutral-soft"></div>
+          <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></div>
+          <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></div>
+        </div>
+      } @else if (impact(); as imp) {
+        <div class="grid grid-cols-2 gap-8">
+          <ui-field
+            size="bare"
+            [label]="'widgets.transferModal.placementsAffected' | transloco"
+            [hint]="'widgets.transferModal.placementsAffectedHint' | transloco"
+          >
+            <div class="flex min-h-field items-center">
+              <ui-badge tone="count">{{ imp.affectedPlacementCount }}</ui-badge>
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [label]="'widgets.transferModal.sharesKept' | transloco"
+            [hint]="'widgets.transferModal.sharesKeptHint' | transloco"
+          >
+            <div class="flex min-h-field items-center">
+              <ui-badge tone="count">{{ imp.retainedShareCount }}</ui-badge>
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [label]="'widgets.transferModal.ownersLosingAccess' | transloco"
+            [hint]="'widgets.transferModal.ownersLosingAccessHint' | transloco"
+          >
+            <div class="flex min-h-field items-center">
+              <ui-badge tone="count">{{ imp.dashboardOwnerAccessLostCount }}</ui-badge>
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            [label]="'widgets.transferModal.readersMayNeedShare' | transloco"
+            [hint]="'widgets.transferModal.readersMayNeedShareHint' | transloco"
+          >
+            <div class="flex min-h-field items-center">
+              <ui-badge tone="count">{{ imp.dashboardReadersMayNeedShareCount }}</ui-badge>
+            </div>
+          </ui-field>
+        </div>
+      }
+    }
+
+    <ui-field
+      size="multiline"
+      [label]="'widgets.modal.reason' | transloco"
+      [for]="uid + '-reason'"
+      [hint]="'widgets.transferModal.reasonHint' | transloco"
+      [required]="true"
+      [count]="reason().length"
+      [max]="500"
+      [error]="reasonError()"
+    >
+      <textarea
+        [id]="uid + '-reason'"
+        rows="3"
+        maxlength="500"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="reason()"
+        [placeholder]="'widgets.transferModal.reasonPlaceholder' | transloco"
+        [disabled]="submitting()"
+        (input)="onReasonInput($event)"
+        (blur)="onReasonBlur()"
+      ></textarea>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'widgets.transferModal.acknowledgeLabel' | transloco"
+      [for]="uid + '-ack'"
+      [hint]="'widgets.transferModal.acknowledgeHint' | transloco"
+      [required]="true"
+    >
+      <div class="flex min-h-field items-center">
+        <ui-checkbox [(checked)]="acknowledged">
+          {{ 'widgets.transferModal.acknowledge' | transloco }}
+        </ui-checkbox>
+      </div>
+    </ui-field>
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton [loading]="submitting()" [disabled]="!canSubmit()" (click)="submit()">
+      {{ 'widgets.transferModal.action' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'analytics.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

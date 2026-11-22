@@ -1,0 +1,17 @@
+@for (seat of seats(); track seat.moduleKey) {
+  @let label = moduleLabel(seat.moduleKey);
+  @if (seat.accessState === 'OVER_CAPACITY') {
+    <span
+      class="inline-flex h-chip items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning"
+      [title]="'seats.chips.readOnly' | transloco"
+      [attr.aria-label]="label + ' - ' + ('seats.chips.readOnly' | transloco)"
+    >
+      <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+      <span>{{ label }}</span>
+    </span>
+  } @else {
+    <span class="inline-flex h-chip items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft">
+      {{ label }}
+    </span>
+  }
+}

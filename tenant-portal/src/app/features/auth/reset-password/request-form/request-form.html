@@ -1,0 +1,58 @@
+<form class="flex flex-col gap-16" novalidate (submit)="onSubmit($event)">
+  <div role="status" [class]="throttle.active() ? '' : 'sr-only'">
+    @if (throttle.active()) {
+      <app-settings-notice tone="warning">
+        <span class="sr-only">{{ 'auth.shared.throttle' | transloco: { s: throttleInitial() } }}</span>
+        <span aria-hidden="true">{{ 'auth.shared.throttle' | transloco: { s: throttle.remaining() } }}</span>
+      </app-settings-notice>
+    } @else if (throttleEnded()) {
+      {{ 'auth.shared.throttleDone' | transloco }}
+    }
+  </div>
+
+  @if (noticeKey(); as key) {
+    <div
+      role="alert"
+      class="flex items-start gap-8 rounded-10 border border-danger-border bg-danger-soft px-10 py-6 text-12 leading-18 text-on-danger-soft"
+    >
+      <span class="mt-2 inline-flex shrink-0 text-danger-text">
+        <ng-icon name="tablerCircleX" size="14" aria-hidden="true" />
+      </span>
+      <div class="min-w-0 flex-1">
+        {{ key | transloco }}
+      </div>
+    </div>
+  }
+
+  <ui-field
+    for="reset-email"
+    [label]="'authReset.request.email' | transloco"
+    [hint]="'authReset.request.emailHint' | transloco"
+    size="large"
+    [required]="true"
+    [error]="emailErrorKey() ? (emailErrorKey()! | transloco) : null"
+  >
+    <input
+      id="reset-email"
+      type="email"
+      dir="ltr"
+      autocomplete="username"
+      class="min-w-0 flex-1 bg-transparent outline-none placeholder:text-text-placeholder"
+      [formField]="form.email"
+      [attr.aria-invalid]="emailErrorKey() ? 'true' : null"
+      [attr.aria-describedby]="'reset-email-hint' + (emailErrorKey() ? ' reset-email-error' : '')"
+      (input)="clearServerError()"
+    />
+  </ui-field>
+
+  <button
+    uiButton
+    type="submit"
+    size="large"
+    class="w-full"
+    [loading]="form().submitting()"
+    [disabled]="throttle.active()"
+  >
+    {{ 'authReset.request.submit' | transloco }}
+  </button>
+</form>

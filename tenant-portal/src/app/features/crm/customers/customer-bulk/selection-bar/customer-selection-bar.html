@@ -1,0 +1,60 @@
+@if (selection.count() > 0) {
+  <div
+    role="region"
+    [attr.aria-label]="'customerBulk.bar.label' | transloco"
+    class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+  >
+    <div class="flex min-w-0 flex-wrap items-center gap-6">
+      <span class="font-medium tabular-nums">
+        {{ 'customerBulk.bar.selected' | transloco: { n: selection.count() } }}
+      </span>
+
+      @if (selection.mode() === 'all') {
+        <span class="tabular-nums">
+          {{ 'customerBulk.bar.allSelected' | transloco: { total: allTotal() } }}
+        </span>
+        <button
+          uiButton
+          variant="ghost"
+          size="small"
+          type="button"
+          (click)="selectOnlyPage()"
+        >
+          {{ 'customerBulk.bar.onlyPage' | transloco }}
+        </button>
+      } @else {
+        @if (hidden() > 0) {
+          <span class="text-text-muted tabular-nums">
+            {{ 'customerBulk.bar.hidden' | transloco: { h: hidden() } }}
+          </span>
+        }
+        @if (canOfferSelectAll()) {
+          @if (!tooMany()) {
+            <button
+              uiButton
+              variant="ghost"
+              size="small"
+              type="button"
+              (click)="selectAllMatching()"
+            >
+              {{ 'customerBulk.bar.selectAll' | transloco: { total: total() } }}
+            </button>
+          } @else {
+            <span class="text-text-muted">{{ 'customerBulk.bar.tooMany' | transloco }}</span>
+          }
+        }
+      }
+    </div>
+
+    <button
+      uiButton
+      variant="ghost"
+      size="small"
+      type="button"
+      class="shrink-0"
+      (click)="clear()"
+    >
+      {{ 'customerBulk.bar.clear' | transloco }}
+    </button>
+  </div>
+}

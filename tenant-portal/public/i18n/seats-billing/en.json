@@ -1,0 +1,103 @@
+{
+  "section": {
+    "title": "Seats",
+    "desc": "Seats follow roles. Each user with any permission of an application takes one seat of it.",
+    "viewHolders": "View holders",
+    "reduce": "Reduce seats",
+    "add": "Add seats",
+    "manual": "This workspace still assigns seats by hand.",
+    "switch": "Switch to automatic seats",
+    "grace": "Reduce {{module}} to {{capacity}} users by {{date}}. After that, the most recently added users become read-only.",
+    "chooseKeepers": "Choose who keeps a seat"
+  },
+  "page": {
+    "note": "The full subscription page is coming. Seats are shown here."
+  },
+  "holders": {
+    "title": "{{module}} seat holders",
+    "cols": {
+      "user": "User",
+      "status": "Status",
+      "roles": "Roles",
+      "since": "Since",
+      "state": "Access"
+    },
+    "readOnly": "Read-only",
+    "active": "Active",
+    "search": "Search users",
+    "empty": "No seat holders.",
+    "status": {
+      "ACTIVE": "Active",
+      "INVITED": "Invited",
+      "SUSPENDED": "Suspended"
+    }
+  },
+  "down": {
+    "title": "Reduce seats",
+    "steps": {
+      "choose": "Choose",
+      "keep": "Who keeps a seat",
+      "review": "Review"
+    },
+    "app": "Application",
+    "appHint": "The application whose seats you want to lower.",
+    "target": "New seat count",
+    "targetHint": "You can lower seats only to a number that fits the users who keep a seat.",
+    "targetInvalid": "Enter a whole number between 1 and {{max}}.",
+    "cannotReduce": "This application already has 1 seat and cannot be reduced further.",
+    "now": "{{used}} users hold a seat now.",
+    "count": "{{n}} of {{target}} chosen",
+    "tooMany": "Choose at most {{target}} users.",
+    "keepField": "Users who keep a seat",
+    "keepHint": "Choose the users who keep their seat. The others lose the roles that give this application.",
+    "alsoLoses": "Also loses: {{apps}}",
+    "losesRoles": "Loses roles: {{roles}}",
+    "addonsRemoved": "Add-ons removed: {{addons}}",
+    "noRemovals": "No users will lose their seat.",
+    "summary": "{{n}} users will lose their {{module}} seat. Their roles that give {{module}} are removed.",
+    "free": "Free {{n}} seats",
+    "confirmTitle": "Free seats?",
+    "confirm": "This removes roles from {{n}} users. Continue?",
+    "done": "Seats freed. Now lower the seat count in your subscription.",
+    "changeSubscription": "Change subscription",
+    "back": "Back to seats",
+    "unsaved": {
+      "title": "Leave without freeing seats?",
+      "text": "Your seat reduction choices have not been applied.",
+      "save": "Keep editing",
+      "discard": "Discard and leave",
+      "cancel": "Cancel"
+    }
+  },
+  "mig": {
+    "title": "Switch to automatic seats",
+    "explain": "Automatic seats follow roles. Users with roles but no seat will get one; seats of users without a matching role are released.",
+    "go": "Switch now",
+    "short": "Some applications need more seats first:",
+    "cols": {
+      "module": "Application",
+      "holders": "Role holders",
+      "seats": "Seats",
+      "short": "Short by",
+      "actions": "Actions"
+    },
+    "review": "Review role holders",
+    "done": "Seats now follow roles."
+  },
+  "common": {
+    "next": "Next",
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close",
+    "reload": "Reload",
+    "retry": "Try again",
+    "loadFailed": "Could not load seat usage.",
+    "noResults": "No matching results",
+    "clearSearch": "Clear search"
+  },
+  "conflict": {
+    "title": "Seat usage changed",
+    "text": "Seat usage was updated since you started. Reload to review the latest holders.",
+    "reload": "Reload"
+  }
+}

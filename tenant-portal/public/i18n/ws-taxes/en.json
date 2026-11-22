@@ -1,0 +1,102 @@
+{
+  "new": "Add tax",
+  "search": "Search by code or name",
+  "title": "Taxes",
+  "filters": {
+    "company": "Company",
+    "companyHint": "Shows only the taxes of the chosen company, not the workspace-wide ones. Choose All to see everything.",
+    "allCompanies": "All",
+    "inactiveSuffix": "(inactive)",
+    "status": "Status",
+    "statusHint": "Show active taxes, inactive taxes or both.",
+    "allStatuses": "All",
+    "inclusive": "Price includes tax",
+    "inclusiveHint": "Show only taxes that are included in the price, or only those added on top.",
+    "allInclusive": "All",
+    "clear": "Clear filters"
+  },
+  "notices": {
+    "companiesFailed": "The company list could not be loaded, so company taxes can't be filtered or created."
+  },
+  "table": {
+    "code": "Code",
+    "name": "Tax",
+    "rate": "Rate",
+    "inclusive": "Price includes tax",
+    "scope": "Scope",
+    "status": "Status",
+    "workspaceWide": "Workspace-wide",
+    "unknownCompany": "Unknown company",
+    "sortBy": "Sort by {{column}}"
+  },
+  "empty": "No taxes yet. Add the first one.",
+  "emptyFiltered": "No taxes match the filters.",
+  "actions": {
+    "deactivate": "Deactivate",
+    "deactivateDesc": "Stop offering it on new documents.",
+    "reactivate": "Reactivate",
+    "reactivateDesc": "Make it available again."
+  },
+  "modal": {
+    "createTitle": "New tax",
+    "editTitle": "Edit tax"
+  },
+  "fields": {
+    "scope": "Scope",
+    "scopeHint": "Workspace-wide applies everywhere; a company applies to that company only. Can't be changed later.",
+    "code": "Code",
+    "codeHint": "Up to 32 characters, unique in its scope, including inactive taxes. Can't be changed later.",
+    "codePlaceholder": "VAT15",
+    "name": "Name",
+    "nameHint": "Up to 120 characters.",
+    "rate": "Rate",
+    "rateHint": "A percentage from 0 to 100 with up to 4 decimals, such as 15 or 7.5.",
+    "inclusive": "Price includes tax",
+    "inclusiveHint": "On when prices already contain this tax. Off when the tax is added on top.",
+    "active": "Active",
+    "activeHint": "Inactive taxes are not offered on new documents. A company tax can't be active while its company is inactive.",
+    "workspaceWide": "Workspace-wide"
+  },
+  "validation": {
+    "scopeRequired": "Choose a scope.",
+    "codeRequired": "Enter a code.",
+    "nameRequired": "Enter a name.",
+    "rateRequired": "Enter a rate.",
+    "rateInvalid": "Enter a number from 0 to 100 with at most 4 decimals."
+  },
+  "deactivate": {
+    "title": "Deactivate {{name}} ({{code}})?",
+    "text": "The tax ({{rate}}%) will no longer be offered on new documents. Existing documents keep it, and you can reactivate it later.",
+    "confirm": "Deactivate"
+  },
+  "blocker": {
+    "reactivateTitle": "Can't reactivate this tax"
+  },
+  "unsaved": {
+    "text": "You have unsaved changes. Save them before closing?",
+    "discard": "Discard"
+  },
+  "toast": {
+    "created": "Tax {{code}} added.",
+    "updated": "Tax {{code}} updated.",
+    "deactivated": "{{code}} deactivated.",
+    "reactivated": "{{code}} reactivated."
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "CORE_VALIDATION_FAILED": "Some values are not valid. Check the fields and try again.",
+    "TAX_CODE_TAKEN": "This code is already used in {{scope}}, including by inactive taxes.",
+    "TAX_NOT_FOUND": "This tax no longer exists. Reload the list.",
+    "COMPANY_INVALID": "The company must exist and be active.",
+    "COMPANY_INVALID_REACTIVATE": "This tax belongs to a company that is not active. Activate the company first, then try again.",
+    "COMPANY_PERMISSION_DENIED": "You don't have permission to manage taxes for this company.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Only users with a workspace-wide permission can manage workspace-wide taxes.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "Your permissions could not be checked right now. Try again in a moment.",
+    "IDEM_OTHER": "The request could not be processed. Try again.",
+    "IDEM_IN_FLIGHT": "The same request is already being processed.",
+    "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action."
+  }
+}

@@ -1,0 +1,111 @@
+@if (selectedCount() > 0) {
+  <div
+    role="region"
+    [attr.aria-label]="'tdb.bar.regionLabel' | transloco"
+    class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+  >
+    <div class="flex min-w-0 flex-wrap items-center gap-6">
+      <span class="text-12 font-medium tabular-nums">
+        {{ 'tdb.bar.selected' | transloco: { n: selectedCount() } }}
+      </span>
+
+      @if (canSelectAll()) {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          size="small"
+          (click)="selectAll()"
+        >
+          {{ 'tdb.bar.selectAll' | transloco: { total: total() } }}
+        </button>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        size="small"
+        (click)="clearSelection()"
+      >
+        {{ 'tdb.bar.clear' | transloco }}
+      </button>
+    </div>
+
+    <div class="flex shrink-0 flex-wrap items-center gap-6">
+      @for (act of barActions(); track act.id) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="actionsDisabled()"
+          [attr.title]="disabledTooltip()"
+          (click)="openAction(act.id)"
+        >
+          <ng-icon [name]="act.icon" size="14" aria-hidden="true" />
+          <span>{{ 'tdb.actions.' + act.id | transloco }}</span>
+        </button>
+      }
+
+      @if (menuActions().length > 0) {
+        <button
+          #moreTrigger
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-surface-muted hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+          [class.bg-neutral-soft]="menuOpen()"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="menuOpen()"
+          [attr.aria-label]="'tdb.bar.more' | transloco"
+          [attr.title]="actionsDisabled() ? disabledTooltip() : ('tdb.bar.more' | transloco)"
+          [disabled]="actionsDisabled()"
+          (click)="toggleMenu()"
+        >
+          <ng-icon name="tablerDots" size="14" aria-hidden="true" />
+        </button>
+
+        @if (menuOpen()) {
+          <div
+            #morePanel
+            role="menu"
+            class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+            [class.invisible]="!menuPlaced()"
+            [style.top.px]="menuPlace().top"
+            [style.inset-inline-end.px]="menuPlace().end"
+            [attr.aria-label]="'tdb.bar.more' | transloco"
+          >
+            @for (act of menuActions(); track act.id) {
+              <button
+                #menuRow
+                type="button"
+                role="menuitem"
+                class="flex w-full cursor-pointer items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="onMenuRowClick(act)"
+              >
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="act.tile"
+                >
+                  <ng-icon [name]="act.icon" size="14" aria-hidden="true" />
+                </span>
+                <span
+                  class="min-w-0 flex-1 text-12 font-medium"
+                  [class]="act.danger ? 'text-danger-text' : 'text-text'"
+                >
+                  {{ 'tdb.actions.' + act.id | transloco }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+<app-bulk-params-modal
+  [kind]="kind()"
+  [selection]="selection()"
+  [query]="query()"
+  [total]="total()"
+/>

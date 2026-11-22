@@ -1,0 +1,61 @@
+{
+  "button": "تم تحديد {{count}}",
+  "busy": "توجد مهمة جماعية أخرى قيد التنفيذ على الحسابات التجارية.",
+  "started": "بدأت العملية الجماعية",
+  "run": "تنفيذ",
+  "succeeded": "تم تحديث {{count}} من الحسابات",
+  "action": {
+    "BLOCK": "حظر الحسابات",
+    "UNBLOCK": "رفع الحظر عن الحسابات"
+  },
+  "block": {
+    "title": "حظر {{count}} من الحسابات"
+  },
+  "unblock": {
+    "title": "رفع الحظر عن {{count}} من الحسابات"
+  },
+  "evidence": {
+    "label": "مرجع الإثبات",
+    "hint": "رقم مستند أو طلب يدعم القرار، حتى 200 حرف.",
+    "tooLong": "يجب ألا يتجاوز مرجع الإثبات 200 حرف."
+  },
+  "selection": {
+    "label": "التحديد",
+    "page": "تم تحديد {{count}} من الحسابات في هذه الصفحة",
+    "selected": "تم تحديد {{count}} من الحسابات",
+    "hidden": "· {{hidden}} خارج هذه الصفحة",
+    "all": "تحديد كل الحسابات المطابقة وعددها {{total}}",
+    "allSelected": "تم تحديد كل الحسابات المطابقة وعددها {{total}}",
+    "onlyPage": "تحديد هذه الصفحة فقط",
+    "tooMany": "يمكن تحديد 10,000 حساب كحد أقصى.",
+    "clear": "إلغاء التحديد"
+  },
+  "codes": {
+    "TRADE": {
+      "ACCOUNT": {
+        "NOT_FOUND": "لم يعد الحساب موجودًا.",
+        "BLOCK_TRANSITION_INVALID": "الحساب في هذه الحالة بالفعل."
+      },
+      "REASON": {
+        "NOT_FOUND": "لم يعد السبب موجودًا.",
+        "INACTIVE": "لم يعد السبب نشطًا.",
+        "NOTE_REQUIRED": "الملاحظة مطلوبة لهذا السبب.",
+        "KIND_INVALID": "هذا السبب لا يخص هذا الإجراء."
+      },
+      "CONTEXT": {
+        "MISSING_COMPANY": "اختر شركة من الشريط العلوي.",
+        "COMPANY_REQUIRED": "اختر شركة من الشريط العلوي."
+      },
+      "VALIDATION_FAILED": "بعض القيم غير صالحة."
+    },
+    "TRADE_ACCOUNT_NOT_FOUND": "لم يعد الحساب موجودًا.",
+    "TRADE_ACCOUNT_BLOCK_TRANSITION_INVALID": "الحساب في هذه الحالة بالفعل.",
+    "TRADE_REASON_NOT_FOUND": "لم يعد السبب موجودًا.",
+    "TRADE_REASON_INACTIVE": "لم يعد السبب نشطًا.",
+    "TRADE_REASON_NOTE_REQUIRED": "الملاحظة مطلوبة لهذا السبب.",
+    "TRADE_REASON_KIND_INVALID": "هذا السبب لا يخص هذا الإجراء.",
+    "TRADE_CONTEXT_MISSING_COMPANY": "اختر شركة من الشريط العلوي.",
+    "TRADE_VALIDATION_FAILED": "بعض القيم غير صالحة.",
+    "TRADE_CONTEXT_COMPANY_REQUIRED": "اختر شركة من الشريط العلوي."
+  }
+}

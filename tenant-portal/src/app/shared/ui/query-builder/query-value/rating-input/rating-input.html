@@ -1,0 +1,213 @@
+@switch (mode()) {
+  @case ('single') {
+    <div
+      role="radiogroup"
+      [class]="groupBoxClasses()"
+      [attr.aria-label]="field().label"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      [attr.aria-describedby]="describedBy() || null"
+      (mouseleave)="hoverSingle.set(null)"
+    >
+      <button
+        #singleBtn
+        type="button"
+        role="radio"
+        class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center rounded-6 px-8 text-12 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+        [class]="
+          singleValue() === 0
+            ? 'bg-brand-soft font-medium text-on-brand-soft'
+            : 'text-text-muted hover:bg-row-hover hover:text-text'
+        "
+        [disabled]="disabled()"
+        [attr.aria-checked]="singleValue() === 0"
+        [tabIndex]="tabIndexFor(singleValue(), 0)"
+        (click)="selectSingle(0)"
+        (keydown)="onRadioKeydown($event, 0, 'single')"
+      >
+        {{ 'qv.noStars' | transloco }}
+      </button>
+
+      @for (star of stars; track star) {
+        <button
+          #singleBtn
+          type="button"
+          role="radio"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+          [class]="isStarActive(star, singleValue(), hoverSingle()) ? 'text-warning-text' : 'text-border-field hover:text-text-muted'"
+          [disabled]="disabled()"
+          [attr.aria-label]="'qv.stars' | transloco: { n: star }"
+          [attr.aria-checked]="singleValue() === star"
+          [tabIndex]="tabIndexFor(singleValue(), star)"
+          (mouseenter)="!disabled() && hoverSingle.set(star)"
+          (focus)="!disabled() && hoverSingle.set(star)"
+          (blur)="hoverSingle.set(null)"
+          (click)="selectSingle(star)"
+          (keydown)="onRadioKeydown($event, star, 'single')"
+        >
+          <ng-icon
+            [name]="isStarActive(star, singleValue(), hoverSingle()) ? 'tablerStarFill' : 'tablerStar'"
+            size="16"
+            aria-hidden="true"
+          />
+        </button>
+      }
+    </div>
+  }
+
+  @case ('range') {
+    <div class="flex flex-wrap items-center gap-6" [attr.aria-describedby]="describedBy() || null">
+      <div class="flex items-center gap-4">
+        <span class="text-11 text-text-muted">{{ 'qv.from' | transloco }}</span>
+        <div
+          role="radiogroup"
+          [class]="groupBoxClasses()"
+          [attr.aria-label]="field().label + ' - ' + ('qv.from' | transloco)"
+          [attr.aria-invalid]="invalid() ? 'true' : null"
+          [attr.aria-describedby]="describedBy() || null"
+          (mouseleave)="hoverFrom.set(null)"
+        >
+          <button
+            #fromBtn
+            type="button"
+            role="radio"
+            class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center rounded-6 px-6 text-11 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+            [class]="
+              rangeFrom() === 0
+                ? 'bg-brand-soft font-medium text-on-brand-soft'
+                : 'text-text-muted hover:bg-row-hover hover:text-text'
+            "
+            [disabled]="disabled()"
+            [attr.aria-checked]="rangeFrom() === 0"
+            [tabIndex]="tabIndexFor(rangeFrom(), 0)"
+            (click)="selectRangePart('from', 0)"
+            (keydown)="onRadioKeydown($event, 0, 'from')"
+          >
+            {{ 'qv.noStars' | transloco }}
+          </button>
+
+          @for (star of stars; track star) {
+            <button
+              #fromBtn
+              type="button"
+              role="radio"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+              [class]="isStarActive(star, rangeFrom(), hoverFrom()) ? 'text-warning-text' : 'text-border-field hover:text-text-muted'"
+              [disabled]="disabled()"
+              [attr.aria-label]="'qv.stars' | transloco: { n: star }"
+              [attr.aria-checked]="rangeFrom() === star"
+              [tabIndex]="tabIndexFor(rangeFrom(), star)"
+              (mouseenter)="!disabled() && hoverFrom.set(star)"
+              (focus)="!disabled() && hoverFrom.set(star)"
+              (blur)="hoverFrom.set(null)"
+              (click)="selectRangePart('from', star)"
+              (keydown)="onRadioKeydown($event, star, 'from')"
+            >
+              <ng-icon
+                [name]="isStarActive(star, rangeFrom(), hoverFrom()) ? 'tablerStarFill' : 'tablerStar'"
+                size="16"
+                aria-hidden="true"
+              />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-11 text-text-muted">{{ 'qv.to' | transloco }}</span>
+        <div
+          role="radiogroup"
+          [class]="groupBoxClasses()"
+          [attr.aria-label]="field().label + ' - ' + ('qv.to' | transloco)"
+          [attr.aria-invalid]="invalid() ? 'true' : null"
+          [attr.aria-describedby]="describedBy() || null"
+          (mouseleave)="hoverTo.set(null)"
+        >
+          <button
+            #toBtn
+            type="button"
+            role="radio"
+            class="inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center rounded-6 px-6 text-11 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+            [class]="
+              rangeTo() === 0
+                ? 'bg-brand-soft font-medium text-on-brand-soft'
+                : 'text-text-muted hover:bg-row-hover hover:text-text'
+            "
+            [disabled]="disabled()"
+            [attr.aria-checked]="rangeTo() === 0"
+            [tabIndex]="tabIndexFor(rangeTo(), 0)"
+            (click)="selectRangePart('to', 0)"
+            (keydown)="onRadioKeydown($event, 0, 'to')"
+          >
+            {{ 'qv.noStars' | transloco }}
+          </button>
+
+          @for (star of stars; track star) {
+            <button
+              #toBtn
+              type="button"
+              role="radio"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+              [class]="isStarActive(star, rangeTo(), hoverTo()) ? 'text-warning-text' : 'text-border-field hover:text-text-muted'"
+              [disabled]="disabled()"
+              [attr.aria-label]="'qv.stars' | transloco: { n: star }"
+              [attr.aria-checked]="rangeTo() === star"
+              [tabIndex]="tabIndexFor(rangeTo(), star)"
+              (mouseenter)="!disabled() && hoverTo.set(star)"
+              (focus)="!disabled() && hoverTo.set(star)"
+              (blur)="hoverTo.set(null)"
+              (click)="selectRangePart('to', star)"
+              (keydown)="onRadioKeydown($event, star, 'to')"
+            >
+              <ng-icon
+                [name]="isStarActive(star, rangeTo(), hoverTo()) ? 'tablerStarFill' : 'tablerStar'"
+                size="16"
+                aria-hidden="true"
+              />
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @case ('list') {
+    <div
+      role="group"
+      class="flex flex-wrap items-center gap-4"
+      [attr.aria-label]="field().label"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      [attr.aria-describedby]="describedBy() || null"
+    >
+      @for (rating of ratings; track rating) {
+        @let selected = listValues().includes(rating);
+        <button
+          type="button"
+          class="inline-flex h-field cursor-pointer items-center gap-4 rounded-8 border px-8 text-12 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+          [class]="
+            selected
+              ? 'border-brand bg-brand-soft font-medium text-on-brand-soft'
+              : invalid()
+                ? 'border-danger-border bg-surface-field text-text ring-2 ring-danger-halo hover:bg-row-hover'
+                : 'border-border-field bg-surface-field text-text hover:border-border-field-hover'
+          "
+          [disabled]="disabled()"
+          [attr.aria-pressed]="selected"
+          [attr.aria-label]="rating === 0 ? ('qv.noStars' | transloco) : ('qv.stars' | transloco: { n: rating })"
+          (click)="toggleList(rating)"
+        >
+          @if (rating === 0) {
+            <span>{{ 'qv.noStars' | transloco }}</span>
+          } @else {
+            <ng-icon
+              [name]="selected ? 'tablerStarFill' : 'tablerStar'"
+              size="14"
+              [class]="selected ? 'text-warning-text' : 'text-text-muted'"
+              aria-hidden="true"
+            />
+            <span>{{ rating }}</span>
+          }
+        </button>
+      }
+    </div>
+  }
+}

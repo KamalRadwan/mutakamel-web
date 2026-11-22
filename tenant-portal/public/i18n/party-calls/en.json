@@ -1,0 +1,12 @@
+{
+  "header": "Calls with this {{type}}, from its record or matching one of its numbers.",
+  "types": {
+    "LEAD": "lead",
+    "CUSTOMER_PROFILE": "customer",
+    "PARTY": "contact",
+    "OPPORTUNITY": "opportunity"
+  },
+  "errors": {
+    "notFound": "You do not have access to this record's calls."
+  }
+}

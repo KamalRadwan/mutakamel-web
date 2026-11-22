@@ -1,0 +1,288 @@
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  <button
+    type="button"
+    uiButton
+    class="shrink-0"
+    [disabled]="!canCreate()"
+    [attr.aria-label]="'opportunities.new' | transloco"
+    [title]="createTitle()"
+    (click)="openCreate()"
+  >
+    <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+    {{ 'opportunities.new' | transloco }}
+  </button>
+
+  <app-pipeline-switcher
+    class="shrink-0"
+    [pipelines]="pipelines()"
+    [value]="switcherValue()"
+    [allowAll]="customerPartyId() !== null"
+    [disabled]="hasNoPipeline() || !pipelinesLoaded()"
+    (valueChange)="selectPipeline($event)"
+  />
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <div
+    class="min-w-0 flex-1"
+    [attr.title]="
+      store.draftDirty()
+        ? ('opportunities.page.lockedByDraft' | transloco)
+        : ('opportunities.page.searchPlaceholder' | transloco)
+    "
+  >
+    <fieldset
+      class="min-w-0"
+      [disabled]="store.draftDirty()"
+      [attr.inert]="store.draftDirty() ? '' : null"
+    >
+      <ui-facet-search
+        [fields]="fields()"
+        [presets]="presets()"
+        [placeholder]="'opportunities.page.searchPlaceholder' | transloco"
+        [facets]="store.facets()"
+        (facetsChange)="setFacets($event)"
+        (chipClick)="onFacetChipClick($event)"
+      />
+    </fieldset>
+  </div>
+
+  @if (current() === 'table' && !allPipelines() && selection.count() > 0) {
+    <app-opportunity-bulk-menu
+      class="shrink-0"
+      [count]="selection.count()"
+      [capabilities]="capabilities()"
+      [disabled]="resolvingBulk() || bulkBusy()"
+      [disabledReason]="bulkBusy() ? ('oppBulk.job.busy' | transloco) : null"
+      (action)="openBulkAction($event)"
+    />
+  }
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="advancedOpen() ? 'bg-brand-soft text-on-brand-soft' : 'text-text-muted hover:bg-neutral-soft hover:text-text'"
+    [attr.aria-pressed]="advancedOpen()"
+    [attr.aria-expanded]="advancedOpen()"
+    aria-controls="opportunities-advanced-search"
+    [attr.aria-label]="'opportunities.page.advancedSearch' | transloco"
+    [title]="'opportunities.page.advancedSearch' | transloco"
+    (click)="toggleAdvanced()"
+  >
+    <ng-icon name="tablerAdjustmentsHorizontal" size="15" aria-hidden="true" />
+  </button>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  @if (allPipelines()) {
+    <div
+      role="radiogroup"
+      [attr.aria-label]="'opportunities.page.viewSwitcher' | transloco"
+      class="inline-flex shrink-0 items-center gap-2 rounded-10 bg-neutral-soft p-3"
+    >
+      @for (option of views(); track option.id) {
+        @let boardDisabled = option.id === 'board';
+        <button
+          type="button"
+          role="radio"
+          class="inline-flex h-field items-center rounded-8 px-10 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            boardDisabled
+              ? 'cursor-not-allowed text-text-placeholder opacity-drag-source'
+              : option.id === current()
+                ? 'cursor-pointer bg-brand text-on-brand'
+                : 'cursor-pointer text-text-muted hover:text-text'
+          "
+          [disabled]="boardDisabled"
+          [attr.aria-disabled]="boardDisabled ? 'true' : null"
+          [attr.aria-checked]="option.id === current()"
+          [attr.aria-label]="option.label"
+          [title]="
+            boardDisabled
+              ? ('opportunities.page.boardDisabledAllPipelines' | transloco)
+              : option.label
+          "
+          (click)="show(option.id)"
+        >
+          <ng-icon [name]="option.icon" size="14" aria-hidden="true" />
+        </button>
+      }
+    </div>
+  } @else {
+    <ui-view-switcher
+      [options]="views()"
+      [label]="'opportunities.page.viewSwitcher' | transloco"
+      [value]="current()"
+      (valueChange)="show($event)"
+    />
+  }
+</div>
+
+@if (advancedVisible()) {
+  <ui-query-builder
+    panelId="opportunities-advanced-search"
+    [fields]="store.fields()"
+    [applied]="store.applied()"
+    [title]="'opportunities.page.advancedSearch' | transloco"
+    [timeZone]="timeZone()"
+    [(expanded)]="advancedOpen"
+    (apply)="applyAdvanced($event)"
+    (clear)="clearAdvanced()"
+    (dirtyChange)="store.draftDirty.set($event)"
+  />
+}
+
+@if (!pipelinesLoaded()) {
+  <div
+    class="flex flex-1 items-center justify-center rounded-10 bg-surface p-16 shadow-card"
+    role="status"
+    aria-live="polite"
+  >
+    <span class="text-12 leading-18 text-text-muted">{{ 'opportunities.page.pipelinesLoading' | transloco }}</span>
+  </div>
+} @else if (pipelinesFailed() && pipelines().length === 0) {
+  <ui-full-state
+    class="rounded-10 bg-surface shadow-card"
+    kind="load-failure"
+    [title]="'opportunities.page.pipelinesFailed' | transloco"
+    [actionLabel]="'opportunities.list.retry' | transloco"
+    (action)="retryPipelines()"
+  />
+} @else if (hasNoPipeline()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerHierarchy2" size="18" aria-hidden="true" />
+    </span>
+    <h1 class="text-13 leading-18 font-medium text-text">
+      {{ 'opportunities.page.noPipeline.title' | transloco }}
+    </h1>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'opportunities.page.noPipeline.text' | transloco }}
+    </p>
+    @if (canManagePipelines()) {
+      <a uiButton routerLink="/crm/settings/pipelines">
+        {{ 'opportunities.page.noPipeline.openSettings' | transloco }}
+      </a>
+    }
+  </div>
+} @else {
+  @if (current() !== 'board') {
+    <ui-step-filter
+      class="shrink-0"
+      [steps]="stageSteps()"
+      [label]="stepFilterLabel()"
+      [hint]="stepFilterHint()"
+      [value]="stage()"
+      (valueChange)="filterStage($event)"
+    />
+  }
+
+  @if (current() === 'table' && !allPipelines() && selection.count() > 0) {
+    <app-opportunity-selection-bar
+      [body]="tableEffectiveBody()"
+      [pageRows]="pageRows()"
+      [total]="matchingTotal()"
+      [visibleIds]="visibleIds()"
+    />
+  }
+
+  @switch (current()) {
+    @case ('board') {
+      @if (!allPipelines() && activePipeline(); as pipeline) {
+        <app-opportunity-board
+          [pipeline]="pipeline"
+          [body]="searchBody()"
+          [capabilities]="capabilities()"
+          [reloadToken]="reloadToken()"
+          (create)="openCreate($event)"
+          (open)="openRecord($event.row, $event.nav)"
+          (activities)="openActivities($event)"
+          (transfer)="transferOpportunity($event)"
+          (changed)="onViewCountsChanged()"
+        />
+      }
+    }
+    @case ('cards') {
+      <app-opportunity-cards
+        [body]="cardsTableBody()"
+        [stages]="activeStages()"
+        [stage]="allPipelines() ? 'all' : stage()"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        [capabilities]="capabilities()"
+        [reloadToken]="reloadToken()"
+        (pageChange)="setPage($event)"
+        (pageSizeChange)="setPageSize($event)"
+        (open)="openRecord($event.row, $event.nav)"
+        (activities)="openActivities($event)"
+        (transfer)="transferOpportunity($event)"
+        (countsChanged)="onViewCountsChanged()"
+      />
+    }
+    @case ('table') {
+      <app-opportunity-table
+        [body]="cardsTableBody()"
+        [stages]="activeStages()"
+        [stage]="allPipelines() ? 'all' : stage()"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        [capabilities]="capabilities()"
+        [selection]="allPipelines() ? null : selection"
+        [sort]="sort()"
+        [reloadToken]="reloadToken()"
+        (pageChange)="setPage($event)"
+        (pageSizeChange)="setPageSize($event)"
+        (sortChange)="setSort($event)"
+        (open)="openRecord($event.row, $event.nav)"
+        (activities)="openActivities($event)"
+        (transfer)="transferOpportunity($event)"
+        (countsChanged)="onViewCountsChanged()"
+      />
+    }
+  }
+}
+
+<app-record-activities class="absolute" (changed)="refreshListAndCounts()" />
+
+<app-opportunity-close-dialog
+  class="absolute"
+  [request]="moves.closeRequest()"
+  (done)="moves.resolveClose($event)"
+/>
+
+<app-opportunity-pipeline-move-dialog
+  class="absolute"
+  [request]="moves.transferRequest()"
+  (done)="moves.resolveTransfer($event)"
+/>
+
+<ui-confirm-dialog
+  #reopenDialog
+  class="absolute"
+  tone="warning"
+  [title]="'oppMoves.reopen.title' | transloco"
+  [text]="reopenText()"
+  [confirmLabel]="'oppMoves.reopen.confirm' | transloco"
+  [cancelLabel]="'oppMoves.common.cancel' | transloco"
+/>
+
+<app-opp-bulk-assign-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
+<app-opp-bulk-stage-modal
+  class="absolute"
+  [branchId]="branchId()"
+  [pipelineId]="activePipeline()?.id ?? ''"
+  [stages]="activePipeline()?.stages ?? []"
+  (submitted)="onBulkSubmitted()"
+/>
+<app-opp-bulk-delete-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
+<app-opp-bulk-activity-modal class="absolute" [branchId]="branchId()" (submitted)="onBulkSubmitted()" />
+
+<app-opportunity-modal
+  class="absolute"
+  (saved)="refreshListAndCounts()"
+  (changed)="refreshListAndCounts()"
+  (deleted)="refreshListAndCounts()"
+  (openIdChange)="onModalOpenIdChange($event)"
+/>

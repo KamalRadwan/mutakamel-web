@@ -1,0 +1,330 @@
+/* Owner-approved departures from the design system. Each value is used only where its name says. */
+:root {
+  /* CRM dashboards charts (owner 2026-11-21, Q9). */
+  --chart-fill-opacity: 0.25;
+  --chart-link-opacity: 0.35;
+  --login-field-h: 36px;
+  --login-btn-h: 40px;
+  --login-logo-h: 64px;
+  --nav-logo-w: 150px;
+  --modal-activity-w: 660px;
+  --modal-activity-h: 720px;
+  /* Record quick modal and full page (owner-approval pending). */
+  --modal-record-w: 980px;
+  --modal-record-h: 760px;
+  --record-side-w: 320px;
+  --brand-whatsapp: #25d366;
+  --brand-telegram: #26a5e4;
+  /* Lead card title block: always two lines (name + contact) so every card has the same height. Owner 2026-11-21. */
+  --card-title-h: 36px;
+  /* Trade item thumbnail: 32 in the table, 56 on the card (AGENTS X1). */
+  --size-item-thumb: 32px;
+  --size-item-thumb-lg: 56px;
+  /* Workspace home app card width (owner 2026-11-21). */ --app-card-w: 250px;
+  /* Advanced search builder: expanded panel max height (owner approved 2026-11-21). */
+  --query-builder-max-h: 360px;
+  /* Advanced search condition row: field and operator column widths (2026-11-21). */
+  --qb-field-w: 136px;
+  --qb-op-w: 108px;
+  /* Workspace home (owner 2026-11-21) */
+  --app-card-shadow: var(--shadow-popover);
+  /* Workspace home (owner 2026-11-21) */
+  --app-card-shadow-hover: var(--shadow-modal);
+  /* Workspace home (owner 2026-11-21) */
+  --app-skeleton-title-w: 136px;
+  /* Workspace home (owner 2026-11-21) */
+  --app-skeleton-text-w: 180px;
+  /* Workspace home (owner 2026-11-21) */
+  --app-skeleton-badge-w: 84px;
+  /* Web phone (owner 2026-11-21) */
+  --phone-panel-w: 330px;
+  --phone-popup-w: 330px;
+  --phone-body-h: 448px;
+  --phone-bar-h: 32px;
+  --phone-bar-w: 275px;
+  --phone-reserve: 40px;
+  --phone-panel-reserve: calc(var(--phone-panel-w) + var(--space-12) * 2);
+  --phone-key-press: 0.96;
+  --phone-dot: 14px;
+  --icon-dot: 9px;
+  --scrollbar-w: 6px;
+  --success-hover: #1aab69;
+  --success-pressed: #179a5e;
+  /* Template designer (plan N1–N10, owner 2026-11-21) */
+  --ruler-size: 16px;
+  --canvas-handle: 8px;
+  --email-col-w: 600px;
+  --email-col-w-sm: 320px;
+  --template-paper: #ffffff;
+  /* Text on user-chosen colours (tags, branding): theme-fixed, same in light and dark. */
+  --ink-on-light: #12141c;
+  --ink-on-dark: #ffffff;
+  /* Trade SO/PO line table minimum width (E-D4, owner 2026-11-21) */
+  --doc-table-wide-min-w: 1100px;
+  /* CRM outbound email HTML preview height (compose-modal, email-detail-modal). */
+  --size-email-body-h: 360px;
+  /* Staff user modal: one fixed height for every tab (screen height minus 2 x 32, view-zoom aware). Coordinator 2026-11-21. */
+  --modal-user-h: calc(100dvh / var(--view-zoom, 1) - 4 * var(--space-16));
+}
+
+/* Web phone success button, dark theme: lighter steps of --success (like --icon-violet-hover in dark). */
+[data-theme="dark"] {
+  --success-hover: #3ccb88;
+  --success-pressed: #58d49a;
+}
+
+@theme inline {
+  /* Web phone (owner 2026-11-21). */
+  --spacing-phone-panel: var(--phone-panel-w);
+  --spacing-phone-popup: var(--phone-popup-w);
+  --spacing-phone-body: var(--phone-body-h);
+  --spacing-phone-bar: var(--phone-bar-h);
+  --spacing-phone-bar-w: var(--phone-bar-w);
+  --spacing-phone-reserve: var(--phone-reserve);
+  --spacing-phone-panel-reserve: var(--phone-panel-reserve);
+  --spacing-phone-dot: var(--phone-dot);
+  --spacing-icon-dot: var(--icon-dot);
+  --color-success-hover: var(--success-hover);
+  --color-success-pressed: var(--success-pressed);
+  --color-brand-whatsapp: var(--brand-whatsapp);
+  --color-brand-telegram: var(--brand-telegram);
+  --spacing-login-field: var(--login-field-h);
+  --spacing-login-btn: var(--login-btn-h);
+  --spacing-login-logo: var(--login-logo-h);
+  --spacing-nav-logo: var(--nav-logo-w);
+  --spacing-modal-activity: var(--modal-activity-w);
+  /* Record quick modal and full page (owner-approval pending). */
+  --spacing-modal-record: var(--modal-record-w);
+  --spacing-record-side: var(--record-side-w);
+  --spacing-card-title: var(--card-title-h);
+  --spacing-query-builder: var(--query-builder-max-h);
+  /* Workspace home (owner 2026-11-21) */
+  --shadow-app-card: var(--app-card-shadow);
+  /* Workspace home (owner 2026-11-21) */
+  --shadow-app-card-hover: var(--app-card-shadow-hover);
+  /* Workspace home (owner 2026-11-21) */
+  --spacing-app-skeleton-title: var(--app-skeleton-title-w);
+  /* Workspace home (owner 2026-11-21) */
+  --spacing-app-skeleton-text: var(--app-skeleton-text-w);
+  /* Workspace home (owner 2026-11-21) */
+  --spacing-app-skeleton-badge: var(--app-skeleton-badge-w);
+  /* Template designer (plan N1–N10, owner 2026-11-21) */
+  --spacing-ruler: var(--ruler-size);
+  --spacing-canvas-handle: var(--canvas-handle);
+  --spacing-email-col: var(--email-col-w);
+  --spacing-email-col-sm: var(--email-col-w-sm);
+  --color-paper: var(--template-paper);
+  --spacing-doc-table-wide: var(--doc-table-wide-min-w);
+  --color-ink-on-light: var(--ink-on-light);
+  --color-ink-on-dark: var(--ink-on-dark);
+  --spacing-email-body: var(--size-email-body-h);
+  /* Staff user modal (AGENTS "Staff user modal, height"). */
+  --spacing-modal-user: var(--modal-user-h);
+  /* Trade foundation tables: proportional column tracks (AGENTS "Trade foundation tables"). */
+  --definition-row-cols: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+  --version-row-cols: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.8fr) minmax(0, 1fr);
+  --version-row-actions-cols: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.9fr) minmax(0, 1.8fr);
+  --channel-row-cols: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
+  --account-row-cols: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1.2fr);
+  /* Trade automation tables: proportional column tracks (AGENTS "Trade automation tables"). */
+  --delivery-row-cols: minmax(0, 1.3fr) minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1.4fr);
+  --subscription-row-cols: minmax(0, 1.4fr) minmax(0, 2.2fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.7fr) minmax(0, 1.3fr);
+  --auto-tower-row-cols: minmax(0, 0.9fr) minmax(0, 1.55fr) minmax(0, 1.55fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.15fr);
+  --auto-tower-attempt-row-cols: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.55fr) minmax(0, 1.2fr) minmax(0, 1.4fr);
+  --auto-evidence-row-cols: minmax(0, 1fr) minmax(0, 1.6fr) var(--btn-h-sm);
+  --auto-ext-field-row-cols: minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.4fr);
+  --auto-ext-profile-row-cols: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.5fr) minmax(0, 1.4fr) minmax(0, 1.1fr);
+  --auto-ext-version-row-cols: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
+  --auto-import-mapping-row-cols: minmax(0, 1.5fr) minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+  --auto-import-mapping-version-row-cols: minmax(0, 0.65fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.6fr);
+  --auto-import-mapping-field-row-cols: minmax(0, 0.65fr) minmax(0, 1.6fr) var(--icon-tile-sm) minmax(0, 1.6fr) minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.6fr) var(--btn-h) var(--icon-tile-sm);
+  --auto-import-run-row-cols: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 0.8fr);
+  --auto-import-invalid-row-cols: minmax(0, 0.6fr) minmax(0, 1.2fr) minmax(0, 2fr);
+  --auto-import-result-row-cols: minmax(0, 0.65fr) minmax(0, 0.9fr) minmax(0, 1.3fr) minmax(0, 2fr) minmax(0, 1fr);
+}
+
+/* Tag chips use user-chosen colours from the API (CRM tags), bound inline. Approved data exception. */
+
+/* Data tables (leads and CRM settings) define per-table proportional column tracks with grid-cols-[minmax(...)…] / grid-template-columns using design-system tokens (--table-head-h, --select-col-w, --time-dd-w). Approved table layout exception. */
+
+/* Template Design UI (features/workspace/templates): own size tokens, same values as the tokens it used to borrow from other features (AGENTS "Template Design UI sizes", coordinator 2026-11-21). */
+:root {
+  --tpl-frame-field-w: 84px;
+  --tpl-rot-field-w: 74px;
+  --tpl-node-name-max-w: 108px;
+  --tpl-label-w: 108px;
+  --tpl-search-min-w: 108px;
+  --tpl-preview-h: 136px;
+  --tpl-list-short-max-h: 136px;
+  --tpl-list-max-h: 330px;
+  --tpl-aside-w: 330px;
+  --tpl-aside-preview-h: 330px;
+  --tpl-image-tile-h: 84px;
+  --tpl-filter-field-w: 280px;
+  --tpl-tooltip-max-w: 280px;
+  --tpl-skeleton-w: 280px;
+  --tpl-skeleton-w-sm: 136px;
+  --tpl-skeleton-chip-w: 44px;
+  --tpl-table-min-w: 860px;
+  --tpl-card-min-w: 280px;
+}
+
+@theme inline {
+  --spacing-tpl-frame-field: var(--tpl-frame-field-w);
+  --spacing-tpl-rot-field: var(--tpl-rot-field-w);
+  --spacing-tpl-node-name: var(--tpl-node-name-max-w);
+  --spacing-tpl-label: var(--tpl-label-w);
+  --spacing-tpl-search: var(--tpl-search-min-w);
+  --spacing-tpl-preview: var(--tpl-preview-h);
+  --spacing-tpl-list-short: var(--tpl-list-short-max-h);
+  --spacing-tpl-list: var(--tpl-list-max-h);
+  --spacing-tpl-aside: var(--tpl-aside-w);
+  --spacing-tpl-aside-preview: var(--tpl-aside-preview-h);
+  --spacing-tpl-image-tile: var(--tpl-image-tile-h);
+  --spacing-tpl-filter-field: var(--tpl-filter-field-w);
+  --spacing-tpl-tooltip: var(--tpl-tooltip-max-w);
+  --spacing-tpl-skeleton: var(--tpl-skeleton-w);
+  --spacing-tpl-skeleton-sm: var(--tpl-skeleton-w-sm);
+  --spacing-tpl-skeleton-chip: var(--tpl-skeleton-chip-w);
+  --spacing-tpl-table: var(--tpl-table-min-w);
+}
+
+/* Workspace billing and operations tables: proportional column tracks (AGENTS "Workspace billing and operations tables"). */
+:root {
+  --billing-invoice-row-cols: minmax(0, 1.3fr) minmax(0, 1.05fr) minmax(0, 1.15fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 1.7fr) minmax(0, 1.05fr) minmax(0, 1.1fr);
+  --billing-invoice-line-cols: minmax(0, 2.8fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 0.75fr) minmax(0, 1.25fr) minmax(0, 1.25fr);
+  --billing-ledger-row-cols: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1.8fr);
+  --billing-payment-row-cols: minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  --ops-activity-row-cols: minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1.65fr) minmax(0, 1.25fr) minmax(0, 1.7fr) minmax(0, 0.85fr) minmax(0, 1.05fr);
+}
+
+/* Workspace remaining tables: proportional column tracks (AGENTS "Workspace remaining tables"). */
+:root {
+  --billing-item-row-cols: minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1.1fr);
+  --billing-quote-row-cols: minmax(0, 1.8fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+  --ops-activation-row-cols: minmax(0, 2.4fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  --ops-audit-row-cols: minmax(0, 1.2fr) minmax(0, 1.25fr) minmax(0, 1.4fr) minmax(0, 1.55fr) minmax(0, 0.7fr) minmax(0, 0.85fr) minmax(0, 0.75fr);
+  --ops-audit-diff-cols: minmax(0, 0.9fr) minmax(0, 1.25fr) minmax(0, 1.25fr);
+  --ops-party-row-cols: minmax(0, 2.1fr) minmax(0, 2.2fr) minmax(0, 1.6fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 0.95fr) minmax(0, 0.95fr);
+  --ops-party-person-row-cols: minmax(0, 1.7fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.3fr);
+  --geo-country-row-cols: minmax(0, 1.6fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  --geo-state-row-cols: minmax(0, 1.6fr) minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  --geo-city-row-cols: minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+  --geo-district-row-cols: minmax(0, 1.6fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+  --geo-zone-row-cols: minmax(0, 1.6fr) minmax(0, 1.8fr) minmax(0, 2.4fr) minmax(0, 1fr);
+  --phone-server-row-cols: minmax(var(--time-dd-w), 0.55fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.65fr) minmax(0, 0.75fr);
+}
+
+/* Workspace staff/settings tables: proportional column tracks (AGENTS "Workspace staff/settings tables"). */
+:root {
+  --ws-holder-row-cols: minmax(0, 1.8fr) minmax(0, 0.9fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  --ws-migration-row-cols: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  --ws-addon-option-row-cols: minmax(0, 2.2fr) minmax(0, 1.7fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  --ws-addon-option-row-manage-cols: minmax(0, 2fr) minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1fr);
+  --ws-addon-assignment-row-cols: minmax(0, 2.4fr) minmax(0, 1.3fr) minmax(0, 1.2fr);
+  --ws-addon-assignment-row-manage-cols: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  --ws-currency-row-cols: minmax(0, 0.7fr) minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1.5fr) minmax(0, 1fr);
+  --ws-numbering-row-cols: minmax(0, 1.6fr) minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 0.6fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  --ws-tax-row-cols: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 1.5fr) minmax(0, 0.9fr);
+  --ws-update-row-cols: minmax(0, 1.7fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 1.1fr);
+  --staff-branch-row-cols: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr);
+  --staff-company-row-cols: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1fr);
+  --staff-department-row-cols: minmax(0, 0.9fr) minmax(0, 1.8fr) minmax(0, 1.6fr) minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1fr);
+  --staff-role-row-cols: minmax(0, 2.4fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.1fr);
+  --staff-team-row-cols: minmax(0, 0.8fr) minmax(0, 1.6fr) minmax(0, 1.6fr) minmax(0, 1.5fr) minmax(0, 0.7fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+  --staff-user-row-cols: minmax(0, 1.9fr) minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 0.9fr);
+  --staff-user-app-row-cols: minmax(0, 2fr) minmax(0, 1.2fr);
+  --staff-user-app-derived-row-cols: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  --staff-user-branch-row-cols: minmax(0, 1.6fr) minmax(0, 1.6fr) minmax(0, 1fr);
+  --staff-user-scope-row-cols: minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1fr);
+  --staff-user-team-row-cols: minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+/* Template Design UI tables and grids: proportional column tracks (AGENTS "Template Design UI sizes"). */
+:root {
+  --tpl-card-grid-cols: repeat(auto-fill, minmax(var(--tpl-card-min-w), 1fr));
+  --tpl-asset-row-cols: minmax(0,2fr) minmax(0,1.2fr) minmax(0,0.8fr) minmax(0,1fr) minmax(0,1.5fr) minmax(0,0.8fr) minmax(0,1fr);
+  --tpl-assignment-row-cols: minmax(0,2fr) minmax(0,1.4fr) minmax(0,1.1fr) minmax(0,1.7fr) minmax(0,0.8fr) minmax(0,0.8fr) minmax(0,0.7fr) minmax(0,1.5fr) minmax(0,0.9fr);
+  --tpl-function-row-cols: minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,0.9fr) minmax(0,1.1fr) minmax(0,1.1fr);
+  --tpl-function-version-row-cols: minmax(0,0.8fr) minmax(0,1.2fr) minmax(0,1.6fr) minmax(0,0.8fr);
+  --tpl-function-usage-row-cols: minmax(0,1.8fr) minmax(0,1fr) minmax(0,1fr);
+  --tpl-function-impact-row-cols: minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.2fr);
+  --tpl-library-row-cols: minmax(0,2fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);
+  --tpl-publish-summary-cols: minmax(max-content, 0.38fr) minmax(0, 1fr);
+  --tpl-recovery-row-cols: minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,0.8fr) minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,0.8fr);
+  --tpl-validation-row-cols: minmax(0, 0.15fr) minmax(0, 1fr) minmax(0, 0.32fr);
+  --tpl-validation-row-validate-cols: minmax(0, 0.15fr) minmax(0, 1fr) minmax(0, 0.28fr) minmax(0, 0.2fr);
+  --tpl-version-row-cols: minmax(0,0.9fr) minmax(0,1.2fr) minmax(0,2fr) minmax(0,0.9fr);
+}
+
+/* Trade tables, remaining: proportional column tracks (AGENTS "Trade tables, remaining"). */
+:root {
+  --trade-doc-quotation-row-cols: var(--select-col-w) minmax(0, 1.45fr) minmax(0, 2.2fr) minmax(0, 1.1fr) minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(0, 1.1fr) var(--time-dd-w);
+  --trade-doc-sales-order-row-cols: var(--select-col-w) minmax(0, 1.5fr) minmax(0, 2.2fr) minmax(0, 1.7fr) minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1.15fr) var(--time-dd-w);
+  --trade-doc-purchase-order-row-cols: var(--select-col-w) minmax(0, 1.4fr) minmax(0, 2.1fr) minmax(0, 1.05fr) minmax(0, 1.3fr) minmax(0, 1.35fr) minmax(0, 1.5fr) minmax(0, 1.1fr) var(--time-dd-w);
+  --trade-doc-purchase-quotation-row-cols: var(--select-col-w) minmax(0, 1.5fr) minmax(0, 2.2fr) minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1.15fr) var(--time-dd-w);
+  --trade-item-channel-row-actions-cols: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.1fr) var(--table-head-h);
+  --trade-unit-row-actions-cols: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1fr) var(--table-head-h);
+  --trade-unit-row-cols: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 1fr);
+  --trade-company-default-row-cols: minmax(0, 0.85fr) minmax(0, 0.65fr) minmax(0, 2.2fr) minmax(0, 1.2fr);
+  --trade-doc-profile-row-actions-cols: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1.6fr) minmax(0, 1.7fr) minmax(0, 0.8fr) var(--table-head-h);
+  --trade-governance-skeleton-row-cols: minmax(0, 1.5fr) minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 1fr) var(--btn-h-sm);
+  --trade-policy-row-cols: minmax(0, 1.5fr) minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(0, 1.05fr) minmax(0, 0.55fr) var(--btn-h-sm);
+  --trade-policy-test-input-row-cols: minmax(0, 1.35fr) minmax(0, 1.45fr) var(--btn-h-sm);
+  --trade-policy-test-split-cols: minmax(0, 1.4fr) minmax(0, 1fr);
+  --trade-policy-test-result-row-actions-cols: minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.75fr) var(--btn-h-sm);
+  --trade-policy-test-result-row-cols: minmax(0, 1fr) minmax(0, 1.9fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.75fr);
+  --trade-policy-test-row-actions-cols: minmax(0, 1.1fr) minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 1.1fr) var(--btn-h-sm);
+  --trade-policy-test-row-cols: minmax(0, 1.1fr) minmax(0, 2.2fr) minmax(0, 1.1fr) minmax(0, 1.1fr);
+  --trade-price-book-detail-row-cols: minmax(0, 2fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 1.2fr);
+  --trade-price-book-row-actions-cols: minmax(0, 2.2fr) minmax(0, 0.85fr) minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1.8fr) minmax(0, 0.75fr) minmax(0, 0.85fr) minmax(0, 0.8fr) var(--table-head-h);
+  --trade-price-diff-entry-row-cols: minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.1fr) var(--table-row-h) minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 0.95fr);
+  --trade-price-diff-promo-row-cols: minmax(0, 1.8fr) minmax(0, 0.9fr) minmax(0, 1.8fr);
+  --trade-price-promo-row-actions-cols: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 0.7fr) var(--table-head-h);
+  --trade-profile-system-case-row-cols: minmax(0, 2.2fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  --trade-profile-case-row-cols: minmax(0, 1.3fr) minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  --trade-profile-case-row-actions-cols: minmax(0, 1.3fr) minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.9fr) var(--table-head-h);
+  --trade-profile-field-row-cols: minmax(0, 1.8fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.9fr);
+  --trade-profile-evidence-row-cols: minmax(0, 2fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  --trade-profile-layout-row-cols: var(--select-col-w) minmax(0, 0.7fr) minmax(0, 1.8fr) minmax(0, 0.9fr) minmax(0, 1.6fr);
+  --trade-profile-layout-row-actions-cols: var(--select-col-w) minmax(0, 0.7fr) minmax(0, 1.8fr) minmax(0, 0.9fr) minmax(0, 1.6fr) var(--table-head-h);
+  --trade-rule-condition-row-cols: var(--time-dd-w) minmax(0, 1.55fr) minmax(0, 0.95fr) minmax(0, 1.25fr) var(--btn-h-sm);
+  --trade-workflow-transition-row-cols: minmax(0, 1.55fr) minmax(0, 0.95fr) minmax(0, 0.95fr) minmax(0, 0.95fr) minmax(0, 0.75fr);
+  --trade-workflow-transition-row-actions-cols: minmax(0, 1.55fr) minmax(0, 0.95fr) minmax(0, 0.95fr) minmax(0, 0.95fr) minmax(0, 0.75fr) var(--table-head-h);
+  --trade-workflow-test-result-row-actions-cols: minmax(0, 1.1fr) minmax(0, 0.85fr) minmax(0, 1.85fr) minmax(0, 0.85fr) minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 0.65fr) var(--table-head-h);
+  --trade-workflow-test-result-row-cols: minmax(0, 1.1fr) minmax(0, 0.85fr) minmax(0, 1.95fr) minmax(0, 0.85fr) minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 0.65fr);
+  --trade-workflow-test-row-actions-cols: minmax(0, 1.2fr) minmax(0, 0.95fr) minmax(0, 2.2fr) minmax(0, 0.95fr) var(--table-head-h);
+  --trade-workflow-test-row-cols: minmax(0, 1.2fr) minmax(0, 0.95fr) minmax(0, 2.4fr) minmax(0, 0.95fr);
+  --trade-workflow-row-actions-cols: minmax(0, 1.5fr) minmax(0, 1.05fr) minmax(0, 1.35fr) minmax(0, 1.05fr) minmax(0, 0.55fr) var(--table-head-h);
+  --trade-inv-availability-row-cols: minmax(0,2.3fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.25fr) minmax(0,0.9fr) minmax(0,0.9fr) minmax(0,0.65fr) minmax(0,1.15fr);
+  --trade-inv-decision-row-actions-cols: minmax(0,1.1fr) minmax(0,1.2fr) minmax(0,0.85fr) minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,1fr) var(--table-head-h);
+  --trade-inv-movement-row-actions-cols: minmax(0,1.15fr) minmax(0,1.05fr) minmax(0,1.75fr) minmax(0,1.05fr) minmax(0,0.95fr) minmax(0,0.9fr) minmax(0,1.05fr) minmax(0,1fr) var(--table-head-h);
+  --trade-inv-node-row-actions-cols: minmax(0,1fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,1.7fr) minmax(0,1.2fr) minmax(0,0.9fr) var(--table-head-h);
+  --trade-inv-period-row-actions-cols: minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,0.9fr) minmax(0,0.6fr) minmax(0,1fr) minmax(0,0.8fr) minmax(0,1.5fr) minmax(0,1.2fr) var(--table-head-h);
+  --trade-inv-serial-row-actions-cols: minmax(0,1.4fr) minmax(0,2.2fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.2fr) var(--table-head-h);
+  --trade-inv-uom-conversion-row-actions-cols: minmax(0,2.2fr) minmax(0,1.8fr) minmax(0,0.8fr) minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,1.2fr) var(--table-head-h);
+  --trade-reason-row-actions-cols: minmax(0, 1.4fr) minmax(0, 2.2fr) minmax(0, 0.9fr) minmax(0, 0.6fr) minmax(0, 1.3fr) var(--table-head-h);
+  --trade-reason-row-cols: minmax(0, 1.4fr) minmax(0, 2.2fr) minmax(0, 0.9fr) minmax(0, 0.6fr) minmax(0, 1.3fr);
+  --trade-term-extended-row-actions-cols: minmax(0, 0.85fr) minmax(0, 1.45fr) minmax(0, 1.85fr) minmax(0, 0.8fr) minmax(0, 0.7fr) minmax(0, 0.85fr) minmax(0, 0.85fr) var(--table-head-h);
+  --trade-term-row-actions-cols: minmax(0, 0.9fr) minmax(0, 1.5fr) minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.85fr) minmax(0, 0.85fr) var(--table-head-h);
+  --trade-item-row-cols: calc(var(--table-row-h) + var(--space-16)) minmax(0, 2.2fr) minmax(0, 0.9fr) minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.1fr) var(--table-head-h);
+  --trade-item-company-row-cols: calc(var(--table-row-h) + var(--space-16)) minmax(0, 2.2fr) minmax(0, 0.9fr) minmax(0, 1.6fr) minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr) var(--table-head-h);
+  --trade-price-line-row-cols: var(--table-row-h) minmax(0, 2.3fr) minmax(0, 1.05fr) minmax(0, 0.85fr) minmax(0, 0.85fr) minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.75fr);
+  --trade-price-line-cost-col: minmax(0, 1fr);
+  --trade-price-line-actions-col: calc(var(--btn-h-sm) * 2 + var(--space-12));
+  /* CRM settings tables: named column tracks (utilities in utilities.css). */
+  --crm-custom-field-row-cols: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.3fr) minmax(0, 0.8fr);
+  --crm-duplicate-row-cols: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.2fr);
+  --crm-lead-source-row-cols: var(--time-dd-w) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 0.8fr);
+  --crm-outbound-email-row-cols: minmax(0, 2.2fr) minmax(0, 1.5fr) minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 1.4fr);
+  --crm-reason-row-cols: minmax(0, 1.2fr) minmax(0, 1.7fr) minmax(0, 2fr) minmax(0, 0.55fr) minmax(0, 1.5fr);
+  --crm-reason-outcome-row-cols: minmax(0, 1.1fr) minmax(0, 1.5fr) minmax(0, 1.6fr) minmax(0, 0.85fr) minmax(0, 0.95fr) minmax(0, 0.55fr) minmax(0, 1.5fr);
+  --crm-static-data-row-cols: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 2fr);
+  /* CRM card grids and shared rows: named column tracks (utilities in utilities.css). */
+  --kanban-cards-cols: repeat(auto-fill, minmax(var(--kanban-col-min), 1fr));
+  --qb-condition-row-cols: var(--qb-field-w) var(--qb-op-w) minmax(0, 1fr) var(--icon-tile-sm);
+  --call-log-party-row-cols: minmax(0, 1.15fr) minmax(0, 1.35fr) minmax(0, 1.45fr) minmax(0, 0.7fr);
+  --call-log-owner-row-cols: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 1.45fr) minmax(0, 0.7fr);
+  --record-attachment-row-cols: minmax(0, 2.5fr) minmax(0, 0.8fr) minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 1.3fr) calc(var(--table-head-h) * 2);
+  --swatch-grid-cols: repeat(6, var(--badge-h));
+}

@@ -1,0 +1,253 @@
+<div
+  #barEl
+  class="flex flex-wrap items-end justify-between gap-x-10 gap-y-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+  [style.--spacing-field]="compact() ? 'var(--field-h-compact)' : null"
+  [style.--field-h]="compact() ? 'var(--field-h-compact)' : null"
+  [style.--spacing-label]="compact() ? 'var(--label-h-compact)' : null"
+  [style.--label-h]="compact() ? 'var(--label-h-compact)' : null"
+>
+  <div
+    class="grid min-w-0 flex-1 items-start gap-x-10"
+    [class]="gridColsClass() + (compact() ? ' gap-y-6' : ' gap-y-8')"
+  >
+    <ui-field
+      size="bare"
+      [for]="uid + '-period'"
+      [label]="'dashFilters.period' | transloco"
+      [hint]="'dashFilters.periodHint' | transloco"
+    >
+      <ui-date-range
+        [id]="uid + '-period'"
+        [describedBy]="uid + '-period-hint'"
+        [ariaLabel]="'dashFilters.period' | transloco"
+        [months]="1"
+        [withTime]="false"
+        [today]="fakeNow"
+        [value]="value().period"
+        (valueChange)="onPeriodChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-compare'"
+      [label]="'dashFilters.compare' | transloco"
+      [hint]="'dashFilters.compareHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-compare'"
+        [describedBy]="uid + '-compare-hint'"
+        [label]="'dashFilters.compare' | transloco"
+        [options]="compareOptions()"
+        [value]="value().compare"
+        (valueChange)="onCompareChange($event)"
+      />
+    </ui-field>
+
+    @if (showScope()) {
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope'"
+        [label]="'dashFilters.scope' | transloco"
+        [hint]="'dashFilters.scopeHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          icon="tablerUser"
+          [id]="uid + '-scope'"
+          [describedBy]="uid + '-scope-hint'"
+          [label]="'dashFilters.scope' | transloco"
+          [options]="scopeOptions()"
+          [value]="value().scope"
+          (valueChange)="onScopeChange($event)"
+        />
+      </ui-field>
+    }
+
+    @if (showTeamsField()) {
+      <ui-field
+        size="bare"
+        [for]="uid + '-teams'"
+        [label]="'dashFilters.teams' | transloco"
+        [hint]="'dashFilters.teamsHint' | transloco"
+      >
+        <div class="relative min-w-0">
+          <div #teamsBox [class]="multiBoxClasses('teams')" (click)="openPicker('teams')">
+            @for (team of selectedTeams(); track team.id) {
+              <span class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                <span class="truncate">{{ team.name }}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'dashFilters.removeItem' | transloco: { name: team.name }"
+                  [title]="'dashFilters.removeItem' | transloco: { name: team.name }"
+                  (click)="$event.stopPropagation(); removeMultiItem('teams', team.id)"
+                >
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                </button>
+              </span>
+            }
+
+            <input
+              #teamsInput
+              [id]="uid + '-teams'"
+              type="text"
+              role="combobox"
+              autocomplete="off"
+              aria-autocomplete="list"
+              class="h-chip min-w-time-dd flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [attr.aria-label]="'dashFilters.teams' | transloco"
+              [attr.aria-describedby]="uid + '-teams-hint'"
+              [attr.aria-expanded]="openMulti() === 'teams'"
+              [attr.aria-controls]="openMulti() === 'teams' ? uid + '-teams-list' : null"
+              [attr.aria-activedescendant]="multiActiveDescendant('teams')"
+              [placeholder]="selectedTeams().length === 0 ? ('dashFilters.allTeams' | transloco) : ''"
+              [value]="teamsQuery()"
+              (focus)="openPicker('teams')"
+              (input)="onMultiInput('teams', $event)"
+              (keydown)="onMultiKeydown('teams', $event)"
+            />
+          </div>
+
+          @if (openMulti() === 'teams') {
+            <ul
+              #teamsList
+              [id]="uid + '-teams-list'"
+              role="listbox"
+              aria-multiselectable="true"
+              class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+              [class.invisible]="!menuPlaced()"
+              [style.top.px]="menuPlace().top"
+              [style.inset-inline-start.px]="menuPlace().start"
+              [style.min-width.px]="menuPlace().width"
+              [style.max-height.px]="menuPlace().maxHeight"
+              [attr.aria-label]="'dashFilters.teams' | transloco"
+              (mousedown)="$event.preventDefault()"
+            >
+              @for (item of filteredTeams(); track item.id; let idx = $index) {
+                <li
+                  [id]="multiOptionId('teams', idx)"
+                  role="option"
+                  [attr.aria-selected]="isMultiSelected('teams', item.id)"
+                  class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+                  [class]="multiRowClasses('teams', item.id, idx)"
+                  (mouseenter)="activeIndex.set(idx)"
+                  (click)="toggleMultiOption('teams', item.id)"
+                >
+                  <span class="truncate">{{ item.name }}</span>
+                  @if (isMultiSelected('teams', item.id)) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                  }
+                </li>
+              }
+              @if (filteredTeams().length === 0) {
+                <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+                  {{ 'dashFilters.noMatches' | transloco }}
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </ui-field>
+    }
+
+    @if (showBranchesField()) {
+      <ui-field
+        size="bare"
+        [for]="uid + '-branches'"
+        [label]="'dashFilters.branches' | transloco"
+        [hint]="'dashFilters.branchesHint' | transloco"
+      >
+        <div class="relative min-w-0">
+          <div #branchesBox [class]="multiBoxClasses('branches')" (click)="openPicker('branches')">
+            @for (branch of selectedBranches(); track branch.id) {
+              <span class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                <span class="truncate">{{ branch.name }}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'dashFilters.removeItem' | transloco: { name: branch.name }"
+                  [title]="'dashFilters.removeItem' | transloco: { name: branch.name }"
+                  (click)="$event.stopPropagation(); removeMultiItem('branches', branch.id)"
+                >
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                </button>
+              </span>
+            }
+
+            <input
+              #branchesInput
+              [id]="uid + '-branches'"
+              type="text"
+              role="combobox"
+              autocomplete="off"
+              aria-autocomplete="list"
+              class="h-chip min-w-time-dd flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [attr.aria-label]="'dashFilters.branches' | transloco"
+              [attr.aria-describedby]="uid + '-branches-hint'"
+              [attr.aria-expanded]="openMulti() === 'branches'"
+              [attr.aria-controls]="openMulti() === 'branches' ? uid + '-branches-list' : null"
+              [attr.aria-activedescendant]="multiActiveDescendant('branches')"
+              [placeholder]="selectedBranches().length === 0 ? ('dashFilters.allBranches' | transloco) : ''"
+              [value]="branchesQuery()"
+              (focus)="openPicker('branches')"
+              (input)="onMultiInput('branches', $event)"
+              (keydown)="onMultiKeydown('branches', $event)"
+            />
+          </div>
+
+          @if (openMulti() === 'branches') {
+            <ul
+              #branchesList
+              [id]="uid + '-branches-list'"
+              role="listbox"
+              aria-multiselectable="true"
+              class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+              [class.invisible]="!menuPlaced()"
+              [style.top.px]="menuPlace().top"
+              [style.inset-inline-start.px]="menuPlace().start"
+              [style.min-width.px]="menuPlace().width"
+              [style.max-height.px]="menuPlace().maxHeight"
+              [attr.aria-label]="'dashFilters.branches' | transloco"
+              (mousedown)="$event.preventDefault()"
+            >
+              @for (item of filteredBranches(); track item.id; let idx = $index) {
+                <li
+                  [id]="multiOptionId('branches', idx)"
+                  role="option"
+                  [attr.aria-selected]="isMultiSelected('branches', item.id)"
+                  class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+                  [class]="multiRowClasses('branches', item.id, idx)"
+                  (mouseenter)="activeIndex.set(idx)"
+                  (click)="toggleMultiOption('branches', item.id)"
+                >
+                  <span class="truncate">{{ item.name }}</span>
+                  @if (isMultiSelected('branches', item.id)) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                  }
+                </li>
+              }
+              @if (filteredBranches().length === 0) {
+                <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+                  {{ 'dashFilters.noMatches' | transloco }}
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </ui-field>
+    }
+  </div>
+
+  <button type="button" uiButton variant="ghost" class="ms-auto shrink-0 self-end" (click)="openWhy.emit()">
+    <ng-icon name="tablerHelpCircle" size="15" aria-hidden="true" />
+    <span>{{ 'dashFilters.why' | transloco }}</span>
+  </button>
+
+  @if (partialAccess()) {
+    <p role="status" class="basis-full text-12 leading-16 text-text-muted">{{ 'dashFilters.partialAccess' | transloco }}</p>
+  }
+</div>

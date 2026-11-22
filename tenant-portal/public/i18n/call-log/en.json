@@ -1,0 +1,62 @@
+{
+  "tableLabel": "Call log",
+  "types": {
+    "IN_ANS": "Incoming",
+    "IN_NOANS": "Missed",
+    "IN_BUSY": "Declined",
+    "OUT_ANS": "Outgoing",
+    "OUT_NOANS": "No answer",
+    "OUT_BUSY": "Busy",
+    "OUT": "Outgoing"
+  },
+  "cols": {
+    "type": "Type",
+    "party": "Name / number",
+    "owner": "User",
+    "date": "Date & time",
+    "duration": "Duration",
+    "actions": "Actions"
+  },
+  "filters": {
+    "type": {
+      "label": "Type",
+      "hint": "Show only these kinds of call.",
+      "all": "All types"
+    },
+    "from": {
+      "label": "From",
+      "hint": "Calls that started on or after this day.",
+      "placeholder": "Any day"
+    },
+    "to": {
+      "label": "To",
+      "hint": "Calls that started on or before this day.",
+      "placeholder": "Any day"
+    },
+    "search": {
+      "label": "Number or name",
+      "hint": "Part of the number or the contact's name.",
+      "placeholder": "Number or name"
+    },
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "states": {
+    "empty": "No calls yet",
+    "noMatch": "No calls match these filters",
+    "error": "Could not load calls"
+  },
+  "actions": {
+    "callBack": "Call back",
+    "inCall": "You are in a call",
+    "retry": "Retry",
+    "clearAll": "Clear all",
+    "clearFilters": "Clear filters",
+    "removeFilter": "Remove filter"
+  },
+  "numberMatch": {
+    "label": "Number match",
+    "hint": "Linked because the number matches."
+  }
+}

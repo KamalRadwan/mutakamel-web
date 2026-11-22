@@ -1,0 +1,94 @@
+<ui-modal
+  size="form"
+  icon="tablerGitBranch"
+  tile="bg-icon-teal"
+  [title]="'workflows.createModal.title' | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <form class="flex flex-col gap-12" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      [label]="'workflows.createModal.codeLabel' | transloco"
+      [required]="true"
+      [for]="'wf-create-code'"
+      [hint]="'workflows.createModal.codeHint' | transloco"
+      [hintText]="'workflows.createModal.codePatternHint' | transloco"
+      [error]="codeError()"
+    >
+      <input
+        id="wf-create-code"
+        type="text"
+        dir="ltr"
+        maxlength="100"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'workflows.createModal.codePlaceholder' | transloco"
+        [value]="code()"
+        [disabled]="saving()"
+        [attr.aria-invalid]="codeError() ? 'true' : null"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'workflows.createModal.kindLabel' | transloco"
+      [for]="'wf-create-kind'"
+      [hint]="'workflows.createModal.kindHint' | transloco"
+      [hintText]="'workflows.createModal.kindHint' | transloco"
+    >
+      <input
+        id="wf-create-kind"
+        type="text"
+        readonly
+        tabindex="-1"
+        class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+        [value]="kindDisplay()"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'workflows.createModal.scopeLabel' | transloco"
+      [for]="'wf-create-scope'"
+      [hint]="'workflows.createModal.scopeHint' | transloco"
+    >
+      <input
+        id="wf-create-scope"
+        type="text"
+        readonly
+        tabindex="-1"
+        class="w-full cursor-default bg-transparent text-12 text-text-muted outline-none"
+        [value]="scopeDisplay()"
+      />
+    </ui-field>
+  </form>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="submit()"
+    >
+      {{ 'workflows.createModal.create' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="warning"
+  [title]="'workflows.createModal.discardTitle' | transloco"
+  [text]="'workflows.createModal.discardText' | transloco"
+  [confirmLabel]="'workflows.createModal.discardConfirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>

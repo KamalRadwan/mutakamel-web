@@ -1,0 +1,94 @@
+{
+  "format": {
+    "label": "Preview type",
+    "html": "HTML",
+    "pdf": "PDF",
+    "email": "Email",
+    "text": "Text"
+  },
+  "source": {
+    "label": "Source",
+    "hint": "The saved draft or a published version.",
+    "draft": "Saved draft · r{{rev}}",
+    "draftSaveFirst": "Saved draft · r{{rev}} · Save first",
+    "version": "Version {{n}} · {{date}}",
+    "saveFirst": "Save first"
+  },
+  "fixture": {
+    "label": "Sample data",
+    "hint": "Made-up data used only for previews.",
+    "empty": "No sample data available"
+  },
+  "width": {
+    "label": "Preview width",
+    "hint": "Width of the email preview: desktop 600 px or mobile 320 px."
+  },
+  "zoom": {
+    "label": "Zoom",
+    "fit": "Fit width",
+    "pct": "{{n}}%"
+  },
+  "again": "Generate again",
+  "download": "Download PDF",
+  "email": {
+    "subject": "Subject",
+    "preheader": "Preheader"
+  },
+  "frame": {
+    "htmlTitle": "Template HTML preview",
+    "emailTitle": "Template email preview",
+    "pdfTitle": "Template PDF preview",
+    "textLabel": "Plain-text email preview"
+  },
+  "state": {
+    "generating": "Generating the PDF…",
+    "attempt": "Attempt {{n}} of 3",
+    "slow": "This is taking longer than usual.",
+    "checkAgain": "Check again",
+    "failed": "The PDF could not be generated.",
+    "expired": "This preview has expired.",
+    "invalid": "The saved draft has errors that stop the preview.",
+    "openValidation": "Open validation",
+    "compiler": "This design could not be prepared for preview.",
+    "unavailable": "The preview service is unavailable right now.",
+    "reference": "Support reference: {{id}}",
+    "saveFirstHint": "Save your changes first to preview the saved draft, or select a published version.",
+    "previewDisabled": "Preview is not available for this template right now.",
+    "openOverview": "Open overview",
+    "openDesign": "Open design",
+    "previewLatestVersion": "Preview latest version"
+  },
+  "badge": {
+    "ready": "Ready",
+    "generating": "Generating",
+    "failed": "Failed",
+    "expired": "Expired"
+  },
+  "status": {
+    "generated": "Generated {{at}} · available until {{until}}",
+    "generatedHtml": "Generated {{at}}",
+    "page": "Page {{i}} of {{n}}",
+    "onePage": "1 page",
+    "manyPages": "{{count}} pages",
+    "overflowReject": "Overflow: reject",
+    "prevPage": "Previous page",
+    "nextPage": "Next page",
+    "widthPx": "{{w}} px",
+    "customPaper": "{{w}} × {{h}} mm",
+    "paperLetter": "Letter"
+  },
+  "toast": {
+    "warningOne": "The preview has 1 warning.",
+    "warnings": "The preview has {{n}} warnings.",
+    "stale": "The saved draft changed. The preview was refreshed.",
+    "tooLarge": "The preview is too large.",
+    "outOfPage": "Some objects are outside the page. Fix them in Design.",
+    "incompatible": "This preview type does not suit this template.",
+    "tooMany": "You already have three PDF previews running. Wait for one to finish."
+  },
+  "fixtures": {
+    "salesStandardEn": "Standard quotation",
+    "salesStandardAr": "Standard quotation",
+    "salesLong48En": "Long quotation · 48 items"
+  }
+}

@@ -1,0 +1,575 @@
+@if (loading()) {
+  <div class="flex flex-col gap-12" aria-busy="true">
+    <div class="flex flex-col gap-10 rounded-12 border border-border bg-surface p-10 shadow-card">
+      <div class="flex items-center gap-10">
+        <span class="size-icon-tile rounded-8 bg-neutral-soft"></span>
+        <div class="flex flex-1 flex-col gap-4">
+          <span class="h-skeleton-line w-1/3 rounded-6 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/4 rounded-6 bg-neutral-soft"></span>
+        </div>
+        <span class="h-btn w-1/4 rounded-8 bg-neutral-soft"></span>
+      </div>
+      <div class="h-btn w-full rounded-8 bg-neutral-soft"></div>
+    </div>
+    <div class="h-field w-full rounded-12 bg-neutral-soft"></div>
+    <div class="h-btn w-2/3 rounded-12 bg-neutral-soft"></div>
+  </div>
+} @else if (loadFailed() || !detail()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-12 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-danger-text">{{ 'workflows.version.loadFailed' | transloco }}</p>
+    <div class="flex items-center gap-8">
+      <button type="button" uiButton variant="secondary" (click)="reload()">
+        {{ 'workflows.version.retry' | transloco }}
+      </button>
+      <button type="button" uiButton variant="ghost" (click)="goBack()">
+        {{ 'workflows.version.back' | transloco }}
+      </button>
+    </div>
+  </div>
+} @else {
+  @let ver = detail()!;
+  @let stepState = stepperState();
+
+  <header class="flex flex-col gap-10 rounded-12 border border-border bg-surface p-10 shadow-card">
+    <div class="flex flex-wrap items-center justify-between gap-10">
+      <div class="flex min-w-0 items-center gap-8">
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          size="small"
+          [attr.aria-label]="'workflows.version.back' | transloco"
+          [title]="'workflows.version.back' | transloco"
+          (click)="goBack()"
+        >
+          <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+
+        <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+          <ng-icon name="tablerGitBranch" size="15" aria-hidden="true" />
+        </span>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <div class="flex flex-wrap items-center gap-8">
+            <h1 class="truncate text-15 leading-22 font-medium text-text">
+              <bdi dir="ltr">{{ ver.definition.code }}</bdi>
+              <span> · {{ 'workflows.version.versionNumber' | transloco: { n: ver.versionNumber } }}</span>
+            </h1>
+            <app-version-status-badge
+              module="policy"
+              [status]="ver.status"
+              [liveScheduled]="isLiveScheduledVersion(ver)"
+              [awaitingActivation]="ver.status === 'APPROVED'"
+            />
+            @if (dirty()) {
+              <span class="inline-flex items-center gap-6 text-12 leading-18 text-text-muted">
+                <span class="size-unread-dot shrink-0 rounded-full bg-warning" aria-hidden="true"></span>
+                <span>{{ 'workflows.version.unsavedLabel' | transloco }}</span>
+              </span>
+            }
+          </div>
+          <p class="truncate text-12 leading-18 text-text-muted">
+            {{ subtitleText() }}
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-8">
+        @if (editable()) {
+          @if (dirty()) {
+            <button
+              type="button"
+              uiButton
+              variant="ghost"
+              [disabled]="saving() || busyAction() !== null"
+              (click)="undoChanges()"
+            >
+              {{ 'workflows.version.undo' | transloco }}
+            </button>
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [loading]="saving()"
+              [disabled]="saving() || busyAction() !== null"
+              (click)="saveDraft()"
+            >
+              <ng-icon name="tablerDeviceFloppy" size="15" aria-hidden="true" />
+              <span>{{ 'workflows.version.save' | transloco }}</span>
+            </button>
+          }
+
+          <button
+            type="button"
+            uiButton
+            [variant]="!dirty() && !validatedCurrent() ? 'primary' : 'secondary'"
+            [loading]="busyAction() === 'validate'"
+            [disabled]="saving() || busyAction() !== null"
+            (click)="runValidate()"
+          >
+            <ng-icon name="tablerCircleCheck" size="15" aria-hidden="true" />
+            <span>{{ 'workflows.version.validate' | transloco }}</span>
+          </button>
+
+          @if (canTest) {
+            <button
+              type="button"
+              uiButton
+              [variant]="!dirty() && validatedCurrent() ? 'primary' : 'secondary'"
+              [loading]="busyAction() === 'test'"
+              [disabled]="saving() || busyAction() !== null"
+              (click)="runTestsAction()"
+            >
+              <ng-icon name="tablerFlask" size="15" aria-hidden="true" />
+              <span>{{ 'workflows.version.runTests' | transloco }}</span>
+            </button>
+          }
+        } @else if (ver.status === 'TESTED' && canManage) {
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            [loading]="busyAction() === 'submit'"
+            [disabled]="busyAction() !== null"
+            (click)="runSubmit()"
+          >
+            <ng-icon name="tablerSend" size="15" aria-hidden="true" />
+            <span>{{ 'workflows.version.submit' | transloco }}</span>
+          </button>
+        } @else if (ver.status === 'APPROVAL_PENDING') {
+          @if (canApprove) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [disabled]="approveDisabledByMakerChecker() || busyAction() !== null"
+              [title]="approveDisabledByMakerChecker() ? ('governance.makerChecker.self' | transloco) : ''"
+              (click)="openRejectDialog()"
+            >
+              <ng-icon name="tablerX" size="15" aria-hidden="true" />
+              <span>{{ 'workflows.version.reject' | transloco }}</span>
+            </button>
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              [loading]="busyAction() === 'approve'"
+              [disabled]="approveDisabledByMakerChecker() || busyAction() !== null"
+              [title]="approveDisabledByMakerChecker() ? ('governance.makerChecker.self' | transloco) : ''"
+              (click)="runApprove()"
+            >
+              <ng-icon name="tablerCheck" size="15" aria-hidden="true" />
+              <span>{{ 'workflows.version.approve' | transloco }}</span>
+            </button>
+          }
+        } @else if (ver.status === 'APPROVED' && canPublish) {
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            [loading]="busyAction() === 'publish'"
+            [disabled]="publishDisabledByMakerChecker() || busyAction() !== null"
+            [title]="publishDisabledByMakerChecker() ? ('governance.makerChecker.self' | transloco) : ''"
+            (click)="openPublishDialog()"
+          >
+            <ng-icon name="tablerCheck" size="15" aria-hidden="true" />
+            <span>{{ 'workflows.version.publish' | transloco }}</span>
+          </button>
+        }
+
+        @if (moreActions().length > 0) {
+          <ui-actions-menu
+            [items]="moreActions()"
+            [label]="'workflows.version.moreActions' | transloco"
+            (selected)="onMoreAction($event)"
+          />
+        }
+      </div>
+    </div>
+
+    <app-lifecycle-stepper
+      [steps]="lifecycleSteps()"
+      [current]="stepState.current"
+      [failedKey]="stepState.failedKey"
+      [label]="'workflows.version.steps.label' | transloco"
+    />
+  </header>
+
+  <section class="rounded-12 border border-border bg-surface p-10 shadow-card">
+    <div class="grid gap-10 desktop:grid-cols-2">
+      @if (editable()) {
+        <ui-field
+          size="bare"
+          [label]="'workflows.version.effectiveFrom' | transloco"
+          [required]="true"
+          [for]="'wf-ver-eff-from'"
+          [hint]="'workflows.version.effectiveFromHint' | transloco"
+          [error]="effFromError()"
+        >
+          <div class="flex flex-wrap items-center gap-6">
+            <div class="min-w-0 flex-1">
+              <ui-date-field
+                id="wf-ver-eff-from"
+                [ariaLabel]="'workflows.version.effectiveFrom' | transloco"
+                [todayLabel]="'workflows.version.today' | transloco"
+                [prevMonthLabel]="'workflows.version.prevMonth' | transloco"
+                [nextMonthLabel]="'workflows.version.nextMonth' | transloco"
+                [value]="effFromDate()"
+                [invalid]="!!effFromError()"
+                [disabled]="!editable() || saving()"
+                (valueChange)="onEffFromDateChange($event)"
+              />
+            </div>
+            <ui-time-field
+              id="wf-ver-eff-from-time"
+              [ariaLabel]="'workflows.version.effectiveFrom' | transloco"
+              [hourLabel]="'workflows.version.hour' | transloco"
+              [minuteLabel]="'workflows.version.minute' | transloco"
+              [value]="effFromTime()"
+              [invalid]="!!effFromError()"
+              [disabled]="!editable() || saving() || !effFromDate()"
+              (valueChange)="onEffFromTimeChange($event)"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'workflows.version.effectiveTo' | transloco"
+          [for]="'wf-ver-eff-to'"
+          [hint]="'workflows.version.effectiveToHint' | transloco"
+          [error]="effToError()"
+        >
+          <div class="flex flex-wrap items-center gap-6">
+            <div class="min-w-0 flex-1">
+              <ui-date-field
+                id="wf-ver-eff-to"
+                [ariaLabel]="'workflows.version.effectiveTo' | transloco"
+                [todayLabel]="'workflows.version.today' | transloco"
+                [prevMonthLabel]="'workflows.version.prevMonth' | transloco"
+                [nextMonthLabel]="'workflows.version.nextMonth' | transloco"
+                [min]="effFromDate()"
+                [value]="effToDate()"
+                [invalid]="!!effToError()"
+                [disabled]="!editable() || saving()"
+                (valueChange)="onEffToDateChange($event)"
+              />
+            </div>
+            <ui-time-field
+              id="wf-ver-eff-to-time"
+              [ariaLabel]="'workflows.version.effectiveTo' | transloco"
+              [hourLabel]="'workflows.version.hour' | transloco"
+              [minuteLabel]="'workflows.version.minute' | transloco"
+              [value]="effToTime()"
+              [invalid]="!!effToError()"
+              [disabled]="!editable() || saving() || !effToDate()"
+              (valueChange)="onEffToTimeChange($event)"
+            />
+            @if (effToDate()) {
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                [disabled]="saving()"
+                (click)="clearEffectiveTo()"
+              >
+                {{ 'workflows.version.clearEnd' | transloco }}
+              </button>
+            } @else {
+              <span class="text-12 text-text-muted">{{ 'workflows.version.noEnd' | transloco }}</span>
+            }
+          </div>
+        </ui-field>
+      } @else {
+        <ui-field
+          [label]="'workflows.version.effectiveFrom' | transloco"
+          [for]="'wf-ver-eff-from-ro'"
+          [hint]="'workflows.version.effectiveFromHint' | transloco"
+        >
+          <input
+            id="wf-ver-eff-from-ro"
+            type="text"
+            readonly
+            tabindex="-1"
+            class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="effectiveFromDisplay()"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'workflows.version.effectiveTo' | transloco"
+          [for]="'wf-ver-eff-to-ro'"
+          [hint]="'workflows.version.effectiveToHint' | transloco"
+        >
+          <input
+            id="wf-ver-eff-to-ro"
+            type="text"
+            readonly
+            tabindex="-1"
+            class="w-full cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="effectiveToDisplay()"
+          />
+        </ui-field>
+      }
+    </div>
+  </section>
+
+  <section class="flex flex-1 flex-col gap-10">
+    <div
+      class="flex items-center gap-4 border-b border-border"
+      role="tablist"
+      [attr.aria-label]="'workflows.version.tabs.label' | transloco"
+    >
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        id="wf-tab-editor"
+        aria-controls="wf-panel-editor"
+        [attr.aria-selected]="activeTab() === 'editor'"
+        [tabindex]="activeTab() === 'editor' ? 0 : -1"
+        class="relative inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          activeTab() === 'editor'
+            ? 'font-medium text-accent'
+            : 'font-normal text-text-muted hover:text-text'
+        "
+        (click)="selectTab('editor')"
+        (keydown)="onTabKeydown(0, $event)"
+      >
+        <ng-icon name="tablerRoute" size="14" aria-hidden="true" />
+        <span>{{ 'workflows.version.tabs.editor' | transloco }}</span>
+        @if (editorHasErrors()) {
+          <span
+            class="inline-block size-6 rounded-full bg-danger"
+            [attr.aria-label]="'workflows.version.tabs.hasErrors' | transloco"
+          ></span>
+        }
+        @if (activeTab() === 'editor') {
+          <span class="absolute inset-x-0 bottom-0 h-border-w-strong bg-accent" aria-hidden="true"></span>
+        }
+      </button>
+
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        id="wf-tab-tests"
+        aria-controls="wf-panel-tests"
+        [attr.aria-selected]="activeTab() === 'tests'"
+        [tabindex]="activeTab() === 'tests' ? 0 : -1"
+        class="relative inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          activeTab() === 'tests'
+            ? 'font-medium text-accent'
+            : 'font-normal text-text-muted hover:text-text'
+        "
+        (click)="selectTab('tests')"
+        (keydown)="onTabKeydown(1, $event)"
+      >
+        <ng-icon name="tablerFlask" size="14" aria-hidden="true" />
+        <span>{{ 'workflows.version.tabs.tests' | transloco }}</span>
+        <span class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-6 text-11 font-medium tabular-nums text-on-neutral-soft">
+          <bdi dir="ltr">{{ draftTests().length }}</bdi>
+        </span>
+        @if (activeTab() === 'tests') {
+          <span class="absolute inset-x-0 bottom-0 h-border-w-strong bg-accent" aria-hidden="true"></span>
+        }
+      </button>
+
+      <button
+        #tabBtn
+        type="button"
+        role="tab"
+        id="wf-tab-review"
+        aria-controls="wf-panel-review"
+        [attr.aria-selected]="activeTab() === 'review'"
+        [tabindex]="activeTab() === 'review' ? 0 : -1"
+        class="relative inline-flex h-tab cursor-pointer items-center gap-6 px-10 text-12 leading-18 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          activeTab() === 'review'
+            ? 'font-medium text-accent'
+            : 'font-normal text-text-muted hover:text-text'
+        "
+        (click)="selectTab('review')"
+        (keydown)="onTabKeydown(2, $event)"
+      >
+        <ng-icon name="tablerHistory" size="14" aria-hidden="true" />
+        <span>{{ 'workflows.version.tabs.review' | transloco }}</span>
+        @if (activeTab() === 'review') {
+          <span class="absolute inset-x-0 bottom-0 h-border-w-strong bg-accent" aria-hidden="true"></span>
+        }
+      </button>
+    </div>
+
+    @if (visitedTabs().has('editor')) {
+      <div
+        id="wf-panel-editor"
+        role="tabpanel"
+        aria-labelledby="wf-tab-editor"
+        [hidden]="activeTab() !== 'editor'"
+      >
+        <app-workflow-editor
+          [content]="draftContent()"
+          [readonly]="!editable()"
+          [kind]="ver.definition.kind"
+          [readonlyNotice]="readonlyNotice()"
+          [diagnostics]="diagnostics()"
+          [showErrors]="showClientErrors()"
+          (contentChange)="onDraftContentChange($event)"
+        />
+      </div>
+    }
+
+    @if (visitedTabs().has('tests')) {
+      <div
+        id="wf-panel-tests"
+        role="tabpanel"
+        aria-labelledby="wf-tab-tests"
+        [hidden]="activeTab() !== 'tests'"
+      >
+        <app-workflow-tests
+          [testCases]="draftTests()"
+          [states]="draftContent().states"
+          [initialState]="draftContent().initialState"
+          [lastResult]="lastTestResult()"
+          [readonly]="!editable()"
+          (testCasesChange)="onDraftTestsChange($event)"
+        />
+      </div>
+    }
+
+    @if (visitedTabs().has('review')) {
+      <div
+        id="wf-panel-review"
+        role="tabpanel"
+        aria-labelledby="wf-tab-review"
+        [hidden]="activeTab() !== 'review'"
+      >
+        <app-governed-review
+          [detail]="ver"
+          [versions]="definition()?.versions ?? []"
+        />
+      </div>
+    }
+  </section>
+}
+
+<ui-unsaved-dialog
+  class="contents"
+  [title]="'workflows.version.unsaved.title' | transloco"
+  [text]="'workflows.version.unsaved.text' | transloco"
+  [saveLabel]="'workflows.version.unsaved.save' | transloco"
+  [discardLabel]="'workflows.version.unsaved.discard' | transloco"
+  [cancelLabel]="'workflows.version.unsaved.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deleteConfirmDialog
+  class="contents"
+  tone="danger"
+  [title]="'workflows.version.deleteConfirm.title' | transloco: { n: detail()?.versionNumber ?? '' }"
+  [text]="'workflows.version.deleteConfirm.text' | transloco"
+  [confirmLabel]="'workflows.version.deleteConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<app-reason-dialog
+  #rejectDialog
+  kind="WORKFLOW_VERSION_REJECT"
+  tone="danger"
+  [required]="true"
+  [loading]="busyAction() === 'reject'"
+  [title]="'workflows.version.rejectDialog.title' | transloco: { n: detail()?.versionNumber ?? '' }"
+  [text]="'workflows.version.rejectDialog.text' | transloco"
+  [confirmLabel]="'workflows.version.rejectDialog.confirm' | transloco"
+  (confirmed)="confirmReject($event)"
+/>
+
+<app-reason-dialog
+  #retireDialog
+  kind="WORKFLOW_VERSION_RETIRE"
+  tone="danger"
+  [required]="true"
+  [loading]="busyAction() === 'retire'"
+  [title]="'workflows.version.retireDialog.title' | transloco: { n: detail()?.versionNumber ?? '' }"
+  [text]="'workflows.version.retireDialog.text' | transloco"
+  [confirmLabel]="'workflows.version.retireDialog.confirm' | transloco"
+  (confirmed)="confirmRetire($event)"
+/>
+
+<app-reason-dialog
+  #rollbackDialog
+  kind="WORKFLOW_VERSION_ROLLBACK"
+  tone="primary"
+  [required]="true"
+  [loading]="busyAction() === 'rollback'"
+  [title]="'workflows.version.rollbackDialog.title' | transloco: { n: detail()?.versionNumber ?? '' }"
+  [text]="'workflows.version.rollbackDialog.text' | transloco"
+  [confirmLabel]="'workflows.version.rollbackDialog.confirm' | transloco"
+  (confirmed)="confirmRollback($event)"
+/>
+
+<ui-modal
+  #publishModal
+  size="confirm"
+  icon="tablerCheck"
+  tile="bg-icon-green"
+  [title]="'workflows.version.publishDialog.title' | transloco: { n: detail()?.versionNumber ?? '' }"
+  [closeLabel]="'governance.common.close' | transloco"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text-muted">{{ publishConfirmText() }}</p>
+
+    <ui-field
+      size="bare"
+      [label]="'workflows.version.publishDialog.replacesLabel' | transloco"
+      [for]="'wf-pub-replaces'"
+      [hint]="'workflows.version.publishDialog.replacesHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        id="wf-pub-replaces"
+        [label]="'workflows.version.publishDialog.replacesLabel' | transloco"
+        [options]="replacesOptions()"
+        [disabled]="busyAction() === 'publish'"
+        [value]="replacesVersionId()"
+        (valueChange)="replacesVersionId.set($event)"
+      />
+    </ui-field>
+  </div>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="busyAction() === 'publish'"
+      [disabled]="busyAction() === 'publish'"
+      (click)="confirmPublish()"
+    >
+      {{
+        (isPublishScheduled()
+          ? 'workflows.version.publishDialog.confirmSchedule'
+          : 'workflows.version.publishDialog.confirmNow'
+        ) | transloco
+      }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="busyAction() === 'publish'"
+      (click)="publishModal.close()"
+    >
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<app-conflict-dialog (reload)="onConflictReload()" (keep)="onConflictKeep()" />

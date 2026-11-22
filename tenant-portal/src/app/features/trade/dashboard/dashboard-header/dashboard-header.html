@@ -1,0 +1,67 @@
+<header class="flex flex-wrap items-center gap-8">
+  <div class="flex min-w-0 items-center gap-8">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon"
+      aria-hidden="true"
+    >
+      <ng-icon name="tablerLayoutDashboard" size="15" />
+    </span>
+
+    <app-trade-dashboard-switcher
+      [items]="navigationItems()"
+      [currentId]="detail().id"
+      [currentName]="detail().name"
+      (selected)="switchTo.emit($event)"
+    />
+
+    @if (sharedLabel(); as sharedText) {
+      <ui-badge tone="tag">{{ sharedText }}</ui-badge>
+    } @else if (detail().sourceTemplateKey) {
+      <ui-badge tone="tag">{{ 'tradeDashboard.header.fromTemplate' | transloco }}</ui-badge>
+    }
+
+    @if (updatedTime(); as time) {
+      <span class="shrink-0 text-12 leading-18 text-text-muted">
+        {{ 'tradeDashboard.header.updated' | transloco }}
+        <bdi dir="ltr" class="tabular-nums">{{ time }}</bdi>
+      </span>
+    }
+  </div>
+
+  <span class="min-w-0 flex-1" aria-hidden="true"></span>
+
+  <div class="flex shrink-0 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      size="small"
+      [disabled]="busy()"
+      (click)="refresh.emit()"
+    >
+      <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+      <span>{{ 'tradeDashboard.header.refresh' | transloco }}</span>
+    </button>
+
+    @if (canEdit() && !editing()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [disabled]="busy()"
+        (click)="editLayout.emit()"
+      >
+        <ng-icon name="tablerLayoutGrid" size="15" aria-hidden="true" />
+        <span>{{ 'tradeDashboard.header.editLayout' | transloco }}</span>
+      </button>
+    }
+
+    @if (menuItems().length > 0) {
+      <ui-actions-menu
+        [items]="menuItems()"
+        [label]="'tradeDashboard.header.menuLabel' | transloco"
+        (selected)="onMenuSelected($event)"
+      />
+    }
+  </div>
+</header>

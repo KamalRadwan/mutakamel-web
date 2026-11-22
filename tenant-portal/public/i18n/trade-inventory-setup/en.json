@@ -1,0 +1,227 @@
+{
+  "common": {
+    "noResults": "No results",
+    "clearFilters": "Clear filters",
+    "loadFailed": "Could not load the list.",
+    "retry": "Try again",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "required": "This field is required.",
+    "warningTitle": "Action not allowed"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit"
+  },
+  "discard": {
+    "title": "Discard changes?",
+    "text": "Your unsaved changes will be lost.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "nodes": {
+    "add": "New node",
+    "search": "Search code or name",
+    "tableLabel": "Fulfilment nodes",
+    "pagination": "Fulfilment nodes pagination",
+    "sampleNotice": "All company nodes are shown from sample data until the company list goes live.",
+    "empty": "No fulfilment nodes yet.",
+    "filters": {
+      "branch": "Branch",
+      "branchHint": "Show the nodes linked to one branch.",
+      "allBranches": "All branches"
+    },
+    "steps": {
+      "label": "Filter by status",
+      "hint": "Filter the storage locations by status",
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "cols": {
+      "code": "Code",
+      "name": "Name",
+      "type": "Type",
+      "branches": "Branches",
+      "timezone": "Time zone",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "label": "Actions for {{name}}",
+      "makeInactive": "Make inactive",
+      "makeActive": "Make active"
+    },
+    "confirm": {
+      "deactivateTitle": "Make {{code}} inactive?",
+      "deactivateText": "An inactive node takes no new movements.",
+      "activateTitle": "Make {{code}} active?",
+      "activateText": "This node will be available for new movements again."
+    },
+    "inUse": {
+      "title": "Node is in use",
+      "message": "This node has open reservations or draft receipts or deliveries. Finish them first."
+    },
+    "toast": {
+      "created": "Fulfilment node created.",
+      "saved": "Fulfilment node saved.",
+      "activated": "{{code}} is now active.",
+      "deactivated": "{{code}} is now inactive."
+    },
+    "footerCount": {
+      "zero": "0 nodes",
+      "one": "1 node",
+      "two": "2 nodes",
+      "few": "{{count}} nodes",
+      "many": "{{count}} nodes",
+      "other": "{{count}} nodes"
+    }
+  },
+  "nodeModal": {
+    "title": "Fulfilment node",
+    "createAction": "Create node",
+    "code": {
+      "label": "Code",
+      "hint": "Unique in the company. It cannot change after creation."
+    },
+    "name": {
+      "label": "Name",
+      "hint": "The name people see in lists and documents."
+    },
+    "type": {
+      "label": "Type",
+      "hint": "Set at creation: warehouse, store or virtual."
+    },
+    "timezone": {
+      "label": "Time zone",
+      "hint": "Used to show the node local time.",
+      "searchPlaceholder": "Search time zone",
+      "clearSearch": "Clear search",
+      "noMatch": "No matching time zones."
+    },
+    "status": {
+      "label": "Active",
+      "hint": "An inactive node takes no new movements."
+    },
+    "branches": {
+      "label": "Branches",
+      "hint": "Branches that can use this node; at least one."
+    },
+    "errors": {
+      "codePattern": "Use letters, digits, dot, dash or underscore.",
+      "codeConflict": "This code is already used.",
+      "maxLength": "Up to {{max}} characters.",
+      "branchesRequired": "Choose at least one branch.",
+      "branchesMax": "Choose at most 100 branches."
+    }
+  },
+  "periods": {
+    "add": "New period",
+    "search": "Search code",
+    "tableLabel": "Inventory periods",
+    "pagination": "Inventory periods pagination",
+    "empty": "No inventory periods yet.",
+    "filters": {
+      "coversDate": "Covers date",
+      "coversDateHint": "Show the period that contains this date.",
+      "coversDatePlaceholder": "Pick a date",
+      "clearDate": "Clear date"
+    },
+    "steps": {
+      "label": "Filter by status",
+      "hint": "Filter the inventory periods by status",
+      "all": "All",
+      "open": "Open",
+      "closed": "Closed"
+    },
+    "cols": {
+      "code": "Code",
+      "starts": "Starts",
+      "ends": "Ends",
+      "days": "Days",
+      "backdate": "Backdate limit",
+      "status": "Status",
+      "closed": "Closed",
+      "reason": "Reason",
+      "actions": "Actions"
+    },
+    "actions": {
+      "label": "Actions for {{code}}",
+      "close": "Close period",
+      "reopen": "Reopen period"
+    },
+    "closeDialog": {
+      "title": "Close period",
+      "message": "No movement can be dated in this period after it is closed. You can reopen it later.",
+      "confirm": "Close period"
+    },
+    "reopenDialog": {
+      "title": "Reopen period",
+      "message": "Choose a reason to reopen this period for stock movements.",
+      "confirm": "Reopen period"
+    },
+    "toast": {
+      "created": "Inventory period created.",
+      "closed": "Period {{code}} closed.",
+      "reopened": "Period {{code}} reopened."
+    },
+    "backdateDays": {
+      "zero": "0 days",
+      "one": "1 day",
+      "two": "2 days",
+      "few": "{{n}} days",
+      "many": "{{n}} days",
+      "other": "{{n}} days"
+    }
+  },
+  "periodModal": {
+    "newTitle": "New period",
+    "title": "Inventory period",
+    "createAction": "Create period",
+    "code": {
+      "label": "Code",
+      "hint": "A short unique code, for example P-2026-12."
+    },
+    "startsOn": {
+      "label": "Starts on",
+      "hint": "First day of the period."
+    },
+    "endsOn": {
+      "label": "Ends on",
+      "hint": "Last day of the period, inclusive."
+    },
+    "maxBackdateDays": {
+      "label": "Max backdate days",
+      "hint": "How many days back a movement may be dated while the period is open."
+    },
+    "status": {
+      "label": "Status",
+      "hint": "Open periods accept stock movements; closed periods do not."
+    },
+    "closedAt": {
+      "label": "Closed at",
+      "hint": "Date and time when this period was closed."
+    },
+    "closedBy": {
+      "label": "Closed by",
+      "hint": "The person who closed this period."
+    },
+    "closeReason": {
+      "label": "Close reason",
+      "hint": "The reason recorded when closing this period."
+    },
+    "errors": {
+      "codePattern": "Start with a letter, 2–40 chars (letters, digits, dot, dash, underscore).",
+      "codeConflict": "This code is already used.",
+      "invalidRange": "The end date is before the start date.",
+      "overlappingPeriod": "These dates overlap another period.",
+      "backdateRange": "Enter a whole number from 0 to 366."
+    }
+  }
+}

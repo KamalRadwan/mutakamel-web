@@ -1,0 +1,72 @@
+<header
+  class="flex shrink-0 flex-wrap items-center bg-surface"
+  [class]="showClose() ? 'border-b border-border' : ''"
+>
+  <div class="flex min-w-0 flex-1 items-center gap-8 ps-10 py-8" [class]="showClose() ? 'pe-8' : 'pe-10'">
+    @if (typeIcon()) {
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="tileClass()"
+        aria-hidden="true"
+      >
+        <ng-icon [name]="typeIcon()" size="15" />
+      </span>
+    }
+
+    <div class="min-w-0 flex-1">
+      <h2 class="truncate text-15 leading-22 font-medium text-text">
+        {{ typeTitle() }}
+      </h2>
+      @if (resolvedSubtitle(); as sub) {
+        <p class="truncate text-12 leading-18 text-text-muted">{{ sub }}</p>
+      }
+    </div>
+
+    @if (position(); as pos) {
+      <div class="flex shrink-0 items-center gap-4">
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+          [disabled]="pos.index <= 1 || updating()"
+          [attr.aria-label]="prevLabel() || ('recordModal.nav.prev' | transloco)"
+          [title]="prevLabel() || ('recordModal.nav.prev' | transloco)"
+          (click)="prev.emit()"
+        >
+          <ng-icon name="tablerChevronLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+
+        <span class="px-4 text-12 leading-18 text-text-muted tabular-nums">
+          {{ 'recordModal.nav.position' | transloco: { index: pos.index, total: pos.total } }}
+        </span>
+
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+          [disabled]="pos.index >= pos.total || updating()"
+          [attr.aria-label]="nextLabel() || ('recordModal.nav.next' | transloco)"
+          [title]="nextLabel() || ('recordModal.nav.next' | transloco)"
+          (click)="next.emit()"
+        >
+          <ng-icon name="tablerChevronRight" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+      </div>
+    }
+  </div>
+
+  <!-- Keep DOM order (title row -> related badges -> close) while flexing badges onto the second row. -->
+  <div class="order-last flex basis-full flex-wrap items-center gap-6 border-t border-border px-10 py-6 empty:hidden"><ng-content select="[headerRelated]" /></div>
+
+  @if (showClose()) {
+    <div class="flex shrink-0 items-center py-8 pe-10">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="closeLabel() || ('recordModal.close' | transloco)"
+        [title]="closeLabel() || ('recordModal.close' | transloco)"
+        (click)="close.emit()"
+      >
+        <ng-icon name="tablerX" size="15" aria-hidden="true" />
+      </button>
+    </div>
+  }
+</header>

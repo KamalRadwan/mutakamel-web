@@ -1,0 +1,242 @@
+<ui-modal
+  #dialog
+  size="wide"
+  icon="tablerArrowBackUp"
+  tile="bg-icon-red"
+  [title]="modalTitle()"
+  [subtitle]="modalSubtitle()"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  [dismissable]="false"
+  (closed)="onModalClosed()"
+>
+  @if (loadingSource()) {
+    <div class="flex flex-col gap-10" aria-busy="true">
+      @for (row of skeletonRows; track row) {
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <div class="flex flex-col gap-4">
+            <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+            <span class="h-field w-full motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+          </div>
+          <div class="flex flex-col gap-4">
+            <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+            <span class="h-field w-full motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+          </div>
+        </div>
+      }
+    </div>
+  } @else if (sourceLoadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ sourceErrorKey() | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="reloadSource()">
+        {{ 'invMoves.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (source()) {
+    <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+      <div class="min-w-0">
+        @if (isOpen()) {
+          <app-trade-reason-picker
+            kind="INVENTORY_REVERSAL"
+            idPrefix="inv-reverse"
+            [value]="reason()"
+            [disabled]="submitting()"
+            [showErrors]="submitted()"
+            [showNote]="false"
+            [error]="serverReasonError()"
+            (valueChange)="onReasonChange($event)"
+          />
+        }
+      </div>
+
+      <div class="min-w-0">
+        <ui-field
+          size="bare"
+          [for]="uid + '-effective-date'"
+          [label]="'invMoves.reverse.effectiveAt' | transloco"
+          [required]="true"
+          [hint]="'invMoves.reverse.effectiveAtHint' | transloco"
+          [error]="effectiveAtError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-effective-date'"
+              [ariaLabel]="'invMoves.reverse.effectiveAt' | transloco"
+              [describedBy]="describedBy('effective-date', !!effectiveAtError())"
+              [todayLabel]="'invMoves.date.today' | transloco"
+              [prevMonthLabel]="'invMoves.date.prevMonth' | transloco"
+              [nextMonthLabel]="'invMoves.date.nextMonth' | transloco"
+              [value]="effectiveDate()"
+              [invalid]="!!effectiveAtError()"
+              [disabled]="submitting()"
+              (valueChange)="onEffectiveDateChange($event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="uid + '-effective-time'"
+              [ariaLabel]="'invMoves.reverse.effectiveAt' | transloco"
+              [describedBy]="describedBy('effective-date', !!effectiveAtError())"
+              [hourLabel]="'invMoves.date.hour' | transloco"
+              [minuteLabel]="'invMoves.date.minute' | transloco"
+              [value]="effectiveTime()"
+              [invalid]="!!effectiveAtError()"
+              [disabled]="submitting()"
+              (valueChange)="onEffectiveTimeChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-reverse-all'"
+          [label]="'invMoves.reverse.reverseAll' | transloco"
+          [hint]="'invMoves.reverse.reverseAllHint' | transloco"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [id]="uid + '-reverse-all'"
+              [describedBy]="uid + '-reverse-all-hint'"
+              [checked]="reverseAllRemaining()"
+              [disabled]="submitting()"
+              (checkedChange)="onReverseAllChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      @if (reversibleLines().length === 0) {
+        <div class="col-span-2">
+          <p class="rounded-10 border border-border bg-surface-muted p-10 text-center text-12 leading-18 text-text-muted">
+            {{ 'invMoves.reverse.nothingRemaining' | transloco }}
+          </p>
+        </div>
+      } @else if (!reverseAllRemaining()) {
+        <div class="col-span-2 flex flex-col gap-8">
+          <ui-section-bar
+            tone="navy"
+            icon="tablerListDetails"
+            [headingLevel]="3"
+            [title]="'invMoves.reverse.linesTitle' | transloco"
+          />
+
+          @for (item of reversibleLines(); track item.line.id) {
+            <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8">
+              <ui-field
+                [for]="uid + '-qty-' + item.line.id"
+                [label]="lineQuantityLabel(item)"
+                [hint]="'invMoves.reverse.lineQtyHint' | transloco"
+                [hintText]="item.line.tracking.lotKey ? ('invMoves.reverse.lotLabel' | transloco: { lot: item.line.tracking.lotKey }) : null"
+                [error]="lineQuantityError(item)"
+              >
+                <input
+                  [id]="uid + '-qty-' + item.line.id"
+                  type="text"
+                  inputmode="decimal"
+                  dir="ltr"
+                  autocomplete="off"
+                  placeholder="0"
+                  class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+                  [value]="lineQuantityValue(item.line.id)"
+                  [disabled]="submitting()"
+                  [attr.aria-invalid]="lineQuantityError(item) ? 'true' : null"
+                  [attr.aria-describedby]="describedBy('qty-' + item.line.id, !!lineQuantityError(item))"
+                  (input)="onLineQuantityInput(item.line.id, $event)"
+                  (blur)="markLineTouched(item.line.id)"
+                />
+                <span class="shrink-0 text-11 text-text-muted">
+                  <bdi dir="ltr">{{ item.line.uomCode }}</bdi>
+                </span>
+              </ui-field>
+
+              @if (item.isSerialized && item.eligibleSerials.length > 0) {
+                <ui-field
+                  size="bare"
+                  [for]="uid + '-serials-' + item.line.id"
+                  [label]="'invMoves.reverse.serialsLabel' | transloco"
+                  [hint]="'invMoves.reverse.serialsHint' | transloco"
+                  [count]="pickedSerials(item.line.id).length"
+                  [max]="lineExpectedSerialCount(item)"
+                  [error]="lineSerialsError(item)"
+                >
+                  <div
+                    [id]="uid + '-serials-' + item.line.id"
+                    role="group"
+                    [attr.aria-label]="'invMoves.reverse.serialsLabel' | transloco"
+                    [attr.aria-describedby]="describedBy('serials-' + item.line.id, !!lineSerialsError(item))"
+                    class="flex max-h-time-list-max flex-col gap-4 overflow-y-auto rounded-8 border bg-surface-field p-8 scrollbar-thin"
+                    [class]="
+                      (lineSerialsError(item) ? 'border-danger-border ring-2 ring-danger-halo ' : 'border-border-field ') +
+                      (submitting() ? 'pointer-events-none opacity-drag-source' : '')
+                    "
+                  >
+                    @for (sk of item.eligibleSerials; track sk) {
+                      <ui-checkbox
+                        [checked]="isSerialPicked(item.line.id, sk)"
+                        (checkedChange)="toggleSerial(item.line.id, sk, $event)"
+                      >
+                        <bdi dir="ltr" class="text-12 tabular-nums text-text">{{ sk }}</bdi>
+                      </ui-checkbox>
+                    }
+                  </div>
+                </ui-field>
+              }
+            </div>
+          }
+        </div>
+      }
+    </form>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      variant="danger"
+      [loading]="submitting()"
+      [disabled]="submitDisabled()"
+    >
+      <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+      {{ 'invMoves.reverse.submit' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="close()"
+    >
+      {{ 'tradeInventory.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<app-inventory-conflict #conflictDialog (reload)="onConflictReload()" />
+
+<ui-modal
+  #warningAlert
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'invMoves.reverse.warningTitle' | transloco"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ warningMessage() }}</p>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (warningDecisionId()) {
+      <button type="button" uiButton variant="secondary" (click)="onOpenWarningDecision()">
+        <ng-icon name="tablerExternalLink" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        {{ 'invMoves.actions.openDecision' | transloco }}
+      </button>
+    }
+    <button type="button" uiButton variant="primary" (click)="closeWarningAlert()">
+      {{ 'tradeInventory.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

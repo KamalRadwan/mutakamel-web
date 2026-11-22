@@ -1,0 +1,333 @@
+<ui-modal
+  size="wide"
+  [title]="modalTitle()"
+  icon="tablerShare"
+  tile="bg-icon-violet"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!adding() && !revokingId()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-12">
+    <div class="flex flex-wrap items-start gap-8 rounded-10 border border-border bg-surface-muted p-8">
+      <div #targetArea class="min-w-0 flex-1">
+        <ui-field
+          for="share-target"
+          [label]="'share.targets' | transloco"
+          [hint]="'share.targetsHint' | transloco"
+          [error]="targetError()"
+        >
+          <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            #targetInput
+            id="share-target"
+            type="text"
+            role="combobox"
+            autocomplete="off"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-controls="share-target-listbox"
+            class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [attr.aria-expanded]="targetMenuOpen()"
+            [attr.aria-activedescendant]="activeOptionId()"
+            [placeholder]="'share.targetsPlaceholder' | transloco"
+            [value]="searchText()"
+            (click)="onTargetClick()"
+            (input)="onTargetInput(targetInput.value)"
+            (keydown)="onTargetKeydown($event)"
+          />
+          @if (selectedTarget() || searchText()) {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'share.clearTarget' | transloco"
+              [title]="'share.clearTarget' | transloco"
+              (click)="clearTarget()"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+        </ui-field>
+      </div>
+
+      <ui-field
+        class="shrink-0"
+        for="share-access"
+        [bare]="true"
+        [label]="'share.access' | transloco"
+        [hint]="'share.accessHint' | transloco"
+      >
+        <ui-segmented
+          id="share-access"
+          describedBy="share-access-hint"
+          [label]="'share.access' | transloco"
+          [options]="accessSegmentedOptions()"
+          [value]="accessLevel()"
+          (valueChange)="onAccessLevelChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="shrink-0"
+        for="share-expires"
+        [bare]="true"
+        [label]="'share.expires' | transloco"
+        [hint]="'share.expiresHint' | transloco"
+        [error]="expiryError()"
+      >
+        <div class="flex items-center gap-4">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            id="share-expires"
+            [describedBy]="expiryDescribedBy()"
+            [ariaLabel]="'share.expires' | transloco"
+            [placeholder]="'share.expiresPlaceholder' | transloco"
+            [todayLabel]="'share.today' | transloco"
+            [prevMonthLabel]="'share.prevMonth' | transloco"
+            [nextMonthLabel]="'share.nextMonth' | transloco"
+            [invalid]="!!expiryError()"
+            [value]="expiresAt()"
+            (valueChange)="onExpiresChange($event)"
+          />
+          @if (expiresAt()) {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'share.clearExpires' | transloco"
+              [title]="'share.clearExpires' | transloco"
+              (click)="clearExpires()"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+        </div>
+      </ui-field>
+
+      <div class="shrink-0">
+        <span class="mb-2 block h-label" aria-hidden="true"></span>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="adding()"
+          [disabled]="!selectedTarget() || adding()"
+          (click)="addShare()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'share.add' | transloco }}
+        </button>
+      </div>
+    </div>
+
+    @if (selectedTarget() && !previewHidden()) {
+      <ui-field
+        for="share-access-preview"
+        [bare]="true"
+        [label]="'share.preview.title' | transloco"
+        [hint]="'share.preview.hint' | transloco"
+        [error]="previewError()"
+      >
+        <div
+          id="share-access-preview"
+          role="region"
+          [attr.aria-label]="'share.preview.title' | transloco"
+          [attr.aria-describedby]="previewError() ? 'share-access-preview-hint share-access-preview-error' : 'share-access-preview-hint'"
+          class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8 text-12 leading-18"
+        >
+          @if (previewLoading()) {
+            <span role="status" class="sr-only">{{ 'share.preview.loading' | transloco }}</span>
+            <div aria-hidden="true" class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></div>
+            <div aria-hidden="true" class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></div>
+            <div aria-hidden="true" class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></div>
+          } @else if (previewData(); as preview) {
+            @if (preview.state === 'EMPTY') {
+              <p class="text-12 leading-18 text-text-muted">{{ 'share.preview.emptyTeam' | transloco }}</p>
+            } @else {
+              <dl class="flex flex-col gap-6">
+                <div class="flex items-center justify-between gap-8 border-b border-border pb-6">
+                  <dt class="text-text-muted">{{ (resourceKind() === 'widget' ? 'share.preview.definitionAccessWidget' : 'share.preview.definitionAccessDashboard') | transloco }}</dt>
+                  <dd>
+                    <ui-badge tone="tag">{{ 'share.preview.level.' + preview.definitionAccessLevel | transloco }}</ui-badge>
+                  </dd>
+                </div>
+
+                @for (src of preview.sources; track src.resource) {
+                  <div class="flex flex-wrap items-center justify-between gap-6">
+                    <dt class="font-medium text-text">{{ 'share.preview.resource.' + src.resource | transloco }}</dt>
+                    <dd class="flex flex-wrap items-center gap-4">
+                      @if (src.granted) {
+                        <ui-badge tone="success">{{ 'share.preview.canRead' | transloco }}</ui-badge>
+                        @if (src.scope) {
+                          <ui-badge tone="tag">{{ 'share.preview.scope.' + src.scope | transloco }}</ui-badge>
+                        }
+                      } @else {
+                        <ui-badge tone="none">{{ 'share.preview.noAccess' | transloco }}</ui-badge>
+                      }
+                      @if (src.variesByMember) {
+                        <ui-badge tone="warning">{{ 'share.preview.variesByMember' | transloco }}</ui-badge>
+                      }
+                    </dd>
+                  </div>
+                }
+              </dl>
+              @if (preview.skippedMetrics?.length) {
+                <div class="mt-6 flex flex-col gap-4 border-t border-border pt-6">
+                  <p class="text-12 leading-18 font-medium text-text">{{ 'analytics.common.skippedMetrics' | transloco }}</p>
+                  @for (skipped of preview.skippedMetrics; track skipped.metricKey) {
+                    <p class="flex flex-wrap items-center gap-4 text-12 leading-18 text-text-muted">
+                      <span class="font-medium text-text" dir="ltr">{{ skipped.metricKey }}</span>
+                      <ui-badge tone="warning">{{ 'analytics.common.skippedMetric.' + skipped.state | transloco }}</ui-badge>
+                      <span>{{ reasonText(skipped.reasonCode) }}</span>
+                    </p>
+                  }
+                </div>
+              }
+            }
+          }
+        </div>
+      </ui-field>
+    }
+
+    <div class="flex flex-col gap-6">
+      <h3 class="text-12 leading-18 font-medium text-text-muted">{{ 'share.current' | transloco }}</h3>
+      <ui-data-table
+        [columns]="columns()"
+        [rows]="shares()"
+        [rowKey]="rowKey"
+        [loading]="loadingShares()"
+        [emptyText]="'share.empty' | transloco"
+        [label]="'share.tableLabel' | transloco"
+      >
+        <ng-template uiCell="name" let-row>
+          @let item = asShare(row);
+          <div class="flex min-w-0 items-center gap-8">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="item.subjectType === 'TEAM' ? 'bg-icon-green' : 'bg-icon-blue'"
+              aria-hidden="true"
+            >
+              <ng-icon [name]="item.subjectType === 'TEAM' ? 'tablerUsers' : 'tablerUser'" size="14" />
+            </span>
+            <div class="min-w-0 flex-1 leading-16">
+              <div class="truncate text-12 font-medium text-text" [title]="shareName(item)">{{ shareName(item) }}</div>
+              @if (item.subjectEmail) {
+                <div class="truncate text-11 text-text-muted"><bdi dir="ltr">{{ item.subjectEmail }}</bdi></div>
+              }
+            </div>
+          </div>
+        </ng-template>
+
+        <ng-template uiCell="type" let-row>
+          @let item = asShare(row);
+          <ui-badge tone="tag">{{ (item.subjectType === 'TEAM' ? 'share.team' : 'share.user') | transloco }}</ui-badge>
+        </ng-template>
+
+        <ng-template uiCell="access" let-row>
+          @let item = asShare(row);
+          <div class="w-full" (click)="$event.stopPropagation()">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [options]="accessDropdownOptions()"
+              [value]="item.accessLevel"
+              [label]="'share.accessFor' | transloco: { name: shareName(item) }"
+              [disabled]="updatingIds().has(item.id) || revokingId() === item.id"
+              (valueChange)="updateAccess(item, $event)"
+            />
+          </div>
+        </ng-template>
+
+        <ng-template uiCell="expires" let-row>
+          @let item = asShare(row);
+          <span class="truncate text-12 text-text-muted">{{ formatExpiry(item.expiresAt) }}</span>
+        </ng-template>
+
+        <ng-template uiCell="actions" let-row>
+          @let item = asShare(row);
+          <button
+            type="button"
+            class="inline-flex h-btn-h-sm cursor-pointer items-center justify-center rounded-6 px-8 text-11 font-medium whitespace-nowrap text-danger-text outline-none transition-colors duration-fast hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+            [disabled]="revokingId() === item.id"
+            (click)="revokeShare(item)"
+          >
+            {{ 'share.revoke' | transloco }}
+          </button>
+        </ng-template>
+      </ui-data-table>
+    </div>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="close()">
+      {{ 'share.done' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+@if (targetMenuOpen()) {
+  <div
+    #targetMenu
+    id="share-target-listbox"
+    role="listbox"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!targetPlaced()"
+    [style.top.px]="targetPlace().top"
+    [style.inset-inline-start.px]="targetPlace().start"
+    [style.min-width.px]="targetPlace().width"
+    [attr.aria-label]="'share.targets' | transloco"
+  >
+    @if (loadingTargets()) {
+      <div class="px-8 py-6 text-12 text-text-muted">{{ 'share.loadingTargets' | transloco }}</div>
+    } @else if (targetOptions().length === 0) {
+      <div class="px-8 py-6 text-12 text-text-muted">{{ 'share.noTargets' | transloco }}</div>
+    } @else {
+      @for (option of targetOptions(); track option.type + ':' + option.id; let idx = $index) {
+        @let isSelected = selectedTarget()?.id === option.id && selectedTarget()?.type === option.type;
+        @let isActive = idx === activeTargetIndex();
+        <button
+          #targetOptionBtn
+          type="button"
+          role="option"
+          [id]="targetOptionId(option)"
+          class="flex min-h-menu-item w-full cursor-pointer items-center gap-8 rounded-6 px-8 py-4 text-start outline-none transition-colors duration-fast"
+          [class]="
+            isSelected
+              ? 'bg-brand-soft text-on-brand-soft'
+              : isActive
+                ? 'bg-row-hover text-text'
+                : 'text-text hover:bg-row-hover'
+          "
+          [attr.aria-selected]="isSelected"
+          (mouseenter)="activeTargetIndex.set(idx)"
+          (click)="chooseTarget(option)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="option.type === 'TEAM' ? 'bg-icon-green' : 'bg-icon-blue'"
+            aria-hidden="true"
+          >
+            <ng-icon [name]="option.type === 'TEAM' ? 'tablerUsers' : 'tablerUser'" size="14" />
+          </span>
+          <span class="min-w-0 flex-1 leading-16">
+            <span class="block truncate text-12 font-medium text-text">{{ option.name }}</span>
+            @if (targetSubline(option); as sub) {
+              <span class="block truncate text-11 text-text-muted"><bdi dir="ltr">{{ sub }}</bdi></span>
+            }
+          </span>
+          @if (isSelected) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </button>
+      }
+    }
+  </div>
+}
+
+<ui-confirm-dialog
+  class="contents"
+  tone="danger"
+  [title]="'share.revokeTitle' | transloco"
+  [text]="'share.revokeText' | transloco: { name: revokingItem() ? shareName(revokingItem()!) : '' }"
+  [confirmLabel]="'share.revoke' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>

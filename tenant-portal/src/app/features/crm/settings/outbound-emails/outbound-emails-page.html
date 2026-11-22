@@ -1,0 +1,322 @@
+<app-settings-frame
+  [addLabel]="'outboundEmails.newEmail' | transloco"
+  [showAdd]="canManage && !featureDisabled()"
+  [addDisabled]="!canSendCrm()"
+  [addHint]="!canSendCrm() ? ('outboundEmails.sender.notReadyHint' | transloco) : null"
+  [searchPlaceholder]="'outboundEmails.searchPlaceholder' | transloco"
+  [loading]="loading()"
+  [(search)]="searchQuery"
+  (add)="openCompose()"
+  (reload)="reloadAll()"
+>
+  <app-sender-status notices [config]="sender()" [loading]="senderLoading()" />
+
+  <div class="rounded-10 border border-border bg-surface p-8 shadow-card">
+    <div class="flex flex-wrap items-start gap-x-10 gap-y-8">
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [label]="'outboundEmails.filters.status' | transloco"
+        [hint]="'outboundEmails.filters.statusHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [options]="statusOptions()"
+          [value]="statusFilter()"
+          [label]="'outboundEmails.filters.status' | transloco"
+          (valueChange)="onStatusFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [label]="'outboundEmails.filters.sourceType' | transloco"
+        [hint]="'outboundEmails.filters.sourceTypeHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [options]="sourceTypeOptions()"
+          [value]="sourceTypeFilter()"
+          [label]="'outboundEmails.filters.sourceType' | transloco"
+          (valueChange)="onSourceTypeFilterChange($event)"
+        />
+      </ui-field>
+
+      @if (sourceTypeFilter() !== 'ALL') {
+        <ui-field
+          class="min-w-0 flex-1"
+          size="bare"
+          [label]="'outboundEmails.filters.record' | transloco"
+          [hint]="'outboundEmails.filters.recordHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [options]="recordOptions()"
+            [value]="sourceIdFilter()"
+            [label]="'outboundEmails.filters.record' | transloco"
+            (valueChange)="onSourceIdFilterChange($event)"
+          />
+        </ui-field>
+      }
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-filter-from-date'"
+        [label]="'outboundEmails.filters.fromDate' | transloco"
+        [hint]="'outboundEmails.filters.fromDateHint' | transloco"
+        [error]="rangeError()"
+      >
+        <ui-date-field
+          [id]="uid + '-filter-from-date'"
+          [ariaLabel]="'outboundEmails.filters.fromDate' | transloco"
+          [placeholder]="'outboundEmails.filters.fromDate' | transloco"
+          [todayLabel]="'outboundEmails.filters.today' | transloco"
+          [prevMonthLabel]="'outboundEmails.filters.prevMonth' | transloco"
+          [nextMonthLabel]="'outboundEmails.filters.nextMonth' | transloco"
+          [value]="fromDate()"
+          [invalid]="!!rangeError()"
+          (valueChange)="onFromDateChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 flex-1"
+        size="bare"
+        [for]="uid + '-filter-to-date'"
+        [label]="'outboundEmails.filters.toDate' | transloco"
+        [hint]="'outboundEmails.filters.toDateHint' | transloco"
+      >
+        <ui-date-field
+          [id]="uid + '-filter-to-date'"
+          [ariaLabel]="'outboundEmails.filters.toDate' | transloco"
+          [placeholder]="'outboundEmails.filters.toDate' | transloco"
+          [todayLabel]="'outboundEmails.filters.today' | transloco"
+          [prevMonthLabel]="'outboundEmails.filters.prevMonth' | transloco"
+          [nextMonthLabel]="'outboundEmails.filters.nextMonth' | transloco"
+          [value]="toDate()"
+          [invalid]="!!rangeError()"
+          (valueChange)="onToDateChange($event)"
+        />
+      </ui-field>
+
+      <div class="flex shrink-0 flex-col">
+        <span class="mb-2 h-label" aria-hidden="true"></span>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="!hasActiveFilters()"
+          (click)="clearFilters()"
+        >
+          {{ 'outboundEmails.filters.clear' | transloco }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  @if (featureDisabled()) {
+    <app-settings-notice tone="warning">
+      {{ errorText() || ('outboundEmails.errors.CRM_FEATURE_DISABLED' | transloco) }}
+    </app-settings-notice>
+  } @else if (failed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-danger-text">{{ errorText() || ('settings.common.loadFailed' | transloco) }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reloadAll()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'outboundEmails.table.label' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumnsClass()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'outboundEmails.table.subject' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'outboundEmails.table.recipient' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'outboundEmails.table.record' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'outboundEmails.table.template' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'outboundEmails.table.status' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'outboundEmails.table.requested' | transloco }}
+          </span>
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'outboundEmails.table.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading() && !rows().length) {
+          @for (item of skeletonRows; track item) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumnsClass()"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-full rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (row of visibleRows(); track row.outboundEmailId) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumnsClass()"
+              (click)="openDetail(row.outboundEmailId)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <button
+                  type="button"
+                  dir="auto"
+                  class="cursor-pointer truncate text-start text-14 leading-20 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="row.subjectPreview === null ? 'text-text-muted' : 'text-text'"
+                  (click)="$event.stopPropagation(); openDetail(row.outboundEmailId)"
+                >
+                  {{ row.subjectPreview ?? ('outboundEmails.table.noSubject' | transloco) }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-10">
+                <span dir="auto" class="truncate text-start text-12 leading-18 font-medium text-text">{{ row.recipient.displayName }}</span>
+                <span dir="ltr" class="truncate text-start text-11 leading-16 text-text-muted">{{ row.recipient.maskedAddress }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="sourceLook[row.sourceType].tile"
+                  [title]="'outboundEmails.sourceTypes.' + row.sourceType | transloco"
+                >
+                  <ng-icon [name]="sourceLook[row.sourceType].icon" size="14" aria-hidden="true" />
+                </span>
+                <span class="truncate text-start text-12 leading-18 font-medium text-text" [title]="row.sourceId">
+                  {{ recordLabel(row) }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-start text-12 leading-18 text-text">
+                  {{ 'outboundEmails.table.version' | transloco: { version: row.templateVersionNumber } }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-4 border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="statusBadge[row.status]"
+                >
+                  {{ 'outboundEmails.statuses.' + row.status | transloco }}
+                </span>
+                @if (row.retryOfId) {
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
+                  >
+                    {{ 'outboundEmails.badges.retry' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-10">
+                <span class="truncate text-12 leading-18 text-text">{{ formatDateTime(row.requestedAt) }}</span>
+                <span dir="auto" class="truncate text-start text-11 leading-16 text-text-muted">{{ row.requestedBy.displayName }}</span>
+              </span>
+
+              @if (canManage) {
+                <span
+                  role="cell"
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="rowActions(row)"
+                    [label]="'settings.common.actions' | transloco"
+                    (selected)="onRowAction(row, $event)"
+                  />
+                </span>
+              }
+            </div>
+          } @empty {
+            @if (!loading()) {
+              <div role="row" class="p-16 text-center text-12 text-text-muted">
+                <span role="cell">
+                  {{ (searchQuery().trim() ? 'settings.common.noResults' : 'outboundEmails.empty') | transloco }}
+                </span>
+              </div>
+            }
+          }
+        }
+      </div>
+    </div>
+
+    @if (hasNext() && !loading()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        class="self-center"
+        [loading]="loadingMore()"
+        (click)="loadMore()"
+      >
+        {{ 'outboundEmails.loadMore' | transloco }}
+      </button>
+    }
+  }
+
+  <div footer class="flex flex-wrap items-center gap-6">
+    <span>{{ 'outboundEmails.retentionFooter' | transloco: { days: retentionDays() } }}</span>
+    <a routerLink="/crm/settings/general" class="font-medium text-accent hover:underline">
+      {{ 'outboundEmails.changeRetention' | transloco }}
+    </a>
+  </div>
+</app-settings-frame>
+
+<app-email-detail-modal [canManage]="canManage" (retryRequested)="openRetry($event)" />
+<app-retry-modal (retried)="onEmailQueued()" (openExisting)="openDetail($event)" />
+<app-compose-modal (sent)="onEmailQueued()" />

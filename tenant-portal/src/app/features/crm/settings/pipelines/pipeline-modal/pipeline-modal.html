@@ -1,0 +1,337 @@
+<ui-modal
+  size="wide"
+  icon="tablerHierarchy2"
+  tile="bg-icon-violet"
+  [title]="modalTitle()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-8">
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      <!-- Code -->
+      <ui-field
+        [label]="'pipelines.modal.code' | transloco"
+        [for]="uid + '-code'"
+        [required]="mode() === 'create'"
+        [hint]="'pipelines.modal.codeHint' | transloco"
+        [error]="errorOf('code')"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [class.cursor-default]="mode() === 'edit'"
+          [placeholder]="'pipelines.modal.codePlaceholder' | transloco"
+          [value]="code()"
+          [readonly]="mode() === 'edit' || !canManage()"
+          [attr.aria-readonly]="mode() === 'edit' || !canManage() ? 'true' : null"
+          [attr.maxlength]="codeMax"
+          [attr.aria-invalid]="errorOf('code') ? 'true' : null"
+          [attr.aria-describedby]="errorOf('code') ? uid + '-code-error ' + uid + '-code-hint' : uid + '-code-hint'"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+      </ui-field>
+
+      <!-- Arabic name -->
+      <ui-field
+        [label]="'pipelines.modal.nameAr' | transloco"
+        [for]="uid + '-name-ar'"
+        [required]="true"
+        [hint]="'pipelines.modal.nameArHint' | transloco"
+        [count]="nameAr().length"
+        [max]="nameMax"
+        [error]="errorOf('nameAr')"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="nameAr()"
+          [readonly]="!canManage()"
+          [attr.maxlength]="nameMax"
+          [attr.aria-invalid]="errorOf('nameAr') ? 'true' : null"
+          [attr.aria-describedby]="errorOf('nameAr') ? uid + '-name-ar-error ' + uid + '-name-ar-hint' : uid + '-name-ar-hint'"
+          (input)="onTextInput('nameAr', $event)"
+          (blur)="markTouched('nameAr')"
+        />
+      </ui-field>
+
+      <!-- English name -->
+      <ui-field
+        [label]="'pipelines.modal.nameEn' | transloco"
+        [for]="uid + '-name-en'"
+        [required]="true"
+        [hint]="'pipelines.modal.nameEnHint' | transloco"
+        [count]="nameEn().length"
+        [max]="nameMax"
+        [error]="errorOf('nameEn')"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="nameEn()"
+          [readonly]="!canManage()"
+          [attr.maxlength]="nameMax"
+          [attr.aria-invalid]="errorOf('nameEn') ? 'true' : null"
+          [attr.aria-describedby]="errorOf('nameEn') ? uid + '-name-en-error ' + uid + '-name-en-hint' : uid + '-name-en-hint'"
+          (input)="onTextInput('nameEn', $event)"
+          (blur)="markTouched('nameEn')"
+        />
+      </ui-field>
+
+      <!-- Description (2 cols) -->
+      <ui-field
+        class="col-span-2"
+        size="multiline"
+        [label]="'pipelines.modal.description' | transloco"
+        [for]="uid + '-description'"
+        [hint]="'pipelines.modal.descriptionHint' | transloco"
+        [count]="description().length"
+        [max]="descriptionMax"
+        [error]="errorOf('description')"
+      >
+        <textarea
+          [id]="uid + '-description'"
+          rows="3"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'pipelines.modal.descriptionPlaceholder' | transloco"
+          [value]="description()"
+          [readonly]="!canManage()"
+          [attr.maxlength]="descriptionMax"
+          [attr.aria-invalid]="errorOf('description') ? 'true' : null"
+          [attr.aria-describedby]="errorOf('description') ? uid + '-description-error ' + uid + '-description-hint' : uid + '-description-hint'"
+          (input)="onTextInput('description', $event)"
+          (blur)="markTouched('description')"
+        ></textarea>
+      </ui-field>
+
+      @if (mode() === 'create') {
+        <ui-field
+          size="bare"
+          [label]="'pipelines.modal.makeDefault' | transloco"
+          [for]="uid + '-default'"
+          [hint]="'pipelines.modal.makeDefaultHint' | transloco"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [(checked)]="isDefault"
+              [disabled]="!canManage()"
+              [label]="'pipelines.modal.makeDefault' | transloco"
+            />
+            <span class="text-12 text-text">{{ (isDefault() ? 'settings.common.yes' : 'settings.common.no') | transloco }}</span>
+          </div>
+        </ui-field>
+      } @else if (editing(); as base) {
+        <ui-field
+          size="bare"
+          [label]="'pipelines.modal.activeLabel' | transloco"
+          [for]="uid + '-active'"
+          [hint]="(base.isDefault ? 'pipelines.modal.defaultActiveHint' : 'pipelines.modal.activeHint') | transloco"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [(checked)]="isActive"
+              [disabled]="base.isDefault || !canManage()"
+              [label]="'pipelines.modal.activeLabel' | transloco"
+            />
+            <span class="text-12 text-text">{{ (isActive() ? 'settings.common.active' : 'settings.common.inactive') | transloco }}</span>
+          </div>
+        </ui-field>
+      }
+    </div>
+
+    @if (mode() === 'create') {
+      <!-- Stages section (create only) -->
+      <div class="flex flex-col gap-8 border-t border-border pt-8">
+        <ui-field
+          size="bare"
+          [label]="'pipelines.modal.stagesSection' | transloco"
+          [for]="uid + '-stage-mode'"
+          [hint]="'pipelines.modal.stagesSectionHint' | transloco"
+        >
+          <ui-segmented
+            class="w-fit"
+            [options]="stageModeOptions()"
+            [label]="'pipelines.modal.stagesSection' | transloco"
+            [value]="stageMode()"
+            [attr.aria-describedby]="uid + '-stage-mode-hint'"
+            (valueChange)="onStageModeChange($event)"
+          />
+        </ui-field>
+
+        @if (stageMode() === 'standard') {
+          <div class="flex flex-wrap gap-6">
+            @for (stage of standardStages(); track stage.id; let index = $index) {
+              <div class="inline-flex items-center gap-6 rounded-8 border border-border bg-surface-muted px-8 py-4 text-12 text-text">
+                <span class="text-11 font-medium text-text-muted">{{ index + 1 }}</span>
+                <span class="font-medium">{{ stageName(stage) }}</span>
+                @if (showMeaningChip(stage)) {
+                  <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+                    {{ 'pipelines.flags.' + stage.flag | transloco }}
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="flex flex-col gap-4">
+            @for (stage of chosenStages(); track stage.id; let index = $index; let first = $first; let last = $last) {
+              <div class="flex h-table-head items-center gap-6 rounded-8 border border-border bg-surface px-8">
+                <span class="min-w-counter text-center text-12 font-medium text-text-muted">{{ index + 1 }}</span>
+                <span class="min-w-0 flex-1 truncate text-12 font-medium text-text">{{ stageName(stage) }}</span>
+                <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+                  {{ 'pipelines.flags.' + stage.flag | transloco }}
+                </span>
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium"
+                  [class]="categoryClass(stage.category)"
+                >
+                  {{ 'pipelines.categories.' + stage.category | transloco }}
+                </span>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                  [disabled]="first"
+                  [attr.aria-label]="'pipelines.modal.moveUp' | transloco"
+                  [title]="'pipelines.modal.moveUp' | transloco"
+                  (click)="moveChosenStage(index, -1)"
+                >
+                  <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+                  [disabled]="last"
+                  [attr.aria-label]="'pipelines.modal.moveDown' | transloco"
+                  [title]="'pipelines.modal.moveDown' | transloco"
+                  (click)="moveChosenStage(index, 1)"
+                >
+                  <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'pipelines.modal.removeStage' | transloco"
+                  [title]="'pipelines.modal.removeStage' | transloco"
+                  (click)="removeChosenStage(stage.id)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="flex items-end gap-6">
+            <ui-field
+              size="bare"
+              class="min-w-0 flex-1"
+              [label]="'pipelines.modal.addStageLabel' | transloco"
+              [for]="uid + '-add-stage'"
+              [hint]="'pipelines.modal.addStageHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [describedBy]="uid + '-add-stage-hint'"
+                [options]="addStageOptions()"
+                [(value)]="selectedStageToAdd"
+                [label]="'pipelines.modal.addStagePlaceholder' | transloco"
+              />
+            </ui-field>
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [disabled]="!selectedStageToAdd()"
+              (click)="addChosenStage()"
+            >
+              <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+              {{ 'pipelines.modal.addStageButton' | transloco }}
+            </button>
+          </div>
+
+          @if (stageProblems().length > 0) {
+            <div class="flex flex-col gap-2" aria-live="polite">
+              @for (problem of stageProblems(); track problem) {
+                <p class="text-11 leading-16 text-danger-text">{{ problem }}</p>
+              }
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center justify-between gap-8">
+    @if (canManage()) {
+      <div class="flex flex-wrap items-center gap-8">
+        <button
+          type="button"
+          uiButton
+          [loading]="saving()"
+          [disabled]="
+            (mode() === 'edit' && !dirty()) ||
+            (mode() === 'create' && stageMode() === 'choose' && stageProblems().length > 0)
+          "
+          (click)="save()"
+        >
+          {{ 'settings.common.save' | transloco }}
+        </button>
+
+        @if (mode() === 'edit' && dirty()) {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            [disabled]="saving()"
+            (click)="undoEdit()"
+          >
+            {{ 'settings.common.undo' | transloco }}
+          </button>
+          <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        }
+
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestCancel()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      </div>
+
+      @if (mode() === 'edit' && editing() && !editing()!.isDefault) {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          [disabled]="saving()"
+          (click)="requestDelete()"
+        >
+          {{ 'settings.common.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestCancel()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'pipelines.modal.discardConfirm.title' | transloco"
+  [text]="'pipelines.modal.discardConfirm.text' | transloco"
+  [confirmLabel]="'pipelines.modal.discardConfirm.confirm' | transloco"
+  [cancelLabel]="'pipelines.modal.discardConfirm.keep' | transloco"
+/>

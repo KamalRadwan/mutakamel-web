@@ -1,0 +1,384 @@
+<div class="flex flex-wrap items-center justify-between gap-8 text-12 leading-18 text-text-muted">
+  <p class="flex min-w-0 items-center gap-6">
+    <ng-icon name="tablerInfoCircle" size="14" class="shrink-0" aria-hidden="true" />
+    <span>{{ 'policy.rules.caption' | transloco }}</span>
+  </p>
+
+  @if (readonlyNotice(); as notice) {
+    <p class="shrink-0 text-11 leading-16 text-text-muted">{{ notice }}</p>
+  }
+</div>
+
+<div class="flex flex-col gap-8">
+  @for (rule of content().rules; track $index; let rIdx = $index; let first = $first; let last = $last) {
+    @let expanded = isRuleExpanded(rIdx);
+    <section
+      class="flex flex-col gap-10 rounded-10 border border-border bg-surface px-10 py-8 shadow-card"
+      [attr.aria-label]="rule.code"
+    >
+      <div class="flex items-center justify-between gap-8">
+        @if (readonly()) {
+          <div class="flex min-w-0 flex-1 items-center gap-8">
+            <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+              <ng-icon name="tablerGavel" size="14" aria-hidden="true" />
+            </span>
+            <span class="truncate text-13 leading-18 font-medium text-text">
+              <bdi dir="ltr">{{ rule.code || '—' }}</bdi>
+            </span>
+            <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted tabular-nums">
+              {{ 'policy.rules.priorityBadge' | transloco: { n: rule.priority } }}
+            </span>
+          </div>
+        } @else {
+          <button
+            type="button"
+            class="flex min-w-0 flex-1 cursor-pointer items-center gap-8 rounded-6 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-expanded]="expanded"
+            (click)="toggleRule(rIdx)"
+          >
+            <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+              <ng-icon name="tablerGavel" size="14" aria-hidden="true" />
+            </span>
+            <span class="truncate text-13 leading-18 font-medium text-text">
+              <bdi dir="ltr">{{ rule.code || '—' }}</bdi>
+            </span>
+            @if (!expanded) {
+              <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted tabular-nums">
+                {{ 'policy.rules.priorityBadge' | transloco: { n: rule.priority } }}
+              </span>
+            }
+          </button>
+
+          <div class="flex shrink-0 items-center gap-2">
+            @if (expanded) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+                [disabled]="first"
+                [attr.aria-label]="'policy.rules.moveUp' | transloco"
+                [title]="'policy.rules.moveUp' | transloco"
+                (click)="moveRule(rIdx, -1)"
+              >
+                <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+                [disabled]="last"
+                [attr.aria-label]="'policy.rules.moveDown' | transloco"
+                [title]="'policy.rules.moveDown' | transloco"
+                (click)="moveRule(rIdx, 1)"
+              >
+                <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'policy.rules.removeRule' | transloco"
+                [title]="'policy.rules.removeRule' | transloco"
+                (click)="removeRule(rIdx)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'policy.rules.toggleRule' | transloco"
+                [title]="'policy.rules.toggleRule' | transloco"
+                (click)="toggleRule(rIdx)"
+              >
+                <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (readonly()) {
+        <div class="flex flex-wrap items-center gap-6">
+          @for (cond of rule.all; track $index) {
+            <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 text-on-neutral-soft">
+              {{ conditionSummary(cond) }}
+            </span>
+          }
+          <span
+            class="inline-flex h-chip shrink-0 items-center rounded-6 px-6 text-11 font-medium"
+            [class]="outcomeChipClass(rule.outcome)"
+          >
+            {{ 'policy.rules.summaryThen' | transloco: { outcome: ('policy.outcomes.' + rule.outcome | transloco) } }}
+          </span>
+          @if (rule.outcome === 'SELECT' && rule.selectedValue) {
+            <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 text-on-neutral-soft">
+              <bdi dir="ltr">{{ rule.selectedValue }}</bdi>
+            </span>
+          }
+          <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 text-text-muted">
+            <bdi dir="ltr">{{ rule.reasonCode }}</bdi>
+          </span>
+        </div>
+      } @else if (!expanded) {
+        <div class="flex flex-wrap items-center gap-6">
+          @if (rule.all.length > 0) {
+            <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 text-on-neutral-soft">
+              {{ conditionSummary(rule.all[0]) }}
+            </span>
+          }
+          @if (extraConditionsCount(rule) > 0) {
+            <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 text-text-muted tabular-nums">
+              <bdi dir="ltr">{{ 'policy.rules.summaryMore' | transloco: { count: extraConditionsCount(rule) } }}</bdi>
+            </span>
+          }
+          <span
+            class="inline-flex h-chip shrink-0 items-center rounded-6 px-6 text-11 font-medium"
+            [class]="outcomeChipClass(rule.outcome)"
+          >
+            {{ 'policy.rules.summaryThen' | transloco: { outcome: ('policy.outcomes.' + rule.outcome | transloco) } }}
+          </span>
+          @if (rule.outcome === 'SELECT' && rule.selectedValue) {
+            <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 text-on-neutral-soft">
+              <bdi dir="ltr">{{ rule.selectedValue }}</bdi>
+            </span>
+          }
+          <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 text-text-muted">
+            <bdi dir="ltr">{{ rule.reasonCode }}</bdi>
+          </span>
+        </div>
+      } @else {
+        <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8 desktop:grid-cols-4">
+          <ui-field
+            [label]="'policy.rules.ruleCodeLabel' | transloco"
+            [for]="uid + '-code-' + rIdx"
+            [required]="true"
+            [hint]="'policy.rules.ruleCodeHint' | transloco"
+            [error]="errorAt('rules[' + rIdx + '].code')"
+          >
+            <input
+              [id]="uid + '-code-' + rIdx"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [value]="rule.code"
+              [attr.aria-invalid]="errorAt('rules[' + rIdx + '].code') ? 'true' : null"
+              (input)="onRuleCodeInput(rIdx, $event)"
+            />
+          </ui-field>
+
+          <ui-field
+            [label]="'policy.rules.priorityLabel' | transloco"
+            [for]="uid + '-prio-' + rIdx"
+            [required]="true"
+            [hint]="'policy.rules.priorityHint' | transloco"
+            [error]="errorAt('rules[' + rIdx + '].priority')"
+          >
+            <input
+              [id]="uid + '-prio-' + rIdx"
+              type="number"
+              min="0"
+              max="100000"
+              step="1"
+              dir="ltr"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+              [value]="rule.priority >= 0 ? rule.priority : ''"
+              [attr.aria-invalid]="errorAt('rules[' + rIdx + '].priority') ? 'true' : null"
+              (input)="onRulePriorityInput(rIdx, $event)"
+            />
+          </ui-field>
+
+          <div class="col-span-2">
+            <ui-field
+              [label]="'policy.rules.reasonCodeLabel' | transloco"
+              [for]="uid + '-reason-' + rIdx"
+              [required]="true"
+              [hint]="'policy.rules.reasonCodeHint' | transloco"
+              [error]="errorAt('rules[' + rIdx + '].reasonCode')"
+            >
+              <input
+                [id]="uid + '-reason-' + rIdx"
+                type="text"
+                dir="ltr"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="rule.reasonCode"
+                [attr.aria-invalid]="errorAt('rules[' + rIdx + '].reasonCode') ? 'true' : null"
+                (input)="onRuleReasonCodeInput(rIdx, $event)"
+              />
+            </ui-field>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-6">
+          <h3 class="text-12 leading-18 font-medium text-text">
+            {{ 'policy.rules.whenAllTrue' | transloco }}
+          </h3>
+
+          <div class="flex flex-col gap-6">
+            @for (cond of rule.all; track $index; let cIdx = $index) {
+              <app-rule-condition
+                [condition]="cond"
+                [index]="cIdx"
+                [showLabels]="cIdx === 0"
+                [canRemove]="rule.all.length > 1"
+                [kind]="kind()"
+                [facts]="facts()"
+                [supportedFactKeys]="supportedFactKeys()"
+                [factError]="errorAt('rules[' + rIdx + '].all[' + cIdx + '].fact')"
+                [operatorError]="errorAt('rules[' + rIdx + '].all[' + cIdx + '].operator')"
+                [valueError]="errorAt('rules[' + rIdx + '].all[' + cIdx + '].value')"
+                (conditionChange)="updateCondition(rIdx, cIdx, $event)"
+                (remove)="removeCondition(rIdx, cIdx)"
+              />
+            }
+          </div>
+
+          <div class="flex items-center">
+            <button
+              type="button"
+              uiButton
+              variant="ghost"
+              size="small"
+              [disabled]="rule.all.length >= maxConditions"
+              (click)="addCondition(rIdx)"
+            >
+              <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+              {{ 'policy.rules.addCondition' | transloco }}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-start gap-10">
+          <ui-field
+            size="bare"
+            [label]="'policy.rules.thenLabel' | transloco"
+            [for]="uid + '-then-' + rIdx"
+            [hint]="'policy.rules.thenHint' | transloco"
+            [error]="errorAt('rules[' + rIdx + '].outcome')"
+          >
+            <ui-segmented
+              [id]="uid + '-then-' + rIdx"
+              [label]="'policy.rules.thenLabel' | transloco"
+              [describedBy]="uid + '-then-' + rIdx + '-hint'"
+              [options]="outcomeOptions()"
+              [value]="rule.outcome"
+              (valueChange)="onRuleOutcomeChange(rIdx, $event)"
+            />
+          </ui-field>
+
+          @if (rule.outcome === 'SELECT') {
+            <div class="min-w-0 flex-1">
+              <ui-field
+                [label]="'policy.rules.selectedValueLabel' | transloco"
+                [for]="uid + '-selval-' + rIdx"
+                [required]="true"
+                [hint]="'policy.rules.selectedValueHint' | transloco"
+                [count]="(rule.selectedValue ?? '').length"
+                [max]="maxSelectedValue"
+                [error]="errorAt('rules[' + rIdx + '].selectedValue')"
+              >
+                <input
+                  [id]="uid + '-selval-' + rIdx"
+                  type="text"
+                  dir="auto"
+                  [attr.maxlength]="maxSelectedValue"
+                  class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                  [placeholder]="'policy.rules.selectedValuePlaceholder' | transloco"
+                  [value]="rule.selectedValue ?? ''"
+                  [attr.aria-invalid]="errorAt('rules[' + rIdx + '].selectedValue') ? 'true' : null"
+                  (input)="onRuleSelectedValueInput(rIdx, $event)"
+                />
+              </ui-field>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
+</div>
+
+<section
+  class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8 shadow-card"
+  [attr.aria-label]="'policy.rules.defaultTitle' | transloco"
+>
+  <div class="flex flex-wrap items-center justify-between gap-8">
+    <div class="flex min-w-0 items-center gap-8">
+      <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerRepeat" size="14" aria-hidden="true" />
+      </span>
+      <span class="text-13 leading-18 font-medium text-text">
+        {{ 'policy.rules.defaultTitle' | transloco }}
+      </span>
+    </div>
+
+    @if (readonly()) {
+      <div class="flex flex-wrap items-center gap-6">
+        <span
+          class="inline-flex h-chip shrink-0 items-center rounded-6 px-6 text-11 font-medium"
+          [class]="outcomeChipClass(content().defaultOutcome)"
+        >
+          {{
+            'policy.rules.defaultSummary'
+              | transloco: { outcome: ('policy.outcomes.' + content().defaultOutcome | transloco) }
+          }}
+        </span>
+        @if (content().defaultOutcome === 'SELECT' && content().defaultSelectedValue) {
+          <span class="inline-flex h-chip items-center rounded-6 bg-surface px-6 text-11 text-text">
+            <bdi dir="ltr">{{ content().defaultSelectedValue }}</bdi>
+          </span>
+        }
+      </div>
+    } @else {
+      <span [id]="uid + '-default-outcome-hint'" class="sr-only">{{ 'policy.rules.defaultHint' | transloco }}</span>
+      <ui-segmented
+        [id]="uid + '-default-outcome'"
+        [label]="'policy.rules.defaultTitle' | transloco"
+        [describedBy]="uid + '-default-outcome-hint'"
+        [options]="outcomeOptions()"
+        [value]="content().defaultOutcome"
+        (valueChange)="onDefaultOutcomeChange($event)"
+      />
+    }
+  </div>
+
+  @if (!readonly() && content().defaultOutcome === 'SELECT') {
+    <ui-field
+      [label]="'policy.rules.selectedValueLabel' | transloco"
+      [for]="uid + '-default-selval'"
+      [required]="true"
+      [hint]="'policy.rules.selectedValueHint' | transloco"
+      [count]="(content().defaultSelectedValue ?? '').length"
+      [max]="maxSelectedValue"
+      [error]="errorAt('defaultSelectedValue')"
+    >
+      <input
+        [id]="uid + '-default-selval'"
+        type="text"
+        dir="auto"
+        [attr.maxlength]="maxSelectedValue"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'policy.rules.selectedValuePlaceholder' | transloco"
+        [value]="content().defaultSelectedValue ?? ''"
+        [attr.aria-invalid]="errorAt('defaultSelectedValue') ? 'true' : null"
+        (input)="onDefaultSelectedValueInput($event)"
+      />
+    </ui-field>
+  }
+</section>
+
+<div class="flex flex-wrap items-center gap-10">
+  @if (!readonly()) {
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="content().rules.length >= maxRules"
+      (click)="addRule()"
+    >
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'policy.rules.addRule' | transloco }}
+    </button>
+  }
+  <p class="min-w-0 flex-1 text-12 leading-18 text-text-muted">
+    {{ 'policy.rules.factsReceived' | transloco: { facts: factsReceivedText() } }}
+  </p>
+</div>

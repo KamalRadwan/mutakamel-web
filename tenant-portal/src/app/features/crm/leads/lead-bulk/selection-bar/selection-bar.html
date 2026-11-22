@@ -1,0 +1,60 @@
+<div
+  role="region"
+  [attr.aria-label]="'bulkBar.bar.label' | transloco"
+  class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+>
+  <div class="flex min-w-0 flex-wrap items-center gap-6">
+    <span class="font-medium tabular-nums">
+      {{ 'bulkBar.bar.selected' | transloco: { n: selection.count() } }}
+    </span>
+
+    @if (hidden() > 0) {
+      <span class="text-text-muted tabular-nums">
+        {{ 'bulkBar.bar.hidden' | transloco: { h: hidden() } }}
+      </span>
+    }
+
+    @if (canOfferSelectAll()) {
+      <button
+        uiButton
+        variant="ghost"
+        size="small"
+        type="button"
+        [disabled]="tooMany()"
+        [attr.title]="tooMany() ? ('bulkBar.bar.tooMany' | transloco) : null"
+        (click)="selectAllMatching()"
+      >
+        {{ 'bulkBar.bar.selectAll' | transloco: { total: total() } }}
+      </button>
+      @if (tooMany()) {
+        <span class="text-text-muted">{{ 'bulkBar.bar.tooMany' | transloco }}</span>
+      }
+    }
+
+    @if (selection.mode() === 'all') {
+      <span class="tabular-nums">
+        {{ 'bulkBar.bar.allSelected' | transloco: { total: allTotal() } }}
+      </span>
+      <button
+        uiButton
+        variant="ghost"
+        size="small"
+        type="button"
+        (click)="selectOnlyPage()"
+      >
+        {{ 'bulkBar.bar.onlyPage' | transloco }}
+      </button>
+    }
+  </div>
+
+  <button
+    uiButton
+    variant="ghost"
+    size="small"
+    type="button"
+    class="shrink-0"
+    (click)="clear()"
+  >
+    {{ 'bulkBar.bar.clear' | transloco }}
+  </button>
+</div>

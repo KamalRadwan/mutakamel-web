@@ -1,0 +1,271 @@
+{
+  "title": "Customers",
+  "record": "Customer",
+  "new": "New customer",
+  "statuses": {
+    "PROSPECT": "Prospect",
+    "ACTIVE_CUSTOMER": "Active customer",
+    "INACTIVE": "Inactive",
+    "BLACKLISTED": "Blacklisted"
+  },
+  "types": {
+    "INDIVIDUAL": "Individual",
+    "CORPORATE": "Company"
+  },
+  "activeHint": "Set automatically when an opportunity is won.",
+  "placeholder": "This page is being built.",
+  "toolbar": {
+    "search": "Search customers",
+    "lockedByDraft": "Apply or clear the advanced search first",
+    "advancedSearch": "Advanced search",
+    "viewSwitcher": "Customers view"
+  },
+  "views": {
+    "board": "Board",
+    "cards": "Cards",
+    "table": "Table"
+  },
+  "statusFilter": {
+    "label": "Filter by status",
+    "hint": "Show only the customers in the chosen status",
+    "all": "All"
+  },
+  "board": {
+    "loadMore": "Load more ({{shown}} of {{total}})",
+    "add": "Add a customer to {{status}}",
+    "empty": "No customers in this status",
+    "emptyHelp": "Drag a customer here or add a new one.",
+    "allShown": "All customers are shown",
+    "deniedStatus": "You can't change customer statuses.",
+    "moved": "Moved to {{status}}",
+    "moveFailed": "The customer status could not be changed.",
+    "concurrentUpdate": "This customer was changed by someone else. Refresh to see the latest.",
+    "blacklistConfirm": {
+      "title": "Blacklist {{name}}?",
+      "body": "No new work can be added to a blacklisted customer, and it cannot be deleted.",
+      "confirm": "Blacklist"
+    }
+  },
+  "table": {
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "primaryContact": "Primary contact",
+      "phone": "Phone",
+      "email": "Email",
+      "city": "City",
+      "owner": "Owner",
+      "source": "Source",
+      "tags": "Tags",
+      "rating": "Rating",
+      "nextActivity": "Next activity",
+      "createdAt": "Created",
+      "updatedAt": "Updated",
+      "actions": "Actions"
+    },
+    "columnsChooser": "Choose columns",
+    "sortBy": "Sort by {{column}}",
+    "pagination": "Customers pagination"
+  },
+  "card": {
+    "actions": "Customer actions",
+    "view": "View customer",
+    "menu": {
+      "open": "Open",
+      "edit": "Edit",
+      "color": "Change colour",
+      "delete": "Delete",
+      "deleteBlacklistedReason": "A blacklisted customer can't be deleted."
+    }
+  },
+  "details": {
+    "phone": "Phone",
+    "email": "Email",
+    "city": "City"
+  },
+  "color": {
+    "none": "No colour",
+    "failed": "The colour could not be saved.",
+    "RED": "Red",
+    "ORANGE": "Orange",
+    "AMBER": "Amber",
+    "YELLOW": "Yellow",
+    "GREEN": "Green",
+    "TEAL": "Teal",
+    "BLUE": "Blue",
+    "INDIGO": "Indigo",
+    "PURPLE": "Purple",
+    "PINK": "Pink",
+    "SLATE": "Slate"
+  },
+  "rate": {
+    "failed": "The rating could not be saved."
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "text": "This can't be undone.",
+    "textFromLead": "The lead this customer came from will be reopened.",
+    "done": "Customer deleted.",
+    "failed": "The customer could not be deleted."
+  },
+  "due": {
+    "OVERDUE": "Overdue",
+    "TODAY": "Today",
+    "FUTURE": "Upcoming",
+    "NONE": "No activity"
+  },
+  "empty": {
+    "noMatches": "No customers match this search.",
+    "clearSearch": "Clear search",
+    "noCustomers": "No customers yet.",
+    "loadFailed": "Customers could not be loaded.",
+    "retry": "Retry"
+  },
+  "search": {
+    "advanced": "Advanced",
+    "advancedCount": "{{n}} conditions",
+    "me": "Me",
+    "textReplaces": "Replaces the current text search.",
+    "invalid": "The search could not run. Check the conditions.",
+    "groups": {
+      "contactAndText": "Contact and text",
+      "classification": "Classification",
+      "people": "People",
+      "dates": "Dates",
+      "tags": "Tags"
+    },
+    "presets": {
+      "mine": "My customers",
+      "active": "Active customers"
+    },
+    "rejected": {
+      "CONTRADICTION": "This conflicts with an existing {{field}} condition.",
+      "ROOT_ONLY": "{{field}} applies to all results and cannot be placed inside an OR group.",
+      "EXCLUSIVE": "Only one text search field can be used at a time.",
+      "SINGLETON": "{{field}} can be used only once.",
+      "UNSUPPORTED": "The {{field}} condition could not be applied."
+    },
+    "nullLabels": {
+      "ownerUserId": {
+        "isNull": "Unassigned",
+        "isNotNull": "Assigned"
+      },
+      "acquisitionSourceId": {
+        "isNull": "No source",
+        "isNotNull": "Has a source"
+      },
+      "cardColor": {
+        "isNull": "No colour",
+        "isNotNull": "Has a colour"
+      }
+    },
+    "fields": {
+      "customer": {
+        "label": "Customer",
+        "hint": "Matches the customer name, company name and linked contacts."
+      },
+      "email": {
+        "label": "Email",
+        "hint": "Matches any email of the customer or its contacts."
+      },
+      "phone": {
+        "label": "Phone",
+        "hint": "Matches mobile and phone numbers, digits only."
+      },
+      "status": {
+        "label": "Status",
+        "hint": "Prospect, active customer, inactive or blacklisted."
+      },
+      "profileType": {
+        "label": "Customer type",
+        "hint": "Individual or company."
+      },
+      "ownerUserId": {
+        "label": "Owner",
+        "hint": "The person responsible for this customer."
+      },
+      "acquisitionSourceId": {
+        "label": "Source",
+        "hint": "Where the customer came from."
+      },
+      "tags": {
+        "label": "Tags",
+        "hint": "Customers with at least one of the chosen tags."
+      },
+      "rating": {
+        "label": "Rating",
+        "hint": "From 0 to 3 stars."
+      },
+      "cardColor": {
+        "label": "Card colour",
+        "hint": "The colour marked on the customer card."
+      },
+      "createdAt": {
+        "label": "Created on",
+        "hint": "Dates use the workspace time zone."
+      },
+      "updatedAt": {
+        "label": "Updated on",
+        "hint": "Dates use the workspace time zone."
+      },
+      "description": {
+        "label": "Description",
+        "hint": "Text search inside the customer description; can be slow on large lists."
+      },
+      "fromLead": {
+        "label": "Converted from a lead",
+        "hint": "Yes = created by converting a lead. No = added directly as a customer."
+      }
+    }
+  },
+  "errors": {
+    "CUSTOMER_PROFILE_NOT_FOUND": "This customer no longer exists.",
+    "CRM.CUSTOMER_PROFILE.CONCURRENT_UPDATE": "Someone else updated this customer. Reload to see their changes.",
+    "CUSTOMER_PROFILE_HAS_ACTIVE_OPPORTUNITIES": "This customer has open opportunities. Close or move them before deleting.",
+    "CUSTOMER_PROFILE_SOURCE_LEAD_CONFLICT": "This customer's source lead link conflicts with another record.",
+    "CUSTOMER_PROFILE_REOPEN_STAGE_UNAVAILABLE": "No reopen stage is available for the linked lead.",
+    "CRM_SCOPED_PERMISSION_DENIED": "You do not have permission to access or modify this customer in this branch.",
+    "CUSTOMER_PROFILE_CORPORATE_FIELDS_FORBIDDEN": "Company details cannot be saved for an individual customer.",
+    "CUSTOMER_PROFILE_BLACKLISTED": "Blacklisted customers cannot be deleted.",
+    "CUSTOMER_PROFILE_STATUS_MANAGE_REQUIRED": "You do not have permission to change a customer's status.",
+    "CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON": "A customer becomes active automatically when an opportunity is won.",
+    "CUSTOMER_PROFILE_PRIMARY_CONTACT_FORBIDDEN": "Direct primary contact identity applies to individual customers only.",
+    "CUSTOMER_PROFILE_CONTACT_NAME_REQUIRED": "Each contact needs a name.",
+    "CUSTOMER_PROFILE_CONTACT_PRIMARY_INVALID": "Choose exactly one primary contact.",
+    "CUSTOMER_PROFILE_DISPLAY_NAME_REQUIRED": "Enter the customer name.",
+    "CUSTOMER_PROFILE_PARTY_MANAGE_REQUIRED": "You do not have permission to manage the linked party record.",
+    "CUSTOMER_PROFILE_REFERENCE_CONFLICT": "This customer is referenced by other records and cannot be modified.",
+    "CUSTOMER_PROFILE_LINKED_LEAD_LIMIT": "This customer has reached the maximum number of linked leads.",
+    "CUSTOMER_PROFILE_LINKED_LEADS_CHANGED": "Linked leads changed during this action. Try again.",
+    "CUSTOMER_PROFILE_DISQUALIFY_STAGE_UNAVAILABLE": "No disqualification stage is available for the linked lead.",
+    "PARTY_CONTACT_INVALID": "The contact details or contact limit are not valid.",
+    "CRM_CONTACT_CHANGE_CONFLICT": "Send either a single contact change or a full contact list, not both.",
+    "CRM_CONTACT_NOT_LINKED": "This contact is not linked to the customer.",
+    "CRM_RECORD_TAG_ALREADY_ATTACHED": "One or more tags are already attached to this record.",
+    "CRM_TAG_NOT_FOUND": "This tag does not exist.",
+    "CRM_VALIDATION_FAILED": "Some of the entered data is not valid. Check the fields and try again.",
+    "CRM_ACQUISITION_SOURCE_NOT_FOUND": "This acquisition source does not exist.",
+    "GW.IDEM.MISSING": "The request could not be processed because its idempotency key is missing. Try again.",
+    "GW.IDEM.MISMATCH": "The same idempotency key was used with a different request. Try again.",
+    "PARTY_DUPLICATE_CONTACT_METHOD": "This contact method is already used by another record.",
+    "PARTY_CONTACT_LIMIT_EXCEEDED": "No more than 20 company contacts can be submitted.",
+    "PARTY_CONTACT_METHOD_REPEATED": "The same contact method is entered more than once.",
+    "LEAD_DUPLICATE_CHECK_EMPTY": "Enter a name, phone, email, tax number or commercial registration number to check for duplicates.",
+    "CRM_SETTINGS_MISSING": "CRM settings are unavailable. Contact support.",
+    "CUSTOMER_PROFILE_SELECTION_TOO_LARGE": "Select at most 10,000 customers.",
+    "CRM_RECORD_TAG_NOT_FOUND": "This tag is not attached to the customer.",
+    "CRM_TAG_UNKNOWN": "One of the tags no longer exists. Remove it and try again.",
+    "CRM_ACQUISITION_SOURCE_INACTIVE": "The chosen source is inactive.",
+    "LEAD_ADDRESS_GEO_INVALID": "The address place is not valid. Choose it again.",
+    "LEAD_ADDRESS_GEO_INCOMPLETE": "Choose each address level before the one below it.",
+    "BRANCH_CONTEXT_REQUIRED": "This customer is not available. It may have been deleted.",
+    "BRANCH_PERMISSION_DENIED": "You do not have permission for customers in this branch.",
+    "BRANCH_ACCESS_DENIED": "This branch is outside your access.",
+    "PARTY_DUPLICATE_CONTACT": "The same contact is selected more than once.",
+    "PARTY_NOT_FOUND": "A selected contact no longer exists.",
+    "INVALID_FIELD": "This filter or sort field is not supported.",
+    "INVALID_OPERATOR_VALUE": "A filter value is not valid. Check the filter and try again.",
+    "CRM_LEADS_DISABLED": "Leads are turned off for this company.",
+    "LEAD_PHONE_INVALID": "Enter a phone number with at least 5 digits."
+  }
+}

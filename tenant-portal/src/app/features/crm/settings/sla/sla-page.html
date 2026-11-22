@@ -1,0 +1,198 @@
+@if (!canRead) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'sla.page.forbiddenTitle' | transloco"
+    [text]="'sla.page.forbiddenText' | transloco"
+    [actionLabel]="'analytics.common.back' | transloco"
+    (action)="goBack()"
+  />
+} @else {
+  <app-settings-frame
+    [addLabel]="'sla.page.newPolicy' | transloco"
+    [showAdd]="canManage"
+    [searchPlaceholder]="'sla.page.searchPlaceholder' | transloco"
+    [loading]="loading()"
+    [(search)]="search"
+    (add)="openCreate()"
+    (reload)="load()"
+  >
+    <!-- Filter bar -->
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface p-8 shadow-card desktop:grid-cols-4">
+      <ui-field
+        size="bare"
+        [label]="'sla.filters.kind' | transloco"
+        [for]="uid + '-filter-kind'"
+        [hint]="'sla.filters.kindHint' | transloco"
+      >
+        <ui-dropdown
+          [id]="uid + '-filter-kind'"
+          size="field"
+          [label]="'sla.filters.kind' | transloco"
+          [describedBy]="uid + '-filter-kind-hint'"
+          [options]="kindOptions()"
+          [value]="kindFilter()"
+          (valueChange)="onKindFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.filters.record' | transloco"
+        [for]="uid + '-filter-record'"
+        [hint]="'sla.filters.recordHint' | transloco"
+      >
+        <ui-dropdown
+          [id]="uid + '-filter-record'"
+          size="field"
+          [label]="'sla.filters.record' | transloco"
+          [describedBy]="uid + '-filter-record-hint'"
+          [options]="recordOptions()"
+          [value]="recordFilter()"
+          (valueChange)="onRecordFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.filters.branch' | transloco"
+        [for]="uid + '-filter-branch'"
+        [hint]="'sla.filters.branchHint' | transloco"
+      >
+        <ui-dropdown
+          [id]="uid + '-filter-branch'"
+          size="field"
+          [label]="'sla.filters.branch' | transloco"
+          [describedBy]="uid + '-filter-branch-hint'"
+          [options]="branchOptions()"
+          [value]="branchFilter()"
+          (valueChange)="onBranchFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.filters.state' | transloco"
+        [for]="uid + '-filter-state'"
+        [hint]="'sla.filters.stateHint' | transloco"
+      >
+        <ui-dropdown
+          [id]="uid + '-filter-state'"
+          size="field"
+          [label]="'sla.filters.state' | transloco"
+          [describedBy]="uid + '-filter-state-hint'"
+          [options]="stateOptions()"
+          [value]="stateFilter()"
+          (valueChange)="onStateFilterChange($event)"
+        />
+      </ui-field>
+
+      @if (activeFilterChips().length > 0) {
+        <div class="col-span-2 flex flex-wrap items-center gap-6 desktop:col-span-4">
+          @for (chip of activeFilterChips(); track chip.key) {
+            <span class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+              <span>{{ chip.label }}</span>
+              <button
+                type="button"
+                class="inline-flex size-counter cursor-pointer items-center justify-center rounded-full text-on-brand-soft outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'settings.common.close' | transloco"
+                (click)="removeFilterChip(chip.key)"
+              >
+                <ng-icon name="tablerX" size="12" aria-hidden="true" />
+              </button>
+            </span>
+          }
+
+          <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
+            {{ 'sla.page.clearFilters' | transloco }}
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (loadError()) {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'sla.page.loadFailedTitle' | transloco"
+        [text]="'sla.page.loadFailedText' | transloco"
+        [actionLabel]="'settings.common.retry' | transloco"
+        (action)="load()"
+      />
+    } @else {
+      <ui-data-table
+        [columns]="columns()"
+        [rows]="filteredPolicies()"
+        [rowKey]="rowKey"
+        [loading]="loading()"
+        [emptyText]="emptyText()"
+        [rowClickable]="true"
+        [label]="'sla.page.title' | transloco"
+        (rowClick)="openPolicy($event)"
+      >
+        <ng-template uiCell="name" let-row>
+          <span class="truncate font-medium text-text">{{ policyName(row) }}</span>
+        </ng-template>
+
+        <ng-template uiCell="kind" let-row>
+          <ui-badge tone="tag">{{ 'sla.kind.' + row.policyKind | transloco }}</ui-badge>
+        </ng-template>
+
+        <ng-template uiCell="record" let-row>
+          <span class="truncate text-12 text-text">{{ 'sla.record.' + row.appliesToRecord | transloco }}</span>
+        </ng-template>
+
+        <ng-template uiCell="branch" let-row>
+          <span class="truncate text-12 text-text-muted">{{ branchName(row.branchId) }}</span>
+        </ng-template>
+
+        <ng-template uiCell="target" let-row>
+          <span class="truncate text-12 text-text">
+            {{ targetPrefixText(row) }}
+            @if (row.policyKind === 'FOLLOW_UP_CADENCE') {
+              <span>, </span>
+              <bdi dir="ltr" class="tabular-nums">{{ formattedCompliancePct(row) }}</bdi>
+            }
+          </span>
+        </ng-template>
+
+        <ng-template uiCell="version" let-row>
+          <span>v{{ row.versionNumber }}</span>
+        </ng-template>
+
+        <ng-template uiCell="effective" let-row>
+          <span class="truncate text-12 text-text-muted">
+            {{ formatPolicyDate(row.effectiveFrom) }} – {{ formatPolicyDate(row.effectiveTo) }}
+          </span>
+        </ng-template>
+
+        <ng-template uiCell="state" let-row>
+          <ui-badge [tone]="row.state === 'ACTIVE' ? 'success' : 'none'">
+            {{ 'sla.state.' + row.state | transloco }}
+          </ui-badge>
+        </ng-template>
+      </ui-data-table>
+
+      @if (nextCursor()) {
+        <div class="flex justify-center">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [loading]="loadingMore()"
+            (click)="loadMore()"
+          >
+            {{ 'sla.page.loadMore' | transloco }}
+          </button>
+        </div>
+      }
+    }
+  </app-settings-frame>
+
+  <app-sla-modal
+    #slaModal
+    [canManage]="canManage"
+    [allPolicies]="policies()"
+    (published)="onPublished()"
+    (reloadRequested)="load()"
+  />
+}

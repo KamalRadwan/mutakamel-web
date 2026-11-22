@@ -1,0 +1,250 @@
+<div class="flex flex-col gap-8">
+  <ui-field
+    for="compare-type"
+    [bare]="true"
+    [label]="'builder2.compare.compareWith' | transloco"
+    [hint]="'builder2.compare.compareWithHint' | transloco"
+    [error]="compareWithError()"
+  >
+    <ui-dropdown
+      id="compare-type"
+      size="field"
+      [label]="'builder2.compare.compareWith' | transloco"
+      describedBy="compare-type-hint"
+      [options]="comparisonOptions()"
+      [value]="comparisonType()"
+      (valueChange)="onComparisonTypeChange($event)"
+    />
+  </ui-field>
+
+  @switch (comparisonType()) {
+    @case ('DATASETS') {
+      <ui-field
+        for="compare-basis"
+        [bare]="true"
+        [label]="'builder2.compare.basis' | transloco"
+        [hint]="'builder2.compare.basisHint' | transloco"
+      >
+        <ui-segmented
+          id="compare-basis"
+          [label]="'builder2.compare.basis' | transloco"
+          describedBy="compare-basis-hint"
+          [options]="basisOptions()"
+          [value]="currentBasis()"
+          (valueChange)="onBasisChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        for="compare-datasets"
+        [bare]="true"
+        [label]="(currentBasis() === 'TEAM' ? 'builder2.compare.teamsLabel' : 'builder2.compare.periodsLabel') | transloco"
+        [hint]="(currentBasis() === 'TEAM' ? 'builder2.compare.teamsHint' : 'builder2.compare.periodsHint') | transloco"
+        [error]="datasetsError()"
+      >
+        <div id="compare-datasets" class="flex flex-col gap-6">
+          @for (row of datasets(); track $index) {
+            <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+              <div class="flex items-center justify-between gap-6">
+                <span class="text-12 leading-18 font-medium text-text">
+                  {{ (currentBasis() === 'TEAM' ? 'builder2.compare.teamItem' : 'builder2.compare.periodItem') | transloco: { n: $index + 1 } }}
+                </span>
+                @if (datasets().length > 2) {
+                  <button
+                    uiButton
+                    type="button"
+                    variant="ghost"
+                    size="small"
+                    [attr.aria-label]="(currentBasis() === 'TEAM' ? 'builder2.compare.removeTeam' : 'builder2.compare.removePeriod') | transloco"
+                    (click)="removeDataset($index)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                    <span>{{ (currentBasis() === 'TEAM' ? 'builder2.compare.removeTeam' : 'builder2.compare.removePeriod') | transloco }}</span>
+                  </button>
+                }
+              </div>
+
+              @if (currentBasis() === 'TEAM') {
+                <div class="grid grid-cols-1 gap-8">
+                  <div [attr.data-field]="'comparison.datasets.' + $index + '.teamId'">
+                    <ui-field
+                      [for]="'compare-ds-team-' + $index"
+                      [bare]="true"
+                      [required]="true"
+                      [label]="'builder2.compare.team' | transloco"
+                      [hint]="'builder2.compare.teamHint' | transloco"
+                      [error]="teamError($index)"
+                    >
+                      <ui-dropdown
+                        [id]="'compare-ds-team-' + $index"
+                        size="field"
+                        [label]="'builder2.compare.team' | transloco"
+                        [describedBy]="teamError($index) ? ('compare-ds-team-' + $index + '-hint compare-ds-team-' + $index + '-error') : ('compare-ds-team-' + $index + '-hint')"
+                        [options]="teamOptions()"
+                        [value]="row.teamId ?? ''"
+                        (valueChange)="onDatasetTeamChange($index, $event)"
+                      />
+                    </ui-field>
+                  </div>
+
+                  <div [attr.data-field]="'comparison.datasets.' + $index + '.label'">
+                    <ui-field
+                      [for]="'compare-ds-label-' + $index"
+                      [required]="true"
+                      [label]="'builder2.compare.teamLabel' | transloco"
+                      [hint]="'builder2.compare.teamLabelHint' | transloco"
+                      [error]="labelError($index)"
+                    >
+                      <input
+                        #teamLabelInput
+                        [id]="'compare-ds-label-' + $index"
+                        type="text"
+                        class="w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                        [placeholder]="'builder2.compare.teamLabelPlaceholder' | transloco"
+                        [value]="row.label ?? ''"
+                        (input)="onDatasetLabelChange($index, teamLabelInput.value)"
+                      />
+                    </ui-field>
+                  </div>
+                </div>
+              } @else {
+                <div class="grid grid-cols-1 gap-8">
+                  <ui-field
+                    [for]="'compare-ds-preset-' + $index"
+                    [bare]="true"
+                    [label]="'builder2.compare.periodPreset' | transloco"
+                    [hint]="'builder2.compare.periodPresetHint' | transloco"
+                  >
+                    <ui-dropdown
+                      [id]="'compare-ds-preset-' + $index"
+                      size="field"
+                      [label]="'builder2.compare.periodPreset' | transloco"
+                      [describedBy]="'compare-ds-preset-' + $index + '-hint'"
+                      [options]="presetOptions()"
+                      [value]="row.datePreset ?? 'CURRENT_MONTH'"
+                      (valueChange)="onDatasetPresetChange($index, $event)"
+                    />
+                  </ui-field>
+
+                  <ui-field
+                    [for]="'compare-ds-branch-' + $index"
+                    [bare]="true"
+                    [label]="'builder2.compare.branch' | transloco"
+                    [hint]="'builder2.compare.branchHint' | transloco"
+                  >
+                    <ui-dropdown
+                      [id]="'compare-ds-branch-' + $index"
+                      size="field"
+                      [label]="'builder2.compare.branch' | transloco"
+                      [describedBy]="'compare-ds-branch-' + $index + '-hint'"
+                      [options]="branchOptions()"
+                      [value]="row.branchId ?? ''"
+                      (valueChange)="onDatasetBranchChange($index, $event)"
+                    />
+                  </ui-field>
+                </div>
+
+                @if (row.datePreset === 'CUSTOM') {
+                  <ui-field
+                    [for]="'compare-ds-range-' + $index"
+                    [bare]="true"
+                    [label]="'builder2.compare.customRange' | transloco"
+                    [hint]="'builder2.compare.customRangeHint' | transloco"
+                  >
+                    <ui-date-range
+                      [id]="'compare-ds-range-' + $index"
+                      [months]="1"
+                      [withTime]="false"
+                      [today]="fakeNow"
+                      [ariaLabel]="'builder2.compare.customRange' | transloco"
+                      [describedBy]="'compare-ds-range-' + $index + '-hint'"
+                      [value]="datasetRange(row)"
+                      (valueChange)="onDatasetRangeChange($index, $event)"
+                    />
+                  </ui-field>
+                }
+              }
+            </div>
+          }
+
+          @if (canAddDataset()) {
+            <div>
+              <button uiButton type="button" variant="secondary" size="small" (click)="addDataset()">
+                <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                <span>{{ (currentBasis() === 'TEAM' ? 'builder2.compare.addTeam' : 'builder2.compare.addPeriod') | transloco }}</span>
+              </button>
+            </div>
+          }
+        </div>
+      </ui-field>
+    }
+
+    @case ('TARGET') {
+      <ui-field
+        for="compare-target-value"
+        [required]="true"
+        [label]="'builder2.compare.targetNumber' | transloco"
+        [hint]="'builder2.compare.targetNumberHint' | transloco"
+        [error]="targetError()"
+      >
+        @if (isMoneyMetric() && currencyCode(); as currency) {
+          <span class="shrink-0 text-12 font-medium text-text-muted select-none">
+            <bdi dir="ltr">{{ currency }}</bdi>
+          </span>
+        }
+        <input
+          #targetInput
+          id="compare-target-value"
+          type="number"
+          dir="ltr"
+          min="0"
+          [attr.step]="isMoneyMetric() ? '0.001' : 'any'"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [placeholder]="'builder2.compare.targetPlaceholder' | transloco"
+          [value]="targetText()"
+          (focus)="onTargetFocus()"
+          (input)="onTargetInput(targetInput.value)"
+          (blur)="onTargetBlur()"
+        />
+      </ui-field>
+    }
+
+    @case ('GOVERNED_TARGET') {
+      <ui-field
+        for="compare-governed-grain"
+        [bare]="true"
+        [label]="'builder2.compare.periodGrain' | transloco"
+        [hint]="'builder2.compare.periodGrainHint' | transloco"
+      >
+        <ui-segmented
+          id="compare-governed-grain"
+          [label]="'builder2.compare.periodGrain' | transloco"
+          describedBy="compare-governed-grain-hint"
+          [options]="grainOptions()"
+          [value]="governedPeriodGrain()"
+          (valueChange)="onGovernedGrainChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        for="compare-governed-target"
+        [bare]="true"
+        [required]="true"
+        [label]="'builder2.compare.governedTargetLabel' | transloco"
+        [hint]="governedTargetHint()"
+        [error]="governedTargetError()"
+      >
+        <ui-dropdown
+          id="compare-governed-target"
+          size="field"
+          [label]="'builder2.compare.governedTargetLabel' | transloco"
+          describedBy="compare-governed-target-hint"
+          [options]="governedTargetOptions()"
+          [value]="selectedGovernedTargetId()"
+          [disabled]="targetsLoading() || governedTargets().length === 0"
+          (valueChange)="onGovernedTargetChange($event)"
+        />
+      </ui-field>
+    }
+  }
+</div>

@@ -1,0 +1,79 @@
+<ui-modal
+  size="wide"
+  [title]="modalTitle()"
+  [icon]="target()?.icon ?? ''"
+  [tile]="target()?.tile ?? 'bg-icon-teal'"
+  [closeLabel]="'bill.common.close' | transloco"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field size="bare" [label]="'bcat.modal.cycleLabel' | transloco" [hint]="'bcat.modal.cycleHint' | transloco">
+      <ui-segmented
+        class="self-start"
+        [options]="cycleOptions()"
+        [label]="'bcat.modal.cycleLabel' | transloco"
+        [value]="cycle()"
+        (valueChange)="onCycleChange($event)"
+      />
+    </ui-field>
+
+    @if (configured()) {
+      <div role="table" [attr.aria-label]="'bcat.modal.tableLabel' | transloco">
+        <div
+          role="row"
+          class="bg-nav-gradient grid h-table-head grid-cols-2 rounded-10 text-13 leading-18 font-medium text-on-nav"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'bcat.modal.colUsers' | transloco }}
+          </span>
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10"
+          >
+            {{ 'bcat.modal.colPricePerUser' | transloco }}
+          </span>
+        </div>
+
+        @for (bracket of brackets(); track bracket.minUsers + '-' + (bracket.maxUsers ?? 'max')) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row grid-cols-2 rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+          >
+            <span role="cell" class="flex min-w-0 items-center px-10">
+              @if (bracket.maxUsers !== null) {
+                <span dir="ltr" class="tabular-nums">{{ bracket.minUsers }}–{{ bracket.maxUsers }}</span>
+              } @else {
+                <span class="tabular-nums">{{
+                  'bcat.modal.rangeOpen' | transloco: { min: bracket.minUsers }
+                }}</span>
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+              <span dir="ltr" class="font-medium tabular-nums">{{ formatPrice(bracket.unitPrice) }}</span>
+            </span>
+          </div>
+        }
+      </div>
+
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'bcat.modal.bracketNote' | transloco }}
+      </p>
+    } @else {
+      <div class="flex flex-col items-center justify-center gap-8 py-16 text-center">
+        <span
+          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+        >
+          <ng-icon name="tablerTag" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">
+          {{ 'bcat.modal.notConfigured' | transloco }}
+        </p>
+      </div>
+    }
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'bill.common.close' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

@@ -1,0 +1,130 @@
+<ng-template #content><ng-content /></ng-template>
+
+@if (variant() === 'icon') {
+  <button
+    #trigger
+    type="button"
+    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class.bg-neutral-soft]="open()"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="label()"
+    [title]="label()"
+    (click)="toggle()"
+  >
+    <ng-container [ngTemplateOutlet]="content" />
+  </button>
+} @else {
+  <button
+    #trigger
+    type="button"
+    class="inline-flex h-nav-item cursor-pointer items-center gap-6 rounded-8 px-10 text-13 leading-18 whitespace-nowrap text-on-nav outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="glass() || open() ? 'bg-nav-glass font-medium inset-ring inset-ring-nav-glass-ring' : 'hover:bg-nav-glass'"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="label()"
+    (click)="toggle()"
+  >
+    <ng-container [ngTemplateOutlet]="content" />
+    <span class="inline-flex text-on-nav-muted">
+      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+    </span>
+  </button>
+}
+
+@if (open()) {
+  <ul
+    role="menu"
+    class="fixed z-dropdown flex flex-col gap-2 rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.inset-inline-end.px]="place().end"
+    [style.min-width.px]="place().minWidth"
+    [attr.aria-label]="label()"
+  >
+    @for (item of items(); track item.id) {
+      @if (item.divider) {
+        <li role="separator" class="h-border bg-border"></li>
+      }
+      <li role="none" (mouseenter)="onRowEnter(item)">
+        <button
+          #mainRow
+          type="button"
+          [attr.role]="!hasChildren(item) && item.selected !== undefined ? 'menuitemradio' : 'menuitem'"
+          [attr.aria-checked]="!hasChildren(item) && item.selected !== undefined ? item.selected : null"
+          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="rowClass(item, activeSubmenuId() === item.id)"
+          [attr.aria-haspopup]="hasChildren(item) ? 'menu' : null"
+          [attr.aria-expanded]="hasChildren(item) ? activeSubmenuId() === item.id : null"
+          (click)="onRowClick(item)"
+        >
+          <span class="flex items-center gap-8">
+            @if (item.icon && item.tile) {
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="item.tile"
+              >
+                <ng-icon [name]="item.icon" size="14" aria-hidden="true" />
+              </span>
+            } @else if (item.icon) {
+              <ng-icon [name]="item.icon" size="14" aria-hidden="true" />
+            }
+            <span>{{ item.label }}</span>
+          </span>
+          @if (hasChildren(item)) {
+            <span class="inline-flex shrink-0 text-text-muted rtl:-scale-x-100">
+              <ng-icon [name]="sideFor(item.id) === 'end' ? 'tablerChevronRight' : 'tablerChevronLeft'" size="14" aria-hidden="true" />
+            </span>
+          } @else if (item.selected) {
+            <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+          }
+        </button>
+
+        @if (hasChildren(item) && activeSubmenuId() === item.id) {
+          <ul
+            #submenu
+            role="menu"
+            class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+            [class.invisible]="!submenuPlaced()"
+            [style.top.px]="submenuPlace().top"
+            [style.inset-inline-start.px]="submenuPlace().start"
+            [attr.aria-label]="item.label"
+          >
+            @for (child of item.children; track child.id) {
+              @if (child.divider) {
+                <li role="separator" class="h-border bg-border"></li>
+              }
+              <li role="none">
+                <button
+                  type="button"
+                  [attr.role]="child.selected !== undefined ? 'menuitemradio' : 'menuitem'"
+                  [attr.aria-checked]="child.selected !== undefined ? child.selected : null"
+                  class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="rowClass(child)"
+                  (click)="choose(child.id)"
+                >
+                  <span class="flex items-center gap-8">
+                    @if (child.icon && child.tile) {
+                      <span
+                        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                        [class]="child.tile"
+                      >
+                        <ng-icon [name]="child.icon" size="14" aria-hidden="true" />
+                      </span>
+                    } @else if (child.icon) {
+                      <ng-icon [name]="child.icon" size="14" aria-hidden="true" />
+                    }
+                    <span>{{ child.label }}</span>
+                  </span>
+                  @if (child.selected) {
+                    <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </li>
+    }
+  </ul>
+}

@@ -1,0 +1,50 @@
+@for (item of barActions(); track item.action) {
+  <button
+    type="button"
+    uiButton
+    [variant]="item.primary ? 'primary' : 'secondary'"
+    [loading]="busy() === item.action"
+    [disabled]="busy() !== null || item.disabledReasonKey !== null"
+    [attr.title]="item.disabledReasonKey ? (item.disabledReasonKey | transloco) : null"
+    [attr.aria-describedby]="item.disabledReasonKey ? reasonId(item.action) : null"
+    (click)="trigger(item)"
+  >
+    @if (busy() !== item.action) {
+      <ng-icon [name]="item.icon" size="15" aria-hidden="true" />
+    }
+    {{ item.labelKey | transloco }}
+  </button>
+  @if (item.disabledReasonKey) {
+    <span class="sr-only" [id]="reasonId(item.action)">{{ item.disabledReasonKey | transloco }}</span>
+  }
+}
+
+@if (menuItems().length > 0) {
+  @if (isMenuActionBusy()) {
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      class="size-btn px-0"
+      [loading]="true"
+      [disabled]="true"
+      [attr.aria-label]="'tda.moreActions' | transloco"
+    ></button>
+  } @else {
+    <span
+      class="inline-flex size-btn shrink-0 items-center justify-center rounded-8 border bg-surface transition-colors duration-fast"
+      [class]="
+        busy() !== null
+          ? 'border-border bg-neutral-soft opacity-drag-source'
+          : 'border-border-field hover:border-border-field-hover hover:bg-surface-muted'
+      "
+      [attr.inert]="busy() !== null ? '' : null"
+    >
+      <ui-actions-menu
+        [items]="menuItems()"
+        [label]="'tda.moreActions' | transloco"
+        (selected)="onMenuSelected($event)"
+      />
+    </span>
+  }
+}

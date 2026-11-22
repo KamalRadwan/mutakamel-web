@@ -1,0 +1,45 @@
+<ng-template #barEnd>
+  <ng-content select="[barEnd]" />
+</ng-template>
+
+@if (expandable()) {
+  <div
+    class="flex h-table-head w-full shrink-0 items-center gap-6 rounded-10 pe-10 text-13 leading-18 font-medium text-on-nav transition-colors duration-fast"
+    [class]="toneClass()"
+  >
+    <button
+      type="button"
+      class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-6 rounded-10 ps-10 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-expanded]="expanded()"
+      [attr.aria-controls]="controls()"
+      (click)="toggle()"
+    >
+      <span class="inline-flex shrink-0 text-on-nav">
+        <ng-icon [name]="icon()" size="14" aria-hidden="true" />
+      </span>
+      <span class="min-w-0 flex-1 truncate text-start">{{ title() }}</span>
+      <span
+        class="inline-flex shrink-0 text-on-nav transition-transform duration-fast"
+        [class.rotate-180]="expanded()"
+      >
+        <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+      </span>
+    </button>
+    <ng-container [ngTemplateOutlet]="barEnd" />
+  </div>
+} @else {
+  <header
+    class="flex h-table-head shrink-0 items-center gap-6 rounded-10 px-10 text-13 leading-18 font-medium text-on-nav"
+    [class]="toneClass()"
+  >
+    <span class="inline-flex shrink-0 text-on-nav">
+      <ng-icon [name]="icon()" size="14" aria-hidden="true" />
+    </span>
+    @if (headingLevel() === 3) {
+      <h3 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-on-nav">{{ title() }}</h3>
+    } @else {
+      <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-on-nav">{{ title() }}</h2>
+    }
+    <ng-container [ngTemplateOutlet]="barEnd" />
+  </header>
+}

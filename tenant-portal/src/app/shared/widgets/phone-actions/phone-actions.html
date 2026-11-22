@@ -1,0 +1,76 @@
+@if (renderNumber()) {
+  <span dir="ltr">{{ phone() }}</span>
+}
+@switch (callMode()) {
+  @case ('call') {
+    <button
+      type="button"
+      [class]="
+        'inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong ' +
+        (isDisabled() ? 'pointer-events-none text-text-muted' : 'cursor-pointer text-icon-green hover:bg-neutral-soft')
+      "
+      [disabled]="isDisabled()"
+      [attr.aria-label]="'phone.callWithPhone' | transloco: { number: displayPhone() }"
+      [title]="'phone.callWithPhone' | transloco: { number: displayPhone() }"
+      (click)="callWithPhone()"
+    >
+      <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+    </button>
+  }
+  @case ('busy') {
+    <button
+      type="button"
+      disabled
+      class="inline-flex size-btn-h-sm shrink-0 cursor-not-allowed items-center justify-center rounded-6 text-text-placeholder outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'phone.inCall' | transloco"
+      [title]="'phone.inCall' | transloco"
+    >
+      <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+    </button>
+  }
+  @default {
+    <a
+      [class]="
+        'inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong ' +
+        (isDisabled() ? 'pointer-events-none text-text-muted' : 'text-icon-green hover:bg-neutral-soft')
+      "
+      [attr.href]="isDisabled() ? null : 'tel:' + cleanPhone()"
+      [attr.aria-disabled]="isDisabled() ? 'true' : null"
+      [attr.tabindex]="isDisabled() ? -1 : null"
+      [attr.aria-label]="'phone.call' | transloco: { number: displayPhone() }"
+      [title]="'phone.call' | transloco: { number: displayPhone() }"
+    >
+      <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+    </a>
+  }
+}
+<a
+  [class]="
+    'inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong ' +
+    (isDisabled() ? 'pointer-events-none text-text-muted' : 'text-brand-whatsapp hover:bg-neutral-soft')
+  "
+  [attr.href]="isDisabled() ? null : 'https://wa.me/' + digits()"
+  [attr.target]="isDisabled() ? null : '_blank'"
+  [attr.rel]="isDisabled() ? null : 'noopener noreferrer'"
+  [attr.aria-disabled]="isDisabled() ? 'true' : null"
+  [attr.tabindex]="isDisabled() ? -1 : null"
+  [attr.aria-label]="'phone.whatsapp' | transloco: { number: displayPhone() }"
+  [title]="'phone.whatsapp' | transloco: { number: displayPhone() }"
+>
+  <ng-icon name="simpleWhatsapp" size="14" aria-hidden="true" />
+</a>
+<a
+  [class]="
+    'inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong ' +
+    (isDisabled() ? 'pointer-events-none text-text-muted' : 'text-brand-telegram hover:bg-neutral-soft')
+  "
+  [attr.href]="isDisabled() ? null : 'https://t.me/' + cleanPhone()"
+  [attr.target]="isDisabled() ? null : '_blank'"
+  [attr.rel]="isDisabled() ? null : 'noopener noreferrer'"
+  [attr.aria-disabled]="isDisabled() ? 'true' : null"
+  [attr.tabindex]="isDisabled() ? -1 : null"
+  [attr.aria-label]="'phone.telegram' | transloco: { number: displayPhone() }"
+  [title]="'phone.telegram' | transloco: { number: displayPhone() }"
+>
+  <ng-icon name="simpleTelegram" size="14" aria-hidden="true" />
+</a>

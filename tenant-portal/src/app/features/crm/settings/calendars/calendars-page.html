@@ -1,0 +1,501 @@
+@if (!canRead) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'calendars.page.forbiddenTitle' | transloco"
+    [text]="'calendars.page.forbiddenText' | transloco"
+    [actionLabel]="'analytics.common.back' | transloco"
+    (action)="goBack()"
+  />
+} @else {
+  <div class="flex min-h-0 flex-1 flex-col gap-12 overflow-y-auto p-12">
+    <!-- Toolbar (no add button) -->
+    <div class="flex shrink-0 flex-wrap items-end gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <div class="w-modal-alert max-w-full">
+        <ui-field
+          size="bare"
+          [label]="'calendars.page.branch' | transloco"
+          [for]="uid + '-branch'"
+          [hint]="'calendars.page.branchHint' | transloco"
+        >
+          <ui-dropdown
+            [id]="uid + '-branch'"
+            size="field"
+            [label]="'calendars.page.branch' | transloco"
+            [describedBy]="uid + '-branch-hint'"
+            [options]="branchOptions()"
+            [value]="selectedBranchId()"
+            (valueChange)="onBranchSelect($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="w-preset">
+        <ui-field
+          size="bare"
+          [label]="'calendars.page.year' | transloco"
+          [for]="uid + '-year'"
+          [hint]="'calendars.page.yearHint' | transloco"
+        >
+          <ui-dropdown
+            [id]="uid + '-year'"
+            size="field"
+            [label]="'calendars.page.year' | transloco"
+            [describedBy]="uid + '-year-hint'"
+            [options]="yearOptions()"
+            [value]="selectedYear()"
+            (valueChange)="onYearSelect($event)"
+          />
+        </ui-field>
+      </div>
+
+      <button
+        type="button"
+        class="ms-auto inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [disabled]="loading()"
+        [attr.aria-label]="'settings.common.reload' | transloco"
+        [title]="'settings.common.reload' | transloco"
+        (click)="reloadClick()"
+      >
+        <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+      </button>
+    </div>
+
+    @if (loadError()) {
+      <ui-full-state
+        kind="load-failure"
+        [title]="'calendars.page.loadFailedTitle' | transloco"
+        [text]="'calendars.page.loadFailedText' | transloco"
+        [actionLabel]="'settings.common.retry' | transloco"
+        (action)="loadCalendar()"
+      />
+    } @else if (loading()) {
+      <div class="flex flex-col gap-8" aria-busy="true">
+        @for (card of skeletonCards; track card) {
+          <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+            <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+          </div>
+        }
+      </div>
+    } @else {
+      <!-- Weekly pattern editor -->
+      <app-week-editor
+        [(weekdayMask)]="weekdayMask"
+        [(startMinute)]="startMinute"
+        [(endMinute)]="endMinute"
+        [(timeZone)]="timeZone"
+        [readOnly]="!canManage"
+        [hoursError]="hoursError()"
+        (applyPattern)="applyWeekPattern()"
+      />
+
+      <!-- Summary counts above the year grids -->
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface p-8 shadow-card desktop:grid-cols-4">
+        <ui-field
+          [label]="'calendars.page.workingDaysCount' | transloco"
+          [for]="uid + '-working-count'"
+          [hint]="'calendars.page.workingDaysCountHint' | transloco"
+        >
+          <input
+            [id]="uid + '-working-count'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="workingDaysDisplay()"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'calendars.page.holidaysCount' | transloco"
+          [for]="uid + '-holidays-count'"
+          [hint]="'calendars.page.holidaysCountHint' | transloco"
+        >
+          <input
+            [id]="uid + '-holidays-count'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="holidaysDisplay()"
+          />
+        </ui-field>
+      </div>
+
+      <!-- 12 small month grids -->
+      <section
+        class="grid grid-cols-1 gap-12 desktop:grid-cols-3 wide:grid-cols-4"
+        [attr.aria-label]="'calendars.yearGrid.sectionLabel' | transloco"
+      >
+        @for (month of monthGrids(); track month.monthIndex) {
+          <div class="flex flex-col rounded-10 border border-border bg-surface p-8 shadow-card">
+            <h3 class="mb-6 text-13 leading-18 font-medium text-text">
+              {{ 'chart.months.' + month.monthIndex | transloco }} {{ selectedYear() }}
+            </h3>
+
+            <div
+              class="grid h-agenda-head grid-cols-7 items-center rounded-8 bg-nav-gradient text-center text-11 leading-16 font-medium text-on-nav"
+              aria-hidden="true"
+            >
+              @for (day of weekdays; track day) {
+                <span class="truncate px-2">{{ 'chart.daysShort.' + day | transloco }}</span>
+              }
+            </div>
+
+            <div class="mt-4 grid grid-cols-7 justify-items-center gap-2">
+              @for (slot of month.leadingSlots; track slot) {
+                <span class="size-cal-cell-single" aria-hidden="true"></span>
+              }
+              @for (cell of month.cells; track cell.index) {
+                <button
+                  type="button"
+                  class="inline-flex size-cal-cell-single items-center justify-center rounded-6 border text-12 tabular-nums outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="
+                    (cell.working
+                      ? 'border-border bg-surface text-text'
+                      : 'border-transparent bg-neutral-soft text-text-muted') +
+                    ' ' +
+                    (canManage
+                      ? cell.working
+                        ? 'cursor-pointer hover:bg-row-hover'
+                        : 'cursor-pointer hover:border-border-field'
+                      : 'cursor-default')
+                  "
+                  [attr.aria-label]="cell.ariaLabel"
+                  [attr.aria-pressed]="cell.working"
+                  [attr.aria-disabled]="!canManage ? 'true' : null"
+                  (click)="toggleDay(cell)"
+                >
+                  {{ cell.day }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </section>
+
+      <!-- Time windows -->
+      <section class="flex flex-col gap-8">
+        <div class="flex items-center justify-between gap-8">
+          <h3 class="text-14 leading-20 font-medium text-text">
+            {{ 'calendars.windows.sectionTitle' | transloco }}
+          </h3>
+
+          @if (canManage) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              (click)="openAddWindow()"
+            >
+              <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+              {{ 'calendars.windows.add' | transloco }}
+            </button>
+          }
+        </div>
+
+        <ui-data-table
+          [columns]="windowColumns()"
+          [rows]="windowRows()"
+          [rowKey]="windowRowKey"
+          [emptyText]="'calendars.windows.empty' | transloco"
+          [rowClickable]="canManage"
+          [label]="'calendars.windows.tableLabel' | transloco"
+          (rowClick)="openEditWindow($event.index)"
+        >
+          <ng-template uiCell="layer" let-row>
+            <span>{{ row.layer }}</span>
+          </ng-template>
+
+          <ng-template uiCell="validFrom" let-row>
+            <span class="truncate text-12 text-text">{{ formatWindowDate(row.validFrom) }}</span>
+          </ng-template>
+
+          <ng-template uiCell="validTo" let-row>
+            <span class="truncate text-12 text-text">{{ formatWindowDate(row.validTo) }}</span>
+          </ng-template>
+
+          <ng-template uiCell="weekdays" let-row>
+            <div class="flex flex-wrap items-center gap-4">
+              @for (day of row.weekdayIndices; track day) {
+                <ui-badge tone="tag">{{ 'chart.daysShort.' + day | transloco }}</ui-badge>
+              }
+            </div>
+          </ng-template>
+
+          <ng-template uiCell="hours" let-row>
+            <span>{{ row.hoursLabel }}</span>
+          </ng-template>
+
+          <ng-template uiCell="label" let-row>
+            <span class="truncate text-12 text-text-muted">{{ row.label || '—' }}</span>
+          </ng-template>
+
+          @if (canManage) {
+            <ng-template uiCell="actions" let-row>
+              <ui-actions-menu
+                [items]="windowActionItems()"
+                [label]="'calendars.windows.colActions' | transloco"
+                (selected)="onWindowAction(row.index, $event)"
+              />
+            </ng-template>
+          }
+        </ui-data-table>
+      </section>
+    }
+  </div>
+
+  <!-- Sticky footer bar (Q20 look) -->
+  @if (canManage && !loadError() && !loading()) {
+    <footer class="flex shrink-0 flex-wrap items-center gap-8 border-t border-border bg-surface-muted px-12 py-8">
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || hoursError() !== null || (revision() > 0 && !dirty())"
+        (click)="publish()"
+      >
+        {{ (revision() === 0 ? 'calendars.page.publishFirst' : 'calendars.page.publish') | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving() || !dirty()"
+        (click)="undo()"
+      >
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    </footer>
+  }
+
+  <!-- Time window 520 modal -->
+  <ui-modal
+    #windowModal
+    size="form"
+    icon="tablerClock"
+    tile="bg-icon-blue"
+    [title]="(editingWindowIndex() !== null ? 'calendars.windows.modalEditTitle' : 'calendars.windows.modalAddTitle') | transloco"
+    [closeLabel]="'settings.common.close' | transloco"
+  >
+    <form class="grid grid-cols-2 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); saveWindow()">
+      <ui-field
+        [label]="'calendars.windows.layer' | transloco"
+        [for]="uid + '-win-layer'"
+        [hint]="'calendars.windows.layerHint' | transloco"
+        [required]="true"
+        [error]="winLayerError()"
+      >
+        <input
+          [id]="uid + '-win-layer'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+          [value]="winLayerInput()"
+          [attr.aria-invalid]="winLayerError() ? 'true' : null"
+          (input)="onWinLayerInput($event)"
+          (blur)="markWinTouched('layer')"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'calendars.windows.label' | transloco"
+        [for]="uid + '-win-label'"
+        [hint]="'calendars.windows.labelHint' | transloco"
+        [count]="winLabelCount()"
+        [max]="maxLabelLength"
+        [error]="winLabelError()"
+      >
+        <input
+          [id]="uid + '-win-label'"
+          type="text"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'calendars.windows.labelPlaceholder' | transloco"
+          [value]="winLabel()"
+          [attr.maxlength]="maxLabelLength"
+          [attr.aria-invalid]="winLabelError() ? 'true' : null"
+          (input)="onWinLabelInput($event)"
+          (blur)="markWinTouched('label')"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'calendars.windows.from' | transloco"
+        [for]="uid + '-win-from'"
+        [hint]="'calendars.windows.fromHint' | transloco"
+        [required]="true"
+        [error]="winFromError()"
+      >
+        <ui-date-field
+          [id]="uid + '-win-from'"
+          [ariaLabel]="'calendars.windows.from' | transloco"
+          [describedBy]="uid + '-win-from-hint' + (winFromError() ? ' ' + uid + '-win-from-error' : '')"
+          [todayLabel]="'calendars.windows.today' | transloco"
+          [prevMonthLabel]="'calendars.windows.prevMonth' | transloco"
+          [nextMonthLabel]="'calendars.windows.nextMonth' | transloco"
+          [invalid]="!!winFromError()"
+          [value]="winValidFrom()"
+          (valueChange)="winValidFrom.set($event ?? ''); winOverlapError.set(null); markWinTouched('validFrom')"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'calendars.windows.to' | transloco"
+        [for]="uid + '-win-to'"
+        [hint]="'calendars.windows.toHint' | transloco"
+        [required]="true"
+        [error]="winToError()"
+      >
+        <ui-date-field
+          [id]="uid + '-win-to'"
+          [ariaLabel]="'calendars.windows.to' | transloco"
+          [describedBy]="uid + '-win-to-hint' + (winToError() ? ' ' + uid + '-win-to-error' : '')"
+          [todayLabel]="'calendars.windows.today' | transloco"
+          [prevMonthLabel]="'calendars.windows.prevMonth' | transloco"
+          [nextMonthLabel]="'calendars.windows.nextMonth' | transloco"
+          [invalid]="!!winToError()"
+          [value]="winValidTo()"
+          (valueChange)="winValidTo.set($event ?? ''); winOverlapError.set(null); markWinTouched('validTo')"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'calendars.windows.start' | transloco"
+        [for]="uid + '-win-start'"
+        [hint]="'calendars.windows.startHint' | transloco"
+        [required]="true"
+        [error]="winHoursError()"
+      >
+        <ui-time-field
+          [id]="uid + '-win-start'"
+          [ariaLabel]="'calendars.windows.start' | transloco"
+          [describedBy]="uid + '-win-start-hint' + (winHoursError() ? ' ' + uid + '-win-start-error' : '')"
+          [hourLabel]="'calendars.week.hour' | transloco"
+          [minuteLabel]="'calendars.week.minute' | transloco"
+          [invalid]="!!winHoursError()"
+          [value]="winStartTime()"
+          (valueChange)="onWinStartTimeChange($event); markWinTouched('hours')"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'calendars.windows.end' | transloco"
+        [for]="uid + '-win-end'"
+        [hint]="'calendars.windows.endHint' | transloco"
+        [required]="true"
+      >
+        <ui-time-field
+          [id]="uid + '-win-end'"
+          [ariaLabel]="'calendars.windows.end' | transloco"
+          [describedBy]="uid + '-win-end-hint' + (winHoursError() ? ' ' + uid + '-win-start-error' : '')"
+          [hourLabel]="'calendars.week.hour' | transloco"
+          [minuteLabel]="'calendars.week.minute' | transloco"
+          [invalid]="!!winHoursError()"
+          [value]="winEndTime()"
+          (valueChange)="onWinEndTimeChange($event); markWinTouched('hours')"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'calendars.windows.days' | transloco"
+          [for]="uid + '-win-days'"
+          [hint]="'calendars.windows.daysHint' | transloco"
+          [required]="true"
+          [error]="winDaysError()"
+        >
+          <div
+            [id]="uid + '-win-days'"
+            role="group"
+            class="flex flex-wrap items-center gap-10 rounded-8 border bg-surface-field px-10 py-6"
+            [class]="winDaysError() ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+            [attr.aria-label]="'calendars.windows.days' | transloco"
+            [attr.aria-describedby]="uid + '-win-days-hint' + (winDaysError() ? ' ' + uid + '-win-days-error' : '')"
+          >
+            @for (day of weekdays; track day) {
+              <ui-checkbox
+                [checked]="isWinDayChecked(day)"
+                (checkedChange)="onWinDayToggle(day, $event); markWinTouched('days')"
+              >
+                {{ 'chart.daysShort.' + day | transloco }}
+              </ui-checkbox>
+            }
+          </div>
+        </ui-field>
+      </div>
+    </form>
+
+    <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+      <button type="button" uiButton variant="primary" (click)="saveWindow()">
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      <button type="button" uiButton variant="secondary" (click)="closeWindowModal()">
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+
+      @let editIdx = editingWindowIndex();
+      @if (editIdx !== null) {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          (click)="deleteWindow(editIdx)"
+        >
+          {{ 'settings.common.delete' | transloco }}
+        </button>
+      }
+    </div>
+  </ui-modal>
+
+  <ui-confirm-dialog
+    #deleteWindowDialog
+    tone="danger"
+    [title]="'calendars.windows.deleteTitle' | transloco"
+    [text]="'calendars.windows.deleteText' | transloco"
+    [confirmLabel]="'settings.common.delete' | transloco"
+    [cancelLabel]="'settings.common.cancel' | transloco"
+  />
+
+  <ui-confirm-dialog
+    #discardDialog
+    tone="warning"
+    [title]="'calendars.page.discardTitle' | transloco"
+    [text]="'calendars.page.discardText' | transloco"
+    [confirmLabel]="'calendars.page.discardConfirm' | transloco"
+    [cancelLabel]="'calendars.page.discardKeep' | transloco"
+  />
+
+  <ui-confirm-dialog
+    #conflictDialog
+    tone="warning"
+    [title]="'analytics.common.conflictTitle' | transloco"
+    [text]="'analytics.common.conflictText' | transloco"
+    [confirmLabel]="'analytics.common.reload' | transloco"
+    [cancelLabel]="'analytics.common.keepMine' | transloco"
+  />
+}

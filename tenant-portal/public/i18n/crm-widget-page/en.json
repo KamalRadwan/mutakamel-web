@@ -1,0 +1,169 @@
+{
+  "newWidget": "New widget",
+  "version": "Version {{n}}",
+  "unsaved": "Unsaved changes",
+  "status": {
+    "draft": "Draft",
+    "published": "Published",
+    "archived": "Archived",
+    "draftChanges": "Draft changes"
+  },
+  "tabs": {
+    "label": "Widget sections",
+    "builder": "Builder",
+    "usage": "Usage",
+    "access": "Access",
+    "versions": "Versions"
+  },
+  "actions": {
+    "label": "Widget actions",
+    "clone": "Clone",
+    "share": "Share",
+    "transfer": "Transfer owner",
+    "archive": "Archive",
+    "restore": "Restore",
+    "delete": "Delete"
+  },
+  "delete": {
+    "title": "Delete widget",
+    "text": "Delete \"{{name}}\"? This cannot be undone.",
+    "success": "Widget deleted",
+    "errorTitle": "Could not delete widget"
+  },
+  "unsavedDialog": {
+    "title": "Unsaved changes",
+    "text": "Save your changes to this widget before leaving?",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
+  "notFound": {
+    "title": "Widget not found",
+    "text": "This widget does not exist or you do not have access to it.",
+    "action": "Back to widgets"
+  },
+  "forbidden": {
+    "title": "Access denied",
+    "text": "You do not have permission to view this widget."
+  },
+  "loadFailure": {
+    "text": "Could not load this widget."
+  },
+  "usage": {
+    "dashboards": "Dashboards",
+    "dashboardsHint": "Number of dashboards where this widget is placed.",
+    "placements": "Placements",
+    "placementsHint": "Total active widget placements across dashboards.",
+    "hiddenPlacements": "Hidden placements",
+    "hiddenPlacementsHint": "Placements currently hidden on dashboards.",
+    "activeShares": "Active shares",
+    "activeSharesHint": "Current user and team share grants for this widget.",
+    "tableLabel": "Dashboards using this widget",
+    "dashboard": "Dashboard",
+    "position": "Position",
+    "size": "Size",
+    "moreHidden": "{{count}} more you cannot see",
+    "loadMore": "Load more",
+    "empty": "This widget is not placed on any dashboard yet.",
+    "loadMoreError": "Could not load more placements"
+  },
+  "access": {
+    "manageAccess": "Manage access",
+    "tableLabel": "Widget access shares",
+    "name": "Name",
+    "type": "Type",
+    "access": "Access",
+    "expires": "Expires",
+    "sharedBy": "Shared by",
+    "user": "User",
+    "team": "Team",
+    "empty": "This widget is not shared with anyone yet.",
+    "loadError": "Could not load shares"
+  },
+  "versions": {
+    "tableLabel": "Published versions",
+    "version": "Version",
+    "active": "Active",
+    "name": "Name",
+    "published": "Published",
+    "provenance": "Provenance",
+    "select": "Select",
+    "selectVersion": "Select version {{n}}",
+    "selectedCount": "{{count}} / 2 selected",
+    "compare": "Compare",
+    "closeCompare": "Close comparison",
+    "compareTitle": "Version comparison",
+    "versionHeader": "Version {{n}}",
+    "section": "Section",
+    "loadMore": "Load more",
+    "empty": "No published versions yet.",
+    "loadError": "Could not load versions",
+    "compareError": "Could not compare versions",
+    "restore": "Restore to draft",
+    "restoreTitle": "Restore version to draft",
+    "restoreText": "Replaces nothing published; creates a draft from version {{n}}.",
+    "restoreSuccess": "Version {{n}} restored to draft",
+    "restoreError": "Could not restore version",
+    "draftExists": "A draft already exists",
+    "sections": {
+      "name": "Name",
+      "chartKind": "Chart kind",
+      "metrics": "Metrics",
+      "grouping": "Grouping",
+      "filters": "Filters",
+      "comparison": "Comparison",
+      "display": "Display"
+    },
+    "provenances": {
+      "PUBLISH": "Published",
+      "INITIAL": "Initial",
+      "MANUAL": "Manual",
+      "RESTORE": "Restored",
+      "BLUEPRINT": "Template",
+      "MIGRATION": "Migrated",
+      "CLONE": "Cloned"
+    },
+    "compareLabels": {
+      "none": "None",
+      "target": "Target {{value}}",
+      "datasets": "{{count}} datasets",
+      "governedTarget": "Governed target ({{currency}})",
+      "viewerRelative": "Viewer scope",
+      "fixedScope": "Fixed scope",
+      "splitBy": "Split by {{dimension}}",
+      "topN": "Top {{n}}",
+      "groupRest": "Group rest as Other",
+      "legend": "Legend: {{position}}",
+      "format": "Format: {{format}}",
+      "subtitle": "Subtitle: {{text}}",
+      "description": "Description: {{text}}",
+      "axisLeft": "First axis",
+      "axisRight": "Second axis",
+      "grain": {
+        "DAY": "Day",
+        "WEEK": "Week",
+        "MONTH": "Month",
+        "QUARTER": "Quarter",
+        "YEAR": "Year"
+      },
+      "legendPos": {
+        "top": "Top",
+        "bottom": "Bottom",
+        "start": "Start",
+        "end": "End",
+        "none": "Hidden"
+      },
+      "numFmt": {
+        "auto": "Automatic",
+        "full": "Full",
+        "duration-auto": "Duration (auto)",
+        "duration-minutes": "Minutes",
+        "duration-hours": "Hours",
+        "duration-days": "Days"
+      }
+    },
+    "discardTitle": "Discard unsaved edits?",
+    "discardText": "The builder has changes that are not saved. Restoring replaces them with the selected version.",
+    "discardConfirm": "Discard and restore"
+  }
+}

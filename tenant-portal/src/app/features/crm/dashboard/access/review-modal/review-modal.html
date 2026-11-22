@@ -1,0 +1,311 @@
+<ui-modal
+  size="form"
+  icon="tablerUserShare"
+  tile="bg-icon-violet"
+  [title]="'access.review.title' | transloco"
+  [subtitle]="resourceLabel()"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting() && !cancelling()"
+  (closed)="onModalClosed()"
+>
+  @if (review(); as rev) {
+    <div class="flex flex-col gap-10">
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8 rounded-10 border border-border bg-surface-muted p-8">
+        <ui-field
+          size="bare"
+          [label]="'access.fields.resource' | transloco"
+          [hint]="'access.fields.resourceHint' | transloco"
+        >
+          <div class="flex min-w-0 items-center gap-6">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="rev.resourceType === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+              aria-hidden="true"
+            >
+              <ng-icon
+                [name]="rev.resourceType === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                size="14"
+              />
+            </span>
+            <span class="truncate text-12 leading-18 font-medium text-text">{{ resourceLabel() }}</span>
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.review.owner' | transloco"
+          [hint]="'access.review.ownerHint' | transloco"
+        >
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="truncate text-12 leading-18 font-medium text-text">{{ currentOwnerLabel() }}</span>
+            @if (currentOwnerInactive()) {
+              <ui-badge tone="tag">{{ 'access.inactive' | transloco }}</ui-badge>
+            }
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.review.triggerReason' | transloco"
+          [hint]="'access.review.triggerReasonHint' | transloco"
+        >
+          <span class="text-12 leading-18 text-text">
+            {{ 'access.reviewReason.' + rev.triggerReason | transloco }}
+          </span>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.review.status' | transloco"
+          [hint]="'access.review.statusHint' | transloco"
+        >
+          <div class="flex items-center">
+            <ui-badge [tone]="statusTone(rev.status)">
+              {{ 'access.reviewStatus.' + rev.status | transloco }}
+            </ui-badge>
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.review.opened' | transloco"
+          [hint]="'access.review.openedHint' | transloco"
+        >
+          <span class="text-12 leading-18 text-text">{{ openedText() }}</span>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'access.review.reviewUntil' | transloco"
+          [hint]="'access.review.reviewUntilHint' | transloco"
+        >
+          <span class="text-12 leading-18 text-text">{{ reviewUntilText() }}</span>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          class="col-span-2"
+          [label]="'access.review.currentProposal' | transloco"
+          [hint]="'access.review.currentProposalHint' | transloco"
+        >
+          @if (currentProposalSummary(); as proposal) {
+            <div class="flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-6 text-12 leading-18">
+                <span class="font-medium text-text">{{ proposal.name }}</span>
+                @if (proposal.date) {
+                  <span class="text-11 text-text-muted">
+                    {{ 'access.review.proposedOn' | transloco: { date: proposal.date } }}
+                  </span>
+                }
+              </div>
+              @if (proposal.reason) {
+                <p class="text-12 leading-18 text-text-muted break-words">{{ proposal.reason }}</p>
+              }
+            </div>
+          } @else {
+            <span class="text-12 leading-18 text-text-muted">{{ 'access.review.noProposal' | transloco }}</span>
+          }
+        </ui-field>
+      </div>
+
+      @if (isOpenReview()) {
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <ui-field
+            size="bare"
+            class="col-span-2"
+            [label]="'access.review.proposedOwner' | transloco"
+            [for]="uid + '-owner'"
+            [hint]="'access.review.proposedOwnerHint' | transloco"
+            [required]="true"
+            [error]="ownerError()"
+          >
+            <div class="relative inline-flex w-full">
+              <button
+                #ownerTrigger
+                type="button"
+                [id]="uid + '-owner'"
+                class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+                [class]="
+                  ownerError()
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : ownerMenuOpen()
+                      ? 'border-focus-ring ring-3 ring-focus-halo'
+                      : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+                "
+                aria-haspopup="listbox"
+                [attr.aria-expanded]="ownerMenuOpen()"
+                [attr.aria-label]="'access.review.proposedOwner' | transloco"
+                [attr.aria-describedby]="
+                  ownerError() ? uid + '-owner-hint ' + uid + '-owner-error' : uid + '-owner-hint'
+                "
+                [attr.aria-invalid]="ownerError() ? 'true' : null"
+                [disabled]="ownersLoading() || owners().length === 0"
+                (click)="toggleOwnerMenu()"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  @if (selectedOwner(); as owner) {
+                    <span
+                      class="inline-flex size-badge shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                      aria-hidden="true"
+                    >
+                      {{ initials(personDisplayName(owner)) }}
+                    </span>
+                    <span class="truncate">{{ personDisplayName(owner) }}</span>
+                  } @else {
+                    <span class="truncate text-text-placeholder">
+                      {{ 'access.review.proposedOwnerPlaceholder' | transloco }}
+                    </span>
+                  }
+                </span>
+                <span class="inline-flex shrink-0 text-text-muted">
+                  <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                </span>
+              </button>
+
+              @if (ownerMenuOpen()) {
+                <div
+                  #ownerPanel
+                  class="fixed z-dropdown flex flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+                  [class.invisible]="!ownerMenuPlaced()"
+                  [style.top.px]="ownerMenuPlace().top"
+                  [style.inset-inline-start.px]="ownerMenuPlace().start"
+                  [style.width.px]="ownerMenuPlace().width"
+                  [style.max-height.px]="ownerMenuPlace().maxHeight"
+                  (keydown)="onOwnerPanelKeydown($event)"
+                >
+                  <div
+                    class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+                  >
+                    <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                    <input
+                      #ownerSearchInput
+                      type="text"
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                      [value]="ownerSearch()"
+                      [placeholder]="'access.review.searchOwner' | transloco"
+                      [attr.aria-label]="'access.review.searchOwner' | transloco"
+                      (input)="onOwnerSearchInput($event)"
+                    />
+                  </div>
+
+                  <ul
+                    role="listbox"
+                    class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto"
+                    [attr.aria-label]="'access.review.proposedOwner' | transloco"
+                  >
+                    @for (owner of filteredOwners(); track owner.id) {
+                      <li role="option" [attr.aria-selected]="selectedOwnerId() === owner.id">
+                        <button
+                          type="button"
+                          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                          [class]="
+                            selectedOwnerId() === owner.id
+                              ? 'bg-brand-soft text-on-brand-soft'
+                              : 'text-text hover:bg-row-hover'
+                          "
+                          (click)="selectOwner(owner.id)"
+                        >
+                          <span class="flex min-w-0 items-center gap-6">
+                            <span
+                              class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                              aria-hidden="true"
+                            >
+                              {{ initials(personDisplayName(owner)) }}
+                            </span>
+                            <span class="truncate">{{ personDisplayName(owner) }}</span>
+                            <span class="truncate text-11 text-text-muted">{{ owner.email }}</span>
+                          </span>
+                          @if (selectedOwnerId() === owner.id) {
+                            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                          }
+                        </button>
+                      </li>
+                    } @empty {
+                      <li class="px-8 py-6 text-center text-12 text-text-muted">
+                        {{ 'analytics.common.noResults' | transloco }}
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </div>
+          </ui-field>
+
+          <ui-field
+            size="multiline"
+            class="col-span-2"
+            [label]="'access.review.reason' | transloco"
+            [for]="uid + '-reason'"
+            [hint]="(isTransferAction() ? 'access.review.reasonHintTransfer' : 'access.review.reasonHintPropose') | transloco"
+            [required]="isTransferAction()"
+            [count]="reason().length"
+            [max]="500"
+            [error]="reasonError()"
+          >
+            <textarea
+              [id]="uid + '-reason'"
+              rows="3"
+              class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+              [value]="reason()"
+              [placeholder]="'access.review.reasonPlaceholder' | transloco"
+              [attr.aria-invalid]="reasonError() ? 'true' : null"
+              (input)="onReasonInput($event)"
+            ></textarea>
+          </ui-field>
+        </div>
+      }
+    </div>
+  }
+
+  <ng-container modal-footer>
+    @if (isOpenReview()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="submitting()"
+        [disabled]="cancelling()"
+        (click)="submitPrimary()"
+      >
+        {{ (isTransferAction() ? 'access.review.transferNow' : 'access.review.propose') | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [loading]="cancelling()"
+        [disabled]="submitting()"
+        (click)="confirmCancelReview()"
+      >
+        {{ 'access.review.cancelReview' | transloco }}
+      </button>
+    }
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting() || cancelling()"
+      (click)="close()"
+    >
+      {{ 'analytics.common.close' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  #cancelConfirm
+  tone="warning"
+  [title]="'access.confirmCancelReview.title' | transloco"
+  [text]="'access.confirmCancelReview.text' | transloco"
+  [confirmLabel]="'access.confirmCancelReview.confirm' | transloco"
+  [cancelLabel]="'analytics.common.close' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'analytics.common.conflictTitle' | transloco"
+  [text]="'analytics.common.conflictText' | transloco"
+  [confirmLabel]="'analytics.common.reload' | transloco"
+  [cancelLabel]="'analytics.common.keepMine' | transloco"
+/>

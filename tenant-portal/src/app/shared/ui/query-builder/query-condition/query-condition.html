@@ -1,0 +1,208 @@
+<div class="flex flex-col gap-2">
+  <div
+    class="flex flex-wrap items-center gap-8 desktop:grid grid-cols-qb-condition-row"
+  >
+    <div class="relative flex min-w-org-card-w flex-1 items-center gap-6 desktop:min-w-0">
+      @if (selectedField(); as field) {
+        <span
+          #hintTrigger
+          class="group relative inline-flex shrink-0 items-center text-accent"
+          (mouseenter)="placeHintTooltip(hintTrigger)"
+          (mouseleave)="hideHintTooltip()"
+        >
+          <ng-icon
+            name="tablerExclamationCircle"
+            size="14"
+            class="cursor-help"
+            tabindex="-1"
+            aria-hidden="true"
+          />
+          <span
+            #hintTooltip
+            [id]="hintId"
+            role="tooltip"
+            class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+            [class.invisible]="!hintTipPlaced()"
+            [style.top.px]="hintTooltipPlace().top"
+            [style.inset-inline-start.px]="hintTooltipPlace().start"
+          >
+            {{ field.hint }}
+          </span>
+        </span>
+      } @else {
+        <span class="inline-flex size-hint-size shrink-0" aria-hidden="true"></span>
+      }
+
+      <button
+        #fieldTrigger
+        type="button"
+        [class]="fieldTriggerClasses()"
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="fieldOpen()"
+        [attr.aria-controls]="fieldOpen() ? fieldMenuId : null"
+        [attr.aria-label]="('qb.field' | transloco) + ': ' + (selectedField()?.label ?? '')"
+        [attr.aria-describedby]="fieldDescribedBy()"
+        [attr.aria-invalid]="hasVisibleError() ? 'true' : null"
+        [disabled]="disabled()"
+        (click)="toggleFieldMenu()"
+      >
+        <span class="truncate" [class]="selectedField() ? 'text-text' : 'text-text-placeholder'">
+          {{ selectedField()?.label ?? ('qb.chooseField' | transloco) }}
+        </span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+
+      @if (fieldOpen()) {
+        <div
+          #fieldMenu
+          [id]="fieldMenuId"
+          class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+          [class.invisible]="!fieldPlaced()"
+          [style.top.px]="fieldPlace().top"
+          [style.inset-inline-start.px]="fieldPlace().start"
+          [style.min-width.px]="fieldPlace().width"
+          [style.max-height.px]="fieldPlace().maxHeight"
+          (keydown)="onFieldMenuKeydown($event)"
+        >
+          <div class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo-strong">
+            <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            <input
+              #fieldSearchInput
+              type="text"
+              autocomplete="off"
+              class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="'qb.chooseField' | transloco"
+              [attr.aria-label]="'qb.chooseField' | transloco"
+              [value]="fieldSearch()"
+              (input)="fieldSearch.set($any($event.target).value)"
+            />
+          </div>
+
+          <ul
+            role="listbox"
+            class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+            [attr.aria-label]="'qb.field' | transloco"
+          >
+            @for (bucket of groupedFields(); track bucket.name) {
+              @if (bucket.name) {
+                <li role="presentation" class="px-8 pt-4 pb-2 text-11 leading-16 font-medium text-text-muted">
+                  {{ bucket.name }}
+                </li>
+              }
+              @for (field of bucket.fields; track field.id) {
+                @let optionDisabled = isFieldDisabled(field);
+                @let reason = fieldDisabledReason(field);
+                <li role="presentation">
+                  <button
+                    #fieldOptionBtn
+                    type="button"
+                    role="option"
+                    class="flex h-menu-item w-full items-center justify-between gap-8 rounded-6 px-8 text-start text-12 whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="
+                      optionDisabled
+                        ? 'cursor-not-allowed text-text-placeholder opacity-drag-source'
+                        : field.id === condition().field
+                          ? 'cursor-pointer bg-brand-soft text-on-brand-soft'
+                          : 'cursor-pointer text-text hover:bg-row-hover'
+                    "
+                    [attr.aria-selected]="field.id === condition().field"
+                    [attr.aria-disabled]="optionDisabled ? 'true' : null"
+                    [disabled]="optionDisabled"
+                    [attr.title]="reason"
+                    (click)="chooseField(field)"
+                  >
+                    <span class="truncate">{{ field.label }}</span>
+                    @if (reason) {
+                      <span class="sr-only">{{ reason }}</span>
+                    }
+                    @if (field.id === condition().field) {
+                      <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                    }
+                  </button>
+                </li>
+              }
+            }
+          </ul>
+        </div>
+      }
+    </div>
+
+    <div class="min-w-preset flex-1 desktop:min-w-0">
+      @if (operators().length === 1) {
+        <span class="flex h-field items-center truncate px-8 text-12 text-text-muted">
+          {{ singleOperatorLabel() }}
+        </span>
+      } @else {
+        <ui-dropdown
+          size="field"
+          class="w-full rounded-8"
+          [class]="hasVisibleError() ? 'ring-2 ring-danger-halo' : hasWarning() ? 'ring-1 ring-warning' : ''"
+          [options]="operatorOptions()"
+          [value]="condition().operator ?? operators()[0]"
+          [label]="'qb.operator' | transloco"
+          [describedBy]="valueDescribedBy()"
+          [disabled]="disabled() || !selectedField()"
+          (valueChange)="onOperatorChange($event)"
+        />
+      }
+    </div>
+
+    <div [class]="showValue() ? 'min-w-org-card-w flex-1 desktop:min-w-0' : 'hidden desktop:block'">
+      @if (showValue() && selectedField() && condition().operator) {
+        <ui-query-value
+          class="block min-w-0"
+          [field]="selectedField()!"
+          [operator]="condition().operator!"
+          [value]="condition().value"
+          [invalid]="hasVisibleError()"
+          [disabled]="disabled()"
+          [describedBy]="valueDescribedBy()"
+          [timeZone]="timeZone()"
+          (valueChange)="onValueChange($event)"
+          (commit)="onCommit()"
+        />
+      }
+    </div>
+
+    <button
+      type="button"
+      class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+      [attr.aria-label]="'qb.remove' | transloco: { field: selectedField()?.label ?? ('qb.field' | transloco) }"
+      [disabled]="disabled()"
+      (click)="remove.emit()"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+  </div>
+
+  @if (rowIssues().length > 0) {
+    <div [id]="issuesId" aria-live="polite" class="flex flex-col gap-2 ps-tree-indent">
+      @for (issue of rowIssues(); track $index) {
+        <p
+          class="flex flex-wrap items-center gap-4 text-11 leading-16"
+          [class]="issue.severity === 'error' ? 'text-danger-text' : 'text-warning-text'"
+        >
+          <ng-icon
+            [name]="issue.severity === 'error' ? 'tablerCircleX' : 'tablerAlertTriangle'"
+            size="11"
+            class="shrink-0"
+            aria-hidden="true"
+          />
+          <span>{{ issueKey(issue) | transloco: issueParams(issue) }}</span>
+          @if (issue.fix; as fix) {
+            <button
+              type="button"
+              class="cursor-pointer rounded-4 font-medium text-accent underline outline-none hover:text-brand-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [disabled]="disabled()"
+              (click)="applyFix.emit(fix)"
+            >
+              {{ 'qb.fix.' + fix.label | transloco }}
+            </button>
+          }
+        </p>
+      }
+    </div>
+  }
+</div>

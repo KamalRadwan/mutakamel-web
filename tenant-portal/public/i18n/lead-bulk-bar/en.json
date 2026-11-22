@@ -1,0 +1,28 @@
+{
+  "menu": {
+    "assign": "Assign to",
+    "stage": "Change stage",
+    "activity": "Batch activity",
+    "delete": "Delete"
+  },
+  "reason": {
+    "noUpdate": "You can't update these leads.",
+    "noDelete": "You can't delete these leads.",
+    "noActivity": "You can't create activities here."
+  },
+  "bar": {
+    "selected": "{{n}} selected",
+    "hidden": "· {{h}} not in the current results",
+    "selectAll": "Select all {{total}} matching leads",
+    "tooMany": "Up to 10,000 leads can be selected.",
+    "allSelected": "All {{total}} matching leads are selected",
+    "onlyPage": "Select only this page",
+    "clear": "Clear selection",
+    "label": "Selection"
+  },
+  "leave": {
+    "title": "Stop the batch update?",
+    "text": "A batch update is running. Leave and stop it? Leads already changed stay changed.",
+    "confirm": "Leave"
+  }
+}

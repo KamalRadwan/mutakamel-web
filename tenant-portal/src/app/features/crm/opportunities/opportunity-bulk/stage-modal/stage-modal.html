@@ -1,0 +1,179 @@
+<app-bulk-run-modal
+  size="form"
+  icon="tablerArrowsExchange"
+  tile="bg-icon-green"
+  [title]="'oppBulk.stage.title' | transloco"
+  [count]="displayCount()"
+  [summary]="('oppBulk.count' | pluralKey: displayCount()) | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="canSubmit()"
+  [dismissable]="!submitting()"
+  [submitLabel]="('oppBulk.stage.go' | pluralKey: rows().length) | transloco: { n: rows().length }"
+  (submit)="submit()"
+  (cancel)="closeStageMenu()"
+  (closed)="onModalClosed()"
+>
+  <ui-field
+    size="bare"
+    [label]="'oppBulk.stage.stage' | transloco"
+    [for]="uid + '-stage'"
+    [hint]="'oppBulk.stage.stageHint' | transloco"
+    [required]="true"
+  >
+    <div class="relative inline-flex w-full">
+      <button
+        #stageTrigger
+        type="button"
+        [id]="uid + '-stage'"
+        class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+        [class]="
+          stageMenuOpen()
+            ? 'border-focus-ring ring-3 ring-focus-halo'
+            : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="stageMenuOpen()"
+        [attr.aria-label]="'oppBulk.stage.stage' | transloco"
+        [attr.aria-describedby]="uid + '-stage-hint'"
+        [disabled]="selectableStages().length === 0"
+        (click)="toggleStageMenu()"
+      >
+        <span class="flex min-w-0 items-center gap-6">
+          @if (selectedStage(); as currentStage) {
+            <span
+              class="size-8 shrink-0 rounded-full"
+              [class]="dotClass(currentStage.flag)"
+              aria-hidden="true"
+            ></span>
+            <span
+              class="truncate"
+              [class]="currentStage.flag === 'LOST' ? 'font-medium text-danger-text' : currentStage.flag === 'WON' ? 'font-medium text-success-text' : ''"
+            >
+              {{ stageText(currentStage) }}
+            </span>
+          } @else {
+            <span class="truncate text-text-placeholder">—</span>
+          }
+        </span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+
+      @if (stageMenuOpen()) {
+        <ul
+          #stageList
+          role="listbox"
+          class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+          [class.invisible]="!stageMenuPlaced()"
+          [style.top.px]="stageMenuPlace().top"
+          [style.inset-inline-start.px]="stageMenuPlace().start"
+          [style.min-width.px]="stageMenuPlace().width"
+          [style.max-height.px]="stageMenuPlace().maxHeight"
+          [attr.aria-label]="'oppBulk.stage.stage' | transloco"
+          (keydown)="onStageListKeydown($event)"
+        >
+          @for (stage of selectableStages(); track stage.id) {
+            @let isDanger = stage.flag === 'LOST';
+            @let isSuccess = stage.flag === 'WON';
+            @let isSelected = selectedStage()?.id === stage.id;
+            <li role="option" [attr.aria-selected]="isSelected">
+              <button
+                type="button"
+                class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  isSelected
+                    ? isDanger
+                      ? 'bg-danger-soft text-on-danger-soft'
+                      : isSuccess
+                        ? 'bg-success-soft text-on-success-soft'
+                        : 'bg-brand-soft text-on-brand-soft'
+                    : isDanger
+                      ? 'text-danger-text hover:bg-danger-soft'
+                      : 'text-text hover:bg-row-hover'
+                "
+                (click)="selectStage(stage.id)"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  <span
+                    class="size-8 shrink-0 rounded-full"
+                    [class]="dotClass(stage.flag)"
+                    aria-hidden="true"
+                  ></span>
+                  <span class="truncate">{{ stageText(stage) }}</span>
+                </span>
+                @if (isSelected) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </ui-field>
+
+  @if (isTerminal()) {
+    @if (!reasonsHidden()) {
+      <ui-field
+        size="bare"
+        [label]="reasonFieldLabelKey() | transloco"
+        [for]="reasonsLoading() ? '' : uid + '-reason'"
+        [hint]="'oppBulk.stage.reasonHint' | transloco"
+        [required]="reasonRequired()"
+        [error]="reasonError()"
+      >
+        @if (reasonsLoading()) {
+          <div class="flex h-field items-center" role="status" aria-busy="true">
+            <div class="h-skeleton-line w-full animate-pulse rounded-6 bg-neutral-soft"></div>
+          </div>
+        } @else {
+          <div class="block min-w-0" [attr.title]="selectedReasonDefinition()">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-reason'"
+              [label]="reasonFieldLabelKey() | transloco"
+              [describedBy]="reasonDescribedBy()"
+              [options]="reasonOptions()"
+              [value]="selectedReasonId()"
+              [disabled]="submitting()"
+              (valueChange)="onReasonChange($event)"
+            />
+          </div>
+        }
+      </ui-field>
+    }
+
+    <ui-field
+      size="multiline"
+      [label]="'oppBulk.stage.note' | transloco"
+      [for]="uid + '-note'"
+      [hint]="(isLost() ? 'oppBulk.stage.noteHintLost' : 'oppBulk.stage.noteHintWon') | transloco"
+      [required]="noteRequired()"
+      [count]="noteLength()"
+      [max]="maxNoteLength"
+      [error]="noteError()"
+    >
+      <textarea
+        [id]="uid + '-note'"
+        rows="2"
+        [attr.maxlength]="maxNoteLength"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [value]="note()"
+        [attr.aria-invalid]="noteError() ? 'true' : null"
+        (input)="onNoteInput($event)"
+      ></textarea>
+    </ui-field>
+  }
+
+  <p class="flex items-start gap-6 text-12 leading-18 text-warning-text">
+    <ng-icon name="tablerAlertTriangle" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+    <span>{{ 'oppBulk.stage.reopenWarning' | transloco }}</span>
+  </p>
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'oppBulk.stage.preview' | transloco: previewParams() }}
+  </p>
+</app-bulk-run-modal>

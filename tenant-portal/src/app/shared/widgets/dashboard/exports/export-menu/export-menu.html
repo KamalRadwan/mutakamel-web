@@ -1,0 +1,60 @@
+@if (canExport) {
+  <button
+    #trigger
+    type="button"
+    uiButton
+    [variant]="primary() ? 'primary' : 'secondary'"
+    [size]="small() ? 'small' : 'default'"
+    [loading]="submitting()"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    (click)="toggle()"
+  >
+    <ng-icon name="tablerFileExport" [size]="iconSize()" aria-hidden="true" />
+    <span>{{ 'exportMenu.export' | transloco }}</span>
+    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+  </button>
+
+  @if (open()) {
+    <div
+      #panel
+      role="menu"
+      class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+      [class.invisible]="!placed()"
+      [style.top.px]="place().top"
+      [style.inset-inline-end.px]="place().end"
+      [attr.aria-label]="'exportMenu.export' | transloco"
+    >
+      @for (option of options; track option.format) {
+        @let disabled = isFormatDisabled(option.format);
+        <button
+          #rowBtn
+          type="button"
+          role="menuitem"
+          class="flex h-menu-item w-full items-center gap-8 rounded-6 px-8 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            disabled
+              ? 'cursor-not-allowed opacity-drag-source'
+              : 'cursor-pointer hover:bg-row-hover'
+          "
+          [attr.aria-disabled]="disabled ? 'true' : null"
+          [attr.title]="disabled ? ('exportMenu.pdfNotAvailable' | transloco) : null"
+          (click)="choose(option.format)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="option.tile"
+          >
+            <ng-icon [name]="option.icon" size="14" aria-hidden="true" />
+          </span>
+          <span
+            class="min-w-0 flex-1 text-12 font-medium"
+            [class]="disabled ? 'text-text-placeholder' : 'text-text'"
+          >
+            {{ option.labelKey | transloco }}
+          </span>
+        </button>
+      }
+    </div>
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "title": "Access requests",
+  "tabs": {
+    "label": "Access request views",
+    "mine": "My requests",
+    "inbox": "To decide",
+    "reviews": "Owner reviews"
+  },
+  "toolbar": {
+    "status": "Status",
+    "statusHint": "Filter listed items by their current workflow status.",
+    "allStatuses": "All statuses",
+    "reload": "Reload"
+  },
+  "columns": {
+    "number": "Number",
+    "requester": "Requester",
+    "resource": "Resource",
+    "requested": "Requested",
+    "purpose": "Purpose",
+    "heldNow": "Held now",
+    "status": "Status",
+    "waitingUntil": "Waiting until",
+    "owner": "Owner",
+    "reason": "Reason",
+    "reviewUntil": "Review until",
+    "actions": "Actions"
+  },
+  "table": {
+    "mineLabel": "My access requests",
+    "inboxLabel": "Access requests to decide",
+    "reviewsLabel": "Owner reviews"
+  },
+  "status": {
+    "PENDING": "Pending",
+    "APPROVED": "Approved",
+    "REJECTED": "Rejected",
+    "CANCELLED": "Cancelled",
+    "EXPIRED": "Expired"
+  },
+  "level": {
+    "VIEW": "View",
+    "EDIT": "Edit"
+  },
+  "resourceType": {
+    "DASHBOARD": "Dashboard",
+    "WIDGET": "Widget"
+  },
+  "reviewStatus": {
+    "OPEN": "Open",
+    "TRANSFERRED": "Transferred",
+    "OWNER_REACTIVATED": "Owner reactivated",
+    "LAPSED": "Lapsed",
+    "CANCELLED": "Cancelled"
+  },
+  "reviewReason": {
+    "OWNER_INACTIVE": "Owner inactive",
+    "OWNER_REMOVED": "Owner removed",
+    "ADMIN_INITIATED": "Admin initiated"
+  },
+  "inactive": "Inactive",
+  "actions": {
+    "requestAccess": "Request access",
+    "cancel": "Cancel",
+    "decide": "Decide",
+    "review": "Review",
+    "view": "View",
+    "loadMore": "Load more",
+    "clearDate": "Clear date"
+  },
+  "fields": {
+    "requester": "Requester",
+    "requesterHint": "User who submitted this access request.",
+    "resource": "Resource",
+    "resourceHint": "The dashboard or widget this request covers.",
+    "requestedLevel": "Requested level",
+    "requestedLevelHint": "Access level requested by the user.",
+    "heldNow": "Held now",
+    "heldNowHint": "Access level the requester held when submitting the request.",
+    "waitingUntil": "Waiting until",
+    "waitingUntilHint": "Requests expire automatically if undecided after 14 days.",
+    "purpose": "Purpose",
+    "purposeHint": "Business reason entered by the requester.",
+    "noExpiry": "No expiry date"
+  },
+  "date": {
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "empty": {
+    "mine": "No access requests match the selected status.",
+    "inbox": "No access requests are waiting for your decision.",
+    "reviews": "No owner reviews match the selected status."
+  },
+  "errors": {
+    "loadTitle": "Could not load access requests",
+    "forbiddenTitle": "Access restricted",
+    "forbiddenText": "You do not have permission to view this section.",
+    "resourceRequired": "Select a dashboard or widget.",
+    "purposeRequired": "Enter the reason for requesting access.",
+    "noteRequired": "Enter a note explaining the rejection.",
+    "ownerRequired": "Select an active user.",
+    "reasonRequired": "Enter a reason for transferring ownership.",
+    "maxLength": "Must not exceed {{max}} characters."
+  },
+  "confirmCancelRequest": {
+    "title": "Cancel access request?",
+    "text": "Cancelling withdraws this pending request so reviewers no longer see it.",
+    "confirm": "Cancel request"
+  },
+  "confirmCancelReview": {
+    "title": "Cancel owner review?",
+    "text": "Cancelling closes this review without transferring ownership.",
+    "confirm": "Cancel review"
+  },
+  "decide": {
+    "title": "Decide access request",
+    "decision": "Decision",
+    "decisionHint": "Approve to grant access immediately, or reject with an explanation.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "grantedLevel": "Granted level",
+    "grantedLevelHint": "May match or be lower than the requested level.",
+    "expires": "Access expires",
+    "expiresHint": "Optional future date when the granted share ends automatically.",
+    "note": "Note",
+    "noteHintApprove": "Optional note recorded with this approval.",
+    "noteHintReject": "Required when rejecting, up to 500 characters.",
+    "notePlaceholder": "Add decision note"
+  },
+  "request": {
+    "title": "Request access",
+    "resourceType": "Resource type",
+    "resourceTypeHint": "Choose whether you need access to a dashboard or a widget.",
+    "resource": "Resource",
+    "resourceHint": "Select a dashboard or widget you currently cannot open or edit.",
+    "resourcePlaceholder": "Select resource",
+    "searchResource": "Search resources",
+    "level": "Access level",
+    "levelHint": "View opens read-only; Edit allows modifying layout or settings.",
+    "expires": "Access until",
+    "expiresHint": "Optional future date when requested access should expire.",
+    "purpose": "Purpose",
+    "purposeHint": "Explain why you need access, up to 250 characters.",
+    "purposePlaceholder": "Explain why access is needed",
+    "send": "Send request"
+  },
+  "review": {
+    "title": "Owner review",
+    "owner": "Current owner",
+    "ownerHint": "Owner whose account status triggered this review.",
+    "triggerReason": "Trigger reason",
+    "triggerReasonHint": "Why this ownership review was opened.",
+    "status": "Review status",
+    "statusHint": "Current state of the ownership review workflow.",
+    "opened": "Opened",
+    "openedHint": "Date when this ownership review started.",
+    "reviewUntil": "Review until",
+    "reviewUntilHint": "Deadline before this review lapses automatically.",
+    "currentProposal": "Current proposal",
+    "currentProposalHint": "Active candidate proposed before executing the transfer.",
+    "noProposal": "No owner proposed yet",
+    "proposedOn": "Proposed on {{date}}",
+    "proposedOwner": "Proposed owner",
+    "proposedOwnerHint": "Select an active user eligible to take ownership.",
+    "proposedOwnerPlaceholder": "Select new owner",
+    "searchOwner": "Search users",
+    "reason": "Reason",
+    "reasonHintPropose": "Optional context when proposing an owner, up to 500 characters.",
+    "reasonHintTransfer": "Required audit reason for executing ownership transfer, up to 500 characters.",
+    "reasonPlaceholder": "Explain ownership transfer decision",
+    "propose": "Propose",
+    "transferNow": "Transfer now",
+    "cancelReview": "Cancel review"
+  },
+  "toast": {
+    "requested": "Access request submitted",
+    "cancelled": "Access request cancelled",
+    "approved": "Access request approved",
+    "rejected": "Access request rejected",
+    "proposed": "New owner proposed",
+    "transferred": "Ownership transferred",
+    "reviewCancelled": "Owner review cancelled"
+  }
+}

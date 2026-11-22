@@ -1,0 +1,55 @@
+<div class="flex flex-col gap-8">
+  <ui-field
+    size="bare"
+    [label]="'tradeShared.reason.label' | transloco"
+    [for]="reasonId()"
+    [hint]="'tradeShared.reason.hint' | transloco"
+    [required]="true"
+    [error]="loadError() ? ('tradeShared.common.loadFailed' | transloco) : reasonErrorKey() ? (reasonErrorKey()! | transloco) : error()"
+  >
+    <div class="flex items-center gap-6">
+      <ui-dropdown
+        class="min-w-0 flex-1"
+        size="field"
+        [id]="reasonId()"
+        [label]="'tradeShared.reason.label' | transloco"
+        [describedBy]="reasonDescribedBy()"
+        [options]="dropdownOptions()"
+        [value]="value().reasonCodeId"
+        [disabled]="disabled() || loading() || loadError() || reasons().length === 0"
+        (valueChange)="onReasonChange($event)"
+      />
+      @if (loadError()) {
+        <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
+          <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      }
+    </div>
+  </ui-field>
+
+  @if (showNote()) {
+    <ui-field
+      size="multiline"
+      [label]="'tradeShared.reason.note' | transloco"
+      [for]="noteId()"
+      [hint]="'tradeShared.reason.noteHint' | transloco"
+      [required]="noteRequired()"
+      [count]="noteLength()"
+      [max]="maxNoteLength"
+      [error]="noteErrorKey() ? (noteErrorKey()! | transloco) : null"
+    >
+      <textarea
+        [id]="noteId()"
+        rows="2"
+        [attr.maxlength]="maxNoteLength"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [disabled]="disabled()"
+        [value]="value().note"
+        [attr.aria-invalid]="noteErrorKey() ? 'true' : null"
+        (input)="onNoteInput($event)"
+        (blur)="onNoteBlur()"
+      ></textarea>
+    </ui-field>
+  }
+</div>

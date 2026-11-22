@@ -1,0 +1,194 @@
+@if (!canView) {
+  <ui-full-state
+    kind="forbidden"
+    [title]="'readiness.forbidden.title' | transloco"
+    [text]="'readiness.forbidden.text' | transloco"
+    [actionLabel]="'readiness.forbidden.action' | transloco"
+    (action)="goHome()"
+  />
+} @else if (loadError()) {
+  <ui-full-state
+    kind="load-failure"
+    [title]="'readiness.loadFailure.title' | transloco"
+    [text]="'analytics.common.loadFailed' | transloco"
+    [actionLabel]="'analytics.common.retry' | transloco"
+    (action)="reload()"
+  />
+} @else {
+  <app-settings-frame
+    [addLabel]="''"
+    [showAdd]="false"
+    [searchPlaceholder]="'readiness.search' | transloco"
+    [loading]="loading()"
+    [(search)]="search"
+    (reload)="reload()"
+  >
+    <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <ui-field
+        size="bare"
+        [label]="'readiness.filters.status' | transloco"
+        [hint]="'readiness.filters.statusHint' | transloco"
+      >
+        <div
+          role="radiogroup"
+          class="flex flex-wrap items-center gap-6"
+          [attr.aria-label]="'readiness.filters.status' | transloco"
+          (keydown)="onChipKeydown($event)"
+        >
+          <button
+            type="button"
+            role="radio"
+            class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap transition-colors duration-fast ease-enter outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              selectedStatus() === null
+                ? 'border-brand bg-brand text-on-brand'
+                : 'border-border bg-surface text-text hover:bg-row-hover'
+            "
+            [attr.aria-checked]="selectedStatus() === null"
+            [tabIndex]="selectedStatus() === null ? 0 : -1"
+            (click)="selectStatus(null)"
+          >
+            <span>{{ 'readiness.all' | transloco }}</span>
+            <ui-badge tone="count">{{ formatCount(statusCounts().total) }}</ui-badge>
+          </button>
+
+          @for (status of statuses; track status) {
+            <button
+              type="button"
+              role="radio"
+              class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap transition-colors duration-fast ease-enter outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                selectedStatus() === status
+                  ? 'border-brand bg-brand text-on-brand'
+                  : 'border-border bg-surface text-text hover:bg-row-hover'
+              "
+              [attr.aria-checked]="selectedStatus() === status"
+              [tabIndex]="selectedStatus() === status ? 0 : -1"
+              (click)="selectStatus(status)"
+            >
+              <span>{{ 'analytics.readiness.' + status | transloco }}</span>
+              <ui-badge tone="count">{{ formatCount(statusCounts().byStatus[status]) }}</ui-badge>
+            </button>
+          }
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'readiness.filters.family' | transloco"
+        [hint]="'readiness.filters.familyHint' | transloco"
+      >
+        <div
+          role="radiogroup"
+          class="flex flex-wrap items-center gap-6"
+          [attr.aria-label]="'readiness.filters.family' | transloco"
+          (keydown)="onChipKeydown($event)"
+        >
+          <button
+            type="button"
+            role="radio"
+            class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap transition-colors duration-fast ease-enter outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              selectedFamily() === null
+                ? 'border-brand bg-brand text-on-brand'
+                : 'border-border bg-surface text-text hover:bg-row-hover'
+            "
+            [attr.aria-checked]="selectedFamily() === null"
+            [tabIndex]="selectedFamily() === null ? 0 : -1"
+            (click)="selectFamily(null)"
+          >
+            <span>{{ 'readiness.all' | transloco }}</span>
+            <ui-badge tone="count">{{ formatCount(familyCounts().total) }}</ui-badge>
+          </button>
+
+          @for (family of availableFamilies(); track family) {
+            <button
+              type="button"
+              role="radio"
+              class="inline-flex h-filter-chip cursor-pointer items-center gap-6 rounded-8 border px-8 text-12 font-medium whitespace-nowrap transition-colors duration-fast ease-enter outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                selectedFamily() === family
+                  ? 'border-brand bg-brand text-on-brand'
+                  : 'border-border bg-surface text-text hover:bg-row-hover'
+              "
+              [attr.aria-checked]="selectedFamily() === family"
+              [tabIndex]="selectedFamily() === family ? 0 : -1"
+              (click)="selectFamily(family)"
+            >
+              <span>{{ familyTranslationKey(family) | transloco }}</span>
+              <ui-badge tone="count">{{ formatCount(familyCounts().byFamily[family] ?? 0) }}</ui-badge>
+            </button>
+          }
+        </div>
+      </ui-field>
+    </div>
+
+    <ui-data-table
+      [columns]="columns()"
+      [rows]="visibleRows()"
+      [rowKey]="rowKey"
+      [loading]="loading() && !loadedOnce()"
+      [emptyText]="emptyText()"
+      [rowClickable]="true"
+      [label]="'readiness.table.label' | transloco"
+      [(sort)]="sort"
+      (rowClick)="openSource($event.sourceKey)"
+    >
+      <ng-template uiCell="sourceKey" let-row>
+        <bdi dir="ltr" class="min-w-0 truncate text-13 leading-18 font-medium text-text tabular-nums" [title]="row.sourceKey">
+          {{ row.sourceKey }}
+        </bdi>
+      </ng-template>
+
+      <ng-template uiCell="sourceFamily" let-row>
+        <span class="min-w-0 truncate text-12 leading-18 text-text" [title]="familyTranslationKey(row.sourceFamily) | transloco">
+          {{ familyTranslationKey(row.sourceFamily) | transloco }}
+        </span>
+      </ng-template>
+
+      <ng-template uiCell="ownerModule" let-row>
+        <bdi dir="ltr" class="min-w-0 truncate text-12 leading-18 text-text-muted" [title]="row.ownerModule">
+          {{ row.ownerModule }}
+        </bdi>
+      </ng-template>
+
+      <ng-template uiCell="status" let-row>
+        <ui-badge
+          [tone]="uiStateTone(row.uiState)"
+          [attr.title]="'analytics.readiness.' + row.status | transloco"
+        >
+          {{ 'analytics.readinessUi.' + row.uiState | transloco }}
+        </ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="reasonCode" let-row>
+        <span class="min-w-0 truncate text-12 leading-18 text-text-muted" [title]="reasonText(row.reasonCode)">
+          {{ reasonText(row.reasonCode) }}
+        </span>
+      </ng-template>
+
+      <ng-template uiCell="lagSeconds" let-row>
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="min-w-0 truncate text-12 leading-18 text-text tabular-nums" [title]="formatFreshness(row.lagSeconds)">
+            {{ formatFreshness(row.lagSeconds) }}
+          </span>
+          @if (row.stale) {
+            <ui-badge tone="warning">{{ 'readiness.stale' | transloco }}</ui-badge>
+          }
+        </div>
+      </ng-template>
+
+      <ng-template uiCell="affectedReportCount" let-row>
+        <ui-badge tone="count">{{ formatCount(row.affectedReportCount) }}</ui-badge>
+      </ng-template>
+
+      <ng-template uiCell="lastCheckedAt" let-row>
+        <span class="min-w-0 truncate text-12 leading-18 text-text-muted tabular-nums" [title]="formatLastChecked(row.lastCheckedAt)">
+          {{ formatLastChecked(row.lastCheckedAt) }}
+        </span>
+      </ng-template>
+    </ui-data-table>
+  </app-settings-frame>
+
+  <app-readiness-modal #readinessModal (closed)="onModalClosed()" />
+}

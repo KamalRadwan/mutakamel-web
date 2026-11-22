@@ -1,0 +1,223 @@
+{
+  "title": "Targets",
+  "new": "New target",
+  "search": "Search targets",
+  "empty": "No targets yet",
+  "forbiddenTitle": "Access denied",
+  "forbiddenText": "You do not have permission to view targets.",
+  "backHome": "Back to home",
+  "quarter": "Q{{n}} {{year}}",
+  "subjectTypes": {
+    "USER": "User",
+    "TEAM": "Team",
+    "BRANCH": "Branch",
+    "TEAM_SET": "Team set"
+  },
+  "measures": {
+    "MONEY": "Money",
+    "COUNT": "Count",
+    "RATE": "Rate"
+  },
+  "grains": {
+    "MONTH": "Monthly",
+    "QUARTER": "Quarterly",
+    "YEAR": "Yearly"
+  },
+  "states": {
+    "DRAFT": "Draft",
+    "SUBMITTED": "Submitted",
+    "APPROVED": "Approved"
+  },
+  "basis": {
+    "REVIEWED": "Reviewed",
+    "LEGACY_BACKFILL": "Legacy",
+    "CORRECTION": "Correction"
+  },
+  "filters": {
+    "grain": "Period grain",
+    "state": "Approval state",
+    "subjectType": "Subject type",
+    "branch": "Branch",
+    "all": "All",
+    "clear": "Clear filters",
+    "sort": "Sort",
+    "sortOptions": {
+      "periodStart:desc": "Period (newest first)",
+      "periodStart:asc": "Period (oldest first)",
+      "metricKey:asc": "Metric (A–Z)",
+      "metricKey:desc": "Metric (Z–A)",
+      "createdAt:desc": "Created (newest first)",
+      "createdAt:asc": "Created (oldest first)"
+    }
+  },
+  "table": {
+    "subject": "Subject",
+    "metric": "Metric",
+    "period": "Period",
+    "target": "Target",
+    "state": "State",
+    "release": "Release",
+    "actions": "Actions"
+  },
+  "actions": {
+    "submit": "Submit",
+    "approve": "Approve",
+    "reject": "Reject",
+    "correct": "Correct",
+    "releases": "Releases",
+    "delete": "Delete",
+    "cannotDeleteSubmitted": "Submitted targets cannot be deleted while awaiting approval."
+  },
+  "form": {
+    "createTitle": "New target",
+    "editTitle": "Target",
+    "subjectType": "Subject type",
+    "subjectTypeHint": "Choose whether this target applies to a user, a team, a branch, or a set of teams.",
+    "branch": "Branch",
+    "branchHint": "Select the branch for this target or to filter users and teams.",
+    "selectBranch": "Select branch",
+    "subject": "Subject",
+    "subjectHint": "The user or team assigned to achieve this target.",
+    "selectSubject": "Select subject",
+    "teams": "Teams",
+    "teamsHint": "Select between 2 and 50 teams covered by this target.",
+    "selectTeams": "Select teams",
+    "teamsSelected": "{{count}} teams selected",
+    "metric": "Metric",
+    "metricHint": "The CRM performance metric measured against this target.",
+    "selectMetric": "Select metric",
+    "measure": "Measure",
+    "measureHint": "Automatically determined by the selected metric (Money, Count, or Rate).",
+    "periodGrain": "Period grain",
+    "periodGrainHint": "The recurring time granularity of the target period: monthly, quarterly, or yearly.",
+    "periodStart": "Period start",
+    "periodStartHint": "Choose the month, quarter, or year when this target period begins.",
+    "month": "Month",
+    "quarterLabel": "Quarter",
+    "year": "Year",
+    "currency": "Currency",
+    "currencyHint": "Targets of different currencies are kept separate and never summed together.",
+    "targetValue": "Target value",
+    "targetValueHint": "Positive goal amount. Counts must be whole numbers; rates must be at most 100%.",
+    "targetValueApprovedHint": "Editing an approved target value returns it to Draft and requires re-approval.",
+    "targetValueLockedHint": "Submitted targets cannot be edited while awaiting approval.",
+    "targetValuePlaceholder": "Enter target value",
+    "reviewNote": "Review note",
+    "reviewNoteHint": "Feedback recorded by the reviewer when approving or rejecting this target."
+  },
+  "months": {
+    "1": "January",
+    "2": "February",
+    "3": "March",
+    "4": "April",
+    "5": "May",
+    "6": "June",
+    "7": "July",
+    "8": "August",
+    "9": "September",
+    "10": "October",
+    "11": "November",
+    "12": "December"
+  },
+  "quarters": {
+    "1": "First quarter (Q1)",
+    "4": "Second quarter (Q2)",
+    "7": "Third quarter (Q3)",
+    "10": "Fourth quarter (Q4)"
+  },
+  "approveModal": {
+    "title": "Approve target",
+    "confirm": "Approve",
+    "subject": "Subject",
+    "metric": "Metric",
+    "period": "Period",
+    "target": "Target",
+    "note": "Review note",
+    "noteHint": "Optional note recorded with this approval.",
+    "notePlaceholder": "Add an optional approval note",
+    "subjectHint": "The user, team, or branch this target is assigned to.",
+    "metricHint": "The CRM performance metric this target measures.",
+    "periodHint": "The period this target covers.",
+    "targetHint": "The target value submitted for approval."
+  },
+  "rejectModal": {
+    "title": "Reject target",
+    "confirm": "Reject",
+    "subject": "Subject",
+    "metric": "Metric",
+    "period": "Period",
+    "target": "Target",
+    "note": "Rejection note",
+    "noteHint": "Required explanation for returning this target to Draft.",
+    "notePlaceholder": "Explain why this target is being rejected",
+    "subjectHint": "The user, team, or branch this target is assigned to.",
+    "metricHint": "The CRM performance metric this target measures.",
+    "periodHint": "The period this target covers.",
+    "targetHint": "The target value being rejected."
+  },
+  "correctModal": {
+    "title": "Correct closed-period target",
+    "confirm": "Save correction",
+    "subject": "Subject",
+    "metric": "Metric",
+    "period": "Period",
+    "currentValue": "Current target",
+    "newValue": "New value",
+    "newValueHint": "Corrected target value to publish as a new release for this closed period.",
+    "reason": "Correction reason",
+    "reasonHint": "Required audit reason explaining why the closed-period target is being corrected.",
+    "reasonPlaceholder": "Explain why this closed-period target is being corrected",
+    "subjectHint": "The user, team, or branch this target is assigned to.",
+    "metricHint": "The CRM performance metric this target measures.",
+    "periodHint": "The period this target covers.",
+    "currentValueHint": "The target value currently published for this closed period."
+  },
+  "releasesModal": {
+    "title": "Target releases",
+    "loadMore": "Load more",
+    "empty": "No releases yet",
+    "columns": {
+      "release": "Release",
+      "value": "Value",
+      "basis": "Basis",
+      "reason": "Reason",
+      "approvedBy": "Approved by",
+      "approvedAt": "Approved",
+      "period": "Period"
+    }
+  },
+  "validation": {
+    "subjectRequired": "Select a subject.",
+    "teamsRange": "Select between 2 and 50 teams.",
+    "metricRequired": "Select a metric.",
+    "periodRequired": "Choose a valid period start.",
+    "currencyRequired": "Select a currency.",
+    "valueRequired": "Target value is required.",
+    "valuePositive": "Enter a number greater than 0.",
+    "valueInteger": "Count targets must be a whole number.",
+    "valueRateMax": "Rate targets cannot exceed 100.",
+    "valueMax": "Value exceeds the maximum allowed limit.",
+    "rejectNoteRequired": "Rejection note is required.",
+    "correctionReasonRequired": "Correction reason is required."
+  },
+  "delete": {
+    "title": "Delete target?",
+    "text": "Delete the target for “{{name}}”?"
+  },
+  "discard": {
+    "title": "Unsaved changes",
+    "text": "Save your changes to this target before closing?",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
+  "toasts": {
+    "created": "Target created",
+    "saved": "Target saved",
+    "deleted": "Target deleted",
+    "submitted": "Target submitted for approval",
+    "approved": "Target approved",
+    "rejected": "Target returned to Draft",
+    "corrected": "Target correction saved"
+  }
+}

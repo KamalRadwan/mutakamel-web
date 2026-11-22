@@ -1,0 +1,3 @@
+.call-history-body {
+  height: calc(100dvh / var(--view-zoom, 1) - 6 * var(--space-16));
+}

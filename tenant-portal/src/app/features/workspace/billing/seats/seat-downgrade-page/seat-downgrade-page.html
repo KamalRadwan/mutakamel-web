@@ -1,0 +1,373 @@
+<header class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <div class="flex min-w-0 items-center gap-8">
+    <a
+      [routerLink]="['/workspace/billing/subscription']"
+      class="inline-flex size-btn shrink-0 items-center justify-center rounded-8 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'sb.down.back' | transloco"
+      [title]="'sb.down.back' | transloco"
+    >
+      <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+    </a>
+    <h1 class="truncate text-15 leading-22 font-medium text-text">{{ 'sb.down.title' | transloco }}</h1>
+  </div>
+</header>
+
+@if (loading() && !usage()) {
+  <div class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card" aria-busy="true">
+    <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+    <div class="grid grid-cols-1 gap-8 desktop:grid-cols-2">
+      <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+      <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+    </div>
+  </div>
+} @else if (loadFailed() && !usage()) {
+  <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'sb.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="reload()">
+      {{ 'sb.common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (usage()) {
+  <!-- 3-step stepper: circle 20, connector 2 -->
+  <nav
+    class="flex items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    [attr.aria-label]="'sb.down.title' | transloco"
+  >
+    @for (item of steps; track item.num; let last = $last) {
+      @let done = freed() || step() > item.num;
+      @let active = !freed() && step() === item.num;
+      <div class="flex shrink-0 items-center gap-6" [attr.aria-current]="active ? 'step' : null">
+        <span
+          class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 leading-16 font-medium tabular-nums"
+          [class]="
+            done
+              ? 'bg-success text-on-success'
+              : active
+                ? 'bg-brand text-on-brand'
+                : 'bg-neutral-soft text-text-muted'
+          "
+        >
+          @if (done) {
+            <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+          } @else {
+            {{ item.num }}
+          }
+        </span>
+        <span
+          class="text-12 leading-18 whitespace-nowrap"
+          [class]="active || done ? 'font-medium text-text' : 'text-text-muted'"
+        >
+          {{ 'sb.down.steps.' + item.key | transloco }}
+        </span>
+      </div>
+      @if (!last) {
+        <span
+          class="h-2 flex-1 rounded-full"
+          [class]="done ? 'bg-brand' : 'bg-border'"
+          aria-hidden="true"
+        ></span>
+      }
+    }
+  </nav>
+
+  @if (!isOwner) {
+    <div class="rounded-10 border border-border bg-surface p-10 text-12 leading-18 text-text-muted shadow-card">
+      {{ 'settings.errors.permission' | transloco }}
+    </div>
+  } @else if (step() === 1) {
+    <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      <div class="grid grid-cols-1 gap-10 desktop:grid-cols-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-app'"
+          [label]="'sb.down.app' | transloco"
+          [required]="true"
+          [hint]="'sb.down.appHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-app'"
+            [describedBy]="uid + '-app-hint'"
+            [options]="moduleOptions()"
+            [value]="moduleKey()"
+            [label]="'sb.down.app' | transloco"
+            (valueChange)="onModuleChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-target'"
+          [label]="'sb.down.target' | transloco"
+          [required]="true"
+          [hint]="'sb.down.targetHint' | transloco"
+          [error]="targetError()"
+        >
+          <input
+            [id]="uid + '-target'"
+            type="number"
+            inputmode="numeric"
+            dir="ltr"
+            [min]="1"
+            [max]="maxTarget()"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [value]="targetInput()"
+            [disabled]="!canReduceModule()"
+            [attr.aria-invalid]="targetError() ? 'true' : null"
+            [attr.aria-describedby]="uid + '-target-hint' + (targetError() ? ' ' + uid + '-target-error' : '')"
+            (input)="onTargetInput($event)"
+            (blur)="targetTouched.set(true)"
+          />
+        </ui-field>
+      </div>
+
+      @if (selectedModule(); as mod) {
+        <p class="text-12 leading-18 text-text-muted">
+          {{ 'sb.down.now' | transloco: { used: mod.used } }}
+        </p>
+      }
+
+      <div class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [disabled]="!step1Valid() || holdersLoading()"
+          [loading]="holdersLoading()"
+          (click)="goToStep2()"
+        >
+          {{ 'sb.common.next' | transloco }}
+        </button>
+        <a uiButton variant="secondary" [routerLink]="['/workspace/billing/subscription']">
+          {{ 'sb.common.cancel' | transloco }}
+        </a>
+      </div>
+    </section>
+  } @else if (step() === 2) {
+    <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      <div class="flex flex-wrap items-center justify-between gap-8">
+        <div class="flex items-center gap-8">
+          <h2 class="text-13 leading-18 font-medium text-text">{{ 'sb.down.steps.keep' | transloco }}</h2>
+          <span
+            class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium tabular-nums"
+            [class]="tooManySelected() ? 'bg-danger text-on-danger' : 'bg-brand-soft text-on-brand-soft'"
+          >
+            {{ 'sb.down.count' | transloco: { n: keptUserIds().length, target: targetSeats() } }}
+          </span>
+        </div>
+        @if (selectedModule(); as mod) {
+          <span class="text-12 leading-18 text-text-muted">{{ moduleName(mod) }}</span>
+        }
+      </div>
+
+      @if (holdersLoading()) {
+        <div class="flex flex-col gap-6" aria-busy="true">
+          @for (row of skeletonRows; track row) {
+            <div class="flex h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+              <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </div>
+          }
+        </div>
+      } @else {
+        <ui-field
+          size="bare"
+          [for]="uid + '-keepers'"
+          [label]="'sb.down.keepField' | transloco"
+          [hint]="'sb.down.keepHint' | transloco"
+          [error]="tooManySelected() ? ('sb.down.tooMany' | transloco: { target: targetSeats() }) : null"
+        >
+        <div
+          [id]="uid + '-keepers'"
+          role="group"
+          [attr.aria-label]="'sb.down.keepField' | transloco"
+          [attr.aria-describedby]="uid + '-keepers-hint'"
+          class="flex flex-col gap-6"
+        >
+          @for (holder of holders(); track holder.userId) {
+            @let kept = isKept(holder.userId);
+            @let removal = kept ? null : removalByUserId().get(holder.userId) ?? null;
+            <div
+              class="flex flex-col gap-6 rounded-10 border p-8 shadow-card transition-colors duration-fast cursor-pointer"
+              [class]="kept ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+              (click)="onKeeperRowClick(holder.userId, $event)"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-8">
+                <div class="flex min-w-0 items-center gap-8">
+                  <ui-checkbox [checked]="kept" (checkedChange)="toggleKeeper(holder.userId, $event)">
+                    <span class="flex min-w-0 flex-col">
+                      <span dir="auto" class="truncate text-12 leading-18 font-medium text-text">{{ holder.name }}</span>
+                      <span dir="ltr" class="truncate text-11 leading-16 text-text-muted">{{ holder.email }}</span>
+                    </span>
+                  </ui-checkbox>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-6">
+                  @for (role of holder.roles; track role.roleId + ':' + role.scope.target + ':' + (role.scope.companyId ?? '') + ':' + (role.scope.branchId ?? '')) {
+                    <span class="inline-flex h-badge items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text">
+                      {{ roleLabel(role) }}
+                    </span>
+                  }
+                  <span class="text-11 leading-16 text-text-muted tabular-nums">
+                    {{ formatDate(holder.grantedAt) }}
+                  </span>
+                </div>
+              </div>
+
+              @if (!kept && removal) {
+                <div class="flex flex-wrap items-center gap-6 border-t border-border pt-6 text-11 leading-16">
+                  @if (removal.roleAssignments.length) {
+                    <span class="text-danger-text">
+                      {{ 'sb.down.losesRoles' | transloco: { roles: rolesListLabel(removal.roleAssignments) } }}
+                    </span>
+                  }
+                  @if (removal.alsoLoses.length) {
+                    <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium text-on-warning">
+                      {{ 'sb.down.alsoLoses' | transloco: { apps: alsoLosesLabel(removal.alsoLoses) } }}
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          } @empty {
+            <p class="p-16 text-center text-12 text-text-muted">{{ 'sb.holders.empty' | transloco }}</p>
+          }
+        </div>
+        </ui-field>
+      }
+
+      <div class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [disabled]="holdersLoading() || tooManySelected() || previewLoading()"
+          [loading]="previewLoading()"
+          (click)="goToStep3()"
+        >
+          {{ 'sb.common.next' | transloco }}
+        </button>
+        <button type="button" uiButton variant="secondary" [disabled]="holdersLoading()" (click)="backToStep1()">
+          {{ 'sb.common.back' | transloco }}
+        </button>
+      </div>
+    </section>
+  } @else if (step() === 3) {
+    <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      @if (freed()) {
+        <div class="flex items-start gap-8 rounded-8 border border-border bg-surface-muted p-10">
+          <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+            <ng-icon name="tablerCircleCheck" size="15" aria-hidden="true" />
+          </span>
+          <div class="flex min-w-0 flex-1 flex-col gap-4">
+            <p class="text-13 leading-18 font-medium text-text">{{ 'sb.down.done' | transloco }}</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          <a
+            uiButton
+            variant="primary"
+            routerLink="/workspace/billing/subscription/change"
+            [queryParams]="changeQueries().get(selectedModule()?.moduleKey ?? '')"
+          >
+            {{ 'sb.down.changeSubscription' | transloco }}
+          </a>
+          <button type="button" uiButton variant="secondary" (click)="goBackToSeats()">
+            {{ 'sb.down.back' | transloco }}
+          </button>
+        </div>
+      } @else {
+        <p class="text-13 leading-18 font-medium text-text">
+          {{ 'sb.down.summary' | transloco: { n: removals().length, module: selectedModuleName() } }}
+        </p>
+
+        @if (removals().length) {
+          <div class="flex flex-col gap-6">
+            @for (removal of removals(); track removal.userId) {
+              <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+                <span dir="auto" class="text-12 leading-18 font-medium text-text">{{ removal.name }}</span>
+                <div class="flex flex-wrap items-center gap-6 text-11 leading-16">
+                  @if (removal.roleAssignments.length) {
+                    <span class="text-danger-text">
+                      {{ 'sb.down.losesRoles' | transloco: { roles: rolesListLabel(removal.roleAssignments) } }}
+                    </span>
+                  }
+                  @if (removal.alsoLoses.length) {
+                    <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium text-on-warning">
+                      {{ 'sb.down.alsoLoses' | transloco: { apps: alsoLosesLabel(removal.alsoLoses) } }}
+                    </span>
+                  }
+                  @if (removal.addonsRemoved.length) {
+                    <span class="inline-flex h-badge items-center rounded-8 bg-danger-soft px-8 text-12 font-medium text-on-danger-soft">
+                      {{ 'sb.down.addonsRemoved' | transloco: { addons: addonsListLabel(removal.addonsRemoved) } }}
+                    </span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="text-12 leading-18 text-text-muted">{{ 'sb.down.noRemovals' | transloco }}</p>
+        }
+
+        <div class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          <button
+            type="button"
+            uiButton
+            variant="danger"
+            [loading]="freeing()"
+            [disabled]="freeing()"
+            (click)="submitFreeUp()"
+          >
+            {{ 'sb.down.free' | transloco: { n: removals().length } }}
+          </button>
+          <button type="button" uiButton variant="secondary" [disabled]="freeing()" (click)="backToStep2()">
+            {{ 'sb.common.back' | transloco }}
+          </button>
+        </div>
+      }
+    </section>
+  }
+}
+
+<ui-confirm-dialog
+  #confirmFreeDialog
+  tone="danger"
+  [title]="'sb.down.confirmTitle' | transloco"
+  [text]="'sb.down.confirm' | transloco: { n: removals().length }"
+  [confirmLabel]="'sb.down.free' | transloco: { n: removals().length }"
+  [cancelLabel]="'sb.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'sb.down.unsaved.title' | transloco"
+  [text]="'sb.down.unsaved.text' | transloco"
+  [saveLabel]="'sb.down.unsaved.save' | transloco"
+  [discardLabel]="'sb.down.unsaved.discard' | transloco"
+  [cancelLabel]="'sb.down.unsaved.cancel' | transloco"
+/>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'sb.conflict.title' | transloco"
+  [closeLabel]="'sb.common.close' | transloco"
+  [dismissable]="!reloadingConflict()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'sb.conflict.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" [loading]="reloadingConflict()" (click)="reloadAfterConflict()">
+      {{ 'sb.conflict.reload' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="reloadingConflict()" (click)="closeConflictModal()">
+      {{ 'sb.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

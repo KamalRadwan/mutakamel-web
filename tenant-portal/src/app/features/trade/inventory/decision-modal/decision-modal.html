@@ -1,0 +1,222 @@
+<ui-modal
+  size="wide"
+  icon="tablerGavel"
+  tile="bg-icon-red"
+  [title]="'invEvidence.decisionModal.title' | transloco"
+  [subtitle]="decisionSubtitle()"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (decision(); as d) {
+    <app-inventory-badge modal-header-end kind="outcome" [value]="outcomeBadgeValue(d)" />
+  }
+
+  @if (loading()) {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8" aria-busy="true">
+      @for (field of skeletonFields; track field) {
+        <div class="flex flex-col gap-4" [class.col-span-2]="field === 2 || field === 3">
+          <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-field w-full motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+        </div>
+      }
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ errorMessageKey() | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="retry()">
+        {{ 'invEvidence.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (decision(); as d) {
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <ui-field
+        [for]="uid + '-outcome'"
+        [label]="'invEvidence.decisionModal.outcome' | transloco"
+        [hint]="'invEvidence.decisionModal.outcomeHint' | transloco"
+      >
+        <input
+          [id]="uid + '-outcome'"
+          type="text"
+          readonly
+          dir="auto"
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="outcomeText()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-evaluated'"
+        [label]="'invEvidence.decisionModal.evaluatedAt' | transloco"
+        [hint]="'invEvidence.decisionModal.evaluatedAtHint' | transloco"
+      >
+        <input
+          [id]="uid + '-evaluated'"
+          type="text"
+          readonly
+          dir="ltr"
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="formatDateTime(d.evaluatedAt)"
+        />
+      </ui-field>
+
+      <div class="col-span-2 flex flex-col gap-4">
+        <ui-field
+          size="multiline"
+          [for]="uid + '-explanation'"
+          [label]="'invEvidence.decisionModal.explanation' | transloco"
+          [hint]="'invEvidence.decisionModal.explanationHint' | transloco"
+          [hintText]="explanationCodeLtr()"
+        >
+          <textarea
+            [id]="uid + '-explanation'"
+            readonly
+            rows="2"
+            dir="auto"
+            class="w-full min-w-0 cursor-default resize-none bg-transparent text-12 leading-18 text-text outline-none"
+            [value]="translatedExplanation()"
+          ></textarea>
+        </ui-field>
+
+        @if (showOriginalExplanation()) {
+          <textarea
+            readonly
+            rows="2"
+            dir="auto"
+            [attr.aria-label]="'invEvidence.decisionModal.originalExplanation' | transloco"
+            [attr.aria-describedby]="uid + '-explanation-hint'"
+            class="w-full min-w-0 cursor-default resize-none rounded-8 border border-border-field bg-surface-field px-8 py-6 text-12 leading-18 text-text outline-none"
+            [value]="d.explanation"
+          ></textarea>
+        }
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-rules'"
+          [label]="'invEvidence.decisionModal.matchedRules' | transloco"
+          [hint]="'invEvidence.decisionModal.matchedRulesHint' | transloco"
+        >
+          @if (d.matchedRules.length > 0) {
+            <div
+              [id]="uid + '-rules'"
+              role="list"
+              [attr.aria-describedby]="uid + '-rules-hint'"
+              class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border border-border-field bg-surface-field px-8 py-2"
+            >
+              @for (rule of d.matchedRules; track rule) {
+                <span
+                  role="listitem"
+                  class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 leading-16 font-medium text-on-brand-soft"
+                >
+                  <bdi dir="ltr" class="tabular-nums">{{ rule }}</bdi>
+                </span>
+              }
+            </div>
+          } @else {
+            <input
+              [id]="uid + '-rules'"
+              type="text"
+              readonly
+              class="flex h-field w-full cursor-default items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+              [attr.aria-describedby]="uid + '-rules-hint'"
+              [value]="'tradeInventory.common.none' | transloco"
+            />
+          }
+        </ui-field>
+      </div>
+
+      <ui-field
+        [for]="uid + '-versions'"
+        [label]="'invEvidence.decisionModal.policyVersions' | transloco"
+        [hint]="'invEvidence.decisionModal.policyVersionsHint' | transloco"
+      >
+        <input
+          [id]="uid + '-versions'"
+          type="text"
+          readonly
+          dir="ltr"
+          class="w-full min-w-0 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="policyVersionsText()"
+          [title]="policyVersionsText()"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-correlation'"
+        [label]="'invEvidence.decisionModal.correlationId' | transloco"
+        [hint]="'invEvidence.decisionModal.correlationIdHint' | transloco"
+      >
+        <input
+          [id]="uid + '-correlation'"
+          type="text"
+          readonly
+          dir="ltr"
+          class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+          [value]="d.correlationId"
+          [title]="d.correlationId"
+        />
+        <button
+          type="button"
+          class="inline-flex size-badge shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'invEvidence.decisionModal.copyCorrelation' | transloco"
+          [title]="'tradeInventory.common.copy' | transloco"
+          (click)="copyText(d.correlationId)"
+        >
+          <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+        </button>
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [for]="uid + '-record'"
+          [label]="'invEvidence.decisionModal.record' | transloco"
+          [hint]="'invEvidence.decisionModal.recordHint' | transloco"
+        >
+          <span class="shrink-0 text-12 text-text-muted">{{ aggregateTypeLabel(d.aggregateType) }}</span>
+          <span class="shrink-0 text-12 text-text-muted" aria-hidden="true">·</span>
+          <input
+            [id]="uid + '-record'"
+            type="text"
+            readonly
+            dir="ltr"
+            class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text tabular-nums outline-none"
+            [value]="d.aggregateId"
+            [title]="d.aggregateId"
+          />
+          <button
+            type="button"
+            class="inline-flex size-badge shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'invEvidence.decisionModal.copyRecord' | transloco"
+            [title]="'tradeInventory.common.copy' | transloco"
+            (click)="copyText(d.aggregateId)"
+          >
+            <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+          </button>
+        </ui-field>
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (decision(); as d) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="!canOpenRecord(d)"
+        [attr.title]="!canOpenRecord(d) ? ('invEvidence.decisionModal.noRecordPage' | transloco) : null"
+        (click)="openRecord(d)"
+      >
+        <ng-icon name="tablerExternalLink" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        {{ 'tradeInventory.common.openRecord' | transloco }}
+      </button>
+    }
+    <button type="button" uiButton variant="ghost" (click)="close()">
+      {{ 'tradeInventory.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

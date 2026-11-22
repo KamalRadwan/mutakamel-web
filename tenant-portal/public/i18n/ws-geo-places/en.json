@@ -1,0 +1,129 @@
+{
+  "filters": {
+    "country": "Country",
+    "countryHint": "Choose the country first.",
+    "state": "State",
+    "stateHint": "Cities are listed per state.",
+    "city": "City",
+    "cityPlaceholder": "Choose a city",
+    "cityHint": "Villages and districts are listed per city.",
+    "showInactive": "Show inactive",
+    "showInactiveHint": "Include inactive places in the list.",
+    "kind": "Kind",
+    "kindHint": "Filter by villages or districts.",
+    "kindAll": "All",
+    "kindDistrict": "Districts",
+    "kindVillage": "Villages"
+  },
+  "chooseState": "Choose a state to see its cities.",
+  "chooseCity": "Choose a city to see its villages and districts.",
+  "cities": {
+    "title": "Cities",
+    "new": "New city",
+    "search": "Search cities",
+    "addHint": "Choose a state first.",
+    "viewDistricts": "View"
+  },
+  "districts": {
+    "new": "New village or district",
+    "search": "Search villages and districts",
+    "addHint": "Choose a city first."
+  },
+  "cols": {
+    "nameEn": "English name",
+    "nameAr": "Arabic name",
+    "zone": "Zone",
+    "districts": "Villages and districts",
+    "kind": "Kind",
+    "status": "Status",
+    "actions": "Actions",
+    "updated": "Last updated"
+  },
+  "kind": {
+    "DISTRICT": "District",
+    "VILLAGE": "Village"
+  },
+  "active": "Active",
+  "inactive": "Inactive",
+  "none": "—",
+  "loadMore": "Load more",
+  "shown": "{{count}} shown",
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "viewDistricts": "View villages and districts",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete"
+  },
+  "delete": {
+    "title": "Delete “{{name}}”?",
+    "text": "Only places that nothing uses can be deleted.",
+    "done": "Deleted."
+  },
+  "inUse": {
+    "title": "This place is in use",
+    "text": "This city is used by {{usedBy}}. Make it inactive to hide it from new records.",
+    "textDistrict": "Addresses use it. Make it inactive to hide it from new records.",
+    "makeInactive": "Make inactive"
+  },
+  "modal": {
+    "newCity": "New city",
+    "city": "City",
+    "newDistrict": "New village or district",
+    "district": "Village or district",
+    "location": "Location",
+    "locationHint": "Where this place belongs. It cannot change here.",
+    "kind": "Kind",
+    "kindHint": "Choose District for a city area or Village for a rural place.",
+    "nameEn": "English name",
+    "nameEnHint": "Up to 120 characters. Must be unique in this area.",
+    "nameAr": "Arabic name",
+    "nameArHint": "Up to 120 characters. Must be unique in this area.",
+    "active": "Active",
+    "activeHint": "Turn off to hide it from new records.",
+    "activeHelp": "Inactive places stay on old records but cannot be chosen for new ones.",
+    "save": "Save",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "cancel": "Cancel",
+    "delete": "Delete"
+  },
+  "discard": {
+    "title": "Discard changes?",
+    "text": "Your changes will be lost.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "created": "Created.",
+  "saved": "Changes saved.",
+  "nameTaken": "This name already exists here.",
+  "required": "This field is required.",
+  "loadFailed": "Could not load the list.",
+  "retry": "Try again",
+  "noResults": "No matches.",
+  "clearSearch": "Clear search",
+  "errors": {
+    "GEO_NAME_TOO_LONG": "Up to 120 characters.",
+    "generic": "Something went wrong. Try again.",
+    "CORE_VALIDATION_FAILED": "Some fields are not valid. Check them and try again.",
+    "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Reload the page and try again.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action.",
+    "GEO_STATE_NOT_FOUND": "This state no longer exists.",
+    "GEO_CITY_NOT_FOUND": "This city no longer exists. Reload the list.",
+    "GEO_DISTRICT_NOT_FOUND": "This village or district no longer exists. Reload the list.",
+    "GEO_CITY_NAME_TAKEN": "A city with this name already exists in this state.",
+    "GEO_DISTRICT_NAME_TAKEN": "A village or district with this name already exists in this city.",
+    "GEO_CITY_IN_USE": "This city is used by addresses, villages and districts, or a zone.",
+    "GEO_DISTRICT_IN_USE": "Addresses use this village or district.",
+    "GEO_PARENT_INACTIVE": "The area it belongs to is inactive. Activate it first."
+  },
+  "usedBy": {
+    "addresses": "addresses",
+    "districts": "villages and districts",
+    "zones": "a zone",
+    "separator": ", "
+  }
+}

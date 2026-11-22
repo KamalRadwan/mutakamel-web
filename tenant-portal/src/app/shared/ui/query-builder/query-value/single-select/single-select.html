@@ -1,0 +1,146 @@
+<button
+  #trigger
+  type="button"
+  [class]="triggerClasses()"
+  aria-haspopup="listbox"
+  [attr.aria-expanded]="open()"
+  [attr.aria-label]="field().label"
+  [attr.aria-invalid]="invalid() ? 'true' : null"
+  [attr.aria-describedby]="describedBy() || null"
+  [disabled]="disabled()"
+  (click)="toggle()"
+>
+  <span class="flex min-w-0 flex-1 items-center gap-6">
+    @if (selectedOption(); as sel) {
+      @if (sel.icon) {
+        @if (isIconUrl(sel.icon)) {
+          <img [src]="sel.icon" alt="" class="size-16 shrink-0 rounded-2 object-cover" />
+        } @else {
+          <ng-icon [name]="sel.icon" size="16" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+      } @else if (sel.colorClass) {
+        <span
+          class="size-12 shrink-0 rounded-full"
+          [class]="isHexColor(sel.colorClass) ? 'border border-border' : sel.colorClass"
+          [style.background-color]="isHexColor(sel.colorClass) ? sel.colorClass : null"
+          aria-hidden="true"
+        ></span>
+      }
+      <span class="truncate text-start text-text">{{ sel.label }}</span>
+    } @else {
+      <span class="truncate text-start text-text-placeholder">{{ 'qv.chooseValue' | transloco }}</span>
+    }
+  </span>
+  <span class="inline-flex shrink-0 text-text-muted">
+    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+  </span>
+</button>
+
+@if (open()) {
+  <div
+    #popover
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    (keydown.escape)="onEscape($event)"
+  >
+    @if (showSearch()) {
+      <div class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo-strong">
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          #searchEl
+          type="text"
+          autocomplete="off"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'qv.search' | transloco"
+          [attr.aria-label]="'qv.search' | transloco"
+          [value]="searchTerm()"
+          (input)="onSearchInput($event)"
+          (keydown.escape)="onEscape($event)"
+        />
+        @if (remoteLoading()) {
+          <ng-icon name="tablerLoader2" size="12" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+        }
+      </div>
+    }
+
+    <ul role="listbox" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" [attr.aria-label]="field().label">
+      @for (option of visibleSpecials(); track option.value) {
+        <li role="option" [attr.aria-selected]="option.value === value()">
+          <button
+            type="button"
+            class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="option.value === value() ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+            (click)="choose(option)"
+          >
+            <span class="flex min-w-0 items-center gap-6">
+              @if (option.icon) {
+                @if (isIconUrl(option.icon)) {
+                  <img [src]="option.icon" alt="" class="size-16 shrink-0 rounded-2 object-cover" />
+                } @else {
+                  <ng-icon [name]="option.icon" size="16" class="shrink-0" aria-hidden="true" />
+                }
+              } @else if (option.colorClass) {
+                <span
+                  class="size-12 shrink-0 rounded-full"
+                  [class]="isHexColor(option.colorClass) ? 'border border-border' : option.colorClass"
+                  [style.background-color]="isHexColor(option.colorClass) ? option.colorClass : null"
+                  aria-hidden="true"
+                ></span>
+              }
+              <span class="truncate">{{ option.label }}</span>
+            </span>
+            @if (option.value === value()) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        </li>
+      }
+
+      @if (showDivider()) {
+        <li role="separator" class="my-2 h-border shrink-0 bg-border"></li>
+      }
+
+      @for (option of visibleRegulars(); track option.value) {
+        <li role="option" [attr.aria-selected]="option.value === value()">
+          <button
+            type="button"
+            class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="option.value === value() ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+            (click)="choose(option)"
+          >
+            <span class="flex min-w-0 items-center gap-6">
+              @if (option.icon) {
+                @if (isIconUrl(option.icon)) {
+                  <img [src]="option.icon" alt="" class="size-16 shrink-0 rounded-2 object-cover" />
+                } @else {
+                  <ng-icon [name]="option.icon" size="16" class="shrink-0" aria-hidden="true" />
+                }
+              } @else if (option.colorClass) {
+                <span
+                  class="size-12 shrink-0 rounded-full"
+                  [class]="isHexColor(option.colorClass) ? 'border border-border' : option.colorClass"
+                  [style.background-color]="isHexColor(option.colorClass) ? option.colorClass : null"
+                  aria-hidden="true"
+                ></span>
+              }
+              <span class="truncate">{{ option.label }}</span>
+            </span>
+            @if (option.value === value()) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        </li>
+      }
+
+      @if (visibleSpecials().length === 0 && visibleRegulars().length === 0) {
+        <li class="px-8 py-6 text-center text-12 text-text-muted">
+          {{ (remoteLoading() ? 'qv.loading' : 'qv.noMatches') | transloco }}
+        </li>
+      }
+    </ul>
+  </div>
+}

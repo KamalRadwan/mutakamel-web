@@ -1,0 +1,39 @@
+{
+  "back": "Back to leads",
+  "newTitle": "New lead",
+  "create": "Create lead",
+  "stageLabel": "Stage",
+  "actions": {
+    "label": "Lead actions"
+  },
+  "tabs": {
+    "label": "Lead sections"
+  },
+  "nav": {
+    "prev": "Previous lead",
+    "next": "Next lead"
+  },
+  "navGone": "That lead is no longer available.",
+  "created": "Lead “{{name}}” created.",
+  "delete": {
+    "title": "Delete this lead?",
+    "text": "“{{name}}” will be removed from the list.",
+    "done": "Lead deleted."
+  },
+  "loadFailed": "Could not load this lead.",
+  "scopeDenied": "You do not have permission to view this lead.",
+  "stage": {
+    "done": "Moved to {{stage}}."
+  },
+  "history": {
+    "filter": {
+      "lead": "Lead details"
+    },
+    "status": {
+      "OPEN": "Open",
+      "ON_HOLD": "On hold",
+      "DISQUALIFIED": "Disqualified",
+      "CONVERTED": "Converted"
+    }
+  }
+}

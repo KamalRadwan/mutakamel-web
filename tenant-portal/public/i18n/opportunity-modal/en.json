@@ -1,0 +1,35 @@
+{
+  "typeTitle": "Opportunity",
+  "newTitle": "New opportunity",
+  "newSubtitle": "New opportunity",
+  "createLabel": "Create opportunity",
+  "created": "Opportunity created",
+  "saved": "Changes saved",
+  "deleted": "Opportunity deleted.",
+  "loadFailed": "Could not load this opportunity.",
+  "customerPresetFailed": "The customer could not be loaded; choose it in the form.",
+  "opportunityGone": "That opportunity no longer exists. Moved to the next one.",
+  "opportunityGonePrev": "That opportunity no longer exists. Moved to the previous one.",
+  "nav": {
+    "prev": "Previous opportunity",
+    "next": "Next opportunity"
+  },
+  "actions": {
+    "won": "Mark won",
+    "lost": "Mark lost",
+    "reopen": "Reopen",
+    "transfer": "Move to pipeline"
+  },
+  "conflict": {
+    "title": "Someone else changed this opportunity.",
+    "text": "Reload to see the latest changes and drop yours, or keep editing.",
+    "reload": "Reload",
+    "keepEditing": "Keep editing"
+  },
+  "delete": {
+    "title": "Delete this opportunity?",
+    "text": "Its notes, attachments and tags are deleted too. A linked lead is unlinked.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  }
+}

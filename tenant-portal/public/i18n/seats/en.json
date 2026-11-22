@@ -1,0 +1,95 @@
+{
+  "module": {
+    "crm": "CRM",
+    "trade": "Trade",
+    "accounting": "Accounting"
+  },
+  "impact": {
+    "row": "{{module}}: {{usedAfter}} of {{capacity}} seats",
+    "gaining": "{{n}} users gain a seat",
+    "losing": "{{n}} users lose their seat",
+    "addons": "Add-on seats removed: {{n}}",
+    "show": "Show {{n}} users",
+    "hide": "Hide",
+    "short": "Needs {{needed}}, {{free}} free",
+    "addSeats": "Add seats",
+    "askOwner": "Ask the workspace owner to add seats.",
+    "manual": "Seats are still assigned by hand in this workspace.",
+    "none": "No seat changes.",
+    "loading": "Checking seat availability…",
+    "checking": "Checking seats…",
+    "error": "Could not check seat availability.",
+    "failed": "Could not check seats.",
+    "retry": "Retry",
+    "blockedReason": "Not enough {{module}} seats. Add seats or choose fewer roles."
+  },
+  "holders": {
+    "scope": {
+      "TENANT": "Whole workspace",
+      "COMPANY": "Company",
+      "BRANCH": "Branch"
+    }
+  },
+  "chips": {
+    "readOnly": "Read-only: over the seat limit"
+  },
+  "usage": {
+    "row": "{{used}} of {{capacity}}",
+    "grace": "Reduce by {{date}}",
+    "over": "{{n}} read-only"
+  },
+  "dry": {
+    "ok": "Everything fits. Nothing was saved yet.",
+    "notOk": "Some seats are missing. Nothing was saved.",
+    "tableLabel": "Import preview results",
+    "cols": {
+      "row": "Row",
+      "status": "Status",
+      "details": "Details"
+    },
+    "status": {
+      "CREATED": "Created",
+      "WOULD_CREATE": "Will be created",
+      "ROLES_SKIPPED": "Created without some roles",
+      "ERROR": "Error"
+    },
+    "row": "Row {{n}}",
+    "skipped": "Skipped roles: {{roles}}",
+    "skippedCount": "{{n}} roles skipped"
+  },
+  "cascade": {
+    "title": "Remove add-on seats too?",
+    "text": "These users lose an application seat, so their add-on seats for it are removed as well:",
+    "confirm": "Remove and continue",
+    "cancel": "Cancel"
+  },
+  "released": "Seats released: {{modules}}",
+  "errors": {
+    "SEAT_CAPACITY_INSUFFICIENT": "Not enough {{module}} seats: needs {{needed}}, {{free}} free.",
+    "capacityGeneric": "Not enough seats for this change.",
+    "SEAT_LIMIT_REACHED": "Seat limit reached for this application.",
+    "SEAT_ADDON_CASCADE_REQUIRED": "This change removes add-on seats. Confirm to continue.",
+    "SEATS_MANAGED_BY_ROLES": "Seats follow roles. Change the user's roles instead.",
+    "SEAT_RELEASE_NOT_ALLOWED": "Seats can be released only for suspended users.",
+    "SEAT_MIGRATION_NOT_READY": "Role holders exceed the purchased seats. Resolve the shortfall first.",
+    "SEAT_PREVIEW_TOO_LARGE": "Too many changes to preview at once.",
+    "SEAT_DOWNGRADE_FREE_UP_REQUIRED": "Free enough seats before lowering the seat count.",
+    "SEAT_KEEP_LIST_TOO_LARGE": "You chose more users than the new seat count.",
+    "SEAT_USAGE_STALE": "Seat usage changed. Reload and review again.",
+    "SEAT_MODULE_HOLDERS_EXCEED_PURCHASE": "Some users already hold roles for this application. Buy enough seats for them or remove their roles first.",
+    "SEAT_SWAP_INVALID": "Choose a read-only user to keep and an active user to release.",
+    "SEAT_OVER_CAPACITY_READ_ONLY": "Your access to this application is read-only because the workspace has more users than seats.",
+    "APPLICATION_CAPACITY_EXCEEDED": "The seat limit was reached. Reload and try again.",
+    "TENANT_EMAIL_TAKEN": "This email address is already in use."
+  },
+  "cause": {
+    "GRACE_EXPIRED": "Read-only because the grace period ended with more users than seats.",
+    "SEAT_SWAPPED": "Seat changed by a seat swap.",
+    "DOWNGRADE_FREE_UP": "Seat released to fit a lower seat count.",
+    "INVOLUNTARY_REDUCTION": "Read-only because the purchased seats were reduced.",
+    "COMMERCIAL_APPLY": "Seat updated after a subscription change.",
+    "ROLE_ASSIGNED": "Seat granted by a role.",
+    "ROLE_REMOVED": "Seat released because a role was removed.",
+    "MIGRATION": "Seat set during the move to role-based seats."
+  }
+}

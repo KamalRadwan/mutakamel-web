@@ -1,0 +1,111 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <ui-section-bar
+    tone="navy"
+    icon="tablerBuilding"
+    [title]="'itemForm.branch.heading' | transloco: { branch: branchName(), company: companyName() }"
+  />
+
+  @if (!hasCompanyProfile()) {
+    <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-dashed border-border-field p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 text-text-muted">{{ 'itemForm.reasons.needProfile' | transloco }}</p>
+    </div>
+  } @else if (!draft().enabled) {
+    <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-dashed border-border-field p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerBuilding" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 text-text-muted">
+        {{ 'itemForm.branch.none' | transloco: { branch: branchName() } }}
+      </p>
+      @if (!readonly()) {
+        <button type="button" uiButton variant="primary" (click)="enableBranch()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          {{ 'itemForm.actions.addBranch' | transloco }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div [class]="pageGrid">
+      <ui-field
+        size="bare"
+        [for]="uid + '-assorted'"
+        [label]="'itemForm.fields.isAssorted.label' | transloco"
+        [hint]="'itemForm.fields.isAssorted.hint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <ui-switch
+            [id]="uid + '-assorted'"
+            [label]="'itemForm.fields.isAssorted.label' | transloco"
+            [describedBy]="uid + '-assorted-hint'"
+            [disabled]="readonly()"
+            [checked]="draft().isAssorted"
+            (checkedChange)="onAssortedChange($event)"
+          />
+        </div>
+      </ui-field>
+
+      @let nodeErr = errorText('defaultFulfillmentNodeId');
+      @if (!readonly()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-node'"
+          [label]="'itemForm.fields.fulfilmentNode.label' | transloco"
+          [hint]="'itemForm.fields.fulfilmentNode.hint' | transloco"
+          [error]="nodeErr"
+        >
+          <div [attr.aria-invalid]="nodeErr ? 'true' : null">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-node'"
+              [label]="'itemForm.fields.fulfilmentNode.label' | transloco"
+              [describedBy]="describedBy('defaultFulfillmentNodeId', uid + '-node')"
+              [options]="nodeOptions()"
+              [value]="draft().defaultFulfillmentNodeId ?? ''"
+              (valueChange)="onNodeChange($event)"
+            />
+          </div>
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-node'"
+          [label]="'itemForm.fields.fulfilmentNode.label' | transloco"
+          [hint]="'itemForm.fields.fulfilmentNode.hint' | transloco"
+          [error]="nodeErr"
+        >
+          <input
+            [id]="uid + '-node'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="nodeLabel(draft().defaultFulfillmentNodeId)"
+          />
+        </ui-field>
+      }
+
+      @let policyErr = errorText('replenishmentPolicyKey');
+      <ui-field
+        [for]="uid + '-policy'"
+        [label]="'itemForm.fields.replenishmentKey.label' | transloco"
+        [hint]="'itemForm.fields.replenishmentKey.hint' | transloco"
+        [count]="draft().replenishmentPolicyKey.trim().length"
+        [max]="limits.key"
+        [error]="policyErr"
+      >
+        <input
+          [id]="uid + '-policy'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [attr.aria-invalid]="policyErr ? 'true' : null"
+          [value]="draft().replenishmentPolicyKey"
+          (input)="onPolicyInput($event)"
+        />
+      </ui-field>
+    </div>
+  }
+</section>

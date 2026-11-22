@@ -1,0 +1,43 @@
+<dialog
+  #dialog
+  class="z-modal m-auto w-modal-confirm rounded-14 border border-border bg-surface p-0 text-text shadow-modal backdrop:bg-overlay"
+  [attr.aria-labelledby]="titleId"
+  [attr.aria-describedby]="textId"
+  (cancel)="onEscape($event)"
+  (keydown.escape)="onEscape($event)"
+  (close)="onNativeClose()"
+>
+  <header class="flex items-center gap-8 border-b border-border px-10 py-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="15" aria-hidden="true" />
+    </span>
+    <div class="min-w-0 flex-1">
+      <h2 [id]="titleId" class="text-15 leading-22 font-medium text-text">
+        {{ 'recordPage.conflict.title' | transloco }}
+      </h2>
+      @if (recordLabel()?.trim(); as label) {
+        <p class="truncate text-12 leading-18 text-text-muted">{{ label }}</p>
+      }
+    </div>
+  </header>
+
+  <p [id]="textId" class="p-10 text-12 leading-18 text-text-muted">
+    {{ 'recordPage.conflict.text' | transloco }}
+  </p>
+
+  <footer class="flex items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+    <button
+      #reloadBtn
+      type="button"
+      uiButton
+      variant="primary"
+      autofocus
+      (click)="choose('reload')"
+    >
+      {{ 'recordPage.conflict.reload' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="choose('keep')">
+      {{ 'recordPage.conflict.keepEditing' | transloco }}
+    </button>
+  </footer>
+</dialog>

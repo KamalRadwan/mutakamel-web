@@ -1,0 +1,263 @@
+<ui-modal
+  size="form"
+  icon="tablerHash"
+  tile="bg-icon-navy"
+  [title]="(mode() === 'create' ? 'wsNumbering.modal.createTitle' : 'wsNumbering.modal.editTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'wsNumbering.fields.code' | transloco"
+        [hint]="'wsNumbering.fields.codeHint' | transloco"
+        [required]="true"
+        [count]="codeCount()"
+        [max]="codeMax"
+        [error]="errorOf('code')"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="numberingForm.code"
+          [attr.aria-invalid]="errorOf('code') ? 'true' : null"
+          (input)="onCodeInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      @if (mode() === 'create') {
+        <ui-field
+          size="bare"
+          [for]="uid + '-companyId'"
+          [label]="'wsNumbering.fields.company' | transloco"
+          [hint]="'wsNumbering.fields.companyHint' | transloco"
+          [required]="!access().tenantWideManage"
+          [error]="errorOf('companyId')"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-companyId'"
+            [options]="createCompanyOptions()"
+            [value]="numberingForm.companyId().value()"
+            [label]="'wsNumbering.fields.company' | transloco"
+            [describedBy]="companyDescribedBy()"
+            [disabled]="saving() || !canEditCurrent()"
+            (valueChange)="onCompanyChange($event)"
+            (focusout)="numberingForm.companyId().markAsTouched()"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-companyId'"
+          [label]="'wsNumbering.fields.company' | transloco"
+          [hint]="'wsNumbering.fields.companyHint' | transloco"
+        >
+          <input
+            [id]="uid + '-companyId'"
+            type="text"
+            readonly
+            aria-readonly="true"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="editCompanyDisplay()"
+          />
+        </ui-field>
+      }
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-prefix'"
+        [label]="'wsNumbering.fields.prefix' | transloco"
+        [hint]="'wsNumbering.fields.prefixHint' | transloco"
+        [count]="prefixCount()"
+        [max]="prefixMax"
+        [error]="errorOf('prefix')"
+      >
+        <input
+          [id]="uid + '-prefix'"
+          type="text"
+          dir="ltr"
+          placeholder="INV-"
+          autocomplete="off"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="numberingForm.prefix"
+          [attr.aria-invalid]="errorOf('prefix') ? 'true' : null"
+          (input)="clearServerError('prefix')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-padding'"
+        [label]="'wsNumbering.fields.padding' | transloco"
+        [hint]="'wsNumbering.fields.paddingHint' | transloco"
+        [error]="errorOf('padding')"
+      >
+        <input
+          [id]="uid + '-padding'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          autocomplete="off"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [formField]="numberingForm.padding"
+          [attr.aria-invalid]="errorOf('padding') ? 'true' : null"
+          (input)="clearServerError('padding')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-counter'"
+        [label]="(mode() === 'create' ? 'wsNumbering.fields.startValue' : 'wsNumbering.fields.nextValue') | transloco"
+        [hint]="
+          mode() === 'create'
+            ? ('wsNumbering.fields.startValueHint' | transloco)
+            : ('wsNumbering.fields.nextValueHint' | transloco: { current: baseSequence()?.nextValue ?? '' })
+        "
+        [required]="true"
+        [error]="errorOf('counter')"
+      >
+        <input
+          [id]="uid + '-counter'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          autocomplete="off"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [formField]="numberingForm.counter"
+          [attr.aria-invalid]="errorOf('counter') ? 'true' : null"
+          (input)="onCounterInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2 flex flex-col gap-6 border-t border-border pt-8">
+      @if (mode() === 'create') {
+        <div class="rounded-8 border border-border bg-surface-muted p-8">
+          <div class="text-12 text-text-muted">{{ 'wsNumbering.preview.title' | transloco }}</div>
+          @if (draftPreview(); as preview) {
+            <div dir="ltr" class="mt-4 truncate text-14 font-medium tabular-nums text-text">
+              {{ preview }}
+            </div>
+          } @else {
+            <div class="mt-4 text-12 text-text-muted">
+              {{ 'wsNumbering.preview.incomplete' | transloco }}
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="grid grid-cols-2 gap-8">
+          <div class="rounded-8 border border-border bg-surface-muted p-8">
+            <div class="text-12 text-text-muted">{{ 'wsNumbering.preview.saved' | transloco }}</div>
+            @if (peekLoading()) {
+              <div class="mt-6 h-skeleton-line w-preset rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+            } @else if (peekStatus() === 'ready' && peekFormatted(); as savedValue) {
+              <div dir="ltr" class="mt-4 truncate text-14 font-medium tabular-nums text-text">
+                {{ savedValue }}
+              </div>
+            } @else if (peekStatus() === 'notFound') {
+              <div class="mt-4 text-12 text-danger-text">
+                {{ 'wsNumbering.preview.notFound' | transloco }}
+              </div>
+            } @else if (peekStatus() === 'failed') {
+              <div class="mt-4 flex flex-wrap items-center gap-6">
+                <span class="text-12 text-danger-text">{{ 'wsNumbering.preview.failed' | transloco }}</span>
+                <button type="button" uiButton variant="ghost" size="small" (click)="retryPeek()">
+                  {{ 'settings.common.retry' | transloco }}
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="rounded-8 border border-border bg-surface-muted p-8">
+            <div class="text-12 text-text-muted">{{ 'wsNumbering.preview.draft' | transloco }}</div>
+            @if (draftPreview(); as preview) {
+              <div dir="ltr" class="mt-4 truncate text-14 font-medium tabular-nums text-text">
+                {{ preview }}
+              </div>
+            } @else {
+              <div class="mt-4 text-12 text-text-muted">
+                {{ 'wsNumbering.preview.incomplete' | transloco }}
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <p class="text-11 leading-16 text-text-muted">
+        {{ 'wsNumbering.preview.nonConsuming' | transloco }}
+        @if (mode() === 'edit') {
+          <span> · {{ 'wsNumbering.preview.counterNote' | transloco }}</span>
+        }
+      </p>
+    </div>
+
+    @if (mode() === 'edit' && !canEditCurrent()) {
+      <div class="col-span-2">
+        <app-settings-notice tone="info">
+          {{ 'wsNumbering.modal.readOnly' | transloco }}
+        </app-settings-notice>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canEditCurrent()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || (mode() === 'edit' && !dirty())"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      }
+
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving()"
+        (click)="requestClose()"
+      >
+        {{ (mode() === 'create' ? 'settings.common.cancel' : 'settings.common.close') | transloco }}
+      </button>
+    } @else {
+      <button [id]="uid + '-close-btn'" type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'wsNumbering.discard.title' | transloco"
+  [text]="'wsNumbering.discard.text' | transloco"
+  [confirmLabel]="'wsNumbering.discard.confirm' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

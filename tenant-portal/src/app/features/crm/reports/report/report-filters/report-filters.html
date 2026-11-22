@@ -1,0 +1,190 @@
+@if (schema().length > 0) {
+  <section
+    class="rounded-10 border border-border bg-surface p-8 shadow-card"
+    [attr.aria-label]="'repReport.filtersRegion' | transloco"
+  >
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8 desktop:grid-cols-3 wide:grid-cols-4">
+      @for (d of schema(); track d.key) {
+        <ui-field
+          [label]="fieldLabel(d)"
+          [for]="fieldId(d)"
+          [hint]="fieldHint(d)"
+          [required]="!!d.required"
+          [error]="fieldError(d)"
+        >
+          @switch (d.kind) {
+            @case ('PERIOD') {
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="fieldId(d)"
+                [describedBy]="hintId(d)"
+                [label]="fieldLabel(d)"
+                [options]="periodOptions()"
+                [value]="periodWindow().preset"
+                (valueChange)="onPresetChange($event)"
+              />
+            }
+            @case ('COMPARISON') {
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="fieldId(d)"
+                [describedBy]="hintId(d)"
+                [label]="fieldLabel(d)"
+                [options]="compareOptions()"
+                [value]="compareValue()"
+                (valueChange)="onCompareChange($event)"
+              />
+            }
+            @case ('NUMBER') {
+              <input
+                [id]="fieldId(d)"
+                type="number"
+                dir="ltr"
+                class="w-full min-w-0 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                [attr.min]="d.min ?? null"
+                [attr.max]="d.max ?? null"
+                [attr.aria-invalid]="fieldError(d) ? 'true' : null"
+                [value]="numberValue(d)"
+                (change)="onNumberChange(d, $event)"
+              />
+            }
+            @default {
+              @if (d.multiple) {
+                <div class="relative w-full min-w-0">
+                  <button
+                    #multiTrigger
+                    type="button"
+                    [id]="fieldId(d)"
+                    class="flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-start text-12 outline-none transition-colors duration-fast"
+                    [class]="
+                      openMultiKey() === d.key
+                        ? 'border-focus-ring ring-3 ring-focus-halo'
+                        : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+                    "
+                    aria-haspopup="listbox"
+                    [attr.aria-expanded]="openMultiKey() === d.key"
+                    [attr.aria-label]="fieldLabel(d)"
+                    [attr.aria-describedby]="hintId(d)"
+                    (click)="toggleMultiPopover(d, multiTrigger)"
+                  >
+                    @let chips = selectedChipLabels(d);
+                    @if (chips.length === 0) {
+                      <span class="min-w-0 flex-1 truncate text-text">{{ 'repReport.filterAll' | transloco }}</span>
+                    } @else if (chips.length <= 2) {
+                      <span class="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
+                        @for (chip of chips; track chip.id) {
+                          <span class="inline-flex h-chip max-w-full shrink-0 items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+                            <span class="truncate">{{ chip.label }}</span>
+                          </span>
+                        }
+                      </span>
+                    } @else {
+                      <span class="min-w-0 flex-1 truncate text-text">
+                        {{ 'repReport.selectedCount' | transloco: { count: chips.length } }}
+                      </span>
+                    }
+                    <span class="inline-flex shrink-0 text-text-muted">
+                      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                    </span>
+                  </button>
+
+                  @if (openMultiKey() === d.key) {
+                    <ul
+                      #multiList
+                      role="listbox"
+                      aria-multiselectable="true"
+                      class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+                      [class.invisible]="!multiPlaced()"
+                      [style.top.px]="multiPlace().top"
+                      [style.inset-inline-start.px]="multiPlace().start"
+                      [style.min-width.px]="multiPlace().width"
+                      [style.max-height.px]="multiPlace().maxHeight"
+                      [attr.aria-label]="fieldLabel(d)"
+                    >
+                      <li role="option" [attr.aria-selected]="multiValues(d).length === 0">
+                        <button
+                          type="button"
+                          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                          [class]="
+                            multiValues(d).length === 0
+                              ? 'bg-brand-soft text-on-brand-soft'
+                              : 'text-text hover:bg-row-hover'
+                          "
+                          (click)="clearMulti(d)"
+                        >
+                          <span>{{ 'repReport.filterAll' | transloco }}</span>
+                          @if (multiValues(d).length === 0) {
+                            <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                          }
+                        </button>
+                      </li>
+                      @for (opt of optionsFor(d); track opt.value) {
+                        @let active = isMultiSelected(d, opt.value);
+                        <li role="option" [attr.aria-selected]="active">
+                          <button
+                            type="button"
+                            class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                            [class]="
+                              active
+                                ? 'bg-brand-soft text-on-brand-soft'
+                                : 'text-text hover:bg-row-hover'
+                            "
+                            (click)="toggleMultiOption(d, opt.value)"
+                          >
+                            <span>{{ opt.label }}</span>
+                            @if (active) {
+                              <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                            }
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
+              } @else {
+                <ui-dropdown
+                  class="w-full"
+                  size="field"
+                  [id]="fieldId(d)"
+                  [describedBy]="hintId(d)"
+                  [label]="fieldLabel(d)"
+                  [options]="optionsFor(d)"
+                  [value]="singleValue(d)"
+                  (valueChange)="onSingleChange(d, $event)"
+                />
+              }
+            }
+          }
+        </ui-field>
+
+        @if (d.kind === 'PERIOD') {
+          <!-- A CUSTOM range: editing either end switches the period to CUSTOM (at most 732 days). -->
+          @for (part of periodParts; track part) {
+            <ui-field
+              size="bare"
+              [label]="periodPartLabel(part)"
+              [for]="periodFieldId(d, part)"
+              [hint]="periodPartHint(part)"
+              [error]="part === 'to' ? periodError() : null"
+            >
+              <ui-date-field
+                class="min-w-0 flex-1"
+                [id]="periodFieldId(d, part)"
+                [ariaLabel]="periodPartLabel(part)"
+                [describedBy]="periodPartDescribedBy(d, part)"
+                [todayLabel]="dateLabel('today')"
+                [prevMonthLabel]="dateLabel('prevMonth')"
+                [nextMonthLabel]="dateLabel('nextMonth')"
+                [invalid]="part === 'to' && !!periodError()"
+                [value]="part === 'from' ? periodWindow().from : periodWindow().to"
+                (valueChange)="onPeriodPartChange(part, $event)"
+              />
+            </ui-field>
+          }
+        }
+      }
+    </div>
+  </section>
+}

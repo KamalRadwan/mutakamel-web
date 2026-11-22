@@ -1,0 +1,131 @@
+@if (readonly()) {
+  <div
+    class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <input
+      type="text"
+      readonly
+      dir="auto"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none read-only:cursor-default"
+      [class.text-text-muted]="!selectedUser()"
+      [id]="fieldId() || null"
+      [value]="selectedUser() ? fullName(selectedUser()!) : emptyLabel()"
+      [attr.aria-readonly]="'true'"
+      [attr.aria-label]="label()"
+      [attr.aria-describedby]="describedBy() || null"
+    />
+  </div>
+} @else {
+  <button
+    #trigger
+    type="button"
+    [id]="fieldId() || null"
+    class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+    [class]="
+      hasError()
+        ? 'border-danger-border ring-2 ring-danger-halo'
+        : menuOpen()
+          ? 'border-focus-ring ring-3 ring-focus-halo'
+          : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+    "
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="menuOpen()"
+    [attr.aria-label]="label()"
+    [attr.aria-describedby]="describedBy() || null"
+    [attr.aria-invalid]="hasError() ? 'true' : null"
+    [disabled]="disabled()"
+    (click)="toggle()"
+  >
+    <span class="flex min-w-0 items-center gap-6">
+      @if (selectedUser(); as owner) {
+        <span class="truncate">{{ fullName(owner) }}</span>
+      } @else {
+        <span class="truncate text-text-muted">{{ emptyLabel() }}</span>
+      }
+    </span>
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+    </span>
+  </button>
+}
+
+@if (menuOpen()) {
+  <div
+    #menuPanel
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 overflow-hidden rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!menuPlaced()"
+    [style.top.px]="menuPlace().top"
+    [style.inset-inline-start.px]="menuPlace().start"
+    [style.min-width.px]="menuPlace().width"
+    [style.max-height.px]="menuPlace().maxHeight"
+    (keydown)="onMenuKeydown($event)"
+  >
+    <div
+      class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      @if (searching()) {
+        <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+      } @else {
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      }
+      <input
+        #searchInput
+        type="text"
+        dir="auto"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="searchPlaceholder()"
+        [attr.aria-label]="searchPlaceholder()"
+        [value]="search()"
+        (input)="onSearchInput($event)"
+      />
+    </div>
+
+    <ul role="listbox" class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" [attr.aria-label]="label()">
+      <li role="presentation">
+        <button
+          type="button"
+          role="option"
+          [attr.aria-selected]="value() === null"
+          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="value() === null ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+          (click)="select(null)"
+        >
+          <span class="truncate text-text-muted">{{ emptyLabel() }}</span>
+          @if (value() === null) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </button>
+      </li>
+
+      @for (user of options(); track user.id) {
+        <li role="presentation">
+          <button
+            type="button"
+            role="option"
+            [attr.aria-selected]="value() === user.id"
+            class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="value() === user.id ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+            (click)="select(user)"
+          >
+            <span class="flex min-w-0 items-center gap-6">
+              <span class="truncate font-medium">{{ fullName(user) }}</span>
+              @if (user.jobTitle) {
+                <span class="truncate text-11 text-text-muted">{{ user.jobTitle }}</span>
+              }
+            </span>
+            @if (value() === user.id) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        </li>
+      } @empty {
+        @if (!searching() && search().trim()) {
+          <li class="flex h-menu-item items-center justify-center px-8 text-12 text-text-muted">
+            {{ 'wsPartyModal.common.noResults' | transloco }}
+          </li>
+        }
+      }
+    </ul>
+  </div>
+}

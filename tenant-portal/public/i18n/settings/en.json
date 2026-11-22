@@ -1,0 +1,43 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "clearSearch": "Clear search",
+    "close": "Close",
+    "delete": "Delete",
+    "reload": "Reload",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "active": "Active",
+    "inactive": "Inactive",
+    "archived": "Archived",
+    "system": "System",
+    "default": "Default",
+    "required": "Required",
+    "yes": "Yes",
+    "no": "No",
+    "moveTo": "Move",
+    "moveToPosition": "Move to position",
+    "position": "Position",
+    "noResults": "No matching results",
+    "loadFailed": "Could not load the list.",
+    "retry": "Try again",
+    "searching": "Reordering is off while searching.",
+    "nameAr": "Arabic name",
+    "nameEn": "English name",
+    "status": "Status",
+    "actions": "Actions",
+    "lastUpdated": "Last updated",
+    "of": "{{count}} of {{max}}"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "network": "Could not reach the server.",
+    "notFound": "This item no longer exists. Reload the list.",
+    "permission": "You do not have permission for this action.",
+    "session": "Your session has ended. Sign in again.",
+    "idempotency": "The same request is already being processed.",
+    "validation": "Check the highlighted fields.",
+    "subscription": "Your subscription allows viewing only."
+  }
+}

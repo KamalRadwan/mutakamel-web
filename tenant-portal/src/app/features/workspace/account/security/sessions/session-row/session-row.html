@@ -1,0 +1,38 @@
+<div class="flex items-center gap-8 py-6">
+  <span
+    class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-neutral-soft text-text-muted"
+  >
+    <ng-icon [name]="deviceIcon()" size="14" aria-hidden="true" />
+  </span>
+
+  <div class="min-w-0 flex-1">
+    <div class="flex min-w-0 items-center gap-6">
+      <span class="truncate text-12 leading-18 text-text" [title]="deviceName()">
+        {{ deviceName() }}
+      </span>
+      @if (session().current) {
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-6 text-11 font-medium text-brand-text"
+        >
+          {{ 'wsAccSessions.thisDevice' | transloco }}
+        </span>
+      }
+    </div>
+    <p class="text-11 leading-16 text-text-muted">
+      {{ 'wsAccSessions.meta' | transloco: metaParams() }}
+    </p>
+  </div>
+
+  <button
+    type="button"
+    uiButton
+    variant="ghost"
+    size="small"
+    class="shrink-0"
+    [loading]="busy()"
+    [attr.aria-label]="'wsAccSessions.endAria' | transloco: { device: deviceName() }"
+    (click)="onEnd()"
+  >
+    {{ 'wsAccSessions.endSession' | transloco }}
+  </button>
+</div>

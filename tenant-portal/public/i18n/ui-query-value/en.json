@@ -1,0 +1,33 @@
+{
+  "typeValue": "Type a value",
+  "addTerm": "Type and press Enter",
+  "chooseValue": "Choose a value",
+  "chooseValues": "Choose values",
+  "search": "Search",
+  "noMatches": "No matching values",
+  "loading": "Loading…",
+  "selectAll": "Select all",
+  "clearAll": "Clear",
+  "more": "+{{n}}",
+  "remove": "Remove {{label}}",
+  "from": "From",
+  "to": "To",
+  "pickDate": "Pick a date",
+  "noStars": "No stars",
+  "stars": "{{n}} stars",
+  "yes": "Yes",
+  "no": "No",
+  "date": {
+    "today": "Today",
+    "on": "On",
+    "onHint": "Match records whose date falls on this day",
+    "fromHint": "The first date to include in the match",
+    "toHint": "The last date to include in the match",
+    "yesterday": "Yesterday",
+    "last7": "Last 7 days",
+    "last30": "Last 30 days",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "thisYear": "This year"
+  }
+}

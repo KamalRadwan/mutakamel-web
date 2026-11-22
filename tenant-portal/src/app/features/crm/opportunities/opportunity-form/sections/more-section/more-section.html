@@ -1,0 +1,109 @@
+@if (mode() === 'create' || !row()) {
+  <p class="text-12 leading-18 text-text-muted">{{ 'oppForm.more.createEmpty' | transloco }}</p>
+} @else {
+  @let opp = row()!;
+  <div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+    <ui-field
+      [label]="'oppForm.more.reference' | transloco"
+      [for]="uid + '-reference'"
+      [hint]="'oppForm.more.referenceHint' | transloco"
+    >
+      <input
+        [id]="uid + '-reference'"
+        type="text"
+        readonly
+        dir="ltr"
+        class="w-full bg-transparent text-start text-12 font-medium tabular-nums text-text outline-none"
+        [value]="reference()"
+      />
+    </ui-field>
+
+    @if (showFromLead()) {
+      <ui-field
+        size="bare"
+        [label]="'oppForm.more.fromLead' | transloco"
+        [for]="uid + '-from-lead'"
+        [hint]="'oppForm.more.fromLeadHint' | transloco"
+      >
+        <div class="flex items-center gap-6">
+          <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-from-lead'"
+              type="text"
+              readonly
+              dir="auto"
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="'oppForm.more.openLead' | transloco"
+            />
+          </div>
+          <a
+            [routerLink]="['/crm/leads', opp.leadId]"
+            class="inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'oppForm.more.openLead' | transloco"
+            [title]="'oppForm.more.openLead' | transloco"
+          >
+            <ng-icon name="tablerExternalLink" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+          </a>
+        </div>
+      </ui-field>
+    }
+
+    <ui-field
+      size="bare"
+      [label]="'oppForm.more.leadSource' | transloco"
+      [for]="uid + '-source'"
+      [hint]="'oppForm.more.leadSourceHint' | transloco"
+    >
+      <div class="flex h-field w-full items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+        @if (opp.leadSourceName) {
+          @if (opp.leadSourceIconUrl) {
+            <img [src]="opp.leadSourceIconUrl" alt="" class="size-16 shrink-0 rounded-4 object-cover" />
+          } @else {
+            <span
+              class="inline-flex size-16 shrink-0 items-center justify-center rounded-4 bg-icon-teal text-on-icon"
+              aria-hidden="true"
+            >
+              <ng-icon name="tablerTrendingUp" size="11" />
+            </span>
+          }
+        }
+        <input
+          [id]="uid + '-source'"
+          type="text"
+          readonly
+          dir="auto"
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="opp.leadSourceName || '—'"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      [label]="'oppForm.more.createdAt' | transloco"
+      [for]="uid + '-created-at'"
+      [hint]="'oppForm.more.createdAtHint' | transloco"
+    >
+      <input
+        [id]="uid + '-created-at'"
+        type="text"
+        readonly
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+        [value]="createdAtText()"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'oppForm.more.updatedAt' | transloco"
+      [for]="uid + '-updated-at'"
+      [hint]="'oppForm.more.updatedAtHint' | transloco"
+    >
+      <input
+        [id]="uid + '-updated-at'"
+        type="text"
+        readonly
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+        [value]="updatedAtText()"
+      />
+    </ui-field>
+  </div>
+}

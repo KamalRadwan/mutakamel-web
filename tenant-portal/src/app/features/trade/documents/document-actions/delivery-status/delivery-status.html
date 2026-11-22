@@ -1,0 +1,14 @@
+<span
+  class="inline-flex h-badge shrink-0 items-center justify-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+  [class]="toneClass()"
+  [attr.title]="errorKey() ? (errorKey()! | transloco) : null"
+>
+  {{ badge().labelKey | transloco }}
+</span>
+
+@if (canRetry()) {
+  <button type="button" uiButton variant="secondary" size="small" (click)="retry.emit()">
+    <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+    {{ 'tda.delivery.retry' | transloco }}
+  </button>
+}

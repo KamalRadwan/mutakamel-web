@@ -1,0 +1,249 @@
+@switch (pageStatus()) {
+  @case ('loading') {
+    <div class="flex flex-col gap-12">
+      <div class="flex items-center justify-between gap-8">
+        <div class="flex items-center gap-8">
+          <div class="size-icon-tile rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+          <div class="h-skeleton-line w-modal-alert rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+        </div>
+        <div class="h-btn w-modal-alert rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-12 desktop:grid-cols-3">
+        @for (item of skeletonItems; track item) {
+          <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+            <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+            <div class="h-skeleton-line w-11/12 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+            <div class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @case ('forbidden') {
+    <ui-full-state
+      kind="forbidden"
+      [title]="'dashPage.forbiddenTitle' | transloco"
+      [text]="'dashPage.forbiddenText' | transloco"
+      [actionLabel]="'dashPage.backHome' | transloco"
+      (action)="goHome()"
+    />
+  }
+
+  @case ('not-found') {
+    <ui-full-state
+      kind="not-found"
+      [title]="'dashPage.notFoundTitle' | transloco"
+      [text]="'dashPage.notFoundText' | transloco"
+      [actionLabel]="'dashPage.backHome' | transloco"
+      (action)="goHome()"
+    />
+  }
+
+  @case ('no-dashboards') {
+    <ui-full-state
+      kind="not-found"
+      [title]="'dashPage.noDashboardsTitle' | transloco"
+      [text]="'dashPage.noDashboardsText' | transloco"
+      [actionLabel]="canCreate ? ('dashPage.createDashboard' | transloco) : ''"
+      (action)="openCreateFromEmpty()"
+    />
+  }
+
+  @case ('load-failure') {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'dashPage.loadFailedTitle' | transloco"
+      [text]="'dashPage.loadFailedText' | transloco"
+      [actionLabel]="'analytics.common.retry' | transloco"
+      (action)="retryPageLoad()"
+    />
+  }
+
+  @case ('ready') {
+    @if (detail(); as current) {
+      <app-dashboard-header
+        [detail]="current"
+        [generatedAt]="latestGeneratedAt()"
+        [editing]="editing()"
+        [canCustomize]="canCustomize()"
+        [canEdit]="canEdit()"
+        [canAddWidget]="canAddWidget()"
+        [busy]="headerBusy() || savingLayout()"
+        [exportPeriod]="exportPeriod()"
+        [exportFilters]="runtimeFilters()"
+        [switcherRefresh]="switcherRefresh()"
+        (customize)="onCustomize()"
+        (editLayout)="onEnterEditMode()"
+        (addWidget)="onAddWidget()"
+        (refresh)="onRefresh()"
+        (menu)="onHeaderMenu($event)"
+        (switchTo)="onSwitchDashboard($event)"
+      />
+
+      <app-dashboard-filters
+        [value]="filterValue()"
+        [teams]="teamOptions()"
+        [branches]="branchOptions()"
+        [showTeams]="showTeams()"
+        [partialAccess]="partialAccess()"
+        (valueChange)="onFiltersChange($event)"
+        (openWhy)="onOpenWhy()"
+      />
+
+      @if (crossFilters().length > 0) {
+        <app-cross-filter-chips
+          [items]="crossFilters()"
+          (remove)="onRemoveCrossFilter($event)"
+          (clear)="onClearCrossFilters()"
+        />
+      }
+
+      @if (editing()) {
+        <app-edit-bar
+          [dirty]="editDirty()"
+          [canUndo]="editor.canUndo()"
+          [saving]="savingLayout()"
+          [selectedName]="selectedWidgetName()"
+          [selectedSize]="selectedWidgetSize()"
+          [sizeError]="editSizeError()"
+          keyboardHintId="dash-page-edit-kbd-hint"
+          (save)="onSaveLayout()"
+          (undo)="onSaveUndo()"
+          (cancel)="onCancelEdit()"
+        />
+      }
+
+      @if (gridItems().length === 0) {
+        <div class="relative min-h-notif-list-max min-h-0 flex-1 rounded-10 border border-border bg-surface p-16 shadow-card">
+          <ui-widget-state
+            kind="empty"
+            [text]="'dashPage.emptyDashboardTitle' | transloco"
+          />
+        </div>
+      } @else {
+        <app-dashboard-grid
+          [items]="gridItems()"
+          [editing]="editing()"
+          [selectedId]="selectedId()"
+          [keyboardHint]="'dashboardWidgets.keyboard' | transloco"
+          (layoutChange)="onGridLayoutChange($event)"
+          (selectedChange)="onSelectedChange($event)"
+        >
+          <ng-template let-item>
+            @if (placementById()[item.id]; as placement) {
+              @let view = viewForWidget(placement.widgetId);
+              @let isPartial = view.status === 'PARTIAL' || view.partialAccess === true;
+              @let partialTip = isPartial ? (partialTooltipByPlacement()[placement.id] ?? '') : '';
+              <ui-widget-frame
+                [title]="placement.widget.name"
+                [hint]="frameHintByPlacement()[placement.id] ?? ''"
+                [tag]="frameTagByPlacement()[placement.id] ?? null"
+                [editing]="editing()"
+                [selected]="editing() && selectedId() === placement.id"
+                [menuItems]="frameMenuByPlacement()[placement.id] ?? []"
+                [menuLabel]="'dashboardWidgets.menu.label' | transloco"
+                [gripLabel]="'dashboardWidgets.grip' | transloco"
+                [removeLabel]="'dashboardWidgets.remove' | transloco"
+                (menuSelected)="onWidgetMenu(placement.id, $event)"
+                (removed)="onRemovePlacement(placement.id)"
+              >
+                @if (isPartial) {
+                  <span frameBadge class="group relative inline-flex shrink-0 items-center gap-4">
+                    <ui-badge tone="warning">{{ 'dashboardWidgets.partial' | transloco }}</ui-badge>
+                    @if (partialTip) {
+                      <button
+                        type="button"
+                        class="inline-flex cursor-help items-center rounded-full text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+                        [attr.aria-label]="'dashboardWidgets.partialDetails' | transloco"
+                        [attr.aria-describedby]="'dash-partial-' + placement.id"
+                        (keydown.escape)="onPartialTipEscape(placement.id, $event)"
+                        (blur)="partialTipDismissed.set(null)"
+                        (mouseleave)="partialTipDismissed.set(null)"
+                      >
+                        <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+                      </button>
+                      <span
+                        [id]="'dash-partial-' + placement.id"
+                        role="tooltip"
+                        [class.hidden]="partialTipDismissed() === placement.id"
+                        class="pointer-events-none invisible absolute start-0 top-full z-tooltip mt-4 flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip group-focus-within:visible group-hover:visible"
+                      >
+                        {{ partialTip }}
+                      </span>
+                    }
+                  </span>
+                }
+                <app-widget-body
+                  [kind]="placement.widget.visualizationType"
+                  [view]="view"
+                  [showTable]="showTableForWidget(placement.widgetId)"
+                  [title]="placement.widget.name"
+                  [canEdit]="canEditWidgetByPlacement()[placement.id] ?? false"
+                  (retry)="onRetryWidget(placement.widgetId)"
+                  (pointClick)="onPointClick(placement, $event)"
+                  (openRecord)="onOpenRecord($event)"
+                  (openBuilder)="onOpenWidgetBuilder(placement.widgetId)"
+                  (openReadiness)="onOpenReadiness($event)"
+                />
+              </ui-widget-frame>
+            } @else if (unavailableById()[item.id]; as unavailable) {
+              <ui-widget-frame
+                [title]="'dashPage.unavailableTitle' | transloco"
+                [editing]="editing()"
+                [selected]="editing() && selectedId() === unavailable.id"
+                [menuItems]="frameMenuByPlacement()[unavailable.id] ?? []"
+                [menuLabel]="'dashboardWidgets.menu.label' | transloco"
+                [gripLabel]="'dashboardWidgets.grip' | transloco"
+                [removeLabel]="'dashboardWidgets.remove' | transloco"
+                (menuSelected)="onWidgetMenu(unavailable.id, $event)"
+                (removed)="onRemovePlacement(unavailable.id)"
+              >
+                <div class="relative size-full min-h-0">
+                  <ui-widget-state
+                    kind="unavailable"
+                    [text]="unavailableReasonKey(unavailable.reason) | transloco"
+                  />
+                </div>
+              </ui-widget-frame>
+            }
+          </ng-template>
+        </app-dashboard-grid>
+      }
+    }
+  }
+}
+
+<app-why-numbers-modal />
+<app-explain-modal />
+<app-add-widget-modal />
+<app-version-policy-modal />
+<app-share-modal (changed)="onSharesChanged()" />
+<app-create-dashboard-modal />
+
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'dashPage.deleteTitle' | transloco"
+  [text]="'dashPage.deleteText' | transloco: { name: detail()?.name ?? '' }"
+  [confirmLabel]="'dashPage.deleteConfirm' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictConfirm
+  tone="warning"
+  [title]="'dashPage.conflictTitle' | transloco"
+  [text]="'dashPage.conflictText' | transloco"
+  [confirmLabel]="'dashPage.keepMine' | transloco"
+  [cancelLabel]="'dashPage.reload' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'dashPage.unsavedTitle' | transloco"
+  [text]="'dashPage.unsavedText' | transloco"
+  [saveLabel]="'dashPage.unsavedSave' | transloco"
+  [discardLabel]="'dashPage.unsavedDiscard' | transloco"
+  [cancelLabel]="'dashPage.unsavedCancel' | transloco"
+/>

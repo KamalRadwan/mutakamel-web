@@ -1,0 +1,50 @@
+<ui-modal
+  #dialog
+  size="confirm"
+  icon="tablerAlertTriangle"
+  [tile]="tone() === 'danger' ? 'bg-icon-red' : 'bg-icon-orange'"
+  [title]="title()"
+  [subtitle]="subtitle()"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  [dismissable]="tone() !== 'danger' && !pending() && !resolving()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    @if (message()) {
+      <p class="text-12 leading-18 text-text-muted">{{ message() }}</p>
+    }
+
+    @if (isOpen()) {
+      <app-trade-reason-picker
+        [kind]="kind()"
+        [(value)]="choice"
+        [idPrefix]="'inv-reason'"
+        [disabled]="pending() || resolving()"
+        [showErrors]="showErrors()"
+        [showNote]="false"
+      />
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      [variant]="tone() === 'danger' ? 'danger' : 'primary'"
+      [loading]="pending() || resolving()"
+      [disabled]="pending() || resolving() || !pickerValid()"
+      (click)="onConfirm()"
+    >
+      {{ confirmLabel() }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="pending() || resolving()"
+      (click)="onCancelClick()"
+    >
+      {{ 'tradeInventory.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

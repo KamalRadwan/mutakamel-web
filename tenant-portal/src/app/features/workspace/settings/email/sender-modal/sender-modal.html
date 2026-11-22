@@ -1,0 +1,171 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerMail"
+  tile="bg-icon-blue"
+  [title]="'wsEmail.sender.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
+    @if (topError(); as err) {
+      <div role="alert">
+        <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
+      </div>
+    }
+
+    @if (showResetNotice()) {
+      <app-settings-notice tone="warning">
+        {{ 'wsEmail.notice.resetsVerification' | transloco }}
+      </app-settings-notice>
+    }
+
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-from-name'"
+          [label]="'wsEmail.fields.fromName.label' | transloco"
+          [hint]="'wsEmail.fields.fromName.hint' | transloco"
+          [required]="!isReadonly()"
+          [count]="!isReadonly() ? fromNameDraft().length : null"
+          [max]="!isReadonly() ? 200 : null"
+          [error]="fromNameError()"
+        >
+          <input
+            [id]="uid + '-from-name'"
+            type="text"
+            dir="auto"
+            maxlength="200"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="fromNameDraft()"
+            [readOnly]="isReadonly() || saving()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="fromNameError() ? 'true' : null"
+            (input)="onInput('fromName', $event)"
+            (blur)="markTouched('fromName')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-from-address'"
+          [label]="'wsEmail.fields.fromAddress.label' | transloco"
+          [hint]="'wsEmail.fields.fromAddress.hint' | transloco"
+          [required]="!isReadonly()"
+          [error]="fromAddressError()"
+        >
+          <input
+            [id]="uid + '-from-address'"
+            type="email"
+            dir="ltr"
+            maxlength="320"
+            autocomplete="off"
+            spellcheck="false"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="fromAddressDraft()"
+            [readOnly]="isReadonly() || saving()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="fromAddressError() ? 'true' : null"
+            (input)="onInput('fromAddress', $event)"
+            (blur)="markTouched('fromAddress')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-reply-to'"
+          [label]="'wsEmail.fields.replyTo.label' | transloco"
+          [hint]="'wsEmail.fields.replyTo.hint' | transloco"
+          [error]="replyToError()"
+        >
+          <input
+            [id]="uid + '-reply-to'"
+            type="email"
+            dir="ltr"
+            maxlength="320"
+            autocomplete="off"
+            spellcheck="false"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="replyToDraft()"
+            [readOnly]="isReadonly() || saving()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="replyToError() ? 'true' : null"
+            (input)="onInput('replyTo', $event)"
+            (blur)="markTouched('replyTo')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-sender-domain'"
+          [label]="'wsEmail.fields.senderDomain.label' | transloco"
+          [hint]="'wsEmail.fields.senderDomain.hint' | transloco"
+          [required]="!isReadonly()"
+          [error]="senderDomainError()"
+        >
+          <input
+            [id]="uid + '-sender-domain'"
+            type="text"
+            dir="ltr"
+            maxlength="253"
+            autocomplete="off"
+            spellcheck="false"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="senderDomainDraft()"
+            [readOnly]="isReadonly() || saving()"
+            [attr.aria-readonly]="isReadonly() ? 'true' : null"
+            [attr.aria-invalid]="senderDomainError() ? 'true' : null"
+            (input)="onInput('senderDomain', $event)"
+            (blur)="onDomainBlur()"
+          />
+        </ui-field>
+      </div>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="!canSubmit()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="close()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

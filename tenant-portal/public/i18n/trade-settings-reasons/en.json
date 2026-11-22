@@ -1,0 +1,105 @@
+{
+  "new": "New reason",
+  "search": "Search reasons",
+  "showInactive": "Show inactive",
+  "showInactiveHint": "Include reasons that are turned off.",
+  "empty": "No reasons for this action yet.",
+  "noResults": "No matching reasons.",
+  "clearSearch": "Clear search",
+  "loadFailed": "This page could not be loaded.",
+  "loadFailedText": "Try reloading the reasons list.",
+  "retry": "Try again",
+  "footerHint": "Reasons are shared by every company. System reasons cannot be turned off.",
+  "systemLocked": "System reasons stay active.",
+  "systemLockedDelete": "System reasons cannot be deleted.",
+  "yes": "Yes",
+  "no": "No",
+  "tabs": {
+    "label": "Reason areas"
+  },
+  "kinds": {
+    "label": "Reason kinds",
+  "hint": "Choose a reason kind to see and manage its reasons"
+  },
+  "columns": {
+    "ariaLabel": "Reasons",
+    "code": "Code",
+    "name": "Name",
+    "requiresNote": "Note required",
+    "order": "Order",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "system": "System"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "save": "Save",
+    "undo": "Undo changes",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "fields": {
+    "kind": "Used for",
+    "sortOrder": "Order",
+    "code": "Code",
+    "nameAr": "Arabic name",
+    "nameEn": "English name",
+    "requiresNote": "Note required",
+    "active": "Active"
+  },
+  "placeholders": {
+    "code": "CUSTOMER_REQUEST"
+  },
+  "hints": {
+    "kind": "Where this reason can be chosen.",
+    "sortOrder": "Whole number controlling the display order in lists (lower appears first).",
+    "code": "Letters, digits and _. It cannot change later. Other screens store this code.",
+    "nameAr": "Required Arabic display name (up to 120 characters).",
+    "nameEn": "Required English display name (up to 120 characters).",
+    "requiresNote": "Users must add a note when they choose this reason.",
+    "inventoryNoNote": "Inventory screens do not ask for a note, so this setting has no effect there.",
+    "active": "Controls whether this reason can be chosen on other screens."
+  },
+  "modal": {
+    "createTitle": "New reason",
+    "editTitle": "Reason details",
+    "unsaved": "Unsaved changes"
+  },
+  "delete": {
+    "title": "Delete reason",
+    "text": "Delete this reason? Records that used it keep its code."
+  },
+  "conflict": {
+    "title": "Reason changed",
+    "text": "Someone changed this reason. Reload to see the latest version, or keep your changes to save them.",
+    "reload": "Reload",
+    "keepMine": "Keep my changes"
+  },
+  "discard": {
+    "title": "Discard unsaved changes?",
+    "text": "Your changes have not been saved yet.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters.",
+    "range": "Must be a whole number between {{min}} and {{max}}.",
+    "reasonCode": "Start with A–Z and use only A–Z, 0–9 or _ (2 to 40 characters)."
+  },
+  "toasts": {
+    "created": "Reason created",
+    "updated": "Reason updated",
+    "activated": "Reason activated",
+    "deactivated": "Reason deactivated",
+    "deleted": "Reason deleted"
+  }
+}

@@ -1,0 +1,178 @@
+@switch (pageState()) {
+  @case ('loading') {
+    <div class="flex flex-col gap-10" aria-busy="true">
+      <div class="flex flex-wrap items-center justify-between gap-8">
+        <div class="flex items-center gap-8">
+          <div class="size-icon-tile rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+          <div class="h-skeleton-line w-org-card-w rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+        </div>
+        <div class="flex items-center gap-8">
+          <div class="h-btn w-preset rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+          <div class="h-btn w-org-card-w rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <div class="h-field w-org-card-w rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+        <div class="h-field w-org-card-w rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+        <div class="h-field w-org-card-w rounded-8 bg-neutral-soft" aria-hidden="true"></div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-8 desktop:grid-cols-4">
+        @for (item of skeletonCards; track item) {
+          <div class="h-agenda-cell-min">
+            <ui-widget-frame title="">
+              <ui-widget-state kind="loading" [text]="'tradeDashboard.state.loading' | transloco" />
+            </ui-widget-frame>
+          </div>
+        }
+      </div>
+
+      <div class="grid grid-cols-1 gap-8 desktop:grid-cols-2">
+        @for (item of skeletonCharts; track item) {
+          <div class="h-toast">
+            <ui-widget-frame title="">
+              <ui-widget-state kind="loading" [text]="'tradeDashboard.state.loading' | transloco" />
+            </ui-widget-frame>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @case ('empty') {
+    <ui-full-state
+      kind="not-found"
+      [title]="'tradeDashboard.page.emptyTitle' | transloco"
+      [actionLabel]="canManage ? ('tradeDashboard.page.createDashboard' | transloco) : ''"
+      (action)="openCreateFromEmpty()"
+    />
+  }
+
+  @case ('forbidden') {
+    <ui-full-state
+      kind="forbidden"
+      [title]="'tradeDashboard.page.forbiddenTitle' | transloco"
+    />
+  }
+
+  @case ('error') {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'tradeShared.common.loadFailed' | transloco"
+      [text]="'tradeDashboard.page.loadFailedText' | transloco"
+      [actionLabel]="'tradeShared.common.retry' | transloco"
+      (action)="retryLoad()"
+    />
+  }
+
+  @case ('ready') {
+    @if (detail(); as current) {
+      <app-trade-dashboard-header
+        [detail]="current"
+        [navigationItems]="navigationItems()"
+        [generatedAt]="runResult()?.generatedAt ?? null"
+        [editing]="editing()"
+        [canManage]="canManage"
+        [canEdit]="canEdit()"
+        [isOwner]="isOwner()"
+        [busy]="headerBusy() || savingLayout()"
+        (switchTo)="onSwitchDashboard($event)"
+        (refresh)="onRefresh()"
+        (editLayout)="onEnterEditMode()"
+        (menuAction)="onHeaderAction($event)"
+      />
+
+      <app-trade-dashboard-filters
+        [value]="filterState()"
+        [scopeCoverage]="current.scopeCoverage"
+        [canReset]="canResetFilters()"
+        [disabled]="savingLayout()"
+        (valueChange)="onFiltersChange($event)"
+        (reset)="onResetFilters()"
+      />
+
+      @if (editing()) {
+        <app-trade-dashboard-edit-bar
+          [dirty]="editDirty()"
+          [canUndo]="canUndo()"
+          [saving]="savingLayout()"
+          [placementCount]="current.placements.length + current.unavailablePlacements.length"
+          [maxPlacements]="maxPlacements"
+          (addWidget)="onOpenLibrary()"
+          (undo)="onUndoLayout()"
+          (cancel)="onCancelEdit()"
+          (save)="onSaveLayout()"
+        />
+      }
+
+      <app-trade-dashboard-canvas
+        [detail]="current"
+        [run]="runResult()"
+        [catalog]="catalog()"
+        [editing]="editing()"
+        [items]="gridItems()"
+        [loadingIds]="loadingIds()"
+        [sourcesDown]="sourcesDown()"
+        [(selectedId)]="selectedId"
+        [removeDisabledReason]="removeDisabledReason()"
+        (retry)="onRetryWidget($event)"
+        (removePlacement)="onRemovePlacement($event)"
+        (layoutChange)="onGridLayoutChange($event)"
+      />
+    }
+  }
+}
+
+<app-trade-dashboard-create-modal
+  [ctx]="ctx()"
+  [catalog]="catalog()"
+  (created)="onDashboardCreated($event)"
+  (updated)="onDashboardUpdated($event)"
+/>
+
+<app-trade-dashboard-share-modal
+  [ctx]="ctx()"
+  (revisionChange)="onShareRevisionChange($event)"
+/>
+
+<app-trade-widget-library-modal
+  [ctx]="ctx()"
+  [catalog]="catalog()"
+  (added)="onWidgetAdded($event)"
+/>
+
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'tradeDashboard.confirm.deleteTitle' | transloco"
+  [text]="'tradeDashboard.confirm.deleteText' | transloco: { name: detail()?.name ?? '' }"
+  [confirmLabel]="'tradeDashboard.confirm.deleteAction' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #removeConfirm
+  tone="danger"
+  [title]="'tradeDashboard.confirm.removeTitle' | transloco"
+  [text]="'tradeDashboard.confirm.removeText' | transloco"
+  [confirmLabel]="'tradeDashboard.confirm.removeAction' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictConfirm
+  tone="warning"
+  [title]="'tradeDashboard.confirm.conflictTitle' | transloco"
+  [text]="'tradeDashboard.confirm.conflictText' | transloco"
+  [confirmLabel]="'tradeShared.conflict.reload' | transloco"
+  [cancelLabel]="'tradeShared.conflict.keepMine' | transloco"
+/>
+
+<ui-unsaved-dialog
+  [title]="'tradeDashboard.confirm.unsavedTitle' | transloco"
+  [text]="'tradeDashboard.confirm.unsavedText' | transloco"
+  [saveLabel]="'tradeDashboard.confirm.unsavedSave' | transloco"
+  [discardLabel]="'tradeDashboard.confirm.unsavedDiscard' | transloco"
+  [cancelLabel]="'tradeDashboard.confirm.unsavedCancel' | transloco"
+/>

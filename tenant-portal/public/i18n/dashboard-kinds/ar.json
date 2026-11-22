@@ -1,0 +1,35 @@
+{
+  "vsPrevious": "مقارنة بالفترة السابقة",
+  "vsLastYear": "مقارنة بالفترة نفسها من العام الماضي",
+  "ofTarget": "{{pct}} · المستهدف {{target}}",
+  "rank": "الترتيب",
+  "metric": "المقياس",
+  "actual": "الفعلي",
+  "target": "المستهدف",
+  "statusLabel": "الحالة",
+  "status": {
+    "ON_TRACK": "على المسار",
+    "AT_RISK": "معرّض للخطر",
+    "OFF_TRACK": "خارج المسار",
+    "UNKNOWN": "غير معروف"
+  },
+  "severity": {
+    "CRITICAL": "حرج",
+    "WARNING": "تحذير",
+    "INFO": "معلومة",
+    "SUCCESS": "تمت المعالجة"
+  },
+  "triggered": "تحقق الشرط",
+  "total": "الإجمالي",
+  "noTarget": "لا يوجد مستهدف",
+  "items": "{{count}} عناصر",
+  "itemsZero": "لا عناصر",
+  "itemsOne": "عنصر واحد",
+  "itemsTwo": "عنصران",
+  "itemsFew": "{{count}} عناصر",
+  "itemsMany": "{{count}} عنصرًا",
+  "itemsOther": "{{count}} عنصر",
+  "partialAccess": "بعض السجلات مخفية وفق صلاحياتك",
+  "moreRows": "تتوفر صفوف إضافية",
+  "moreCurrencies": "عملات أخرى"
+}

@@ -1,0 +1,138 @@
+{
+  "back": "Back to opportunities",
+  "newTitle": "New opportunity",
+  "create": "Create opportunity",
+  "created": "Opportunity “{{name}}” created.",
+  "loadFailed": "Could not load this opportunity.",
+  "scopeDenied": "You do not have permission to view this opportunity.",
+  "navGone": "That opportunity is no longer available.",
+  "notFound": {
+    "text": "This opportunity does not exist or you cannot open it."
+  },
+  "errors": {
+    "customerCannotCreate": "This customer cannot get a new opportunity."
+  },
+  "header": {
+    "stageLabel": "Stage",
+    "pipelineLabel": "Pipeline",
+    "amountLabel": "Amount",
+    "fromLead": "From lead",
+    "logActivity": "Log activity",
+    "actionsLabel": "Opportunity actions",
+    "markWon": "Mark won",
+    "markLost": "Mark lost",
+    "reopen": "Reopen",
+    "movePipeline": "Move to pipeline",
+    "changeColour": "Change colour",
+    "delete": "Delete"
+  },
+  "nav": {
+    "prev": "Previous opportunity",
+    "next": "Next opportunity"
+  },
+  "tabs": {
+    "label": "Opportunity sections",
+    "overview": "Overview",
+    "activities": "Activities",
+    "calls": "Calls",
+    "attachments": "Attachments",
+    "history": "History",
+    "stages": "Stages",
+    "quotations": "Quotations",
+    "missed": "{{n}} missed"
+  },
+  "delete": {
+    "title": "Delete this opportunity?",
+    "text": "Its notes, attachments and tags will be deleted too, and any linked lead will be unlinked.",
+    "confirm": "Delete",
+    "cancel": "Cancel",
+    "done": "Opportunity deleted."
+  },
+  "conflict": {
+    "title": "Someone else changed this opportunity",
+    "text": "Your changes were not saved. Reload the latest version, or keep editing and copy your changes first.",
+    "reload": "Reload",
+    "keepEditing": "Keep editing"
+  },
+  "history": {
+    "filter": {
+      "details": "Details",
+      "stages": "Stages"
+    },
+    "stars0": "0 stars",
+    "stars1": "1 star",
+    "stars2": "2 stars",
+    "starsOther": "{{n}} stars"
+  },
+  "stages": {
+    "listLabel": "Stage history",
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "startedIn": "Started in",
+    "hiddenStage": "A stage you cannot see",
+    "unknownUser": "A user",
+    "from": "From",
+    "to": "To",
+    "status": {
+      "WON": "Won",
+      "LOST": "Lost",
+      "REOPENED": "Reopened"
+    },
+    "durationInStage": "{{duration}} in {{stage}}",
+    "durationJoin": " ",
+    "duration": {
+      "lessThanMinute": "< 1 m",
+      "dayOne": "1 d",
+      "dayTwo": "2 d",
+      "dayFew": "{{n}} d",
+      "dayMany": "{{n}} d",
+      "hourOne": "1 h",
+      "hourTwo": "2 h",
+      "hourFew": "{{n}} h",
+      "hourMany": "{{n}} h",
+      "minOne": "1 m",
+      "minTwo": "2 m",
+      "minFew": "{{n}} m",
+      "minMany": "{{n}} m"
+    },
+    "loadMore": "Load more",
+    "empty": "No stage changes yet.",
+    "loadFailed": "Could not load stage history.",
+    "retry": "Try again",
+    "denied": {
+      "title": "Stage history is not available",
+      "text": "You do not have access to view stage changes for this opportunity."
+    }
+  },
+  "quotations": {
+    "new": "New quotation",
+    "tableLabel": "Linked quotations",
+    "pagination": "Quotations pagination",
+    "columns": {
+      "number": "Number",
+      "status": "Status",
+      "date": "Date",
+      "grandTotal": "Grand total",
+      "owner": "Owner"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "SENT": "Sent",
+      "ACCEPTED": "Accepted",
+      "CONVERTED": "Converted",
+      "REJECTED": "Rejected",
+      "EXPIRED": "Expired",
+      "CANCELLED": "Cancelled"
+    },
+    "empty": "No quotations are linked to this opportunity yet.",
+    "denied": {
+      "title": "Quotations are not available",
+      "text": "You do not have access to quotations."
+    },
+    "loadFailed": "Could not load linked quotations.",
+    "retry": "Try again",
+    "unavailable": "This quotation cannot be opened yet."
+  }
+}

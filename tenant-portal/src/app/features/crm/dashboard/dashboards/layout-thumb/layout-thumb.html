@@ -1,0 +1,28 @@
+<div class="h-dropzone w-full overflow-hidden rounded-8 border border-border bg-surface-muted p-4" aria-hidden="true">
+  @let data = layout();
+  @if (!data) {
+    <div class="grid size-full grid-cols-3 gap-4 animate-pulse">
+      <span class="rounded-4 bg-neutral-soft"></span>
+      <span class="rounded-4 bg-neutral-soft"></span>
+      <span class="rounded-4 bg-neutral-soft"></span>
+    </div>
+  } @else if (data.rects.length === 0) {
+    <div class="size-full rounded-4 border border-dashed border-border"></div>
+  } @else {
+    <svg class="block size-full" [attr.viewBox]="data.viewBox" preserveAspectRatio="none" aria-hidden="true">
+      @for (rect of data.rects; track rect.id) {
+        <rect
+          [attr.x]="rect.x"
+          [attr.y]="rect.y"
+          [attr.width]="rect.w"
+          [attr.height]="rect.h"
+          rx="0.6"
+          [attr.fill]="rect.kpi ? 'var(--brand-soft)' : 'var(--neutral-soft)'"
+          stroke="var(--border)"
+          stroke-width="1"
+          vector-effect="non-scaling-stroke"
+        />
+      }
+    </svg>
+  }
+</div>

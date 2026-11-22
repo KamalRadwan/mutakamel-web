@@ -1,0 +1,32 @@
+{
+  "due": {
+    "OVERDUE": "Overdue",
+    "TODAY": "Today",
+    "FUTURE": "Upcoming",
+    "NONE": "No activity"
+  },
+  "color": {
+    "none": "No color"
+  },
+  "card": {
+    "actions": "Record actions",
+    "expand": "Show details",
+    "collapse": "Hide details",
+    "view": "View record",
+    "rating": "Rating {{value}} of 3",
+    "rate": "Rate {{value}} of 3",
+    "clearRating": "Clear rating",
+    "owner": "Owner: {{name}}",
+    "noOwner": "No owner"
+  },
+  "board": {
+    "add": "Add to {{lane}}",
+    "collapse": "Collapse {{lane}}",
+    "expand": "Expand {{lane}}",
+    "empty": "No records in this lane",
+    "emptyHelp": "Drag a record here or add a new one.",
+    "quickAdd": "Quick add",
+    "loadMore": "Load more ({{shown}} of {{total}})",
+    "allShown": "All records are shown"
+  }
+}

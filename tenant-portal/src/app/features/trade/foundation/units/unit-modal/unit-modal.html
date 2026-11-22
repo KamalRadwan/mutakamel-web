@@ -1,0 +1,289 @@
+<ui-modal
+  #unitModal
+  size="form"
+  icon="tablerRuler2"
+  tile="bg-icon-teal"
+  [title]="mode() === 'create' ? ('tradeUnits.modal.newTitle' | transloco) : ('tradeUnits.modal.title' | transloco: { code: baseUnit()?.code ?? '' })"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!saving() && !conflictBusy()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tradeUnits.modal.code' | transloco"
+        [for]="uid + '-code'"
+        [required]="mode() === 'create'"
+        [hint]="'tradeUnits.modal.codeHint' | transloco"
+        [count]="mode() === 'create' ? form().code.length : null"
+        [max]="mode() === 'create' ? limits.codeMax : null"
+        [error]="errorText('code')"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().code"
+          [readonly]="mode() === 'edit' || !canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('code') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-code-hint' + (errorText('code') ? ' ' + uid + '-code-error' : '')"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+        @if (mode() === 'edit') {
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        }
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tradeUnits.modal.displayName' | transloco"
+        [for]="uid + '-display-name'"
+        [required]="true"
+        [hint]="'tradeUnits.modal.displayNameHint' | transloco"
+        [count]="form().displayName.length"
+        [max]="limits.nameMax"
+        [error]="errorText('displayName')"
+      >
+        <input
+          [id]="uid + '-display-name'"
+          type="text"
+          dir="auto"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().displayName"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('displayName') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-display-name-hint' + (errorText('displayName') ? ' ' + uid + '-display-name-error' : '')"
+          (input)="onFieldInput('displayName', $event)"
+          (blur)="markTouched('displayName')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tradeUnits.modal.nameEn' | transloco"
+        [for]="uid + '-name-en'"
+        [required]="true"
+        [hint]="'tradeUnits.modal.nameEnHint' | transloco"
+        [count]="form().nameEn.length"
+        [max]="limits.nameMax"
+        [error]="errorText('nameEn')"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameEn"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('nameEn') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-en-hint' + (errorText('nameEn') ? ' ' + uid + '-name-en-error' : '')"
+          (input)="onFieldInput('nameEn', $event)"
+          (blur)="markTouched('nameEn')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [label]="'tradeUnits.modal.nameAr' | transloco"
+        [for]="uid + '-name-ar'"
+        [required]="true"
+        [hint]="'tradeUnits.modal.nameArHint' | transloco"
+        [count]="form().nameAr.length"
+        [max]="limits.nameMax"
+        [error]="errorText('nameAr')"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          autocomplete="off"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="form().nameAr"
+          [readonly]="!canManage()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="errorText('nameAr') ? 'true' : null"
+          [attr.aria-describedby]="uid + '-name-ar-hint' + (errorText('nameAr') ? ' ' + uid + '-name-ar-error' : '')"
+          (input)="onFieldInput('nameAr', $event)"
+          (blur)="markTouched('nameAr')"
+        />
+      </ui-field>
+    </div>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'tradeUnits.modal.active' | transloco"
+          [for]="uid + '-active'"
+          [hint]="'tradeUnits.modal.activeHint' | transloco"
+        >
+          <div class="flex items-start gap-8">
+            <ui-switch
+              [id]="uid + '-active'"
+              [label]="'tradeUnits.modal.active' | transloco"
+              [describedBy]="uid + '-active-hint'"
+              [checked]="form().active"
+              [disabled]="!canManage() || saving()"
+              (checkedChange)="setActive($event)"
+            />
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <span class="text-12 leading-18 text-text">
+                {{ (form().active ? 'tradeShared.uomStatus.ACTIVE' : 'tradeShared.uomStatus.RETIRED') | transloco }}
+              </span>
+              <span class="text-11 leading-16 text-text-muted">
+                {{ 'tradeUnits.modal.activeHelp' | transloco }}
+              </span>
+            </div>
+          </div>
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || !dirty() || !isValid()"
+        (click)="save()"
+      >
+        {{ 'tradeShared.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'tradeShared.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'tradeShared.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        (click)="requestClose()"
+      >
+        {{ 'tradeShared.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-modal
+  #conflictModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'tradeShared.conflict.title' | transloco"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!conflictBusy()"
+  (closed)="onConflictClosed()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'tradeShared.conflict.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="conflictBusy()"
+      (click)="reloadLatest()"
+    >
+      {{ 'tradeShared.conflict.reload' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="conflictBusy()"
+      (click)="keepMyChanges()"
+    >
+      {{ 'tradeShared.conflict.keepMine' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-modal
+  #inUseModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'tradeUnits.inUse.title' | transloco"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+>
+  <div class="flex flex-col gap-8 text-12 leading-18 text-text-muted">
+    <p>{{ 'tradeUnits.inUse.text' | transloco }}</p>
+    @if (inUseGroups().length > 0) {
+      <ul class="flex list-disc flex-col gap-2 ps-16 text-text">
+        @for (group of inUseGroups(); track group.key) {
+          <li>
+            <bdi dir="ltr" class="tabular-nums">{{ group.count }}</bdi> {{ refGroupLabel(group) }}
+          </li>
+        }
+      </ul>
+      <p>{{ 'tradeUnits.inUse.groupsNote' | transloco }}</p>
+    } @else {
+      <ul class="flex list-disc flex-col gap-2 ps-16 text-text">
+        @for (key of inUseReasonKeys; track key) {
+          <li>{{ key | transloco }}</li>
+        }
+      </ul>
+      <p>{{ 'tradeUnits.inUse.note' | transloco }}</p>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="closeInUse()">
+      {{ 'tradeShared.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tradeShared.discard.title' | transloco"
+  [text]="'tradeShared.discard.text' | transloco"
+  [confirmLabel]="'tradeShared.discard.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #retireDialog
+  tone="warning"
+  [title]="'tradeUnits.retire.title' | transloco: { code: baseUnit()?.code ?? '' }"
+  [text]="'tradeUnits.retire.text' | transloco"
+  [confirmLabel]="'tradeUnits.retire.confirm' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

@@ -1,0 +1,331 @@
+<ui-modal
+  size="wide"
+  icon="tablerMailForward"
+  tile="bg-icon-blue"
+  [title]="'outboundEmails.compose.title' | transloco"
+  [subtitle]="selectedRecord()?.name ?? ''"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!busy()"
+  (closed)="onClosed()"
+>
+  <div class="mb-12 flex items-center gap-8 border-b border-border pb-10">
+    @for (item of steps(); track item.num; let last = $last) {
+      <div class="flex items-center gap-6" [attr.aria-current]="step() === item.num ? 'step' : null">
+        <span
+          class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 font-medium"
+          [class]="
+            step() > item.num
+              ? 'bg-success text-on-success'
+              : step() === item.num
+                ? 'bg-brand text-on-brand'
+                : 'bg-neutral-soft text-text-muted'
+          "
+        >
+          @if (step() > item.num) {
+            <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+          } @else {
+            {{ item.num }}
+          }
+        </span>
+        <span
+          class="text-12 leading-18 whitespace-nowrap"
+          [class]="step() === item.num ? 'font-medium text-text' : 'text-text-muted'"
+        >
+          {{ item.label }}
+        </span>
+      </div>
+      @if (!last) {
+        <span class="h-border-w-strong flex-1 rounded-2" [class]="step() > item.num ? 'bg-brand' : 'bg-border'" aria-hidden="true"></span>
+      }
+    }
+  </div>
+
+  @switch (step()) {
+    @case (1) {
+      <div class="flex flex-col gap-8">
+        <ui-field
+          size="bare"
+          [label]="'outboundEmails.compose.recordTypeLabel' | transloco"
+          [hint]="'outboundEmails.compose.recordTypeHint' | transloco"
+          [required]="true"
+        >
+          <div>
+            <ui-segmented
+              [options]="sourceTypeOptions()"
+              [label]="'outboundEmails.compose.recordTypeLabel' | transloco"
+              [value]="sourceType()"
+              (valueChange)="onSourceTypeChange($event)"
+            />
+          </div>
+        </ui-field>
+
+        <div #recordPicker class="relative" (keydown.escape)="onRecordPickerEscape($event)">
+          <ui-field
+            size="bare"
+            [for]="uid + '-record-trigger'"
+            [label]="'outboundEmails.compose.recordLabel' | transloco"
+            [hint]="'outboundEmails.compose.recordHint' | transloco"
+            [required]="true"
+          >
+            <button
+              #recordTrigger
+              [id]="uid + '-record-trigger'"
+              type="button"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="recordMenuOpen()"
+              [attr.aria-describedby]="uid + '-record-trigger-hint'"
+              class="flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast"
+              [class]="
+                recordMenuOpen()
+                  ? 'border-focus-ring ring-3 ring-focus-halo'
+                  : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+              "
+              [disabled]="loadingRecords()"
+              (click)="toggleRecordMenu()"
+            >
+              <span dir="auto" class="min-w-0 flex-1 truncate text-start" [class]="selectedRecord() ? 'text-text' : 'text-text-placeholder'">
+                {{ selectedRecord()?.name || ('outboundEmails.compose.recordPlaceholder' | transloco) }}
+              </span>
+              <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </button>
+          </ui-field>
+
+          @if (recordMenuOpen()) {
+            <div
+              class="absolute start-0 top-full z-dropdown mt-4 flex w-full flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+              (keydown)="onRecordMenuKeydown($event)"
+            >
+              <ui-field
+                [for]="uid + '-record-search'"
+                [label]="'outboundEmails.compose.recordSearchLabel' | transloco"
+                [hint]="'outboundEmails.compose.recordSearchHint' | transloco"
+              >
+                <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                <input
+                  [id]="uid + '-record-search'"
+                  type="text"
+                  autocomplete="off"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                  [placeholder]="'outboundEmails.compose.recordSearchPlaceholder' | transloco"
+                  [attr.aria-describedby]="uid + '-record-search-hint'"
+                  [value]="recordQuery()"
+                  (input)="onRecordQueryInput($event)"
+                />
+              </ui-field>
+
+              <ul role="listbox" class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto" [attr.aria-label]="'outboundEmails.compose.recordLabel' | transloco">
+                @for (record of filteredRecords(); track record.id) {
+                  <li role="option" [attr.aria-selected]="record.id === selectedRecordId()">
+                    <button
+                      #recordOption
+                      type="button"
+                      class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [class]="record.id === selectedRecordId() ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                      (click)="selectRecord(record)"
+                    >
+                      <span dir="auto" class="truncate text-start">{{ record.name }}</span>
+                      @if (record.id === selectedRecordId()) {
+                        <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                      }
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="p-8 text-center text-12 text-text-muted">
+                    {{ 'outboundEmails.compose.noMatchingRecords' | transloco }}
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @case (2) {
+      @if (senderUnverified()) {
+        <div class="flex flex-col gap-8">
+          <app-settings-notice tone="warning">
+            <div class="flex flex-wrap items-center justify-between gap-8">
+              <span>{{ 'outboundEmails.errors.CRM.EMAIL.SENDER_UNVERIFIED' | transloco }}</span>
+              <a uiButton variant="secondary" size="small" routerLink="/workspace/settings" (click)="close()">
+                {{ 'outboundEmails.sender.openSettings' | transloco }}
+              </a>
+            </div>
+          </app-settings-notice>
+        </div>
+      } @else if (options(); as opts) {
+        <div class="flex flex-col gap-8">
+          @if (opts.availability.includes('NO_APPROVED_RECIPIENT')) {
+            <app-settings-notice tone="warning">
+              {{ 'outboundEmails.compose.noApprovedRecipient' | transloco }}
+            </app-settings-notice>
+          }
+
+          @if (opts.availability.includes('NO_COMPATIBLE_TEMPLATE')) {
+            <app-settings-notice tone="warning">
+              {{ 'outboundEmails.compose.noCompatibleTemplate' | transloco }}
+            </app-settings-notice>
+          }
+
+          @if (opts.recipients.length) {
+            <ui-field
+              size="bare"
+              [label]="'outboundEmails.compose.recipientLabel' | transloco"
+              [hint]="'outboundEmails.compose.recipientHint' | transloco"
+              [required]="true"
+            >
+              <div
+                role="radiogroup"
+                class="flex flex-col gap-6"
+                [attr.aria-label]="'outboundEmails.compose.recipientLabel' | transloco"
+                (keydown)="onRecipientKeydown($event)"
+              >
+                @for (recipient of opts.recipients; track recipientKeyOf(recipient); let idx = $index) {
+                  @let selected = selectedRecipientKey() === recipientKeyOf(recipient);
+                  <button
+                    #recipientRadio
+                    type="button"
+                    role="radio"
+                    class="flex w-full cursor-pointer items-center gap-8 rounded-10 border p-8 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="selected ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+                    [attr.aria-checked]="selected"
+                    [tabIndex]="selected || (!selectedRecipientKey() && idx === 0) ? 0 : -1"
+                    (click)="selectRecipient(recipient)"
+                  >
+                    <span
+                      class="inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border-check"
+                      [class]="selected ? 'border-brand bg-surface' : 'border-border-field bg-surface-field'"
+                      aria-hidden="true"
+                    >
+                      @if (selected) {
+                        <span class="size-radio-dot rounded-full bg-brand"></span>
+                      }
+                    </span>
+
+                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-6">
+                      <span dir="auto" class="text-start text-12 leading-18 font-medium text-text">{{ recipient.displayName }}</span>
+                      <span dir="ltr" class="text-12 leading-18 text-text-muted">{{ recipient.maskedAddress }}</span>
+                    </div>
+
+                    @if (recipient.isPrimary) {
+                      <span
+                        class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                        [class]="selected ? 'bg-surface text-on-brand-soft' : 'bg-brand-soft text-on-brand-soft'"
+                      >
+                        {{ 'outboundEmails.badges.primaryContact' | transloco }}
+                      </span>
+                    }
+                  </button>
+                }
+              </div>
+            </ui-field>
+          }
+
+          @if (opts.templates.length) {
+            <ui-field
+              size="bare"
+              [label]="'outboundEmails.compose.templateLabel' | transloco"
+              [hint]="'outboundEmails.compose.templateHint' | transloco"
+              [required]="true"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [options]="templateDropdownOptions()"
+                [value]="selectedTemplateId()"
+                [label]="'outboundEmails.compose.templateLabel' | transloco"
+                (valueChange)="selectedTemplateId.set($event)"
+              />
+            </ui-field>
+          }
+        </div>
+      }
+    }
+
+    @case (3) {
+      @if (preview(); as prev) {
+        <div class="flex flex-col gap-8">
+          <div class="flex flex-col gap-4">
+            <h3 dir="auto" class="text-start text-15 leading-22 font-medium text-text">{{ prev.subject }}</h3>
+            @if (prev.preheader) {
+              <p dir="auto" class="text-start text-12 leading-18 text-text-muted">{{ prev.preheader }}</p>
+            }
+          </div>
+
+          <ui-field
+            size="bare"
+            [label]="'outboundEmails.detail.format.label' | transloco"
+            [hint]="'outboundEmails.detail.format.hint' | transloco"
+          >
+            <div>
+              <ui-segmented
+                [options]="previewFormatOptions()"
+                [label]="'outboundEmails.detail.format.label' | transloco"
+                [value]="previewFormat()"
+                (valueChange)="setPreviewFormat($event)"
+              />
+            </div>
+          </ui-field>
+
+          @if (previewFormat() === 'html') {
+            <iframe
+              class="h-email-body w-full rounded-10 border border-border bg-surface"
+              sandbox=""
+              [srcdoc]="safeHtml()"
+              [title]="'outboundEmails.detail.htmlPreview' | transloco"
+            ></iframe>
+          } @else {
+            <pre
+              class="m-0 max-h-notif-list-max overflow-y-auto rounded-10 border border-border bg-surface-muted p-10 font-sans text-12 leading-18 whitespace-pre-wrap text-text"
+            >{{ prev.bodyText }}</pre>
+          }
+        </div>
+      }
+    }
+  }
+
+  @if (step() === 1) {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [loading]="loadingOptions()"
+      [disabled]="!selectedRecordId() || loadingOptions()"
+      (click)="nextFromRecord()"
+    >
+      {{ 'outboundEmails.compose.next' | transloco }}
+    </button>
+  } @else if (step() === 2 && !senderUnverified()) {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [loading]="loadingPreview()"
+      [disabled]="!canProceedToPreview() || loadingPreview()"
+      (click)="nextFromOptions()"
+    >
+      {{ 'outboundEmails.compose.next' | transloco }}
+    </button>
+  } @else if (step() === 3) {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [loading]="sending()"
+      [disabled]="sending()"
+      (click)="send()"
+    >
+      {{ 'outboundEmails.compose.send' | transloco }}
+    </button>
+  }
+
+  @if (step() > 1) {
+    <button modal-footer type="button" uiButton variant="secondary" [disabled]="busy()" (click)="goBack()">
+      {{ 'outboundEmails.compose.back' | transloco }}
+    </button>
+  }
+
+  <button modal-footer type="button" uiButton variant="secondary" [disabled]="busy()" (click)="close()">
+    {{ 'settings.common.cancel' | transloco }}
+  </button>
+</ui-modal>

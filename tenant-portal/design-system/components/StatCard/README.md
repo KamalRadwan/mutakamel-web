@@ -1,0 +1,1 @@
+A metric with a small chart. Padding 8, soft shadow. Every stat card carries a chart: line or smooth line with an arrow end, shaded area, bars, half-circle gauge, progress bar or segmented bar, chosen by the metric. You provide the label, value, optional delta and the chart data.

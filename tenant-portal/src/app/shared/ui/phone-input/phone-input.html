@@ -1,0 +1,168 @@
+<div #fieldBox dir="ltr" [class]="fieldBoxClasses()" (mousedown)="onContainerMouseDown($event)">
+  @if (!isEditing()) {
+    <div class="flex h-full w-full items-center gap-6 px-8" dir="ltr">
+      @if (viewCountry(); as country) {
+        <img
+          [src]="'assets/flags/' + country.iso2.toLowerCase() + '.svg'"
+          alt=""
+          class="h-12 w-16 shrink-0 rounded-2 object-cover"
+          (pointerdown)="onViewPointerDown('dial')"
+        />
+      }
+      <input
+        #viewInput
+        type="text"
+        readonly
+        dir="ltr"
+        class="h-full min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [attr.id]="inputId() || null"
+        [value]="displayValue()"
+        [disabled]="disabled()"
+        [attr.aria-label]="label()"
+        [attr.aria-invalid]="invalid() ? 'true' : null"
+        [attr.aria-describedby]="describedBy() || null"
+        (pointerdown)="onViewPointerDown('number')"
+        (focus)="onViewFocus()"
+      />
+    </div>
+  } @else {
+    <button
+      #dialTrigger
+      type="button"
+      dir="ltr"
+      class="inline-flex h-full shrink-0 cursor-pointer items-center gap-4 rounded-s-8 px-8 text-12 text-text outline-none hover:bg-row-hover focus-visible:bg-row-hover disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      aria-haspopup="listbox"
+      [attr.aria-expanded]="open()"
+      [attr.aria-controls]="open() ? listId : null"
+      [attr.aria-label]="
+        ('phone.dialCode' | transloco) +
+        (dialPrefix() ? ' ' + dialPrefix() : '') +
+        (selectedCountry() ? ' ' + countryName(selectedCountry()!) : '')
+      "
+      [disabled]="disabled()"
+      [attr.aria-describedby]="describedBy() || null"
+      (click)="toggleList()"
+      (focus)="onEditFocus()"
+      (keydown)="onDialKeyDown($event)"
+    >
+      @if (selectedCountry(); as country) {
+        <img
+          [src]="'assets/flags/' + country.iso2.toLowerCase() + '.svg'"
+          alt=""
+          class="h-12 w-16 shrink-0 rounded-2 object-cover"
+        />
+      }
+      <span dir="ltr" class="tabular-nums">{{ dialPrefix() || '+' }}</span>
+      <ng-icon
+        name="tablerChevronDown"
+        size="14"
+        class="shrink-0 text-text-muted transition-transform duration-fast"
+        [class.rotate-180]="open()"
+        aria-hidden="true"
+      />
+    </button>
+
+    <span class="h-full w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+    <input
+      #numberInput
+      type="text"
+      inputmode="tel"
+      autocomplete="tel"
+      dir="ltr"
+      class="h-full min-w-0 flex-1 bg-transparent px-8 text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+      [attr.id]="inputId() || null"
+      [value]="localNumber()"
+      [attr.maxlength]="maxLocalLength()"
+      [disabled]="disabled()"
+      [attr.aria-label]="label() || ('phone.number' | transloco)"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      [attr.aria-describedby]="describedBy() || null"
+      (focus)="onEditFocus()"
+      (keydown)="onNumberKeyDown($event)"
+      (paste)="onNumberPaste($event)"
+      (input)="onNumberInput($event)"
+    />
+  }
+</div>
+
+@if (open()) {
+  <div
+    #list
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    (mousedown)="onPopoverMouseDown($event)"
+    (keydown.escape)="onEscape($event)"
+  >
+    <div
+      class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo-strong"
+    >
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #searchInput
+        type="text"
+        role="combobox"
+        autocomplete="off"
+        aria-autocomplete="list"
+        class="h-full min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+        [value]="search()"
+        [placeholder]="'phone.search' | transloco"
+        [attr.aria-label]="'phone.search' | transloco"
+        [attr.aria-expanded]="open()"
+        [attr.aria-controls]="listId"
+        [attr.aria-activedescendant]="activeDescendantId()"
+        (input)="onSearchInput($event)"
+        (keydown)="onSearchKeyDown($event)"
+      />
+    </div>
+
+    <ul
+      [id]="listId"
+      role="listbox"
+      class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+      [attr.aria-label]="'phone.dialCode' | transloco"
+    >
+      @for (country of filteredCountries(); track country.id; let index = $index) {
+        <li
+          [id]="optionId(index)"
+          role="option"
+          [attr.aria-selected]="country.id === selectedCountry()?.id"
+          class="flex h-menu-item w-full shrink-0 cursor-pointer items-center gap-8 whitespace-nowrap rounded-6 px-8 text-12 transition-colors duration-fast"
+          [class]="
+            country.id === selectedCountry()?.id
+              ? index === activeIndex()
+                ? 'bg-brand-soft text-on-brand-soft ring-2 ring-focus-halo'
+                : 'bg-brand-soft text-on-brand-soft'
+              : index === activeIndex()
+                ? 'bg-row-hover text-text'
+                : 'text-text hover:bg-row-hover'
+          "
+          (mouseenter)="activeIndex.set(index)"
+          (click)="chooseCountry(country)"
+        >
+          <img
+            [src]="'assets/flags/' + country.iso2.toLowerCase() + '.svg'"
+            alt=""
+            class="h-12 w-16 shrink-0 rounded-2 object-cover"
+          />
+          <span dir="ltr" class="shrink-0 text-start tabular-nums">{{ dialText(country) }}</span>
+          <span class="min-w-0 flex-1 truncate text-start">{{ countryName(country) }}</span>
+          @if (country.id === selectedCountry()?.id) {
+            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+          }
+        </li>
+      } @empty {
+        <li
+          role="presentation"
+          class="flex h-menu-item shrink-0 items-center justify-center px-8 text-12 text-text-muted"
+        >
+          {{ 'phone.noMatches' | transloco }}
+        </li>
+      }
+    </ul>
+  </div>
+}

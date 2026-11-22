@@ -1,0 +1,133 @@
+<ui-modal
+  size="wide"
+  icon="tablerListCheck"
+  tile="bg-icon-violet"
+  [title]="'roles.global.title' | transloco"
+  [subtitle]="roleDisplayName()"
+  [closeLabel]="'roles.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (!loading() && !loadFailed() && !isBranchRole()) {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium tabular-nums whitespace-nowrap"
+      [class]="selected().length > maxPermissions ? 'bg-danger-soft text-on-danger-soft' : 'bg-neutral-soft text-text-muted'"
+    >
+      {{ countText() }}
+    </span>
+  }
+
+  @if (loading()) {
+    <div class="flex flex-col gap-8" aria-busy="true">
+      @for (row of skeletonRows; track row) {
+        <div class="h-table-row rounded-10 border border-border bg-surface p-10">
+          <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft motion-safe:animate-pulse"></div>
+        </div>
+      }
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center gap-8 p-16 text-center" role="alert">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCloudOff" size="20" />
+      </span>
+      <p class="text-12 text-danger-text">{{ 'roles.global.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reloadData()">
+        {{ 'roles.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (isBranchRole()) {
+    <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+      <ng-icon name="tablerAlertTriangle" size="14" aria-hidden="true" />
+      <span>{{ 'roles.global.branchOwnerOnly' | transloco }}</span>
+    </p>
+  } @else {
+    <div class="flex flex-col gap-10">
+      @if (role()?.isSystem) {
+        <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+          <ng-icon name="tablerLock" size="14" aria-hidden="true" />
+          <span>{{ 'roles.modal.systemNote' | transloco }}</span>
+        </p>
+      }
+
+      <app-permission-tree
+        [entries]="entries()"
+        mode="GLOBAL"
+        [(selected)]="selected"
+        [readonly]="isReadonly()"
+        [disabledIds]="disabledPermissionIds()"
+        [max]="maxPermissions"
+      />
+
+      @if (!isReadonly() && dirty()) {
+        <app-seat-impact
+          [changes]="seatChanges()"
+          [canBuySeats]="session.isOwner()"
+          (blocking)="seatBlocked.set($event)"
+        />
+      }
+    </div>
+  }
+
+  <!-- Footer order (03-components, as the other app modals): primary first, then Undo, Reload, Close. -->
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly() && !loading() && !loadFailed()) {
+      <button
+        type="button"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || !dirty() || selected().length > maxPermissions || seatBlocked()"
+        (click)="save()"
+      >
+        {{ 'roles.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'roles.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'roles.common.unsaved' | transloco }}</span>
+      }
+    }
+
+    @if (listChangedError()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving()"
+        (click)="reloadData()"
+      >
+        <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+        {{ 'roles.global.reload' | transloco }}
+      </button>
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ (!isReadonly() && dirty() ? 'roles.common.cancel' : 'roles.common.close') | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'roles.discard.title' | transloco"
+  [text]="'roles.discard.text' | transloco"
+  [confirmLabel]="'roles.discard.confirm' | transloco"
+  [cancelLabel]="'roles.discard.keep' | transloco"
+/>

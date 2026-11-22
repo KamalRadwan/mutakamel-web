@@ -1,0 +1,227 @@
+<section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+  <header class="flex items-center justify-between gap-8">
+    <div class="flex min-w-0 items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerReceipt2" size="14" />
+      </span>
+      <h2 class="truncate text-13 leading-18 font-medium text-text">
+        {{ 'priceEval.answer.title' | transloco }}
+      </h2>
+    </div>
+
+    @if (!loading() && !error() && decision(); as dec) {
+      <ui-badge [tone]="dec.outcome === 'ALLOW' ? 'success' : 'danger'">
+        {{ (dec.outcome === 'ALLOW' ? 'priceEval.answer.allowed' : 'priceEval.answer.notAllowed') | transloco }}
+      </ui-badge>
+    }
+  </header>
+
+  @if (loading()) {
+    <div class="flex flex-col gap-10 py-6" role="status" [attr.aria-label]="'priceEval.answer.loading' | transloco">
+      <div class="flex items-center gap-8">
+        <span class="h-table-row w-1/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+        <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+      </div>
+      <div class="flex flex-col gap-6">
+        <div class="flex items-center justify-between gap-12">
+          <span class="h-skeleton-line w-1/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+        <div class="flex items-center justify-between gap-12">
+          <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+        <div class="flex items-center justify-between gap-12">
+          <span class="h-skeleton-line w-1/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+        <div class="flex items-center justify-between gap-12">
+          <span class="h-skeleton-line w-1/4 animate-pulse rounded-4 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+        </div>
+      </div>
+    </div>
+  } @else if (errorPresentation(); as err) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="alert">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-danger-soft text-danger-text"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerAlertTriangle" size="18" />
+      </span>
+      <p class="text-13 leading-18 font-medium text-text">
+        {{ err.titleKey | transloco }}
+      </p>
+      <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">
+        {{ err.messageKey | transloco }}
+      </p>
+      @if (err.actionKind === 'openBooks') {
+        <a uiButton variant="secondary" routerLink="/trade/governance/price-books">
+          {{ 'priceEval.answer.errors.openPriceBooks' | transloco }}
+        </a>
+      } @else {
+        <button type="button" uiButton variant="secondary" (click)="focusQuestion.emit()">
+          {{ 'priceEval.answer.errors.changeQuestion' | transloco }}
+        </button>
+      }
+    </div>
+  } @else if (decision(); as dec) {
+    <div class="flex flex-wrap items-baseline gap-6">
+      <bdi dir="ltr" class="text-20 leading-26 font-medium tabular-nums text-text">
+        {{ formattedFinalUnitPrice() }}
+      </bdi>
+      <span class="text-12 leading-18 text-text-muted">
+        {{ 'priceEval.answer.perUnitAfterPromotions' | transloco: { unit: resolvedUnitLabel() } }}
+      </span>
+    </div>
+
+    <dl class="flex flex-col gap-6">
+      <div class="flex items-center justify-between gap-12 text-12 leading-18">
+        <dt class="text-text-muted">{{ 'priceEval.answer.fields.basePrice' | transloco }}</dt>
+        <dd class="font-medium tabular-nums text-text">
+          <bdi dir="ltr">{{ formattedBasePrice() }}</bdi>
+        </dd>
+      </div>
+
+      @for (promo of dec.matchedPromotions; track promo.promotionVersionId) {
+        <div class="flex items-center justify-between gap-12 text-12 leading-18">
+          <dt class="text-text-muted">
+            {{ 'priceEval.answer.fields.promotionRow' | transloco: { code: promo.code } }}@if (promoPercent(promo); as percent) { ({{ percent }}%)}
+          </dt>
+          <dd class="font-medium tabular-nums text-success-text">
+            <bdi dir="ltr">&minus; {{ formatDiscount(dec.currencyCode, promo.discountAmount) }}</bdi>
+          </dd>
+        </div>
+      }
+
+      @if (dec.minimumAllowedPrice) {
+        <div class="flex items-center justify-between gap-12 text-12 leading-18">
+          <dt class="text-text-muted">{{ 'priceEval.answer.fields.floorPrice' | transloco }}</dt>
+          <dd class="font-medium tabular-nums text-text">
+            <bdi dir="ltr">{{ formattedFloorPrice() }}</bdi>
+          </dd>
+        </div>
+      }
+
+      <div class="flex items-center justify-between gap-12 text-12 leading-18">
+        <dt class="text-text-muted">{{ 'priceEval.answer.fields.priceBook' | transloco }}</dt>
+        <dd class="text-end">
+          <a
+            [routerLink]="['/trade/governance/price-books', dec.priceBookId, 'versions', dec.priceBookVersionId]"
+            class="inline-flex items-center gap-4 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          >
+            <span>{{ 'priceEval.answer.fields.priceBookValue' | transloco: { name: bookDisplayName(), version: dec.priceBookVersion } }}</span>
+            <ng-icon name="tablerExternalLink" size="13" class="shrink-0" aria-hidden="true" />
+          </a>
+        </dd>
+      </div>
+
+      <div class="flex items-center justify-between gap-12 text-12 leading-18">
+        <dt class="text-text-muted">{{ 'priceEval.answer.fields.chosenBy' | transloco }}</dt>
+        <dd class="flex flex-wrap items-center justify-end gap-6 font-medium text-text">
+          @if (sourceKey(); as srcKey) {
+            <span>{{ srcKey | transloco }}</span>
+          }
+          @if (previewBadgeKey(); as previewKey) {
+            <ui-badge tone="warning">{{ previewKey | transloco }}</ui-badge>
+          }
+        </dd>
+      </div>
+
+      <div class="flex items-center justify-between gap-12 text-12 leading-18">
+        <dt class="text-text-muted">{{ 'priceEval.answer.fields.matchedLine' | transloco }}</dt>
+        <dd class="text-end">
+          <a
+            [routerLink]="['/trade/governance/price-books', dec.priceBookId, 'versions', dec.priceBookVersionId]"
+            [queryParams]="{ tab: 'lines', line: dec.matchedEntryId }"
+            class="inline-flex items-center gap-4 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          >
+            <span>{{ matchedLineText() }}</span>
+          </a>
+        </dd>
+      </div>
+    </dl>
+
+    @if (dec.rejectedPromotions.length > 0) {
+      <div class="flex flex-col gap-6 pt-2">
+        <h3 class="text-12 leading-18 font-medium text-text">
+          {{ 'priceEval.answer.rejectedPromotionsTitle' | transloco }}
+        </h3>
+        <div class="flex flex-col gap-6">
+          @for (promo of dec.rejectedPromotions; track promo.promotionVersionId) {
+            <div class="grid grid-cols-1 items-center rounded-8 border border-border desktop:grid-cols-12">
+              <div class="px-10 py-8 desktop:col-span-7 desktop:border-e desktop:border-border">
+                <bdi dir="ltr" class="text-12 leading-18 font-medium text-text">{{ promo.code }}</bdi>
+              </div>
+              <div class="border-t border-border px-10 py-8 desktop:col-span-5 desktop:border-t-0">
+                <ui-badge tone="tag">{{ ('priceEval.answer.rejectReasons.' + promo.reason) | transloco }}</ui-badge>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (dec.rejectedCandidates.length > 0) {
+      <div class="flex flex-col gap-6 pt-2">
+        <h3 class="text-12 leading-18 font-medium text-text">
+          {{ 'priceEval.answer.rejectedCandidatesTitle' | transloco }}
+        </h3>
+        <div class="flex flex-col gap-6">
+          @for (cand of dec.rejectedCandidates; track cand.entryId) {
+            <div class="grid grid-cols-1 items-center rounded-8 border border-border desktop:grid-cols-12">
+              <div class="flex flex-wrap items-center gap-6 px-10 py-8 desktop:col-span-5 desktop:border-e desktop:border-border">
+                @if (candidateSummary(cand); as summary) {
+                  <span class="text-12 leading-18 text-text">{{ summary }}</span>
+                }
+                <bdi dir="ltr" class="text-11 leading-16 text-text-muted">{{ shortId(cand.entryId) }}</bdi>
+              </div>
+              <div class="border-t border-border px-10 py-8 desktop:col-span-3 desktop:border-t-0 desktop:border-e desktop:border-border">
+                <bdi dir="ltr" class="text-12 leading-18 font-medium tabular-nums text-text">
+                  {{ candidatePrice(dec.currencyCode, cand) }}
+                </bdi>
+              </div>
+              <div class="border-t border-border px-10 py-8 desktop:col-span-4 desktop:border-t-0">
+                <ui-badge tone="tag">{{ 'priceEval.answer.candidateLowerPrecedence' | transloco }}</ui-badge>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <footer class="flex flex-wrap items-center justify-between gap-8 border-t border-border pt-8 text-11 leading-16 text-text-muted">
+      <span>{{ 'priceEval.answer.footer.calculated' | transloco: { dateTime: calculatedAtText() } }}</span>
+
+      <div class="inline-flex items-center gap-4">
+        <bdi dir="ltr" class="tabular-nums">
+          {{ 'priceEval.answer.footer.fingerprintPrefix' | transloco }} {{ shortFingerprint() }}
+        </bdi>
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'priceEval.answer.footer.copyAria' | transloco"
+          [title]="'priceEval.answer.footer.copyAria' | transloco"
+          (click)="copyFingerprint()"
+        >
+          <ng-icon name="tablerCopy" size="13" aria-hidden="true" />
+        </button>
+      </div>
+    </footer>
+  } @else {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-neutral-soft text-text-muted"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCalculator" size="18" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'priceEval.answer.emptyTitle' | transloco }}
+      </p>
+    </div>
+  }
+</section>

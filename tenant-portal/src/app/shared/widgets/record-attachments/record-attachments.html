@@ -1,0 +1,271 @@
+<div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  @if (allowUpload() && !denied()) {
+    <ui-file-drop
+      [accept]="accept"
+      [maxBytes]="maxBytes"
+      [title]="'recordAttachments.drop.title' | transloco"
+      [hint]="'recordAttachments.drop.hint' | transloco"
+      [browseLabel]="'recordAttachments.drop.browse' | transloco"
+      [disabled]="branchId() === null"
+      (picked)="onPicked($event)"
+      (rejected)="onRejected($event)"
+    />
+  }
+
+  @if (!denied() && uploads().length > 0) {
+    <div class="flex flex-col gap-6">
+      @for (up of uploads(); track up.id) {
+        @let meta = metaOf(up.file.type, up.file.name);
+        <div
+          class="flex items-center gap-8 rounded-10 border bg-surface-muted p-8"
+          [class]="up.status === 'failed' ? 'border-danger-border' : 'border-border'"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="meta.tileClass"
+          >
+            <ng-icon [name]="meta.icon" size="14" aria-hidden="true" />
+          </span>
+
+          <div class="flex min-w-0 flex-1 flex-col gap-4">
+            <div class="flex min-w-0 items-center justify-between gap-8">
+              <span class="truncate text-12 leading-16 font-medium text-text" [title]="up.file.name">
+                {{ up.file.name }}
+              </span>
+              <span class="shrink-0 text-11 leading-16 text-text-muted" dir="ltr">
+                {{ formatSize(up.file.size) }}
+              </span>
+            </div>
+
+            @if (up.status === 'failed') {
+              <p class="text-11 leading-16 text-danger-text">{{ up.error }}</p>
+            } @else {
+              <div
+                role="progressbar"
+                class="h-status-bar w-full overflow-hidden rounded-2 bg-neutral-soft"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                [attr.aria-valuenow]="up.progress"
+                [attr.aria-label]="'recordAttachments.uploading' | transloco: { name: up.file.name }"
+              >
+                <div class="h-full rounded-2 bg-brand transition-all duration-fast" [style.width.%]="up.progress"></div>
+              </div>
+            }
+          </div>
+
+          @if (up.status === 'queued') {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'recordAttachments.cancelUpload' | transloco"
+              [title]="'recordAttachments.cancelUpload' | transloco"
+              (click)="cancelUpload(up.id)"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          } @else if (up.status === 'failed') {
+            <div class="flex shrink-0 items-center gap-4">
+              <button type="button" uiButton variant="ghost" size="small" (click)="retryUpload(up.id)">
+                {{ 'recordAttachments.retry' | transloco }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'recordAttachments.dismiss' | transloco"
+                [title]="'recordAttachments.dismiss' | transloco"
+                (click)="dismissUpload(up.id)"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @if (denied()) {
+    <div class="flex flex-col items-center justify-center gap-6 py-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+      </span>
+      <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">
+        {{ 'recordAttachments.denied' | transloco }}
+      </p>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 p-16 text-center" role="alert">
+      <p class="text-12 leading-18 text-text-muted">{{ 'recordAttachments.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'recordAttachments.tryAgain' | transloco }}
+      </button>
+    </div>
+  } @else if (!showSkeleton() && items().length === 0) {
+    @if (allowUpload()) {
+      <p class="p-16 text-center text-12 leading-18 text-text-muted">{{ 'recordAttachments.empty.title' | transloco }}</p>
+    } @else {
+      <div class="flex flex-col items-center justify-center gap-6 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+          <ng-icon name="tablerPaperclip" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-13 leading-18 font-medium text-text">{{ 'recordAttachments.empty.title' | transloco }}</p>
+        <p class="text-12 leading-18 text-text-muted">{{ 'recordAttachments.empty.text' | transloco }}</p>
+      </div>
+    }
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div role="table" class="min-w-doc-table-min" [attr.aria-busy]="showSkeleton() || loadingMore()">
+        <div
+          role="row"
+          class="grid grid-cols-record-attachment-row bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'recordAttachments.col.file' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'recordAttachments.col.type' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'recordAttachments.col.size' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'recordAttachments.col.by' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'recordAttachments.col.added' | transloco }}
+          </span>
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'recordAttachments.col.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (showSkeleton()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row grid-cols-record-attachment-row rounded-10 border border-border bg-surface shadow-card"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <span class="size-icon-tile-sm shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                <span class="size-avatar shrink-0 animate-pulse rounded-full bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-1/2 animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center gap-4 border-s border-border px-10">
+                <span class="size-btn-h-sm animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (row of items(); track row.id) {
+            @let meta = metaOf(row.mimeType, row.fileName);
+            @let uploader = resolveUploaderName(row.uploadedByUserId);
+            <div
+              role="row"
+              class="mt-6 grid h-table-row grid-cols-record-attachment-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+            >
+              <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="meta.tileClass"
+                >
+                  <ng-icon [name]="meta.icon" size="14" aria-hidden="true" />
+                </span>
+                <button
+                  #fileBtn
+                  type="button"
+                  class="min-w-0 cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium text-text outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [title]="row.fileName"
+                  [disabled]="downloadingId() === row.id"
+                  (click)="download(row)"
+                >
+                  {{ row.fileName }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted">
+                <span class="truncate">{{ meta.labelKey | transloco }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted">
+                <span class="truncate" dir="ltr">{{ formatSize(row.sizeBytes) }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10 text-12">
+                @if (uploader) {
+                  <span
+                    class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                    aria-hidden="true"
+                  >
+                    {{ uploaderInitials(uploader) }}
+                  </span>
+                  <span class="truncate">{{ uploader }}</span>
+                } @else {
+                  <span class="truncate text-text-muted">—</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted">
+                <span class="truncate">{{ formatAdded(row.createdAt) }}</span>
+              </span>
+
+              <span role="cell" class="flex items-center justify-center gap-4 border-s border-border px-8">
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                  [attr.aria-label]="'recordAttachments.download' | transloco: { name: row.fileName }"
+                  [title]="'recordAttachments.download' | transloco: { name: row.fileName }"
+                  [disabled]="downloadingId() === row.id"
+                  (click)="download(row)"
+                >
+                  <ng-icon name="tablerDownload" size="14" aria-hidden="true" />
+                </button>
+
+                @if (allowDelete()) {
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                    [attr.aria-label]="'recordAttachments.deleteFile' | transloco: { name: row.fileName }"
+                    [title]="'recordAttachments.deleteFile' | transloco: { name: row.fileName }"
+                    [disabled]="deletingId() === row.id"
+                    (click)="remove(row)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                }
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (!showSkeleton() && hasNext()) {
+      <div class="flex justify-center pt-4">
+        <button type="button" uiButton variant="secondary" size="small" [loading]="loadingMore()" (click)="loadMore()">
+          {{ 'recordAttachments.loadMore' | transloco: { shown: items().length, total: total() } }}
+        </button>
+      </div>
+    }
+  }
+</div>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="danger"
+  [title]="'recordAttachments.delete.title' | transloco"
+  [text]="'recordAttachments.delete.text' | transloco: { name: deletingName() }"
+  [confirmLabel]="'recordAttachments.delete.confirm' | transloco"
+  [cancelLabel]="'recordAttachments.delete.cancel' | transloco"
+/>

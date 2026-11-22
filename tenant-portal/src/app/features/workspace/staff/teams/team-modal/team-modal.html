@@ -1,0 +1,348 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerUsersGroup"
+  tile="bg-icon-green"
+  [title]="(mode() === 'create' ? 'teams.modal.new' : 'teams.modal.title') | transloco"
+  [closeLabel]="'teams.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-3 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <app-org-cascade
+      [levels]="['company', 'branch', 'department']"
+      [required]="mode() === 'create' ? ['company', 'branch', 'department'] : []"
+      [readonly]="mode() === 'edit' || !canManage()"
+      [disabledLevels]="saving() ? ['company', 'branch', 'department'] : []"
+      [activeOnly]="mode() === 'create'"
+      [errors]="cascadeErrors()"
+      [value]="cascadeValue()"
+      (valueChange)="onCascadeChange($event)"
+    />
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'teams.fields.code' | transloco"
+        [hint]="'teams.fields.codeHint' | transloco"
+        [required]="mode() === 'create'"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="mode() === 'create' ? ('teams.fields.codePlaceholder' | transloco) : ''"
+          [maxLength]="limits.code"
+          [value]="code()"
+          [readOnly]="mode() === 'edit' || !canManage() || saving()"
+          [attr.aria-readonly]="mode() === 'edit' || !canManage() ? 'true' : null"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name'"
+        [label]="'teams.fields.name' | transloco"
+        [hint]="'teams.fields.nameHint' | transloco"
+        [required]="true"
+        [count]="nameCount()"
+        [max]="limits.name"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'teams.fields.namePlaceholder' | transloco"
+          [maxLength]="limits.name"
+          [value]="name()"
+          [readOnly]="!canManage() || saving()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          (input)="onNameInput($event)"
+          (blur)="markTouched('name')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1" (keydown.escape)="onHostEscape($event)">
+      <ui-field
+        [size]="canManage() ? 'bare' : 'default'"
+        [for]="uid + '-lead'"
+        [label]="'teams.fields.lead' | transloco"
+        [hint]="'teams.fields.leadHint' | transloco"
+        [error]="leadError()"
+      >
+        @if (!canManage()) {
+          <input
+            [id]="uid + '-lead'"
+            type="text"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="readonlyLeadText()"
+            readonly
+          />
+        } @else {
+          <button
+            #leadTrigger
+            type="button"
+            [id]="uid + '-lead'"
+            class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+            [class]="
+              leadError()
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : leadMenuOpen()
+                  ? 'border-focus-ring ring-3 ring-focus-halo'
+                  : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+            "
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="leadMenuOpen()"
+            [attr.aria-controls]="leadMenuOpen() ? uid + '-lead-listbox' : null"
+            [attr.aria-label]="'teams.fields.lead' | transloco"
+            [attr.aria-describedby]="uid + '-lead-hint' + (leadError() ? ' ' + uid + '-lead-error' : '')"
+            [attr.aria-invalid]="leadError() ? 'true' : null"
+            [disabled]="saving()"
+            (click)="toggleLeadMenu()"
+          >
+            <span class="flex min-w-0 items-center gap-6">
+              @if (selectedLead(); as lead) {
+                <span class="truncate">{{ fullName(lead) }}</span>
+              } @else {
+                <span class="truncate text-text-muted">{{ 'teams.fields.noLead' | transloco }}</span>
+              }
+            </span>
+            <span class="inline-flex shrink-0 text-text-muted">
+              <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+            </span>
+          </button>
+        }
+      </ui-field>
+
+      @if (leadMenuOpen()) {
+        <div
+          #leadMenuPanel
+          class="fixed z-dropdown flex max-h-time-list-max flex-col gap-4 overflow-hidden rounded-10 border border-border bg-surface p-4 shadow-popover"
+          [class.invisible]="!leadMenuPlaced()"
+          [style.top.px]="leadMenuPlace().top"
+          [style.inset-inline-start.px]="leadMenuPlace().start"
+          [style.min-width.px]="leadMenuPlace().width"
+          [style.max-height.px]="leadMenuPlace().maxHeight"
+          (keydown)="onLeadMenuKeydown($event)"
+        >
+          <div
+            class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+          >
+            @if (leadSearching()) {
+              <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+            } @else {
+              <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            }
+            <input
+              #leadSearchInput
+              type="text"
+              autocomplete="off"
+              class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="'teams.fields.leadSearch' | transloco"
+              [attr.aria-label]="'teams.fields.leadSearch' | transloco"
+              [value]="leadSearch()"
+              (input)="onLeadSearchInput($event)"
+              (keydown.enter)="$event.preventDefault()"
+            />
+          </div>
+
+          <ul
+            [id]="uid + '-lead-listbox'"
+            role="listbox"
+            class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+            [attr.aria-label]="'teams.fields.lead' | transloco"
+          >
+            <li
+              role="option"
+              tabindex="0"
+              [attr.aria-selected]="leadUserId() === null"
+              class="flex h-menu-item shrink-0 cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="leadUserId() === null ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+              (click)="selectLead(null)"
+              (keydown.enter)="selectLead(null); $event.preventDefault()"
+              (keydown.space)="selectLead(null); $event.preventDefault()"
+            >
+              <span class="truncate text-text-muted">{{ 'teams.fields.noLead' | transloco }}</span>
+              @if (leadUserId() === null) {
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              }
+            </li>
+
+            @for (user of leadOptions(); track user.id) {
+              <li
+                role="option"
+                tabindex="0"
+                [attr.aria-selected]="leadUserId() === user.id"
+                class="flex h-menu-item shrink-0 cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="leadUserId() === user.id ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                (click)="selectLead(user)"
+                (keydown.enter)="selectLead(user); $event.preventDefault()"
+                (keydown.space)="selectLead(user); $event.preventDefault()"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  <span class="truncate font-medium">{{ fullName(user) }}</span>
+                  @if (user.jobTitle) {
+                    <span class="truncate text-11 text-text-muted">{{ user.jobTitle }}</span>
+                  }
+                </span>
+                @if (leadUserId() === user.id) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </li>
+            } @empty {
+              @if (!leadSearching() && leadSearch().trim()) {
+                <li class="flex h-menu-item items-center justify-center px-8 text-12 text-text-muted">
+                  {{ 'teams.noResults' | transloco }}
+                </li>
+              }
+            }
+          </ul>
+        </div>
+      }
+    </div>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [for]="uid + '-active'"
+          [label]="'teams.fields.active' | transloco"
+          [hint]="'teams.fields.activeHint' | transloco"
+        >
+          <div
+            class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+          >
+            <app-staff-status-badge [status]="isActive() ? 'ACTIVE' : 'INACTIVE'" />
+            <ui-switch
+              [id]="uid + '-active'"
+              [(checked)]="isActive"
+              [disabled]="!canManage() || saving()"
+              [label]="'teams.fields.active' | transloco"
+              [describedBy]="uid + '-active-hint'"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="col-span-3 flex flex-col gap-8 border-t border-border pt-8">
+        <div class="flex items-center justify-between gap-8">
+          <h3 class="text-13 leading-18 font-medium text-text">
+            {{ 'teams.members.title' | transloco: { n: membersTotal() } }}
+          </h3>
+          <button type="button" uiButton variant="ghost" size="small" (click)="viewAllMembers()">
+            {{ 'teams.members.viewAll' | transloco }}
+          </button>
+        </div>
+
+        @if (membersLoading()) {
+          <div class="flex flex-col gap-6" aria-hidden="true">
+            @for (row of [1, 2, 3]; track row) {
+              <div class="flex items-center gap-8 py-2">
+                <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></span>
+                <span class="ms-auto h-badge w-preset rounded-8 bg-neutral-soft"></span>
+              </div>
+            }
+          </div>
+        } @else {
+          @for (item of members(); track item.user.id) {
+            <div class="flex items-center gap-8 py-2">
+              <span
+                class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                aria-hidden="true"
+              >
+                {{ initials(item.user) }}
+              </span>
+              <span class="min-w-0 truncate text-12 font-medium text-text">{{ fullName(item.user) }}</span>
+              @if (item.user.jobTitle) {
+                <span class="min-w-0 truncate text-12 text-text-muted">{{ item.user.jobTitle }}</span>
+              }
+              @if (item.role; as role) {
+                <span
+                  class="ms-auto inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium"
+                  [class]="role === 'LEAD' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text'"
+                >
+                  {{ 'teams.role.' + role | transloco }}
+                </span>
+              }
+            </div>
+          } @empty {
+            <p class="text-12 text-text-muted">{{ 'teams.members.none' | transloco }}</p>
+          }
+        }
+
+        <p class="text-11 leading-16 text-text-muted">{{ 'teams.members.hint' | transloco }}</p>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || (mode() === 'edit' && !dirty())"
+      >
+        {{ 'teams.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
+          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+          {{ 'teams.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'teams.unsaved' | transloco }}</span>
+      }
+
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+        {{ (mode() === 'create' ? 'teams.cancel' : 'teams.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [disabled]="saving()"
+          (click)="requestDelete()"
+        >
+          {{ 'teams.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'teams.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'teams.confirm.discardTitle' | transloco"
+  [text]="'teams.confirm.discardText' | transloco"
+  [confirmLabel]="'teams.confirm.discardConfirm' | transloco"
+  [cancelLabel]="'teams.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #staleDialog
+  tone="warning"
+  [title]="'teams.confirm.staleTitle' | transloco"
+  [text]="'teams.confirm.staleText' | transloco"
+  [confirmLabel]="'teams.confirm.reload' | transloco"
+  [cancelLabel]="'teams.confirm.keepChanges' | transloco"
+/>

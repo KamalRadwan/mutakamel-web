@@ -1,0 +1,61 @@
+{
+  "button": "{{count}} selected",
+  "busy": "Another batch job is running for commercial accounts.",
+  "started": "Batch started",
+  "run": "Run",
+  "succeeded": "{{count}} accounts updated",
+  "action": {
+    "BLOCK": "Block accounts",
+    "UNBLOCK": "Unblock accounts"
+  },
+  "block": {
+    "title": "Block {{count}} accounts"
+  },
+  "unblock": {
+    "title": "Unblock {{count}} accounts"
+  },
+  "evidence": {
+    "label": "Evidence reference",
+    "hint": "A document or ticket number that supports the decision, up to 200 characters.",
+    "tooLong": "Evidence reference must be 200 characters or fewer."
+  },
+  "selection": {
+    "label": "Selection",
+    "page": "{{count}} accounts selected on this page",
+    "selected": "{{count}} accounts selected",
+    "hidden": "· {{hidden}} not on this page",
+    "all": "Select all {{total}} matching accounts",
+    "allSelected": "All {{total}} matching accounts are selected",
+    "onlyPage": "Select only this page",
+    "tooMany": "Up to 10,000 accounts can be selected.",
+    "clear": "Clear selection"
+  },
+  "codes": {
+    "TRADE": {
+      "ACCOUNT": {
+        "NOT_FOUND": "Account no longer exists.",
+        "BLOCK_TRANSITION_INVALID": "Already in this state."
+      },
+      "REASON": {
+        "NOT_FOUND": "The reason no longer exists.",
+        "INACTIVE": "The reason is no longer active.",
+        "NOTE_REQUIRED": "A note is required for this reason.",
+        "KIND_INVALID": "This reason does not belong to this action."
+      },
+      "CONTEXT": {
+        "MISSING_COMPANY": "Choose a company in the top bar.",
+        "COMPANY_REQUIRED": "Choose a company in the top bar."
+      },
+      "VALIDATION_FAILED": "Some values are not valid."
+    },
+    "TRADE_ACCOUNT_NOT_FOUND": "Account no longer exists.",
+    "TRADE_ACCOUNT_BLOCK_TRANSITION_INVALID": "Already in this state.",
+    "TRADE_REASON_NOT_FOUND": "The reason no longer exists.",
+    "TRADE_REASON_INACTIVE": "The reason is no longer active.",
+    "TRADE_REASON_NOTE_REQUIRED": "A note is required for this reason.",
+    "TRADE_REASON_KIND_INVALID": "This reason does not belong to this action.",
+    "TRADE_CONTEXT_MISSING_COMPANY": "Choose a company in the top bar.",
+    "TRADE_VALIDATION_FAILED": "Some values are not valid.",
+    "TRADE_CONTEXT_COMPANY_REQUIRED": "Choose a company in the top bar."
+  }
+}

@@ -1,0 +1,142 @@
+<div
+  #fieldBox
+  [attr.title]="atMax() && !disabled() && !readonly() ? ('tagPicker.maxReached' | transloco: { max: max() }) : null"
+  [class]="fieldBoxClasses()"
+  (click)="onFieldClick()"
+>
+  @for (tag of selectedTags(); track tag.id) {
+    <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+    <span
+      class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 px-6 text-11 font-medium"
+      [class]="hasCustomColors(tag) ? '' : 'bg-neutral-soft text-text'"
+      [style.background-color]="hasCustomColors(tag) ? tag.backgroundColor : null"
+      [style.color]="hasCustomColors(tag) ? tag.textColor : null"
+    >
+      <span class="truncate">{{ tag.name }}</span>
+      @if (!readonly() && !disabled()) {
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tagPicker.remove' | transloco: { name: tag.name }"
+          [title]="'tagPicker.remove' | transloco: { name: tag.name }"
+          (click)="$event.stopPropagation(); removeTag(tag.id)"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      }
+    </span>
+  }
+
+  <input
+    #inputEl
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-autocomplete="list"
+    [class]="
+      readonly()
+        ? selectedTags().length === 0
+          ? 'h-chip min-w-0 flex-1 bg-transparent text-12 text-text-muted outline-none'
+          : 'h-chip w-0 min-w-0 flex-none bg-transparent text-12 text-text outline-none'
+        : 'h-chip min-w-time-dd flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder'
+    "
+    [attr.id]="inputId() || null"
+    [attr.aria-label]="label()"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? listId : null"
+    [attr.aria-activedescendant]="activeDescendantId()"
+    [attr.aria-busy]="creating() ? 'true' : null"
+    [attr.aria-disabled]="!readonly() && atMax() ? 'true' : null"
+    [attr.aria-invalid]="errorKey() ? 'true' : null"
+    [disabled]="disabled()"
+    [readOnly]="readonly() || atMax()"
+    [attr.title]="!readonly() && atMax() ? ('tagPicker.maxReached' | transloco: { max: max() }) : null"
+    [placeholder]="!readonly() && selectedTags().length === 0 ? ('tagPicker.placeholder' | transloco) : ''"
+    [value]="readonly() ? (selectedTags().length === 0 ? '—' : '') : query()"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+</div>
+
+@if (open() && !readonly() && !disabled()) {
+  <ul
+    #list
+    [id]="listId"
+    role="listbox"
+    aria-multiselectable="true"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    [attr.aria-label]="label()"
+    (mousedown)="$event.preventDefault()"
+  >
+    @for (option of filteredOptions(); track option.id; let index = $index) {
+      <li
+        [id]="optionId(index)"
+        role="option"
+        [attr.aria-selected]="isSelected(option.id)"
+        [attr.aria-disabled]="!isSelected(option.id) && atMax() ? 'true' : null"
+        class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+        [class]="rowClasses(option, index)"
+        (mouseenter)="activeIndex.set(index)"
+        (click)="toggleOption(option)"
+      >
+        <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+        <span
+          class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+          [class]="hasCustomColors(option) ? '' : 'bg-neutral-soft text-text'"
+          [style.background-color]="hasCustomColors(option) ? option.backgroundColor : null"
+          [style.color]="hasCustomColors(option) ? option.textColor : null"
+        >
+          {{ option.name }}
+        </span>
+        @if (isSelected(option.id)) {
+          <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+        }
+      </li>
+    }
+
+    @if (showCreateRow()) {
+      <li
+        [id]="optionId(filteredOptions().length)"
+        role="option"
+        aria-selected="false"
+        [attr.aria-disabled]="createTooLong() || creating() || atMax() ? 'true' : null"
+        [attr.title]="createTooLong() ? ('tagPicker.tooLong' | transloco) : atMax() ? ('tagPicker.maxReached' | transloco: { max: max() }) : null"
+        class="flex h-menu-item shrink-0 items-center justify-between gap-8 rounded-6 px-8 transition-colors duration-fast"
+        [class]="createRowClasses()"
+        (mouseenter)="!createTooLong() && !atMax() ? activeIndex.set(filteredOptions().length) : null"
+        (click)="onCreateRowClick()"
+      >
+        <span class="flex min-w-0 items-center gap-6">
+          @if (creating()) {
+            <ng-icon name="tablerLoader2" size="12" class="shrink-0 animate-spin" aria-hidden="true" />
+            <span class="truncate">{{ 'tagPicker.creating' | transloco }}</span>
+          } @else {
+            <ng-icon name="tablerPlus" size="14" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'tagPicker.create' | transloco: { name: trimmedQuery() } }}</span>
+          }
+        </span>
+        @if (createTooLong()) {
+          <span class="shrink-0 text-11 text-danger-text">{{ 'tagPicker.tooLong' | transloco }}</span>
+        }
+      </li>
+    }
+
+    @if (filteredOptions().length === 0 && !showCreateRow()) {
+      <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+        {{ 'tagPicker.noMatches' | transloco }}
+      </li>
+    }
+  </ul>
+}
+
+@if (errorKey(); as errKey) {
+  <p [id]="errId" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text" role="alert">
+    <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+    <span>{{ errKey | transloco }}</span>
+  </p>
+}

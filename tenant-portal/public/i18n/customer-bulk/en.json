@@ -1,0 +1,203 @@
+{
+  "menu": {
+    "assign": "Assign to",
+    "status": "Change status",
+    "activity": "Batch activity",
+    "delete": "Delete"
+  },
+  "reason": {
+    "noUpdate": "You can't update these customers.",
+    "noStatus": "Changing status requires the status management permission.",
+    "noDelete": "You can't delete these customers."
+  },
+  "table": {
+    "selectPage": "Select all customers on this page",
+    "selectRow": "Select {{name}}"
+  },
+  "bar": {
+    "label": "Selection",
+    "selected": "{{n}} selected",
+    "hidden": "· {{h}} not in the current results",
+    "selectAll": "Select all {{total}} matching customers",
+    "tooMany": "Up to 10,000 customers can be selected.",
+    "truncated": "Selection was limited to the first 10,000 matching customers.",
+    "allSelected": "All {{total}} matching customers are selected",
+    "onlyPage": "Select only this page",
+    "clear": "Clear selection"
+  },
+  "count": {
+    "one": "{{n}} customer",
+    "other": "{{n}} customers"
+  },
+  "assign": {
+    "title": "Assign customers",
+    "owner": "Owner",
+    "ownerHint": "The person who will own the selected customers.",
+    "searchPlaceholder": "Search people…",
+    "noOwners": "No one can be assigned here.",
+    "noMatch": "No matching people.",
+    "summary": "{{n}} customers will be assigned to {{owner}}.",
+    "go": "Assign {{n}} customers"
+  },
+  "status": {
+    "title": "Change customer status",
+    "field": "New status",
+    "fieldHint": "Active customer is set only by winning an opportunity.",
+    "PROSPECT": "Prospect",
+    "ACTIVE_CUSTOMER": "Active customer",
+    "INACTIVE": "Inactive",
+    "BLACKLISTED": "Blacklisted",
+    "unchanged": "{{u}} already have this status and will be skipped.",
+    "blacklistNote": "Blacklisted customers can't be deleted or used in new opportunities.",
+    "go": "Change status"
+  },
+  "activity": {
+    "title": "Batch activity",
+    "customers": "{{n}} customers",
+    "sec": {
+      "activity": "Activity",
+      "schedule": "Schedule",
+      "preview": "Preview"
+    },
+    "type": "Type",
+    "subject": "Subject",
+    "subjectPlaceholder": "What is this activity about?",
+    "priority": "Priority",
+    "direction": "Direction",
+    "duration": "Duration",
+    "noEnd": "No end",
+    "reminder": "Reminder",
+    "reminderNone": "None",
+    "reminderMin": "{{n}} min before",
+    "reminderDay": "1 day before",
+    "location": "Location",
+    "meetingUrl": "Meeting link",
+    "description": "Description",
+    "start": "Start",
+    "startPast": "Choose a time in the future.",
+    "gap": "Gap between activities",
+    "gapCustom": "Custom",
+    "gapMinutes": "{{n}} min",
+    "gapInvalid": "Enter 1 to 1440 minutes.",
+    "order": "Order",
+    "orderTable": "Table order",
+    "orderOwner": "By owner",
+    "assignee": {
+      "label": "Assignee",
+      "owner": "Customer owner",
+      "me": "Me",
+      "other": "Choose a person"
+    },
+    "perAssignee": "Space per assignee",
+    "perAssigneeHelp": "Each person's activities start at the start time and follow the gap, instead of one long line for everybody.",
+    "summary": "First at {{first}} · last at {{last}}",
+    "more": "and {{n}} more",
+    "pastMidnight": "The schedule runs past midnight.",
+    "noOwner": "{{n}} customers have no owner; they will be assigned to you.",
+    "go": "Create {{n}} activities",
+    "running": "Creating activities",
+    "adjusted": "The server adjusted the schedule slightly.",
+    "discard": {
+      "title": "Discard this batch?",
+      "text": "Your batch activity settings will not be saved.",
+      "confirm": "Discard"
+    },
+    "cancel": "Cancel",
+    "hints": {
+      "type": "The same activity is created for every selected customer.",
+      "subject": "Up to 180 characters.",
+      "priority": "How urgent the activity is.",
+      "direction": "Inbound, outbound, or internal.",
+      "duration": "How long each activity takes.",
+      "reminder": "When the assignee is reminded before each activity.",
+      "location": "Up to 180 characters.",
+      "meetingUrl": "Starts with https://.",
+      "description": "Optional, up to 4000 characters.",
+      "start": "The date and time of the first activity.",
+      "gap": "The time added before each next activity.",
+      "order": "The order in which activities are scheduled.",
+      "assignee": "Who will do each activity.",
+      "perAssignee": "Each person's activities start at the start time and follow the gap, instead of one long line for everybody."
+    },
+    "types": {
+      "TODO": "Task",
+      "CALL": "Call",
+      "MEETING": "Meeting",
+      "EMAIL": "Email",
+      "VISIT": "Visit",
+      "FOLLOW_UP": "Follow-up",
+      "OTHER": "Other"
+    },
+    "priorities": {
+      "LOW": "Low",
+      "NORMAL": "Normal",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "directions": {
+      "NONE": "None",
+      "INBOUND": "Inbound",
+      "OUTBOUND": "Outbound",
+      "INTERNAL": "Internal"
+    },
+    "hour": "Hour",
+    "minute": "Minutes",
+    "today": "Today",
+    "validation": {
+      "required": "This field is required.",
+      "maxLength": "At most {{max}} characters.",
+      "invalidUrl": "Enter a full link that starts with http:// or https://."
+    }
+  },
+  "delete": {
+    "title": "Delete customers",
+    "reason": "Reason",
+    "reasonHint": "Optional. Saved in the history of each customer.",
+    "blacklisted": "{{b}} blacklisted customers will be skipped.",
+    "leads": "Linked leads are reopened or disqualified.",
+    "go": "Delete {{n}} customers"
+  },
+  "job": {
+    "ASSIGN": "Assign customers to {{ownerName}}",
+    "SET_STATUS": "Change customer status to {{statusLabel}}",
+    "CREATE_ACTIVITY": "Batch activity: {{subject}}",
+    "DELETE": "Delete customers",
+    "updated": "{{n}} customers updated.",
+    "created": "{{n}} activities created.",
+    "deleted": "{{n}} customers deleted.",
+    "firstLast": "First {{first}} · last {{last}}",
+    "unavailable": "{{n}} failed customers are no longer available."
+  },
+  "skip": {
+    "UNCHANGED": "Already set",
+    "BLACKLISTED": "Blacklisted customer"
+  },
+  "codes": {
+    "CUSTOMER_PROFILE_NOT_FOUND": "This customer no longer exists.",
+    "CUSTOMER_PROFILE_BLACKLISTED": "Blacklisted customers cannot be deleted.",
+    "CUSTOMER_PROFILE_HAS_ACTIVE_OPPORTUNITIES": "This customer has open opportunities. Close or move them before deleting.",
+    "CUSTOMER_PROFILE_LINKED_LEAD_LIMIT": "This customer has reached the maximum number of linked leads.",
+    "CUSTOMER_PROFILE_LINKED_LEADS_CHANGED": "Linked leads changed during this action. Try again.",
+    "CUSTOMER_PROFILE_DISQUALIFY_STAGE_UNAVAILABLE": "No disqualification stage is available for the linked lead.",
+    "CUSTOMER_PROFILE_REOPEN_STAGE_UNAVAILABLE": "No reopen stage is available for the linked lead.",
+    "CUSTOMER_PROFILE_SOURCE_LEAD_CONFLICT": "This customer's source lead link conflicts with another record.",
+    "CUSTOMER_PROFILE_REFERENCE_CONFLICT": "This customer is referenced by other records and cannot be modified.",
+    "CUSTOMER_PROFILE_STATUS_MANAGE_REQUIRED": "You do not have permission to change a customer's status.",
+    "CUSTOMER_PROFILE_ACTIVATION_REQUIRES_WON": "A customer becomes active automatically when an opportunity is won.",
+    "CRM_SCOPED_PERMISSION_DENIED": "You do not have permission to access or modify this customer in this branch.",
+    "CRM": {
+      "CUSTOMER_PROFILE": {
+        "CONCURRENT_UPDATE": "Someone else updated this customer. Reload to see their changes."
+      }
+    },
+    "ACTIVITY_INVALID": "Invalid value: {{field}}",
+    "ACTIVITY_ACCESS_DENIED": "Not allowed for this customer or person.",
+    "ACTIVITY_TARGET_NOT_FOUND": "Customer not found.",
+    "ACTIVITY_ASSIGNEE_INELIGIBLE": "This person can't be assigned.",
+    "CUSTOMER_BULK_START_IN_PAST": "Choose a time in the future.",
+    "BULK_SELECTION_TOO_LARGE": "Too many customers selected. Select at most {{max}}.",
+    "CUSTOMER_PROFILE_SELECTION_TOO_LARGE": "Select at most 10,000 customers.",
+    "BULK_JOB_PARAMS_INVALID": "Some batch settings are not valid. Check your choices and try again.",
+    "generic": "Couldn't be completed."
+  }
+}

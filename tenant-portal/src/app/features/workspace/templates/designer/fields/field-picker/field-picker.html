@@ -1,0 +1,474 @@
+<ui-modal
+  #pickerModal
+  size="wide"
+  icon="tablerBraces"
+  tile="bg-icon-blue"
+  [title]="modalTitle()"
+  [closeLabel]="'tplFields.picker.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10" (keydown)="onModalKeydown($event)">
+    <!-- Row 1: Search & All/Required/Optional -->
+    <div class="flex items-start gap-10">
+      <ui-field
+        class="min-w-0 flex-1"
+        for="tpl-field-picker-search"
+        [label]="'tplFields.picker.search' | transloco"
+        [hint]="'tplFields.picker.searchHint' | transloco"
+        [error]="missingPathError()"
+      >
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          #searchInput
+          id="tpl-field-picker-search"
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tplFields.picker.searchPlaceholder' | transloco"
+          [formField]="pickerForm.searchQuery"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        class="shrink-0"
+        for="tpl-field-picker-req"
+        [label]="'tplFields.picker.filterLabel' | transloco"
+        [hint]="'tplFields.picker.filterHint' | transloco"
+      >
+        <ui-segmented
+          [id]="'tpl-field-picker-req'"
+          [label]="'tplFields.picker.filterLabel' | transloco"
+          [options]="reqOptions()"
+          [(value)]="reqFilter"
+        />
+      </ui-field>
+    </div>
+
+    <!-- Line 2: source · field count + optional breadcrumb -->
+    <div class="flex flex-wrap items-center justify-between gap-8 text-11 leading-16 text-text-muted">
+      <span>{{ countLine() }}</span>
+
+      @if (drillPrefix() !== null) {
+        <nav class="flex items-center gap-4 text-12 leading-16" [attr.aria-label]="'tplFields.picker.allFields' | transloco">
+          @for (crumb of breadcrumbs(); track crumb.path ?? '__root'; let last = $last) {
+            @if (!$first) {
+              <ng-icon name="tablerChevronRight" size="12" class="text-text-muted rtl:rotate-180" aria-hidden="true" />
+            }
+            @if (last) {
+              <span class="font-medium text-text">{{ crumb.label }}</span>
+            } @else {
+              <button
+                type="button"
+                class="cursor-pointer rounded-4 px-4 text-accent outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="onBreadcrumbClick(crumb.path)"
+              >
+                {{ crumb.label }}
+              </button>
+            }
+          }
+        </nav>
+      }
+    </div>
+
+    <!-- Grouped list of 40px rows -->
+    <div
+      #listContainer
+      role="listbox"
+      [attr.aria-label]="modalTitle()"
+      class="flex max-h-tpl-list flex-col gap-4 overflow-y-auto rounded-10 border border-border bg-surface p-6 scrollbar-thin"
+    >
+      @if (visibleGroups().length === 0) {
+        <div class="py-16 text-center text-12 text-text-muted">
+          {{ 'tplFields.picker.empty' | transloco }}
+        </div>
+      } @else {
+        @for (group of visibleGroups(); track group.key) {
+          <div
+            role="group"
+            [attr.aria-labelledby]="'tpl-fp-group-' + group.key"
+            class="flex flex-col gap-2"
+          >
+            <div
+              [id]="'tpl-fp-group-' + group.key"
+              class="px-6 pt-4 pb-2 text-11 leading-16 font-medium text-text-muted"
+            >
+              {{ group.label }}
+            </div>
+            @for (item of group.items; track item.field.path) {
+              <app-tpl-field-row
+                [field]="item.field"
+                [label]="item.label"
+                [selected]="selectedPath() === item.field.path"
+                [highlighted]="highlightedPath() === item.field.path"
+                [disabled]="item.disabled"
+                [disabledReason]="item.disabledReason"
+                [typeLabel]="typeLabel(item.field.dataType)"
+                [requiredLabel]="'tplFields.picker.required' | transloco"
+                [optionalLabel]="'tplFields.picker.optional' | transloco"
+                [isObject]="item.isObject"
+                (picked)="onRowPicked(item)"
+              />
+            }
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Binding settings (reserved area for DATA_FIELD and BINDING modes) -->
+    @if (options()?.purpose !== 'PATH') {
+      <div class="flex flex-col gap-8 border-t border-border pt-10">
+        @if (showBindingSettings() && selectedField(); as field) {
+        <!-- Main 3-column binding row -->
+        <div class="grid grid-cols-3 gap-10">
+          <!-- Column 1: Format -->
+          @switch (formatKind()) {
+            @case ('TEXT') {
+              <ui-field
+                size="bare"
+                for="tpl-fp-text-transform"
+                [label]="'tplFields.format.textTransform' | transloco"
+                [hint]="'tplFields.format.textTransformHint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-fp-text-transform'"
+                  size="field"
+                  [label]="'tplFields.format.textTransform' | transloco"
+                  [options]="textTransformOptions()"
+                  [value]="textTransform()"
+                  (valueChange)="textTransform.set($event)"
+                />
+              </ui-field>
+            }
+            @case ('DATE') {
+              <ui-field
+                size="bare"
+                for="tpl-fp-date-style"
+                [label]="'tplFields.format.dateStyleLabel' | transloco"
+                [hint]="'tplFields.format.dateStyleHint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-fp-date-style'"
+                  size="field"
+                  [label]="'tplFields.format.dateStyleLabel' | transloco"
+                  [options]="dateStyleOptions()"
+                  [value]="dateStyle()"
+                  (valueChange)="dateStyle.set($event)"
+                />
+              </ui-field>
+            }
+            @case ('DATETIME') {
+              <ui-field
+                size="bare"
+                for="tpl-fp-datetime-style"
+                [label]="'tplFields.format.dateStyleLabel' | transloco"
+                [hint]="'tplFields.format.dateStyleHint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-fp-datetime-style'"
+                  size="field"
+                  [label]="'tplFields.format.dateStyleLabel' | transloco"
+                  [options]="dateStyleOptions()"
+                  [value]="dateStyle()"
+                  (valueChange)="dateStyle.set($event)"
+                />
+              </ui-field>
+            }
+            @case ('NONE') {
+              <ui-field
+                for="tpl-fp-format-none"
+                [label]="'tplFields.format.label' | transloco"
+                [hint]="'tplFields.format.hint' | transloco"
+              >
+                <input
+                  id="tpl-fp-format-none"
+                  type="text"
+                  readonly
+                  class="min-w-0 flex-1 bg-transparent text-text outline-none"
+                  [value]="'tplFields.format.none' | transloco"
+                />
+              </ui-field>
+            }
+            @default {
+              <ui-field
+                size="bare"
+                for="tpl-fp-format-kind"
+                [label]="'tplFields.format.label' | transloco"
+                [hint]="'tplFields.format.hint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-fp-format-kind'"
+                  size="field"
+                  [label]="'tplFields.format.label' | transloco"
+                  [options]="formatDropdownOptions()"
+                  [value]="formatChoice()"
+                  (valueChange)="formatChoice.set($event)"
+                />
+              </ui-field>
+            }
+          }
+
+          <!-- Column 2: When empty -->
+          <ui-field
+            size="bare"
+            for="tpl-fp-null-behavior"
+            [label]="'tplFields.when.label' | transloco"
+            [hint]="'tplFields.when.hint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              class="w-full"
+              [id]="'tpl-fp-null-behavior'"
+              size="field"
+              [label]="'tplFields.when.label' | transloco"
+              [options]="nullBehaviorOptions()"
+              [value]="nullBehavior()"
+              (valueChange)="onNullBehaviorChange($event)"
+            />
+          </ui-field>
+
+          <!-- Column 3: Fallback text -->
+          <ui-field
+            for="tpl-fp-fallback"
+            [label]="'tplFields.fallback.label' | transloco"
+            [hint]="'tplFields.fallback.hint' | transloco"
+            [required]="nullBehavior() === 'FALLBACK'"
+            [count]="nullBehavior() === 'FALLBACK' ? pickerModel().fallbackText.length : null"
+            [max]="nullBehavior() === 'FALLBACK' ? 500 : null"
+            [error]="fallbackError()"
+          >
+            <input
+              id="tpl-fp-fallback"
+              type="text"
+              class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+              [placeholder]="nullBehavior() === 'FALLBACK' ? ('tplFields.fallback.placeholder' | transloco) : ''"
+              [formField]="pickerForm.fallbackText"
+            />
+          </ui-field>
+        </div>
+
+        <!-- Secondary format details when applicable -->
+        @if (showDateTimeSubControl()) {
+          <div class="grid grid-cols-3 gap-10">
+            <ui-field
+              size="bare"
+              for="tpl-fp-time-style"
+              [label]="'tplFields.format.timeStyleLabel' | transloco"
+              [hint]="'tplFields.format.timeStyleHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-fp-time-style'"
+                size="field"
+                [label]="'tplFields.format.timeStyleLabel' | transloco"
+                [options]="timeStyleOptions()"
+                [value]="timeStyle()"
+                (valueChange)="timeStyle.set($event)"
+              />
+            </ui-field>
+          </div>
+        }
+
+        @if (showFractionControls()) {
+          <div class="grid grid-cols-3 items-end gap-10">
+            <ui-field
+              for="tpl-fp-min-dec"
+              [label]="'tplFields.format.minDecimals' | transloco"
+              [hint]="'tplFields.format.minDecimalsHint' | transloco"
+              [error]="minDecimalsError()"
+            >
+              <input
+                id="tpl-fp-min-dec"
+                type="number"
+                dir="ltr"
+                step="1"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="pickerForm.minFraction"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-fp-max-dec"
+              [label]="'tplFields.format.maxDecimals' | transloco"
+              [hint]="'tplFields.format.maxDecimalsHint' | transloco"
+              [error]="maxDecimalsError()"
+            >
+              <input
+                id="tpl-fp-max-dec"
+                type="number"
+                dir="ltr"
+                step="1"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="pickerForm.maxFraction"
+              />
+            </ui-field>
+
+            @if (showCurrencyFromControl()) {
+              <ui-field
+                size="bare"
+                for="tpl-fp-currency-from"
+                [label]="'tplFields.format.currencyFrom' | transloco"
+                [hint]="'tplFields.format.currencyFromHint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-fp-currency-from'"
+                  size="field"
+                  [label]="'tplFields.format.currencyFrom' | transloco"
+                  [options]="currencyCodePathOptions()"
+                  [value]="currencyCodePath()"
+                  (valueChange)="currencyCodePath.set($event)"
+                />
+              </ui-field>
+            } @else {
+              <ui-field
+                size="bare"
+                for="tpl-fp-grouping"
+                [label]="'tplFields.format.useGrouping' | transloco"
+                [hint]="'tplFields.format.useGroupingHint' | transloco"
+              >
+                <div class="flex h-field items-center">
+                  <ui-checkbox [formField]="pickerForm.useGrouping" />
+                </div>
+              </ui-field>
+            }
+          </div>
+
+          @if (showCurrencyFromControl()) {
+            <div class="grid grid-cols-3 gap-10">
+              <ui-field
+                size="bare"
+                for="tpl-fp-grouping-currency"
+                [label]="'tplFields.format.useGrouping' | transloco"
+                [hint]="'tplFields.format.useGroupingHint' | transloco"
+              >
+                <div class="flex h-field items-center">
+                  <ui-checkbox [formField]="pickerForm.useGrouping" />
+                </div>
+              </ui-field>
+            </div>
+          }
+        }
+
+        @if (showBooleanControls()) {
+          <div class="grid grid-cols-3 gap-10">
+            <ui-field
+              for="tpl-fp-true-text"
+              [label]="'tplFields.format.trueText' | transloco"
+              [hint]="'tplFields.format.trueTextHint' | transloco"
+              [required]="true"
+              [count]="pickerModel().trueText.length"
+              [max]="200"
+              [error]="trueTextError()"
+            >
+              <input
+                id="tpl-fp-true-text"
+                type="text"
+                class="min-w-0 flex-1 bg-transparent text-text outline-none"
+                [formField]="pickerForm.trueText"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-fp-false-text"
+              [label]="'tplFields.format.falseText' | transloco"
+              [hint]="'tplFields.format.falseTextHint' | transloco"
+              [required]="true"
+              [count]="pickerModel().falseText.length"
+              [max]="200"
+              [error]="falseTextError()"
+            >
+              <input
+                id="tpl-fp-false-text"
+                type="text"
+                class="min-w-0 flex-1 bg-transparent text-text outline-none"
+                [formField]="pickerForm.falseText"
+              />
+            </ui-field>
+          </div>
+        }
+
+        <!-- Label / position / separator for DATA_FIELD edit mode -->
+        @if (showDataFieldLabelRow()) {
+          <div class="grid grid-cols-3 gap-10">
+            <ui-field
+              for="tpl-fp-df-label"
+              [label]="'tplFields.dataField.label' | transloco"
+              [hint]="'tplFields.dataField.labelHint' | transloco"
+              [count]="pickerModel().dfLabel.length"
+              [max]="500"
+              [error]="dfLabelError()"
+            >
+              <input
+                id="tpl-fp-df-label"
+                type="text"
+                class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+                [placeholder]="'tplFields.dataField.labelPlaceholder' | transloco"
+                [formField]="pickerForm.dfLabel"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              for="tpl-fp-df-pos"
+              [label]="'tplFields.dataField.labelPosition' | transloco"
+              [hint]="'tplFields.dataField.labelPositionHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-fp-df-pos'"
+                size="field"
+                [label]="'tplFields.dataField.labelPosition' | transloco"
+                [options]="labelPositionOptions()"
+                [value]="dfLabelPosition()"
+                (valueChange)="dfLabelPosition.set($event)"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-fp-df-sep"
+              [label]="'tplFields.dataField.separator' | transloco"
+              [hint]="'tplFields.dataField.separatorHint' | transloco"
+              [count]="pickerModel().dfSeparator.length"
+              [max]="20"
+              [error]="dfSeparatorError()"
+            >
+              <input
+                id="tpl-fp-df-sep"
+                type="text"
+                class="min-w-0 flex-1 bg-transparent text-text outline-none"
+                [formField]="pickerForm.dfSeparator"
+              />
+            </ui-field>
+          </div>
+        }
+        } @else {
+          <div class="grid grid-cols-3 gap-10" aria-hidden="true">
+            <div class="flex flex-col">
+              <div class="mb-2 h-label"></div>
+              <div class="h-field"></div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [disabled]="!canSubmit()"
+      (click)="submit()"
+    >
+      {{ confirmLabel() }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="cancel()">
+      {{ 'tplFields.picker.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

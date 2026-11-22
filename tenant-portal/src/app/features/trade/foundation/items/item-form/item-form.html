@@ -1,0 +1,172 @@
+@if (layout() === 'modal') {
+  <div class="flex h-full min-h-0 flex-1 overflow-hidden">
+    <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-y-10 overflow-y-auto px-16 py-10">
+      <section class="flex flex-col gap-8">
+        <ui-section-bar tone="navy" icon="tablerBox" [title]="'itemForm.sections.identity' | transloco" />
+        <app-item-identity-section
+          layout="modal"
+          [mode]="mode()"
+          [readonly]="readonly()"
+          [errors]="errors()"
+          [(draft)]="draft"
+        />
+      </section>
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar tone="blue" icon="tablerPhoto" [title]="'itemForm.sections.image' | transloco" />
+        <app-item-image-section
+          layout="modal"
+          [mode]="mode()"
+          [readonly]="readonly()"
+          [itemId]="itemId()"
+          [image]="image()"
+          [pendingFile]="pendingImage()"
+          [uploading]="uploadingImage()"
+          [error]="imageError()"
+          (imagePicked)="onImagePicked($event)"
+          (imageRemove)="imageRemove.emit()"
+          (clientError)="onImageClientError($event)"
+          (dialogBusyChange)="onChildDialogBusy('image', $event)"
+        />
+      </section>
+
+      @if (draft().itemKind === 'COMBO') {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="violet" icon="tablerPackages" [title]="'itemForm.sections.combo' | transloco" />
+          <app-item-combo-section
+            layout="modal"
+            [readonly]="readonly()"
+            [errors]="errors()"
+            [selfId]="itemId()"
+            [(draft)]="draft"
+          />
+        </section>
+      }
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="blue"
+          icon="tablerNote"
+          [title]="'itemForm.sections.more' | transloco"
+          [expandable]="true"
+          [(expanded)]="moreOpen"
+          [controls]="moreOpen() ? uid + '-more-panel' : null"
+        />
+
+        @if (moreOpen()) {
+          <div [id]="uid + '-more-panel'" class="pt-2">
+            <app-item-more-section
+              layout="modal"
+              [readonly]="readonly()"
+              [errors]="errors()"
+              [(draft)]="draft"
+            />
+          </div>
+        }
+      </section>
+    </div>
+
+    <aside class="flex h-full min-h-0 w-record-side shrink-0 flex-col gap-y-8 overflow-y-auto border-s border-border bg-surface-muted px-16 py-10">
+      <ui-section-bar tone="gradient" icon="tablerCategory" [title]="'itemForm.sections.classification' | transloco" />
+      <app-item-classification-section
+        layout="modal"
+        [mode]="mode()"
+        [readonly]="readonly()"
+        [errors]="errors()"
+        [owners]="owners()"
+        [updatingStatus]="updatingStatus()"
+        [baseUom]="baseUom()"
+        [categoryLabel]="categoryLabel()"
+        [(draft)]="draft"
+        (statusChange)="statusChange.emit($event)"
+        (dialogBusyChange)="onChildDialogBusy('classification', $event)"
+      />
+    </aside>
+  </div>
+} @else {
+  <div class="flex flex-col gap-10">
+    <section
+      id="item-classification"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="gradient" icon="tablerCategory" [title]="'itemForm.sections.classification' | transloco" />
+      <app-item-classification-section
+        layout="page"
+        [mode]="mode()"
+        [readonly]="readonly()"
+        [errors]="errors()"
+        [owners]="owners()"
+        [updatingStatus]="updatingStatus()"
+        [baseUom]="baseUom()"
+        [categoryLabel]="categoryLabel()"
+        [(draft)]="draft"
+        (statusChange)="statusChange.emit($event)"
+        (dialogBusyChange)="onChildDialogBusy('classification', $event)"
+      />
+    </section>
+
+    <section
+      id="item-identity"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="navy" icon="tablerBox" [title]="'itemForm.sections.identity' | transloco" />
+      <app-item-identity-section
+        layout="page"
+        [mode]="mode()"
+        [readonly]="readonly()"
+        [errors]="errors()"
+        [(draft)]="draft"
+      />
+    </section>
+
+    <section
+      id="item-image"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="blue" icon="tablerPhoto" [title]="'itemForm.sections.image' | transloco" />
+      <app-item-image-section
+        layout="page"
+        [mode]="mode()"
+        [readonly]="readonly()"
+        [itemId]="itemId()"
+        [image]="image()"
+        [pendingFile]="pendingImage()"
+        [uploading]="uploadingImage()"
+        [error]="imageError()"
+        (imagePicked)="onImagePicked($event)"
+        (imageRemove)="imageRemove.emit()"
+        (clientError)="onImageClientError($event)"
+        (dialogBusyChange)="onChildDialogBusy('image', $event)"
+      />
+    </section>
+
+    @if (draft().itemKind === 'COMBO') {
+      <section
+        id="item-combo"
+        class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+      >
+        <ui-section-bar tone="violet" icon="tablerPackages" [title]="'itemForm.sections.combo' | transloco" />
+        <app-item-combo-section
+          layout="page"
+          [readonly]="readonly()"
+          [errors]="errors()"
+          [selfId]="itemId()"
+          [(draft)]="draft"
+        />
+      </section>
+    }
+
+    <section
+      id="item-more"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+    >
+      <ui-section-bar tone="blue" icon="tablerNote" [title]="'itemForm.sections.more' | transloco" />
+      <app-item-more-section
+        layout="page"
+        [readonly]="readonly()"
+        [errors]="errors()"
+        [(draft)]="draft"
+      />
+    </section>
+  </div>
+}

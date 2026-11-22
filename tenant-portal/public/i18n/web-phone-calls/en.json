@@ -1,0 +1,157 @@
+{
+  "days": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "earlier": "Earlier"
+  },
+  "actions": {
+    "viewAll": "View all calls",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "retryNow": "Retry now",
+    "callBack": "Call back"
+  },
+  "types": {
+    "IN_ANS": "Incoming",
+    "IN_NOANS": "Missed",
+    "IN_BUSY": "Declined",
+    "OUT_ANS": "Outgoing",
+    "OUT_NOANS": "No answer",
+    "OUT_BUSY": "Busy",
+    "OUT": "Outgoing"
+  },
+  "log": {
+    "ariaLabel": "Recent calls",
+    "loadingMore": "Loading more…",
+    "empty": "No calls yet",
+    "error": "Could not load calls"
+  },
+  "history": {
+    "title": "Call history",
+    "close": "Close"
+  },
+  "settings": {
+    "systemDefault": "System default",
+    "deviceFallback": "Device {{index}}",
+    "ringAlerts": "Ringtone & alerts",
+    "device": {
+      "label": "Device"
+    },
+    "level": {
+      "label": "Level"
+    },
+    "volumes": {
+      "off": "Off",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "micPermission": {
+      "label": "Microphone permission",
+      "hint": "The browser asks once. If blocked, allow the microphone from the lock icon in the address bar.",
+      "allowed": "Allowed",
+      "blocked": "Blocked",
+      "simulated": "Simulated",
+      "notAsked": "Not asked",
+      "allow": "Allow microphone",
+      "allowShort": "Allow"
+    },
+    "mic": {
+      "label": "Microphone",
+      "hint": "The microphone used for calls."
+    },
+    "micLevel": {
+      "label": "Microphone level",
+      "hint": "Speak to check that the bar moves."
+    },
+    "micVolume": {
+      "label": "Microphone volume",
+      "hint": "How loud you sound to the other side."
+    },
+    "speaker": {
+      "label": "Speaker",
+      "hint": "The device that plays the other side's voice.",
+      "unsupportedHint": "Your browser plays sound on the system default device."
+    },
+    "speakerVolume": {
+      "label": "Speaker volume",
+      "hint": "How loud the other side sounds.",
+      "test": "Test"
+    },
+    "ringDevice": {
+      "label": "Ringtone device",
+      "hint": "Where the ringtone plays, for example the computer speakers while you wear a headset.",
+      "unsupportedHint": "Your browser plays sound on the system default device."
+    },
+    "ringVolume": {
+      "label": "Ringtone volume",
+      "hint": "Off keeps the call card without sound."
+    },
+    "autoAnswer": {
+      "label": "Auto answer",
+      "hint": "Answers incoming calls automatically after a short delay."
+    },
+    "dnd": {
+      "label": "Do not disturb",
+      "hint": "Incoming calls get a busy signal while this is on."
+    },
+    "notifications": {
+      "label": "Desktop notifications",
+      "hint": "Shows a system notice for incoming calls when this tab is in the background. If your browser blocks it, allow notifications from the lock icon in the address bar.",
+      "blocked": "Blocked by the browser",
+      "allow": "Allow"
+    }
+  },
+  "states": {
+    "notConfigured": {
+      "title": "Phone not set up",
+      "line": "Ask your administrator to finish your extension."
+    },
+    "connecting": {
+      "title": "Connecting…",
+      "line": "Server {{index}} of {{count}} · {{name}}"
+    },
+    "registrationFailed": {
+      "title": "Cannot reach the phone server",
+      "line": "Retrying in a few seconds.",
+      "action": "Retry now"
+    },
+    "offline": {
+      "title": "Phone offline",
+      "line": "Reconnecting automatically.",
+      "action": "Retry"
+    },
+    "requiresHttps": {
+      "title": "Secure connection required",
+      "line": "Calls work only over HTTPS."
+    },
+    "unsupported": {
+      "title": "Browser not supported",
+      "line": "Use a current version of Chrome, Edge or Firefox."
+    },
+    "micBlocked": {
+      "title": "Microphone blocked",
+      "line": "Allow it from the lock icon in the address bar.",
+      "action": "Open settings"
+    },
+    "noMicrophone": {
+      "title": "No microphone found",
+      "line": "Connect a microphone or headset.",
+      "action": "Check again"
+    },
+    "paused": {
+      "title": "Phone paused",
+      "line": "Your workspace has more phones than seats. Ask the workspace owner."
+    },
+    "suspended": {
+      "title": "Phone suspended",
+      "line": "Your workspace subscription is suspended. Ask an administrator to renew it.",
+      "action": "Retry"
+    },
+    "scopeMismatch": {
+      "title": "Phone belongs to another workspace",
+      "line": "This page is signed in to a different workspace session. Reload the page to continue.",
+      "action": "Reload page"
+    }
+  }
+}

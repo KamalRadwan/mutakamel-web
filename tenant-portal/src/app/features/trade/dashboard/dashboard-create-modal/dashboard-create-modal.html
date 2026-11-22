@@ -1,0 +1,272 @@
+<ui-modal
+  size="form"
+  icon="tablerLayoutDashboard"
+  tile="bg-icon-navy"
+  [title]="modalTitle()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!submitting()"
+  [preventDismiss]="isDirty() && !submitting()"
+  (dismiss)="onAttemptDismiss()"
+  (closed)="onModalClosed()"
+>
+  <form class="flex flex-col gap-10" (submit)="$event.preventDefault(); submit()">
+    @if (modalMode() === 'create') {
+      <ui-field
+        [for]="uid + '-mode'"
+        [bare]="true"
+        [label]="'tradeDashboardModals.create.modeLabel' | transloco"
+        [hint]="'tradeDashboardModals.create.modeHint' | transloco"
+      >
+        <ui-segmented
+          class="self-start"
+          [id]="uid + '-mode'"
+          [describedBy]="uid + '-mode-hint'"
+          [label]="'tradeDashboardModals.create.modeLabel' | transloco"
+          [options]="createTabOptions()"
+          [value]="createTab()"
+          (valueChange)="onCreateTabChange($event)"
+        />
+      </ui-field>
+    }
+
+    @if (modalMode() === 'edit' || createTab() === 'blank') {
+      <ui-field
+        [for]="uid + '-name'"
+        [required]="true"
+        [label]="'tradeDashboardModals.create.name' | transloco"
+        [hint]="'tradeDashboardModals.create.nameHint' | transloco"
+        [count]="name().length"
+        [max]="nameMax"
+        [error]="nameError()"
+      >
+        <input
+          #nameInput
+          [id]="uid + '-name'"
+          type="text"
+          dir="auto"
+          autocomplete="off"
+          [maxLength]="nameMax"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tradeDashboardModals.create.namePlaceholder' | transloco"
+          [value]="name()"
+          [disabled]="submitting()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          (input)="onNameInput(nameInput.value)"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-description'"
+        size="multiline"
+        [label]="'tradeDashboardModals.create.description' | transloco"
+        [hint]="'tradeDashboardModals.create.descriptionHint' | transloco"
+        [count]="description().length"
+        [max]="descriptionMax"
+        [error]="descriptionError()"
+      >
+        <textarea
+          #descInput
+          [id]="uid + '-description'"
+          rows="3"
+          dir="auto"
+          [maxLength]="descriptionMax"
+          class="min-h-0 w-full flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tradeDashboardModals.create.descriptionPlaceholder' | transloco"
+          [value]="description()"
+          [disabled]="submitting()"
+          [attr.aria-invalid]="descriptionError() ? 'true' : null"
+          (input)="onDescriptionInput(descInput.value)"
+        ></textarea>
+      </ui-field>
+
+      @if (modalMode() === 'create') {
+        <ui-field
+          [for]="uid + '-companies'"
+          [bare]="true"
+          [label]="'tradeDashboardModals.create.companies' | transloco"
+          [hint]="'tradeDashboardModals.create.companiesHint' | transloco"
+        >
+          <ui-segmented
+            class="self-start"
+            [id]="uid + '-companies'"
+            [describedBy]="uid + '-companies-hint'"
+            [label]="'tradeDashboardModals.create.companies' | transloco"
+            [options]="companyModeOptions()"
+            [value]="scopeMode()"
+            (valueChange)="onScopeModeChange($event)"
+          />
+        </ui-field>
+
+        @if (scopeMode() === 'MULTI') {
+          <ui-field
+            [for]="uid + '-choose-companies'"
+            [bare]="true"
+            [required]="true"
+            [label]="'tradeDashboardModals.create.chooseCompanies' | transloco"
+            [hint]="'tradeDashboardModals.create.chooseCompaniesHint' | transloco"
+            [error]="companiesError()"
+          >
+            <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+              @for (company of companies(); track company.id) {
+                <ui-checkbox
+                  [checked]="selectedCompanyIds().has(company.id)"
+                  [disabled]="submitting()"
+                  (checkedChange)="toggleCompany(company.id, $event)"
+                >
+                  <span dir="auto">{{ companyName(company) }}</span>
+                </ui-checkbox>
+              }
+            </div>
+          </ui-field>
+        }
+      }
+    } @else {
+      <ui-field
+        [for]="uid + '-template'"
+        [bare]="true"
+        [required]="true"
+        [label]="'tradeDashboardModals.create.template' | transloco"
+        [hint]="'tradeDashboardModals.create.templateHint' | transloco"
+        [error]="templateError()"
+      >
+        @if (templateTiles().length === 0) {
+          <div class="rounded-10 border border-border bg-surface-muted px-10 py-8 text-12 leading-18 text-text-muted">
+            {{ 'tradeDashboardModals.create.noTemplates' | transloco }}
+          </div>
+        } @else {
+          <div
+            [id]="uid + '-template'"
+            role="radiogroup"
+            class="grid grid-cols-2 gap-8"
+            [attr.aria-label]="'tradeDashboardModals.create.template' | transloco"
+            [attr.aria-describedby]="templateDescribedBy()"
+          >
+            @for (tile of templateTiles(); track tile.key; let idx = $index) {
+              @let selected = selectedTemplateKey() === tile.key;
+              <button
+                #templateBtn
+                type="button"
+                role="radio"
+                class="flex min-w-0 cursor-pointer flex-col gap-4 rounded-10 border p-10 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  selected
+                    ? 'border-brand bg-brand-soft ring-2 ring-brand'
+                    : 'border-border bg-surface shadow-card hover:border-border-field-hover hover:bg-row-hover'
+                "
+                [attr.aria-checked]="selected"
+                [tabIndex]="selected ? 0 : -1"
+                [disabled]="submitting()"
+                (click)="selectTemplate(tile.key)"
+                (keydown)="onTemplateKeydown($event, idx)"
+              >
+                <span class="flex w-full items-center justify-between gap-6">
+                  <span class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
+                    {{ tile.label }}
+                  </span>
+                  @if (selected) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0 text-brand-text" aria-hidden="true" />
+                  }
+                </span>
+                <span class="text-12 leading-16 text-text-muted">{{ tile.description }}</span>
+                <span class="line-clamp-3 text-12 leading-16 text-text-muted" [title]="tile.widgetsLine">
+                  {{ tile.widgetsLine }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-template-name'"
+        [label]="'tradeDashboardModals.create.name' | transloco"
+        [hint]="'tradeDashboardModals.create.nameHint' | transloco"
+        [count]="name().length"
+        [max]="nameMax"
+        [error]="nameError()"
+      >
+        <input
+          #tplNameInput
+          [id]="uid + '-template-name'"
+          type="text"
+          dir="auto"
+          autocomplete="off"
+          [maxLength]="nameMax"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="selectedTemplateLabel()"
+          [value]="name()"
+          [disabled]="submitting()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          (input)="onNameInput(tplNameInput.value)"
+        />
+      </ui-field>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (modalMode() === 'create') {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="submitting()"
+        [disabled]="submitting() || (createTab() === 'template' && !selectedTemplateKey())"
+        (click)="submit()"
+      >
+        {{ 'tradeDashboardModals.create.createAction' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="submitting()"
+        (click)="requestClose()"
+      >
+        {{ 'tradeShared.common.cancel' | transloco }}
+      </button>
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="submitting()"
+        [disabled]="!isDirty() || submitting()"
+        (click)="submit()"
+      >
+        {{ 'tradeShared.common.save' | transloco }}
+      </button>
+      @if (isDirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="submitting()"
+          (click)="undoEdit()"
+        >
+          {{ 'tradeShared.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">
+          {{ 'tradeShared.common.unsaved' | transloco }}
+        </span>
+      }
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="submitting()"
+        (click)="requestClose()"
+      >
+        {{ 'tradeShared.common.cancel' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  class="contents"
+  [title]="'tradeDashboardModals.create.unsavedTitle' | transloco"
+  [text]="'tradeDashboardModals.create.unsavedText' | transloco"
+  [saveLabel]="(modalMode() === 'edit' ? 'tradeShared.common.save' : 'tradeDashboardModals.create.createAction') | transloco"
+  [discardLabel]="'tradeDashboardModals.create.discard' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

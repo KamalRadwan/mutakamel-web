@@ -1,0 +1,248 @@
+@switch (editorMode()) {
+  @case ('none') {
+    <!-- Operators with no value (e.g. isNull / isNotNull) render nothing. -->
+  }
+
+  @case ('textSingle') {
+    <div [class]="fieldBoxClasses()">
+      <input
+        type="text"
+        autocomplete="off"
+        class="h-full w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [dir]="textDir()"
+        [attr.inputmode]="textInputMode()"
+        [attr.maxlength]="textMaxLength()"
+        [placeholder]="'qv.typeValue' | transloco"
+        [attr.aria-label]="field().label"
+        [attr.aria-invalid]="invalid() ? 'true' : null"
+        [attr.aria-describedby]="describedBy() || null"
+        [disabled]="disabled()"
+        [value]="textSingleValue()"
+        (input)="onTextSingleInput($event)"
+        (keydown.enter)="onCommitKey()"
+      />
+    </div>
+  }
+
+  @case ('textList') {
+    <ui-query-token-list
+      [field]="field()"
+      [invalid]="invalid()"
+      [disabled]="disabled()"
+      [describedBy]="describedBy()"
+      [tokens]="stringListValue()"
+      (tokensChange)="value.set($event)"
+      (commit)="onCommitKey()"
+    />
+  }
+
+  @case ('segmentedEnum') {
+    <ui-segmented
+      [options]="enumSegmentedOptions()"
+      [label]="field().label"
+      [describedBy]="describedBy()"
+      [value]="stringSingleValue()"
+      [class.border]="invalid()"
+      [class.border-danger-border]="invalid()"
+      [class.ring-2]="invalid()"
+      [class.ring-danger-halo]="invalid()"
+      [attr.aria-disabled]="disabled() ? 'true' : null"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      (valueChange)="onEnumSegmentedChange($event)"
+    />
+  }
+
+  @case ('singleSelect') {
+    <ui-query-single-select
+      [field]="field()"
+      [invalid]="invalid()"
+      [disabled]="disabled()"
+      [describedBy]="describedBy()"
+      [value]="stringSingleValue()"
+      (valueChange)="value.set($event ?? undefined)"
+    />
+  }
+
+  @case ('multiSelect') {
+    <ui-query-multi-select
+      [field]="field()"
+      [invalid]="invalid()"
+      [disabled]="disabled()"
+      [describedBy]="describedBy()"
+      [values]="stringListValue()"
+      (valuesChange)="value.set($event)"
+    />
+  }
+
+  @case ('ratingSingle') {
+    <ui-query-rating-input
+      mode="single"
+      [field]="field()"
+      [invalid]="invalid()"
+      [disabled]="disabled()"
+      [describedBy]="describedBy()"
+      [(value)]="value"
+    />
+  }
+
+  @case ('ratingRange') {
+    <ui-query-rating-input
+      mode="range"
+      [field]="field()"
+      [invalid]="invalid()"
+      [disabled]="disabled()"
+      [describedBy]="describedBy()"
+      [(value)]="value"
+    />
+  }
+
+  @case ('ratingList') {
+    <ui-query-rating-input
+      mode="list"
+      [field]="field()"
+      [invalid]="invalid()"
+      [disabled]="disabled()"
+      [describedBy]="describedBy()"
+      [(value)]="value"
+    />
+  }
+
+  @case ('numberSingle') {
+    <div [class]="fieldBoxClasses()">
+      <input
+        type="number"
+        inputmode="numeric"
+        step="any"
+        dir="ltr"
+        class="h-full w-full min-w-0 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [attr.min]="field().min ?? null"
+        [attr.max]="field().max ?? null"
+        [placeholder]="'qv.typeValue' | transloco"
+        [attr.aria-label]="field().label"
+        [attr.aria-invalid]="invalid() ? 'true' : null"
+        [attr.aria-describedby]="describedBy() || null"
+        [disabled]="disabled()"
+        [value]="numberSingleText()"
+        (input)="onNumberSingleInput($event)"
+        (keydown.enter)="onCommitKey()"
+      />
+    </div>
+  }
+
+  @case ('numberRange') {
+    <div class="grid w-full grid-cols-2 gap-6">
+      <div [class]="fieldBoxClasses()">
+        <input
+          type="number"
+          inputmode="numeric"
+          step="any"
+          dir="ltr"
+          class="h-full w-full min-w-0 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [attr.min]="field().min ?? null"
+          [attr.max]="field().max ?? null"
+          [placeholder]="'qv.from' | transloco"
+          [attr.aria-label]="field().label + ' - ' + ('qv.from' | transloco)"
+          [attr.aria-invalid]="invalid() ? 'true' : null"
+          [attr.aria-describedby]="describedBy() || null"
+          [disabled]="disabled()"
+          [value]="numberFromText()"
+          (input)="onNumberRangeInput('from', $event)"
+          (keydown.enter)="onCommitKey()"
+        />
+      </div>
+
+      <div [class]="fieldBoxClasses()">
+        <input
+          type="number"
+          inputmode="numeric"
+          step="any"
+          dir="ltr"
+          class="h-full w-full min-w-0 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [attr.min]="field().min ?? null"
+          [attr.max]="field().max ?? null"
+          [placeholder]="'qv.to' | transloco"
+          [attr.aria-label]="field().label + ' - ' + ('qv.to' | transloco)"
+          [attr.aria-invalid]="invalid() ? 'true' : null"
+          [attr.aria-describedby]="describedBy() || null"
+          [disabled]="disabled()"
+          [value]="numberToText()"
+          (input)="onNumberRangeInput('to', $event)"
+          (keydown.enter)="onCommitKey()"
+        />
+      </div>
+    </div>
+  }
+
+  @case ('dateSingle') {
+    <ui-field size="bare" [label]="'qv.date.on' | transloco" [hint]="'qv.date.onHint' | transloco">
+      <ui-date-field
+        [value]="dateSingleValue()"
+        [ariaLabel]="field().label"
+        [placeholder]="'qv.pickDate' | transloco"
+        [todayLabel]="'qv.date.today' | transloco"
+        [invalid]="invalid()"
+        [disabled]="disabled()"
+        (valueChange)="onDateSingleChange($event)"
+      />
+    </ui-field>
+  }
+
+  @case ('dateRange') {
+    <div class="grid w-full grid-cols-2 gap-6">
+      <ui-field size="bare" [label]="'qv.from' | transloco" [hint]="'qv.date.fromHint' | transloco">
+        <ui-date-field
+          [value]="dateRangeFrom()"
+          [ariaLabel]="field().label + ' - ' + ('qv.from' | transloco)"
+          [placeholder]="'qv.from' | transloco"
+          [todayLabel]="'qv.date.today' | transloco"
+          [invalid]="invalid()"
+          [disabled]="disabled()"
+          (valueChange)="onDateRangeChange('from', $event)"
+        />
+      </ui-field>
+      <ui-field size="bare" [label]="'qv.to' | transloco" [hint]="'qv.date.toHint' | transloco">
+        <ui-date-field
+          [value]="dateRangeTo()"
+          [ariaLabel]="field().label + ' - ' + ('qv.to' | transloco)"
+          [placeholder]="'qv.to' | transloco"
+          [todayLabel]="'qv.date.today' | transloco"
+          [invalid]="invalid()"
+          [disabled]="disabled()"
+          (valueChange)="onDateRangeChange('to', $event)"
+        />
+      </ui-field>
+    </div>
+  }
+
+  @case ('dateRelative') {
+    <ui-dropdown
+      class="w-full rounded-8"
+      [class.ring-2]="invalid()"
+      [class.ring-danger-halo]="invalid()"
+      size="field"
+      [options]="relativeDateOptions()"
+      [value]="relativeDateValue()"
+      [label]="field().label"
+      [describedBy]="describedBy()"
+      [disabled]="disabled()"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      (valueChange)="onRelativeDateChange($event)"
+    />
+  }
+
+  @case ('boolean') {
+    <ui-segmented
+      [options]="booleanOptions()"
+      [label]="field().label"
+      [describedBy]="describedBy()"
+      [value]="booleanSegmentedValue()"
+      [class.border]="invalid()"
+      [class.border-danger-border]="invalid()"
+      [class.ring-2]="invalid()"
+      [class.ring-danger-halo]="invalid()"
+      [attr.aria-disabled]="disabled() ? 'true' : null"
+      [attr.aria-invalid]="invalid() ? 'true' : null"
+      (valueChange)="onBooleanChange($event)"
+    />
+  }
+}

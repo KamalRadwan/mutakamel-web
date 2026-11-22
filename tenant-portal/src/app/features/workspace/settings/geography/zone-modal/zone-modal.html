@@ -1,0 +1,189 @@
+<ui-modal
+  size="wide"
+  icon="tablerPolygon"
+  tile="bg-icon-violet"
+  [title]="(mode() === 'create' ? 'geoZones.modal.new' : 'geoZones.modal.title') | transloco"
+  [closeLabel]="'geoZones.modal.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name-en'"
+        [label]="'geoZones.modal.nameEn' | transloco"
+        [hint]="'geoZones.modal.nameEnHint' | transloco"
+        [required]="true"
+        [count]="nameEnCount()"
+        [max]="nameMax"
+        [error]="nameEnError()"
+      >
+        <input
+          [id]="uid + '-name-en'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="nameEn()"
+          [readonly]="!canManage()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="nameEnError() ? 'true' : null"
+          (input)="onNameInput('nameEn', $event)"
+          (blur)="markTouched('nameEn')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name-ar'"
+        [label]="'geoZones.modal.nameAr' | transloco"
+        [hint]="'geoZones.modal.nameArHint' | transloco"
+        [required]="true"
+        [count]="nameArCount()"
+        [max]="nameMax"
+        [error]="nameArError()"
+      >
+        <input
+          [id]="uid + '-name-ar'"
+          type="text"
+          dir="rtl"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="nameAr()"
+          [readonly]="!canManage()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="nameArError() ? 'true' : null"
+          (input)="onNameInput('nameAr', $event)"
+          (blur)="markTouched('nameAr')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [for]="uid + '-description'"
+        [label]="'geoZones.modal.description' | transloco"
+        [hint]="'geoZones.modal.descriptionHint' | transloco"
+        [count]="descriptionCount()"
+        [max]="descriptionMax"
+        [error]="descriptionError()"
+      >
+        <textarea
+          [id]="uid + '-description'"
+          rows="2"
+          dir="auto"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="description()"
+          [readonly]="!canManage()"
+          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [attr.aria-invalid]="descriptionError() ? 'true' : null"
+          (input)="onDescriptionInput($event)"
+          (blur)="markTouched('description')"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [for]="uid + '-active'"
+        [label]="'geoZones.modal.active' | transloco"
+        [hint]="'geoZones.modal.activeHint' | transloco"
+      >
+        <div class="flex items-start gap-8 pt-2">
+          <ui-switch
+            [id]="uid + '-active'"
+            [describedBy]="uid + '-active-hint'"
+            [(checked)]="isActive"
+            [disabled]="!canManage() || saving()"
+            [label]="'geoZones.modal.active' | transloco"
+          />
+          <span class="text-12 leading-18 font-medium text-text">
+            {{ (isActive() ? 'wsGeo.active' : 'wsGeo.inactive') | transloco }}
+          </span>
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [for]="uid + '-cities'"
+        [label]="'geoZones.modal.cities' | transloco"
+        [hint]="'geoZones.modal.citiesHint' | transloco"
+      >
+        <app-zone-city-picker
+          [(value)]="cityIds"
+          [zoneId]="editingZone()?.id ?? null"
+          [listboxId]="uid + '-cities'"
+          [describedBy]="uid + '-cities-hint'"
+          [readonly]="!canManage()"
+          [disabled]="saving() || loadingDetail()"
+        />
+      </ui-field>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || loadingDetail() || !dirty() || !isFormValid()"
+      >
+        {{ 'geoZones.modal.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'geoZones.modal.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'geoZones.modal.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="requestClose()"
+        >
+          {{ 'geoZones.modal.cancel' | transloco }}
+        </button>
+      }
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [disabled]="saving()"
+          (click)="requestDelete()"
+        >
+          {{ 'geoZones.modal.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'geoZones.modal.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'geoZones.discard.title' | transloco"
+  [text]="'geoZones.discard.text' | transloco"
+  [confirmLabel]="'geoZones.discard.confirm' | transloco"
+  [cancelLabel]="'geoZones.modal.cancel' | transloco"
+/>

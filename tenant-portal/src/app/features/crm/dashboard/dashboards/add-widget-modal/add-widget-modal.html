@@ -1,0 +1,161 @@
+<ui-modal
+  size="wide"
+  tile="bg-icon-green"
+  icon="tablerPlus"
+  [title]="'dashEdit.addTitle' | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      [label]="'dashEdit.search' | transloco"
+      [for]="searchInputId"
+      [hint]="'dashEdit.searchHint' | transloco"
+    >
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        [id]="searchInputId"
+        type="search"
+        autocomplete="off"
+        class="w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="searchText()"
+        [placeholder]="'dashEdit.searchPlaceholder' | transloco"
+        (input)="onSearchInput($event)"
+      />
+    </ui-field>
+
+    @if (loading()) {
+      <div class="flex flex-col gap-6" [attr.aria-busy]="true">
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <span class="sr-only" role="status">{{ 'dashEdit.loading' | transloco }}</span>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex flex-col items-center justify-center gap-8 py-8 text-center">
+        <p class="text-12 leading-18 text-text-muted">{{ 'analytics.common.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
+          {{ 'analytics.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (items().length === 0) {
+      <div class="flex items-center justify-center py-8 text-12 leading-18 text-text-muted">
+        {{ 'analytics.common.noResults' | transloco }}
+      </div>
+    } @else {
+      <div
+        role="radiogroup"
+        [attr.aria-label]="'dashEdit.widgetListLabel' | transloco"
+        class="flex max-h-notif-list-max flex-col gap-6 overflow-y-auto p-2 scrollbar-thin"
+      >
+        @for (widget of items(); track widget.id) {
+          @let used = usedIds().has(widget.id);
+          @let selected = !used && selectedId() === widget.id;
+          <button
+            #rowBtn
+            type="button"
+            role="radio"
+            [disabled]="used"
+            [attr.aria-checked]="selected"
+            [attr.aria-disabled]="used ? 'true' : null"
+            [tabIndex]="$index === activeRowIndex() ? 0 : -1"
+            class="flex h-table-row w-full shrink-0 items-center gap-8 rounded-10 border px-8 text-start outline-none transition-colors duration-fast ease-enter focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              used
+                ? 'cursor-not-allowed border-border bg-neutral-soft text-text-placeholder'
+                : selected
+                  ? 'cursor-pointer border-brand bg-brand-soft text-text'
+                  : 'cursor-pointer border-border bg-surface text-text shadow-card hover:bg-row-hover'
+            "
+            (click)="selectWidget(widget)"
+            (keydown)="onRowKeydown($event, $index)"
+          >
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+              aria-hidden="true"
+            >
+              <ng-icon name="tablerChartDots3" size="14" />
+            </span>
+
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate text-12 leading-16 font-medium" dir="auto">{{ widget.name }}</span>
+              <span class="truncate text-11 leading-16 text-text-muted">
+                {{ 'analytics.visualization.' + widget.visualizationType | transloco }}
+              </span>
+            </span>
+
+            @if (widget.ownerName) {
+              <span class="shrink-0 truncate text-11 leading-16 text-text-muted" dir="auto">
+                {{ widget.ownerName }}
+              </span>
+            }
+
+            @if (used) {
+              <ui-badge tone="tag">{{ 'dashEdit.added' | transloco }}</ui-badge>
+            } @else if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0 text-brand-text" aria-hidden="true" />
+            }
+          </button>
+        }
+
+        @if (nextCursor()) {
+          <div class="flex justify-center pt-2">
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [loading]="loadingMore()"
+              [disabled]="loadingMore()"
+              (click)="loadMore()"
+            >
+              {{ 'dashEdit.loadMore' | transloco }}
+            </button>
+          </div>
+        }
+      </div>
+    }
+
+    <ui-field
+      size="bare"
+      [label]="'dashEdit.version' | transloco"
+      [for]="versionFieldId"
+      [hint]="'dashEdit.versionHint' | transloco"
+    >
+      <ui-segmented
+        class="self-start"
+        [id]="versionFieldId"
+        [describedBy]="versionFieldId + '-hint'"
+        [label]="'dashEdit.version' | transloco"
+        [options]="versionOptions()"
+        [value]="versionMode()"
+        (valueChange)="onVersionModeChange($event)"
+      />
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="!selectedWidget() || submitting()"
+      (click)="submit()"
+    >
+      {{ 'dashEdit.add' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="cancel()"
+    >
+      {{ 'dashEdit.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

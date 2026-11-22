@@ -1,0 +1,47 @@
+{
+  "back": "Back",
+  "save": "Save",
+  "undo": "Undo changes",
+  "unsavedLabel": "Unsaved changes",
+  "deleteLabel": "Delete",
+  "createdOn": "Created {{date}}",
+  "ownerLabel": "Owner",
+  "logActivity": "Log activity",
+  "noColor": "No colour",
+  "actions": {
+    "label": "Actions"
+  },
+  "tabs": {
+    "label": "Record sections",
+    "overview": "Overview",
+    "activities": "Activities",
+    "attachments": "Attachments",
+    "history": "History",
+    "calls": "Calls",
+    "missed": "{{n}} missed calls",
+    "hasErrors": "This tab has errors"
+  },
+  "nav": {
+    "prev": "Previous record",
+    "next": "Next record",
+    "position": "{{index}} of {{total}}"
+  },
+  "saved": "Changes saved.",
+  "unsaved": {
+    "title": "Save changes?",
+    "text": "You have changes that are not saved yet.",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Cancel"
+  },
+  "conflict": {
+    "title": "Someone else changed this record",
+    "text": "Your changes were not saved. Load the latest version, or keep editing and copy your changes first.",
+    "reload": "Load the latest version",
+    "keepEditing": "Keep my changes"
+  },
+  "retry": "Try again",
+  "instant": {
+    "failed": "Could not save this change."
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "toolbar": {
+    "new": "New unit",
+    "search": "Search units",
+    "reload": "Reload the list",
+    "clearSearch": "Clear search"
+  },
+  "filter": {
+    "label": "Unit status",
+    "hint": "Filter the units by status",
+    "active": "Active",
+    "retired": "Retired",
+    "all": "All"
+  },
+  "cols": {
+    "code": "Code",
+    "name": "Name",
+    "nameEn": "English name",
+    "nameAr": "Arabic name",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "retire": "Retire",
+    "activate": "Activate"
+  },
+  "empty": {
+    "title": "No units yet",
+    "text": "Add the units you sell, buy and stock in.",
+    "filter": "No {{status}} units.",
+    "search": "No units match “{{q}}”."
+  },
+  "modal": {
+    "newTitle": "New unit",
+    "title": "Unit {{code}}",
+    "code": "Code",
+    "codeHint": "A short code such as PCS or KG. Start with a letter; it cannot change after you save.",
+    "displayName": "Display name",
+    "displayNameHint": "The main name shown when a language name is missing. Up to 160 characters.",
+    "nameEn": "English name",
+    "nameEnHint": "Shown in the English interface. Up to 160 characters.",
+    "nameAr": "Arabic name",
+    "nameArHint": "Shown in the Arabic interface. Up to 160 characters.",
+    "active": "Active",
+    "activeHint": "Retired units stay on old records but cannot be chosen for new ones.",
+    "activeHelp": "Turn off to retire this unit.",
+    "codePattern": "Start with a letter; use letters, digits, dot, dash or underscore (up to 32).",
+    "codeTaken": "This code is already used."
+  },
+  "retire": {
+    "title": "Retire “{{code}}”?",
+    "text": "It will no longer be offered for new items, prices or documents.",
+    "confirm": "Retire",
+    "group": {
+      "ITEM_BASE": "items use it as their base unit",
+      "COMPANY_DEFAULT": "company default units",
+      "PRICE_ENTRY": "prices",
+      "PURCHASE_QUOTATION_DRAFT": "draft purchase quotations",
+      "QUOTATION_OPEN": "open quotations",
+      "ORDER_OPEN": "open orders",
+      "SALES_INVOICE_DRAFT": "draft invoices",
+      "CONVERSION": "unit conversions",
+      "STOCK": "stock balances",
+      "RESERVATION": "open reservations"
+    },
+    "groupOne": {
+      "ITEM_BASE": "item uses it as its base unit",
+      "COMPANY_DEFAULT": "company default unit",
+      "PRICE_ENTRY": "price",
+      "PURCHASE_QUOTATION_DRAFT": "draft purchase quotation",
+      "QUOTATION_OPEN": "open quotation",
+      "ORDER_OPEN": "open order",
+      "SALES_INVOICE_DRAFT": "draft invoice",
+      "CONVERSION": "unit conversion",
+      "STOCK": "stock balance",
+      "RESERVATION": "open reservation"
+    }
+  },
+  "inUse": {
+    "title": "This unit is still in use",
+    "text": "The unit cannot be retired while any of these use it:",
+    "reason1": "An item's base unit",
+    "reason2": "A company's default sales or purchase unit for an item",
+    "reason3": "A live price",
+    "reason4": "An open quotation, order or draft invoice",
+    "reason5": "A unit conversion",
+    "reason6": "Stock on hand or reserved",
+    "reason7": "An active reservation",
+    "note": "The system does not say which one. Remove the unit from these records, then retire it again.",
+    "groupsNote": "Remove the unit from these records, then retire it again."
+  },
+  "toast": {
+    "created": "Unit created.",
+    "saved": "Changes saved.",
+    "retired": "Unit retired.",
+    "activated": "Unit activated."
+  }
+}

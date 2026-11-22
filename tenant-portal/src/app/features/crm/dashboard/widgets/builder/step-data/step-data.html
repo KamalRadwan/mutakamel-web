@@ -1,0 +1,82 @@
+<div data-field="source">
+  <ui-field
+    [label]="'builder.data.source' | transloco"
+    [hint]="'builder.data.sourceHint' | transloco"
+    [required]="true"
+    [bare]="true"
+    for="builder-source"
+    [error]="sourceError()"
+  >
+    <div
+      id="builder-source"
+      role="radiogroup"
+      [attr.aria-label]="'builder.data.source' | transloco"
+      aria-describedby="builder-source-hint"
+      class="flex flex-col gap-6"
+    >
+      @for (src of sources; track src.id; let index = $index) {
+        @let selected = selectedSource() === src.id;
+        <button
+          #tileBtn
+          type="button"
+          role="radio"
+          [attr.aria-checked]="selected"
+          [attr.tabindex]="index === activeTileIndex() ? 0 : -1"
+          class="flex w-full cursor-pointer items-start gap-8 rounded-10 border p-8 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            selected
+              ? 'border-brand bg-brand-soft'
+              : 'border-border-field bg-surface hover:border-border-field-hover'
+          "
+          (click)="selectSource(src.id)"
+          (keydown)="onTileKeydown($event, index)"
+        >
+          <span
+            class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="src.tileClass"
+            aria-hidden="true"
+          >
+            <ng-icon [name]="src.icon" size="15" aria-hidden="true" />
+          </span>
+
+          <span class="flex min-w-0 flex-1 flex-col gap-2">
+            <span class="text-12 leading-18 font-medium text-text">
+              {{ 'builder.data.sources.' + src.id + '.name' | transloco }}
+            </span>
+            <span class="text-11 leading-16 text-text-muted">
+              {{ 'builder.data.sources.' + src.id + '.description' | transloco }}
+            </span>
+          </span>
+
+          <span
+            class="mt-2 inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border-check bg-surface-field"
+            [class]="selected ? 'border-brand' : 'border-border-field'"
+            aria-hidden="true"
+          >
+            @if (selected) {
+              <span class="size-radio-dot rounded-full bg-brand"></span>
+            }
+          </span>
+        </button>
+      }
+    </div>
+  </ui-field>
+</div>
+
+<ui-field
+  [label]="'builder.data.startFrom' | transloco"
+  [hint]="'builder.data.startFromHint' | transloco"
+  [bare]="true"
+  for="builder-start-from"
+>
+  <ui-dropdown
+    [id]="'builder-start-from'"
+    class="w-full"
+    size="field"
+    [label]="'builder.data.startFrom' | transloco"
+    describedBy="builder-start-from-hint"
+    [options]="startFromOptions()"
+    [value]="selectedPreset()"
+    (valueChange)="onStartFromChange($event)"
+  />
+</ui-field>

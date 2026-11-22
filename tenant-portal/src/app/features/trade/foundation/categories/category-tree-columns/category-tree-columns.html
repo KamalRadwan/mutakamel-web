@@ -1,0 +1,113 @@
+<div class="flex min-h-0 flex-1 overflow-x-auto pb-4">
+  <div class="flex min-h-0 flex-1 gap-8">
+    @for (col of columns(); track col.key; let colIdx = $index) {
+      @let colTitle = col.isRootTitle ? ('tradeCategories.modal.topLevel' | transloco) : col.title;
+      <section
+        class="flex min-h-0 w-kanban-col-min shrink-0 flex-col rounded-10 border border-border bg-surface p-8 shadow-card"
+        [attr.aria-label]="colTitle"
+      >
+        <header class="mb-6 flex h-menu-item shrink-0 items-center justify-between gap-8 border-b border-border px-6">
+          <span class="truncate text-13 leading-18 font-medium text-text" [title]="colTitle">
+            {{ colTitle }}
+          </span>
+          <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted tabular-nums">
+            {{ col.items.length }}
+          </span>
+        </header>
+
+        @if (col.loading && col.items.length === 0) {
+          <div class="flex flex-col gap-4 p-4" [attr.aria-busy]="true">
+            @for (skeleton of skeletonRows; track skeleton) {
+              <div class="h-menu-item motion-safe:animate-pulse rounded-6 bg-neutral-soft" aria-hidden="true"></div>
+            }
+          </div>
+        } @else if (col.items.length === 0) {
+          <p class="flex min-h-0 flex-1 items-center justify-center p-12 text-center text-12 leading-18 text-text-muted">
+            {{ 'tradeCategories.children' | transloco: { count: 0 } }}
+          </p>
+        } @else {
+          <div
+            role="list"
+            class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto scrollbar-thin"
+            [attr.aria-label]="colTitle"
+          >
+            @for (node of col.items; track node.id) {
+              @let muted = isMuted(node);
+              @let selected = col.selectedId === node.id;
+              <div
+                role="listitem"
+                class="flex h-menu-item shrink-0 items-center gap-4 rounded-6 border pe-4 transition-colors duration-fast"
+                [class]="
+                  selected
+                    ? 'border-transparent bg-brand-soft font-medium text-on-brand-soft'
+                    : 'border-transparent text-text hover:bg-row-hover'
+                "
+              >
+                <button
+                  type="button"
+                  [attr.aria-pressed]="selected"
+                  [attr.aria-describedby]="muted ? uid + '-muted-' + node.id : null"
+                  [attr.title]="muted ? ('tradeCategories.inactiveBecause' | transloco: { parent: ancestorName(node) }) : null"
+                  class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-6 rounded-6 px-6 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="selectNode(colIdx, node)"
+                  (dblclick)="openNode(node)"
+                >
+                  <span
+                    class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                    [class]="tileClass(node)"
+                  >
+                    <ng-icon name="tablerCategory" size="14" aria-hidden="true" />
+                  </span>
+
+                  <span
+                    class="min-w-0 flex-1 truncate text-start"
+                    [class]="muted ? 'text-text-muted' : selected ? 'text-on-brand-soft' : 'text-text'"
+                    [title]="node.name"
+                  >
+                    {{ node.name }}
+                  </span>
+
+                  <span dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">
+                    {{ node.code }}
+                  </span>
+
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                    [class]="node.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                  >
+                    {{ (node.status === 'ACTIVE' ? 'tradeCategories.active' : 'tradeCategories.inactive') | transloco }}
+                  </span>
+
+                  @if (node.hasChildren) {
+                    <span class="inline-flex shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true">
+                      <ng-icon name="tablerChevronRight" size="12" />
+                    </span>
+                  }
+
+                  @if (muted) {
+                    <span [id]="uid + '-muted-' + node.id" class="sr-only">
+                      {{ 'tradeCategories.inactiveBecause' | transloco: { parent: ancestorName(node) } }}
+                    </span>
+                  }
+                </button>
+
+                <div
+                  data-row-action
+                  class="shrink-0"
+                  (click)="$event.stopPropagation()"
+                  (keydown)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="actionsFor()(node)"
+                    [label]="node.name"
+                    (selected)="onActionSelected(node, $event)"
+                  />
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  </div>
+</div>

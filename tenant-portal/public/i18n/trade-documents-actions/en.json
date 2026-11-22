@@ -1,0 +1,111 @@
+{
+  "moreActions": "More actions",
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "actions": {
+    "send": "Send",
+    "accept": "Accept",
+    "reject": "Reject",
+    "cancel": "Cancel",
+    "convert": "Convert to sales order",
+    "createSalesOrderDirect": "Create sales order directly",
+    "openSalesOrder": "Open sales order",
+    "confirm": "Confirm",
+    "hold": "Put on hold",
+    "releaseHold": "Release hold",
+    "submit": "Submit for approval",
+    "withdraw": "Withdraw",
+    "approve": "Approve",
+    "poReject": "Reject",
+    "poConfirm": "Confirm",
+    "retryDelivery": "Retry delivery",
+    "issue": "Issue",
+    "convertToPurchaseOrder": "Convert to purchase order",
+    "createPurchaseOrderDirect": "Create purchase order directly",
+    "openPurchaseOrder": "Open purchase order",
+    "pqCancel": "Cancel",
+    "deleteDraft": "Delete draft",
+    "print": "Print"
+  },
+  "why": {
+    "permission": "You do not have permission for this action.",
+    "saveFirst": "Save your changes first",
+    "priceLockExpired": "The price hold has ended. Save a new revision and send it again.",
+    "makerChecker": "You created or submitted this order, so someone else must approve it.",
+    "noLines": "Add at least one line and save before sending."
+  },
+  "confirm": {
+    "confirm": {
+      "title": "Confirm sales order?",
+      "text": "Confirming assigns a document number and reserves available stock."
+    },
+    "poConfirm": {
+      "title": "Confirm purchase order?",
+      "text": "Confirming assigns a document number and starts supplier delivery."
+    },
+    "issue": {
+      "title": "Issue purchase quotation?",
+      "text": "Issuing assigns a number and locks the quotation. It cannot be changed afterwards."
+    },
+    "createSalesOrderDirect": {
+      "title": "Create sales order directly?",
+      "text": "The sales order is created now with each item's default tax. You can change charges and tax while it is a draft."
+    },
+    "createPurchaseOrderDirect": {
+      "title": "Create purchase order directly?",
+      "text": "The purchase order is created now with each item's default tax. You can change charges and tax while it is a draft."
+    },
+    "deleteDraft": {
+      "title": "Delete draft?",
+      "text": "Delete this draft? This cannot be undone."
+    }
+  },
+  "reason": {
+    "label": "Reason",
+    "labelHint": "Choose a reason from the list managed in Trade settings.",
+    "note": "Note",
+    "noteHint": "Add details up to 500 characters. Required for some reasons.",
+    "title": {
+      "reject": "Reject quotation",
+      "cancel": "Cancel document",
+      "hold": "Put order on hold",
+      "releaseHold": "Release order hold",
+      "poReject": "Reject purchase order",
+      "pqCancel": "Cancel purchase quotation"
+    },
+    "text": {
+      "reject": "Choose why this quotation was rejected.",
+      "cancel": "Choose why this document is being cancelled. This cannot be undone.",
+      "hold": "Choose why this order is being put on hold.",
+      "releaseHold": "Choose why the hold is being removed.",
+      "poReject": "Choose why this purchase order is being rejected.",
+      "pqCancel": "Choose why this purchase quotation is being cancelled. This cannot be undone."
+    }
+  },
+  "approval": {
+    "pending": "Submitted by {{name}} on {{date}}. One approval is needed from someone other than the creator or the submitter.",
+    "approved": "Approved. You can confirm the order.",
+    "rejected": "Rejected. Change the order and submit it again.",
+    "rejectedWithReason": "Rejected: {{reason}}",
+    "withdrawn": "Withdrawn by the submitter.",
+    "readyNoApproval": "No approval needed. You can confirm the order."
+  },
+  "delivery": {
+    "retry": "Retry",
+    "error": {
+      "DELIVERY_PDF_FAILED": "Could not generate the purchase order PDF for delivery.",
+      "DELIVERY_ATTACHMENT_TOO_LARGE": "The purchase order PDF exceeds the email size limit.",
+      "DELIVERY_EMAIL_NOT_FOUND": "The supplier has no email address.",
+      "DELIVERY_EMAIL_UNAVAILABLE": "Email delivery is temporarily unavailable. Try again later.",
+      "DELIVERY_EMAIL_FAILED": "The supplier email could not be delivered.",
+      "DELIVERY_SOURCE_STALE": "The order changed before delivery completed. Retry from the updated order.",
+      "generic": "Delivery failed. Try again later."
+    }
+  },
+  "priceLock": {
+    "heldUntil": "Prices held until {{dateTime}}",
+    "expired": "Price hold ended"
+  }
+}

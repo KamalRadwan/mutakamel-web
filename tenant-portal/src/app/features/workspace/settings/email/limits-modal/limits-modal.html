@@ -1,0 +1,174 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerGauge"
+  tile="bg-icon-green"
+  [title]="'wsEmail.limits.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
+    @if (topError(); as err) {
+      <div role="alert">
+        <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
+      </div>
+    }
+
+    <app-settings-notice tone="info">
+      {{ 'wsEmail.limits.plan' | transloco: planSummaryParams() }}
+    </app-settings-notice>
+
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-daily-switch'"
+          [label]="'wsEmail.fields.dailyQuota.label' | transloco"
+          [hint]="'wsEmail.fields.dailyQuota.hint' | transloco"
+          [error]="dailyError()"
+        >
+          <div class="flex flex-col gap-6">
+            <div class="flex h-field items-center gap-8">
+              <ui-switch
+                [id]="uid + '-daily-switch'"
+                [describedBy]="uid + '-daily-switch-hint'"
+                [label]="'wsEmail.limits.usePlan' | transloco"
+                [checked]="dailyUsePlan()"
+                [disabled]="isReadonly() || saving()"
+                (checkedChange)="onDailyUsePlanChange($event)"
+              />
+              <span class="text-12 text-text">{{ 'wsEmail.limits.usePlan' | transloco }}</span>
+            </div>
+
+            @if (!dailyUsePlan()) {
+              <div
+                class="flex h-field items-center gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  dailyError()
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-daily-value'"
+                  type="number"
+                  min="1"
+                  [max]="dailyCap()"
+                  step="1"
+                  inputmode="numeric"
+                  dir="ltr"
+                  class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                  [placeholder]="dailyCapPlaceholder()"
+                  [value]="dailyText()"
+                  [readOnly]="isReadonly() || saving()"
+                  [attr.aria-label]="'wsEmail.fields.dailyQuota.label' | transloco"
+                  [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                  [attr.aria-invalid]="dailyError() ? 'true' : null"
+                  (input)="onDailyInput($event)"
+                  (blur)="markTouched('dailyQuota')"
+                />
+              </div>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-per-min-switch'"
+          [label]="'wsEmail.fields.rateLimitPerMin.label' | transloco"
+          [hint]="'wsEmail.fields.rateLimitPerMin.hint' | transloco"
+          [error]="perMinuteError()"
+        >
+          <div class="flex flex-col gap-6">
+            <div class="flex h-field items-center gap-8">
+              <ui-switch
+                [id]="uid + '-per-min-switch'"
+                [describedBy]="uid + '-per-min-switch-hint'"
+                [label]="'wsEmail.limits.usePlan' | transloco"
+                [checked]="perMinuteUsePlan()"
+                [disabled]="isReadonly() || saving()"
+                (checkedChange)="onPerMinuteUsePlanChange($event)"
+              />
+              <span class="text-12 text-text">{{ 'wsEmail.limits.usePlan' | transloco }}</span>
+            </div>
+
+            @if (!perMinuteUsePlan()) {
+              <div
+                class="flex h-field items-center gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  perMinuteError()
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-per-min-value'"
+                  type="number"
+                  min="1"
+                  [max]="perMinuteCap()"
+                  step="1"
+                  inputmode="numeric"
+                  dir="ltr"
+                  class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                  [placeholder]="perMinuteCapPlaceholder()"
+                  [value]="perMinuteText()"
+                  [readOnly]="isReadonly() || saving()"
+                  [attr.aria-label]="'wsEmail.fields.rateLimitPerMin.label' | transloco"
+                  [attr.aria-readonly]="isReadonly() ? 'true' : null"
+                  [attr.aria-invalid]="perMinuteError() ? 'true' : null"
+                  (input)="onPerMinuteInput($event)"
+                  (blur)="markTouched('rateLimitPerMin')"
+                />
+              </div>
+            }
+          </div>
+        </ui-field>
+      </div>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="!canSubmit()"
+      >
+        {{ 'settings.common.save' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="close()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

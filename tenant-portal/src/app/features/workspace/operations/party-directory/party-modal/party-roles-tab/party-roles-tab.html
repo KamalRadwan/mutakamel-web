@@ -1,0 +1,167 @@
+<div class="min-h-0 flex-1 overflow-y-auto p-10">
+  @if (canAddAnyRole() && !adding() && roles().length > 0) {
+    <div class="mb-8 flex justify-end">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [disabled]="removingRoleId() !== null"
+        (click)="openAddForm()"
+      >
+        <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+        <span>{{ 'wsPartyModal.roles.add' | transloco }}</span>
+      </button>
+    </div>
+  }
+
+  @if (roles().length === 0 && !adding()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerShieldLock" size="18" />
+      </span>
+      <p class="text-12 text-text-muted">{{ 'wsPartyModal.roles.empty' | transloco }}</p>
+      @if (canAddAnyRole()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          (click)="openAddForm()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          <span>{{ 'wsPartyModal.roles.add' | transloco }}</span>
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="flex flex-col gap-10">
+      @if (roles().length > 0) {
+        <div class="flex flex-wrap gap-6">
+          @for (role of roles(); track role.id) {
+            @let sourceLabel = sourceText(role.appSource);
+            @let coreManaged = !isAppManaged(role.appSource);
+            <span class="inline-flex min-h-btn max-w-full items-center gap-6 rounded-8 border border-border bg-surface px-8 py-2 text-12 shadow-card">
+              <span class="truncate font-medium text-text">
+                {{ 'wsParty.roles.' + role.roleType | transloco }}
+              </span>
+              <span class="text-text-muted" aria-hidden="true">·</span>
+              <span class="truncate text-text-muted">{{ branchLabel(role.branchId) }}</span>
+
+              <span
+                class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-11 font-medium text-text-muted whitespace-nowrap"
+                [attr.title]="!coreManaged ? ('wsPartyModal.roles.managedBy' | transloco: { app: sourceLabel }) : null"
+              >
+                @if (!coreManaged) {
+                  <ng-icon name="tablerLock" size="12" aria-hidden="true" />
+                }
+                <span>{{ sourceLabel }}</span>
+              </span>
+
+              @if (canRemove(role)) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                  [disabled]="savingAdd() || removingRoleId() === role.id"
+                  [attr.aria-label]="'wsPartyModal.roles.removeAria' | transloco: { role: ('wsParty.roles.' + role.roleType | transloco) }"
+                  [title]="'wsPartyModal.common.remove' | transloco"
+                  (click)="removeRole(role)"
+                >
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                </button>
+              }
+            </span>
+          }
+        </div>
+      }
+
+      @if (adding()) {
+        <article class="flex flex-col gap-8 rounded-10 border border-brand bg-surface p-8 shadow-card">
+          <div class="flex items-center justify-between gap-8">
+            <span class="text-12 leading-18 font-medium text-text">
+              {{ 'wsPartyModal.roles.add' | transloco }}
+            </span>
+            <div class="flex items-center gap-6">
+              <button
+                type="submit"
+                [attr.form]="uid + '-form'"
+                uiButton
+                variant="primary"
+                size="small"
+                [loading]="savingAdd()"
+                [disabled]="savingAdd()"
+              >
+                <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                <span>{{ 'wsPartyModal.common.save' | transloco }}</span>
+              </button>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                [disabled]="savingAdd()"
+                [attr.aria-label]="'wsPartyModal.common.cancel' | transloco"
+                [title]="'wsPartyModal.common.cancel' | transloco"
+                (click)="cancelAdd()"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          <form [id]="uid + '-form'" class="grid grid-cols-2 items-start gap-x-10 gap-y-8" novalidate (submit)="saveAdd($event)">
+            <ui-field
+              size="bare"
+              [for]="uid + '-role'"
+              [label]="'wsPartyModal.roles.role' | transloco"
+              [hint]="'wsPartyModal.roles.roleHint' | transloco"
+              [required]="true"
+              [error]="roleError()"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-role'"
+                [describedBy]="uid + '-role-hint' + (roleError() ? ' ' + uid + '-role-error' : '')"
+                [options]="roleOptions()"
+                [value]="selectedRole()"
+                [label]="'wsPartyModal.roles.role' | transloco"
+                [disabled]="savingAdd()"
+                (valueChange)="onRoleChange($event)"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [for]="uid + '-branch'"
+              [label]="'wsPartyModal.roles.branch' | transloco"
+              [hint]="'wsPartyModal.roles.branchHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-branch'"
+                [describedBy]="uid + '-branch-hint'"
+                [options]="branchOptions()"
+                [value]="selectedBranch()"
+                [label]="'wsPartyModal.roles.branch' | transloco"
+                [disabled]="savingAdd()"
+                (valueChange)="onBranchChange($event)"
+              />
+            </ui-field>
+          </form>
+        </article>
+      }
+    </div>
+  }
+</div>
+
+<ui-confirm-dialog
+  #removeConfirm
+  tone="danger"
+  [title]="'wsPartyModal.roles.removeTitle' | transloco"
+  [text]="'wsPartyModal.roles.removeText' | transloco"
+  [confirmLabel]="'wsPartyModal.common.remove' | transloco"
+  [cancelLabel]="'wsPartyModal.common.cancel' | transloco"
+/>

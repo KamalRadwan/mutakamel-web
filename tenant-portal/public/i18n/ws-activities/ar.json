@@ -1,0 +1,153 @@
+{
+  "newActivity": "نشاط جديد",
+  "searchPlaceholder": "ابحث في الأنشطة حسب العنوان…",
+  "clearSearch": "مسح البحث",
+  "filtersToggle": "التصفية",
+  "clearFilters": "مسح التصفية",
+  "viewSwitcher": "طريقة العرض",
+  "views": {
+    "list": "قائمة",
+    "board": "لوحة",
+    "calendar": "التقويم"
+  },
+  "summary": {
+    "region": "ملخص الأنشطة",
+    "overdue": "متأخرة {{n}}",
+    "today": "اليوم {{n}}",
+    "upcoming": "قادمة {{n}}",
+    "completedToday": "مكتملة اليوم {{n}}"
+  },
+  "sort": {
+    "label": "الترتيب حسب تاريخ الاستحقاق",
+    "asc": "الأقدم أولًا",
+    "desc": "الأحدث أولًا"
+  },
+  "filters": {
+    "region": "عوامل تصفية الأنشطة",
+    "show": "عرض",
+    "showHint": "التبديل بين الأنشطة المسندة إليك وجميع الأنشطة المصرح لك بعرضها.",
+    "myActivities": "أنشطتي",
+    "allVisible": "كل ما يمكنني رؤيته",
+    "types": "الأنواع",
+    "typesHint": "تصفية الأنشطة حسب نوع واحد أو أكثر.",
+    "allTypes": "جميع الأنواع",
+    "priorities": "الأولويات",
+    "prioritiesHint": "تصفية الأنشطة حسب مستوى أولوية واحد أو أكثر.",
+    "allPriorities": "جميع الأولويات",
+    "statuses": "الحالة",
+    "statusesHint": "تصفية الأنشطة حسب الحالة. تعرض القائمة الأنشطة المجدولة وقيد التنفيذ افتراضيًا.",
+    "statusesBoardHint": "تعرض اللوحة أعمدة الحالات الأربع دائمًا.",
+    "allStatuses": "جميع الحالات",
+    "branch": "الفرع",
+    "branchHint": "قصر عرض الأنشطة على فرع محدد.",
+    "allBranches": "جميع الفروع",
+    "recordType": "نوع السجل",
+    "recordTypeHint": "يُصفّي الصفحة المحمّلة حسب نوع السجل المرتبط.",
+    "allRecordTypes": "جميع أنواع السجلات",
+    "dueRange": "نطاق تاريخ الاستحقاق",
+    "dueRangeHint": "تصفية الأنشطة التي يقع تاريخ استحقاقها ضمن النطاق الزمني المحدد.",
+    "dueRangePlaceholder": "اختر نطاق التاريخ",
+    "clearDueRange": "مسح نطاق تاريخ الاستحقاق",
+    "selectAll": "تحديد الكل",
+    "clearAll": "مسح",
+    "moreSelected": "+{{n}}",
+    "overdueActive": "المتأخرة فقط",
+    "removeFilter": "إزالة {{name}}"
+  },
+  "apps": {
+    "CRM": "إدارة علاقات العملاء",
+    "CORE": "النظام الأساسي",
+    "TRADE": "التجارة"
+  },
+  "recordTypes": {
+    "CRM": {
+      "LEAD": "عميل محتمل",
+      "CUSTOMER_PROFILE": "عميل",
+      "PARTY": "طرف",
+      "OPPORTUNITY": "فرصة"
+    },
+    "CORE": {
+      "PARTY": "طرف"
+    },
+    "TRADE": {
+      "QUOTATION": "عرض سعر",
+      "SALES_ORDER": "أمر بيع"
+    }
+  },
+  "table": {
+    "ariaLabel": "قائمة الأنشطة",
+    "paginationLabel": "ترقيم صفحات الأنشطة",
+    "cols": {
+      "type": "النوع",
+      "subject": "العنوان",
+      "record": "السجل",
+      "assignee": "المسؤول",
+      "due": "الاستحقاق",
+      "priority": "الأولوية",
+      "status": "الحالة",
+      "actions": "الإجراءات"
+    }
+  },
+  "unavailable": "غير متاح",
+  "unassigned": "غير مسند",
+  "actions": {
+    "menu": "إجراءات النشاط",
+    "open": "فتح",
+    "complete": "إكمال",
+    "cancel": "إلغاء",
+    "alreadyClosed": "هذا النشاط مغلق بالفعل.",
+    "noPermission": "ليست لديك صلاحية تنفيذ هذا الإجراء."
+  },
+  "board": {
+    "collapse": "طي {{status}}",
+    "expand": "توسيع {{status}}",
+    "empty": "لا توجد أنشطة في هذه الحالة",
+    "loadMore": "تحميل المزيد ({{shown}} من {{total}})",
+    "allShown": "تم عرض جميع الأنشطة",
+    "dueSummary": "متأخرة {{overdue}}، اليوم {{today}}، قادمة {{upcoming}}"
+  },
+  "calendar": {
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "today": "اليوم",
+    "more": "+{{count}} المزيد",
+    "dayModalSubtitle": "{{count}} أنشطة",
+    "dayModalSubtitlePlural": {
+      "zero": "لا أنشطة",
+      "one": "نشاط واحد",
+      "two": "نشاطان",
+      "few": "{{count}} أنشطة",
+      "many": "{{count}} نشاطًا",
+      "other": "{{count}} نشاط"
+    },
+    "truncatedToast": "تُعرض أول 500 نشاط فقط. يرجى تضييق عوامل التصفية."
+  },
+  "picker": {
+    "title": "اختر سجلًا",
+    "app": "التطبيق",
+    "appHint": "اختر التطبيق الذي يتبع له السجل المستهدف.",
+    "recordType": "نوع السجل",
+    "recordTypeHint": "اختر نوع السجل المراد ربط هذا النشاط به.",
+    "record": "السجل",
+    "recordHint": "اكتب للبحث. تُعرض أول 20 نتيجة مطابقة.",
+    "searchPlaceholder": "ابحث عن سجل…",
+    "empty": "لا توجد سجلات مطابقة.",
+    "loadFailed": "تعذّر تحميل السجلات.",
+    "retry": "حاول مرة أخرى",
+    "next": "التالي",
+    "cancel": "إلغاء"
+  },
+  "states": {
+    "forbiddenTitle": "غير مصرح بالوصول",
+    "forbiddenText": "ليست لديك صلاحية عرض الأنشطة.",
+    "backToHome": "العودة إلى الرئيسية",
+    "loadFailedTitle": "تعذّر تحميل الأنشطة",
+    "loadFailedText": "حدث خطأ أثناء تحميل الأنشطة. حاول مرة أخرى.",
+    "reference": "مرجع الدعم: {{correlationId}}",
+    "retry": "حاول مرة أخرى",
+    "emptyFirstTitle": "لا توجد أنشطة بعد",
+    "emptyFirstText": "أنشئ أول نشاط لك على سجل في إدارة علاقات العملاء أو النظام الأساسي أو التجارة.",
+    "emptyFilteredTitle": "لا توجد أنشطة مطابقة",
+    "emptyFilteredText": "جرّب تعديل عوامل التصفية أو مسحها لعرض المزيد من الأنشطة."
+  }
+}

@@ -1,0 +1,79 @@
+<div class="flex flex-wrap items-start gap-12">
+  <div class="flex flex-col items-center gap-6">
+    <div
+      class="flex size-dropzone shrink-0 items-center justify-center overflow-hidden rounded-10 border border-border bg-surface-muted"
+    >
+      @if (previewUrl(); as url) {
+        <img
+          [src]="url"
+          [alt]="'itemForm.fields.image.label' | transloco"
+          class="size-full object-cover"
+        />
+      } @else {
+        <ng-icon name="tablerPhoto" size="20" class="text-text-muted" aria-hidden="true" />
+      }
+    </div>
+
+    @if (!readonly() && hasImage()) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        size="small"
+        [disabled]="uploading()"
+        (click)="confirmRemove()"
+      >
+        <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+        {{ 'itemForm.actions.remove' | transloco }}
+      </button>
+    }
+  </div>
+
+  <div class="min-w-0 flex-1">
+    <ui-field
+      size="bare"
+      [for]="uid + '-image'"
+      [label]="'itemForm.fields.image.label' | transloco"
+      [hint]="'itemForm.fields.image.hint' | transloco"
+      [error]="errorText()"
+    >
+      @if (!readonly()) {
+        <div [attr.aria-invalid]="errorText() ? 'true' : null">
+          <ui-file-drop
+            [id]="uid + '-image'"
+            [describedBy]="describedBy()"
+            [accept]="accept"
+            [maxBytes]="rules.maxBytes"
+            [title]="'itemForm.states.dropTitle' | transloco"
+            [hint]="'itemForm.states.dropHint' | transloco"
+            [disabled]="uploading()"
+            (picked)="onFilePicked($event)"
+            (rejected)="onFileRejected($event)"
+          />
+        </div>
+      } @else {
+        <div
+          class="flex h-field w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text"
+        >
+          <input
+            [id]="uid + '-image'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [attr.aria-describedby]="describedBy()"
+            [value]="(hasImage() ? 'itemForm.fields.image.label' : 'itemForm.states.noImage') | transloco"
+          />
+        </div>
+      }
+    </ui-field>
+  </div>
+</div>
+
+<ui-confirm-dialog
+  #removeDialog
+  tone="danger"
+  [title]="'itemForm.removeImage' | transloco"
+  [text]="'itemForm.removeImageText' | transloco"
+  [confirmLabel]="'itemForm.actions.remove' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

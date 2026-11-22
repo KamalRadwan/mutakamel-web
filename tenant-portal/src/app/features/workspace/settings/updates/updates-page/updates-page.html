@@ -1,0 +1,370 @@
+@if (!canRead()) {
+  <div class="flex flex-1 p-12">
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+      </span>
+      <h2 class="text-16 leading-22 font-medium text-text">{{ 'wsUpdates.noPermission.title' | transloco }}</h2>
+      <p class="text-12 leading-18 text-text-muted">{{ 'wsUpdates.noPermission.text' | transloco }}</p>
+    </div>
+  </div>
+} @else {
+  <app-settings-frame
+    addLabel=""
+    [showAdd]="false"
+    [searchPlaceholder]="'wsUpdates.search' | transloco"
+    [loading]="listLoading()"
+    [(search)]="searchInput"
+    (reload)="reloadList()"
+  >
+    @if (showAmbiguousNotice()) {
+      <app-settings-notice notices tone="warning">
+        <div class="flex flex-wrap items-center justify-between gap-8">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-text">{{ 'wsUpdates.ambiguous.title' | transloco }}</p>
+            <p class="text-12 leading-18 text-text-muted">{{ 'wsUpdates.ambiguous.text' | transloco }}</p>
+          </div>
+          @if (canManage()) {
+            <button
+              type="button"
+              uiButton
+              size="small"
+              [loading]="submittingApply()"
+              [disabled]="submittingApply()"
+              (click)="retryAmbiguousApply()"
+            >
+              {{ 'wsUpdates.ambiguous.retry' | transloco }}
+            </button>
+          }
+        </div>
+      </app-settings-notice>
+    }
+
+    @if (reconcile(); as rec) {
+      <app-settings-notice notices tone="info">
+        <div class="flex flex-wrap items-center justify-between gap-8">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-text">{{ 'wsUpdates.reconcile.title' | transloco }}</p>
+            <p class="text-12 leading-18 text-text-muted">{{ 'wsUpdates.reconcile.text' | transloco }}</p>
+            @if (rec.lastError) {
+              <p class="text-11 leading-16 text-danger-text">{{ rec.lastError }}</p>
+            }
+          </div>
+          <div class="flex flex-wrap items-center gap-6">
+            @if (canManage()) {
+              <button
+                type="button"
+                uiButton
+                size="small"
+                [loading]="reconciling()"
+                [disabled]="reconciling()"
+                (click)="checkReconcileStatus()"
+              >
+                {{ 'wsUpdates.reconcile.check' | transloco }}
+              </button>
+            }
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [disabled]="reconciling() || listLoading()"
+              (click)="reloadList()"
+            >
+              {{ 'wsUpdates.apply.reload' | transloco }}
+            </button>
+          </div>
+        </div>
+      </app-settings-notice>
+    }
+
+    @if (refreshFailed()) {
+      <app-settings-notice notices tone="warning">
+        <div class="flex flex-wrap items-center justify-between gap-8">
+          <span class="min-w-0 flex-1">{{ 'wsUpdates.loadFailed.refreshFailed' | transloco }}</span>
+          <button type="button" uiButton variant="secondary" size="small" (click)="reloadList()">
+            {{ 'settings.common.retry' | transloco }}
+          </button>
+        </div>
+      </app-settings-notice>
+    }
+
+    @if (!canManage()) {
+      <app-settings-notice notices tone="info">
+        {{ 'wsUpdates.noPermission.readOnly' | transloco }}
+      </app-settings-notice>
+    }
+
+    <div class="flex flex-wrap items-end justify-between gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <div class="grid min-w-0 flex-1 grid-cols-1 gap-8 desktop:grid-cols-2 wide:grid-cols-4">
+        <ui-field
+          size="bare"
+          [for]="uid + '-risk'"
+          [label]="'wsUpdates.filters.risk' | transloco"
+          [hint]="'wsUpdates.filters.riskHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-risk'"
+            [options]="riskOptions()"
+            [value]="riskFilter()"
+            [label]="'wsUpdates.filters.risk' | transloco"
+            [describedBy]="uid + '-risk-hint'"
+            (valueChange)="onRiskChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-backup'"
+          [label]="'wsUpdates.filters.backup' | transloco"
+          [hint]="'wsUpdates.filters.backupHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-backup'"
+            [options]="requirementOptions()"
+            [value]="backupFilter()"
+            [label]="'wsUpdates.filters.backup' | transloco"
+            [describedBy]="uid + '-backup-hint'"
+            (valueChange)="onBackupChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-maintenance'"
+          [label]="'wsUpdates.filters.maintenance' | transloco"
+          [hint]="'wsUpdates.filters.maintenanceHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-maintenance'"
+            [options]="requirementOptions()"
+            [value]="maintenanceFilter()"
+            [label]="'wsUpdates.filters.maintenance' | transloco"
+            [describedBy]="uid + '-maintenance-hint'"
+            (valueChange)="onMaintenanceChange($event)"
+          />
+        </ui-field>
+
+        <div class="flex min-w-0 items-end gap-6">
+          <ui-field
+            class="min-w-0 flex-1"
+            size="bare"
+            [for]="uid + '-sort'"
+            [label]="'wsUpdates.filters.sort' | transloco"
+            [hint]="'wsUpdates.filters.sortHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-sort'"
+              [options]="sortOptions()"
+              [value]="sortBy()"
+              [label]="'wsUpdates.filters.sort' | transloco"
+              [describedBy]="uid + '-sort-hint'"
+              (valueChange)="onSortByChange($event)"
+            />
+          </ui-field>
+
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:border-border-field-hover hover:bg-surface-muted hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'wsUpdates.filters.sort' | transloco"
+            [title]="'wsUpdates.filters.sort' | transloco"
+            (click)="toggleSortDir()"
+          >
+            <ng-icon
+              [name]="sortDir() === 'ASC' ? 'tablerSortAscending' : 'tablerSortDescending'"
+              size="14"
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+      </div>
+
+      <div class="flex shrink-0 flex-wrap items-center gap-6">
+        @if (hasClearableFilters()) {
+          <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
+            {{ 'wsUpdates.filters.clear' | transloco }}
+          </button>
+        }
+
+        <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft tabular-nums">
+          {{ ('wsUpdates.totalPlural' | pluralKey: total()) | transloco: { count: total() } }}
+        </span>
+
+        @if (canManage() && selectedCount() > 0) {
+          <span class="inline-flex h-badge items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft tabular-nums">
+            {{ ('wsUpdates.selectedBadgePlural' | pluralKey: selectedCount()) | transloco: { count: selectedCount() } }}
+          </span>
+        }
+      </div>
+    </div>
+
+    @if (canManage() && selectedCount() > 0) {
+      <div class="flex min-h-bulk-bar flex-wrap items-center justify-between gap-8 rounded-10 border border-brand bg-brand-soft px-10 py-6">
+        <span class="text-12 font-medium text-on-brand-soft tabular-nums">
+          {{ ('wsUpdates.selectedBadgePlural' | pluralKey: selectedCount()) | transloco: { count: selectedCount() } }}
+        </span>
+
+        <div class="flex flex-wrap items-center gap-6">
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [disabled]="locked()"
+            (click)="clearSelection()"
+          >
+            {{ 'wsUpdates.clearSelection' | transloco }}
+          </button>
+          <button
+            type="button"
+            uiButton
+            size="small"
+            [disabled]="locked()"
+            (click)="openApplyDialog()"
+          >
+            {{ 'wsUpdates.applySelected' | transloco: { count: selectedCount() } }}
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (loadFailedWithoutRows()) {
+      <div
+        role="alert"
+        class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+      >
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'wsUpdates.loadFailed.title' | transloco }}</p>
+        <button type="button" uiButton variant="primary" (click)="reloadList()">
+          {{ 'settings.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-8">
+        @if (showOperationStrip()) {
+          <div class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-8">
+              @if (trackedOperation(); as op) {
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="stripBadgeClass()"
+                >
+                  {{ stripStatusText() }}
+                </span>
+
+                @if (stripIsActive()) {
+                  <ng-icon
+                    name="tablerLoader2"
+                    size="14"
+                    class="animate-spin text-accent motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                }
+
+                @if (stripGuidanceKey(); as gKey) {
+                  <span class="text-12 leading-18 text-text-muted">{{ gKey | transloco }}</span>
+                }
+
+                <span class="text-11 leading-16 text-text-muted">{{ stripUpdatedText() }}</span>
+
+                @if (operationError(); as opErr) {
+                  <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                    {{ opErr }}
+                  </span>
+                  <span class="text-11 leading-16 text-text-muted">{{ 'wsUpdates.operation.lastConfirmed' | transloco }}</span>
+                }
+              } @else if (operationError()) {
+                <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                  {{ 'wsUpdates.operation.loadFailed' | transloco }}
+                </span>
+              } @else {
+                <ng-icon
+                  name="tablerLoader2"
+                  size="14"
+                  class="animate-spin text-accent motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+                <span class="h-skeleton-line w-picker-w-single max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              }
+            </div>
+
+            <div class="flex shrink-0 items-center gap-6">
+              <button type="button" uiButton variant="secondary" size="small" (click)="openStatusDialog()">
+                {{ 'wsUpdates.operation.view' | transloco }}
+              </button>
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [loading]="operationLoading()"
+                [disabled]="operationLoading()"
+                (click)="refreshTrackedOperation()"
+              >
+                {{ 'wsUpdates.operation.refresh' | transloco }}
+              </button>
+            </div>
+          </div>
+        }
+
+        <app-updates-table
+          [rows]="rows()"
+          [loading]="firstLoadLoading()"
+          [selectable]="canManage()"
+          [selectedKeys]="selectedKeys()"
+          [locked]="locked() || listLoading()"
+          [capReached]="capReached()"
+          [filtered]="hasActiveFilters()"
+          (toggle)="toggleRowSelection($event)"
+          (togglePage)="togglePageSelection($event)"
+          (clearFilters)="clearFilters()"
+        />
+      </div>
+
+      @if (firstLoadLoading() ? total() > 0 : rows().length > 0) {
+        <footer class="mt-auto border-t border-border pt-8">
+          <ui-pagination
+            [total]="total()"
+            [pageSizes]="[defaultPageSize]"
+            [page]="page()"
+            [(pageSize)]="pageSize"
+            (pageChange)="onPageChange($event)"
+          />
+        </footer>
+      }
+    }
+  </app-settings-frame>
+}
+
+<app-apply-dialog
+  [snapshot]="attempt()?.snapshot ?? []"
+  [liveRows]="rows()"
+  [phase]="attempt()?.phase ?? 'confirm'"
+  [errorCode]="attempt()?.errorCode ?? null"
+  [submitting]="submittingApply()"
+  (confirmed)="submitApply()"
+  (retry)="retryAmbiguousApply()"
+  (reload)="onApplyReload()"
+  (diverged)="onApplyDiverged()"
+  (closed)="onApplyDialogClosed()"
+/>
+
+<app-operation-status-dialog
+  [operation]="trackedOperation()"
+  [loading]="operationLoading()"
+  [error]="operationError()"
+  [autoRefreshStopped]="autoRefreshStopped()"
+  [snapshotItems]="trackedSnapshot()"
+  (refresh)="refreshTrackedOperation()"
+  (closed)="onStatusDialogClosed()"
+/>

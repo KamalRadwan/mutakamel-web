@@ -1,0 +1,67 @@
+{
+  "drop": {
+    "title": "Drop files here",
+    "hint": "PDF, images, Excel, Word, CSV or text, up to 25 MB each.",
+    "browse": "Browse"
+  },
+  "col": {
+    "file": "File",
+    "type": "Type",
+    "size": "Size",
+    "by": "Uploaded by",
+    "added": "Added",
+    "actions": "Actions"
+  },
+  "type": {
+    "pdf": "PDF",
+    "image": "Image",
+    "excel": "Excel",
+    "word": "Word",
+    "csv": "CSV",
+    "text": "Text",
+    "other": "File"
+  },
+  "download": "Download {{name}}",
+  "deleteFile": "Delete {{name}}",
+  "delete": {
+    "title": "Delete this file?",
+    "text": "\"{{name}}\" will be removed from this record.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  },
+  "deleted": "File deleted.",
+  "uploaded": "File uploaded.",
+  "uploading": "Uploading {{name}}",
+  "cancelUpload": "Remove from queue",
+  "retry": "Retry",
+  "dismiss": "Dismiss",
+  "loadMore": "Load more ({{shown}} of {{total}})",
+  "empty": {
+    "title": "No files yet",
+    "text": "Add quotes, contracts or photos for this record."
+  },
+  "loadFailed": "Could not load the files.",
+  "denied": "You don't have access to attachments.",
+  "tryAgain": "Try again",
+  "errors": {
+    "CRM_ATTACHMENT_FILE_TOO_LARGE": "This file is larger than 25 MB.",
+    "CRM_ATTACHMENT_FILE_TYPE_UNSUPPORTED": "This file type is not allowed.",
+    "CRM_ATTACHMENT_FILE_EMPTY": "This file is empty.",
+    "CRM_ATTACHMENT_NOT_FOUND": "This file no longer exists.",
+    "STORAGE_CAPACITY_EXCEEDED": "Your workspace storage is full.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription is read-only, so changes cannot be saved.",
+    "CRM_SCOPED_PERMISSION_DENIED": "You do not have permission to do this.",
+    "CRM_ATTACHMENT_FILE_REQUIRED": "Choose a file to upload.",
+    "CRM_ATTACHMENT_INVALID": "This file does not match its type. Check the file name and try again.",
+    "CRM_ATTACHMENT_FILE_NOT_FOUND": "The stored file is not available.",
+    "CRM_SOURCE_NOT_FOUND": "This record no longer exists.",
+    "CRM_SOURCE_BRANCH_MISMATCH": "This record belongs to another branch.",
+    "CRM_PERMISSION_DENIED": "You do not have permission to do this.",
+    "CRM_VALIDATION_FAILED": "The request is not valid. Reload the page and try again.",
+    "GW.IDEM.MISSING": "The upload could not be sent safely. Try again.",
+    "GW.IDEM.BAD_VALUE": "The upload could not be sent safely. Try again.",
+    "GW.IDEM.MISMATCH": "This upload was already sent with a different file. Remove it and add the file again.",
+    "GW.IDEM.IN_FLIGHT": "This upload is still being processed.",
+    "generic": "Something went wrong. Try again."
+  }
+}

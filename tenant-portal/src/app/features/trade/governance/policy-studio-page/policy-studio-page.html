@@ -1,0 +1,205 @@
+<header class="flex flex-wrap items-center gap-8 rounded-12 border border-border bg-surface px-12 py-8 shadow-card">
+  <div class="flex items-center gap-8">
+    <h1 class="text-15 leading-22 font-medium text-text">
+      {{ 'policy.list.title' | transloco }}
+    </h1>
+    @if (canManage) {
+      <button type="button" uiButton variant="primary" (click)="openCreateModal()">
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        <span>{{ 'policy.list.newPolicy' | transloco }}</span>
+      </button>
+    }
+  </div>
+
+  <div class="flex h-field min-w-0 max-w-kanban-col-min flex-1 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo">
+    <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+    <input
+      type="search"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [attr.aria-label]="'policy.list.searchPlaceholder' | transloco"
+      [placeholder]="'policy.list.searchPlaceholder' | transloco"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+    />
+  </div>
+
+  <span class="hidden h-btn-h-sm w-border bg-border desktop:block" aria-hidden="true"></span>
+
+  <div class="min-w-org-card-w">
+    <ui-dropdown
+      class="w-full"
+      size="field"
+      [label]="'policy.list.kindFilter' | transloco"
+      [options]="kindOptions()"
+      [value]="kindFilter()"
+      (valueChange)="onKindFilterChange($event)"
+    />
+  </div>
+
+  <span [id]="uid + '-status-hint'" class="sr-only">{{ 'policy.list.statusFilterHint' | transloco }}</span>
+  <ui-segmented
+    [label]="'policy.list.statusFilter' | transloco"
+    [describedBy]="uid + '-status-hint'"
+    [options]="statusOptions()"
+    [value]="statusFilter()"
+    (valueChange)="onStatusFilterChange($event)"
+  />
+
+  <div class="ms-auto flex items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      size="small"
+      [disabled]="loading()"
+      [attr.aria-label]="'policy.list.reload' | transloco"
+      [title]="'policy.list.reload' | transloco"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+    </button>
+    <app-scope-chip />
+  </div>
+</header>
+
+@if (loading()) {
+  <div class="flex flex-col gap-6" aria-busy="true">
+    @for (row of skeletonRows; track row) {
+      <div
+        class="grid h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 shadow-card grid-cols-trade-governance-skeleton-row"
+      >
+        <div class="flex items-center gap-8">
+          <span class="size-icon-tile-sm shrink-0 rounded-6 bg-neutral-soft"></span>
+          <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+        </div>
+        <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+        <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+        <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+        <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+      </div>
+    }
+  </div>
+} @else if (loadFailed()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-12 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-danger-text">{{ 'policy.list.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="reload()">
+      {{ 'policy.list.retry' | transloco }}
+    </button>
+  </div>
+} @else if (definitions().length === 0) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-12 border border-border bg-surface px-12 py-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerShieldCheck" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-14 leading-20 font-medium text-text">{{ 'policy.list.emptyTitle' | transloco }}</p>
+    <p class="text-12 leading-18 text-text-muted">{{ 'policy.list.emptyText' | transloco }}</p>
+    @if (canManage) {
+      <button type="button" uiButton variant="primary" (click)="openCreateModal()">
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        <span>{{ 'policy.list.newPolicy' | transloco }}</span>
+      </button>
+    }
+  </div>
+} @else if (filteredDefinitions().length === 0 && hasActiveFilters()) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-12 border border-border bg-surface px-12 py-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerSearch" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'policy.list.noMatchText' | transloco }}</p>
+  </div>
+} @else {
+  <div class="flex flex-1 flex-col gap-6 overflow-x-auto pb-4">
+    <div class="flex min-w-doc-table-min flex-col gap-6">
+      <div
+        class="grid h-table-head items-center gap-8 rounded-10 bg-linear-to-b from-nav-start to-nav-end px-10 text-12 leading-18 font-medium text-on-nav shadow-card grid-cols-trade-policy-row"
+        role="row"
+      >
+        <span class="truncate">{{ 'policy.list.columns.code' | transloco }}</span>
+        <span class="truncate">{{ 'policy.list.columns.kind' | transloco }}</span>
+        <span class="truncate">{{ 'policy.list.columns.live' | transloco }}</span>
+        <span class="truncate">{{ 'policy.list.columns.inProgress' | transloco }}</span>
+        <span class="truncate">{{ 'policy.list.columns.versions' | transloco }}</span>
+        <span class="sr-only">{{ 'policy.list.columns.actions' | transloco }}</span>
+      </div>
+
+      @for (def of pagedDefinitions(); track def.id) {
+        @let live = liveVersionOf(def);
+        @let inProg = inProgressVersionOf(def);
+        <div
+          class="grid min-h-table-row cursor-pointer items-center gap-8 rounded-10 border border-border bg-surface px-10 py-6 text-12 leading-18 text-text shadow-card transition-colors duration-fast hover:bg-neutral-soft grid-cols-trade-policy-row"
+          role="row"
+          (click)="openPolicy(def)"
+        >
+          <div class="flex min-w-0 items-center gap-8">
+            <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-6 bg-icon-violet text-on-icon">
+              <ng-icon name="tablerShieldCheck" size="13" aria-hidden="true" />
+            </span>
+            <span class="truncate font-medium" dir="ltr">{{ def.code }}</span>
+            @if (def.status === 'INACTIVE') {
+              <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+                {{ 'policy.list.inactive' | transloco }}
+              </span>
+            }
+          </div>
+
+          <div class="flex min-w-0 items-center">
+            <span class="inline-flex h-chip max-w-full items-center truncate rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft">
+              {{ 'policy.kinds.' + def.policyKind + '.name' | transloco }}
+            </span>
+          </div>
+
+          <span class="truncate text-12 tabular-nums" [class]="live ? 'text-text' : 'text-text-muted'">
+            {{ live ? liveVersionText(live) : '—' }}
+          </span>
+
+          <div class="flex min-w-0 items-center">
+            @if (inProg) {
+              <app-version-status-badge
+                module="policy"
+                [status]="inProg.status"
+                [liveScheduled]="inProg.status === 'SCHEDULED'"
+                [awaitingActivation]="inProg.status === 'APPROVED'"
+              />
+            } @else {
+              <span class="text-text-muted">—</span>
+            }
+          </div>
+
+          <span class="tabular-nums text-text-muted">
+            {{ 'policy.list.versionsCount' | transloco: { count: def.versions.length } }}
+          </span>
+
+          <div class="flex items-center justify-end" (click)="$event.stopPropagation()">
+            <ui-actions-menu
+              size="small"
+              [items]="actionsFor(def)"
+              [label]="'policy.list.actionsLabel' | transloco"
+              (selected)="onRowAction(def, $event)"
+            />
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="filteredDefinitions().length"
+      [label]="'policy.list.pagination' | transloco"
+      [(page)]="page"
+      [(pageSize)]="pageSize"
+      (pageChange)="onPageChange($event)"
+      (pageSizeChange)="onPageSizeChange($event)"
+    />
+  </footer>
+}
+
+<app-policy-modal
+  [kinds]="activeKinds()"
+  (created)="onPolicyCreated($event)"
+/>
+
+<app-decision-modal (closed)="onDecisionModalClosed()" />

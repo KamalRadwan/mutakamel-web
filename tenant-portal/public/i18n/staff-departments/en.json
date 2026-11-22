@@ -1,0 +1,90 @@
+{
+  "title": "Departments",
+  "add": "Add department",
+  "search": "Search departments",
+  "empty": "No departments yet.",
+  "noResults": "No matching departments.",
+  "loadFailed": "Could not load departments.",
+  "retry": "Try again",
+  "filters": {
+    "company": "Company",
+    "branch": "Branch",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "sort": {
+    "name": "Name",
+    "code": "Code",
+    "newest": "Newest"
+  },
+  "cols": {
+    "code": "Code",
+    "name": "Department",
+    "branch": "Branch",
+    "teams": "Teams",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "modal": {
+    "new": "New department",
+    "title": "Department"
+  },
+  "fields": {
+    "code": "Code",
+    "codeHint": "Letters A-Z, digits, \"_\" and \"-\", up to 32, unique in the branch. Can't be changed later.",
+    "codePlaceholder": "e.g. SALES_HQ",
+    "name": "Name",
+    "nameHint": "Up to 120 characters.",
+    "namePlaceholder": "Enter department name",
+    "active": "Active",
+    "activeHint": "Controls whether this department is active and can receive new teams or users.",
+    "activeHelp": "Inactive departments can't receive new teams or users."
+  },
+  "validation": {
+    "companyRequired": "Select a company.",
+    "branchRequired": "Select a branch.",
+    "codeRequired": "Code is required.",
+    "codeInvalid": "Use letters A-Z, digits, \"_\" and \"-\", up to 32 characters.",
+    "nameRequired": "Department name is required.",
+    "nameMaxLength": "Name must be at most {{max}} characters."
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "addTeam": "Add team",
+    "addTeamInactiveReason": "Activate this department before adding a team.",
+    "viewTeams": "View teams",
+    "viewUsers": "View users",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete"
+  },
+  "confirm": {
+    "deleteTitle": "Delete {{name}}?",
+    "deleteText": "A department that still has teams or users cannot be deleted.",
+    "staleTitle": "Department scope changed",
+    "staleText": "The organization hierarchy changed while you were editing. Reload to get the latest data.",
+    "reload": "Reload",
+    "keepChanges": "Keep my changes",
+    "discardTitle": "Discard your changes?",
+    "discardText": "Your unsaved changes to this department will be lost.",
+    "discardConfirm": "Discard",
+    "discardKeep": "Keep editing",
+    "blockersTitle": "Cannot complete action"
+  },
+  "toast": {
+    "created": "Department created.",
+    "saved": "Department saved.",
+    "activated": "Department activated.",
+    "deactivated": "Department deactivated.",
+    "deleted": "Department deleted."
+  },
+  "save": "Save",
+  "undo": "Undo changes",
+  "unsaved": "Unsaved changes",
+  "cancel": "Cancel",
+  "close": "Close",
+  "delete": "Delete"
+}

@@ -1,0 +1,21 @@
+<div
+  class="mx-auto overflow-hidden rounded-4 bg-paper shadow-card"
+  [class]="wrapperWidthClass()"
+  [style.width.px]="useEmailTokenClass() ? null : scaledWidthPx()"
+  [style.height.px]="scaledHeightPx()"
+>
+  <iframe
+    #frame
+    class="block border-0 bg-paper"
+    sandbox="allow-same-origin"
+    referrerpolicy="no-referrer"
+    scrolling="no"
+    [attr.title]="title()"
+    [srcdoc]="safeHtml()"
+    [style.width.px]="baseWidthPx()"
+    [style.height.px]="contentHeightPx()"
+    [style.transform]="frameTransform()"
+    [style.transform-origin]="'top left'"
+    (load)="measureHeight()"
+  ></iframe>
+</div>

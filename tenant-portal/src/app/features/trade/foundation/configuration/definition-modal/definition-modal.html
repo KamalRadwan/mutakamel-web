@@ -1,0 +1,393 @@
+<ui-modal
+  size="wide"
+  icon="tablerAdjustmentsHorizontal"
+  tile="bg-icon-violet"
+  [title]="activeDef()?.key ?? ''"
+  [subtitle]="modalScopeSubtitle()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="busyVersionId() === null"
+  (closed)="onModalClosed()"
+>
+  @if (activeDef(); as def) {
+    <div class="flex flex-col gap-12">
+      <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+        <ui-field
+          [label]="'tradeConfig.definitionModal.key' | transloco"
+          [for]="uid + '-key'"
+          [hint]="'tradeConfig.definitionModal.keyHint' | transloco"
+        >
+          <input
+            [id]="uid + '-key'"
+            type="text"
+            dir="ltr"
+            readonly
+            [value]="def.key"
+            class="w-full bg-transparent text-12 text-text outline-none"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'tradeConfig.definitionModal.valueType' | transloco"
+          [for]="uid + '-type'"
+          [hint]="'tradeConfig.definitionModal.valueTypeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-type'"
+            type="text"
+            readonly
+            [value]="valueTypeText()"
+            class="w-full bg-transparent text-12 text-text outline-none"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'tradeConfig.definitionModal.allowedScopes' | transloco"
+          [for]="uid + '-scopes'"
+          [hint]="'tradeConfig.definitionModal.allowedScopesHint' | transloco"
+        >
+          <input
+            [id]="uid + '-scopes'"
+            type="text"
+            readonly
+            [value]="allowedScopesText()"
+            class="w-full bg-transparent text-12 text-text outline-none"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'tradeConfig.definitionModal.mergeRule' | transloco"
+          [for]="uid + '-merge'"
+          [hint]="'tradeConfig.definitionModal.mergeRuleHint' | transloco"
+        >
+          <input
+            [id]="uid + '-merge'"
+            type="text"
+            readonly
+            [value]="mergeRuleText()"
+            class="w-full bg-transparent text-12 text-text outline-none"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'tradeConfig.definitionModal.risk' | transloco"
+          [for]="uid + '-risk'"
+          [hint]="'tradeConfig.definitionModal.riskHint' | transloco"
+        >
+          <input
+            [id]="uid + '-risk'"
+            type="text"
+            readonly
+            [value]="riskText()"
+            class="w-full bg-transparent text-12 text-text outline-none"
+          />
+        </ui-field>
+
+        @if (hasLockPolicy()) {
+          <ui-field
+            [label]="'tradeConfig.definitionModal.companyRequired' | transloco"
+            [for]="uid + '-lock'"
+            [hint]="'tradeConfig.definitionModal.companyRequiredHint' | transloco"
+          >
+            <input
+              [id]="uid + '-lock'"
+              type="text"
+              readonly
+              [value]="companyRequiredText()"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </ui-field>
+        }
+      </div>
+
+      @if (formattedDiagnostics().length > 0) {
+        <div
+          role="alert"
+          class="flex items-start gap-8 rounded-10 border border-warning bg-surface p-8 text-12 leading-18 text-text"
+        >
+          <ng-icon name="tablerAlertTriangle" size="16" class="mt-2 shrink-0 text-warning-text" aria-hidden="true" />
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-warning-text">{{ 'tradeConfig.definitionModal.testFailedTitle' | transloco }}</p>
+            <ul class="mt-2 flex flex-col gap-2">
+              @for (item of formattedDiagnostics(); track $index) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+
+      <section class="flex flex-col gap-8">
+        <header class="flex h-table-head items-center gap-6 rounded-10 bg-icon-violet px-10 text-13 leading-18 font-medium text-on-nav">
+          <span class="inline-flex shrink-0 text-on-nav">
+            <ng-icon name="tablerHistory" size="14" aria-hidden="true" />
+          </span>
+          <h3 class="truncate text-13 leading-18 font-medium text-on-nav">
+            {{ 'tradeConfig.definitionModal.versionsTitle' | transloco }}
+          </h3>
+        </header>
+
+        <ui-field
+          size="bare"
+          [label]="'tradeConfig.definitionModal.scopeLabel' | transloco"
+          [for]="uid + '-scope'"
+          [hint]="'tradeConfig.definitionModal.scopeHint' | transloco"
+        >
+          <ui-segmented
+            [id]="uid + '-scope'"
+            [describedBy]="uid + '-scope-hint'"
+            [label]="'tradeConfig.definitionModal.scopeLabel' | transloco"
+            [options]="scopeOptions()"
+            [value]="modalScope()"
+            (valueChange)="onModalScopeChange($event)"
+          />
+        </ui-field>
+
+        @if (loadingDetail() && !detail()) {
+          <div class="overflow-x-auto" [attr.aria-busy]="true">
+            <div role="table" class="min-w-modal-form-wide" [attr.aria-label]="'tradeConfig.definitionModal.versionsTitle' | transloco">
+              <div
+                role="row"
+                class="grid h-table-head rounded-10 border border-border bg-surface-muted text-12 leading-18 font-medium text-text-muted"
+                [class]="
+                  showActionsColumn()
+                    ? 'grid-cols-version-row-actions'
+                    : 'grid-cols-version-row'
+                "
+              >
+                <span role="columnheader" class="flex min-w-0 items-center truncate px-8">
+                  {{ 'tradeConfig.definitionModal.cols.no' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                  {{ 'tradeConfig.definitionModal.cols.value' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                  {{ 'tradeConfig.definitionModal.cols.effective' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                  {{ 'tradeConfig.definitionModal.cols.state' | transloco }}
+                </span>
+                @if (showActionsColumn()) {
+                  <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                    {{ 'tradeConfig.definitionModal.cols.actions' | transloco }}
+                  </span>
+                }
+              </div>
+
+              @for (row of skeletonRows; track row) {
+                <div
+                  role="row"
+                  class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+                  [class]="
+                    showActionsColumn()
+                      ? 'grid-cols-version-row-actions'
+                      : 'grid-cols-version-row'
+                  "
+                >
+                  <span role="cell" class="flex items-center px-8">
+                    <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-8">
+                    <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-8">
+                    <span class="h-skeleton-line w-3/4 rounded-6 bg-neutral-soft"></span>
+                  </span>
+                  <span role="cell" class="flex items-center border-s border-border px-8">
+                    <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+                  </span>
+                  @if (showActionsColumn()) {
+                    <span role="cell" class="flex items-center gap-6 border-s border-border px-8">
+                      <span class="h-btn-h-sm w-1/3 rounded-6 bg-neutral-soft"></span>
+                      <span class="h-btn-h-sm w-1/3 rounded-6 bg-neutral-soft"></span>
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        } @else if (loadError() && !detail()) {
+          <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+              <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-12 leading-18 text-text-muted">{{ 'tradeConfig.definitionModal.loadFailed' | transloco }}</p>
+            <button type="button" uiButton variant="primary" (click)="retryLoad()">
+              {{ 'tradeShared.common.retry' | transloco }}
+            </button>
+          </div>
+        } @else if (!allowedHere()) {
+          <p class="rounded-10 border border-border bg-surface p-12 text-center text-12 leading-18 text-text-muted">
+            {{ 'tradeConfig.definitionModal.versionsNotAllowed' | transloco }}
+          </p>
+        } @else if (filteredVersions().length === 0) {
+          <p class="rounded-10 border border-border bg-surface p-12 text-center text-12 leading-18 text-text-muted">
+            {{ 'tradeConfig.definitionModal.versionsEmpty' | transloco }}
+          </p>
+        } @else {
+          <div class="overflow-x-auto">
+            <div role="table" class="min-w-modal-form-wide" [attr.aria-label]="'tradeConfig.definitionModal.versionsTitle' | transloco">
+              <div
+                role="row"
+                class="grid h-table-head rounded-10 border border-border bg-surface-muted text-12 leading-18 font-medium text-text-muted"
+                [class]="
+                  showActionsColumn()
+                    ? 'grid-cols-version-row-actions'
+                    : 'grid-cols-version-row'
+                "
+              >
+                <span role="columnheader" class="flex min-w-0 items-center truncate px-8">
+                  {{ 'tradeConfig.definitionModal.cols.no' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                  {{ 'tradeConfig.definitionModal.cols.value' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                  {{ 'tradeConfig.definitionModal.cols.effective' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                  {{ 'tradeConfig.definitionModal.cols.state' | transloco }}
+                </span>
+                @if (showActionsColumn()) {
+                  <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-border px-8">
+                    {{ 'tradeConfig.definitionModal.cols.actions' | transloco }}
+                  </span>
+                }
+              </div>
+
+              @for (ver of filteredVersions(); track ver.id) {
+                @let vState = stateOf(ver);
+                @let replaceNote = pendingReplacementText(ver);
+                @let menuItems = rowMenuActions(ver);
+                <div
+                  role="row"
+                  class="mt-6 grid min-h-table-row rounded-10 border border-border bg-surface text-12 leading-18 text-text shadow-card"
+                  [class]="
+                    showActionsColumn()
+                      ? 'grid-cols-version-row-actions'
+                      : 'grid-cols-version-row'
+                  "
+                >
+                  <span role="cell" class="flex min-w-0 flex-col justify-center px-8 py-6">
+                    <span class="tabular-nums">
+                      <bdi dir="ltr">v{{ ver.versionNumber }}</bdi>
+                    </span>
+                    <span class="truncate text-11 leading-16 text-text-muted" [title]="ver.createdByName">
+                      {{ ver.createdByName }}
+                    </span>
+                  </span>
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-8 py-6" [title]="valueSummary(ver)">
+                    <span class="truncate">{{ valueSummary(ver) }}</span>
+                  </span>
+                  <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-8 py-6">
+                    <span class="truncate tabular-nums">
+                      <bdi dir="ltr">{{ effectiveFromText(ver) }} → {{ effectiveToText(ver) }}</bdi>
+                    </span>
+                    @if (replaceNote) {
+                      <span class="truncate text-11 leading-16 text-text-muted">{{ replaceNote }}</span>
+                    }
+                  </span>
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-8 py-6">
+                    <span [class]="stateBadgeClass(ver)">
+                      {{ 'tradeConfig.state.' + vState | transloco }}
+                    </span>
+                  </span>
+                  @if (showActionsColumn()) {
+                    <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-8 py-6">
+                      @if (canTestRow(ver)) {
+                        <button
+                          type="button"
+                          uiButton
+                          variant="secondary"
+                          size="small"
+                          [loading]="testingVersionId() === ver.id"
+                          [disabled]="busyVersionId() !== null && testingVersionId() !== ver.id"
+                          (click)="runTest(ver)"
+                        >
+                          {{ 'tradeConfig.definitionModal.test' | transloco }}
+                        </button>
+                      }
+                      @if (showPublishRow(ver)) {
+                        <span
+                          class="inline-flex shrink-0"
+                          [attr.title]="publishDisabledTitle(ver)"
+                        >
+                          <button
+                            type="button"
+                            uiButton
+                            variant="primary"
+                            size="small"
+                            [disabled]="isPublishDisabled(ver)"
+                            (click)="openPublish(ver)"
+                          >
+                            {{ 'tradeConfig.definitionModal.publish' | transloco }}
+                          </button>
+                        </span>
+                      }
+                      @if (menuItems.length > 0) {
+                        <span class="ms-auto inline-flex shrink-0">
+                          <ui-actions-menu
+                            [items]="menuItems"
+                            [label]="'tradeShared.common.actions' | transloco"
+                            (selected)="onRowMenuAction(ver, $event)"
+                          />
+                        </span>
+                      }
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </section>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (canManage() && allowedHere() && detail()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [disabled]="busyVersionId() !== null"
+        (click)="requestNewVersion()"
+      >
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+        {{ 'tradeConfig.definitionModal.newVersion' | transloco }}
+      </button>
+    }
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="busyVersionId() !== null"
+      (click)="close()"
+    >
+      {{ 'tradeShared.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<app-config-publish-dialog
+  [ctx]="modalCtx()"
+  (published)="onPublished($event)"
+  (reloadRequested)="onChildReloadRequested()"
+/>
+
+<ui-confirm-dialog
+  #retireDialog
+  tone="danger"
+  [title]="retireDialogTitle()"
+  [text]="'tradeConfig.retire.text' | transloco"
+  [confirmLabel]="'tradeConfig.actions.retire' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'tradeShared.conflict.title' | transloco"
+  [text]="'tradeShared.conflict.text' | transloco"
+  [confirmLabel]="'tradeShared.conflict.reload' | transloco"
+  [cancelLabel]="'tradeShared.conflict.keepMine' | transloco"
+/>

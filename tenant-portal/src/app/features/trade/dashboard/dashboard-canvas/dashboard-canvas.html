@@ -1,0 +1,114 @@
+@if (items().length === 0) {
+  <div class="relative min-h-notif-list-max rounded-10 border border-border bg-surface p-16 shadow-card">
+    <ui-widget-state
+      kind="empty"
+      [text]="'tradeDashboard.page.emptyDashboard' | transloco"
+    />
+  </div>
+} @else {
+  <app-dashboard-grid
+    [items]="items()"
+    [editing]="editing()"
+    [selectedId]="selectedId()"
+    [step]="gridStep"
+    [keyboardHint]="'tradeDashboard.editBar.keyboardHint' | transloco"
+    (layoutChange)="onGridLayoutChange($event)"
+    (selectedChange)="selectedId.set($event)"
+  >
+    <ng-template let-item>
+      @if (placementById()[item.id]; as placement) {
+        @let title = placement.widget.displaySpec.title ?? placement.widget.name;
+        @let adapted = adaptedByPlacement()[placement.id];
+        @let isLoading = loadingIds().has(placement.widgetId);
+        <ui-widget-frame
+          [title]="title"
+          [hint]="frameHintByPlacement()[placement.id] ?? ''"
+          [tag]="isLoading || sourcesDown() ? null : (adapted?.tag ?? null)"
+          [editing]="editing()"
+          [selected]="editing() && selectedId() === placement.id"
+          [menuItems]="menuItemsByPlacement()[placement.id] ?? []"
+          [menuLabel]="'tradeDashboard.frame.menuLabel' | transloco"
+          [gripLabel]="'tradeDashboard.frame.grip' | transloco"
+          [removeLabel]="removeDisabledReason() || ('tradeDashboard.frame.remove' | transloco)"
+          (menuSelected)="onMenuSelected(placement, $event)"
+          (removed)="removePlacement.emit(placement.id)"
+        >
+          @if (isLoading) {
+            <ui-widget-state
+              kind="loading"
+              [text]="'tradeDashboard.state.loading' | transloco"
+            />
+          } @else if (sourcesDown()) {
+            <ui-widget-state
+              kind="timeout"
+              [text]="'tradeDashboard.state.timeout' | transloco"
+              [actionLabel]="'tradeShared.common.retry' | transloco"
+              (action)="retry.emit(placement.widgetId)"
+            />
+          } @else if (!adapted) {
+            <ui-widget-state
+              kind="loading"
+              [text]="'tradeDashboard.state.loading' | transloco"
+            />
+          } @else {
+            @switch (adapted.execution.state) {
+              @case ('READY') {
+                @if (adapted.table) {
+                  <app-widget-table [table]="adapted.table" [label]="title" />
+                } @else {
+                  <app-widget-body
+                    [kind]="adapted.kind"
+                    [view]="readyPanelView(adapted.execution)"
+                    [showTable]="isShowingTable(placement.widgetId)"
+                    [title]="title"
+                    (retry)="retry.emit(placement.widgetId)"
+                  />
+                }
+              }
+              @case ('EMPTY') {
+                <ui-widget-state
+                  kind="empty"
+                  [text]="'tradeDashboard.state.empty' | transloco"
+                />
+              }
+              @case ('UNAVAILABLE') {
+                <ui-widget-state
+                  kind="empty"
+                  [text]="
+                    (adapted.errorCode === 'TRADE.DASHBOARD.SCOPE_INVALID'
+                      ? 'tradeDashboard.state.wholeCompany'
+                      : 'tradeDashboard.state.noAccess') | transloco
+                  "
+                />
+              }
+              @default {
+                <ui-widget-state
+                  kind="timeout"
+                  [text]="'tradeDashboard.state.timeout' | transloco"
+                  [actionLabel]="'tradeShared.common.retry' | transloco"
+                  (action)="retry.emit(placement.widgetId)"
+                />
+              }
+            }
+          }
+        </ui-widget-frame>
+      } @else if (unavailableById()[item.id]; as unavailable) {
+        <ui-widget-frame
+          [title]="'tradeDashboard.frame.unavailable' | transloco"
+          [editing]="editing()"
+          [selected]="editing() && selectedId() === unavailable.placementId"
+          [menuItems]="[]"
+          [menuLabel]="'tradeDashboard.frame.menuLabel' | transloco"
+          [gripLabel]="'tradeDashboard.frame.grip' | transloco"
+          [removeLabel]="removeDisabledReason() || ('tradeDashboard.frame.remove' | transloco)"
+          (removed)="removePlacement.emit(unavailable.placementId)"
+        >
+          <ui-widget-state
+            kind="empty"
+            [text]="'tradeDashboard.unavailable.' + unavailable.reasonCode | transloco"
+          />
+        </ui-widget-frame>
+      }
+    </ng-template>
+  </app-dashboard-grid>
+}

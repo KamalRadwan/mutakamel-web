@@ -1,0 +1,129 @@
+<section
+  class="rounded-10 border border-border bg-surface p-8 shadow-card"
+  [attr.aria-label]="'tradeDashboard.filters.regionLabel' | transloco"
+>
+  <div class="flex flex-wrap items-start gap-10">
+    <div class="min-w-org-card-w max-w-toast flex-1">
+      <ui-field
+        [for]="uid + '-period'"
+        [label]="'tradeDashboard.filters.period.label' | transloco"
+        [hint]="'tradeDashboard.filters.period.hint' | transloco"
+      >
+        <ui-dropdown
+          size="field"
+          class="w-full"
+          [id]="uid + '-period'"
+          [describedBy]="uid + '-period-hint'"
+          [label]="'tradeDashboard.filters.period.label' | transloco"
+          [options]="periodOptions()"
+          [value]="value().datePreset"
+          [disabled]="disabled()"
+          (valueChange)="onPresetChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (value().datePreset === 'CUSTOM') {
+      <div class="min-w-org-card-w max-w-toast flex-1">
+        <ui-field
+          [for]="uid + '-from'"
+          [label]="'tradeDashboard.filters.from.label' | transloco"
+          [hint]="'tradeDashboard.filters.from.hint' | transloco"
+          [required]="true"
+          [error]="fromErrorText()"
+        >
+          <ui-date-field
+            [id]="uid + '-from'"
+            [describedBy]="fromDescribedBy()"
+            [ariaLabel]="'tradeDashboard.filters.from.label' | transloco"
+            [placeholder]="'tradeDashboard.filters.datePlaceholder' | transloco"
+            [todayLabel]="'tradeDashboard.filters.dateToday' | transloco"
+            [prevMonthLabel]="'tradeDashboard.filters.prevMonth' | transloco"
+            [nextMonthLabel]="'tradeDashboard.filters.nextMonth' | transloco"
+            [value]="value().dateFrom"
+            [invalid]="!!fromErrorText()"
+            [disabled]="disabled()"
+            (valueChange)="onFromChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="min-w-org-card-w max-w-toast flex-1">
+        <ui-field
+          [for]="uid + '-to'"
+          [label]="'tradeDashboard.filters.to.label' | transloco"
+          [hint]="'tradeDashboard.filters.to.hint' | transloco"
+          [required]="true"
+          [error]="toErrorText()"
+        >
+          <ui-date-field
+            [id]="uid + '-to'"
+            [describedBy]="toDescribedBy()"
+            [ariaLabel]="'tradeDashboard.filters.to.label' | transloco"
+            [placeholder]="'tradeDashboard.filters.datePlaceholder' | transloco"
+            [todayLabel]="'tradeDashboard.filters.dateToday' | transloco"
+            [prevMonthLabel]="'tradeDashboard.filters.prevMonth' | transloco"
+            [nextMonthLabel]="'tradeDashboard.filters.nextMonth' | transloco"
+            [value]="value().dateTo"
+            [invalid]="!!toErrorText()"
+            [disabled]="disabled()"
+            (valueChange)="onToChange($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="min-w-org-card-w max-w-toast flex-1">
+      <ui-field
+        [for]="uid + '-compare'"
+        [label]="'tradeDashboard.filters.compare.label' | transloco"
+        [hint]="'tradeDashboard.filters.compare.hint' | transloco"
+      >
+        <ui-dropdown
+          size="field"
+          class="w-full"
+          [id]="uid + '-compare'"
+          [describedBy]="uid + '-compare-hint'"
+          [label]="'tradeDashboard.filters.compare.label' | transloco"
+          [options]="compareOptions()"
+          [value]="value().comparisonMode"
+          [disabled]="disabled()"
+          (valueChange)="onCompareChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="min-w-org-card-w max-w-toast flex-1">
+      <ui-field
+        [for]="uid + '-scope'"
+        [label]="'tradeDashboard.filters.scope.label' | transloco"
+        [hint]="'tradeDashboard.filters.scope.hint' | transloco"
+      >
+        <ui-dropdown
+          size="field"
+          class="w-full"
+          [id]="uid + '-scope'"
+          [describedBy]="uid + '-scope-hint'"
+          [label]="'tradeDashboard.filters.scope.label' | transloco"
+          [options]="scopeOptions()"
+          [value]="value().scopeChoice"
+          [disabled]="disabled()"
+          (valueChange)="onScopeChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="mt-2 shrink-0 pt-label">
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        size="small"
+        [disabled]="!canReset() || disabled()"
+        (click)="reset.emit()"
+      >
+        {{ 'tradeDashboard.filters.reset' | transloco }}
+      </button>
+    </div>
+  </div>
+</section>

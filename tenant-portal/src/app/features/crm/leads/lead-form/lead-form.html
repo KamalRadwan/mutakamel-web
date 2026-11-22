@@ -1,0 +1,313 @@
+@if (layout() === 'modal') {
+  <div class="flex h-full min-h-0 flex-1 overflow-hidden">
+    <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-y-10 overflow-y-auto px-16 py-10">
+      <app-lf-basics
+        part="type"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [mode]="mode()"
+      />
+
+      @if (draft().leadProfileType === 'INDIVIDUAL') {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="navy" icon="tablerPhone" [title]="'leadForm.sections.reach' | transloco" />
+          <app-lf-basics
+            part="names"
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+          />
+          <app-lf-reach
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+            [crm]="true"
+            [source]="phoneSource()"
+          />
+        </section>
+      } @else {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="navy" icon="tablerBuilding" [title]="'leadForm.sections.company' | transloco" />
+          <app-lf-company
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+            [crm]="true"
+            [source]="phoneSource()"
+          />
+        </section>
+
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="blue" icon="tablerUsers" [title]="'leadForm.sections.contacts' | transloco" />
+          <app-lf-contacts
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+            [leadId]="leadId()"
+            [revision]="revision()"
+            [saveContacts]="saveContacts()"
+            [crm]="true"
+            [source]="phoneSource()"
+          />
+        </section>
+      }
+
+      <app-duplicate-strip
+        [probe]="duplicateProbe()"
+        [check]="checkDuplicates"
+        [disabled]="readonly()"
+        openLabelKey="recordDup.openLead"
+        (openRecord)="onOpenDuplicateRecord($event)"
+        (useCompany)="onUseCompany($event)"
+      />
+
+      @if (hasOtherCustomFields()) {
+        <section class="flex flex-col gap-8">
+          <ui-section-bar tone="violet" icon="tablerAdjustments" [title]="'leadForm.sections.custom' | transloco" />
+          <app-lf-custom-fields
+            scope="others"
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+          />
+        </section>
+      }
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="blue"
+          icon="tablerNote"
+          [title]="(moreOpen() ? 'leadForm.more.titleOpen' : 'leadForm.more.title') | transloco"
+          [expandable]="true"
+          [(expanded)]="moreOpen"
+          [controls]="moreOpen() ? uid + '-more-panel' : null"
+        />
+
+        @if (moreOpen()) {
+          <div [id]="uid + '-more-panel'" class="flex flex-col gap-y-10 pt-2">
+            <app-lf-more
+              part="all"
+              [draft]="draft()"
+              (draftChange)="draft.set($event)"
+              [errors]="errors()"
+              [readonly]="readonly()"
+              [mode]="mode()"
+            />
+          </div>
+        }
+      </section>
+    </div>
+
+    <aside class="flex h-full min-h-0 w-record-side shrink-0 flex-col gap-y-8 overflow-y-auto border-s border-border bg-surface-muted px-16 py-10">
+      <ui-section-bar tone="gradient" icon="tablerCategory" [title]="'leadForm.classification.title' | transloco" />
+      <app-lf-classification
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [mode]="mode()"
+        [stages]="resolvedStages()"
+        [stageId]="resolvedStageId()"
+        [updating]="updating()"
+        (rate)="rate.emit($event)"
+        (recolor)="recolor.emit($event)"
+        (moveStage)="moveStage.emit($event)"
+      >
+        <app-lf-value
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+        />
+        @if (hasRequiredCustomFields()) {
+          <app-lf-custom-fields
+            scope="required"
+            [stacked]="true"
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+          />
+        }
+      </app-lf-classification>
+    </aside>
+  </div>
+} @else {
+  <div class="flex flex-col gap-10">
+    <section id="lf-classification" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <ui-section-bar tone="gradient" icon="tablerCategory" [title]="'leadForm.classification.title' | transloco" />
+      <app-lf-classification
+        layout="page"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [mode]="mode()"
+        [stages]="resolvedStages()"
+        [stageId]="resolvedStageId()"
+        [updating]="updating()"
+        (rate)="rate.emit($event)"
+        (recolor)="recolor.emit($event)"
+        (moveStage)="moveStage.emit($event)"
+      >
+        <app-lf-value
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+        />
+        @if (hasRequiredCustomFields()) {
+          <app-lf-custom-fields
+            scope="required"
+            layout="page"
+            class="contents"
+            [draft]="draft()"
+            (draftChange)="draft.set($event)"
+            [errors]="errors()"
+            [readonly]="readonly()"
+            [mode]="mode()"
+            [countries]="countries()"
+          />
+        }
+      </app-lf-classification>
+    </section>
+
+    @if (draft().leadProfileType === 'INDIVIDUAL') {
+      <section id="lf-reach" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="navy" icon="tablerPhone" [title]="'leadForm.sections.reach' | transloco" />
+        <app-lf-basics
+          part="type"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+        />
+        <app-lf-basics
+          part="names"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+        />
+        <app-lf-reach
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+          [countries]="countries()"
+          [crm]="true"
+          [source]="phoneSource()"
+        />
+      </section>
+    } @else {
+      <section id="lf-company" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="navy" icon="tablerBuilding" [title]="'leadForm.sections.company' | transloco" />
+        <app-lf-basics
+          part="type"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+        />
+        <app-lf-company
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+          [countries]="countries()"
+          [crm]="true"
+          [source]="phoneSource()"
+        />
+      </section>
+    }
+
+    <app-duplicate-strip
+      [probe]="duplicateProbe()"
+      [check]="checkDuplicates"
+      [disabled]="readonly()"
+      openLabelKey="recordDup.openLead"
+      (openRecord)="onOpenDuplicateRecord($event)"
+      (useCompany)="onUseCompany($event)"
+    />
+
+    @if (draft().leadProfileType === 'CORPORATE') {
+      <section id="lf-contacts" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="blue" icon="tablerUsers" [title]="'leadForm.sections.contacts' | transloco" />
+        <app-lf-contacts
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+          [countries]="countries()"
+          [leadId]="leadId()"
+          [revision]="revision()"
+          [saveContacts]="saveContacts()"
+          [crm]="true"
+          [source]="phoneSource()"
+        />
+      </section>
+    }
+
+    @if (hasOtherCustomFields()) {
+      <section id="lf-custom" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <ui-section-bar tone="violet" icon="tablerAdjustments" [title]="'leadForm.sections.custom' | transloco" />
+        <app-lf-custom-fields
+          scope="others"
+          layout="page"
+          [draft]="draft()"
+          (draftChange)="draft.set($event)"
+          [errors]="errors()"
+          [readonly]="readonly()"
+          [mode]="mode()"
+          [countries]="countries()"
+        />
+      </section>
+    }
+
+    <section id="lf-more" class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <ui-section-bar tone="blue" icon="tablerNote" [title]="'leadForm.more.title' | transloco" />
+      <app-lf-more
+        part="all"
+        layout="page"
+        [draft]="draft()"
+        (draftChange)="draft.set($event)"
+        [errors]="errors()"
+        [readonly]="readonly()"
+        [mode]="mode()"
+      />
+    </section>
+  </div>
+}

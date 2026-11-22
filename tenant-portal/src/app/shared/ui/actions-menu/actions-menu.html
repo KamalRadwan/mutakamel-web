@@ -1,0 +1,156 @@
+<button
+  #trigger
+  type="button"
+  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  [class.bg-neutral-soft]="open()"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="open()"
+  [attr.aria-label]="label()"
+  [title]="label()"
+  (click)="toggle()"
+>
+  <ng-icon name="tablerDots" size="14" aria-hidden="true" />
+</button>
+
+@if (open()) {
+  <div
+    #panel
+    role="menu"
+    class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!panelPlaced()"
+    [style.top.px]="place().top"
+    [style.inset-inline-end.px]="place().end"
+    [attr.aria-label]="label()"
+  >
+    @for (item of items(); track item.id; let first = $first) {
+      @if (item.danger && !first) {
+        <div role="separator" class="h-border bg-border"></div>
+      }
+      <div class="relative" role="none" (mouseenter)="onRowEnter(item)">
+        <button
+          #mainRow
+          type="button"
+          role="menuitem"
+          class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            item.disabled
+              ? 'cursor-not-allowed opacity-drag-source'
+              : 'cursor-pointer hover:bg-row-hover' + (activeSubmenuId() === item.id ? ' bg-row-hover' : '')
+          "
+          [attr.aria-disabled]="item.disabled ? 'true' : null"
+          [attr.aria-describedby]="item.reason ? reasonId(item) : null"
+          (mouseenter)="showReason(item, $event.currentTarget)"
+          (mouseleave)="hideReason()"
+          (focus)="showReason(item, $event.currentTarget)"
+          (blur)="hideReason()"
+          [attr.aria-haspopup]="hasSubmenu(item) ? 'menu' : null"
+          [attr.aria-expanded]="hasSubmenu(item) ? activeSubmenuId() === item.id : null"
+          (click)="onRowClick(item)"
+        >
+          <span
+            class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+            [class]="item.tile"
+          >
+            <ng-icon [name]="item.icon" size="14" aria-hidden="true" />
+          </span>
+
+          <span
+            class="min-w-0 flex-1 text-12 font-medium"
+            [class]="item.disabled ? 'text-text-placeholder' : item.danger ? 'text-danger-text' : 'text-text'"
+          >
+            {{ item.title }}
+          </span>
+
+          @if (hasSubmenu(item)) {
+            <span class="inline-flex shrink-0 text-text-muted rtl:-scale-x-100">
+              <ng-icon [name]="sideFor(item.id) === 'end' ? 'tablerChevronRight' : 'tablerChevronLeft'" size="14" aria-hidden="true" />
+            </span>
+          }
+        </button>
+        @if (item.reason) {
+          <span hidden [id]="reasonId(item)">{{ item.reason }}</span>
+        }
+
+        @if (hasSubmenu(item) && activeSubmenuId() === item.id) {
+          <div
+            #submenu
+            role="menu"
+            class="absolute z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+            [class.end-full]="sideFor(item.id) === 'start'"
+            [class.me-4]="sideFor(item.id) === 'start'"
+            [class.start-full]="sideFor(item.id) === 'end'"
+            [class.ms-4]="sideFor(item.id) === 'end'"
+            [class.invisible]="!submenuPlaced()"
+            [style.top.px]="submenuTop()"
+            [attr.aria-label]="item.title"
+          >
+            @if (item.choices?.length) {
+              @for (choice of item.choices; track choice.id) {
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="flex h-menu-item w-full items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="choice.selected ? 'bg-brand-soft text-on-brand-soft cursor-default' : 'cursor-pointer text-text hover:bg-row-hover'"
+                  [disabled]="!!choice.selected"
+                  (click)="chooseSubmenu(item.id, choice.id)"
+                >
+                  <span>{{ choice.label }}</span>
+                  @if (choice.selected) {
+                    <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                  }
+                </button>
+              }
+            }
+
+            @if (item.swatches?.length) {
+              <div class="grid grid-cols-swatches gap-6 p-4">
+                @for (swatch of colorSwatches(item.swatches!); track swatch.id) {
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="inline-flex size-badge cursor-pointer items-center justify-center rounded-full text-on-icon outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="(swatch.color ?? '') + (swatch.selected ? ' ring-2 ring-focus-ring ring-offset-2 ring-offset-surface' : '')"
+                    [attr.aria-label]="swatch.label"
+                    [title]="swatch.label"
+                    (click)="chooseSubmenu(item.id, swatch.id)"
+                  >
+                    @if (swatch.selected) {
+                      <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                    }
+                  </button>
+                }
+              </div>
+
+              <button
+                type="button"
+                role="menuitem"
+                class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="isNoColorSelected(item) ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+                (click)="chooseSubmenu(item.id, null)"
+              >
+                <span class="flex items-center gap-8">
+                  <ng-icon name="tablerCircleOff" size="14" aria-hidden="true" />
+                  <span>{{ noColorText(item) }}</span>
+                </span>
+                @if (isNoColorSelected(item)) {
+                  <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+                }
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+}
+
+@if (reasonTip(); as tip) {
+  <span
+    aria-hidden="true"
+    class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+    [style.top.px]="tip.top"
+    [style.inset-inline-start.px]="tip.start"
+  >
+    {{ tip.text }}
+  </span>
+}

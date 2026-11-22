@@ -1,0 +1,169 @@
+{
+  "newWidget": "عنصر جديد",
+  "version": "الإصدار {{n}}",
+  "unsaved": "تغييرات غير محفوظة",
+  "status": {
+    "draft": "مسودة",
+    "published": "منشور",
+    "archived": "مؤرشف",
+    "draftChanges": "تعديلات المسودة"
+  },
+  "tabs": {
+    "label": "أقسام العنصر",
+    "builder": "المنشئ",
+    "usage": "الاستخدام",
+    "access": "الوصول",
+    "versions": "الإصدارات"
+  },
+  "actions": {
+    "label": "إجراءات العنصر",
+    "clone": "استنساخ",
+    "share": "مشاركة",
+    "transfer": "نقل الملكية",
+    "archive": "أرشفة",
+    "restore": "استعادة",
+    "delete": "حذف"
+  },
+  "delete": {
+    "title": "حذف العنصر",
+    "text": "هل تريد حذف «{{name}}»؟ لا يمكن التراجع عن هذا الإجراء.",
+    "success": "تم حذف العنصر",
+    "errorTitle": "تعذر حذف العنصر"
+  },
+  "unsavedDialog": {
+    "title": "تغييرات غير محفوظة",
+    "text": "هل تريد حفظ التغييرات على هذا العنصر قبل المغادرة؟",
+    "save": "حفظ",
+    "discard": "تجاهل",
+    "cancel": "إلغاء"
+  },
+  "notFound": {
+    "title": "العنصر غير موجود",
+    "text": "هذا العنصر غير موجود أو ليست لديك صلاحية الوصول إليه.",
+    "action": "العودة إلى العناصر"
+  },
+  "forbidden": {
+    "title": "تم رفض الوصول",
+    "text": "ليست لديك صلاحية عرض هذا العنصر."
+  },
+  "loadFailure": {
+    "text": "تعذر تحميل هذا العنصر."
+  },
+  "usage": {
+    "dashboards": "اللوحات",
+    "dashboardsHint": "عدد اللوحات التي يظهر فيها هذا العنصر.",
+    "placements": "المواضع",
+    "placementsHint": "إجمالي مواضع العنصر النشطة عبر اللوحات.",
+    "hiddenPlacements": "المواضع المخفية",
+    "hiddenPlacementsHint": "المواضع المخفية حاليًا في اللوحات.",
+    "activeShares": "المشاركات النشطة",
+    "activeSharesHint": "أذونات المشاركة الحالية للمستخدمين والفرق لهذا العنصر.",
+    "tableLabel": "اللوحات التي تستخدم هذا العنصر",
+    "dashboard": "لوحة التحكم",
+    "position": "الموضع",
+    "size": "الحجم",
+    "moreHidden": "{{count}} أخرى لا يمكنك رؤيتها",
+    "loadMore": "تحميل المزيد",
+    "empty": "هذا العنصر غير مضاف إلى أي لوحة تحكم بعد.",
+    "loadMoreError": "تعذر تحميل المزيد من المواضع"
+  },
+  "access": {
+    "manageAccess": "إدارة الوصول",
+    "tableLabel": "مشاركات الوصول للعنصر",
+    "name": "الاسم",
+    "type": "النوع",
+    "access": "الوصول",
+    "expires": "تاريخ الانتهاء",
+    "sharedBy": "شاركها",
+    "user": "مستخدم",
+    "team": "فريق",
+    "empty": "لم تتم مشاركة هذا العنصر مع أي جهة بعد.",
+    "loadError": "تعذر تحميل المشاركات"
+  },
+  "versions": {
+    "tableLabel": "الإصدارات المنشورة",
+    "version": "الإصدار",
+    "active": "نشط",
+    "name": "الاسم",
+    "published": "تاريخ النشر",
+    "provenance": "المصدر",
+    "select": "تحديد",
+    "selectVersion": "تحديد الإصدار {{n}}",
+    "selectedCount": "تم تحديد {{count}} / 2",
+    "compare": "مقارنة",
+    "closeCompare": "إغلاق المقارنة",
+    "compareTitle": "مقارنة الإصدارات",
+    "versionHeader": "الإصدار {{n}}",
+    "section": "القسم",
+    "loadMore": "تحميل المزيد",
+    "empty": "لا توجد إصدارات منشورة بعد.",
+    "loadError": "تعذر تحميل الإصدارات",
+    "compareError": "تعذرت مقارنة الإصدارات",
+    "restore": "استعادة كمسودة",
+    "restoreTitle": "استعادة الإصدار كمسودة",
+    "restoreText": "لا يستبدل أي إصدار منشور؛ يُنشئ مسودة من الإصدار {{n}}.",
+    "restoreSuccess": "تمت استعادة الإصدار {{n}} كمسودة",
+    "restoreError": "تعذرت استعادة الإصدار",
+    "draftExists": "توجد مسودة بالفعل",
+    "sections": {
+      "name": "الاسم",
+      "chartKind": "نوع الرسم",
+      "metrics": "المقاييس",
+      "grouping": "التجميع",
+      "filters": "عوامل التصفية",
+      "comparison": "المقارنة",
+      "display": "إعدادات العرض"
+    },
+    "provenances": {
+      "PUBLISH": "منشور",
+      "INITIAL": "أولي",
+      "MANUAL": "يدوي",
+      "RESTORE": "مستعاد",
+      "BLUEPRINT": "قالب",
+      "MIGRATION": "مُرحّل",
+      "CLONE": "مستنسخ"
+    },
+    "compareLabels": {
+      "none": "بدون",
+      "target": "المستهدف {{value}}",
+      "datasets": "مجموعات البيانات: {{count}}",
+      "governedTarget": "مستهدف معتمد ({{currency}})",
+      "viewerRelative": "نطاق العارض",
+      "fixedScope": "نطاق ثابت",
+      "splitBy": "التقسيم حسب {{dimension}}",
+      "topN": "أعلى {{n}}",
+      "groupRest": "تجميع الباقي تحت أخرى",
+      "legend": "وسيلة الإيضاح: {{position}}",
+      "format": "التنسيق: {{format}}",
+      "subtitle": "العنوان الفرعي: {{text}}",
+      "description": "الوصف: {{text}}",
+      "axisLeft": "المحور الأول",
+      "axisRight": "المحور الثاني",
+      "grain": {
+        "DAY": "يوم",
+        "WEEK": "أسبوع",
+        "MONTH": "شهر",
+        "QUARTER": "ربع سنة",
+        "YEAR": "سنة"
+      },
+      "legendPos": {
+        "top": "أعلى",
+        "bottom": "أسفل",
+        "start": "البداية",
+        "end": "النهاية",
+        "none": "مخفي"
+      },
+      "numFmt": {
+        "auto": "تلقائي",
+        "full": "كامل",
+        "duration-auto": "المدة (تلقائي)",
+        "duration-minutes": "دقائق",
+        "duration-hours": "ساعات",
+        "duration-days": "أيام"
+      }
+    },
+    "discardTitle": "تجاهل التعديلات غير المحفوظة؟",
+    "discardText": "في المنشئ تغييرات غير محفوظة، وسيستبدلها الاسترجاع بالنسخة المحددة.",
+    "discardConfirm": "تجاهل واسترجاع"
+  }
+}

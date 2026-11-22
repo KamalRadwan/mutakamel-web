@@ -1,0 +1,89 @@
+{
+  "title": "Opportunity stages",
+  "new": "New stage",
+  "search": "Search opportunity stages",
+  "limitHint": "Maximum of {{max}} opportunity stages reached",
+  "empty": "No opportunity stages yet.",
+  "notice": "Stage definitions are shared by pipelines. Each pipeline sets its own order.",
+  "table": {
+    "meaning": "Meaning",
+    "category": "Category",
+    "usedIn": "Used in"
+  },
+  "flags": {
+    "NEW": "New",
+    "DISCOVERY": "Discovery",
+    "QUALIFICATION": "Qualification",
+    "PROPOSAL": "Proposal",
+    "NEGOTIATION": "Negotiation",
+    "CONTRACTING": "Contracting",
+    "ON_HOLD": "On hold",
+    "WON": "Won",
+    "LOST": "Lost"
+  },
+  "categories": {
+    "OPEN": "Open",
+    "IN_PROGRESS": "In progress",
+    "POSITIVE": "Positive",
+    "NEGATIVE": "Negative"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "openPipelines": "Open pipelines",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "systemLockedDesc": "System stages cannot be deactivated",
+    "usedDeactivateDesc": "Remove this stage from its pipelines before deactivating",
+    "usedDeleteDesc": "Remove this stage from its pipelines before deleting"
+  },
+  "footer": {
+    "count": "Stage definitions: {{count}} · each pipeline sets its own order",
+    "openPipelines": "Open pipelines"
+  },
+  "modal": {
+    "createTitle": "New opportunity stage",
+    "editTitle": "Opportunity stage",
+    "nameArHint": "Enter the Arabic stage name shared across sales pipelines (up to 80 characters).",
+    "nameEnHint": "Enter the English stage name shared across sales pipelines (up to 80 characters).",
+    "meaning": "Meaning",
+    "meaningHint": "Choose the operational meaning that controls stage rules and reporting.",
+    "meaningSystemHint": "System stage meaning cannot be changed.",
+    "meaningUsedHint": "Meaning cannot be changed while the stage is used by a pipeline.",
+    "category": "Category",
+    "categoryHint": "New pairs with Open, Won with Positive, Lost with Negative. No other meaning may use Open.",
+    "activeHint": "Inactive stages cannot be added to pipelines.",
+    "activeSystemHint": "System stages stay active.",
+    "activeUsedHint": "Stages used by a pipeline cannot be deactivated.",
+    "usedIn": "Used in",
+    "usedInNone": "Not used in any pipeline",
+    "usedInHint": "Renaming changes the name in every pipeline that uses this stage."
+  },
+  "delete": {
+    "title": "Delete opportunity stage?",
+    "text": "“{{name}}” will be removed from the stage list. A stage used by a pipeline cannot be deleted."
+  },
+  "inUse": {
+    "title": "Stage is in use",
+    "text": "Remove this stage from its pipelines first: {{names}}."
+  },
+  "discard": {
+    "title": "Discard unsaved changes?",
+    "text": "Your changes to this opportunity stage have not been saved.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "Enter at most {{max}} characters."
+  },
+  "errors": {
+    "OPPORTUNITY_STAGE_CATEGORY_INVALID": "The selected category is not valid for this stage meaning.",
+    "OPPORTUNITY_STAGE_SYSTEM_PROTECTED": "This system stage is protected and cannot be modified this way.",
+    "OPPORTUNITY_STAGE_IN_USE": "This stage is currently used by one or more pipelines.",
+    "OPPORTUNITY_STAGE_LIMIT_EXCEEDED": "The maximum number of opportunity stages (500) has been reached.",
+    "OPPORTUNITY_STAGE_NOT_FOUND": "This opportunity stage no longer exists.",
+    "VALIDATION_ERROR": "Check the highlighted fields.",
+    "CRM_VALIDATION_FAILED": "Some values are not valid. Check them and try again."
+  }
+}

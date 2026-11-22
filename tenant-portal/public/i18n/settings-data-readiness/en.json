@@ -1,0 +1,130 @@
+{
+  "title": "Data readiness",
+  "search": "Search by source key or family",
+  "all": "All",
+  "behind": {
+    "zero": "{{n}} minutes behind",
+    "one": "{{n}} minute behind",
+    "two": "{{n}} minutes behind",
+    "few": "{{n}} minutes behind",
+    "many": "{{n}} minutes behind",
+    "other": "{{n}} minutes behind"
+  },
+  "behindSeconds": {
+    "zero": "{{n}} seconds behind",
+    "one": "{{n}} second behind",
+    "two": "{{n}} seconds behind",
+    "few": "{{n}} seconds behind",
+    "many": "{{n}} seconds behind",
+    "other": "{{n}} seconds behind"
+  },
+  "within": {
+    "zero": "within {{n}} minutes",
+    "one": "within {{n}} minute",
+    "two": "within {{n}} minutes",
+    "few": "within {{n}} minutes",
+    "many": "within {{n}} minutes",
+    "other": "within {{n}} minutes"
+  },
+  "withinSeconds": {
+    "zero": "within {{n}} seconds",
+    "one": "within {{n}} second",
+    "two": "within {{n}} seconds",
+    "few": "within {{n}} seconds",
+    "many": "within {{n}} seconds",
+    "other": "within {{n}} seconds"
+  },
+  "stale": "Stale",
+  "dependsOn": "What depends on it",
+  "open": "Open",
+  "close": "Close",
+  "empty": "No data sources found.",
+  "noMatches": "No data sources match your filters.",
+  "loadMore": "Load more",
+  "forbidden": {
+    "title": "Access denied",
+    "text": "You do not have permission to view data readiness.",
+    "action": "Back to home"
+  },
+  "loadFailure": {
+    "title": "Could not load data readiness"
+  },
+  "filters": {
+    "status": "Status",
+    "statusHint": "Filter data sources by their current readiness status.",
+    "family": "Family",
+    "familyHint": "Filter data sources by the domain family they belong to."
+  },
+  "table": {
+    "label": "Data sources readiness",
+    "source": "Source",
+    "family": "Family",
+    "ownerModule": "Owner module",
+    "status": "Status",
+    "reason": "Reason",
+    "freshness": "Freshness",
+    "affectedReports": "Affected reports",
+    "lastChecked": "Last checked"
+  },
+  "family": {
+    "CRM_CURRENT": "Current CRM data",
+    "CRM_HISTORY": "CRM history",
+    "CRM_CONFIG": "CRM configuration",
+    "CORE": "Core",
+    "TRADE": "Trade",
+    "FINANCE": "Finance",
+    "MARKETING": "Marketing",
+    "HR": "Human resources",
+    "WORKFLOW": "Workflow",
+    "EMAIL": "Email",
+    "CONTRACTS": "Contracts",
+    "RECOMMENDATIONS": "Recommendations",
+    "PLATFORM": "Platform",
+    "OTHER": "Other"
+  },
+  "kinds": {
+    "REPORT": "Report",
+    "WIDGET": "Widget",
+    "ALERT": "Alert",
+    "SUBSCRIPTION": "Subscription"
+  },
+  "affected": {
+    "kind": "Kind",
+    "name": "Name",
+    "actions": "Actions",
+    "empty": "No reports, widgets, alerts, or subscriptions depend on this source."
+  },
+  "modal": {
+    "firstSeen": "First seen {{date}}",
+    "fields": {
+      "status": "Status",
+      "statusHint": "Current readiness status recorded for this data source.",
+      "uiState": "Shown to users as",
+      "uiStateHint": "Simplified availability state displayed to users in reports and dashboards.",
+      "reason": "Reason",
+      "reasonHint": "Explanation when this source is not fully ready or is experimental.",
+      "family": "Family",
+      "familyHint": "Domain group to which this data source belongs.",
+      "ownerModule": "Owner module",
+      "ownerModuleHint": "System module responsible for maintaining this data source.",
+      "captureSource": "Capture source",
+      "captureSourceHint": "Underlying source key from which events or snapshots are captured.",
+      "lag": "Lag",
+      "lagHint": "How far behind current time the latest captured data is, alongside the freshness target.",
+      "watermark": "Watermark",
+      "watermarkHint": "Timestamp of the most recent data processed for this source.",
+      "pinnedWatermark": "Pinned watermark",
+      "pinnedWatermarkHint": "Watermark held in place when freshness stalls, together with when it was first observed.",
+      "coverageStarted": "Coverage started",
+      "coverageStartedHint": "Earliest point in time from which historical data coverage is available.",
+      "backfillFloor": "Backfill floor",
+      "backfillFloorHint": "Earliest timestamp reachable by historical backfill for this source.",
+      "lastConfirmed": "Last confirmed",
+      "lastConfirmedHint": "Most recent time this data source's status was confirmed.",
+      "lastChecked": "Last checked",
+      "lastCheckedHint": "Most recent time readiness was checked for this source.",
+      "statusChanged": "Status changed",
+      "statusChangedHint": "When this data source last transitioned to its current status."
+    }
+  }
+}

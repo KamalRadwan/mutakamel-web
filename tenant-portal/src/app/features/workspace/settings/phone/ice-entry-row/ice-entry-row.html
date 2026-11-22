@@ -1,0 +1,275 @@
+<div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <div class="grid grid-cols-3 items-start gap-x-10 gap-y-8">
+    <div class="col-span-1">
+      @if (readonly()) {
+        <ui-field
+          [for]="uid + '-kind'"
+          [label]="'wsPhone.modal.ice.kind' | transloco"
+          [hint]="'wsPhone.modal.ice.kindHint' | transloco"
+        >
+          <input
+            [id]="uid + '-kind'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="selectedKindLabel()"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [for]="uid + '-kind'"
+          [label]="'wsPhone.modal.ice.kind' | transloco"
+          [hint]="'wsPhone.modal.ice.kindHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-kind'"
+            [describedBy]="uid + '-kind-hint'"
+            [options]="kindOptions()"
+            [value]="entry().kind"
+            [label]="'wsPhone.modal.ice.kind' | transloco"
+            [disabled]="disabled()"
+            (valueChange)="onKindChange($event)"
+          />
+        </ui-field>
+      }
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [for]="uid + '-enabled'"
+        [label]="'wsPhone.modal.ice.enabled' | transloco"
+        [hint]="'wsPhone.modal.ice.enabledHint' | transloco"
+      >
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-enabled'"
+            [describedBy]="uid + '-enabled-hint'"
+            [label]="'wsPhone.modal.ice.enabled' | transloco"
+            [checked]="entry().enabled"
+            [disabled]="readonly() || disabled()"
+            (checkedChange)="onEnabledChange($event)"
+          />
+          <span class="text-12 text-text">
+            {{ (entry().enabled ? 'wsPhone.modal.fields.enabled' : 'wsPhone.modal.fields.disabled') | transloco }}
+          </span>
+        </div>
+      </ui-field>
+    </div>
+
+    <div class="col-span-1 flex flex-col items-end">
+      @if (!readonly()) {
+        <span class="mb-2 h-label" aria-hidden="true"></span>
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          size="small"
+          class="text-danger-text"
+          [disabled]="disabled()"
+          [attr.aria-label]="('wsPhone.modal.ice.remove' | transloco) + ' #' + (index() + 1)"
+          (click)="removed.emit()"
+        >
+          <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+          {{ 'wsPhone.modal.ice.remove' | transloco }}
+        </button>
+      }
+    </div>
+
+    <div class="col-span-3">
+      <ui-field
+        size="multiline"
+        [for]="uid + '-urls'"
+        [label]="'wsPhone.modal.ice.urls' | transloco"
+        [hint]="'wsPhone.modal.ice.urlsHint' | transloco"
+        [required]="!readonly()"
+        [error]="errors()?.urls ?? null"
+      >
+        <textarea
+          [id]="uid + '-urls'"
+          rows="2"
+          dir="ltr"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="entry().urlsText"
+          [readOnly]="readonly() || disabled()"
+          [attr.aria-readonly]="readonly() ? 'true' : null"
+          [attr.aria-invalid]="errors()?.urls ? 'true' : null"
+          (input)="onUrlsInput($event)"
+          (blur)="markTouched()"
+        ></textarea>
+      </ui-field>
+    </div>
+
+    @if (entry().kind === 'TURN') {
+      <div class="col-span-1">
+        <ui-field
+          [for]="uid + '-username'"
+          [label]="'wsPhone.modal.ice.username' | transloco"
+          [hint]="'wsPhone.modal.ice.usernameHint' | transloco"
+          [error]="errors()?.username ?? null"
+        >
+          <input
+            [id]="uid + '-username'"
+            type="text"
+            autocomplete="off"
+            dir="ltr"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [value]="entry().username"
+            [readOnly]="readonly() || disabled()"
+            [attr.aria-readonly]="readonly() ? 'true' : null"
+            [attr.aria-invalid]="errors()?.username ? 'true' : null"
+            (input)="onUsernameInput($event)"
+            (blur)="markTouched()"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-credential'"
+          [label]="'wsPhone.modal.ice.credential' | transloco"
+          [hint]="'wsPhone.modal.ice.credentialHint' | transloco"
+          [error]="errors()?.credential ?? null"
+        >
+          @if (readonly()) {
+            <div class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              @if (entry().credentialConfigured) {
+                <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-success px-8 text-12 font-medium whitespace-nowrap text-on-success">
+                  <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+                  <span>{{ 'wsPhone.modal.ice.set' | transloco }}</span>
+                </span>
+              } @else {
+                <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-text-muted">
+                  {{ 'wsPhone.modal.ice.notSet' | transloco }}
+                </span>
+              }
+            </div>
+          } @else if (entry().credentialConfigured && entry().credentialAction === 'keep') {
+            <div class="flex items-center gap-6">
+              <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8">
+                <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-success px-8 text-12 font-medium whitespace-nowrap text-on-success">
+                  <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+                  <span>{{ 'wsPhone.modal.ice.set' | transloco }}</span>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [attr.id]="uid + '-credential'"
+                [attr.aria-describedby]="credentialDescribedBy()"
+                [disabled]="disabled()"
+                (click)="startChangeCredential()"
+              >
+                {{ 'wsPhone.modal.ice.change' | transloco }}
+              </button>
+
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                [disabled]="disabled()"
+                (click)="clearCredential()"
+              >
+                {{ 'wsPhone.modal.ice.clear' | transloco }}
+              </button>
+            </div>
+          } @else if (entry().credentialConfigured && entry().credentialAction === 'clear') {
+            <div class="flex items-center gap-6">
+              <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8">
+                <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-text-muted">
+                  {{ 'wsPhone.modal.ice.notSet' | transloco }}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [attr.id]="uid + '-credential'"
+                [attr.aria-describedby]="credentialDescribedBy()"
+                [disabled]="disabled()"
+                (click)="startChangeCredential()"
+              >
+                {{ 'wsPhone.modal.ice.change' | transloco }}
+              </button>
+
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                [disabled]="disabled()"
+                (click)="keepCurrentCredential()"
+              >
+                {{ 'wsPhone.modal.ice.keepCurrent' | transloco }}
+              </button>
+            </div>
+          } @else {
+            <div class="flex items-center gap-6">
+              <div
+                class="flex h-field min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-8 border bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  errors()?.credential
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-credential'"
+                  [type]="revealed() ? 'text' : 'password'"
+                  dir="ltr"
+                  autocomplete="new-password"
+                  class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                  [value]="entry().credentialValue"
+                  [readOnly]="disabled()"
+                  [attr.aria-describedby]="credentialDescribedBy()"
+                  [attr.aria-invalid]="errors()?.credential ? 'true' : null"
+                  (input)="onCredentialInput($event)"
+                  (blur)="markTouched()"
+                />
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="(revealed() ? 'wsPhone.modal.ice.hide' : 'wsPhone.modal.ice.show') | transloco"
+                  [title]="(revealed() ? 'wsPhone.modal.ice.hide' : 'wsPhone.modal.ice.show') | transloco"
+                  (click)="toggleReveal()"
+                >
+                  <ng-icon [name]="revealed() ? 'tablerEyeOff' : 'tablerEye'" size="14" aria-hidden="true" />
+                </button>
+              </div>
+
+              @if (entry().credentialConfigured) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="ghost"
+                  size="small"
+                  [disabled]="disabled()"
+                  (click)="keepCurrentCredential()"
+                >
+                  {{ 'wsPhone.modal.ice.keepCurrent' | transloco }}
+                </button>
+              }
+            </div>
+          }
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  @if (hiddenFieldLineError(); as lineError) {
+    <p class="flex items-center gap-3 text-11 leading-16 text-danger-text" role="status">
+      <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+      <span>{{ lineError }}</span>
+    </p>
+  }
+</div>

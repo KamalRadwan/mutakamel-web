@@ -1,0 +1,27 @@
+<section [attr.aria-labelledby]="headingId">
+  <header class="flex items-center gap-8">
+    <span
+      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="tile()"
+    >
+      <ng-icon [name]="icon()" size="14" aria-hidden="true" />
+    </span>
+    <div class="flex min-w-0 flex-1 flex-col">
+      <h2 [id]="headingId" class="truncate text-13 leading-18 font-medium text-text" [title]="title()">
+        {{ title() }}
+      </h2>
+      @if (description()) {
+        <p class="truncate text-12 leading-16 text-text-muted" [title]="description()">
+          {{ description() }}
+        </p>
+      }
+    </div>
+    <div class="ms-auto flex shrink-0 items-center gap-8">
+      <ng-content select="[sectionEnd]" />
+    </div>
+  </header>
+
+  <div class="my-8 border-t border-border"></div>
+
+  <ng-content />
+</section>

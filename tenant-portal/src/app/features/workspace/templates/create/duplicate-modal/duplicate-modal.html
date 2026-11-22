@@ -1,0 +1,199 @@
+<ui-modal
+  #dupModal
+  size="form"
+  [icon]="isConvertiblePrint() ? 'tablerArrowsExchange' : 'tablerCopy'"
+  [tile]="isConvertiblePrint() ? 'bg-icon-blue' : 'bg-icon-gray'"
+  [title]="modalTitleKey() | transloco"
+  [subtitle]="modalSubtitle()"
+  [closeLabel]="'tplCreate.wizard.close' | transloco"
+  [dismissable]="!saving() && !guardBusy()"
+  [hasFooter]="!loading() && !loadFailed() && creationScopes().length > 0"
+  (closed)="onModalClosed()"
+>
+  <div [attr.aria-busy]="loading()">
+    @if (loading()) {
+      <div class="flex flex-col gap-10">
+        <div class="grid grid-cols-2 gap-10">
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-10">
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        </div>
+        <div class="h-textarea animate-pulse rounded-8 bg-neutral-soft"></div>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'tplCreate.duplicate.loadFailed' | transloco }}</p>
+        @if (loadCorrelationId(); as corrId) {
+          <p class="text-11 leading-16 text-text-muted">
+            {{ 'templates.states.loadFailed.reference' | transloco: { correlationId: corrId } }}
+          </p>
+        }
+        <button type="button" uiButton variant="primary" (click)="retryLoad()">
+          {{ 'tplCreate.duplicate.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (creationScopes().length === 0) {
+      <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+          <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'tplCreate.details.noCreationScopes' | transloco }}</p>
+      </div>
+    } @else {
+      <div class="grid grid-cols-2 gap-10">
+        <ui-field
+          size="bare"
+          for="tpl-dup-source"
+          [label]="'tplCreate.duplicate.sourceLabel' | transloco"
+          [hint]="'tplCreate.duplicate.sourceHint' | transloco"
+          [required]="true"
+          [error]="sourceError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            [id]="'tpl-dup-source'"
+            size="field"
+            [title]="isDraftDirty() ? ('tplCreate.duplicate.saveFirst' | transloco) : null"
+            [label]="'tplCreate.duplicate.sourceLabel' | transloco"
+            [options]="sourceOptions()"
+            [value]="sourceKey()"
+            (valueChange)="onSourceChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          for="tpl-dup-scope"
+          [label]="'tplCreate.duplicate.scopeLabel' | transloco"
+          [hint]="'tplCreate.duplicate.scopeHint' | transloco"
+          [required]="true"
+          [error]="scopeError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            [id]="'tpl-dup-scope'"
+            size="field"
+            [label]="'tplCreate.duplicate.scopeLabel' | transloco"
+            [options]="scopeOptions()"
+            [value]="scopeKey()"
+            (valueChange)="onScopeChange($event)"
+          />
+        </ui-field>
+
+        @if (isConvertiblePrint()) {
+          <ui-field
+            size="bare"
+            class="col-span-2"
+            for="tpl-dup-layout"
+            [label]="'tplCreate.duplicate.targetLayoutLabel' | transloco"
+            [hint]="'tplCreate.duplicate.targetLayoutHint' | transloco"
+            [required]="true"
+            [error]="targetLayoutError()"
+          >
+            <ui-dropdown
+              class="w-full"
+              [id]="'tpl-dup-layout'"
+              size="field"
+              [label]="'tplCreate.duplicate.targetLayoutLabel' | transloco"
+              [options]="targetLayoutOptions()"
+              [value]="targetLayout()"
+              (valueChange)="onTargetLayoutChange($event)"
+            />
+          </ui-field>
+        }
+
+        <ui-field
+          for="tpl-dup-name"
+          [label]="'tplCreate.duplicate.nameLabel' | transloco"
+          [hint]="'tplCreate.duplicate.nameHint' | transloco"
+          [required]="true"
+          [count]="name().length"
+          [max]="200"
+          [error]="nameError()"
+        >
+          <input
+            id="tpl-dup-name"
+            type="text"
+            maxlength="200"
+            class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+            [value]="name()"
+            (input)="onNameInput($any($event.target).value)"
+          />
+        </ui-field>
+
+        <ui-field
+          for="tpl-dup-code"
+          [label]="'tplCreate.duplicate.codeLabel' | transloco"
+          [hint]="'tplCreate.duplicate.codeHint' | transloco"
+          [required]="true"
+          [count]="code().length"
+          [max]="100"
+          [error]="codeError()"
+        >
+          <input
+            #codeInput
+            id="tpl-dup-code"
+            type="text"
+            dir="ltr"
+            maxlength="100"
+            class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+            [value]="code()"
+            (input)="onCodeInput($any($event.target).value)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="multiline"
+          class="col-span-2"
+          for="tpl-dup-description"
+          [label]="'tplCreate.duplicate.descriptionLabel' | transloco"
+          [hint]="'tplCreate.duplicate.descriptionHint' | transloco"
+          [count]="description().length"
+          [max]="1000"
+          [error]="descriptionError()"
+        >
+          <textarea
+            id="tpl-dup-description"
+            rows="3"
+            maxlength="1000"
+            class="min-w-0 flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [value]="description()"
+            (input)="onDescriptionInput($any($event.target).value)"
+          ></textarea>
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving() || loading() || loadFailed() || creationScopes().length === 0"
+      (click)="submit()"
+    >
+      {{ (isConvertiblePrint() ? 'tplCreate.duplicate.submitConvert' : 'tplCreate.duplicate.submitDuplicate') | transloco }}
+    </button>
+
+    <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="requestCancel()">
+      {{ 'tplCreate.duplicate.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'tplCreate.unsaved.title' | transloco"
+  [text]="'tplCreate.unsaved.text' | transloco"
+  [saveLabel]="(isConvertiblePrint() ? 'tplCreate.duplicate.submitConvert' : 'tplCreate.duplicate.submitDuplicate') | transloco"
+  [discardLabel]="'tplCreate.unsaved.discard' | transloco"
+  [cancelLabel]="'tplCreate.unsaved.cancel' | transloco"
+/>

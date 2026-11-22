@@ -1,0 +1,146 @@
+{
+  "types": {
+    "PAYMENT": "شروط الدفع",
+    "DELIVERY": "شروط التسليم",
+    "WARRANTY": "شروط الضمان",
+    "RETURNS": "سياسة الإرجاع",
+    "GENERAL": "الشروط والأحكام"
+  },
+  "sides": {
+    "SALES": "المبيعات",
+    "PURCHASE": "المشتريات",
+    "BOTH": "كلاهما"
+  },
+  "incoterms": {
+    "EXW": "التسليم في مقر البائع",
+    "FCA": "التسليم إلى الناقل",
+    "CPT": "أجرة النقل مدفوعة إلى",
+    "CIP": "النقل والتأمين مدفوعان إلى",
+    "DAP": "التسليم في المكان المحدد",
+    "DPU": "التسليم في المكان مع التفريغ",
+    "DDP": "التسليم خالص الرسوم",
+    "FAS": "التسليم بجانب السفينة",
+    "FOB": "التسليم على ظهر السفينة",
+    "CFR": "التكلفة والشحن",
+    "CIF": "التكلفة والتأمين والشحن"
+  },
+  "areas": {
+    "documents": "المستندات",
+    "inventory": "المخزون",
+    "catalogue": "الكتالوج والحسابات",
+    "governance": "الحوكمة والأتمتة"
+  },
+  "kinds": {
+    "DOCUMENT_CANCEL": "إلغاء مستند",
+    "QUOTATION_REJECT": "رفض عرض سعر",
+    "DOCUMENT_HOLD": "إيقاف أمر",
+    "DOCUMENT_HOLD_RELEASE": "رفع إيقاف أمر",
+    "DOCUMENT_DISCOUNT": "تطبيق خصم على المستند",
+    "PURCHASE_ORDER_REJECT": "رفض أمر شراء",
+    "INVENTORY_PERIOD_CLOSE": "إقفال فترة مخزون",
+    "INVENTORY_PERIOD_REOPEN": "إعادة فتح فترة مخزون",
+    "INVENTORY_UOM_PUBLISH": "اعتماد تحويل وحدة",
+    "INVENTORY_UOM_RETIRE": "إيقاف تحويل وحدة",
+    "INVENTORY_REVERSAL": "عكس حركة",
+    "CATEGORY_STATUS": "تغيير حالة فئة",
+    "CATEGORY_DELETE": "حذف فئة",
+    "ACCOUNT_BLOCK": "حظر حساب",
+    "ACCOUNT_UNBLOCK": "رفع حظر حساب",
+    "ITEM_DISCONTINUE": "إيقاف صنف نهائيًا",
+    "PRICE_VERSION_RETIRE": "إيقاف نسخة أسعار",
+    "POLICY_VERSION_REJECT": "رفض سياسة",
+    "POLICY_VERSION_RETIRE": "إيقاف سياسة",
+    "POLICY_VERSION_ROLLBACK": "استعادة سياسة",
+    "WORKFLOW_VERSION_REJECT": "رفض مسار عمل",
+    "WORKFLOW_VERSION_RETIRE": "إيقاف مسار عمل",
+    "WORKFLOW_VERSION_ROLLBACK": "استعادة مسار عمل",
+    "WEBHOOK_DELIVERY_RETRY": "إعادة إرسال خطاف ويب",
+    "CONTROL_TOWER_RESOLVE": "حلّ تنبيه برج المراقبة"
+  },
+  "select": {
+    "paymentLabel": "شروط الدفع",
+    "paymentHintSales": "متى يدفع العميل وكيف. يُطبع على المستند.",
+    "paymentHintPurchase": "متى ندفع للمورد وكيف.",
+    "deliveryLabel": "شروط التسليم",
+    "deliveryHint": "مكان تسليم البضاعة وموعده.",
+    "warrantyLabel": "شروط الضمان",
+    "warrantyHint": "الضمان الذي تقدمه على الأصناف.",
+    "clausesLabel": "الشروط والأحكام",
+    "clausesHint": "بنود إضافية تُطبع بهذا الترتيب.",
+    "inactive": "غير نشط",
+    "noLongerActive": "لم يعد هذا الشرط نشطًا. اختر شرطًا آخر.",
+    "showAll": "عرض الكل",
+    "showLess": "عرض أقل",
+    "moveEarlier": "تقديم",
+    "moveLater": "تأخير",
+    "groupReturns": "سياسة الإرجاع",
+    "groupGeneral": "الشروط والأحكام",
+    "placeholder": "اختر…",
+    "clausesPlaceholder": "أضف بنودًا…",
+    "searchPlaceholder": "بحث",
+    "searchLabel": "البحث في الشروط",
+    "clear": "مسح",
+    "removeClause": "إزالة {{name}}",
+    "clauseMenu": "ترتيب {{name}}",
+    "maxReached": "بحد أقصى {{max}} بنود.",
+    "noMatches": "لا توجد شروط مطابقة.",
+    "loading": "جارٍ التحميل…",
+    "loadFailed": "تعذّر تحميل الشروط.",
+    "retry": "حاول مرة أخرى"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما، فحاول مرة أخرى.",
+    "TRADE_VALIDATION_FAILED": "بعض القيم غير صالحة.",
+    "TRADE_CONCURRENCY_STALE_VERSION": "عدّل مستخدم آخر هذا السجل، فأعد تحميله.",
+    "TRADE_IDEMPOTENCY_KEY_MISSING": "مفتاح الطلب مفقود، فحاول مجددًا.",
+    "TRADE_IDEMPOTENCY_KEY_REQUIRED": "مفتاح الطلب غير صالح، فحاول مجددًا.",
+    "TRADE_IDEMPOTENCY_MISMATCH": "تغيّر الطلب أثناء إرساله، فحاول مجددًا.",
+    "TRADE_CONCURRENCY_IF_MATCH_REQUIRED": "أعد تحميل السجل قبل حفظ تغييراتك.",
+    "TRADE_IDEMPOTENCY_IN_FLIGHT": "لا يزال الطلب قيد المعالجة. أعد المحاولة بعد قليل.",
+    "TRADE_AUTH_TARGET_DENIED": "لا تملك صلاحية الوصول إلى النطاق المحدد.",
+    "TRADE_TERMS_NOT_FOUND": "لم يعد هذا الشرط موجودًا.",
+    "TRADE_TERMS_CODE_TAKEN": "هذا الرمز مستخدم بالفعل لهذا النوع من الشروط.",
+    "TRADE_TERMS_TEXT_REQUIRED": "يجب إدخال النصين العربي والإنجليزي للشرط النشط.",
+    "TRADE_TERMS_TYPE_FIELD_INVALID": "هذا الخيار غير صالح لهذا النوع من الشروط.",
+    "TRADE_TERMS_DEFAULT_INACTIVE": "لا يمكن جعل شرط غير نشط افتراضيًا.",
+    "TRADE_TERMS_DEFAULT_IN_USE": "اختر شرطًا افتراضيًا آخر قبل حذف هذا الشرط.",
+    "TRADE_TERMS_PAYMENT_REQUIRED": "اختر شروط الدفع.",
+    "TRADE_REASON_NOT_FOUND": "لم يعد السبب موجودًا.",
+    "TRADE_REASON_CODE_TAKEN": "هذا الرمز مستخدم بالفعل لهذا النوع من الأسباب.",
+    "TRADE_REASON_KIND_INVALID": "نوع السبب غير صالح.",
+    "TRADE_REASON_SYSTEM_IMMUTABLE": "لا يمكن إيقاف أسباب النظام أو حذفها.",
+    "TRADE_REASON_NOTE_REQUIRED": "أضف ملاحظة لهذا السبب.",
+    "TRADE": {
+      "VALIDATION_FAILED": "بعض القيم غير صالحة.",
+      "CONCURRENCY": {
+        "STALE_VERSION": "عدّل مستخدم آخر هذا السجل، فأعد تحميله.",
+        "IF_MATCH_REQUIRED": "أعد تحميل السجل قبل حفظ تغييراتك."
+      },
+      "IDEMPOTENCY": {
+        "KEY_MISSING": "مفتاح الطلب مفقود، فحاول مجددًا.",
+        "KEY_REQUIRED": "مفتاح الطلب غير صالح، فحاول مجددًا.",
+        "MISMATCH": "تغيّر الطلب أثناء إرساله، فحاول مجددًا.",
+        "IN_FLIGHT": "لا يزال الطلب قيد المعالجة. أعد المحاولة بعد قليل."
+      },
+      "AUTH": {
+        "TARGET_DENIED": "لا تملك صلاحية الوصول إلى النطاق المحدد."
+      },
+      "TERMS": {
+        "NOT_FOUND": "لم يعد هذا الشرط موجودًا.",
+        "CODE_TAKEN": "هذا الرمز مستخدم بالفعل لهذا النوع من الشروط.",
+        "TEXT_REQUIRED": "يجب إدخال النصين العربي والإنجليزي للشرط النشط.",
+        "TYPE_FIELD_INVALID": "هذا الخيار غير صالح لهذا النوع من الشروط.",
+        "DEFAULT_INACTIVE": "لا يمكن جعل شرط غير نشط افتراضيًا.",
+        "DEFAULT_IN_USE": "اختر شرطًا افتراضيًا آخر قبل حذف هذا الشرط.",
+        "PAYMENT_REQUIRED": "اختر شروط الدفع."
+      },
+      "REASON": {
+        "NOT_FOUND": "لم يعد السبب موجودًا.",
+        "CODE_TAKEN": "هذا الرمز مستخدم بالفعل لهذا النوع من الأسباب.",
+        "KIND_INVALID": "نوع السبب غير صالح.",
+        "SYSTEM_IMMUTABLE": "لا يمكن إيقاف أسباب النظام أو حذفها.",
+        "NOTE_REQUIRED": "أضف ملاحظة لهذا السبب."
+      }
+    }
+  }
+}

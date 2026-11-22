@@ -1,0 +1,651 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerClock"
+  tile="bg-icon-teal"
+  [title]="(isEdit() ? 'sla.modal.editTitle' : 'sla.modal.createTitle') | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (editingPolicy(); as policy) {
+    <div modal-header-end class="flex items-center gap-6">
+      <ui-badge tone="tag">
+        <bdi dir="ltr">v{{ policy.versionNumber }}</bdi>
+      </ui-badge>
+      <ui-badge [tone]="policy.state === 'ACTIVE' ? 'success' : 'none'">
+        {{ 'sla.state.' + policy.state | transloco }}
+      </ui-badge>
+    </div>
+  }
+
+  <form class="flex flex-col gap-12" (submit)="$event.preventDefault(); publish()">
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      <!-- Row 1: English + Arabic names -->
+      <div class="col-span-3 grid grid-cols-2 gap-x-10">
+        <ui-field
+          [label]="'sla.form.nameEn' | transloco"
+          [for]="uid + '-name-en'"
+          [hint]="'sla.form.nameEnHint' | transloco"
+          [required]="true"
+          [count]="nameEnCount()"
+          [max]="maxNameLength"
+          [error]="nameEnError()"
+        >
+          <input
+            [id]="uid + '-name-en'"
+            type="text"
+            dir="ltr"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'sla.form.nameEnPlaceholder' | transloco"
+            [value]="nameEn()"
+            [attr.maxlength]="maxNameLength"
+            [readOnly]="readOnly()"
+            [attr.aria-readonly]="readOnly() ? 'true' : null"
+            [attr.aria-invalid]="nameEnError() ? 'true' : null"
+            (input)="onNameInput('nameEn', $event)"
+            (blur)="markTouched('nameEn')"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'sla.form.nameAr' | transloco"
+          [for]="uid + '-name-ar'"
+          [hint]="'sla.form.nameArHint' | transloco"
+          [required]="true"
+          [count]="nameArCount()"
+          [max]="maxNameLength"
+          [error]="nameArError()"
+        >
+          <input
+            [id]="uid + '-name-ar'"
+            type="text"
+            dir="rtl"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'sla.form.nameArPlaceholder' | transloco"
+            [value]="nameAr()"
+            [attr.maxlength]="maxNameLength"
+            [readOnly]="readOnly()"
+            [attr.aria-readonly]="readOnly() ? 'true' : null"
+            [attr.aria-invalid]="nameArError() ? 'true' : null"
+            (input)="onNameInput('nameAr', $event)"
+            (blur)="markTouched('nameAr')"
+          />
+        </ui-field>
+      </div>
+
+      <!-- Row 2: Kind, Record, Branch -->
+      <ui-field
+        size="bare"
+        [label]="'sla.form.kind' | transloco"
+        [for]="uid + '-kind'"
+        [hint]="'sla.form.kindHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          [id]="uid + '-kind'"
+          size="field"
+          [label]="'sla.form.kind' | transloco"
+          [describedBy]="uid + '-kind-hint'"
+          [options]="kindOptions()"
+          [value]="policyKind()"
+          [disabled]="lineageLocked()"
+          (valueChange)="onKindChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.form.record' | transloco"
+        [for]="uid + '-record'"
+        [hint]="'sla.form.recordHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          [id]="uid + '-record'"
+          size="field"
+          [label]="'sla.form.record' | transloco"
+          [describedBy]="uid + '-record-hint'"
+          [options]="recordOptions()"
+          [value]="appliesToRecord()"
+          [disabled]="lineageLocked()"
+          (valueChange)="onRecordChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.form.branch' | transloco"
+        [for]="uid + '-branch'"
+        [hint]="'sla.form.branchHint' | transloco"
+      >
+        <ui-dropdown
+          [id]="uid + '-branch'"
+          size="field"
+          [label]="'sla.form.branch' | transloco"
+          [describedBy]="uid + '-branch-hint'"
+          [options]="branchOptions()"
+          [value]="branchKey()"
+          [disabled]="lineageLocked()"
+          (valueChange)="onBranchChange($event)"
+        />
+      </ui-field>
+
+      <!-- Row 3: Clock + Target -->
+      <ui-field
+        size="bare"
+        [label]="'sla.form.clockKind' | transloco"
+        [for]="uid + '-clock-kind'"
+        [hint]="'sla.form.clockKindHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          [id]="uid + '-clock-kind'"
+          size="field"
+          [label]="'sla.form.clockKind' | transloco"
+          [describedBy]="uid + '-clock-kind-hint'"
+          [options]="clockKindOptions()"
+          [value]="clockKind()"
+          [disabled]="readOnly() || policyKind() === 'FOLLOW_UP_CADENCE'"
+          (valueChange)="onClockKindChange($event)"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'sla.form.target' | transloco"
+          [for]="uid + '-target'"
+          [hint]="'sla.form.targetHint' | transloco"
+          [required]="true"
+          [error]="targetError()"
+        >
+          <div class="flex items-center gap-6">
+            <div
+              class="flex h-field min-w-0 flex-1 items-center rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+              [class]="
+                targetError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+              "
+            >
+              <input
+                [id]="uid + '-target'"
+                type="text"
+                inputmode="numeric"
+                dir="ltr"
+                class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+                [value]="targetValueInput()"
+                [readOnly]="readOnly()"
+                [attr.aria-readonly]="readOnly() ? 'true' : null"
+                [attr.aria-invalid]="targetError() ? 'true' : null"
+                [attr.aria-describedby]="uid + '-target-hint' + (targetError() ? ' ' + uid + '-target-error' : '')"
+                (input)="onTargetInput($event)"
+                (blur)="markTouched('target')"
+              />
+            </div>
+
+            <div class="w-preset shrink-0">
+              <ui-dropdown
+                size="field"
+                [label]="'sla.form.targetUnit' | transloco"
+                [describedBy]="uid + '-target-hint'"
+                [options]="targetUnitOptions()"
+                [value]="targetUnit()"
+                [disabled]="readOnly()"
+                (valueChange)="targetUnit.set($event)"
+              />
+            </div>
+          </div>
+        </ui-field>
+      </div>
+
+      <!-- Row 4 (Cadence only): Required touches & Compliance % -->
+      @if (policyKind() === 'FOLLOW_UP_CADENCE') {
+        <ui-field
+          [label]="'sla.form.requiredTouchCount' | transloco"
+          [for]="uid + '-touches'"
+          [hint]="'sla.form.requiredTouchCountHint' | transloco"
+          [required]="true"
+          [error]="touchesError()"
+        >
+          <input
+            [id]="uid + '-touches'"
+            type="text"
+            inputmode="numeric"
+            dir="ltr"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [value]="requiredTouchCountInput()"
+            [readOnly]="readOnly()"
+            [attr.aria-readonly]="readOnly() ? 'true' : null"
+            [attr.aria-invalid]="touchesError() ? 'true' : null"
+            (input)="onTouchesInput($event)"
+            (blur)="markTouched('touches')"
+          />
+        </ui-field>
+
+        <ui-field
+          [label]="'sla.form.compliancePct' | transloco"
+          [for]="uid + '-compliance'"
+          [hint]="'sla.form.compliancePctHint' | transloco"
+          [required]="true"
+          [error]="complianceError()"
+        >
+          <input
+            [id]="uid + '-compliance'"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [value]="compliancePctInput()"
+            [readOnly]="readOnly()"
+            [attr.aria-readonly]="readOnly() ? 'true' : null"
+            [attr.aria-invalid]="complianceError() ? 'true' : null"
+            (input)="onComplianceInput($event)"
+            (blur)="markTouched('compliance')"
+          />
+          <span class="shrink-0 text-12 text-text-muted" aria-hidden="true">%</span>
+        </ui-field>
+
+        <div></div>
+      }
+
+      <!-- Row 5: Counted touches by, Effective from, State -->
+      <ui-field
+        size="bare"
+        [label]="'sla.form.qualifyingTouchBy' | transloco"
+        [for]="uid + '-touch-by'"
+        [hint]="'sla.form.qualifyingTouchByHint' | transloco"
+      >
+        <ui-dropdown
+          [id]="uid + '-touch-by'"
+          size="field"
+          [label]="'sla.form.qualifyingTouchBy' | transloco"
+          [describedBy]="uid + '-touch-by-hint'"
+          [options]="touchByOptions()"
+          [value]="qualifyingTouchBy()"
+          [disabled]="readOnly()"
+          (valueChange)="qualifyingTouchBy.set($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.form.effectiveFrom' | transloco"
+        [for]="uid + '-effective-from'"
+        [hint]="'sla.form.effectiveFromHint' | transloco"
+        [required]="true"
+        [error]="effectiveFromError()"
+      >
+        <ui-date-field
+          [id]="uid + '-effective-from'"
+          [ariaLabel]="'sla.form.effectiveFrom' | transloco"
+          [describedBy]="uid + '-effective-from-hint' + (effectiveFromError() ? ' ' + uid + '-effective-from-error' : '')"
+          [min]="readOnly() ? null : todayIso"
+          [todayLabel]="'sla.form.today' | transloco"
+          [prevMonthLabel]="'sla.form.prevMonth' | transloco"
+          [nextMonthLabel]="'sla.form.nextMonth' | transloco"
+          [invalid]="!!effectiveFromError()"
+          [disabled]="readOnly()"
+          [value]="effectiveFrom()"
+          (valueChange)="onEffectiveFromChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'sla.form.state' | transloco"
+        [for]="uid + '-state'"
+        [hint]="'sla.form.stateHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          [id]="uid + '-state'"
+          size="field"
+          [label]="'sla.form.state' | transloco"
+          [describedBy]="uid + '-state-hint'"
+          [options]="stateOptions()"
+          [value]="policyState()"
+          [disabled]="readOnly()"
+          (valueChange)="policyState.set($event)"
+        />
+      </ui-field>
+
+      <!-- Row 6: Qualifying multi-select chip groups -->
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [label]="'sla.form.activityTypes' | transloco"
+          [for]="uid + '-activity-types'"
+          [hint]="'sla.form.activityTypesHint' | transloco"
+        >
+          <div
+            [id]="uid + '-activity-types'"
+            role="group"
+            class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
+            [attr.aria-label]="'sla.form.activityTypes' | transloco"
+            [attr.aria-describedby]="uid + '-activity-types-hint'"
+          >
+            @for (type of activityTypeOptions(); track type) {
+              @let selected = activityTypes().includes(type);
+              <button
+                type="button"
+                class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  (selected
+                    ? 'border-brand bg-brand-soft text-on-brand-soft'
+                    : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                  ' ' +
+                  (readOnly() ? 'cursor-default' : 'cursor-pointer')
+                "
+                [attr.aria-pressed]="selected"
+                [attr.aria-disabled]="readOnly() ? 'true' : null"
+                (click)="toggleActivityType(type)"
+              >
+                {{ 'sla.activityType.' + type | transloco }}
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      @if (showTouchFilters()) {
+      <div class="col-span-3 grid grid-cols-2 gap-x-10">
+        <ui-field
+          size="bare"
+          [label]="'sla.form.directions' | transloco"
+          [for]="uid + '-directions'"
+          [hint]="'sla.form.directionsHint' | transloco"
+        >
+          <div
+            [id]="uid + '-directions'"
+            role="group"
+            class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
+            [attr.aria-label]="'sla.form.directions' | transloco"
+            [attr.aria-describedby]="uid + '-directions-hint'"
+          >
+            @for (dir of directionOptions; track dir) {
+              @let selected = directions().includes(dir);
+              <button
+                type="button"
+                class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  (selected
+                    ? 'border-brand bg-brand-soft text-on-brand-soft'
+                    : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                  ' ' +
+                  (readOnly() ? 'cursor-default' : 'cursor-pointer')
+                "
+                [attr.aria-pressed]="selected"
+                [attr.aria-disabled]="readOnly() ? 'true' : null"
+                (click)="toggleDirection(dir)"
+              >
+                {{ 'sla.direction.' + dir | transloco }}
+              </button>
+            }
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'sla.form.touchSources' | transloco"
+          [for]="uid + '-touch-sources'"
+          [hint]="'sla.form.touchSourcesHint' | transloco"
+        >
+          <div
+            [id]="uid + '-touch-sources'"
+            role="group"
+            class="flex flex-wrap gap-4 rounded-8 border border-border-field bg-surface-field p-4"
+            [attr.aria-label]="'sla.form.touchSources' | transloco"
+            [attr.aria-describedby]="uid + '-touch-sources-hint'"
+          >
+            @for (src of touchSourceOptions; track src) {
+              @let selected = touchSources().includes(src);
+              <button
+                type="button"
+                class="inline-flex h-chip items-center rounded-6 border px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  (selected
+                    ? 'border-brand bg-brand-soft text-on-brand-soft'
+                    : 'border-border-field bg-surface text-text hover:bg-row-hover') +
+                  ' ' +
+                  (readOnly() ? 'cursor-default' : 'cursor-pointer')
+                "
+                [attr.aria-pressed]="selected"
+                [attr.aria-disabled]="readOnly() ? 'true' : null"
+                (click)="toggleTouchSource(src)"
+              >
+                {{ 'sla.touchSource.' + src | transloco }}
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+      }
+    </div>
+
+    <!-- Read-only metadata rows (Q11: key-value list, no inputs) -->
+    <dl class="grid grid-cols-4 gap-x-10 gap-y-6 border-t border-border pt-8">
+      <div>
+        <ui-field
+          size="bare"
+          [label]="'sla.meta.version' | transloco"
+          [for]="uid + '-meta-version'"
+          [hint]="'sla.meta.versionHint' | transloco"
+        >
+          <dd [id]="uid + '-meta-version'" class="text-12 leading-18 font-medium text-text">
+            <bdi dir="ltr">v{{ displayVersionNumber() }}</bdi>
+          </dd>
+        </ui-field>
+      </div>
+
+      <div>
+        <ui-field
+          size="bare"
+          [label]="'sla.meta.startEvent' | transloco"
+          [for]="uid + '-meta-start'"
+          [hint]="'sla.meta.startEventHint' | transloco"
+        >
+          <dd [id]="uid + '-meta-start'" class="text-12 leading-18 font-medium text-text">
+            {{ startEventKey() | transloco }}
+          </dd>
+        </ui-field>
+      </div>
+
+      <div>
+        <ui-field
+          size="bare"
+          [label]="'sla.meta.qualifyingFact' | transloco"
+          [for]="uid + '-meta-fact'"
+          [hint]="'sla.meta.qualifyingFactHint' | transloco"
+        >
+          <dd [id]="uid + '-meta-fact'" class="text-12 leading-18 font-medium text-text">
+            {{ qualifyingFactKey() | transloco }}
+          </dd>
+        </ui-field>
+      </div>
+
+      <div>
+        <ui-field
+          size="bare"
+          [label]="'sla.meta.supersedes' | transloco"
+          [for]="uid + '-meta-supersedes'"
+          [hint]="'sla.meta.supersedesHint' | transloco"
+        >
+          <dd [id]="uid + '-meta-supersedes'" class="text-12 leading-18 font-medium text-text">
+            <bdi dir="ltr">{{ supersedesDisplay() }}</bdi>
+          </dd>
+        </ui-field>
+      </div>
+    </dl>
+
+    <!-- Try the clock section -->
+    @if (canManage()) {
+      <section class="flex flex-col gap-8 border-t border-border pt-8" [attr.aria-label]="'sla.clock.sectionTitle' | transloco">
+        <h3 class="text-13 leading-18 font-medium text-text">{{ 'sla.clock.sectionTitle' | transloco }}</h3>
+
+        <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+          <ui-field
+            size="bare"
+            [label]="'sla.clock.branch' | transloco"
+            [for]="uid + '-clock-branch'"
+            [hint]="'sla.clock.branchHint' | transloco"
+          >
+            <ui-dropdown
+              [id]="uid + '-clock-branch'"
+              size="field"
+              [label]="'sla.clock.branch' | transloco"
+              [describedBy]="uid + '-clock-branch-hint'"
+              [options]="previewBranchOptions()"
+              [value]="clockBranchId()"
+              (valueChange)="clockBranchId.set($event)"
+            />
+          </ui-field>
+
+          <div class="col-span-2">
+            <ui-field
+              size="bare"
+              [label]="'sla.clock.from' | transloco"
+              [for]="uid + '-clock-date'"
+              [hint]="'sla.clock.fromHint' | transloco"
+              [error]="clockFromError()"
+            >
+              <div class="flex items-center gap-6">
+                <div class="min-w-0 flex-1">
+                  <ui-date-field
+                    [id]="uid + '-clock-date'"
+                    [ariaLabel]="'sla.clock.from' | transloco"
+                    [describedBy]="uid + '-clock-date-hint' + (clockFromError() ? ' ' + uid + '-clock-date-error' : '')"
+                    [todayLabel]="'sla.form.today' | transloco"
+                    [prevMonthLabel]="'sla.form.prevMonth' | transloco"
+                    [nextMonthLabel]="'sla.form.nextMonth' | transloco"
+                    [invalid]="!!clockFromError()"
+                    [value]="clockFromDate()"
+                    (valueChange)="clockFromDate.set($event ?? todayIso)"
+                  />
+                </div>
+                <ui-time-field
+                  [id]="uid + '-clock-time'"
+                  [ariaLabel]="'sla.clock.from' | transloco"
+                  [describedBy]="uid + '-clock-date-hint' + (clockFromError() ? ' ' + uid + '-clock-date-error' : '')"
+                  [hourLabel]="'sla.form.hour' | transloco"
+                  [minuteLabel]="'sla.form.minute' | transloco"
+                  [invalid]="!!clockFromError()"
+                  [value]="clockFromTime()"
+                  (valueChange)="clockFromTime.set($event ?? '09:00')"
+                />
+              </div>
+            </ui-field>
+          </div>
+
+          <ui-field
+            [label]="'sla.clock.minutes' | transloco"
+            [for]="uid + '-clock-minutes'"
+            [hint]="'sla.clock.minutesHint' | transloco"
+            [error]="clockMinutesError()"
+          >
+            <input
+              [id]="uid + '-clock-minutes'"
+              type="text"
+              inputmode="numeric"
+              dir="ltr"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+              [value]="clockMinutesInput()"
+              [attr.aria-invalid]="clockMinutesError() ? 'true' : null"
+              (input)="onClockMinutesInput($event)"
+            />
+          </ui-field>
+
+          <div class="col-span-2 flex items-start gap-8">
+            <div class="min-w-0 flex-1">
+              <ui-field
+                [label]="'sla.clock.deadline' | transloco"
+                [for]="uid + '-clock-deadline'"
+                [hint]="'sla.clock.deadlineHint' | transloco"
+                [error]="clockDeadlineError()"
+              >
+                <input
+                  [id]="uid + '-clock-deadline'"
+                  type="text"
+                  readonly
+                  class="w-full bg-transparent text-12 text-text outline-none"
+                  [value]="clockDeadlineDisplay()"
+                />
+              </ui-field>
+            </div>
+
+            <div class="flex shrink-0 flex-col">
+              <span class="mb-2 h-label" aria-hidden="true"></span>
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [loading]="clockBusy()"
+                (click)="calculateClock()"
+              >
+                {{ 'sla.clock.calculate' | transloco }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!readOnly()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="isEdit() ? !dirty() : false"
+        (click)="publish()"
+      >
+        {{ 'sla.modal.publishVersion' | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      }
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ (readOnly() ? 'settings.common.close' : 'settings.common.cancel') | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'sla.modal.discardTitle' | transloco"
+  [text]="'sla.modal.discardText' | transloco"
+  [confirmLabel]="'sla.modal.discardConfirm' | transloco"
+  [cancelLabel]="'sla.modal.discardKeep' | transloco"
+/>
+
+<ui-confirm-dialog
+  #conflictDialog
+  tone="warning"
+  [title]="'analytics.common.conflictTitle' | transloco"
+  [text]="'analytics.common.conflictText' | transloco"
+  [confirmLabel]="'analytics.common.reload' | transloco"
+  [cancelLabel]="'analytics.common.keepMine' | transloco"
+/>

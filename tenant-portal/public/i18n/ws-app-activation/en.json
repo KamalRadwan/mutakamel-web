@@ -1,0 +1,109 @@
+{
+  "company": {
+    "label": "Company",
+    "hint": "Activation is set per company.",
+    "placeholder": "Select a company"
+  },
+  "cols": {
+    "application": "Application",
+    "status": "Status",
+    "activation": "Activation",
+    "activationHint": "Turns the application on or off for the selected company.",
+    "actions": "Actions"
+  },
+  "status": {
+    "notCreated": "Not set up",
+    "on": "On",
+    "off": "Off",
+    "applying": "Applying…",
+    "checkedBranches": "Checked {{n}} branches",
+    "checkedBranchesPlural": {
+      "one": "Checked {{n}} branch",
+      "other": "Checked {{n}} branches"
+    }
+  },
+  "actions": {
+    "branches": "Branches"
+  },
+  "reasons": {
+    "turnOnParentFirst": "Turn on {{app}} first.",
+    "readOnly": "You can view activation status only."
+  },
+  "footerNote": "Turning an application off keeps its purchases, seats and history.",
+  "states": {
+    "emptyTitle": "No applications are purchased for this workspace yet.",
+    "forbiddenTitle": "Access restricted",
+    "forbiddenText": "You need the permission to view application activation for this company.",
+    "loadFailed": "Could not load application activations.",
+    "supportRef": "Support reference",
+    "retry": "Try again"
+  },
+  "reasonModal": {
+    "turnOnTitle": "Turn on {{name}} for {{company}}?",
+    "turnOffTitle": "Turn off {{name}} for {{company}}?",
+    "turnOnConfirm": "Turn on",
+    "turnOffConfirm": "Turn off",
+    "reasonLabel": "Reason",
+    "reasonHint": "Saved in the audit log.",
+    "reasonPlaceholder": "Explain why you are making this change"
+  },
+  "validation": {
+    "reasonRequired": "Reason is required.",
+    "reasonMin": "Enter at least {{min}} characters.",
+    "reasonMax": "Enter at most {{max}} characters.",
+    "reasonNoControlChars": "Control characters are not allowed."
+  },
+  "branchModal": {
+    "title": "{{addon}} in each branch of {{company}}",
+    "colBranch": "Branch",
+    "colMode": "Setting",
+    "colModeHint": "Each branch follows the company setting or has the add-on turned off.",
+    "followCompany": "Follow company",
+    "off": "Off",
+    "companyAddonOff": "Turned off for the whole company.",
+    "companyAppOff": "The application is turned off for the whole company, so the branch cannot follow it.",
+    "turnInheritTitle": "Follow company for {{addon}} in {{branch}}?",
+    "turnDisabledTitle": "Turn off {{addon}} in {{branch}}?",
+    "turnInheritConfirm": "Follow company",
+    "turnDisabledConfirm": "Turn off",
+    "empty": "This company has no branches yet.",
+    "loadFailed": "Could not load branch overrides.",
+    "branchLoadFailed": "Could not load",
+    "forbidden": "You don't have permission to view branches for this company.",
+    "toastSaved": "Branch setting updated."
+  },
+  "toast": {
+    "turnedOn": "{{name}} turned on.",
+    "turnedOff": "{{name}} turned off."
+  },
+  "rejected": {
+    "SOURCE_CHANGED": "The purchase changed while applying. Try again.",
+    "AUTHORITY_CHANGED": "Your access changed while applying.",
+    "CONFIGURATION_REJECTED": "The add-on settings were not accepted."
+  },
+  "errors": {
+    "companyNotFound": "The company in the link is not available to you. Showing another company.",
+    "addonNotAvailable": "This add-on is not available to turn on yet.",
+    "APPLICATION_ALLOWANCE_NOT_READY": "{{name}} is not ready to turn on. Check the subscription or try again later.",
+    "APPLICATION_ACTIVATION_REVISION_STALE": "This changed since you opened it. The list was refreshed.",
+    "ADDON_REVISION_STALE": "This changed since you opened it. The list was refreshed.",
+    "ADDON_CONFIGURATION_INVALID": "Set up this add-on's settings before turning it on.",
+    "ADDON_OPERATION_UNCERTAIN": "A previous change has no confirmed result yet. Refresh and try again.",
+    "ACCESS_POLICY_UNAVAILABLE": "Subscription access policy is temporarily unavailable. Try again shortly.",
+    "ACCESS_POLICY_BLOCKED": "You do not have permission for this action.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request conflicts with an earlier submission. Try again.",
+    "CORE_VALIDATION_FAILED": "Check the reason and try again."
+  },
+  "apps": {
+    "accounting": "Accounting",
+    "crm": "CRM",
+    "trade": "Trade"
+  },
+  "addons": {
+    "crm": {
+      "homes": "Real estate (homes)",
+      "telephony": "Telephony"
+    },
+    "unknown": "Add-on {{key}}"
+  }
+}

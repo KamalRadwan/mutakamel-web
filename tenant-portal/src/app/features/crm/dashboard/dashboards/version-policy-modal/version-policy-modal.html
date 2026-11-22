@@ -1,0 +1,240 @@
+<ui-modal
+  size="form"
+  tile="bg-icon-gray"
+  icon="tablerVersions"
+  [title]="'dashEdit.policyTitle' | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  @if (loading()) {
+    <div class="flex flex-col gap-8" [attr.aria-busy]="true">
+      <div class="h-btn animate-pulse rounded-8 bg-neutral-soft"></div>
+      <div class="h-btn animate-pulse rounded-8 bg-neutral-soft"></div>
+      <div class="h-btn animate-pulse rounded-8 bg-neutral-soft"></div>
+      <span class="sr-only" role="status">{{ 'dashEdit.loading' | transloco }}</span>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-8 text-center">
+      <p class="text-12 leading-18 text-text-muted">{{ 'analytics.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
+        {{ 'analytics.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (binding(); as b) {
+    <div class="flex flex-col gap-10">
+      <dl class="divide-y divide-border rounded-10 border border-border bg-surface px-10">
+        <div #activeRow class="flex h-btn items-center justify-between gap-8 text-12">
+          <dt class="flex min-w-0 items-center gap-4 text-text-muted">
+            <span class="truncate">{{ 'dashEdit.activeVersion' | transloco }}</span>
+            <span
+              #activeTrigger
+              class="relative inline-flex shrink-0 items-center text-accent"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-active-hint'"
+              (mouseenter)="showHint('active', activeTrigger, activeRow, activeTip)"
+              (mouseleave)="hideHint()"
+              (focus)="showHint('active', activeTrigger, activeRow, activeTip)"
+              (blur)="hideHint()"
+              (keydown.escape)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #activeTip
+                [id]="uid + '-active-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class.invisible]="activeHint() !== 'active'"
+                [style.top.px]="tooltipPlace().top"
+                [style.inset-inline-start.px]="tooltipPlace().start"
+              >
+                {{ 'dashEdit.activeVersionHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd [attr.aria-describedby]="uid + '-active-hint'" class="shrink-0 font-medium text-text tabular-nums">
+            <bdi dir="ltr">{{ b.activeVersionNumber }}</bdi>
+          </dd>
+        </div>
+
+        <div #selectedRow class="flex h-btn items-center justify-between gap-8 text-12">
+          <dt class="flex min-w-0 items-center gap-4 text-text-muted">
+            <span class="truncate">{{ 'dashEdit.selectedVersion' | transloco }}</span>
+            <span
+              #selectedTrigger
+              class="relative inline-flex shrink-0 items-center text-accent"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-selected-hint'"
+              (mouseenter)="showHint('selected', selectedTrigger, selectedRow, selectedTip)"
+              (mouseleave)="hideHint()"
+              (focus)="showHint('selected', selectedTrigger, selectedRow, selectedTip)"
+              (blur)="hideHint()"
+              (keydown.escape)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #selectedTip
+                [id]="uid + '-selected-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class.invisible]="activeHint() !== 'selected'"
+                [style.top.px]="tooltipPlace().top"
+                [style.inset-inline-start.px]="tooltipPlace().start"
+              >
+                {{ 'dashEdit.selectedVersionHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd [attr.aria-describedby]="uid + '-selected-hint'" class="shrink-0 font-medium text-text tabular-nums">
+            <bdi dir="ltr">{{ b.selectedVersionNumber }}</bdi>
+          </dd>
+        </div>
+
+        <div #revisionRow class="flex h-btn items-center justify-between gap-8 text-12">
+          <dt class="flex min-w-0 items-center gap-4 text-text-muted">
+            <span class="truncate">{{ 'dashEdit.widgetRevision' | transloco }}</span>
+            <span
+              #revisionTrigger
+              class="relative inline-flex shrink-0 items-center text-accent"
+              tabindex="0"
+              [attr.aria-describedby]="uid + '-revision-hint'"
+              (mouseenter)="showHint('revision', revisionTrigger, revisionRow, revisionTip)"
+              (mouseleave)="hideHint()"
+              (focus)="showHint('revision', revisionTrigger, revisionRow, revisionTip)"
+              (blur)="hideHint()"
+              (keydown.escape)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #revisionTip
+                [id]="uid + '-revision-hint'"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class.invisible]="activeHint() !== 'revision'"
+                [style.top.px]="tooltipPlace().top"
+                [style.inset-inline-start.px]="tooltipPlace().start"
+              >
+                {{ 'dashEdit.widgetRevisionHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd [attr.aria-describedby]="uid + '-revision-hint'" class="shrink-0 font-medium text-text tabular-nums">
+            <bdi dir="ltr">{{ b.widgetRevision }}</bdi>
+          </dd>
+        </div>
+      </dl>
+
+      <ui-field
+        size="bare"
+        [label]="'dashEdit.policy' | transloco"
+        [for]="uid + '-policy'"
+        [hint]="'dashEdit.policyHint' | transloco"
+      >
+        <ui-segmented
+          class="self-start"
+          [id]="uid + '-policy'"
+          [describedBy]="uid + '-policy-hint'"
+          [label]="'dashEdit.policy' | transloco"
+          [options]="policyOptions()"
+          [value]="policy()"
+          (valueChange)="onPolicyChange($event)"
+        />
+      </ui-field>
+
+      @if (policy() === 'PINNED') {
+        <ui-field
+          size="bare"
+          [label]="'dashEdit.version' | transloco"
+          [for]="uid + '-version'"
+          [hint]="'dashEdit.versionSelectHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-version'"
+            [describedBy]="uid + '-version-hint'"
+            [label]="'dashEdit.version' | transloco"
+            [options]="versionOptions()"
+            [value]="pinnedVersion()"
+            (valueChange)="onPinnedVersionChange($event)"
+          />
+        </ui-field>
+      }
+
+      @if (proposedNewSize(); as box) {
+        <dl class="rounded-10 border border-border bg-surface px-10">
+          <div #newSizeRow class="flex h-btn items-center justify-between gap-8 text-12">
+            <dt class="flex min-w-0 items-center gap-4 text-text-muted">
+              <span class="truncate">{{ 'dashEdit.newSize' | transloco }}</span>
+              <span
+                #newSizeTrigger
+                class="relative inline-flex shrink-0 items-center text-accent"
+                tabindex="0"
+                [attr.aria-describedby]="uid + '-newsize-hint'"
+                (mouseenter)="showHint('newSize', newSizeTrigger, newSizeRow, newSizeTip)"
+                (mouseleave)="hideHint()"
+                (focus)="showHint('newSize', newSizeTrigger, newSizeRow, newSizeTip)"
+                (blur)="hideHint()"
+                (keydown.escape)="hideHint()"
+              >
+                <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+                <span
+                  #newSizeTip
+                  [id]="uid + '-newsize-hint'"
+                  role="tooltip"
+                  class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                  [class.invisible]="activeHint() !== 'newSize'"
+                  [style.top.px]="tooltipPlace().top"
+                  [style.inset-inline-start.px]="tooltipPlace().start"
+                >
+                  {{ 'dashEdit.newSizeHint' | transloco }}
+                </span>
+              </span>
+            </dt>
+            <dd [attr.aria-describedby]="uid + '-newsize-hint'" class="shrink-0 font-medium text-text tabular-nums">
+              <bdi dir="ltr">{{ 'dashEdit.size' | transloco: { w: box.w, h: box.h } }}</bdi>
+            </dd>
+          </div>
+        </dl>
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="!canSave()"
+      (click)="save()"
+    >
+      {{ 'dashEdit.save' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="loading() || loadFailed() || !dirty() || saving()"
+      (click)="undo()"
+    >
+      <ng-icon name="tablerArrowBackUp" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      <span>{{ 'dashEdit.undo' | transloco }}</span>
+    </button>
+
+    @if (dirty()) {
+      <span class="text-12 leading-18 text-text-muted">{{ 'dashEdit.unsaved' | transloco }}</span>
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="cancel()"
+    >
+      {{ 'dashEdit.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

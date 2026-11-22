@@ -1,0 +1,431 @@
+@if (readonly()) {
+  <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+    <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+    <span>{{ readonlyReason() || ('access.common.readonly' | transloco) }}</span>
+  </p>
+}
+
+@if (!readonly()) {
+  <div class="flex justify-end">
+    <button type="button" uiButton variant="secondary" size="small" (click)="openAddTeamModal()">
+      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+      <span>{{ 'access.teams.add' | transloco }}</span>
+    </button>
+  </div>
+}
+
+@if (loadFailed()) {
+  <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span
+      class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+      aria-hidden="true"
+    >
+      <ng-icon name="tablerCloudOff" size="20" />
+    </span>
+    <p class="text-12 text-danger-text">{{ 'access.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+      {{ 'access.common.retry' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-modal-form"
+      [attr.aria-label]="'access.teams.cols.team' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [class]="gridColumns()"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'access.teams.cols.team' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'access.teams.cols.role' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'access.teams.cols.primary' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'access.teams.cols.reporting' | transloco }}
+        </span>
+        @if (!readonly()) {
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'access.common.actions' | transloco }}</span>
+          </span>
+        }
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+            [class]="gridColumns()"
+            aria-hidden="true"
+          >
+            <span role="cell" class="flex min-w-0 items-center px-10">
+              <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-time-dd rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-time-dd rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-time-dd rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </span>
+            @if (!readonly()) {
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+            }
+          </div>
+        }
+      } @else {
+        @for (membership of memberships(); track membership.id) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+            [class]="gridColumns()"
+          >
+            <span role="cell" class="flex min-w-0 items-baseline gap-6 px-10">
+              <span class="truncate font-medium">{{ teamName(membership) }}</span>
+              <span class="truncate text-12 text-text-muted">
+                {{ departmentName(membership.departmentId) }} · {{ branchName(membership.branchId) }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span
+                class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                [class]="roleBadge[membership.role]"
+              >
+                {{ 'access.teams.role.' + membership.role | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (membership.isPrimary) {
+                <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text whitespace-nowrap">
+                  <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+                  <span>{{ 'access.teams.home' | transloco }}</span>
+                </span>
+              } @else {
+                <span class="text-12 text-text-muted">—</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (hasReportingAccess(membership.role)) {
+                <button
+                  type="button"
+                  class="inline-flex h-badge cursor-pointer items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft tabular-nums outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="('access.teams.reporting' | transloco) + ': ' + reportingCount(membership)"
+                  (click)="openReportingModal(membership)"
+                >
+                  <ng-icon name="tablerGitBranch" size="11" aria-hidden="true" />
+                  <span>{{ reportingCount(membership) }}</span>
+                </button>
+              } @else {
+                <span class="text-12 text-text-muted">—</span>
+              }
+            </span>
+
+            @if (!readonly()) {
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <ui-actions-menu
+                  [items]="actionsFor(membership)"
+                  [label]="'access.common.actions' | transloco"
+                  (selected)="onAction(membership, $event)"
+                />
+              </span>
+            }
+          </div>
+        } @empty {
+          <div role="row">
+            <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+              {{ 'access.teams.empty' | transloco }}
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+<ui-modal
+  #addTeamModal
+  size="form"
+  icon="tablerPlus"
+  tile="bg-icon-blue"
+  [title]="'access.teams.add' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+  [dismissable]="!savingAdd()"
+>
+  <div class="flex flex-col gap-8">
+    <app-org-cascade
+      [levels]="['company', 'branch', 'department', 'team']"
+      [required]="['company', 'branch', 'department', 'team']"
+      [errors]="cascadeErrors()"
+      [(value)]="cascadeValue"
+    />
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-add-role'"
+      [label]="'access.teams.roleField' | transloco"
+      [hint]="'access.teams.roleFieldHint' | transloco"
+      [required]="true"
+    >
+      <div>
+        <ui-segmented
+          [id]="uid + '-add-role'"
+          [describedBy]="uid + '-add-role-hint'"
+          [options]="roleOptions()"
+          [label]="'access.teams.roleField' | transloco"
+          [value]="addRole()"
+          (valueChange)="setAddRole($event)"
+        />
+      </div>
+    </ui-field>
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    [loading]="savingAdd()"
+    [disabled]="savingAdd()"
+    (click)="saveAddTeam()"
+  >
+    {{ 'access.common.save' | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="savingAdd()"
+    (click)="addTeamModal.close()"
+  >
+    {{ 'access.common.cancel' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-modal
+  #changeRoleModal
+  size="confirm"
+  icon="tablerAdjustmentsHorizontal"
+  tile="bg-icon-blue"
+  [title]="'access.teams.changeRole' | transloco"
+  [subtitle]="editingMembership() ? teamName(editingMembership()!) : ''"
+  [closeLabel]="'access.common.close' | transloco"
+  [dismissable]="!savingRole()"
+>
+  <ui-field
+    size="bare"
+    [for]="uid + '-change-role'"
+    [label]="'access.teams.roleField' | transloco"
+    [hint]="'access.teams.roleFieldHint' | transloco"
+    [required]="true"
+  >
+    <div>
+      <ui-segmented
+        [id]="uid + '-change-role'"
+        [describedBy]="uid + '-change-role-hint'"
+        [options]="roleOptions()"
+        [label]="'access.teams.roleField' | transloco"
+        [value]="nextRole()"
+        (valueChange)="setNextRole($event)"
+      />
+    </div>
+  </ui-field>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    [loading]="savingRole()"
+    [disabled]="savingRole()"
+    (click)="saveRoleChange()"
+  >
+    {{ 'access.common.save' | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="savingRole()"
+    (click)="changeRoleModal.close()"
+  >
+    {{ 'access.common.cancel' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-confirm-dialog
+  #removeTeamConfirm
+  tone="danger"
+  [title]="'access.teams.remove' | transloco"
+  [text]="removeConfirmText()"
+  [confirmLabel]="'access.teams.remove' | transloco"
+  [cancelLabel]="'access.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #reportingModal
+  size="form"
+  icon="tablerGitBranch"
+  tile="bg-icon-teal"
+  [title]="'access.rep.title' | transloco"
+  [subtitle]="'access.rep.desc' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+  [dismissable]="!savingReporting()"
+>
+  @if (reportingLoading()) {
+    <div class="flex flex-col gap-6" aria-hidden="true">
+      @for (row of skeletonRows; track row) {
+        <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+      }
+    </div>
+  } @else if (reportingFailed()) {
+    <div class="flex flex-col items-center gap-8 p-16 text-center" role="alert">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCloudOff" size="20" />
+      </span>
+      <p class="text-12 text-danger-text">{{ 'access.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reloadCurrentReporting()">
+        {{ 'access.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (reportingScopes(); as scopes) {
+    <div class="flex flex-col gap-10">
+      @if (!canManageReporting()) {
+        <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+          <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+          <span>{{ 'access.rep.readonly' | transloco }}</span>
+        </p>
+      }
+
+      <div class="flex items-center justify-between gap-8">
+        <span class="text-12 font-medium text-text">{{ 'access.rep.title' | transloco }}</span>
+        <span class="text-12 tabular-nums text-text-muted">
+          {{ 'access.rep.count' | transloco: { n: totalReportingCount() } }}
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-6">
+        @for (item of visibleExistingReporting(); track item.id) {
+          <div class="flex h-table-row items-center justify-between gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+            <span class="min-w-0 truncate text-13 font-medium text-text">{{ branchName(item.branchId) }}</span>
+
+            @if (item.origin === 'HOME') {
+              <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text whitespace-nowrap">
+                <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+                <span>{{ 'access.rep.home' | transloco }}</span>
+              </span>
+            } @else if (canManageReporting() && item.capabilities.canRemove) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'access.common.remove' | transloco"
+                [title]="'access.common.remove' | transloco"
+                (click)="stageRemoveExplicit(item.branchId)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        }
+      </div>
+
+      @if (canManageReporting()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-reporting-branches'"
+          [label]="'access.rep.add' | transloco"
+          [hint]="'access.rep.addHint' | transloco"
+        >
+          <div
+            [id]="uid + '-reporting-branches'"
+            role="group"
+            [attr.aria-label]="'access.rep.add' | transloco"
+            [attr.aria-describedby]="uid + '-reporting-branches-hint'"
+            class="flex max-h-notif-list-max flex-col gap-4 overflow-y-auto rounded-10 border border-border bg-surface p-6"
+          >
+            @for (branch of addableBranches(); track branch.id) {
+              <div class="flex items-center rounded-6 px-4 py-2 hover:bg-row-hover">
+                @if (atReportingLimit() && !isPendingAdd(branch.id)) {
+                  <div class="inline-flex cursor-not-allowed items-center gap-6 text-12 text-text-placeholder opacity-drag-source">
+                    <span
+                      role="checkbox"
+                      aria-checked="false"
+                      aria-disabled="true"
+                      class="inline-flex size-checkbox-size shrink-0 rounded-4 border-check border-border-field bg-neutral-soft"
+                    ></span>
+                    <span>{{ branch.name }}</span>
+                  </div>
+                } @else {
+                  <ui-checkbox
+                    [checked]="isPendingAdd(branch.id)"
+                    (checkedChange)="togglePendingAdd(branch.id, $event)"
+                  >
+                    <span>{{ branch.name }}</span>
+                  </ui-checkbox>
+                }
+              </div>
+            } @empty {
+              <p class="p-8 text-center text-12 text-text-muted">{{ 'access.rep.emptyAdd' | transloco }}</p>
+            }
+          </div>
+        </ui-field>
+      }
+    </div>
+  }
+
+  @if (canManageReporting() && !reportingLoading() && !reportingFailed()) {
+    <button
+      modal-footer
+      type="button"
+      uiButton
+      [loading]="savingReporting()"
+      [disabled]="savingReporting()"
+      (click)="saveReporting()"
+    >
+      {{ 'access.common.save' | transloco }}
+    </button>
+  }
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="savingReporting()"
+    (click)="reportingModal.close()"
+  >
+    {{ (canManageReporting() ? 'access.common.cancel' : 'access.common.close') | transloco }}
+  </button>
+</ui-modal>
+
+<ui-modal
+  #conflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'access.rep.conflictTitle' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'access.rep.conflictText' | transloco }}</p>
+
+  <button modal-footer type="button" uiButton (click)="reloadReportingAfterConflict()">
+    {{ 'access.common.reload' | transloco }}
+  </button>
+</ui-modal>

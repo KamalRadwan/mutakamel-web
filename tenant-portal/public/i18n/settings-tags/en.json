@@ -1,0 +1,103 @@
+{
+  "title": "Tags",
+  "new": "New tag",
+  "search": "Search tags",
+  "limitReached": "Maximum of {{max}} tags reached",
+  "empty": "No tags yet",
+  "table": {
+    "tag": "Tag",
+    "colour": "Colour"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit"
+  },
+  "color": {
+    "none": "No colour",
+    "custom": "Custom",
+    "background": "Background colour",
+    "backgroundHint": "Fill colour of the tag chip in #RRGGBB hex format, such as #DBEAFE.",
+    "text": "Text colour",
+    "textHint": "Text colour inside the tag chip in #RRGGBB hex format, such as #1E40AF.",
+    "presetsLabel": "Colour presets"
+  },
+  "presets": {
+    "red": "Red",
+    "orange": "Orange",
+    "amber": "Amber",
+    "yellow": "Yellow",
+    "lime": "Lime",
+    "green": "Green",
+    "emerald": "Emerald",
+    "teal": "Teal",
+    "cyan": "Cyan",
+    "sky": "Sky",
+    "blue": "Blue",
+    "indigo": "Indigo",
+    "violet": "Violet",
+    "purple": "Purple",
+    "fuchsia": "Fuchsia",
+    "pink": "Pink",
+    "rose": "Rose",
+    "slate": "Slate",
+    "gray": "Gray",
+    "stone": "Stone",
+    "redStrong": "Strong red",
+    "orangeStrong": "Strong orange",
+    "amberStrong": "Strong amber",
+    "greenStrong": "Strong green",
+    "tealStrong": "Strong teal",
+    "blueStrong": "Strong blue",
+    "indigoStrong": "Strong indigo",
+    "purpleStrong": "Strong purple",
+    "pinkStrong": "Strong pink",
+    "slateStrong": "Strong slate"
+  },
+  "form": {
+    "createTitle": "New tag",
+    "editTitle": "Tag",
+    "name": "Name",
+    "nameHint": "Shown as a chip on leads, customers and opportunities (up to 60 characters).",
+    "namePlaceholder": "Enter tag name",
+    "colour": "Colour",
+    "colourHint": "Choose a preset, set custom hex colours, or leave without a colour.",
+    "preview": "Preview",
+    "previewHint": "Live preview of how this tag chip appears on leads, customers and opportunities.",
+    "previewPlaceholder": "Tag preview",
+    "lowContrast": "This text colour may be hard to read."
+  },
+  "validation": {
+    "nameRequired": "Tag name is required.",
+    "nameMaxLength": "Tag name must be at most {{max}} characters.",
+    "hexRequired": "Enter a hex colour.",
+    "invalidHex": "Use the #RRGGBB format."
+  },
+  "discard": {
+    "title": "Discard your changes?",
+    "text": "Your changes to this tag are not saved.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "delete": {
+    "title": "Delete tag?",
+    "text": "Delete “{{name}}”? It is removed from every lead, customer and opportunity that carries it.",
+    "blockedTitle": "Cannot delete tag yet",
+    "blockedText": "{{count}} leads carry this tag. Remove it from leads until 100 or fewer carry it, then delete it."
+  },
+  "toasts": {
+    "created": "Tag created",
+    "saved": "Tag saved",
+    "deleted": "Tag deleted"
+  },
+  "errors": {
+    "CRM_TAG_NAME_TAKEN": "A tag with this name already exists.",
+    "CRM_TAG_COLOR_INCOMPLETE": "Choose both background and text colours, or clear both.",
+    "CRM_TAG_LIMIT_EXCEEDED": "You have reached the maximum number of tags.",
+    "CRM_TAG_UPDATE_EMPTY": "No changes to save.",
+    "CRM_TAG_NOT_FOUND": "This tag no longer exists.",
+    "CRM_TAG_DETACH_LIMIT_EXCEEDED": "Too many leads carry this tag to delete it at once.",
+    "CRM_TAG_NAME_INVALID": "Enter a valid tag name up to 60 characters.",
+    "CRM_TAG_COLOR_INVALID": "Enter valid #RRGGBB hex colours.",
+    "CRM_VALIDATION_FAILED": "Some values are not valid. Check them and try again."
+  }
+}

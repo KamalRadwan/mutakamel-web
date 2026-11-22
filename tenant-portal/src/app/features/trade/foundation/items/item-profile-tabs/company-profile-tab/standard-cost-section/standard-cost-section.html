@@ -1,0 +1,30 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <ui-section-bar tone="navy" icon="tablerCoins" [title]="'itemForm.sections.standardCost' | transloco" />
+
+  <div [class]="pageGrid">
+    <ui-field
+      [for]="uid + '-standard-cost'"
+      [label]="'itemForm.fields.standardCost.label' | transloco"
+      [hint]="'itemForm.fields.standardCost.hint' | transloco"
+      [hintText]="disabledReason()"
+      [error]="errorText()"
+    >
+      @if (!isReadonly() && currencyCode(); as code) {
+        <bdi dir="ltr" class="shrink-0 text-11 font-medium text-text-muted">{{ code }}</bdi>
+      }
+      <input
+        [id]="uid + '-standard-cost'"
+        type="text"
+        dir="ltr"
+        [attr.inputmode]="isReadonly() ? null : 'decimal'"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [disabled]="isDisabled()"
+        [readonly]="isReadonly()"
+        [attr.title]="disabledReason()"
+        [attr.aria-invalid]="errorText() ? 'true' : null"
+        [value]="isReadonly() ? formattedValue() : value()"
+        (input)="onInput($event)"
+      />
+    </ui-field>
+  </div>
+</section>

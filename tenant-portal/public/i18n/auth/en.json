@@ -1,0 +1,104 @@
+{
+  "brand": "Mutakamel",
+  "login": {
+    "headline": "From the first sale",
+    "headlineAccent": "to the final invoice.",
+    "description": "Sales, customers, and accounting in one workspace.",
+    "copyright": "© Mutakamel {{year}}",
+    "title": "Sign in",
+    "email": "Email",
+    "emailHint": "The email your invitation was sent to",
+    "password": "Password",
+    "passwordHint": "Your account password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "submit": "Sign in",
+    "session": "Session",
+    "remember": "Remember me",
+    "rememberHint": "Keep you signed in on this device after you close the browser",
+    "forgot": "Forgot password?",
+    "verifyExpired": "Your verification session expired. Sign in again."
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Enter a valid email",
+    "maxLength": "Use at most {{max}} characters",
+    "server": "Check this value and try again"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": {
+      "title": "Sign-in failed",
+      "text": "Wrong email or password"
+    },
+    "AUTH_LOGIN_THROTTLED": {
+      "title": "Too many attempts",
+      "text": "Try again in {{minutes}} minutes"
+    },
+    "AUTH_MFA_THROTTLED": {
+      "title": "Too many attempts",
+      "text": "Try again in {{minutes}} minutes"
+    },
+    "AUTH_SESSION_LIMIT_REACHED": {
+      "title": "Too many open sessions",
+      "text": "Close an old session and try again"
+    },
+    "SUBSCRIPTION_PAST_DUE": {
+      "title": "Subscription past due",
+      "text": "Contact the account owner"
+    },
+    "PLATFORM_MAINTENANCE": {
+      "title": "Under maintenance",
+      "text": "Try again shortly"
+    },
+    "AUTH_MFA_UNAVAILABLE": {
+      "title": "Verification unavailable",
+      "text": "Try again shortly"
+    },
+    "RATE_LIMITED": {
+      "title": "Too many requests",
+      "text": "Wait a moment, then try again"
+    },
+    "TENANT_NOT_RESOLVABLE": {
+      "title": "Workspace not found",
+      "text": "Check the workspace address you opened"
+    },
+    "CORE_VALIDATION_FAILED": {
+      "title": "Check your entries",
+      "text": "Correct the email and password, then try again"
+    },
+    "UNKNOWN": {
+      "title": "Something went wrong",
+      "text": "Try again"
+    }
+  },
+  "shared": {
+    "backToSignIn": "Back to sign in",
+    "newPassword": "New password",
+    "newPasswordHint": "At least 12 characters with a lowercase letter, a capital letter, a number and a symbol.",
+    "confirmPassword": "Confirm password",
+    "confirmPasswordHint": "Type the new password again.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "rules": {
+      "length": "At least 12 characters",
+      "lower": "A lowercase letter",
+      "upper": "A capital letter",
+      "digit": "A number",
+      "symbol": "A symbol, such as ! or #",
+      "match": "The two passwords match"
+    },
+    "throttle": "Too many attempts. Try again in {{s}} seconds.",
+    "throttleDone": "You can try again now.",
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "network": "Could not reach the server. Check your connection.",
+      "WEAK_PASSWORD": "This password is too common, too simple, or contains your name or email. Choose another.",
+      "PASSWORD_TOO_LONG": "Use 128 characters or fewer.",
+      "PLATFORM_MAINTENANCE": "The workspace is under maintenance. Try again shortly.",
+      "SUBSCRIPTION_PAST_DUE": "The subscription is past due. Only the account owner can sign in.",
+      "AUTH_SESSION_LIMIT_REACHED": "You have too many open sessions. Sign out on another device and try again.",
+      "TENANT_NOT_RESOLVABLE": "This workspace address was not found.",
+      "unavailable": "The service is not available right now. Try again shortly."
+    }
+  }
+}

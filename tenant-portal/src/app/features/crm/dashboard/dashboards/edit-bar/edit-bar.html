@@ -1,0 +1,108 @@
+<div
+  role="region"
+  [attr.aria-label]="'dashEdit.editBarLabel' | transloco"
+  class="flex min-h-bulk-bar items-center gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+  [class.py-4]="!!(sizeError())"
+>
+  <button
+    type="button"
+    uiButton
+    variant="primary"
+    size="small"
+    class="shrink-0"
+    [loading]="saving()"
+    [disabled]="!dirty() || saving()"
+    (click)="save.emit()"
+  >
+    {{ 'dashEdit.saveLayout' | transloco }}
+  </button>
+
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    size="small"
+    class="shrink-0"
+    [disabled]="!canUndo() || saving()"
+    (click)="undo.emit()"
+  >
+    <ng-icon name="tablerArrowBackUp" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    <span>{{ 'dashEdit.undo' | transloco }}</span>
+  </button>
+
+  @if (dirty()) {
+    <span class="shrink-0 whitespace-nowrap text-12 leading-18 font-medium">
+      {{ 'dashEdit.unsaved' | transloco }}
+    </span>
+  }
+
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    size="small"
+    class="shrink-0"
+    [disabled]="saving()"
+    (click)="cancel.emit()"
+  >
+    {{ 'dashEdit.cancel' | transloco }}
+  </button>
+
+  <span class="h-counter w-border shrink-0 bg-border-field" aria-hidden="true"></span>
+
+  @if (selectedName(); as name) {
+    <span class="min-w-0 truncate text-12 leading-18 font-medium" dir="auto" [title]="name">
+      {{ name }}
+    </span>
+  } @else {
+    <span class="min-w-0 truncate text-12 leading-18 text-text-muted">
+      {{ 'dashEdit.noSelection' | transloco }}
+    </span>
+  }
+
+  @if (selectedSize(); as box) {
+    <div class="flex min-w-0 shrink-0 flex-col">
+      <bdi dir="ltr" class="whitespace-nowrap text-12 leading-18 tabular-nums">
+        {{ 'dashEdit.size' | transloco: { w: box.w, h: box.h } }}
+      </bdi>
+      @if (sizeError(); as err) {
+        <span role="alert" class="mt-2 text-12 leading-16 text-danger-text">
+          {{ err }}
+        </span>
+      }
+    </div>
+  } @else if (sizeError(); as err) {
+    <span role="alert" class="shrink-0 text-12 leading-16 text-danger-text">
+      {{ err }}
+    </span>
+  }
+
+  <span class="min-w-0 flex-1" aria-hidden="true"></span>
+
+  <button
+    #kbdBtn
+    type="button"
+    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-accent outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [attr.aria-label]="'dashEdit.keyboardLabel' | transloco"
+    [attr.aria-describedby]="resolvedKeyboardHintId()"
+    (mouseenter)="showTooltip(kbdBtn)"
+    (mouseleave)="hideTooltip()"
+    (focus)="showTooltip(kbdBtn)"
+    (blur)="hideTooltip()"
+    (keydown.escape)="hideTooltip()"
+  >
+    <ng-icon name="tablerKeyboard" size="14" aria-hidden="true" />
+  </button>
+
+  <span
+    #tooltip
+    [id]="resolvedKeyboardHintId()"
+    role="tooltip"
+    class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+    [class.invisible]="!tipOpen()"
+    [style.top.px]="tooltipPlace().top"
+    [style.inset-inline-start.px]="tooltipPlace().start"
+  >
+    {{ 'dashEdit.keyboard' | transloco }}
+  </span>
+</div>

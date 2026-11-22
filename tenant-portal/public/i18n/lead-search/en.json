@@ -1,0 +1,123 @@
+{
+  "advanced": "Advanced",
+  "advancedCount": "{{n}} conditions",
+  "me": "Me",
+  "textReplaces": "Replaces the current text search.",
+  "rejected": {
+    "CONTRADICTION": "This conflicts with an existing {{field}} condition."
+  },
+  "presets": {
+    "mine": "My leads",
+    "unassigned": "Unassigned",
+    "hot": "Hot (3 stars)",
+    "overdue": "Overdue activity"
+  },
+  "groups": {
+    "contactAndText": "Contact and text",
+    "classification": "Classification",
+    "people": "People",
+    "dates": "Dates",
+    "activityAndTags": "Activity and tags"
+  },
+  "fields": {
+    "lead": "Lead name",
+    "customer": "Contact name",
+    "email": "Email",
+    "phone": "Phone",
+    "tag": "Tags",
+    "overdue": "Overdue activity",
+    "leadType": "Lead type",
+    "source": "Source",
+    "stage": "Stage",
+    "stageFlag": "Stage meaning",
+    "status": "Status",
+    "owner": "Owner",
+    "createdBy": "Created by",
+    "rating": "Rating",
+    "cardColor": "Card colour",
+    "createdAt": "Created on",
+    "updatedAt": "Updated on",
+    "convertedAt": "Converted on",
+    "description": "Description",
+    "interestSummary": "Interest summary",
+    "expectedNeed": "Expected need"
+  },
+  "hints": {
+    "lead": "Matches the lead's name and its notes.",
+    "customer": "Matches the person or company name and linked contacts.",
+    "email": "Matches any email of the lead or its contacts.",
+    "phone": "Matches mobile and phone numbers, digits only.",
+    "tag": "Leads with at least one of the chosen tags.",
+    "overdue": "Yes = has an open activity past its due time. No = has no overdue activity (it may still have none at all).",
+    "leadType": "Individual or company.",
+    "source": "Where the lead came from.",
+    "stage": "The lead's current stage.",
+    "stageFlag": "What the stage means, across all stage names.",
+    "status": "Open, on hold, converted or disqualified.",
+    "owner": "The person responsible. \"Unassigned\" leads are visible only to users who can see all leads.",
+    "createdBy": "The person who added the lead.",
+    "rating": "From 0 to 3 stars.",
+    "cardColor": "The colour marked on the lead card.",
+    "createdAt": "Dates use the workspace time zone.",
+    "updatedAt": "Dates use the workspace time zone.",
+    "convertedAt": "Dates use the workspace time zone.",
+    "description": "Text search inside this note; can be slow on large lists.",
+    "interestSummary": "Text search inside this note; can be slow on large lists.",
+    "expectedNeed": "Text search inside this note; can be slow on large lists."
+  },
+  "leadTypes": {
+    "INDIVIDUAL": "Individual",
+    "CORPORATE": "Company"
+  },
+  "stageFlags": {
+    "NEW": "New",
+    "CONTACTED": "Contacted",
+    "QUALIFYING": "Qualifying",
+    "QUALIFIED": "Qualified",
+    "DISQUALIFIED": "Disqualified",
+    "CONVERTED": "Converted",
+    "NURTURING": "Nurturing",
+    "ON_HOLD": "On hold"
+  },
+  "statuses": {
+    "OPEN": "Open",
+    "ON_HOLD": "On hold",
+    "CONVERTED": "Converted",
+    "DISQUALIFIED": "Disqualified"
+  },
+  "cardColors": {
+    "RED": "Red",
+    "ORANGE": "Orange",
+    "AMBER": "Amber",
+    "YELLOW": "Yellow",
+    "GREEN": "Green",
+    "TEAL": "Teal",
+    "BLUE": "Blue",
+    "INDIGO": "Indigo",
+    "PURPLE": "Purple",
+    "PINK": "Pink",
+    "SLATE": "Slate"
+  },
+  "nullLabels": {
+    "source": {
+      "isNull": "No source",
+      "isNotNull": "Has a source"
+    },
+    "owner": {
+      "isNull": "Unassigned",
+      "isNotNull": "Assigned"
+    },
+    "createdBy": {
+      "isNull": "Unknown",
+      "isNotNull": "Known"
+    },
+    "cardColor": {
+      "isNull": "No colour",
+      "isNotNull": "Has a colour"
+    },
+    "convertedAt": {
+      "isNull": "Not converted",
+      "isNotNull": "Converted"
+    }
+  }
+}

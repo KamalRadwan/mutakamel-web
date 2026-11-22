@@ -1,0 +1,45 @@
+{
+  "back": "Back to customers",
+  "newTitle": "New customer",
+  "create": "Create customer",
+  "statusLabel": "Status",
+  "errorsDot": "This tab has errors",
+  "header": {
+    "customerSince": "Customer since {{date}}",
+    "fromLead": "From lead",
+    "logActivity": "Log activity",
+    "newOpportunity": "New opportunity",
+    "changeColour": "Change colour",
+    "delete": "Delete",
+    "actionsLabel": "Customer actions"
+  },
+  "tabs": {
+    "label": "Customer sections",
+    "overview": "Overview",
+    "activities": "Activities",
+    "calls": "Calls",
+    "attachments": "Attachments",
+    "history": "History",
+    "missed": "{{n}} missed"
+  },
+  "nav": {
+    "prev": "Previous customer",
+    "next": "Next customer"
+  },
+  "navGone": "That customer is no longer available.",
+  "created": "Customer “{{name}}” created.",
+  "loadFailed": "Could not load this customer.",
+  "scopeDenied": "You do not have permission to view this customer.",
+  "delete": {
+    "title": "Delete {{name}}?",
+    "bodyReopensLead": "The lead this customer came from will be reopened.",
+    "bodyPermanent": "This can't be undone.",
+    "reasonLabel": "Reason",
+    "reasonHint": "Optional note explaining why this customer is being deleted, up to 500 characters.",
+    "reasonTooLong": "Up to 500 characters.",
+    "done": "Customer deleted."
+  },
+  "history": {
+    "rating": "{{n}} of 3 stars"
+  }
+}

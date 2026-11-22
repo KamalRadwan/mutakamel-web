@@ -1,0 +1,274 @@
+<ui-modal
+  #dialog
+  size="form"
+  icon="tablerPlus"
+  tile="bg-icon-green"
+  [title]="'invStock.opening.title' | transloco"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+    <ui-field
+      size="bare"
+      [for]="uid + '-node'"
+      [label]="'invStock.opening.node' | transloco"
+      [required]="true"
+      [hint]="'invStock.opening.nodeHint' | transloco"
+      [error]="nodeError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-node'"
+        [describedBy]="describedBy('node', !!nodeError())"
+        [options]="nodeOptions()"
+        [value]="nodeId()"
+        [disabled]="saving() || nodesLoading() || activeNodes().length === 0"
+        [label]="'invStock.opening.node' | transloco"
+        (valueChange)="onNodeChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-item'"
+      [label]="'invStock.opening.item' | transloco"
+      [required]="true"
+      [hint]="'invStock.opening.itemHint' | transloco"
+      [error]="itemError()"
+    >
+      <app-trade-item-picker
+        [id]="uid + '-item'"
+        [describedBy]="describedBy('item', !!itemError())"
+        [kinds]="productKinds"
+        [excludeIds]="nonTrackedItemIds()"
+        [context]="companyContext()"
+        [value]="itemId()"
+        [invalid]="!!itemError()"
+        [disabled]="saving()"
+        (valueChange)="onItemChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-unit'"
+      [label]="'invStock.opening.unit' | transloco"
+      [required]="true"
+      [hint]="'invStock.opening.unitHint' | transloco"
+      [error]="uomError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-unit'"
+        [describedBy]="describedBy('unit', !!uomError())"
+        [options]="uomOptions()"
+        [value]="uomId()"
+        [disabled]="saving() || itemLoading() || !selectedItem() || itemUoms().length === 0"
+        [label]="'invStock.opening.unit' | transloco"
+        (valueChange)="onUomChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="uid + '-quantity'"
+      [label]="'invStock.opening.quantity' | transloco"
+      [required]="true"
+      [hint]="'invStock.opening.quantityHint' | transloco"
+      [error]="quantityError()"
+    >
+      <input
+        #quantityInput
+        [id]="uid + '-quantity'"
+        type="text"
+        inputmode="decimal"
+        dir="ltr"
+        autocomplete="off"
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="quantity()"
+        [disabled]="saving()"
+        [attr.aria-invalid]="quantityError() ? 'true' : null"
+        [attr.aria-describedby]="describedBy('quantity', !!quantityError())"
+        (input)="onQuantityInput($event)"
+        (blur)="markTouched('quantity')"
+      />
+    </ui-field>
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [for]="uid + '-effective-date'"
+        [label]="'invStock.opening.effectiveAt' | transloco"
+        [required]="true"
+        [hint]="'invStock.opening.effectiveAtHint' | transloco"
+        [error]="effectiveAtError()"
+      >
+        <div class="flex items-center gap-6">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            [id]="uid + '-effective-date'"
+            [ariaLabel]="'invStock.opening.effectiveAt' | transloco"
+            [describedBy]="describedBy('effective-date', !!effectiveAtError())"
+            [todayLabel]="'invStock.date.today' | transloco"
+            [prevMonthLabel]="'invStock.date.prevMonth' | transloco"
+            [nextMonthLabel]="'invStock.date.nextMonth' | transloco"
+            [value]="effectiveDate()"
+            [invalid]="!!effectiveAtError()"
+            [disabled]="saving()"
+            (valueChange)="onEffectiveDateChange($event)"
+          />
+          <ui-time-field
+            class="shrink-0"
+            [id]="uid + '-effective-time'"
+            [ariaLabel]="'invStock.opening.effectiveAt' | transloco"
+            [describedBy]="describedBy('effective-date', !!effectiveAtError())"
+            [hourLabel]="'invStock.date.hour' | transloco"
+            [minuteLabel]="'invStock.date.minute' | transloco"
+            [value]="effectiveTime()"
+            [invalid]="!!effectiveAtError()"
+            [disabled]="saving()"
+            (valueChange)="onEffectiveTimeChange($event)"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    @if (trackingMode() === 'LOT') {
+      <ui-field
+        [for]="uid + '-lot-key'"
+        [label]="'invStock.opening.lotKey' | transloco"
+        [required]="true"
+        [hint]="'invStock.opening.lotKeyHint' | transloco"
+        [count]="lotKey().length"
+        [max]="limits.lotKey"
+        [error]="lotKeyError()"
+      >
+        <input
+          [id]="uid + '-lot-key'"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          [attr.maxlength]="limits.lotKey"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [value]="lotKey()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="lotKeyError() ? 'true' : null"
+          [attr.aria-describedby]="describedBy('lot-key', !!lotKeyError())"
+          (input)="onLotKeyInput($event)"
+          (blur)="markTouched('lotKey')"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-expiry-date'"
+        [label]="'invStock.opening.expiryDate' | transloco"
+        [hint]="'invStock.opening.expiryDateHint' | transloco"
+      >
+        <div class="flex items-center gap-4">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            [id]="uid + '-expiry-date'"
+            [ariaLabel]="'invStock.opening.expiryDate' | transloco"
+            [describedBy]="uid + '-expiry-date-hint'"
+            [placeholder]="'invStock.opening.expiryDatePlaceholder' | transloco"
+            [todayLabel]="'invStock.date.today' | transloco"
+            [prevMonthLabel]="'invStock.date.prevMonth' | transloco"
+            [nextMonthLabel]="'invStock.date.nextMonth' | transloco"
+            [value]="expiryDate()"
+            [disabled]="saving()"
+            (valueChange)="onExpiryDateChange($event)"
+          />
+          @if (expiryDate() && !saving()) {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'tradeShared.picker.clear' | transloco"
+              [title]="'tradeShared.picker.clear' | transloco"
+              (click)="clearExpiryDate()"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+        </div>
+      </ui-field>
+    } @else if (trackingMode() === 'SERIAL') {
+      <div class="col-span-2">
+        <ui-field
+          size="multiline"
+          [for]="uid + '-serials'"
+          [label]="'invStock.opening.serials' | transloco"
+          [required]="true"
+          [hint]="'invStock.opening.serialsHint' | transloco"
+          [count]="parsedSerials().length"
+          [max]="expectedSerialCount()"
+          [error]="serialsError()"
+        >
+          <textarea
+            [id]="uid + '-serials'"
+            dir="ltr"
+            rows="4"
+            class="w-full resize-y bg-transparent text-12 leading-18 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+            [placeholder]="'invStock.opening.serialsPlaceholder' | transloco"
+            [value]="serialsText()"
+            [disabled]="saving()"
+            [attr.aria-invalid]="serialsError() ? 'true' : null"
+            [attr.aria-describedby]="describedBy('serials', !!serialsError())"
+            (input)="onSerialsInput($event)"
+            (blur)="markTouched('serials')"
+          ></textarea>
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving() || itemLoading()"
+    >
+      {{ 'invStock.opening.submit' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'tradeInventory.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'invStock.opening.discard.title' | transloco"
+  [text]="'invStock.opening.discard.text' | transloco"
+  [confirmLabel]="'invStock.opening.discard.confirm' | transloco"
+  [cancelLabel]="'invStock.opening.discard.keep' | transloco"
+/>
+
+<ui-modal
+  #quantityConflictModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'invStock.opening.quantityConflict.title' | transloco"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'invStock.opening.quantityConflict.text' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="closeQuantityConflict()">
+      {{ 'tradeInventory.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

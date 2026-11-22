@@ -1,0 +1,130 @@
+<div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (showAdd()) {
+    <button
+      type="button"
+      class="inline-flex h-btn shrink-0 items-center justify-center gap-4 rounded-8 border border-transparent px-12 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast ease-enter focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        addDisabled()
+          ? 'cursor-not-allowed bg-neutral-soft text-text-placeholder'
+          : 'cursor-pointer bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-pressed'
+      "
+      [attr.aria-disabled]="addDisabled() ? 'true' : null"
+      [attr.aria-describedby]="addHint() ? uid + '-add-hint' : null"
+      [attr.title]="addHint() || null"
+      (click)="onAddClick()"
+    >
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ addLabel() }}
+    </button>
+    @if (addHint(); as hint) {
+      <span [id]="uid + '-add-hint'" class="sr-only">{{ hint }}</span>
+    }
+  }
+
+  <div
+    class="flex h-field min-w-0 flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      #searchInput
+      type="text"
+      autocomplete="off"
+      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="searchPlaceholder()"
+      [attr.aria-label]="searchPlaceholder()"
+      [value]="draftSearch()"
+      (input)="onSearchInput($event)"
+      (keydown.escape)="clearSearch()"
+    />
+    @if (draftSearch()) {
+      <button
+        type="button"
+        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'staff.list.clearSearch' | transloco"
+        (click)="clearSearch(); searchInput.focus()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  @for (filter of filters(); track filter.id) {
+    <ui-dropdown
+      class="shrink-0"
+      size="field"
+      [options]="filterDropdownOptions(filter)"
+      [value]="currentFilterValue(filter)"
+      [label]="filter.label"
+      (valueChange)="onFilterChange(filter.id, $event)"
+    />
+  }
+
+  @if (sortOptions().length > 0) {
+    <ui-dropdown
+      class="shrink-0"
+      size="field"
+      icon="tablerArrowsSort"
+      [options]="sortDropdownOptions()"
+      [value]="activeSortValue()"
+      [label]="'staff.list.sort' | transloco"
+      (valueChange)="onSortChange($event)"
+    />
+  }
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="loading()"
+    [attr.aria-label]="'staff.list.reload' | transloco"
+    [title]="'staff.list.reload' | transloco"
+    (click)="reload.emit()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+  </button>
+</div>
+
+@if (activeChips().length > 0) {
+  <div class="flex shrink-0 flex-wrap items-center gap-6">
+    @for (chip of activeChips(); track chip.id) {
+      <span class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+        <span class="truncate">{{ chip.filterLabel }}: {{ chip.valueLabel }}</span>
+        <button
+          type="button"
+          class="inline-flex size-checkbox-size shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="chip.filterLabel + ': ' + chip.valueLabel"
+          (click)="onFilterChange(chip.id, null)"
+        >
+          <ng-icon name="tablerX" size="11" aria-hidden="true" />
+        </button>
+      </span>
+    }
+
+    <button type="button" uiButton variant="ghost" size="small" (click)="clearAllFilters()">
+      {{ 'staff.list.clearAll' | transloco }}
+    </button>
+  </div>
+}
+
+<ng-content select="[notices]" />
+<ng-content />
+
+<div class="text-12 text-text-muted empty:hidden">
+  <ng-content select="[footer]" />
+</div>
+
+@if (total() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      [pageSizes]="pageSizes"
+      (pageChange)="page.set($event)"
+      (pageSizeChange)="onPageSizeChange($event)"
+    />
+  </footer>
+}

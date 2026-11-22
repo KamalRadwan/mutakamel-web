@@ -1,0 +1,137 @@
+{
+  "bar": {
+    "regionLabel": "Bulk actions",
+    "selected": "{{n}} selected",
+    "selectAll": "Select all {{total}}",
+    "clear": "Clear selection",
+    "more": "More actions",
+    "tooMany": "Select at most 10,000 documents.",
+    "busy": "Wait for your running job to finish."
+  },
+  "actions": {
+    "SEND": "Send",
+    "HOLD": "Hold",
+    "RELEASE_HOLD": "Release hold",
+    "SUBMIT": "Submit",
+    "ISSUE": "Issue",
+    "PRINT": "Print",
+    "CANCEL": "Cancel"
+  },
+  "modal": {
+    "title": {
+      "quotation": {
+        "SEND": "Send quotations",
+        "PRINT": "Print quotations",
+        "CANCEL": "Cancel quotations"
+      },
+      "salesOrder": {
+        "HOLD": "Hold sales orders",
+        "RELEASE_HOLD": "Release hold on sales orders",
+        "PRINT": "Print sales orders",
+        "CANCEL": "Cancel sales orders"
+      },
+      "purchaseOrder": {
+        "SUBMIT": "Submit purchase orders",
+        "PRINT": "Print purchase orders",
+        "CANCEL": "Cancel purchase orders"
+      },
+      "purchaseQuotation": {
+        "ISSUE": "Issue purchase quotations",
+        "PRINT": "Print purchase quotations",
+        "CANCEL": "Cancel purchase quotations"
+      }
+    },
+    "confirm": {
+      "quotation": {
+        "SEND": "Send {{n}} quotations? Documents that cannot be sent are skipped and listed in the report.",
+        "CANCEL": "Cancel {{n}} quotations? Documents that cannot be cancelled are skipped and listed in the report."
+      },
+      "salesOrder": {
+        "HOLD": "Put {{n}} sales orders on hold? Documents that cannot be put on hold are skipped and listed in the report.",
+        "RELEASE_HOLD": "Release hold on {{n}} sales orders? Documents that cannot be released are skipped and listed in the report.",
+        "CANCEL": "Cancel {{n}} sales orders? Documents that cannot be cancelled are skipped and listed in the report."
+      },
+      "purchaseOrder": {
+        "SUBMIT": "Submit {{n}} purchase orders? Documents that cannot be submitted are skipped and listed in the report.",
+        "CANCEL": "Cancel {{n}} purchase orders? Documents that cannot be cancelled are skipped and listed in the report."
+      },
+      "purchaseQuotation": {
+        "ISSUE": "Issue {{n}} purchase quotations? Documents that cannot be issued are skipped and listed in the report.",
+        "CANCEL": "Cancel {{n}} purchase quotations? Documents that cannot be cancelled are skipped and listed in the report."
+      }
+    },
+    "go": {
+      "SEND": "Send",
+      "HOLD": "Put on hold",
+      "RELEASE_HOLD": "Release hold",
+      "SUBMIT": "Submit",
+      "ISSUE": "Issue",
+      "PRINT": "Prepare ZIP",
+      "CANCEL": "Cancel documents"
+    }
+  },
+  "print": {
+    "template": "Template",
+    "templateHint": "The default template assignment is used for each document unless you pick a template.",
+    "defaultTemplate": "Default template",
+    "templateOption": "{{name}} (v{{version}})",
+    "loadingTemplates": "Loading templates…",
+    "templatesLoadFailed": "Could not load print templates.",
+    "language": "Language",
+    "languageHint": "Used when printing with the default template. Specific templates use their own language.",
+    "lang": {
+      "en-US": "English",
+      "ar-EG": "العربية"
+    },
+    "zipNote": "After the job ends, one ZIP file with a PDF per document is prepared. It can be up to 25 MB; if it is larger, print fewer documents at a time."
+  },
+  "toast": {
+    "started": "Batch operation started. You can keep working."
+  },
+  "job": {
+    "printDownload": "ZIP file: {{count}} PDFs. A ZIP file larger than 25 MB cannot be prepared.",
+    "printNoZip": "No PDF was prepared, so there is no ZIP file.",
+    "quotation": {
+      "SEND": "Send quotations",
+      "PRINT": "Print quotations",
+      "CANCEL": "Cancel quotations",
+      "succeeded": {
+        "SEND": "{{n}} quotations sent",
+        "PRINT": "{{n}} quotations prepared",
+        "CANCEL": "{{n}} quotations cancelled"
+      }
+    },
+    "salesOrder": {
+      "HOLD": "Hold sales orders",
+      "RELEASE_HOLD": "Release hold on sales orders",
+      "PRINT": "Print sales orders",
+      "CANCEL": "Cancel sales orders",
+      "succeeded": {
+        "HOLD": "{{n}} orders put on hold",
+        "RELEASE_HOLD": "{{n}} orders released from hold",
+        "PRINT": "{{n}} sales orders prepared",
+        "CANCEL": "{{n}} sales orders cancelled"
+      }
+    },
+    "purchaseOrder": {
+      "SUBMIT": "Submit purchase orders",
+      "PRINT": "Print purchase orders",
+      "CANCEL": "Cancel purchase orders",
+      "succeeded": {
+        "SUBMIT": "{{n}} purchase orders submitted",
+        "PRINT": "{{n}} purchase orders prepared",
+        "CANCEL": "{{n}} purchase orders cancelled"
+      }
+    },
+    "purchaseQuotation": {
+      "ISSUE": "Issue purchase quotations",
+      "PRINT": "Print purchase quotations",
+      "CANCEL": "Cancel purchase quotations",
+      "succeeded": {
+        "ISSUE": "{{n}} purchase quotations issued",
+        "PRINT": "{{n}} purchase quotations prepared",
+        "CANCEL": "{{n}} purchase quotations cancelled"
+      }
+    }
+  }
+}

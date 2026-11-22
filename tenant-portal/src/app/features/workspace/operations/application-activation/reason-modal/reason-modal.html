@@ -1,0 +1,59 @@
+<ui-modal
+  #modal
+  size="form"
+  [icon]="icon()"
+  [tile]="tile()"
+  [title]="title()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="flex flex-col gap-8" novalidate (submit)="onSubmit($event)">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-reason'"
+      [label]="'wsActivation.reasonModal.reasonLabel' | transloco"
+      [hint]="'wsActivation.reasonModal.reasonHint' | transloco"
+      [required]="true"
+      [count]="reasonCount()"
+      [max]="maxReason"
+      [error]="reasonError()"
+    >
+      <textarea
+        [id]="uid + '-reason'"
+        rows="3"
+        dir="auto"
+        class="min-h-textarea w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'wsActivation.reasonModal.reasonPlaceholder' | transloco"
+        [value]="reason()"
+        [disabled]="submitting()"
+        [attr.aria-invalid]="reasonError() ? 'true' : null"
+        (input)="onReasonInput($event)"
+        (blur)="markTouched()"
+      ></textarea>
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      [variant]="danger() ? 'danger' : 'primary'"
+      [loading]="submitting()"
+      [disabled]="submitting()"
+    >
+      {{ confirmLabel() }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="cancel()"
+    >
+      {{ 'settings.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

@@ -1,0 +1,341 @@
+{
+  "purpose": {
+    "all": "كل الأغراض",
+    "SALES": "البيع",
+    "PURCHASE": "الشراء"
+  },
+  "status": {
+    "all": "كل الحالات",
+    "ACTIVE": "نشط",
+    "INACTIVE": "غير نشط"
+  },
+  "partyType": {
+    "INDIVIDUAL": "فرد",
+    "ORGANIZATION": "منشأة"
+  },
+  "companyDefault": "الدفتر الافتراضي للشركة",
+  "versionNumber": "النسخة {{n}}",
+  "kpi": {
+    "priceBooks": "دفاتر الأسعار",
+    "activeInactive": "{{active}} نشط · {{inactive}} غير نشط",
+    "published": "منشورة",
+    "liveToday": "سارية اليوم",
+    "scheduled": "مجدولة",
+    "startLater": "تبدأ لاحقًا",
+    "draftOnly": "مسودات فقط",
+    "currencies": "العملات"
+  },
+  "toolbar": {
+    "new": "دفتر أسعار جديد",
+    "searchPlaceholder": "ابحث بالرمز أو الاسم",
+    "clearSearch": "مسح البحث",
+    "purposeLabel": "الغرض",
+    "purposeAll": "الغرض",
+    "purposeOption": "الغرض: {{label}}",
+    "statusLabel": "الحالة",
+    "statusAll": "الحالة",
+    "statusOption": "الحالة: {{label}}",
+    "companyDefaults": "الدفاتر الافتراضية للشركة",
+    "viewLabel": "طريقة العرض",
+    "viewCards": "بطاقات",
+    "viewTable": "جدول"
+  },
+  "steps": {
+    "label": "تصفية حالة الحوكمة",
+    "hint": "صفِّ قوائم الأسعار حسب حالة الحوكمة",
+    "all": "الكل"
+  },
+  "table": {
+    "label": "دفاتر الأسعار",
+    "book": "دفتر الأسعار",
+    "purpose": "الغرض",
+    "currency": "العملة",
+    "state": "الحالة",
+    "liveVersion": "النسخة السارية",
+    "lines": "البنود",
+    "promotions": "العروض",
+    "accounts": "الحسابات",
+    "actions": "إجراءات دفتر الأسعار",
+    "noLiveVersion": "لا توجد نسخة سارية"
+  },
+  "card": {
+    "summary": "{{lines}} بند · {{promotions}} عرض"
+  },
+  "counts": {
+    "lines": "البنود: {{count}}",
+    "promotions": "العروض: {{count}}"
+  },
+  "actions": {
+    "open": "فتح",
+    "edit": "تعديل",
+    "newVersion": "نسخة جديدة",
+    "makeDefault": "تعيين دفترًا افتراضيًا للشركة",
+    "removeDefault": "إلغاء التعيين كدفتر افتراضي للشركة",
+    "deactivate": "تعطيل",
+    "activate": "تفعيل"
+  },
+  "empty": {
+    "title": "لا توجد دفاتر أسعار بعد.",
+    "filtered": "لا توجد دفاتر أسعار تطابق عوامل التصفية الحالية.",
+    "clearFilters": "مسح التصفية"
+  },
+  "error": {
+    "load": "تعذّر تحميل دفاتر الأسعار.",
+    "notFound": "لم يعد دفتر الأسعار هذا موجودًا."
+  },
+  "pagination": {
+    "label": "صفحات دفاتر الأسعار"
+  },
+  "deactivateConfirm": {
+    "title": "تعطيل دفتر الأسعار؟",
+    "text": "سيصبح {{name}} غير نشط ولن يكون مؤهلًا لعمليات التقييم الجديدة.",
+    "confirm": "تعطيل"
+  },
+  "discardConfirm": {
+    "title": "تجاهل التغييرات غير المحفوظة؟",
+    "text": "ستفقد البيانات التي أدخلتها إذا أغلقت النافذة الآن.",
+    "confirm": "تجاهل"
+  },
+  "deleteDraftConfirm": {
+    "title": "حذف نسخة المسودة؟",
+    "text": "ستُحذف النسخة {{version}} وجميع بنودها وعروضها نهائيًا.",
+    "confirm": "حذف المسودة"
+  },
+  "retireDialog": {
+    "title": "إيقاف النسخة {{version}}؟",
+    "text": "يُوقف هذا الإجراء استخدام هذه النسخة في تقييم الأسعار.",
+    "confirm": "إيقاف"
+  },
+  "create": {
+    "title": "دفتر أسعار جديد",
+    "submit": "إنشاء",
+    "success": "تم إنشاء دفتر الأسعار.",
+    "fields": {
+      "code": "الرمز",
+      "purpose": "الغرض",
+      "currency": "العملة",
+      "nameEn": "الاسم (بالإنجليزية)",
+      "nameAr": "الاسم (بالعربية)",
+      "description": "الوصف"
+    },
+    "placeholders": {
+      "code": "مثل RETAIL-EGP",
+      "nameEn": "أدخل الاسم بالإنجليزية",
+      "nameAr": "أدخل الاسم بالعربية",
+      "description": "اكتب وصفًا لنطاق استخدام دفتر الأسعار هذا…"
+    },
+    "hints": {
+      "code": "معرّف فريد بأحرف كبيرة لدفتر الأسعار بحد أقصى 80 حرفًا.",
+      "purpose": "اختر ما إذا كان دفتر الأسعار يخص مبيعات العملاء أم مشتريات الموردين.",
+      "currency": "رمز العملة الثابت المستخدم في جميع بنود دفتر الأسعار هذا.",
+      "nameEn": "اسم العرض الظاهر عند استخدام الواجهة الإنجليزية بحد أقصى 160 حرفًا.",
+      "nameAr": "اسم العرض الظاهر عند استخدام الواجهة العربية بحد أقصى 160 حرفًا.",
+      "description": "ملخص اختياري يوضح نطاق استخدام دفتر الأسعار أو الفئة المستهدفة."
+    },
+    "errors": {
+      "codeRequired": "أدخل رمز دفتر الأسعار.",
+      "codeMax": "لا يمكن أن يتجاوز الرمز 80 حرفًا.",
+      "currencyRequired": "اختر العملة.",
+      "nameMax": "لا يمكن أن يتجاوز الاسم 160 حرفًا.",
+      "descriptionMax": "لا يمكن أن يتجاوز الوصف 500 حرف."
+    }
+  },
+  "page": {
+    "back": "العودة إلى دفاتر الأسعار",
+    "loadFailed": "تعذّر تحميل دفتر الأسعار هذا.",
+    "notFound": "تعذّر العثور على دفتر الأسعار هذا.",
+    "tabsLabel": "أقسام دفتر الأسعار",
+    "tabs": {
+      "versions": "النسخ",
+      "accounts": "الحسابات",
+      "history": "السجل"
+    },
+    "details": {
+      "title": "التفاصيل",
+      "saved": "تم حفظ تفاصيل دفتر الأسعار.",
+      "fields": {
+        "nameEn": "الاسم (بالإنجليزية)",
+        "nameAr": "الاسم (بالعربية)",
+        "status": "الحالة",
+        "description": "الوصف"
+      },
+      "hints": {
+        "nameEn": "اسم العرض الظاهر باللغة الإنجليزية في المستندات وتقييم الأسعار.",
+        "nameAr": "اسم العرض الظاهر باللغة العربية في المستندات وتقييم الأسعار.",
+        "status": "دفاتر الأسعار النشطة فقط تكون متاحة للتقييم والربط بالحسابات التجارية.",
+        "description": "ملاحظات اختيارية توضح طريقة استخدام دفتر الأسعار."
+      }
+    },
+    "accounts": {
+      "label": "الحسابات التجارية المرتبطة",
+      "empty": "لا توجد حسابات تجارية مرتبطة بدفتر الأسعار هذا.",
+      "columns": {
+        "account": "الحساب",
+        "partyType": "نوع الطرف",
+        "role": "الدور",
+        "status": "الحالة",
+        "creditLimit": "حد الائتمان"
+      }
+    },
+    "history": {
+      "empty": "لا توجد سجلات تغييرات بعد."
+    },
+    "unsaved": {
+      "title": "حفظ التغييرات؟",
+      "text": "لديك تغييرات غير محفوظة في تفاصيل دفتر الأسعار هذا.",
+      "save": "حفظ",
+      "discard": "تجاهل",
+      "cancel": "إلغاء"
+    }
+  },
+  "sourceMode": {
+    "MANUAL": "يدوي",
+    "CLONE_VERSION": "نسخة من نسخة سابقة",
+    "CLONE_VERSION_OF": "نسخة من النسخة {{version}}",
+    "SEED_FROM_CATALOG": "من الكتالوج",
+    "EMPTY_DRAFT": "فارغة"
+  },
+  "test": {
+    "passed": "نجح الاختبار.",
+    "failedTitle": "فشل الاختبار: {{count}} تعارض",
+    "failedHint": "افتح النسخة لمراجعة التعارضات المُبلّغ عنها ومعالجتها."
+  },
+  "toasts": {
+    "activated": "تم تفعيل دفتر الأسعار.",
+    "deactivated": "تم تعطيل دفتر الأسعار.",
+    "defaultSet": "تم تحديث الدفتر الافتراضي للشركة.",
+    "defaultRemoved": "تم إلغاء تعيين الدفتر الافتراضي للشركة.",
+    "versionCreated": "تم إنشاء نسخة المسودة.",
+    "draftDeleted": "تم حذف نسخة المسودة.",
+    "retired": "تم إيقاف النسخة."
+  },
+  "newVersion": {
+    "title": "نسخة جديدة",
+    "submit": "إنشاء مسودة",
+    "emptyHelp": "لا يمكن للنسخة الفارغة اجتياز الاختبار قبل إضافة بنود.",
+    "roundingDisabledHint": "يتطلب التقريب لأقرب 0.50 أو المنتهي بـ .95 عملةً ذات منزلتين عشريتين على الأقل.",
+    "noSourceVersions": "لا توجد نسخ بعد مطابقة لهذا الغرض وهذه العملة.",
+    "clearEnd": "مسح تاريخ الانتهاء",
+    "today": "اليوم",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "hour": "الساعة",
+    "minute": "الدقيقة",
+    "thisBookVersion": "النسخة {{n}} · {{status}}",
+    "otherBookVersion": "{{code}} · v{{n}}",
+    "fields": {
+      "startFrom": "البدء من",
+      "sourceVersion": "النسخة المصدرية",
+      "includePromotions": "تضمين العروض",
+      "effectiveFrom": "يسري من",
+      "effectiveTo": "ينتهي في",
+      "priceChange": "تعديل السعر",
+      "changeValue": "قيمة التعديل",
+      "rounding": "التقريب",
+      "notes": "ملاحظات"
+    },
+    "hints": {
+      "startFrom": "اختر ما إذا كنت ستنسخ نسخة قائمة أم تستورد أسعار الكتالوج أم تبدأ بنسخة فارغة.",
+      "sourceVersion": "اختر أي نسخة مطابقة في الغرض والعملة لنسخ بنودها.",
+      "includePromotions": "نسخ قواعد العروض الترويجية من النسخة المصدرية المحددة.",
+      "effectiveFrom": "التاريخ والساعة بنظام 24 ساعة لبدء سريان هذه النسخة.",
+      "effectiveTo": "التاريخ والساعة الاختياريان لانتهاء سريان النسخة؛ اتركه فارغًا للسريان المفتوح.",
+      "priceChange": "عدّل أسعار الوحدات المنسوخة أو المستوردة من الكتالوج بنسبة مئوية أو مبلغ ثابت.",
+      "changeValue": "رقم بإشارة للزيادة أو النقصان في كل سعر، مثل 5 أو -2.5.",
+      "rounding": "قرّب الأسعار المعدّلة إلى فئات سعرية منتظمة.",
+      "notes": "توضيح اختياري لسبب إنشاء نسخة المسودة هذه أو نطاقها."
+    },
+    "modes": {
+      "CLONE_VERSION": "نسخ نسخة قائمة",
+      "SEED_FROM_CATALOG": "أسعار الكتالوج",
+      "EMPTY_DRAFT": "فارغة"
+    },
+    "adjustments": {
+      "NONE": "بلا تعديل",
+      "PERCENTAGE": "نسبة مئوية",
+      "FIXED_DELTA": "مبلغ ثابت"
+    },
+    "roundings": {
+      "NONE": "بلا تقريب",
+      "NEAREST_1": "أقرب 1",
+      "NEAREST_0_50": "أقرب 0.50",
+      "END_95": "ينتهي بـ .95"
+    },
+    "placeholders": {
+      "effectiveFrom": "اختر تاريخ البدء",
+      "effectiveTo": "بلا تاريخ انتهاء",
+      "changeValue": "مثل 5 أو -2.5",
+      "notes": "أضف ملاحظات حول هذه النسخة…"
+    },
+    "errors": {
+      "sourceRequired": "اختر نسخة مصدرية للنسخ منها.",
+      "effectiveFromRequired": "حدد وقت بدء سريان النسخة.",
+      "effectiveToAfterFrom": "يجب أن يكون تاريخ «ينتهي في» بعد تاريخ «يسري من».",
+      "changeValueInvalid": "أدخل رقمًا عشريًا صالحًا مثل 5 أو -2.5.",
+      "notesMax": "لا يمكن أن تتجاوز الملاحظات 500 حرف."
+    }
+  },
+  "defaults": {
+    "title": "الدفاتر الافتراضية للشركة",
+    "empty": "لا توجد دفاتر أسعار نشطة متاحة لتعيينها كدفاتر افتراضية للشركة بعد.",
+    "loadFailed": "تعذّر تحميل الدفاتر الافتراضية للشركة.",
+    "saveRow": "حفظ",
+    "remove": "إزالة",
+    "saved": "تم حفظ الدفتر الافتراضي للشركة.",
+    "removed": "تمت إزالة الدفتر الافتراضي للشركة.",
+    "selectBook": "اختر دفتر أسعار نشطًا…",
+    "columns": {
+      "purpose": "الغرض",
+      "currency": "العملة",
+      "priceBook": "دفتر الأسعار",
+      "actions": "الإجراءات"
+    },
+    "removeConfirm": {
+      "title": "إزالة الدفتر الافتراضي للشركة؟",
+      "text": "لن يعود للغرض {{purpose}} بالعملة {{currency}} دفتر أسعار افتراضي للشركة.",
+      "confirm": "إزالة"
+    }
+  },
+  "audit": {
+    "CREATE": "أنشأ دفتر الأسعار هذا",
+    "UPDATE": "حدّث تفاصيل دفتر الأسعار",
+    "ACTIVATE": "فعّل دفتر الأسعار هذا",
+    "DEACTIVATE": "عطّل دفتر الأسعار هذا",
+    "CLONE": "أنشأ مسودة بنسخ نسخة سابقة",
+    "SEED_CATALOG": "أنشأ مسودة من أسعار الكتالوج",
+    "CREATE_EMPTY": "أنشأ نسخة مسودة فارغة",
+    "UPDATE_DRAFT": "حدّث نسخة مسودة",
+    "DELETE_DRAFT": "حذف نسخة مسودة",
+    "TEST_PASSED": "أجرى اختبارًا ناجحًا",
+    "TEST_FAILED": "أجرى اختبارًا فاشلًا",
+    "PUBLISH": "نشر نسخة",
+    "SCHEDULE": "جدول نسخة",
+    "SOLO_OWNER_PUBLISH": "نشر نسخة ذاتيًا بصفته المالك الوحيد",
+    "SOLO_OWNER_SCHEDULE": "جدول نسخة ذاتيًا بصفته المالك الوحيد",
+    "RETIRE": "أوقف نسخة",
+    "SET_COMPANY_DEFAULT": "عيّنه دفترًا افتراضيًا للشركة",
+    "REMOVE_COMPANY_DEFAULT": "أزاله من الدفاتر الافتراضية للشركة"
+  },
+  "priceErrors": {
+    "TRADE.PRICE.BOOK_IN_USE": "اختر دفتر أسعار افتراضيًا آخر للشركة قبل تعطيل هذا الدفتر.",
+    "TRADE.PRICE.BOOK_IN_USE.mapped_as_company_default": "اختر دفتر أسعار افتراضيًا آخر للشركة قبل تعطيل هذا الدفتر.",
+    "TRADE.PRICE.BOOK_INVALID.version_not_in_book": "الإصدار المحدد لا ينتمي إلى دفتر الأسعار المحدد.",
+    "TRADE.PRICE.BOOK_INVALID.preview_status_invalid": "لا يمكن معاينة إصدار موقوف. اختر إصدارًا آخر.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_tested": "شغّل اختبارًا ناجحًا على هذا الإصدار قبل نشره.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_editable": "لا يمكن تعديل إلا الإصدارات المسودة أو المختبرة. أنشئ إصدارًا جديدًا بدلًا من ذلك.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_live": "لا يمكن إيقاف إلا الإصدارات المنشورة أو المجدولة.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.retroactive_supersession": "يجب أن يبدأ الإصدار البديل الآن أو لاحقًا. اختر تاريخ بدء مستقبليًا.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.predecessor_invalid": "يجب أن يكون الإصدار المستبدَل منشورًا أو مجدولًا، وأن يبدأ قبل هذا الإصدار، وأن يظل ساريًا عند بدئه.",
+    "TRADE.PRICE.TEST_NOT_ALLOWED.not_editable": "لا يمكن اختبار إلا الإصدارات المسودة أو المختبرة.",
+    "TRADE.PRICE.ENTRY_INVALID.operations_required": "أضف سطر سعر واحدًا على الأقل أو عدّله أو احذفه قبل الحفظ.",
+    "TRADE.PRICE.ENTRY_INVALID.duplicate_operation": "لا يمكن تغيير سطر السعر إلا مرة واحدة في الحفظ الواحد.",
+    "TRADE.PRICE.ENTRY_INVALID.entry_not_in_version": "بعض أسطر الأسعار لم تعد موجودة في هذا الإصدار. أعد التحميل وحاول مرة أخرى.",
+    "TRADE.PRICE.ENTRY_INVALID.row_limit_exceeded": "يمكن أن يحتوي الإصدار على 10,000 سطر سعر كحد أقصى.",
+    "TRADE.PRICE.RULE_INVALID.operations_required": "أضف عرضًا ترويجيًا واحدًا على الأقل أو عدّله أو احذفه قبل الحفظ.",
+    "TRADE.PRICE.RULE_INVALID.duplicate_operation": "لا يمكن تغيير العرض الترويجي إلا مرة واحدة في الحفظ الواحد.",
+    "TRADE.PRICE.RULE_INVALID.entry_not_in_version": "بعض العروض الترويجية لم تعد موجودة في هذا الإصدار. أعد التحميل وحاول مرة أخرى.",
+    "TRADE.PRICE.RULE_INVALID.operation_limit_exceeded": "احفظ 500 تغيير على العروض الترويجية كحد أقصى في كل مرة.",
+    "TRADE.PRICE.RULE_INVALID.row_limit_exceeded": "يمكن أن يحتوي الإصدار على 500 عرض ترويجي كحد أقصى.",
+    "TRADE.PRICE.RULE_INVALID.equal_precedence": "امنح العروض الترويجية في مجموعة التراكب نفسها أولويات مختلفة."
+  }
+}

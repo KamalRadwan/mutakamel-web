@@ -1,0 +1,150 @@
+<ui-modal
+  #modal
+  size="form"
+  [icon]="convertMode() ? 'tablerArrowsExchange' : 'tablerCopy'"
+  [tile]="convertMode() ? 'bg-icon-teal' : 'bg-icon-gray'"
+  [title]="(convertMode() ? 'templatesPage.duplicateModal.convertTitle' : 'templatesPage.duplicateModal.duplicateTitle') | transloco"
+  [subtitle]="definition()?.name || ''"
+  [closeLabel]="'templates.actions.close' | transloco"
+  [dismissable]="!submitting()"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <div [class]="convertMode() ? 'col-span-1' : 'col-span-2'">
+      <ui-field
+        size="bare"
+        [for]="uid + '-source'"
+        [label]="'templatesPage.duplicateModal.sourceLabel' | transloco"
+        [hint]="'templatesPage.duplicateModal.sourceHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-source'"
+          [title]="service.dirty() ? ('templatesPage.header.saveFirst' | transloco) : null"
+          [options]="sourceOptions()"
+          [(value)]="sourceKind"
+          [label]="'templatesPage.duplicateModal.sourceLabel' | transloco"
+          [describedBy]="uid + '-source-hint'"
+        />
+      </ui-field>
+    </div>
+
+    @if (convertMode()) {
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-layout'"
+          [label]="'templatesPage.duplicateModal.targetLayoutLabel' | transloco"
+          [hint]="'templatesPage.duplicateModal.targetLayoutHint' | transloco"
+          [required]="true"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-layout'"
+            [options]="layoutOptions()"
+            [(value)]="targetLayout"
+            [label]="'templatesPage.duplicateModal.targetLayoutLabel' | transloco"
+            [describedBy]="uid + '-layout-hint'"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'templatesPage.duplicateModal.codeLabel' | transloco"
+        [hint]="'templatesPage.duplicateModal.codeHint' | transloco"
+        [required]="true"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          maxlength="100"
+          class="w-full min-w-0 bg-transparent text-12 uppercase text-text outline-none placeholder:text-text-placeholder"
+          [value]="code()"
+          (input)="onCodeInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope'"
+        [label]="'templatesPage.duplicateModal.scopeLabel' | transloco"
+        [hint]="'templatesPage.duplicateModal.scopeHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scope'"
+          [options]="scopeOptions()"
+          [(value)]="selectedScopeKey"
+          [label]="'templatesPage.duplicateModal.scopeLabel' | transloco"
+          [describedBy]="uid + '-scope-hint'"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [for]="uid + '-name'"
+        [label]="'templatesPage.duplicateModal.nameLabel' | transloco"
+        [hint]="'templatesPage.duplicateModal.nameHint' | transloco"
+        [required]="true"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          maxlength="200"
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="name()"
+          (input)="onNameInput($event)"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        size="multiline"
+        [for]="uid + '-description'"
+        [label]="'templatesPage.duplicateModal.descriptionLabel' | transloco"
+        [hint]="'templatesPage.duplicateModal.descriptionHint' | transloco"
+        [count]="description().length"
+        [max]="1000"
+      >
+        <textarea
+          [id]="uid + '-description'"
+          rows="3"
+          maxlength="1000"
+          class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="description()"
+          (input)="onDescriptionInput($event)"
+        ></textarea>
+      </ui-field>
+    </div>
+  </div>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      [loading]="submitting()"
+      [disabled]="submitting() || (sourceKind() === 'CURRENT_DRAFT' && service.dirty())"
+      [title]="sourceKind() === 'CURRENT_DRAFT' && service.dirty() ? ('templatesPage.header.saveFirst' | transloco) : null"
+      (click)="submit()"
+    >
+      {{ (convertMode() ? 'templatesPage.duplicateModal.submitConvert' : 'templatesPage.duplicateModal.submitDuplicate') | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="modal.close()">
+      {{ 'templates.actions.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

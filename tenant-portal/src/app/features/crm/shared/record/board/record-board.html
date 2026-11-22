@@ -1,0 +1,146 @@
+<div #boardRoot class="flex shrink-0 items-start gap-8 overflow-x-scroll pb-8" [attr.aria-busy]="loading()">
+  @for (lane of displayLanes(); track lane.id) {
+    @let isCollapsed = collapsed().has(lane.id);
+    @let addLabel = labels().add ? labels().add!(lane.label) : ('recordList.board.add' | transloco: { lane: lane.label });
+    <section
+      [recordDrop]="lane.id"
+      [dropDenied]="lane.dropRule === 'deny'"
+      #drop="recordDrop"
+      (dropped)="onDropped(lane, $event)"
+      class="flex flex-col rounded-14 shadow-card transition-colors duration-fast"
+      [style.min-height.px]="columnMinHeight()"
+      [class]="laneClass(lane, isCollapsed, !!drop.over())"
+      [attr.aria-label]="lane.label"
+      [attr.aria-disabled]="lane.dropRule === 'deny' ? 'true' : null"
+      [attr.title]="lane.dropRule === 'deny' && lane.denyReason ? lane.denyReason : null"
+    >
+      @if (isCollapsed) {
+        <button
+          type="button"
+          class="inline-flex size-btn cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong rtl:-scale-x-100"
+          [attr.aria-label]="'recordList.board.expand' | transloco: { lane: lane.label }"
+          [title]="'recordList.board.expand' | transloco: { lane: lane.label }"
+          (click)="toggle(lane.id)"
+        >
+          <ng-icon name="tablerChevronsRight" size="15" aria-hidden="true" />
+        </button>
+        <span
+          class="inline-flex h-badge min-w-badge items-center justify-center rounded-full px-6 text-12 font-medium"
+          [class]="countBadgeClass(lane.tone)"
+        >
+          {{ lane.total }}
+        </span>
+        @if (lane.statusSegments; as segments) {
+          <div
+            class="flex h-status-bar w-16 shrink-0 gap-2 overflow-hidden rounded-2"
+            role="img"
+            [attr.aria-label]="lane.statusSummary || null"
+            [attr.title]="lane.statusSummary || null"
+          >
+            @for (segment of segments; track segment.key) {
+              <span class="h-full rounded-2" [class]="segment.color" [style.flex-grow]="segment.count"></span>
+            } @empty {
+              <span class="h-full flex-1 rounded-2 bg-status-none"></span>
+            }
+          </div>
+        }
+        <span class="rotate-180 text-14 font-medium whitespace-nowrap text-text [writing-mode:vertical-rl]">{{ lane.label }}</span>
+      } @else {
+        <header class="flex items-center gap-6 px-8 pt-8 pb-6">
+          <h2 class="truncate text-14 leading-20 font-medium text-text">{{ lane.label }}</h2>
+          <span
+            class="inline-flex h-badge shrink-0 items-center rounded-full px-8 text-12"
+            [class]="countBadgeClass(lane.tone)"
+          >
+            {{ lane.total }}
+          </span>
+          <span class="flex-1"></span>
+          @if (laneHeaderEnd(); as headerEndTpl) {
+            <ng-container [ngTemplateOutlet]="headerEndTpl" [ngTemplateOutletContext]="{ $implicit: lane }" />
+          }
+          @if (lane.canCreate) {
+            <button
+              type="button"
+              class="inline-flex size-btn cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="addLabel"
+              [title]="addLabel"
+              (click)="create.emit(lane.id)"
+            >
+              <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+            </button>
+          }
+          <button
+            type="button"
+            class="inline-flex size-btn cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong rtl:-scale-x-100"
+            [attr.aria-label]="'recordList.board.collapse' | transloco: { lane: lane.label }"
+            [title]="'recordList.board.collapse' | transloco: { lane: lane.label }"
+            (click)="toggle(lane.id)"
+          >
+            <ng-icon name="tablerChevronsLeft" size="15" aria-hidden="true" />
+          </button>
+        </header>
+
+        @if (lane.statusSegments; as segments) {
+          <div
+            class="mx-8 mb-8 flex h-status-bar shrink-0 gap-2 overflow-hidden rounded-2"
+            role="img"
+            [attr.aria-label]="lane.statusSummary || null"
+            [attr.title]="lane.statusSummary || null"
+          >
+            @for (segment of segments; track segment.key) {
+              <span class="h-full rounded-2" [class]="segment.color" [style.flex-grow]="segment.count"></span>
+            } @empty {
+              <span class="h-full flex-1 rounded-2 bg-status-none"></span>
+            }
+          </div>
+        }
+
+        <div class="flex flex-1 flex-col gap-6 px-8 pb-8">
+          @if (drop.over(); as dragged) {
+            <div class="shrink-0 rounded-10 border-2 border-dashed border-brand bg-brand-soft" [style.height.px]="dragged.height" aria-hidden="true"></div>
+          }
+
+          @for (item of lane.items; track itemTrack(item)) {
+            <div
+              class="block"
+              [recordDrag]="idOf()(item)"
+              [laneId]="lane.id"
+              [dragDisabled]="!canDragItem(item)"
+              [class.cursor-grab]="canDragItem(item)"
+            >
+              <ng-container [ngTemplateOutlet]="itemTemplate()" [ngTemplateOutletContext]="{ $implicit: item, lane: lane }" />
+            </div>
+          } @empty {
+            @if (!drop.over() && !loading()) {
+              <div class="flex flex-col items-center gap-6 rounded-10 border border-dashed border-border-field p-12 text-center">
+                <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+                  <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+                </span>
+                <p class="text-13 leading-18 font-medium text-text">{{ labels().empty || ('recordList.board.empty' | transloco) }}</p>
+                <p class="text-12 leading-18 text-text-muted">{{ labels().emptyHelp || ('recordList.board.emptyHelp' | transloco) }}</p>
+                @if (lane.canCreate) {
+                  <button uiButton variant="secondary" (click)="create.emit(lane.id)">{{ 'recordList.board.quickAdd' | transloco }}</button>
+                }
+              </div>
+            }
+          }
+
+          @if (lane.hasNext) {
+            <button
+              uiButton
+              variant="secondary"
+              size="small"
+              class="w-full shrink-0"
+              [loading]="!!lane.loading"
+              (click)="loadMore.emit(lane.id)"
+            >
+              {{ 'recordList.board.loadMore' | transloco: { shown: lane.items.length, total: lane.total } }}
+            </button>
+          } @else if (lane.items.length) {
+            <p class="text-center text-11 leading-16 text-text-muted">{{ labels().allShown || ('recordList.board.allShown' | transloco) }}</p>
+          }
+        </div>
+      }
+    </section>
+  }
+</div>

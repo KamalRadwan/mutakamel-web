@@ -1,0 +1,350 @@
+<app-settings-frame
+  [addLabel]="'leadStages.new' | transloco"
+  [addDisabled]="atLimit()"
+  [addHint]="atLimit() ? ('leadStages.limitHint' | transloco) : null"
+  [searchPlaceholder]="'leadStages.search' | transloco"
+  [loading]="loading()"
+  [showAdd]="canManage"
+  [(search)]="search"
+  (add)="openCreate()"
+  (reload)="reload()"
+>
+  @if (isSearching()) {
+    <app-settings-notice notices tone="info">
+      {{ 'settings.common.searching' | transloco }}
+    </app-settings-notice>
+  }
+
+  @if (showMissingQualifiedWarning()) {
+    <app-settings-notice notices tone="warning">
+      {{ 'leadStages.notices.noActiveQualified' | transloco }}
+    </app-settings-notice>
+  }
+
+  @if (loadFailed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'leadStages.table.ariaLabel' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns()"
+        >
+          <span role="columnheader" class="flex items-center justify-center">
+            <span class="sr-only">{{ 'leadStages.table.dragHandle' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center border-s border-on-nav-line px-10">#</span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.nameAr' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.nameEn' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'leadStages.table.meaning' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'leadStages.table.category' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.status' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'leadStages.table.default' | transloco }}
+          </span>
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading() && stages().length === 0) {
+          @for (skeleton of skeletonRows; track skeleton) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns()"
+            >
+              <span role="cell" class="flex items-center justify-center">
+                <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (stage of filteredStages(); track stage.id) {
+            <div
+              role="row"
+              [stageRowDrag]="stage.id"
+              [dragDisabled]="!canRowDrag(stage)"
+              [stageRowDrop]="stage.id"
+              [dropDisabled]="!canRowDrop(stage)"
+              #drop="stageRowDrop"
+              (dropped)="onRowDrop($event)"
+              class="relative mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumns()"
+              (click)="onRowClick(stage, $event)"
+            >
+              @if (drop.edge() === 'before') {
+                <span aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-4 h-2 rounded-full bg-brand"></span>
+              }
+
+              <span role="cell" class="flex items-center justify-center text-text-muted">
+                @if (isProtectedStage(stage)) {
+                  <span [title]="'leadStages.table.systemLocked' | transloco">
+                    <ng-icon name="tablerLock" size="16" aria-hidden="true" />
+                  </span>
+                } @else if (canManage) {
+                  <span
+                    data-drag-handle
+                    [class]="canRowDrag(stage) ? 'cursor-grab' : 'text-text-placeholder cursor-not-allowed'"
+                    [title]="'leadStages.table.dragHandle' | transloco"
+                  >
+                    <ng-icon name="tablerGripVertical" size="16" aria-hidden="true" />
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted">
+                {{ stage.sortOrder }}
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <button
+                  type="button"
+                  dir="rtl"
+                  class="cursor-pointer truncate rounded-4 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="openEdit(stage)"
+                >
+                  {{ stage.nameAr }}
+                </button>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span dir="ltr" class="truncate">{{ stage.nameEn }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+                  {{ 'leadStages.flags.' + stage.flag | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span
+                  class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium"
+                  [class]="categoryBadges[stage.category]"
+                >
+                  {{ 'leadStages.categories.' + stage.category | transloco }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (isProtectedStage(stage)) {
+                  <span class="inline-flex h-badge max-w-full items-center gap-4 truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text">
+                    <ng-icon name="tablerLock" size="12" aria-hidden="true" />
+                    {{ 'settings.common.system' | transloco }}
+                  </span>
+                } @else if (stage.isActive) {
+                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success px-8 text-12 font-medium text-on-success">
+                    {{ 'settings.common.active' | transloco }}
+                  </span>
+                } @else {
+                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+                    {{ 'settings.common.inactive' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (stage.isDefault) {
+                  <span class="inline-flex h-badge max-w-full items-center gap-4 truncate rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                    <ng-icon name="tablerStar" size="12" aria-hidden="true" />
+                    {{ 'settings.common.default' | transloco }}
+                  </span>
+                } @else if (canSetDefault(stage)) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="ghost"
+                    size="small"
+                    [disabled]="busy()"
+                    (click)="makeDefault(stage)"
+                  >
+                    {{ 'leadStages.table.setAsDefault' | transloco }}
+                  </button>
+                }
+              </span>
+
+              @if (canManage) {
+                <span role="cell" data-row-action class="flex items-center justify-center border-s border-border">
+                  <ui-actions-menu
+                    [items]="rowActions(stage)"
+                    [label]="'settings.common.actions' | transloco"
+                    (selected)="onRowAction(stage, $event)"
+                  />
+                </span>
+              }
+              @if (drop.edge() === 'after') {
+                <span aria-hidden="true" class="pointer-events-none absolute inset-x-0 -bottom-4 h-2 rounded-full bg-brand"></span>
+              }
+            </div>
+          } @empty {
+            <div role="row">
+              <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+                {{ 'settings.common.noResults' | transloco }}
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <div footer class="flex flex-wrap items-center justify-between gap-8 text-12 text-text-muted">
+    <span>{{ 'settings.common.of' | transloco: { count: stages().length, max: stageLimit } }}</span>
+    <span>{{ 'leadStages.footerHint' | transloco }}</span>
+  </div>
+</app-settings-frame>
+
+<app-lead-stage-modal
+  [canManage]="canManage"
+  (saved)="onStageSaved()"
+  (deleted)="requestDelete($event)"
+/>
+
+<ui-confirm-dialog
+  #confirmDelete
+  tone="danger"
+  [title]="'leadStages.delete.title' | transloco"
+  [text]="'leadStages.delete.text' | transloco: { name: deletingName() }"
+  [confirmLabel]="'settings.common.delete' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #inUseModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'leadStages.delete.inUseTitle' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!deactivating()"
+  (closed)="inUseStage.set(null)"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'leadStages.delete.inUseText' | transloco }}</p>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (inUseStage()?.isActive) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="deactivating()"
+        (click)="deactivateInUseStage()"
+      >
+        {{ 'leadStages.delete.makeInactive' | transloco }}
+      </button>
+    }
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="deactivating()"
+      (click)="closeInUseModal()"
+    >
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-modal
+  #moveModal
+  size="form"
+  icon="tablerListNumbers"
+  tile="bg-icon-green"
+  [title]="'leadStages.moveModal.title' | transloco"
+  [subtitle]="movingStage() ? (language() === 'ar' ? movingStage()!.nameAr : movingStage()!.nameEn) : ''"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!savingMove()"
+  (closed)="movingStage.set(null)"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <ui-field
+      size="bare"
+      [for]="uid + '-move-position'"
+      [label]="'leadStages.moveModal.position' | transloco"
+      [required]="true"
+      [hint]="'leadStages.moveModal.positionHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [describedBy]="uid + '-move-position-hint'"
+        [options]="positionOptions()"
+        [value]="moveTargetPosition()"
+        [label]="'leadStages.moveModal.position' | transloco"
+        (valueChange)="moveTargetPosition.set($event)"
+      />
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="savingMove()"
+      (click)="saveMovePosition()"
+    >
+      {{ 'settings.common.save' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="savingMove()"
+      (click)="closeMoveModal()"
+    >
+      {{ 'settings.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

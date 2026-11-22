@@ -1,0 +1,203 @@
+{
+  "title": "Schedules",
+  "new": "New schedule",
+  "search": "Search schedules",
+  "clearSearch": "Clear search",
+  "reload": "Reload",
+  "loadMore": "Load more",
+  "empty": "No schedules yet",
+  "forbiddenTitle": "Access denied",
+  "forbiddenText": "You do not have permission to view schedules.",
+  "linkOnly": "Link only",
+  "columns": {
+    "name": "Name",
+    "target": "Target",
+    "cadence": "Cadence",
+    "period": "Period",
+    "recipients": "Recipients",
+    "formats": "Formats",
+    "nextRun": "Next run",
+    "state": "State",
+    "actions": "Actions"
+  },
+  "targetType": {
+    "DASHBOARD": "Dashboard",
+    "REPORT": "Report"
+  },
+  "state": {
+    "ACTIVE": "Active",
+    "PAUSED": "Paused",
+    "SUSPENDED": "Suspended"
+  },
+  "suspendedReason": {
+    "OWNER_INACTIVE": "The schedule owner is no longer active.",
+    "REPORT_DELETED": "The scheduled report was deleted.",
+    "OWNER_ACCESS_LOST": "The schedule owner lost access to the target data."
+  },
+  "actions": {
+    "pause": "Pause",
+    "resume": "Resume",
+    "deliveries": "Deliveries",
+    "delete": "Delete",
+    "clearDate": "Clear date"
+  },
+  "delete": {
+    "title": "Delete schedule?",
+    "text": "Delete “{{name}}”? Scheduled deliveries will stop immediately."
+  },
+  "toasts": {
+    "created": "Schedule created",
+    "saved": "Schedule saved",
+    "paused": "Schedule paused",
+    "resumed": "Schedule active",
+    "deleted": "Schedule deleted"
+  },
+  "recurrence": {
+    "DAILY": "Daily",
+    "WEEKLY": "Weekly",
+    "MONTHLY": "Monthly"
+  },
+  "weekdays": {
+    "0": "Sunday",
+    "1": "Monday",
+    "2": "Tuesday",
+    "3": "Wednesday",
+    "4": "Thursday",
+    "5": "Friday",
+    "6": "Saturday"
+  },
+  "lastDay": "the last day",
+  "lastDayOption": "Last day",
+  "cadence": {
+    "daily": "Every day at {{time}}",
+    "weekly": "Every {{weekday}} at {{time}}",
+    "monthly": "Monthly on day {{day}} at {{time}}",
+    "monthlyLastDay": "Monthly on the last day at {{time}}"
+  },
+  "period": {
+    "PREVIOUS_DAY": "Previous day",
+    "LAST_COMPLETED_WEEK": "Last completed week",
+    "LAST_COMPLETED_MONTH": "Last completed month",
+    "LAST_COMPLETED_QUARTER": "Last completed quarter",
+    "WEEK_TO_DATE": "Week to date",
+    "MONTH_TO_DATE": "Month to date",
+    "QUARTER_TO_DATE": "Quarter to date",
+    "YEAR_TO_DATE": "Year to date"
+  },
+  "channel": {
+    "EMAIL": "Email"
+  },
+  "formats": {
+    "CSV": "CSV",
+    "XLSX": "Excel",
+    "PDF": "PDF"
+  },
+  "locale": {
+    "ar": "Arabic",
+    "en": "English"
+  },
+  "timeZones": {
+    "Africa/Cairo": "Cairo",
+    "Asia/Riyadh": "Riyadh",
+    "Asia/Dubai": "Dubai",
+    "UTC": "UTC",
+    "Europe/London": "London",
+    "America/New_York": "New York"
+  },
+  "form": {
+    "createTitle": "New schedule",
+    "editTitle": "Schedule",
+    "name": "Name",
+    "namePlaceholder": "Enter schedule name",
+    "nameHint": "Descriptive name for this scheduled delivery, up to 120 characters.",
+    "targetType": "Target type",
+    "targetTypeHint": "Choose whether this schedule delivers a dashboard or a report. It cannot be changed after creation.",
+    "target": "Target",
+    "targetPlaceholder": "Select target",
+    "targetHint": "Choose the dashboard or report to run on each occurrence. It cannot be changed after creation.",
+    "period": "Period",
+    "periodHint": "Reporting time window evaluated on each scheduled run.",
+    "recurrence": "Repeat",
+    "recurrenceHint": "How often the schedule runs.",
+    "weekday": "Weekday",
+    "weekdayHint": "Day of the week when weekly deliveries run.",
+    "monthDay": "Day of month",
+    "monthDayHint": "Calendar day (1–28) or the last day of each month.",
+    "time": "Time",
+    "timeHint": "Delivery run time in 24-hour format.",
+    "hour": "Hour",
+    "minute": "Minutes",
+    "timeZone": "Time zone",
+    "timeZoneHint": "Time zone used to evaluate the run schedule and period.",
+    "language": "Language",
+    "languageHint": "Language used for generated links and attached files.",
+    "startsOn": "Starts on",
+    "startsOnPlaceholder": "Select a date",
+    "startsOnHint": "First date on which this schedule can run.",
+    "endsOn": "Ends on",
+    "endsOnPlaceholder": "No end date",
+    "endsOnHint": "Optional last date on which this schedule can run.",
+    "linkTtlHours": "Link valid for (hours)",
+    "linkTtlHoursHint": "Hours before delivery links expire (1–720, or up to 168 with attachments).",
+    "recipients": "Recipients",
+    "recipientsPlaceholder": "Add recipients",
+    "recipientsHint": "Select 1 to 50 users who will receive this delivery.",
+    "recipientsEmpty": "No matching users",
+    "removeRecipient": "Remove {{name}}",
+    "channel": "Delivery channel",
+    "channelHint": "Deliveries are sent by email to each recipient. Email is the only delivery channel in this release.",
+    "attachments": "Attachments",
+    "attachmentsHint": "Optional file formats attached to each run. PDF is not available yet.",
+    "notAvailableYet": "Not available yet",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "discard": {
+    "title": "Save changes?",
+    "text": "You have unsaved changes on this schedule.",
+    "save": "Save",
+    "discard": "Discard",
+    "cancel": "Keep editing"
+  },
+  "validation": {
+    "NAME_REQUIRED": "Name is required.",
+    "NAME_TOO_LONG": "Name must be 120 characters or fewer.",
+    "TARGET_REQUIRED": "Select a target.",
+    "ENDS_BEFORE_STARTS": "End date cannot be before start date.",
+    "RECIPIENTS_REQUIRED": "Select at least one recipient.",
+    "RECIPIENTS_TOO_MANY": "Select at most 50 recipients.",
+    "TTL_OUT_OF_RANGE": "Enter a whole number between 1 and 720.",
+    "TTL_ATTACHMENT_LIMIT": "Link validity cannot exceed 168 hours when attachments are enabled.",
+    "STARTS_ON_REQUIRED": "Select a start date."
+  },
+  "deliveries": {
+    "title": "Deliveries",
+    "empty": "No deliveries recorded for this schedule yet.",
+    "columns": {
+      "scheduledFor": "Scheduled for",
+      "recipient": "Recipient",
+      "status": "Status",
+      "attempts": "Attempts",
+      "opened": "Opened",
+      "lastOpened": "Last opened"
+    },
+    "status": {
+      "PENDING": "Pending",
+      "SENT": "Sent",
+      "SKIPPED": "Skipped",
+      "FAILED": "Failed"
+    },
+    "skip": {
+      "ENTITLEMENT_EXPIRED": "The recipient's access to this target expired.",
+      "ENTITLEMENT_REVOKED": "The recipient's access to this target was revoked.",
+      "PERMISSION_CHANGED": "The recipient's permissions changed before delivery.",
+      "RECIPIENT_INACTIVE": "The recipient account is inactive.",
+      "REPORT_UNAVAILABLE": "The report was unavailable at run time.",
+      "SOURCE_NOT_READY": "A data source was not ready at run time.",
+      "OWNER_INACTIVE": "The schedule owner is no longer active.",
+      "NO_DELIVERY_ADDRESS": "No delivery address on file for this recipient.",
+      "GENERIC": "Delivery was skipped."
+    }
+  }
+}

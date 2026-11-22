@@ -1,0 +1,647 @@
+<ui-modal
+  #propModal
+  size="form"
+  icon="tablerAdjustmentsHorizontal"
+  tile="bg-icon-gray"
+  [title]="'tplFields.properties.title' | transloco"
+  [closeLabel]="'tplFields.properties.close' | transloco"
+>
+  <div class="flex flex-col gap-12">
+    <!-- Section: Object -->
+    <section class="flex flex-col gap-8">
+      <h3 class="border-b border-border pb-4 text-13 leading-18 font-medium text-text">
+        {{ 'tplFields.properties.sections.object' | transloco }}
+      </h3>
+
+      <div class="grid grid-cols-2 items-start gap-10">
+        <ui-field
+          class="col-span-2"
+          for="tpl-prop-name"
+          [label]="'tplFields.properties.object.name' | transloco"
+          [hint]="'tplFields.properties.object.nameHint' | transloco"
+          [count]="propModel().nodeName.trim().length"
+          [max]="120"
+          [error]="nameError()"
+        >
+          <input
+            id="tpl-prop-name"
+            type="text"
+            class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'tplFields.properties.object.namePlaceholder' | transloco"
+            [formField]="propForm.nodeName"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          for="tpl-prop-hidden"
+          [label]="'tplFields.properties.object.hidden' | transloco"
+          [hint]="'tplFields.properties.object.hiddenHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [id]="'tpl-prop-hidden'"
+              [label]="'tplFields.properties.object.hidden' | transloco"
+              [formField]="propForm.nodeHidden"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          for="tpl-prop-locked"
+          [label]="'tplFields.properties.object.locked' | transloco"
+          [hint]="'tplFields.properties.object.lockedHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-switch
+              [id]="'tpl-prop-locked'"
+              [label]="'tplFields.properties.object.locked' | transloco"
+              [formField]="propForm.nodeLocked"
+            />
+          </div>
+        </ui-field>
+      </div>
+    </section>
+
+    <!-- Section: Text -->
+    @if (showTextSection()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="border-b border-border pb-4 text-13 leading-18 font-medium text-text">
+          {{ 'tplFields.properties.sections.text' | transloco }}
+        </h3>
+
+        <div class="grid grid-cols-2 items-start gap-10">
+          @if (allowsStyle('fontFamilyToken')) {
+            <ui-field
+              size="bare"
+              for="tpl-prop-font"
+              [label]="'tplFields.properties.text.font' | transloco"
+              [hint]="'tplFields.properties.text.fontHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-prop-font'"
+                size="field"
+                [disabled]="state.readOnly()"
+                [label]="'tplFields.properties.text.font' | transloco"
+                [options]="fontOptions()"
+                [value]="fontFamily()"
+                (valueChange)="fontFamily.set($event)"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('fontSizePx')) {
+            <ui-field
+              for="tpl-prop-font-size"
+              [label]="'tplFields.properties.text.size' | transloco"
+              [hint]="'tplFields.properties.text.sizeHint' | transloco"
+              [error]="fontSizeError()"
+            >
+              <input
+                id="tpl-prop-font-size"
+                type="number"
+                dir="ltr"
+                step="1"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.fontSize"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('fontWeight')) {
+            <ui-field
+              size="bare"
+              for="tpl-prop-font-weight"
+              [label]="'tplFields.properties.text.weight' | transloco"
+              [hint]="'tplFields.properties.text.weightHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-prop-font-weight'"
+                size="field"
+                [disabled]="state.readOnly()"
+                [label]="'tplFields.properties.text.weight' | transloco"
+                [options]="weightOptions()"
+                [value]="fontWeight()"
+                (valueChange)="fontWeight.set($event)"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('fontStyle') || allowsStyle('textDecoration')) {
+            <ui-field
+              size="bare"
+              for="tpl-prop-text-style"
+              [label]="'tplFields.properties.text.style' | transloco"
+              [hint]="'tplFields.properties.text.styleHint' | transloco"
+            >
+              <div id="tpl-prop-text-style" class="flex h-field items-center gap-12">
+                @if (state.readOnly()) {
+                  @if (allowsStyle('fontStyle')) {
+                    <ui-checkbox [checked]="propModel().italic" [disabled]="true">
+                      <span>{{ 'tplFields.properties.text.italic' | transloco }}</span>
+                    </ui-checkbox>
+                  }
+                  @if (allowsStyle('textDecoration')) {
+                    <ui-checkbox [checked]="propModel().underline" [disabled]="true">
+                      <span>{{ 'tplFields.properties.text.underline' | transloco }}</span>
+                    </ui-checkbox>
+                  }
+                } @else {
+                  @if (allowsStyle('fontStyle')) {
+                    <ui-checkbox [formField]="propForm.italic">
+                      <span>{{ 'tplFields.properties.text.italic' | transloco }}</span>
+                    </ui-checkbox>
+                  }
+                  @if (allowsStyle('textDecoration')) {
+                    <ui-checkbox [formField]="propForm.underline">
+                      <span>{{ 'tplFields.properties.text.underline' | transloco }}</span>
+                    </ui-checkbox>
+                  }
+                }
+              </div>
+            </ui-field>
+          }
+
+          @if (allowsStyle('color')) {
+            <ui-field
+              for="tpl-prop-text-color"
+              [label]="'tplFields.properties.text.color' | transloco"
+              [hint]="'tplFields.properties.text.colorHint' | transloco"
+              [error]="textColorError()"
+            >
+              <span
+                class="size-badge shrink-0 rounded-4 border border-border-field"
+                [style.background-color]="swatchBg(propModel().textColor)"
+                aria-hidden="true"
+              ></span>
+              <input
+                id="tpl-prop-text-color"
+                type="text"
+                dir="ltr"
+                placeholder="#12141C"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+                [formField]="propForm.textColor"
+                (blur)="onColorBlur('text')"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('lineHeight')) {
+            <ui-field
+              for="tpl-prop-line-height"
+              [label]="'tplFields.properties.text.lineHeight' | transloco"
+              [hint]="'tplFields.properties.text.lineHeightHint' | transloco"
+              [error]="lineHeightError()"
+            >
+              <input
+                id="tpl-prop-line-height"
+                type="number"
+                dir="ltr"
+                step="0.05"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.lineHeight"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('letterSpacingPx')) {
+            <ui-field
+              for="tpl-prop-letter-spacing"
+              [label]="'tplFields.properties.text.letterSpacing' | transloco"
+              [hint]="'tplFields.properties.text.letterSpacingHint' | transloco"
+              [error]="letterSpacingError()"
+            >
+              <input
+                id="tpl-prop-letter-spacing"
+                type="number"
+                dir="ltr"
+                step="0.5"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.letterSpacing"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('textAlign')) {
+            <ui-field
+              size="bare"
+              for="tpl-prop-align"
+              [label]="'tplFields.properties.text.align' | transloco"
+              [hint]="'tplFields.properties.text.alignHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-prop-align'"
+                size="field"
+                [disabled]="state.readOnly()"
+                [label]="'tplFields.properties.text.align' | transloco"
+                [options]="alignOptions()"
+                [value]="textAlign()"
+                (valueChange)="textAlign.set($event)"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('verticalAlign')) {
+            <ui-field
+              size="bare"
+              for="tpl-prop-valign"
+              [label]="'tplFields.properties.text.verticalAlign' | transloco"
+              [hint]="'tplFields.properties.text.verticalAlignHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-prop-valign'"
+                size="field"
+                [disabled]="state.readOnly()"
+                [label]="'tplFields.properties.text.verticalAlign' | transloco"
+                [options]="verticalAlignOptions()"
+                [value]="verticalAlign()"
+                (valueChange)="verticalAlign.set($event)"
+              />
+            </ui-field>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Section: Box -->
+    @if (showBoxSection()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="border-b border-border pb-4 text-13 leading-18 font-medium text-text">
+          {{ 'tplFields.properties.sections.box' | transloco }}
+        </h3>
+
+        <div class="grid grid-cols-2 items-start gap-10">
+          @if (allowsStyle('backgroundColor')) {
+            <ui-field
+              for="tpl-prop-bg-color"
+              [label]="'tplFields.properties.box.backgroundColor' | transloco"
+              [hint]="'tplFields.properties.box.backgroundColorHint' | transloco"
+              [error]="bgColorError()"
+            >
+              <span
+                class="size-badge shrink-0 rounded-4 border border-border-field"
+                [style.background-color]="swatchBg(propModel().backgroundColor)"
+                aria-hidden="true"
+              ></span>
+              <input
+                id="tpl-prop-bg-color"
+                type="text"
+                dir="ltr"
+                placeholder="#FFFFFF"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+                [formField]="propForm.backgroundColor"
+                (blur)="onColorBlur('bg')"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('overflow')) {
+            <ui-field
+              size="bare"
+              for="tpl-prop-overflow"
+              [label]="'tplFields.properties.box.overflow' | transloco"
+              [hint]="'tplFields.properties.box.overflowHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-prop-overflow'"
+                size="field"
+                [disabled]="state.readOnly()"
+                [label]="'tplFields.properties.box.overflow' | transloco"
+                [options]="overflowOptions()"
+                [value]="overflow()"
+                (valueChange)="overflow.set($event)"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('border')) {
+            <ui-field
+              for="tpl-prop-border-width"
+              [label]="'tplFields.properties.box.borderWidth' | transloco"
+              [hint]="'tplFields.properties.box.borderWidthHint' | transloco"
+              [error]="borderWidthError()"
+            >
+              <input
+                id="tpl-prop-border-width"
+                type="number"
+                dir="ltr"
+                step="0.5"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.borderWidth"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              for="tpl-prop-border-style"
+              [label]="'tplFields.properties.box.borderStyle' | transloco"
+              [hint]="'tplFields.properties.box.borderStyleHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-prop-border-style'"
+                size="field"
+                [disabled]="state.readOnly()"
+                [label]="'tplFields.properties.box.borderStyle' | transloco"
+                [options]="borderStyleOptions()"
+                [value]="borderStyle()"
+                (valueChange)="onBorderStyleChange($event)"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-prop-border-color"
+              [label]="'tplFields.properties.box.borderColor' | transloco"
+              [hint]="'tplFields.properties.box.borderColorHint' | transloco"
+              [error]="borderColorError()"
+            >
+              <span
+                class="size-badge shrink-0 rounded-4 border border-border-field"
+                [style.background-color]="swatchBg(propModel().borderColor)"
+                aria-hidden="true"
+              ></span>
+              <input
+                id="tpl-prop-border-color"
+                type="text"
+                dir="ltr"
+                placeholder="#E4E7EC"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+                [formField]="propForm.borderColor"
+                (blur)="onColorBlur('border')"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('borderRadiusPx')) {
+            <ui-field
+              for="tpl-prop-border-radius"
+              [label]="'tplFields.properties.box.borderRadius' | transloco"
+              [hint]="'tplFields.properties.box.borderRadiusHint' | transloco"
+              [error]="borderRadiusError()"
+            >
+              <input
+                id="tpl-prop-border-radius"
+                type="number"
+                dir="ltr"
+                step="1"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.borderRadius"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('opacity')) {
+            <ui-field
+              for="tpl-prop-opacity"
+              [label]="'tplFields.properties.box.opacity' | transloco"
+              [hint]="'tplFields.properties.box.opacityHint' | transloco"
+              [error]="opacityError()"
+            >
+              <input
+                id="tpl-prop-opacity"
+                type="number"
+                dir="ltr"
+                step="0.05"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.opacity"
+              />
+            </ui-field>
+          }
+
+          @if (allowsStyle('padding')) {
+            @if (isPrint()) {
+              <ui-field
+                size="bare"
+                for="tpl-prop-pad-unit"
+                [label]="'tplFields.properties.box.paddingUnit' | transloco"
+                [hint]="'tplFields.properties.box.paddingUnitHint' | transloco"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-prop-pad-unit'"
+                  size="field"
+                  [disabled]="state.readOnly()"
+                  [label]="'tplFields.properties.box.paddingUnit' | transloco"
+                  [options]="paddingUnitOptions()"
+                  [value]="paddingUnit()"
+                  (valueChange)="paddingUnit.set($event)"
+                />
+              </ui-field>
+            }
+
+            <ui-field
+              for="tpl-prop-pad-top"
+              [label]="'tplFields.properties.box.paddingTop' | transloco"
+              [hint]="'tplFields.properties.box.paddingTopHint' | transloco"
+              [error]="padTopError()"
+            >
+              <input
+                id="tpl-prop-pad-top"
+                type="number"
+                dir="ltr"
+                step="0.5"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.padTop"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-prop-pad-end"
+              [label]="'tplFields.properties.box.paddingEnd' | transloco"
+              [hint]="'tplFields.properties.box.paddingEndHint' | transloco"
+              [error]="padEndError()"
+            >
+              <input
+                id="tpl-prop-pad-end"
+                type="number"
+                dir="ltr"
+                step="0.5"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.padEnd"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-prop-pad-bottom"
+              [label]="'tplFields.properties.box.paddingBottom' | transloco"
+              [hint]="'tplFields.properties.box.paddingBottomHint' | transloco"
+              [error]="padBottomError()"
+            >
+              <input
+                id="tpl-prop-pad-bottom"
+                type="number"
+                dir="ltr"
+                step="0.5"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.padBottom"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-prop-pad-start"
+              [label]="'tplFields.properties.box.paddingStart' | transloco"
+              [hint]="'tplFields.properties.box.paddingStartHint' | transloco"
+              [error]="padStartError()"
+            >
+              <input
+                id="tpl-prop-pad-start"
+                type="number"
+                dir="ltr"
+                step="0.5"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                [formField]="propForm.padStart"
+              />
+            </ui-field>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Section: Image -->
+    @if (showImageSection()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="border-b border-border pb-4 text-13 leading-18 font-medium text-text">
+          {{ 'tplFields.properties.sections.image' | transloco }}
+        </h3>
+
+        <div class="grid grid-cols-2 gap-10">
+          <ui-field
+            size="bare"
+            for="tpl-prop-image-fit"
+            [label]="'tplFields.properties.image.fit' | transloco"
+            [hint]="'tplFields.properties.image.fitHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              [id]="'tpl-prop-image-fit'"
+              size="field"
+              [disabled]="state.readOnly()"
+              [label]="'tplFields.properties.image.fit' | transloco"
+              [options]="fitOptions()"
+              [value]="objectFit()"
+              (valueChange)="objectFit.set($event)"
+            />
+          </ui-field>
+        </div>
+      </section>
+    }
+
+    <!-- Section: Line -->
+    @if (showLineSection()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="border-b border-border pb-4 text-13 leading-18 font-medium text-text">
+          {{ 'tplFields.properties.sections.line' | transloco }}
+        </h3>
+
+        <div class="grid grid-cols-2 items-start gap-10">
+          <ui-field
+            for="tpl-prop-line-thickness"
+            [label]="'tplFields.properties.line.thickness' | transloco"
+            [hint]="'tplFields.properties.line.thicknessHint' | transloco"
+            [required]="true"
+            [error]="lineThicknessError()"
+          >
+            <input
+              id="tpl-prop-line-thickness"
+              type="number"
+              dir="ltr"
+              step="0.1"
+              class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+              [formField]="propForm.lineThickness"
+            />
+          </ui-field>
+
+          <ui-field
+            size="bare"
+            for="tpl-prop-line-style"
+            [label]="'tplFields.properties.line.style' | transloco"
+            [hint]="'tplFields.properties.line.styleHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              [id]="'tpl-prop-line-style'"
+              size="field"
+              [disabled]="state.readOnly()"
+              [label]="'tplFields.properties.line.style' | transloco"
+              [options]="lineStyleOptions()"
+              [value]="lineStyle()"
+              (valueChange)="lineStyle.set($event)"
+            />
+          </ui-field>
+
+          <ui-field
+            for="tpl-prop-line-color"
+            [label]="'tplFields.properties.line.color' | transloco"
+            [hint]="'tplFields.properties.line.colorHint' | transloco"
+            [required]="true"
+            [error]="lineColorError()"
+          >
+            <span
+              class="size-badge shrink-0 rounded-4 border border-border-field"
+              [style.background-color]="swatchBg(propModel().lineColor)"
+              aria-hidden="true"
+            ></span>
+            <input
+              id="tpl-prop-line-color"
+              type="text"
+              dir="ltr"
+              placeholder="#E4E7EC"
+              class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+              [formField]="propForm.lineColor"
+              (blur)="onColorBlur('line')"
+            />
+          </ui-field>
+        </div>
+      </section>
+    }
+
+    <!-- Section: Spacer -->
+    @if (showSpacerSection()) {
+      <section class="flex flex-col gap-8">
+        <h3 class="border-b border-border pb-4 text-13 leading-18 font-medium text-text">
+          {{ 'tplFields.properties.sections.spacer' | transloco }}
+        </h3>
+
+        <div class="grid grid-cols-2 gap-10">
+          <ui-field
+            for="tpl-prop-spacer-height"
+            [label]="'tplFields.properties.spacer.height' | transloco"
+            [hint]="'tplFields.properties.spacer.heightHint' | transloco"
+            [required]="true"
+            [error]="spacerHeightError()"
+          >
+            <input
+              id="tpl-prop-spacer-height"
+              type="number"
+              dir="ltr"
+              step="1"
+              class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+              [formField]="propForm.spacerHeight"
+            />
+          </ui-field>
+        </div>
+      </section>
+    }
+  </div>
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    @if (!state.readOnly()) {
+      <button type="button" uiButton variant="primary" [disabled]="!canApply()" (click)="apply()">
+        {{ 'tplFields.properties.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplFields.properties.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplFields.properties.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

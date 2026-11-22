@@ -1,0 +1,105 @@
+<div
+  role="tree"
+  class="flex flex-col gap-6"
+  [attr.aria-label]="'org.views.rows' | transloco"
+  (keydown)="onTreeKeydown($event)"
+>
+  @for (row of flatRows(); track row.id) {
+    <div
+      #rowEl
+      role="treeitem"
+      [attr.data-node-id]="row.id"
+      [attr.aria-level]="row.depth + 1"
+      [attr.aria-expanded]="row.children.length > 0 ? isExpanded(row.id) : null"
+      [attr.aria-selected]="activeRowId() === row.id"
+      [tabIndex]="activeRowId() === row.id ? 0 : -1"
+      [style.margin-inline-start]="indentStyle(row.depth)"
+      class="flex h-table-row cursor-pointer items-center gap-8 rounded-10 border px-8 shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="row.isMatch ? 'border-warning bg-surface-muted' : 'border-border bg-surface'"
+      (focus)="focusedId.set(row.id)"
+      (click)="onRowClick(row, $event)"
+    >
+      @if (row.children.length > 0) {
+        <button
+          type="button"
+          tabindex="-1"
+          data-chevron
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text"
+          [attr.aria-label]="(isExpanded(row.id) ? 'org.collapse' : 'org.expand') | transloco"
+          (click)="onToggle(row.id, $event)"
+        >
+          <ng-icon
+            [name]="isExpanded(row.id) ? 'tablerChevronDown' : 'tablerChevronRight'"
+            size="14"
+            [class.rtl:-scale-x-100]="!isExpanded(row.id)"
+            aria-hidden="true"
+          />
+        </button>
+      } @else {
+        <span class="size-icon-tile-sm shrink-0" aria-hidden="true"></span>
+      }
+
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="meta(row.level).tile"
+      >
+        <ng-icon [name]="meta(row.level).icon" size="14" aria-hidden="true" />
+      </span>
+
+      <span
+        class="min-w-0 truncate text-13 leading-18 font-medium"
+        [class]="row.isMatch ? 'rounded-4 bg-warning px-4 text-on-warning' : 'text-text'"
+        [title]="row.name"
+      >
+        {{ row.name }}
+      </span>
+
+      <span
+        dir="ltr"
+        class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium tabular-nums"
+        [class]="row.isMatch ? 'bg-warning text-on-warning' : 'bg-neutral-soft text-text'"
+      >
+        {{ row.code }}
+      </span>
+
+      <span class="shrink-0 text-11 leading-16 text-text-muted">
+        {{ meta(row.level).typeKey | transloco }}
+      </span>
+
+      @if (meta(row.level).childrenKey; as childrenKey) {
+        @if (!row.hiddenByPermission) {
+          <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+            {{ childrenKey | transloco: { n: row.children.length } }}
+          </span>
+        }
+      }
+
+      @if (row.status === 'INACTIVE') {
+        <app-staff-status-badge [status]="row.status" />
+      }
+
+      <span class="flex-1"></span>
+
+      <div data-row-action class="shrink-0" (click)="$event.stopPropagation()">
+        <ui-actions-menu
+          [items]="actionsFor()(row)"
+          [label]="row.name"
+          (selected)="onActionSelected(row, $event)"
+        />
+      </div>
+    </div>
+
+    @if (row.hiddenByPermission) {
+      <div
+        role="treeitem"
+        aria-disabled="true"
+        [attr.aria-level]="row.depth + 2"
+        [style.margin-inline-start]="indentStyle(row.depth + 1)"
+        class="flex items-center gap-6 px-8 py-2 text-11 leading-16 text-text-muted"
+      >
+        <ng-icon name="tablerLock" size="12" aria-hidden="true" />
+        <span>{{ 'org.hiddenByPermission' | transloco }}</span>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,103 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerUpload"
+  tile="bg-icon-blue"
+  [title]="modalTitle()"
+  [closeLabel]="'templates.actions.close' | transloco"
+  [dismissable]="!actions.publishing()"
+  (closed)="onClosed()"
+>
+  <dl
+    class="grid items-center gap-x-10 gap-y-8 text-12 leading-18 grid-cols-tpl-publish-summary"
+  >
+    <dt class="text-text-muted">{{ 'tplValidation.publish.draft' | transloco }}</dt>
+    <dd class="min-w-0 font-medium text-text">
+      @for (seg of revisionSegments(); track $index) {
+        @if (seg.isolate === 'none') {
+          <span>{{ seg.text }}</span>
+        } @else {
+          <bdi [attr.dir]="seg.isolate === 'ltr' ? 'ltr' : null" class="tabular-nums">{{ seg.text }}</bdi>
+        }
+      }
+    </dd>
+
+    <dt class="text-text-muted">{{ 'tplValidation.publish.check' | transloco }}</dt>
+    <dd class="min-w-0">
+      <span class="inline-flex h-badge items-center rounded-8 bg-success px-8 text-12 font-medium whitespace-nowrap text-on-success">
+        @for (seg of checkSegments(); track $index) {
+          @if (seg.isolate === 'none') {
+            <span>{{ seg.text }}</span>
+          } @else {
+            <bdi [attr.dir]="seg.isolate === 'ltr' ? 'ltr' : null" class="tabular-nums">{{ seg.text }}</bdi>
+          }
+        }
+      </span>
+    </dd>
+
+    <dt class="text-text-muted">{{ 'tplValidation.publish.current' | transloco }}</dt>
+    <dd class="min-w-0 font-medium text-text">
+      @if (currentVersionSegments(); as segments) {
+        @for (seg of segments; track $index) {
+          @if (seg.isolate === 'none') {
+            <span>{{ seg.text }}</span>
+          } @else {
+            <bdi [attr.dir]="seg.isolate === 'ltr' ? 'ltr' : null" class="tabular-nums">{{ seg.text }}</bdi>
+          }
+        }
+      } @else {
+        <span class="text-text-muted">{{ 'tplValidation.publish.notPublished' | transloco }}</span>
+      }
+    </dd>
+
+    <dt class="text-text-muted">{{ 'tplValidation.publish.assignments' | transloco }}</dt>
+    <dd class="min-w-0 font-medium text-text">
+      {{ 'tplValidation.publish.assignmentsText' | transloco }}
+    </dd>
+  </dl>
+
+  <div class="mt-10">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-note'"
+      [label]="'tplValidation.publish.note' | transloco"
+      [hint]="'tplValidation.publish.noteHint' | transloco"
+      [count]="changeNote().length"
+      [max]="500"
+      [error]="changeNoteError()"
+    >
+      <textarea
+        [id]="uid + '-note'"
+        rows="3"
+        maxlength="500"
+        class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [disabled]="actions.publishing()"
+        [value]="changeNote()"
+        (input)="onNoteInput($event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="actions.publishing()"
+      [disabled]="actions.publishing()"
+      (click)="submit()"
+    >
+      <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
+      {{ 'tplValidation.publish.submit' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="actions.publishing()"
+      (click)="close()"
+    >
+      {{ 'tplValidation.publish.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

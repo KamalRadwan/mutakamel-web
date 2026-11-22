@@ -1,0 +1,118 @@
+{
+  "title": "Branding",
+  "actions": {
+    "save": "Save branding",
+    "undo": "Undo",
+    "unsaved": "Unsaved changes",
+    "preview": "Preview",
+    "reload": "Reload",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "loadFailed": "Branding could not be loaded.",
+  "readOnlyNotice": "Read-only access. Contact a workspace administrator to update branding.",
+  "saved": "Branding updated.",
+  "identity": {
+    "title": "Identity"
+  },
+  "colours": {
+    "title": "Colours"
+  },
+  "assets": {
+    "title": "Visual assets",
+    "immediate": "Uploads apply immediately without saving branding.",
+    "noRemove": "Images can be replaced but not removed."
+  },
+  "fields": {
+    "appName": "App name",
+    "appNameHint": "Shown in the header and on the sign-in page. Up to 120 characters. Leave empty to use the default name.",
+    "tabTitle": "Browser tab title",
+    "tabTitleHint": "Shown on the browser tab. Up to 120 characters. Leave empty to use the app name.",
+    "primary": "Primary colour",
+    "primaryHint": "Main brand colour for buttons and highlights, as a hex code such as #2563eb. Leave empty for the system colour.",
+    "secondary": "Secondary colour",
+    "secondaryHint": "Optional second brand colour, for example #0f172a. Leave empty for none."
+  },
+  "validation": {
+    "textTooLong": "Use at most 120 characters.",
+    "colourInvalid": "Enter a hex colour, for example #2563eb."
+  },
+  "asset": {
+    "logo": {
+      "title": "Logo",
+      "hint": "Shown in the header and on the sign-in page.",
+      "limits": "PNG, JPG or WebP • Up to 2 MB • 4096×4096 px"
+    },
+    "icon": {
+      "title": "Tab icon",
+      "hint": "Shown on the browser tab.",
+      "limits": "PNG, JPG or WebP • Up to 512 KB • 1024×1024 px"
+    },
+    "empty": "Nothing uploaded yet.",
+    "upload": "Upload image",
+    "replace": "Replace image"
+  },
+  "upload": {
+    "logoTitle": "Upload logo",
+    "iconTitle": "Change tab icon",
+    "current": "Current image",
+    "selected": "Selected file",
+    "noFile": "No file selected.",
+    "field": "Image",
+    "fieldHint": "Drop a PNG, JPG or WebP file or browse. It applies immediately and replaces the current image.",
+    "dropTitle": "Drop an image here",
+    "browse": "Choose image",
+    "chooseAnother": "Choose another file",
+    "confirm": "Upload image",
+    "inspecting": "Checking the file…",
+    "success": "The image was uploaded.",
+    "errors": {
+      "fileRequired": "Choose an image first.",
+      "typeUnsupported": "Use a PNG, JPG or WebP image.",
+      "logoTooLarge": "The logo must not exceed 2 MB.",
+      "iconTooLarge": "The icon must not exceed 512 KB.",
+      "dimensionsLogo": "The image must not exceed 4096×4096 px.",
+      "dimensionsIcon": "The image must not exceed 1024×1024 px.",
+      "unreadable": "This file could not be read as a valid PNG, JPEG or WebP image."
+    }
+  },
+  "preview": {
+    "title": "Branding preview",
+    "themeLabel": "Preview theme",
+    "themeHint": "Preview your colours on the light or the dark theme",
+    "light": "Light",
+    "dark": "Dark",
+    "tabLabel": "Browser tab",
+    "headerLabel": "App header",
+    "signInLabel": "Sign-in page",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "defaultName": "Mutakamel",
+    "systemColour": "Using the system colour.",
+    "note": "The preview uses your unsaved values and the saved images."
+  },
+  "discard": {
+    "title": "Discard changes?",
+    "text": "Unsaved text and colour edits will be discarded. Uploaded images are saved immediately and will remain.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "errors": {
+    "BRANDING_FILE_REQUIRED": "Choose an image first.",
+    "BRANDING_FILE_INVALID": "The image could not be read, is empty, or exceeds the allowed dimensions.",
+    "BRANDING_FILE_TYPE_UNSUPPORTED": "Use a PNG, JPG or WebP image.",
+    "BRANDING_FILE_TOO_LARGE": "The image is larger than the allowed size.",
+    "BRANDING_STATE_UNAVAILABLE": "Branding is temporarily unavailable. Try again later.",
+    "BRANDING_STORAGE_UNAVAILABLE": "Image storage is not configured for this workspace, so uploads are unavailable.",
+    "INVALID_IDEMPOTENCY_KEY": "The request could not be sent safely. Try again.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "Only workspace-wide administrators can change branding.",
+    "MISSING_REQUIRED_PERMISSIONS": "You don't have permission to do this.",
+    "CORE_VALIDATION_FAILED": "Check the values and try again.",
+    "network": "Can't reach the server. Check your connection and try again.",
+    "generic": "Something went wrong. Try again in a moment.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "This request is still being processed. Wait a moment, then reload.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches the earlier attempt. Try again."
+  }
+}

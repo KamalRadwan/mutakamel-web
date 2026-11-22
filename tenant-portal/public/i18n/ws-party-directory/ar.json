@@ -1,0 +1,159 @@
+{
+  "title": "دليل الجهات",
+  "newParty": "جهة جديدة",
+  "searchPlaceholder": "ابحث بالاسم أو الرقم الضريبي أو الهاتف أو البريد الإلكتروني",
+  "clearSearch": "مسح البحث",
+  "shared": "مشترك",
+  "managedByCrm": "مُدار بواسطة إدارة علاقات العملاء",
+  "managedByApp": "مُدار بواسطة تطبيق آخر",
+  "pagination": "تصفح صفحات دليل الجهات",
+  "types": {
+    "PERSON": "فرد",
+    "ORGANIZATION": "مؤسسة"
+  },
+  "status": {
+    "ACTIVE": "نشط",
+    "INACTIVE": "غير نشط",
+    "BLOCKED": "محظور"
+  },
+  "roles": {
+    "CUSTOMER": "عميل",
+    "SUPPLIER": "مورّد",
+    "EMPLOYEE": "موظف",
+    "LEAD": "عميل محتمل",
+    "SHIPPING_RECIPIENT": "مستلم شحنات",
+    "CONTACT_PERSON": "جهة اتصال",
+    "BILLING_CONTACT": "جهة اتصال للفوترة",
+    "LEGAL_ENTITY": "كيان قانوني",
+    "GUARANTOR": "ضامن",
+    "PARTNER": "شريك"
+  },
+  "contactTypes": {
+    "PHONE": "هاتف",
+    "MOBILE": "جوال",
+    "EMAIL": "بريد إلكتروني",
+    "WHATSAPP": "واتساب",
+    "WEBSITE": "موقع إلكتروني",
+    "OTHER": "أخرى"
+  },
+  "addressTypes": {
+    "LEGAL": "قانوني",
+    "BILLING": "فوترة",
+    "SHIPPING": "شحن",
+    "HOME": "منزل",
+    "WORK": "عمل",
+    "OTHER": "أخرى"
+  },
+  "relationshipTypes": {
+    "CONTACT_PERSON": "جهة اتصال",
+    "BILLING_CONTACT": "جهة اتصال للفوترة",
+    "LEGAL_CONTACT": "جهة اتصال قانونية",
+    "GUARANTOR": "ضامن",
+    "PARTNER_OF": "شريك لـ",
+    "EMPLOYEE_OF": "موظف لدى",
+    "OTHER": "أخرى"
+  },
+  "filters": {
+    "toggle": "التصفية",
+    "all": "الكل",
+    "clear": "مسح عوامل التصفية",
+    "remove": "إزالة عامل التصفية",
+    "type": "النوع",
+    "typeHint": "التصفية حسب فرد أو مؤسسة.",
+    "status": "الحالة",
+    "statusHint": "التصفية حسب الحالة الحالية للجهة.",
+    "role": "الدور",
+    "roleHint": "مطابقة الجهات التي تملك دورًا نشطًا من هذا النوع.",
+    "branch": "الفرع",
+    "branchHint": "اختر فرعًا أو الجهات المشتركة على مستوى مساحة العمل.",
+    "owner": "المسؤول",
+    "ownerHint": "التصفية حسب المستخدم المسؤول المعيّن."
+  },
+  "cols": {
+    "party": "الجهة",
+    "phone": "الهاتف",
+    "email": "البريد الإلكتروني",
+    "roles": "الأدوار",
+    "branch": "الفرع",
+    "owner": "المسؤول",
+    "status": "الحالة",
+    "created": "تاريخ الإنشاء",
+    "updated": "آخر تحديث",
+    "actions": "الإجراءات"
+  },
+  "sort": {
+    "asc": "ترتيب تصاعدي",
+    "desc": "ترتيب تنازلي"
+  },
+  "actions": {
+    "open": "فتح",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "noPermissionBranch": "ليست لديك صلاحية لإدارة هذا الفرع.",
+    "noPermissionShared": "تتطلب إدارة الجهات المشتركة صلاحية على مستوى مساحة العمل."
+  },
+  "confirmDelete": {
+    "title": "حذف الجهة",
+    "text": "هل أنت متأكد من حذف «{{name}}»؟ لا يمكن التراجع عن هذا الإجراء.",
+    "confirm": "حذف",
+    "cancel": "إلغاء"
+  },
+  "inUse": {
+    "title": "هذه الجهة قيد الاستخدام",
+    "text": "إنها مرتبطة بسجلات أو تطبيقات أخرى، لذا لا يمكن حذفها. عيّن حالتها إلى غير نشط بدلًا من ذلك.",
+    "setInactive": "تعيين كغير نشط",
+    "cancel": "إلغاء",
+    "close": "إغلاق"
+  },
+  "toast": {
+    "deleted": "تم حذف الجهة.",
+    "setInactive": "تم تعيين الجهة كغير نشطة."
+  },
+  "states": {
+    "emptyFirstUse": "لا يوجد أفراد أو مؤسسات بعد",
+    "emptyFiltered": "لا يوجد أفراد أو مؤسسات مطابقة.",
+    "loadFailed": "تعذّر تحميل دليل الجهات.",
+    "retry": "إعادة المحاولة",
+    "referenceLabel": "المرجع:",
+    "reference": "المرجع: {{id}}",
+    "forbiddenTitle": "غير مسموح بالوصول",
+    "forbiddenText": "ليست لديك صلاحية لعرض دليل الجهات.",
+    "backToHome": "العودة إلى الرئيسية"
+  },
+  "errors": {
+    "PARTY_NOT_FOUND": "الجهة غير موجودة.",
+    "PARTY_CONTACT_METHOD_NOT_FOUND": "وسيلة التواصل غير موجودة.",
+    "PARTY_ADDRESS_NOT_FOUND": "عنوان الجهة غير موجود.",
+    "PARTY_ROLE_NOT_FOUND": "دور الجهة غير موجود.",
+    "PARTY_RELATIONSHIP_NOT_FOUND": "علاقة الجهة غير موجودة.",
+    "PARTY_IMAGE_NOT_FOUND": "صورة الجهة غير موجودة.",
+    "PARTY_IMAGE_REQUIRED": "ملف صورة الجهة مطلوب.",
+    "PARTY_CONTACT_VALUE_INVALID": "يجب أن تتطابق قيمة التواصل مع نوعها.",
+    "PARTY_IMAGE_INVALID": "صورة الجهة ليست ملف PNG أو JPEG أو WebP آمنًا.",
+    "PARTY_IMAGE_TOO_LARGE": "يجب ألا يتجاوز حجم صورة الجهة 2 ميجابايت.",
+    "PARTY_IMAGE_STORAGE_UNAVAILABLE": "تخزين صور الجهات غير متاح حاليًا.",
+    "PARTY_DUPLICATE_CONTACT_METHOD": "وسيلة التواصل هذه مستخدمة بالفعل من قِبل جهة أخرى.",
+    "PARTY_ROLE_ALREADY_EXISTS": "دور الجهة هذا موجود بالفعل ضمن النطاق نفسه.",
+    "PARTY_ROLE_MANAGED_BY_APP": "يُدار هذا الدور بواسطة تطبيق آخر ولا يمكن حذفه من هنا.",
+    "DIRECTORY_PARTY_IN_USE": "هذه الجهة قيد الاستخدام ولا يمكن حذفها.",
+    "PARTY_RELATIONSHIP_ALREADY_EXISTS": "هذه العلاقة موجودة بالفعل.",
+    "PARTY_ALREADY_LINKED": "هذه الجهة مرتبطة بالفعل بمستخدم في مساحة العمل.",
+    "PARTY_CONTACT_METHOD_LIMIT_EXCEEDED": "تم تجاوز الحد الأقصى لوسائل التواصل للجهة.",
+    "PARTY_ADDRESS_LIMIT_EXCEEDED": "تم تجاوز الحد الأقصى للعناوين للجهة.",
+    "PARTY_ROLE_LIMIT_EXCEEDED": "تم تجاوز الحد الأقصى لأدوار الجهة.",
+    "PARTY_CHILD_BATCH_INVALID": "مجموعات العناصر الفرعية للجهة غير صالحة.",
+    "PARTY_ROLE_METADATA_INVALID": "يجب أن تكون بيانات الدور الوصفية كائنًا مسطحًا لا يتجاوز 4096 بايت UTF-8.",
+    "PARTY_FIELDS_INVALID": "يجب أن تتوافق حقول الجهة مع نوعها.",
+    "PARTY_RELATIONSHIP_INVALID": "علاقة الجهة غير صالحة.",
+    "PARTY_BRANCH_INVALID": "يجب أن يكون الفرع موجودًا ونشطًا.",
+    "PARTY_OWNER_INVALID": "يجب أن يكون المسؤول مستخدمًا نشطًا ضمن نطاق الجهة.",
+    "PARTY_TENANT_USER_INVALID": "لا يمكن ربط مستخدمي مساحة العمل إلا بجهات أفراد نشطة.",
+    "DIRECTORY_SETTINGS_INVALID": "إعدادات الدليل غير صالحة.",
+    "DIRECTORY_PARTY_CHILD_AUTHORITY_EXCEEDED": "تتجاوز العناصر الفرعية المحفوظة الحد المدعوم.",
+    "BRANCH_PERMISSION_DENIED": "الصلاحية المطلوبة غير ممنوحة لهذا الفرع.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "تعذّر تحديد نطاق الصلاحيات حاليًا.",
+    "INVALID_FIELD": "حقل الفرز المطلوب غير مسموح به.",
+    "CORE_VALIDATION_FAILED": "فشل التحقق من صحة البيانات المرسلة.",
+    "generic": "حدث خطأ ما. حاول مرة أخرى."
+  }
+}

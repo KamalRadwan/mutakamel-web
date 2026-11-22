@@ -1,0 +1,374 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <ui-section-bar
+    tone="navy"
+    icon="tablerBuildingStore"
+    [title]="'itemForm.profile.heading' | transloco: { company: companyName() }"
+  />
+
+  @if (!draft().enabled) {
+    <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-dashed border-border-field p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerBuildingStore" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 text-text-muted">
+        {{ 'itemForm.profile.none' | transloco: { company: companyName() } }}
+      </p>
+      @if (!readonly()) {
+        <button type="button" uiButton variant="primary" (click)="enableProfile()">
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          {{ 'itemForm.actions.enable' | transloco }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div [class]="pageGrid">
+      <ui-field
+        size="bare"
+        [for]="uid + '-can-sell'"
+        [label]="'itemForm.fields.canSell.label' | transloco"
+        [hint]="'itemForm.fields.canSell.hint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <ui-switch
+            [id]="uid + '-can-sell'"
+            [label]="'itemForm.fields.canSell.label' | transloco"
+            [describedBy]="uid + '-can-sell-hint'"
+            [disabled]="readonly()"
+            [checked]="draft().canSell"
+            (checkedChange)="onCanSellChange($event)"
+          />
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-can-purchase'"
+        [label]="'itemForm.fields.canPurchase.label' | transloco"
+        [hint]="'itemForm.fields.canPurchase.hint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <ui-switch
+            [id]="uid + '-can-purchase'"
+            [label]="'itemForm.fields.canPurchase.label' | transloco"
+            [describedBy]="uid + '-can-purchase-hint'"
+            [disabled]="readonly()"
+            [checked]="draft().canPurchase"
+            (checkedChange)="onCanPurchaseChange($event)"
+          />
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-can-pos'"
+        [label]="'itemForm.fields.canPos.label' | transloco"
+        [hint]="'itemForm.fields.canPos.hint' | transloco"
+        [hintText]="posDisabledReason()"
+      >
+        <div class="flex h-field items-center" [attr.title]="posDisabledReason()">
+          <ui-switch
+            [id]="uid + '-can-pos'"
+            [label]="'itemForm.fields.canPos.label' | transloco"
+            [describedBy]="uid + '-can-pos-hint'"
+            [disabled]="posDisabled()"
+            [checked]="draft().canPos"
+            (checkedChange)="onCanPosChange($event)"
+          />
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-track-inv'"
+        [label]="'itemForm.fields.trackInventory.label' | transloco"
+        [hint]="'itemForm.fields.trackInventory.hint' | transloco"
+        [hintText]="trackingDisabledReason()"
+      >
+        <div class="flex h-field items-center" [attr.title]="trackingDisabledReason()">
+          <ui-switch
+            [id]="uid + '-track-inv'"
+            [label]="'itemForm.fields.trackInventory.label' | transloco"
+            [describedBy]="uid + '-track-inv-hint'"
+            [disabled]="trackingDisabled()"
+            [checked]="draft().trackInventory"
+            (checkedChange)="onTrackInventoryChange($event)"
+          />
+        </div>
+      </ui-field>
+
+      <div class="col-span-1 desktop:col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-tracking-mode'"
+          [label]="'itemForm.fields.trackingMode.label' | transloco"
+          [hint]="'itemForm.fields.trackingMode.hint' | transloco"
+          [hintText]="trackingDisabledReason()"
+        >
+          <div class="flex items-center" [attr.title]="trackingDisabledReason()">
+            <ui-segmented
+              [id]="uid + '-tracking-mode'"
+              [label]="'itemForm.fields.trackingMode.label' | transloco"
+              [describedBy]="uid + '-tracking-mode-hint'"
+              [options]="trackingOptions()"
+              [value]="draft().trackingMode"
+              (valueChange)="onTrackingModeChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      @let salesUomErr = errorText('defaultSalesUomId');
+      @if (!readonly()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-sales-uom'"
+          [label]="'itemForm.fields.defaultSalesUnit.label' | transloco"
+          [hint]="'itemForm.fields.defaultSalesUnit.hint' | transloco"
+          [error]="salesUomErr"
+        >
+          <app-trade-uom-picker
+            [id]="uid + '-sales-uom'"
+            [describedBy]="describedBy('defaultSalesUomId', uid + '-sales-uom')"
+            [includeRetired]="false"
+            [invalid]="!!salesUomErr"
+            [value]="draft().defaultSalesUomId"
+            (valueChange)="onUomChange('defaultSalesUomId', $event)"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-sales-uom'"
+          [label]="'itemForm.fields.defaultSalesUnit.label' | transloco"
+          [hint]="'itemForm.fields.defaultSalesUnit.hint' | transloco"
+          [error]="salesUomErr"
+        >
+          <input
+            [id]="uid + '-sales-uom'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="uomDisplayLabel(draft().defaultSalesUomId)"
+          />
+        </ui-field>
+      }
+
+      @let purchaseUomErr = errorText('defaultPurchaseUomId');
+      @if (!readonly()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-purchase-uom'"
+          [label]="'itemForm.fields.defaultPurchaseUnit.label' | transloco"
+          [hint]="'itemForm.fields.defaultPurchaseUnit.hint' | transloco"
+          [error]="purchaseUomErr"
+        >
+          <app-trade-uom-picker
+            [id]="uid + '-purchase-uom'"
+            [describedBy]="describedBy('defaultPurchaseUomId', uid + '-purchase-uom')"
+            [includeRetired]="false"
+            [invalid]="!!purchaseUomErr"
+            [value]="draft().defaultPurchaseUomId"
+            (valueChange)="onUomChange('defaultPurchaseUomId', $event)"
+          />
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-purchase-uom'"
+          [label]="'itemForm.fields.defaultPurchaseUnit.label' | transloco"
+          [hint]="'itemForm.fields.defaultPurchaseUnit.hint' | transloco"
+          [error]="purchaseUomErr"
+        >
+          <input
+            [id]="uid + '-purchase-uom'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="uomDisplayLabel(draft().defaultPurchaseUomId)"
+          />
+        </ui-field>
+      }
+
+      @let priceErr = errorText('salesPrice');
+      <ui-field
+        [for]="uid + '-sales-price'"
+        [label]="'itemForm.fields.salesPrice.label' | transloco"
+        [hint]="'itemForm.fields.salesPrice.hint' | transloco"
+        [error]="priceErr"
+      >
+        <input
+          [id]="uid + '-sales-price'"
+          type="text"
+          dir="ltr"
+          [attr.inputmode]="readonly() ? null : 'decimal'"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+          [readonly]="readonly()"
+          [attr.aria-invalid]="priceErr ? 'true' : null"
+          [value]="readonly() ? formattedSalesPrice() : draft().salesPrice"
+          (input)="onTextChange('salesPrice', $event)"
+        />
+      </ui-field>
+
+      @let currencyErr = errorText('currencyCode');
+      <ui-field
+        [for]="uid + '-currency'"
+        [label]="'itemForm.fields.currency.label' | transloco"
+        [hint]="'itemForm.fields.currency.hint' | transloco"
+        [error]="currencyErr"
+      >
+        <input
+          [id]="uid + '-currency'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none tabular-nums"
+          [attr.aria-invalid]="currencyErr ? 'true' : null"
+          [value]="displayCurrencyCode() ?? '—'"
+        />
+      </ui-field>
+
+      @let salesTaxErr = errorText('salesTaxId');
+      @if (!readonly()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-sales-tax'"
+          [label]="'itemForm.fields.salesTax.label' | transloco"
+          [hint]="'itemForm.fields.salesTax.hint' | transloco"
+          [error]="salesTaxErr"
+        >
+          <div [attr.aria-invalid]="salesTaxErr ? 'true' : null">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-sales-tax'"
+              [label]="'itemForm.fields.salesTax.label' | transloco"
+              [describedBy]="describedBy('salesTaxId', uid + '-sales-tax')"
+              [options]="taxOptions()"
+              [value]="draft().salesTaxId ?? ''"
+              (valueChange)="onTaxChange('salesTaxId', $event)"
+            />
+          </div>
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-sales-tax'"
+          [label]="'itemForm.fields.salesTax.label' | transloco"
+          [hint]="'itemForm.fields.salesTax.hint' | transloco"
+          [error]="salesTaxErr"
+        >
+          <input
+            [id]="uid + '-sales-tax'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="taxDisplayLabel(draft().salesTaxId)"
+          />
+        </ui-field>
+      }
+
+      @let purchaseTaxErr = errorText('purchaseTaxId');
+      @if (!readonly()) {
+        <ui-field
+          size="bare"
+          [for]="uid + '-purchase-tax'"
+          [label]="'itemForm.fields.purchaseTax.label' | transloco"
+          [hint]="'itemForm.fields.purchaseTax.hint' | transloco"
+          [error]="purchaseTaxErr"
+        >
+          <div [attr.aria-invalid]="purchaseTaxErr ? 'true' : null">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-purchase-tax'"
+              [label]="'itemForm.fields.purchaseTax.label' | transloco"
+              [describedBy]="describedBy('purchaseTaxId', uid + '-purchase-tax')"
+              [options]="taxOptions()"
+              [value]="draft().purchaseTaxId ?? ''"
+              (valueChange)="onTaxChange('purchaseTaxId', $event)"
+            />
+          </div>
+        </ui-field>
+      } @else {
+        <ui-field
+          [for]="uid + '-purchase-tax'"
+          [label]="'itemForm.fields.purchaseTax.label' | transloco"
+          [hint]="'itemForm.fields.purchaseTax.hint' | transloco"
+          [error]="purchaseTaxErr"
+        >
+          <input
+            [id]="uid + '-purchase-tax'"
+            type="text"
+            readonly
+            class="w-full bg-transparent text-12 text-text outline-none"
+            [value]="taxDisplayLabel(draft().purchaseTaxId)"
+          />
+        </ui-field>
+      }
+
+      @let taxClassErr = errorText('taxClassificationKey');
+      <ui-field
+        [for]="uid + '-tax-class'"
+        [label]="'itemForm.fields.taxClassificationKey.label' | transloco"
+        [hint]="'itemForm.fields.taxClassificationKey.hint' | transloco"
+        [count]="draft().taxClassificationKey.trim().length"
+        [max]="limits.key"
+        [error]="taxClassErr"
+      >
+        <input
+          [id]="uid + '-tax-class'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [attr.aria-invalid]="taxClassErr ? 'true' : null"
+          [value]="draft().taxClassificationKey"
+          (input)="onTextChange('taxClassificationKey', $event)"
+        />
+      </ui-field>
+
+      @let acctErr = errorText('accountingMappingKey');
+      <ui-field
+        [for]="uid + '-acct-key'"
+        [label]="'itemForm.fields.accountingMappingKey.label' | transloco"
+        [hint]="'itemForm.fields.accountingMappingKey.hint' | transloco"
+        [count]="draft().accountingMappingKey.trim().length"
+        [max]="limits.key"
+        [error]="acctErr"
+      >
+        <input
+          [id]="uid + '-acct-key'"
+          type="text"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [readonly]="readonly()"
+          [attr.aria-invalid]="acctErr ? 'true' : null"
+          [value]="draft().accountingMappingKey"
+          (input)="onTextChange('accountingMappingKey', $event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-profile-status'"
+        [label]="'itemForm.fields.profileStatus.label' | transloco"
+        [hint]="'itemForm.fields.profileStatus.hint' | transloco"
+      >
+        <input
+          [id]="uid + '-profile-status'"
+          type="text"
+          readonly
+          class="w-full bg-transparent text-12 text-text outline-none"
+          [value]="profileStatusLabel()"
+        />
+      </ui-field>
+    </div>
+  }
+</section>
+
+@if (canViewCost()) {
+  <app-item-standard-cost-section
+    [currencyCode]="displayCurrencyCode()"
+    [hasProfile]="hasServerProfile()"
+    [canManageCost]="canManageCost()"
+    [readonly]="readonly()"
+    [error]="errors()['standardCost'] ?? null"
+    [(value)]="standardCost"
+  />
+}

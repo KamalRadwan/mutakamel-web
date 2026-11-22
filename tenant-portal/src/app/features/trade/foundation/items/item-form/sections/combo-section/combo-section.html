@@ -1,0 +1,250 @@
+<div class="flex flex-col gap-10">
+  <div class="flex flex-col gap-8">
+    @for (row of draft().comboComponents; track row.key; let i = $index) {
+      @let compErr = errorText('comboComponents.' + i + '.componentItemId');
+      @let qtyErr = errorText('comboComponents.' + i + '.quantity');
+      @let orderErr = errorText('comboComponents.' + i + '.sortOrder');
+      <div [class]="comboGridClass()">
+        <div [class]="readonly() ? 'min-w-0 desktop:col-span-6' : 'min-w-0 desktop:col-span-5'">
+          @if (!readonly()) {
+            <ui-field
+              size="bare"
+              [for]="uid + '-comp-' + i"
+              [label]="'itemForm.fields.component.label' | transloco"
+              [hint]="'itemForm.fields.component.hint' | transloco"
+              [required]="true"
+              [error]="compErr"
+            >
+              <app-trade-item-picker
+                [id]="uid + '-comp-' + i"
+                [describedBy]="describedBy('comboComponents.' + i + '.componentItemId', uid + '-comp-' + i)"
+                [kinds]="['PRODUCT']"
+                [statuses]="['ACTIVE']"
+                [excludeIds]="excludeForComponent(i)"
+                [invalid]="!!compErr"
+                [value]="row.componentItemId"
+                (valueChange)="setComponentItem(i, $event)"
+              />
+            </ui-field>
+          } @else {
+            <ui-field
+              [for]="uid + '-comp-' + i"
+              [label]="'itemForm.fields.component.label' | transloco"
+              [hint]="'itemForm.fields.component.hint' | transloco"
+              [error]="compErr"
+            >
+              <input
+                [id]="uid + '-comp-' + i"
+                type="text"
+                readonly
+                dir="auto"
+                class="w-full bg-transparent text-12 text-text outline-none"
+                [value]="itemLabel(row.componentItemId)"
+                [attr.aria-invalid]="compErr ? 'true' : null"
+              />
+            </ui-field>
+          }
+        </div>
+
+        <div class="min-w-0 desktop:col-span-3">
+          <ui-field
+            [for]="uid + '-qty-' + i"
+            [label]="'itemForm.fields.quantity.label' | transloco"
+            [hint]="'itemForm.fields.quantity.hint' | transloco"
+            [required]="true"
+            [error]="qtyErr"
+          >
+            <input
+              [id]="uid + '-qty-' + i"
+              type="text"
+              dir="ltr"
+              inputmode="decimal"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+              [readonly]="readonly()"
+              [attr.aria-required]="'true'"
+              [attr.aria-invalid]="qtyErr ? 'true' : null"
+              [value]="row.quantity"
+              (input)="setComponentField(i, 'quantity', $event)"
+            />
+          </ui-field>
+        </div>
+
+        <div class="min-w-0 desktop:col-span-3">
+          <ui-field
+            [for]="uid + '-ord-' + i"
+            [label]="'itemForm.fields.order.label' | transloco"
+            [hint]="'itemForm.fields.order.hint' | transloco"
+            [required]="true"
+            [error]="orderErr"
+          >
+            <input
+              [id]="uid + '-ord-' + i"
+              type="text"
+              dir="ltr"
+              inputmode="numeric"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+              [readonly]="readonly()"
+              [attr.aria-required]="'true'"
+              [attr.aria-invalid]="orderErr ? 'true' : null"
+              [value]="row.sortOrder"
+              (input)="setComponentField(i, 'sortOrder', $event)"
+            />
+          </ui-field>
+        </div>
+
+        @if (!readonly()) {
+          <div class="flex justify-end desktop:col-span-1 desktop:mt-label desktop:pt-2">
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'itemForm.actions.remove' | transloco"
+              [title]="'itemForm.actions.remove' | transloco"
+              [attr.data-combo-remove]="'components-' + i"
+              (click)="removeComponent(i)"
+            >
+              <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+            </button>
+          </div>
+        }
+      </div>
+    } @empty {
+      <p class="text-12 leading-18 text-text-muted">{{ 'itemForm.states.noComponents' | transloco }}</p>
+    }
+
+    @let comboErr = errorText('comboComponents');
+    @if (comboErr) {
+      <p class="flex items-center gap-3 text-11 leading-16 text-danger-text">
+        <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+        {{ comboErr }}
+      </p>
+    }
+
+    @if (!readonly()) {
+      <div>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="draft().comboComponents.length >= maxComponents"
+          [attr.aria-invalid]="comboErr ? 'true' : null"
+          data-combo-add="components"
+          (click)="addComponent()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'itemForm.actions.addComponent' | transloco }}
+        </button>
+      </div>
+    }
+  </div>
+
+  <div class="h-border bg-border" aria-hidden="true"></div>
+
+  <div class="flex flex-col gap-8">
+    <h3 class="text-12 leading-18 font-medium text-text">{{ 'itemForm.sections.optional' | transloco }}</h3>
+
+    @for (row of draft().optionalProducts; track row.key; let i = $index) {
+      @let optErr = errorText('optionalProducts.' + i + '.optionalProductItemId');
+      @let optOrderErr = errorText('optionalProducts.' + i + '.sortOrder');
+      <div [class]="comboGridClass()">
+        <div [class]="readonly() ? 'min-w-0 desktop:col-span-9' : 'min-w-0 desktop:col-span-8'">
+          @if (!readonly()) {
+            <ui-field
+              size="bare"
+              [for]="uid + '-opt-' + i"
+              [label]="'itemForm.fields.optionalProduct.label' | transloco"
+              [hint]="'itemForm.fields.optionalProduct.hint' | transloco"
+              [required]="true"
+              [error]="optErr"
+            >
+              <app-trade-item-picker
+                [id]="uid + '-opt-' + i"
+                [describedBy]="describedBy('optionalProducts.' + i + '.optionalProductItemId', uid + '-opt-' + i)"
+                [kinds]="['PRODUCT']"
+                [statuses]="['ACTIVE']"
+                [excludeIds]="excludeForOptional(i)"
+                [invalid]="!!optErr"
+                [value]="row.optionalProductItemId"
+                (valueChange)="setOptionalItem(i, $event)"
+              />
+            </ui-field>
+          } @else {
+            <ui-field
+              [for]="uid + '-opt-' + i"
+              [label]="'itemForm.fields.optionalProduct.label' | transloco"
+              [hint]="'itemForm.fields.optionalProduct.hint' | transloco"
+              [error]="optErr"
+            >
+              <input
+                [id]="uid + '-opt-' + i"
+                type="text"
+                readonly
+                dir="auto"
+                class="w-full bg-transparent text-12 text-text outline-none"
+                [value]="itemLabel(row.optionalProductItemId)"
+                [attr.aria-invalid]="optErr ? 'true' : null"
+              />
+            </ui-field>
+          }
+        </div>
+
+        <div class="min-w-0 desktop:col-span-3">
+          <ui-field
+            [for]="uid + '-opt-ord-' + i"
+            [label]="'itemForm.fields.order.label' | transloco"
+            [hint]="'itemForm.fields.order.hint' | transloco"
+            [required]="true"
+            [error]="optOrderErr"
+          >
+            <input
+              [id]="uid + '-opt-ord-' + i"
+              type="text"
+              dir="ltr"
+              inputmode="numeric"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder tabular-nums"
+              [readonly]="readonly()"
+              [attr.aria-required]="'true'"
+              [attr.aria-invalid]="optOrderErr ? 'true' : null"
+              [value]="row.sortOrder"
+              (input)="setOptionalOrder(i, $event)"
+            />
+          </ui-field>
+        </div>
+
+        @if (!readonly()) {
+          <div class="flex justify-end desktop:col-span-1 desktop:mt-label desktop:pt-2">
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-danger-text outline-none transition-colors duration-fast hover:bg-danger-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'itemForm.actions.remove' | transloco"
+              [title]="'itemForm.actions.remove' | transloco"
+              [attr.data-combo-remove]="'optionals-' + i"
+              (click)="removeOptional(i)"
+            >
+              <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+            </button>
+          </div>
+        }
+      </div>
+    } @empty {
+      <p class="text-12 leading-18 text-text-muted">{{ 'itemForm.states.noOptionals' | transloco }}</p>
+    }
+
+    @if (!readonly()) {
+      <div>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="draft().optionalProducts.length >= maxComponents"
+          data-combo-add="optionals"
+          (click)="addOptional()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'itemForm.actions.addOptional' | transloco }}
+        </button>
+      </div>
+    }
+  </div>
+</div>

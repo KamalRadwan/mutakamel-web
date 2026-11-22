@@ -1,0 +1,93 @@
+<div class="flex min-h-0 flex-1 overflow-x-auto pb-4">
+  <div class="grid min-w-doc-table-min flex-1 grid-cols-4 gap-8">
+    @for (col of columns(); track col.level) {
+      <section
+        class="flex min-h-0 flex-col rounded-10 border border-border bg-surface p-8 shadow-card"
+        [attr.aria-label]="col.titleKey | transloco"
+      >
+        <header class="mb-6 flex h-menu-item shrink-0 items-center justify-between gap-8 border-b border-border px-6">
+          <span class="truncate text-13 leading-18 font-medium text-text">{{ col.titleKey | transloco }}</span>
+          <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted tabular-nums">
+            {{ col.items.length }}
+          </span>
+        </header>
+
+        @if (col.locked) {
+          <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 p-12 text-center text-12 leading-18 text-text-muted">
+            <ng-icon name="tablerLock" size="16" aria-hidden="true" />
+            <span>{{ 'org.hiddenByPermission' | transloco }}</span>
+          </div>
+        } @else if (col.items.length === 0) {
+          <p class="flex min-h-0 flex-1 items-center justify-center p-12 text-center text-12 leading-18 text-text-muted">
+            {{ col.emptyKey | transloco: col.emptyParams }}
+          </p>
+        } @else {
+          <div
+            role="listbox"
+            class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+            [attr.aria-label]="col.titleKey | transloco"
+          >
+            @for (node of col.items; track node.id) {
+              <div
+                class="flex h-menu-item shrink-0 items-center gap-4 rounded-6 border pe-4 transition-colors duration-fast"
+                [class]="
+                  col.selectedId === node.id
+                    ? 'border-transparent bg-brand-soft font-medium text-on-brand-soft'
+                    : node.isMatch
+                      ? 'border-warning bg-surface-muted text-text hover:bg-row-hover'
+                      : 'border-transparent text-text hover:bg-row-hover'
+                "
+              >
+                <div
+                  role="option"
+                  tabindex="0"
+                  [attr.aria-selected]="col.selectedId === node.id"
+                  class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-6 rounded-6 px-6 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="selectNode(node)"
+                  (keydown.enter)="selectNode(node)"
+                  (keydown.space)="selectNode(node); $event.preventDefault()"
+                >
+                  <span
+                    class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                    [class]="meta(node.level).tile"
+                  >
+                    <ng-icon [name]="meta(node.level).icon" size="14" aria-hidden="true" />
+                  </span>
+
+                  <span
+                    class="min-w-0 flex-1 truncate text-start"
+                    [class]="node.isMatch ? 'rounded-4 bg-warning px-4 text-on-warning' : ''"
+                    [title]="node.name"
+                  >
+                    {{ node.name }}
+                  </span>
+
+                  <span dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">
+                    {{ node.code }}
+                  </span>
+
+                  @if (node.status === 'INACTIVE') {
+                    <app-staff-status-badge [status]="node.status" />
+                  }
+                </div>
+
+                <div
+                  data-row-action
+                  class="shrink-0"
+                  (click)="$event.stopPropagation()"
+                  (keydown)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="actionsFor()(node)"
+                    [label]="node.name"
+                    (selected)="onActionSelected(node, $event)"
+                  />
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  </div>
+</div>

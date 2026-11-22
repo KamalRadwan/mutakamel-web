@@ -1,0 +1,83 @@
+@let current = item();
+@let tile = kindTile();
+@let elig = current.eligibility;
+@let thumb = showThumb() && current.image ? thumbUrl() : null;
+
+<article
+  class="flex h-full cursor-pointer items-center gap-8 rounded-10 border border-border bg-surface p-8 text-start transition-colors duration-fast hover:bg-row-hover has-focus-visible:ring-3 has-focus-visible:ring-focus-halo-strong"
+  [class]="elevated() ? 'shadow-popover' : 'shadow-card'"
+  (click)="onCardClick()"
+>
+  @if (thumb) {
+    <img
+      [src]="thumb"
+      [alt]="name()"
+      class="size-item-thumb-lg shrink-0 rounded-8 border border-border object-cover"
+    />
+  } @else {
+    <span
+      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="tile.tile"
+      [title]="kindKey() | transloco"
+    >
+      <ng-icon [name]="tile.icon" size="14" aria-hidden="true" />
+    </span>
+  }
+
+  <div
+    [class]="
+      elevated()
+        ? 'flex min-w-0 flex-1 flex-wrap items-center gap-x-8 gap-y-4'
+        : 'flex min-w-0 flex-1 flex-col gap-4'
+    "
+  >
+    <div class="flex min-w-0 flex-1 flex-col">
+      <button
+        type="button"
+        dir="auto"
+        class="min-w-0 cursor-pointer truncate text-start text-13 leading-18 font-medium text-text outline-none"
+        (click)="$event.stopPropagation(); onCardClick()"
+      >
+        {{ name() }}
+      </button>
+      <div class="flex min-w-0 items-center gap-4 text-12 leading-16 text-text-muted">
+        <bdi dir="ltr" class="shrink-0 truncate tabular-nums">{{ current.canonicalCode }}</bdi>
+        @if (categoryName(); as cat) {
+          <span class="shrink-0" aria-hidden="true">·</span>
+          <span class="min-w-0 truncate" [title]="categoryPath()">{{ cat }}</span>
+        }
+      </div>
+    </div>
+
+    <div class="flex shrink-0 flex-wrap items-center gap-4">
+      @if (companyView()) {
+        <bdi dir="ltr" class="text-13 leading-18 font-medium text-text tabular-nums whitespace-nowrap">{{ priceText() }}</bdi>
+      }
+      <span [class]="statusBadgeClass()">{{ statusKey() | transloco }}</span>
+      @if (companyView() && elig) {
+        @if (elig.canSell) {
+          <span [class]="eligibilityBadgeClass">{{ 'tradeItems.card.sell' | transloco }}</span>
+        }
+        @if (elig.canPurchase) {
+          <span [class]="eligibilityBadgeClass">{{ 'tradeItems.card.buy' | transloco }}</span>
+        }
+        @if (elig.canPos) {
+          <span [class]="eligibilityBadgeClass">{{ 'tradeItems.card.pos' | transloco }}</span>
+        }
+      }
+    </div>
+  </div>
+
+  <div
+    data-no-drag
+    class="shrink-0"
+    (click)="$event.stopPropagation()"
+    (keydown)="$event.stopPropagation()"
+  >
+    <ui-actions-menu
+      [items]="actions()"
+      [label]="menuLabel()"
+      (selected)="onActionSelected($event)"
+    />
+  </div>
+</article>

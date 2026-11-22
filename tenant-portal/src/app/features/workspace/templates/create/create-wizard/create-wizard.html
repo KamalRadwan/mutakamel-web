@@ -1,0 +1,915 @@
+<ui-modal
+  #wizardModal
+  size="wide"
+  icon="tablerPlus"
+  tile="bg-icon-green"
+  [title]="'tplCreate.wizard.title' | transloco"
+  [closeLabel]="'tplCreate.wizard.close' | transloco"
+  [dismissable]="!saving() && !guardBusy()"
+  [hasFooter]="!loading() && !loadFailed() && creationScopes().length > 0"
+  bodyClass="flex flex-col p-0 overflow-hidden"
+  (closed)="onModalClosed()"
+>
+  <nav
+    class="flex h-tab shrink-0 items-center border-b border-border bg-surface px-12"
+    [attr.aria-label]="'tplCreate.wizard.title' | transloco"
+  >
+    <ol class="flex min-w-0 flex-1 items-center gap-6">
+      @for (s of steps; track s.id; let idx = $index; let last = $last) {
+        @let active = step() === s.id;
+        @let invalid = isStepInvalid(s.id);
+        @let skipped = isStepSkipped(s.id);
+        @let done = isStepDone(idx, s.id);
+        @let clickable = canClickStep(idx, s.id);
+
+        <li class="flex min-w-0 items-center gap-6" [class.flex-1]="!last">
+          @if (clickable) {
+            <button
+              type="button"
+              class="inline-flex cursor-pointer items-center gap-6 rounded-6 px-4 py-2 text-12 leading-18 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-current]="active ? 'step' : null"
+              (click)="goToStep(s.id)"
+            >
+              <span
+                class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 font-medium"
+                [class]="invalid ? 'bg-danger text-on-danger' : done ? 'bg-success text-on-success' : 'bg-brand text-on-brand'"
+              >
+                @if (invalid) {
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                } @else if (done) {
+                  <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                } @else {
+                  {{ s.num }}
+                }
+              </span>
+              <span [class]="invalid ? 'font-medium text-danger-text' : 'font-medium text-text'">
+                {{ s.labelKey | transloco }}
+                @if (invalid) {
+                  <span class="sr-only"> ({{ 'tplCreate.wizard.steps.needsAttention' | transloco }})</span>
+                } @else if (done) {
+                  <span class="sr-only"> ({{ 'tplCreate.wizard.steps.completed' | transloco }})</span>
+                }
+              </span>
+            </button>
+          } @else {
+            <div
+              class="inline-flex items-center gap-6 px-2 py-2 text-12 leading-18"
+              [attr.aria-current]="active ? 'step' : null"
+              [attr.aria-disabled]="skipped ? 'true' : null"
+              [title]="skipped ? ('tplCreate.page.emailAfterCreateText' | transloco) : null"
+            >
+              <span
+                class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 font-medium"
+                [class]="
+                  invalid
+                    ? 'bg-danger text-on-danger'
+                    : skipped
+                      ? 'border border-border-field bg-surface text-text-muted'
+                      : active
+                        ? 'bg-brand text-on-brand'
+                        : done
+                          ? 'bg-success text-on-success'
+                          : 'border border-border-field bg-surface text-text-muted'
+                "
+              >
+                @if (invalid) {
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                } @else if (done) {
+                  <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                } @else {
+                  {{ s.num }}
+                }
+              </span>
+              <span
+                class="truncate"
+                [class]="
+                  invalid
+                    ? 'font-medium text-danger-text'
+                    : active && !skipped
+                      ? 'font-medium text-text'
+                      : 'text-text-muted'
+                "
+              >
+                {{ s.labelKey | transloco }}
+                @if (invalid) {
+                  <span class="sr-only"> ({{ 'tplCreate.wizard.steps.needsAttention' | transloco }})</span>
+                } @else if (skipped) {
+                  <span class="sr-only"> ({{ 'tplCreate.page.emailAfterCreateText' | transloco }})</span>
+                } @else if (done) {
+                  <span class="sr-only"> ({{ 'tplCreate.wizard.steps.completed' | transloco }})</span>
+                }
+              </span>
+            </div>
+          }
+
+          @if (!last) {
+            <span
+              class="h-border-w-strong min-w-12 flex-1 rounded-full"
+              [class]="done ? 'bg-success' : 'bg-border'"
+              aria-hidden="true"
+            ></span>
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+
+  <div class="min-h-0 flex-1 overflow-y-auto p-10" [attr.aria-busy]="loading()">
+    @if (loading()) {
+      <div class="flex flex-col gap-10">
+        <div class="grid grid-cols-2 gap-10">
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        </div>
+        <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+        <div class="h-textarea animate-pulse rounded-8 bg-neutral-soft"></div>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'tplCreate.wizard.loadFailed' | transloco }}</p>
+        @if (loadCorrelationId(); as corrId) {
+          <p class="text-11 leading-16 text-text-muted">
+            {{ 'templates.states.loadFailed.reference' | transloco: { correlationId: corrId } }}
+          </p>
+        }
+        <button type="button" uiButton variant="primary" (click)="retryInitialLoad()">
+          {{ 'tplCreate.wizard.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (creationScopes().length === 0) {
+      <div class="flex flex-col items-center justify-center gap-8 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+          <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'tplCreate.details.noCreationScopes' | transloco }}</p>
+      </div>
+    } @else {
+      @switch (step()) {
+        @case ('details') {
+          <div class="grid grid-cols-2 gap-10">
+            <ui-field
+              for="tpl-create-name"
+              [label]="'tplCreate.details.nameLabel' | transloco"
+              [hint]="'tplCreate.details.nameHint' | transloco"
+              [required]="true"
+              [count]="name().length"
+              [max]="200"
+              [error]="nameError()"
+            >
+              <input
+                id="tpl-create-name"
+                type="text"
+                maxlength="200"
+                class="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-placeholder"
+                [placeholder]="'tplCreate.details.namePlaceholder' | transloco"
+                [value]="name()"
+                (input)="onNameInput($any($event.target).value)"
+              />
+            </ui-field>
+
+            <ui-field
+              for="tpl-create-code"
+              [label]="'tplCreate.details.codeLabel' | transloco"
+              [hint]="'tplCreate.details.codeHint' | transloco"
+              [required]="true"
+              [count]="code().length"
+              [max]="100"
+              [error]="codeError()"
+            >
+              <input
+                #codeInput
+                id="tpl-create-code"
+                type="text"
+                dir="ltr"
+                maxlength="100"
+                class="min-w-0 flex-1 bg-transparent text-start text-text outline-none placeholder:text-text-placeholder"
+                [placeholder]="'tplCreate.details.codePlaceholder' | transloco"
+                [value]="code()"
+                (input)="onCodeInput($any($event.target).value)"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              class="col-span-2"
+              for="tpl-create-scope"
+              [label]="'tplCreate.details.scopeLabel' | transloco"
+              [hint]="'tplCreate.details.scopeHint' | transloco"
+              [required]="true"
+              [error]="scopeError()"
+            >
+              <ui-dropdown
+                class="w-full"
+                [id]="'tpl-create-scope'"
+                size="field"
+                [label]="'tplCreate.details.scopeLabel' | transloco"
+                [options]="scopeOptions()"
+                [value]="scopeKey()"
+                (valueChange)="onScopeChange($event)"
+              />
+            </ui-field>
+
+            <ui-field
+              size="multiline"
+              class="col-span-2"
+              for="tpl-create-description"
+              [label]="'tplCreate.details.descriptionLabel' | transloco"
+              [hint]="'tplCreate.details.descriptionHint' | transloco"
+              [count]="description().length"
+              [max]="1000"
+              [error]="descriptionError()"
+            >
+              <textarea
+                id="tpl-create-description"
+                rows="3"
+                maxlength="1000"
+                class="min-w-0 flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                [placeholder]="'tplCreate.details.descriptionPlaceholder' | transloco"
+                [value]="description()"
+                (input)="onDescriptionInput($any($event.target).value)"
+              ></textarea>
+            </ui-field>
+          </div>
+        }
+
+        @case ('document') {
+          <div class="flex flex-col gap-12">
+            <ui-field
+              size="bare"
+              for="tpl-create-doctype"
+              [label]="'tplCreate.document.documentTypeLabel' | transloco"
+              [hint]="'tplCreate.document.documentTypeHint' | transloco"
+              [required]="true"
+            >
+              <div
+                id="tpl-create-doctype"
+                role="radiogroup"
+                class="grid grid-cols-3 gap-8"
+                [attr.aria-label]="'tplCreate.document.documentTypeLabel' | transloco"
+              >
+                @for (docType of documentTypes; track docType; let idx = $index) {
+                  @let meta = familyMetaMap[docType];
+                  @let selected = documentType() === docType;
+                  @let disabled = isDocumentTypeDisabled(docType);
+
+                  <button
+                    type="button"
+                    role="radio"
+                    class="flex min-w-0 items-center gap-8 rounded-10 border px-8 py-6 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="
+                      disabled
+                        ? 'cursor-not-allowed border-border bg-surface-muted opacity-drag-source'
+                        : selected
+                          ? 'cursor-pointer border-brand bg-brand-soft'
+                          : 'cursor-pointer border-border bg-surface hover:border-border-field-hover'
+                    "
+                    [disabled]="disabled"
+                    [attr.tabindex]="isDocumentTypeTabStop(docType) ? 0 : -1"
+                    [attr.aria-checked]="selected"
+                    [title]="disabled ? ('tplCreate.document.errors.noCompatibleSources' | transloco) : (meta.labelKey | transloco)"
+                    (click)="selectDocumentType(docType)"
+                    (keydown)="onDocumentTypeKeydown($event, idx)"
+                  >
+                    <span
+                      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                      [class]="meta.tile"
+                    >
+                      <ng-icon [name]="meta.icon" size="14" aria-hidden="true" />
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text">
+                      {{ meta.labelKey | transloco }}
+                    </span>
+                  </button>
+                }
+              </div>
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              for="tpl-create-layout"
+              [label]="'tplCreate.document.layoutLabel' | transloco"
+              [hint]="'tplCreate.document.layoutHint' | transloco"
+              [required]="true"
+            >
+              <div
+                id="tpl-create-layout"
+                role="radiogroup"
+                class="grid gap-8"
+                [class]="isEmail() ? 'grid-cols-2' : 'grid-cols-3'"
+                [attr.aria-label]="'tplCreate.document.layoutLabel' | transloco"
+              >
+                @for (mode of layoutTileModes(); track mode; let idx = $index) {
+                  @let lmeta = layoutMetaFn(mode);
+                  @let selected = layoutMode() === mode;
+                  @let disabled = isLayoutDisabled(mode);
+                  @let reason = layoutDisabledReason(mode);
+
+                  <button
+                    type="button"
+                    role="radio"
+                    class="flex min-w-0 items-start gap-8 rounded-10 border p-8 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="
+                      disabled
+                        ? 'cursor-not-allowed border-border bg-surface-muted opacity-drag-source'
+                        : selected
+                          ? 'cursor-pointer border-brand bg-brand-soft'
+                          : 'cursor-pointer border-border bg-surface hover:border-border-field-hover'
+                    "
+                    [disabled]="disabled"
+                    [attr.tabindex]="isLayoutTabStop(mode) ? 0 : -1"
+                    [attr.aria-checked]="selected"
+                    (click)="selectLayoutMode(mode)"
+                    (keydown)="onLayoutKeydown($event, idx)"
+                  >
+                    <span
+                      class="mt-2 inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border"
+                      [class]="selected ? 'border-brand bg-brand' : 'border-border-field bg-surface-field'"
+                      aria-hidden="true"
+                    >
+                      @if (selected) {
+                        <span class="size-radio-dot rounded-full bg-on-brand"></span>
+                      }
+                    </span>
+                    <span class="flex min-w-0 flex-1 flex-col gap-2">
+                      <span class="text-12 leading-18 font-medium text-text">{{ lmeta.labelKey | transloco }}</span>
+                      <span class="text-11 leading-16 text-text-muted">
+                        {{ reason || (lmeta.descriptionKey | transloco) }}
+                      </span>
+                    </span>
+                  </button>
+                }
+              </div>
+            </ui-field>
+
+            <div class="grid grid-cols-3 gap-10">
+              @if (isEmail()) {
+                <ui-field
+                  size="bare"
+                  for="tpl-create-datasource-select"
+                  [label]="'tplCreate.document.dataSourceLabel' | transloco"
+                  [hint]="'tplCreate.document.dataSourceHint' | transloco"
+                  [required]="true"
+                >
+                  <ui-dropdown
+                    class="w-full"
+                    [id]="'tpl-create-datasource-select'"
+                    size="field"
+                    [label]="'tplCreate.document.dataSourceLabel' | transloco"
+                    [options]="emailSourceOptions()"
+                    [value]="dataSourceKey()"
+                    (valueChange)="onDataSourceChange($event)"
+                  />
+                </ui-field>
+              } @else {
+                <ui-field
+                  for="tpl-create-datasource-readonly"
+                  [label]="'tplCreate.document.dataSourceLabel' | transloco"
+                  [hint]="'tplCreate.document.dataSourceHint' | transloco"
+                  [required]="true"
+                >
+                  <input
+                    id="tpl-create-datasource-readonly"
+                    type="text"
+                    readonly
+                    class="min-w-0 flex-1 cursor-default bg-transparent text-text outline-none"
+                    [value]="dataSourceLabel()"
+                  />
+                  <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                </ui-field>
+              }
+
+              <ui-field
+                size="bare"
+                for="tpl-create-locale"
+                [label]="'tplCreate.document.languageLabel' | transloco"
+                [hint]="'tplCreate.document.languageHint' | transloco"
+                [required]="true"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-create-locale'"
+                  size="field"
+                  [label]="'tplCreate.document.languageLabel' | transloco"
+                  [options]="languageOptions()"
+                  [value]="locale()"
+                  (valueChange)="onLocaleChange($event)"
+                />
+              </ui-field>
+
+              <ui-field
+                size="bare"
+                for="tpl-create-direction"
+                [label]="'tplCreate.document.directionLabel' | transloco"
+                [hint]="'tplCreate.document.directionHint' | transloco"
+                [required]="true"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-create-direction'"
+                  size="field"
+                  [label]="'tplCreate.document.directionLabel' | transloco"
+                  [options]="directionOptions()"
+                  [value]="direction()"
+                  (valueChange)="onDirectionChange($event)"
+                />
+              </ui-field>
+            </div>
+          </div>
+        }
+
+        @case ('page') {
+          <div class="grid grid-cols-2 items-start gap-12">
+            <div class="grid grid-cols-2 gap-10">
+              <ui-field
+                size="bare"
+                class="col-span-2"
+                for="tpl-create-preset"
+                [label]="'tplCreate.page.presetLabel' | transloco"
+                [hint]="'tplCreate.page.presetHint' | transloco"
+                [required]="true"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-create-preset'"
+                  size="field"
+                  [label]="'tplCreate.page.presetLabel' | transloco"
+                  [options]="presetOptions()"
+                  [value]="pagePreset()"
+                  (valueChange)="onPresetChange($event)"
+                />
+              </ui-field>
+
+              <ui-field
+                size="bare"
+                class="col-span-2"
+                for="tpl-create-orientation"
+                [label]="'tplCreate.page.orientationLabel' | transloco"
+                [hint]="'tplCreate.page.orientationHint' | transloco"
+                [required]="true"
+              >
+                <ui-dropdown
+                  class="w-full"
+                  [id]="'tpl-create-orientation'"
+                  size="field"
+                  [label]="'tplCreate.page.orientationLabel' | transloco"
+                  [options]="orientationOptions()"
+                  [value]="pageOrientation()"
+                  (valueChange)="onOrientationChange($event)"
+                />
+              </ui-field>
+
+              @if (pagePreset() === 'CUSTOM') {
+                <ui-field
+                  for="tpl-create-width"
+                  [label]="'tplCreate.page.widthLabel' | transloco"
+                  [hint]="'tplCreate.page.widthHint' | transloco"
+                  [required]="true"
+                  [error]="widthError()"
+                >
+                  <input
+                    id="tpl-create-width"
+                    type="number"
+                    dir="ltr"
+                    min="50"
+                    max="500"
+                    step="1"
+                    class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                    [value]="formatNumberInput(customWidthMm())"
+                    (input)="onNumericInput('width', $any($event.target).value)"
+                  />
+                </ui-field>
+
+                <ui-field
+                  for="tpl-create-height"
+                  [label]="'tplCreate.page.heightLabel' | transloco"
+                  [hint]="'tplCreate.page.heightHint' | transloco"
+                  [required]="true"
+                  [error]="heightError()"
+                >
+                  <input
+                    id="tpl-create-height"
+                    type="number"
+                    dir="ltr"
+                    min="50"
+                    max="1000"
+                    step="1"
+                    class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                    [value]="formatNumberInput(customHeightMm())"
+                    (input)="onNumericInput('height', $any($event.target).value)"
+                  />
+                </ui-field>
+              }
+
+              <ui-field
+                for="tpl-create-margin-top"
+                [label]="'tplCreate.page.marginTopLabel' | transloco"
+                [hint]="'tplCreate.page.marginTopHint' | transloco"
+                [required]="true"
+                [error]="marginTopError()"
+              >
+                <input
+                  id="tpl-create-margin-top"
+                  type="number"
+                  dir="ltr"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                  [value]="formatNumberInput(marginTopMm())"
+                  (input)="onNumericInput('top', $any($event.target).value)"
+                />
+              </ui-field>
+
+              <ui-field
+                for="tpl-create-margin-end"
+                [label]="'tplCreate.page.marginEndLabel' | transloco"
+                [hint]="'tplCreate.page.marginEndHint' | transloco"
+                [required]="true"
+                [error]="marginEndError()"
+              >
+                <input
+                  id="tpl-create-margin-end"
+                  type="number"
+                  dir="ltr"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                  [value]="formatNumberInput(marginEndMm())"
+                  (input)="onNumericInput('end', $any($event.target).value)"
+                />
+              </ui-field>
+
+              <ui-field
+                for="tpl-create-margin-bottom"
+                [label]="'tplCreate.page.marginBottomLabel' | transloco"
+                [hint]="'tplCreate.page.marginBottomHint' | transloco"
+                [required]="true"
+                [error]="marginBottomError()"
+              >
+                <input
+                  id="tpl-create-margin-bottom"
+                  type="number"
+                  dir="ltr"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                  [value]="formatNumberInput(marginBottomMm())"
+                  (input)="onNumericInput('bottom', $any($event.target).value)"
+                />
+              </ui-field>
+
+              <ui-field
+                for="tpl-create-margin-start"
+                [label]="'tplCreate.page.marginStartLabel' | transloco"
+                [hint]="'tplCreate.page.marginStartHint' | transloco"
+                [required]="true"
+                [error]="marginStartError()"
+              >
+                <input
+                  id="tpl-create-margin-start"
+                  type="number"
+                  dir="ltr"
+                  min="0"
+                  max="100"
+                  step="1"
+                  class="min-w-0 flex-1 bg-transparent text-start text-text outline-none"
+                  [value]="formatNumberInput(marginStartMm())"
+                  (input)="onNumericInput('start', $any($event.target).value)"
+                />
+              </ui-field>
+            </div>
+
+            <ui-field
+              size="bare"
+              for="tpl-create-page-diagram"
+              [label]="'tplCreate.page.diagramLabel' | transloco"
+              [hint]="'tplCreate.page.diagramHint' | transloco"
+            >
+              <app-template-page-diagram
+                id="tpl-create-page-diagram"
+                [widthMm]="diagramWidthMm()"
+                [heightMm]="diagramHeightMm()"
+                [marginTopMm]="marginTopMm()"
+                [marginEndMm]="marginEndMm()"
+                [marginBottomMm]="marginBottomMm()"
+                [marginStartMm]="marginStartMm()"
+                [rtl]="resolvedDirection() === 'RTL'"
+                [ariaLabel]="'tplCreate.page.sizeAria' | transloco: { w: diagramWidthMm(), h: diagramHeightMm() }"
+                [paperLabel]="'tplCreate.page.paperSizeLabel' | transloco"
+                [printableLabel]="'tplCreate.page.printableAreaLabel' | transloco"
+                [topLabel]="'tplCreate.page.topShort' | transloco"
+                [bottomLabel]="'tplCreate.page.bottomShort' | transloco"
+                [startLabel]="'tplCreate.page.startShort' | transloco"
+                [endLabel]="'tplCreate.page.endShort' | transloco"
+              />
+            </ui-field>
+          </div>
+        }
+
+        @case ('starter') {
+          <ui-field
+            size="bare"
+            for="tpl-create-starter-grid"
+            [label]="'tplCreate.starter.fieldLabel' | transloco"
+            [hint]="'tplCreate.starter.fieldHint' | transloco"
+          >
+            @if (startersLoading()) {
+              <div class="grid grid-cols-2 gap-8" [attr.aria-busy]="true">
+                <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+                  <div class="h-tpl-preview animate-pulse rounded-8 bg-neutral-soft"></div>
+                  <div class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></div>
+                </div>
+                <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+                  <div class="h-tpl-preview animate-pulse rounded-8 bg-neutral-soft"></div>
+                  <div class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></div>
+                </div>
+              </div>
+            } @else if (startersFailed()) {
+              <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface-muted p-16 text-center">
+                <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+                  <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+                </span>
+                <p class="text-12 leading-18 text-text-muted">{{ 'tplCreate.wizard.startersLoadFailed' | transloco }}</p>
+                @if (startersCorrelationId(); as corrId) {
+                  <p class="text-11 leading-16 text-text-muted">
+                    {{ 'templates.states.loadFailed.reference' | transloco: { correlationId: corrId } }}
+                  </p>
+                }
+                <button type="button" uiButton variant="secondary" (click)="reloadStarters()">
+                  {{ 'tplCreate.wizard.retry' | transloco }}
+                </button>
+              </div>
+            } @else {
+              <div
+                id="tpl-create-starter-grid"
+                role="radiogroup"
+                class="grid grid-cols-2 gap-8"
+                [attr.aria-label]="'tplCreate.starter.fieldLabel' | transloco"
+              >
+                @let blankSelected = selectedStarterKey() === null;
+                <button
+                  type="button"
+                  role="radio"
+                  class="flex min-w-0 cursor-pointer flex-col gap-8 rounded-10 border p-8 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="blankSelected ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:border-border-field-hover'"
+                  [attr.tabindex]="isStarterTabStop(null) ? 0 : -1"
+                  [attr.aria-checked]="blankSelected"
+                  (click)="selectStarter(null)"
+                  (keydown)="onStarterKeydown($event, 0)"
+                >
+                  <div class="flex h-tpl-preview w-full items-center justify-center rounded-8 border border-dashed border-border-field bg-surface-muted p-8">
+                    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+                      <ng-icon name="tablerTemplate" size="18" aria-hidden="true" />
+                    </span>
+                  </div>
+                  <div class="flex items-start gap-8">
+                    <span
+                      class="mt-2 inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border"
+                      [class]="blankSelected ? 'border-brand bg-brand' : 'border-border-field bg-surface-field'"
+                      aria-hidden="true"
+                    >
+                      @if (blankSelected) {
+                        <span class="size-radio-dot rounded-full bg-on-brand"></span>
+                      }
+                    </span>
+                    <div class="flex min-w-0 flex-1 flex-col gap-2">
+                      <span class="truncate text-12 leading-18 font-medium text-text">
+                        {{ 'tplCreate.starter.blankTitle' | transloco }}
+                      </span>
+                      <span class="text-11 leading-16 text-text-muted">
+                        {{ 'tplCreate.starter.blankDescription' | transloco }}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+
+                @for (starter of starters(); track starter.starterKey; let idx = $index) {
+                  @let selected = selectedStarterKey() === starter.starterKey;
+                  @let thumbUrl = starterThumbUrls()[starter.starterKey];
+
+                  <button
+                    type="button"
+                    role="radio"
+                    class="flex min-w-0 cursor-pointer flex-col gap-8 rounded-10 border p-8 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="selected ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:border-border-field-hover'"
+                    [attr.tabindex]="isStarterTabStop(starter.starterKey) ? 0 : -1"
+                    [attr.aria-checked]="selected"
+                    (click)="selectStarter(starter.starterKey)"
+                    (keydown)="onStarterKeydown($event, idx + 1)"
+                  >
+                    <div class="flex h-tpl-preview w-full items-center justify-center overflow-hidden rounded-8 border border-border bg-surface-muted p-6">
+                      @if (thumbUrl) {
+                        <img
+                          [src]="thumbUrl"
+                          [alt]="starter.displayName"
+                          class="h-full w-auto rounded-4 border border-border bg-surface object-contain shadow-card"
+                        />
+                      } @else if (starter.thumbnail.state === 'PENDING') {
+                        <span class="text-11 leading-16 text-text-muted">
+                          {{ 'tplCreate.starter.thumbnailPending' | transloco }}
+                        </span>
+                      } @else {
+                        <span class="text-11 leading-16 text-text-muted">
+                          {{ 'tplCreate.starter.thumbnailUnavailable' | transloco }}
+                        </span>
+                      }
+                    </div>
+                    <div class="flex items-start gap-8">
+                      <span
+                        class="mt-2 inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border"
+                        [class]="selected ? 'border-brand bg-brand' : 'border-border-field bg-surface-field'"
+                        aria-hidden="true"
+                      >
+                        @if (selected) {
+                          <span class="size-radio-dot rounded-full bg-on-brand"></span>
+                        }
+                      </span>
+                      <div class="flex min-w-0 flex-1 flex-col gap-2">
+                        <span class="truncate text-12 leading-18 font-medium text-text" [title]="starter.displayName">
+                          {{ starter.displayName }}
+                        </span>
+                        <span class="inline-flex h-badge w-fit items-center rounded-8 bg-neutral-soft px-8 text-11 font-medium text-on-neutral-soft">
+                          {{ 'tplCreate.starter.starterBadge' | transloco }} · {{ 'templates.directions.' + starter.resolvedDirection | transloco }}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                }
+              </div>
+            }
+          </ui-field>
+        }
+
+        @case ('review') {
+          <div class="grid grid-cols-3 items-start gap-10">
+            <ui-field
+              size="bare"
+              class="col-span-2"
+              for="tpl-create-review-summary"
+              [label]="'tplCreate.review.summaryLabel' | transloco"
+              [hint]="'tplCreate.review.summaryHint' | transloco"
+            >
+              <dl
+                id="tpl-create-review-summary"
+                class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-10 text-12 leading-18"
+              >
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.name' | transloco }}</dt>
+                  <dd class="min-w-0 truncate font-medium text-text">{{ name().trim() }}</dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.code' | transloco }}</dt>
+                  <dd class="font-medium text-text"><bdi dir="ltr">{{ code().trim().toUpperCase() }}</bdi></dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.scope' | transloco }}</dt>
+                  <dd class="min-w-0 truncate text-text">{{ currentScopeLabel() }}</dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.documentType' | transloco }}</dt>
+                  <dd class="flex items-center gap-6 text-text">
+                    <span
+                      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                      [class]="familyMetaMap[documentType()].tile"
+                    >
+                      <ng-icon [name]="familyMetaMap[documentType()].icon" size="14" aria-hidden="true" />
+                    </span>
+                    <span>{{ familyMetaMap[documentType()].labelKey | transloco }}</span>
+                  </dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.layout' | transloco }}</dt>
+                  <dd class="text-text">{{ layoutMetaFn(layoutMode()).labelKey | transloco }}</dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.dataSource' | transloco }}</dt>
+                  <dd class="text-text">{{ dataSourceLabel() }}</dd>
+                </div>
+                <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.language' | transloco }}</dt>
+                  <dd class="text-text">
+                    {{ 'templates.locales.' + locale() | transloco }} · {{ 'templates.directions.' + direction() | transloco }}
+                  </dd>
+                </div>
+                @if (!isEmail()) {
+                  <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                    <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.pageSetup' | transloco }}</dt>
+                    <dd class="text-text">
+                      {{ 'tplCreate.page.presets.' + pagePreset() | transloco }} ·
+                      {{ 'tplCreate.page.orientations.' + pageOrientation() | transloco }}
+                      (<bdi dir="ltr">{{ diagramWidthMm() }} × {{ diagramHeightMm() }} mm</bdi>)
+                    </dd>
+                  </div>
+                  <div class="flex items-baseline justify-between gap-8 border-b border-border pb-4">
+                    <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.margins' | transloco }}</dt>
+                    <dd class="text-text">
+                      <bdi dir="ltr">{{ marginTopMm() }} / {{ marginEndMm() }} / {{ marginBottomMm() }} / {{ marginStartMm() }} mm</bdi>
+                    </dd>
+                  </div>
+                }
+                <div class="flex items-baseline justify-between gap-8">
+                  <dt class="shrink-0 text-text-muted">{{ 'tplCreate.review.description' | transloco }}</dt>
+                  <dd class="min-w-0 truncate text-text">
+                    {{ description().trim() || ('tplCreate.review.none' | transloco) }}
+                  </dd>
+                </div>
+              </dl>
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              for="tpl-create-review-starter"
+              [label]="'tplCreate.review.starterPreviewLabel' | transloco"
+              [hint]="'tplCreate.review.starterPreviewHint' | transloco"
+            >
+              <div
+                id="tpl-create-review-starter"
+                class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-8"
+              >
+                <div class="flex h-tpl-preview w-full items-center justify-center overflow-hidden rounded-8 border border-border bg-surface p-6">
+                  @if (selectedStarter(); as starter) {
+                    @if (starterThumbUrls()[starter.starterKey]; as thumbUrl) {
+                      <img
+                        [src]="thumbUrl"
+                        [alt]="starter.displayName"
+                        class="h-full w-auto rounded-4 border border-border bg-surface object-contain shadow-card"
+                      />
+                    } @else {
+                      <span class="text-center text-11 leading-16 text-text-muted">
+                        {{ 'tplCreate.starter.thumbnailUnavailable' | transloco }}
+                      </span>
+                    }
+                  } @else {
+                    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+                      <ng-icon name="tablerTemplate" size="18" aria-hidden="true" />
+                    </span>
+                  }
+                </div>
+                <span class="text-12 leading-18 font-medium text-text">
+                  {{ selectedStarter()?.displayName || ('tplCreate.starter.blankTitle' | transloco) }}
+                </span>
+              </div>
+            </ui-field>
+          </div>
+        }
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    @if (step() === 'review') {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saving() || loading() || loadFailed() || creationScopes().length === 0"
+        (click)="submitCreate()"
+      >
+        {{ 'tplCreate.wizard.createAndOpen' | transloco }}
+      </button>
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [disabled]="saving() || loading() || loadFailed() || creationScopes().length === 0"
+        (click)="goNext()"
+      >
+        <span>{{ 'tplCreate.wizard.next' | transloco }}</span>
+        <ng-icon [name]="forwardArrowIcon()" size="14" aria-hidden="true" />
+      </button>
+    }
+
+    @if (step() !== 'details') {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving() || loading()"
+        (click)="goPrevious()"
+      >
+        <ng-icon [name]="backArrowIcon()" size="14" aria-hidden="true" />
+        <span>{{ 'tplCreate.wizard.previous' | transloco }}</span>
+      </button>
+    }
+
+    <span class="ms-auto text-12 leading-18 text-text-muted">
+      {{ 'tplCreate.wizard.stepOf' | transloco: { current: currentStepNumber(), total: steps.length } }}
+    </span>
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'tplCreate.unsaved.title' | transloco"
+  [text]="'tplCreate.unsaved.text' | transloco"
+  [saveLabel]="'tplCreate.unsaved.save' | transloco"
+  [discardLabel]="'tplCreate.unsaved.discard' | transloco"
+  [cancelLabel]="'tplCreate.unsaved.cancel' | transloco"
+/>

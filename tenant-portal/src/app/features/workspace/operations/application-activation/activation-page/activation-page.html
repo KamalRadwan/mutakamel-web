@@ -1,0 +1,245 @@
+@if (sessionFailed()) {
+  <app-session-failed-state (retry)="retrySession()" />
+} @else {
+<div class="flex shrink-0 flex-wrap items-end justify-between gap-8 rounded-10 bg-surface p-8 shadow-card">
+  <div class="w-notif max-w-full">
+    <ui-field
+      size="bare"
+      [for]="uid + '-company'"
+      [label]="'wsActivation.company.label' | transloco"
+      [hint]="'wsActivation.company.hint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-company'"
+        [options]="companyOptions()"
+        [value]="selectedCompanyId()"
+        [label]="'wsActivation.company.label' | transloco"
+        [describedBy]="uid + '-company-hint'"
+        [disabled]="companiesLoading() || companies().length === 0"
+        (valueChange)="onCompanyChange($event)"
+      />
+    </ui-field>
+  </div>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="loading() || companiesLoading() || !selectedCompanyId()"
+    [attr.aria-label]="'settings.common.reload' | transloco"
+    [attr.title]="'settings.common.reload' | transloco"
+    (click)="reload()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+  </button>
+</div>
+
+@if (isForbidden()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+    </span>
+    <h1 class="text-16 leading-24 font-medium text-text">{{ 'wsActivation.states.forbiddenTitle' | transloco }}</h1>
+    <p class="text-12 leading-18 text-text-muted">{{ 'wsActivation.states.forbiddenText' | transloco }}</p>
+  </div>
+} @else if (loadFailed() && !loading()) {
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    role="alert"
+  >
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-danger-text">{{ 'wsActivation.states.loadFailed' | transloco }}</p>
+    @if (correlationId(); as refId) {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'wsActivation.states.supportRef' | transloco }}: <bdi dir="ltr">{{ refId }}</bdi>
+      </p>
+    }
+    <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+      {{ 'wsActivation.states.retry' | transloco }}
+    </button>
+  </div>
+} @else if (!loading() && !companiesLoading() && rows().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+      <ng-icon name="tablerPuzzle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'wsActivation.states.emptyTitle' | transloco }}</p>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'wsActivation.cols.application' | transloco"
+      [attr.aria-busy]="loading() || companiesLoading()"
+    >
+      <div
+        role="row"
+        class="grid grid-cols-ops-activation-row h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'wsActivation.cols.application' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'wsActivation.cols.status' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center gap-4 border-s border-on-nav-line px-10">
+          <span class="truncate">{{ 'wsActivation.cols.activation' | transloco }}</span>
+          <span #activationTip class="relative inline-flex shrink-0 items-center text-on-nav" (mouseenter)="showColTip('activation', activationTip, activationTipBody)" (mouseleave)="hideColTip()">
+            <button
+              type="button"
+              class="inline-flex cursor-help items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              [attr.aria-label]="'wsActivation.cols.activation' | transloco"
+              [attr.aria-describedby]="uid + '-col-activation-hint'"
+              (focus)="showColTip('activation', activationTip, activationTipBody)"
+              (blur)="hideColTip()"
+              (keydown.escape)="onColTipEscape($event)"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+            </button>
+            <span
+              #activationTipBody
+              [id]="uid + '-col-activation-hint'"
+              role="tooltip"
+              class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 font-normal text-on-tooltip"
+              [class]="colTip() === 'activation' ? 'visible' : 'invisible'"
+              [style.top.px]="colTipPlace().top"
+              [style.inset-inline-start.px]="colTipPlace().start"
+            >
+              {{ 'wsActivation.cols.activationHint' | transloco }}
+            </span>
+          </span>
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'wsActivation.cols.actions' | transloco }}
+        </span>
+      </div>
+
+      @if (loading() || companiesLoading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            aria-hidden="true"
+            class="mt-6 grid grid-cols-ops-activation-row h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 rounded-4 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-1/2 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-switch-h w-switch-w rounded-full bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-btn-h-sm w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (row of rows(); track trackRow(row)) {
+          <div
+            role="row"
+            class="mt-6 grid grid-cols-ops-activation-row min-h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10 py-4">
+              @if (isAddonRow(row)) {
+                <span class="inline-flex shrink-0 items-center ps-tree-indent text-text-muted">
+                  <ng-icon name="tablerCornerDownRight" size="12" class="rtl:-scale-x-100" aria-hidden="true" />
+                </span>
+                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+                  <ng-icon name="tablerPuzzle" size="14" aria-hidden="true" />
+                </span>
+                <span class="min-w-0 truncate text-13 leading-18 text-text">
+                  {{ rowName(row) }}
+                </span>
+              } @else {
+                @let look = appTile(row.target.applicationKey);
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="look.tile"
+                >
+                  <ng-icon [name]="look.icon" size="14" aria-hidden="true" />
+                </span>
+                <span class="min-w-0 truncate text-13 leading-18 font-medium text-text">
+                  {{ rowName(row) }}
+                </span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-4">
+              @if (pendingForRow(row); as pending) {
+                <div class="flex min-w-0 flex-col justify-center gap-2">
+                  <span class="inline-flex h-badge self-start items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                    {{ 'wsActivation.status.applying' | transloco }}
+                  </span>
+                  @if (!pending.foreignActor && pending.validatedBranchCount !== null) {
+                    <span class="truncate text-11 leading-16 text-text-muted">
+                      {{ ('wsActivation.status.checkedBranchesPlural' | pluralKey: pending.validatedBranchCount) | transloco: { n: pending.validatedBranchCount } }}
+                    </span>
+                  }
+                </div>
+              } @else if (row.resource.state === 'NOT_CREATED') {
+                <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-text-muted">
+                  {{ 'wsActivation.status.notCreated' | transloco }}
+                </span>
+              } @else if (isRowOn(row)) {
+                <span class="inline-flex h-badge items-center rounded-8 bg-success px-8 text-12 font-medium whitespace-nowrap text-on-success">
+                  {{ 'wsActivation.status.on' | transloco }}
+                </span>
+              } @else {
+                <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+                  {{ 'wsActivation.status.off' | transloco }}
+                </span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-4">
+              @if (canManage()) {
+                <span class="inline-flex items-center" [attr.title]="switchDisabledReason(row)">
+                  <ui-switch
+                    #rowSwitch
+                    [checked]="isRowOn(row)"
+                    [disabled]="isSwitchDisabled(row)"
+                    [label]="rowName(row)"
+                    [describedBy]="uid + '-col-activation-hint'"
+                    (checkedChange)="onSwitchToggle(row, $event, rowSwitch)"
+                  />
+                </span>
+              } @else {
+                <span class="truncate text-12 text-text-muted">{{ statusText(row) }}</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-4">
+              @if (isAddonRow(row)) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  [disabled]="isRowPending(row)"
+                  (click)="openBranchOverrides(row)"
+                >
+                  {{ 'wsActivation.actions.branches' | transloco }}
+                </button>
+              }
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'wsActivation.footerNote' | transloco }}
+  </p>
+}
+
+<app-activation-reason-modal />
+<app-branch-overrides-modal [canManage]="canManage()" />
+}

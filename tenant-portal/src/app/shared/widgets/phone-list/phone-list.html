@@ -1,0 +1,124 @@
+@if (display() === 'read') {
+  <ui-field size="bare" [label]="label()" [for]="rowId(0)" [hint]="hint()">
+    <div
+      [id]="rowId(0)"
+      [attr.aria-describedby]="hint().trim() ? rowId(0) + '-hint' : null"
+      class="flex flex-col gap-4"
+    >
+      @for (phone of readPhones(); track $index) {
+        <div class="flex items-center gap-4 text-12 leading-18 text-text">
+          <span dir="ltr" class="tabular-nums">{{ displayPhone(phone) }}</span>
+          <app-phone-actions
+            class="shrink-0"
+            [phone]="actionPhone(phone)"
+            [showNumber]="false"
+            [crm]="crm()"
+            [source]="source()"
+          />
+        </div>
+      } @empty {
+        <span class="text-12 leading-18 text-text-muted">—</span>
+      }
+    </div>
+  </ui-field>
+} @else {
+  <div class="flex flex-col gap-6">
+    @for (phone of rows(); track $index; let idx = $index) {
+      @if (idx === 0) {
+        <ui-field
+          size="bare"
+          [label]="label()"
+          [for]="rowId(0)"
+          [hint]="hint()"
+          [error]="rowError(0)"
+        >
+          <div class="flex items-center gap-6">
+            <ui-phone-input
+              class="min-w-0 flex-1"
+              [countries]="countries()"
+              [inputId]="rowId(0)"
+              [label]="label()"
+              [readonly]="readonly()"
+              [invalid]="!!rowError(0)"
+              [value]="phone"
+              (valueChange)="setPhone(0, $event)"
+            />
+            <app-phone-actions
+              class="shrink-0"
+              [phone]="actionPhone(phone)"
+              [disabled]="!isPhoneValid(0, phone)"
+              [showNumber]="false"
+              [crm]="crm()"
+              [source]="source()"
+            />
+            @if (rows().length > 1 && !readonly()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="removeLabelFor(0)"
+                [title]="removeLabelFor(0)"
+                (click)="removePhone(0)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        </ui-field>
+      } @else {
+        <div class="flex flex-col">
+          <label class="sr-only" [attr.for]="rowId(idx)">{{ rowLabel(idx) }}</label>
+          <div class="flex items-center gap-6">
+            <ui-phone-input
+              class="min-w-0 flex-1"
+              [countries]="countries()"
+              [inputId]="rowId(idx)"
+              [label]="rowLabel(idx)"
+              [readonly]="readonly()"
+              [invalid]="!!rowError(idx)"
+              [describedBy]="rowDescribedBy(idx)"
+              [value]="phone"
+              (valueChange)="setPhone(idx, $event)"
+            />
+            <app-phone-actions
+              class="shrink-0"
+              [phone]="actionPhone(phone)"
+              [disabled]="!isPhoneValid(idx, phone)"
+              [showNumber]="false"
+              [crm]="crm()"
+              [source]="source()"
+            />
+            @if (rows().length > 1 && !readonly()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="removeLabelFor(idx)"
+                [title]="removeLabelFor(idx)"
+                (click)="removePhone(idx)"
+              >
+                <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+          @if (rowError(idx); as err) {
+            <p
+              [id]="rowId(idx) + '-error'"
+              class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text"
+            >
+              <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+              {{ err }}
+            </p>
+          }
+        </div>
+      }
+    }
+
+    @if (canAdd()) {
+      <div class="flex">
+        <button type="button" uiButton variant="ghost" size="small" (click)="addPhone()">
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ addLabel() }}
+        </button>
+      </div>
+    }
+  </div>
+}

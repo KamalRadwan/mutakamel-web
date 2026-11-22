@@ -1,0 +1,144 @@
+<ui-field
+  size="bare"
+  [label]="label()"
+  [for]="uid + '-stage'"
+  [hint]="hint()"
+  [error]="error()"
+>
+  @if (readonly()) {
+    <div
+      class="flex h-field w-full items-center gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text"
+      [class]="error() ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+    >
+      <input
+        [id]="uid + '-stage'"
+        type="text"
+        readonly
+        [value]="selectedOption()?.label || '—'"
+        [attr.aria-invalid]="error() ? 'true' : null"
+        class="w-full bg-transparent text-12 text-text outline-none"
+      />
+      @if (updating()) {
+        <ng-icon name="tablerLoader2" size="12" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+      }
+    </div>
+  } @else {
+    <button
+      #trigger
+      type="button"
+      [id]="uid + '-stage'"
+      class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+      [class]="
+        error()
+          ? 'border-danger-border ring-2 ring-danger-halo'
+          : open()
+            ? 'border-focus-ring ring-3 ring-focus-halo'
+            : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+      "
+      aria-haspopup="listbox"
+      [attr.aria-expanded]="open()"
+      [attr.aria-label]="label()"
+      [attr.aria-invalid]="error() ? 'true' : null"
+      [attr.aria-busy]="updating() ? 'true' : null"
+      [disabled]="updating() || allOptions().length === 0"
+      (click)="toggle()"
+    >
+      <span class="truncate" [class]="selectedOption() ? '' : 'text-text-muted'">
+        {{ selectedOption()?.label || '—' }}
+      </span>
+      <span class="inline-flex shrink-0 text-text-muted">
+        @if (updating()) {
+          <ng-icon name="tablerLoader2" size="12" class="animate-spin" aria-hidden="true" />
+        } @else {
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        }
+      </span>
+    </button>
+  }
+</ui-field>
+
+@if (open()) {
+  <div
+    #menuList
+    role="listbox"
+    (keydown)="onMenuKeydown($event)"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    [attr.aria-label]="label()"
+  >
+    @if (hasGroups()) {
+      @for (group of groups(); track group.id) {
+        @if (group.options.length > 0) {
+          <div role="group" [attr.aria-labelledby]="uid + '-group-' + group.id" class="flex flex-col gap-2">
+            <div [id]="uid + '-group-' + group.id" class="px-8 py-4 text-11 leading-16 font-medium text-text-muted">
+              {{ group.label }}
+            </div>
+            @for (option of group.options; track option.id) {
+              <div
+                role="option"
+                [attr.aria-selected]="option.id === value()"
+                [attr.aria-disabled]="option.disabled ? 'true' : null"
+                [attr.title]="option.hint || null"
+              >
+                <button
+                  type="button"
+                  class="flex h-menu-item w-full items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="
+                    option.disabled
+                      ? 'cursor-not-allowed text-text-placeholder opacity-drag-source'
+                      : option.id === value()
+                        ? 'cursor-pointer bg-brand-soft text-on-brand-soft'
+                        : 'cursor-pointer text-text hover:bg-row-hover'
+                  "
+                  [disabled]="!!option.disabled"
+                  [attr.aria-disabled]="option.disabled ? 'true' : null"
+                  [attr.title]="option.hint || null"
+                  (click)="choose(option)"
+                >
+                  <span class="truncate">{{ option.label }}</span>
+                  @if (option.id === value()) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                  }
+                </button>
+              </div>
+            }
+          </div>
+        }
+      }
+    } @else {
+      @for (option of options(); track option.id) {
+        <div
+          role="option"
+          [attr.aria-selected]="option.id === value()"
+          [attr.aria-disabled]="option.disabled ? 'true' : null"
+          [attr.title]="option.hint || null"
+        >
+          <button
+            type="button"
+            class="flex h-menu-item w-full items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              option.disabled
+                ? 'cursor-not-allowed text-text-placeholder opacity-drag-source'
+                : option.id === value()
+                  ? 'cursor-pointer bg-brand-soft text-on-brand-soft'
+                  : 'cursor-pointer text-text hover:bg-row-hover'
+            "
+            [disabled]="!!option.disabled"
+            [attr.aria-disabled]="option.disabled ? 'true' : null"
+            [attr.title]="option.hint || null"
+            (click)="choose(option)"
+          >
+            <span class="truncate">{{ option.label }}</span>
+            @if (option.id === value()) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        </div>
+      }
+    }
+  </div>
+}

@@ -1,0 +1,72 @@
+<ui-modal
+  #modal
+  size="form"
+  tile="bg-icon-violet"
+  icon="tablerPin"
+  [title]="'repReport.pinTitle' | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <form class="grid grid-cols-2 gap-10" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      [label]="'repReport.panel' | transloco"
+      [for]="uid + '-panel'"
+      [hint]="'repReport.panelHint' | transloco"
+      [required]="true"
+      [error]="panelError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-panel'"
+        [describedBy]="uid + '-panel-hint'"
+        [label]="'repReport.panel' | transloco"
+        [options]="panelOptions()"
+        [disabled]="submitting() || panelOptions().length === 0"
+        [(value)]="selectedPanelKey"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'repReport.dashboard' | transloco"
+      [for]="uid + '-dashboard'"
+      [hint]="'repReport.dashboardHint' | transloco"
+      [required]="true"
+      [error]="dashboardError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-dashboard'"
+        [describedBy]="uid + '-dashboard-hint'"
+        [label]="'repReport.dashboard' | transloco"
+        [options]="dashboardOptions()"
+        [disabled]="submitting() || loadingTargets() || dashboardOptions().length === 0"
+        [(value)]="selectedDashboardId"
+      />
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="loadingTargets() || panelOptions().length === 0 || dashboardOptions().length === 0"
+      (click)="submit()"
+    >
+      {{ 'repReport.add' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="close()"
+    >
+      {{ 'repReport.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

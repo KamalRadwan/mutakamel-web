@@ -1,0 +1,9 @@
+<ui-dropdown
+  size="button"
+  icon="tablerHierarchy2"
+  [options]="options()"
+  [value]="dropdownValue()"
+  [label]="switcherLabel()"
+  [disabled]="disabled() || options().length === 0"
+  (valueChange)="onSelect($event)"
+/>

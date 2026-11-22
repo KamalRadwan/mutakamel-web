@@ -1,0 +1,373 @@
+@if (list.failed()) {
+  <div class="flex flex-col items-center gap-8 p-16 text-center">
+    <p class="text-12 text-danger-text" role="alert">{{ 'opportunities.list.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" (click)="retryLoad()">
+      {{ 'opportunities.list.retry' | transloco }}
+    </button>
+  </div>
+} @else if (!list.loading() && !items().length) {
+  <p class="p-16 text-center text-12 text-text-muted">{{ 'opportunities.list.noResults' | transloco }}</p>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-design w-full"
+      [attr.aria-label]="'opportunities.title' | transloco"
+      [attr.aria-busy]="list.loading()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [style.grid-template-columns]="gridCols"
+      >
+        <span role="columnheader" class="flex items-center justify-center">
+          @if (selection()) {
+            <span class="relative inline-flex size-checkbox-size items-center justify-center">
+              <ui-checkbox
+                #pageCb
+                [checked]="pageState() === 'all'"
+                [indeterminate]="pageState() === 'some'"
+                [attr.aria-label]="'opportunities.table.selectPage' | transloco"
+                (checkedChange)="togglePage(pageCb)"
+              >
+                <span class="sr-only">{{ 'opportunities.table.selectPage' | transloco }}</span>
+              </ui-checkbox>
+              @if (pageState() === 'some') {
+                <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                  <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+                </span>
+              }
+            </span>
+          }
+        </span>
+
+        @for (col of columns; track col.id) {
+          @let colLabel = 'opportunities.table.' + col.id | transloco;
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center border-s border-on-nav-line px-10"
+            [class.justify-end]="col.alignEnd"
+            [attr.aria-sort]="ariaSort(col.sortKey)"
+          >
+            @if (col.sortKey) {
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-4 rounded-4 outline-none transition-colors duration-fast hover:text-on-nav-muted focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class.text-end]="col.alignEnd"
+                [class.text-start]="!col.alignEnd"
+                [attr.aria-label]="'opportunities.table.sortBy' | transloco: { column: colLabel }"
+                [title]="'opportunities.table.sortHint' | transloco"
+                (click)="toggleSort(col)"
+              >
+                <span class="truncate" [class.ms-auto]="col.alignEnd">{{ colLabel }}</span>
+                <ng-icon
+                  [name]="sortIcon(col.sortKey)"
+                  size="13"
+                  class="shrink-0"
+                  [class]="sortField() === col.sortKey ? 'text-on-nav' : 'text-on-nav-muted'"
+                  aria-hidden="true"
+                />
+              </button>
+            } @else {
+              <span class="truncate">{{ colLabel }}</span>
+            }
+          </span>
+        }
+
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'opportunities.table.actions' | transloco }}</span>
+        </span>
+      </div>
+
+      @if (list.loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+            [style.grid-template-columns]="gridCols"
+          >
+            <span role="cell" class="flex items-center justify-center">
+              @if (selection()) {
+                <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+              <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (row of items(); track row.id) {
+          <div
+            role="row"
+            tabindex="0"
+            class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [style.grid-template-columns]="gridCols"
+            [class]="isSelected(row.id) ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+            [attr.aria-selected]="selection() ? isSelected(row.id) : null"
+            (click)="emitOpen(row)"
+            (keydown)="onRowKeydown($event, row)"
+          >
+            <span
+              role="cell"
+              class="flex items-center justify-center"
+              (click)="onSelectCellClick($event, row)"
+            >
+              @if (selection()) {
+                <ui-checkbox
+                  #rowCb
+                  [checked]="isSelected(row.id)"
+                  [attr.aria-label]="'opportunities.table.selectRow' | transloco: { name: row.title }"
+                  (click)="onRowCheckboxClick($event)"
+                  (checkedChange)="onRowCheckedChange(row, rowCb)"
+                >
+                  <span class="sr-only">{{ 'opportunities.table.selectRow' | transloco: { name: row.title } }}</span>
+                </ui-checkbox>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon"
+                [title]="'opportunities.record' | transloco"
+              >
+                <ng-icon name="tablerTarget" size="14" aria-hidden="true" />
+              </span>
+              <span class="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+                <button
+                  type="button"
+                  dir="auto"
+                  class="cursor-pointer truncate rounded-4 text-start text-13 leading-16 font-medium text-text outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [title]="row.title"
+                  (click)="$event.stopPropagation(); emitOpen(row)"
+                >
+                  {{ row.title }}
+                </button>
+                <bdi dir="ltr" class="truncate text-11 leading-16 text-text-muted tabular-nums">
+                  {{ opportunityRef(row.id) }}
+                </bdi>
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+                @if (customerName(row); as customer) {
+                  <span dir="auto" class="truncate text-13 leading-16 text-text" [title]="customer">{{ customer }}</span>
+                }
+                @if (contactName(row); as contact) {
+                  <span dir="auto" class="truncate text-11 leading-16 text-text-muted" [title]="contact">{{ contact }}</span>
+                }
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span
+                class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                [class]="stageBadge(row)"
+              >
+                {{ stageName(row) }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-end">
+              @if (amountText(row); as amount) {
+                <bdi dir="ltr" class="truncate text-13 font-medium text-text tabular-nums" [title]="amount">{{ amount }}</bdi>
+              } @else {
+                <span class="text-12 text-text-muted">—</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (row.probabilityPercent !== null) {
+                <bdi dir="ltr" class="truncate text-12 text-text tabular-nums">{{ row.probabilityPercent }}%</bdi>
+              } @else {
+                <span class="text-12 text-text-muted">—</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (closeDateText(row); as closeDate) {
+                <span
+                  class="truncate text-12 tabular-nums"
+                  [class]="closeDateOverdue(row) ? 'text-danger-text' : 'text-text'"
+                >
+                  {{ closeDate }}
+                </span>
+                @if (closeDateOverdue(row)) {
+                  <span class="sr-only">{{ 'opportunities.card.overdue' | transloco }}</span>
+                }
+              } @else {
+                <span class="text-12 text-text-muted">—</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              @if (row.ownerDisplayName; as owner) {
+                @if (row.ownerAvatarUrl; as avatarUrl) {
+                  <img [src]="avatarUrl" [alt]="owner" class="size-avatar shrink-0 rounded-full object-cover" />
+                } @else {
+                  <span
+                    class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                    aria-hidden="true"
+                  >
+                    {{ initials(owner) }}
+                  </span>
+                }
+                <span dir="auto" class="truncate text-12 text-text" [title]="owner">{{ owner }}</span>
+              } @else {
+                <span
+                  class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-neutral-soft text-text-muted"
+                  aria-hidden="true"
+                >
+                  <ng-icon name="tablerUserCircle" size="14" aria-hidden="true" />
+                </span>
+                <span class="truncate text-12 text-text-muted">{{ 'opportunities.card.noOwner' | transloco }}</span>
+              }
+            </span>
+
+            <span
+              role="cell"
+              class="flex min-w-0 items-center border-s border-border px-10"
+              (click)="$event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+            >
+              <button
+                type="button"
+                class="inline-flex h-badge cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="dueClass(row)"
+                (click)="activities.emit(row)"
+              >
+                {{ 'recordList.due.' + dueKey(row) | transloco }}
+              </button>
+            </span>
+
+            <span
+              role="cell"
+              class="flex min-w-0 items-center overflow-hidden border-s border-border px-10 text-12"
+              (click)="$event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+            >
+              @if (phone(row); as oppPhone) {
+                <app-phone-actions [phone]="oppPhone" [crm]="true" [source]="phoneSource(row)" />
+              }
+            </span>
+
+            <span
+              role="cell"
+              class="flex min-w-0 items-center border-s border-border px-10"
+              (click)="$event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+              (mouseleave)="hovered.set(null)"
+            >
+              @if (canUpdate(row)) {
+                <span
+                  class="flex items-center"
+                  role="radiogroup"
+                  [attr.aria-label]="'recordList.card.rating' | transloco: { value: row.importance }"
+                >
+                  @for (star of stars; track star) {
+                    <button
+                      type="button"
+                      class="inline-flex cursor-pointer rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [class]="star <= ratingValue(row) ? 'text-warning-text' : 'text-border-field'"
+                      role="radio"
+                      [attr.aria-checked]="star === row.importance"
+                      [attr.aria-label]="'recordList.card.rate' | transloco: { value: star }"
+                      (mouseenter)="hovered.set({ opportunityId: row.id, value: star })"
+                      (focus)="hovered.set({ opportunityId: row.id, value: star })"
+                      (blur)="hovered.set(null)"
+                      (click)="rate(row, star)"
+                    >
+                      <ng-icon [name]="star <= ratingValue(row) ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+                    </button>
+                  }
+                </span>
+              } @else {
+                <span
+                  class="flex items-center"
+                  role="img"
+                  [attr.aria-label]="'recordList.card.rating' | transloco: { value: row.importance }"
+                >
+                  @for (star of stars; track star) {
+                    <span class="inline-flex" [class]="star <= row.importance ? 'text-warning-text' : 'text-border-field'">
+                      <ng-icon [name]="star <= row.importance ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+                    </span>
+                  }
+                </span>
+              }
+            </span>
+
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border"
+              (click)="$event.stopPropagation()"
+              (keydown)="$event.stopPropagation()"
+            >
+              <ui-actions-menu
+                [items]="actions(row)"
+                [label]="'opportunities.card.actions' | transloco"
+                [noColorLabel]="'opportunities.card.color.none' | transloco"
+                (selected)="act(row, $event)"
+              />
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (!list.failed() && (list.loading() ? totalCount() > 0 : items().length > 0)) {
+  <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
+    <span class="shrink-0 text-12 leading-18 text-text-muted">{{ 'opportunities.table.showInTable' | transloco }}</span>
+    <ui-pagination
+      class="min-w-0 flex-1"
+      [total]="totalCount()"
+      [pageSizes]="pageSizes()"
+      [label]="'opportunities.list.pagination' | transloco"
+      [(page)]="page"
+      [pageSize]="pageSize()"
+      (pageSizeChange)="onPageSizeChange($event)"
+    />
+  </footer>
+}
+
+<ui-confirm-dialog
+  class="contents"
+  [title]="'opportunities.list.deleteTitle' | transloco"
+  [text]="'opportunities.list.deleteBody' | transloco"
+  [confirmLabel]="'common.delete' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>

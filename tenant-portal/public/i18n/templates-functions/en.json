@@ -1,0 +1,397 @@
+{
+  "toolbar": {
+    "newFunction": "New function",
+    "searchPlaceholder": "Search functions by name",
+    "searchAria": "Search functions by name",
+    "clearSearch": "Clear search",
+    "filters": "Filters"
+  },
+  "filters": {
+    "title": "Filter functions",
+    "statusLabel": "Status",
+    "statusHint": "Show active or archived functions.",
+    "allStatuses": "All statuses",
+    "scopeLabel": "Scope",
+    "scopeHint": "Filter by tenant-wide or company-owned functions.",
+    "allScopes": "All scopes",
+    "companyLabel": "Company",
+    "companyHint": "Filter by the company that owns the function.",
+    "allCompanies": "All companies"
+  },
+  "chips": {
+    "status": "Status: {{value}}",
+    "scope": "Scope: {{value}}",
+    "remove": "Remove filter"
+  },
+  "table": {
+    "ariaLabel": "Template functions list",
+    "function": "Function",
+    "scope": "Scope",
+    "status": "Status",
+    "published": "Published",
+    "updated": "Updated",
+    "actions": "Actions",
+    "publishedVersion": "Version {{version}}",
+    "publishedGeneric": "Published",
+    "notPublished": "Not published"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "ARCHIVED": "Archived"
+  },
+  "validationStates": {
+    "PASSED": "Passed",
+    "FAILED": "Failed",
+    "EXPIRED": "Expired"
+  },
+  "scopes": {
+    "tenant": "Tenant",
+    "company": "Company",
+    "nileCompany": "Mutakamel Trading",
+    "mtgCompany": "Mutakamel Industries"
+  },
+  "types": {
+    "DECIMAL": "Decimal",
+    "STRING": "Text",
+    "BOOLEAN": "Yes / no",
+    "DATE": "Date"
+  },
+  "dimensions": {
+    "SCALAR": "Plain number",
+    "MONEY": "Money",
+    "QUANTITY": "Quantity",
+    "UNIT_PRICE": "Unit price"
+  },
+  "values": {
+    "yes": "Yes",
+    "no": "No",
+    "empty": "Empty (null)"
+  },
+  "actions": {
+    "open": "Open",
+    "save": "Save",
+    "undoChanges": "Undo changes",
+    "validate": "Validate",
+    "publish": "Publish",
+    "archive": "Archive",
+    "restore": "Restore",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "close": "Close",
+    "clearFilters": "Clear filters",
+    "retry": "Try again",
+    "backToHome": "Back to home",
+    "previous": "Previous",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "saveFirst": "Save changes before validating or publishing.",
+    "manageRequired": "You do not have permission to manage functions."
+  },
+  "states": {
+    "forbiddenTitle": "Access denied",
+    "forbiddenDescription": "You do not have permission to view reusable functions.",
+    "featureDisabledTitle": "Template functions unavailable",
+    "featureDisabledDescription": "Reusable template functions are unavailable for this workspace.",
+    "loadFailedTitle": "Could not load functions",
+    "loadFailedDescription": "An unexpected error occurred while loading template functions.",
+    "supportReference": "Support reference: {{correlationId}}",
+    "emptyTitle": "No functions yet",
+    "emptyDescription": "Create reusable typed calculations that can be tested, versioned, and checked for template impact.",
+    "filteredEmptyTitle": "No functions match these filters",
+    "filteredEmptyDescription": "Change or clear your search and filter criteria to see functions."
+  },
+  "modal": {
+    "createTitle": "New function",
+    "createSubtitle": "Define parameters, result type, calculation expression, and test cases.",
+    "tabsAria": "Function sections",
+    "tabs": {
+      "definition": "Definition",
+      "tests": "Tests",
+      "versions": "Versions",
+      "usage": "Usage"
+    },
+    "unsavedChanges": "Unsaved changes",
+    "readOnlyWorkingNotice": "You have read-only access to this function. Open the Versions tab to inspect published definitions.",
+    "validUntil": "Valid until {{time}}",
+    "validationExpired": "Validation proof expired. Validate again before publishing.",
+    "publishNeedsTests": "Add and save at least one test case before publishing.",
+    "publishNeedsValidation": "Validate the current revision before publishing.",
+    "publishValidationFailed": "Fix validation errors and pass all tests before publishing.",
+    "publishValidationExpired": "The validation proof expired after 30 minutes. Validate again."
+  },
+  "fields": {
+    "codeLabel": "Code",
+    "codeHint": "Unique uppercase identifier (letters, digits, underscores, or hyphens). Cannot be changed after creation.",
+    "codeLockedHint": "The function code cannot be changed after creation.",
+    "codePlaceholder": "LINE_NET_AFTER_DISCOUNT",
+    "scopeLabel": "Scope",
+    "scopeHint": "Tenant functions work across all companies; company functions serve only one company.",
+    "scopeLockedHint": "Scope cannot be changed after creation.",
+    "companyLabel": "Company",
+    "companyHint": "Company whose templates may reference this function.",
+    "nameLabel": "Name",
+    "nameHint": "Human-readable name for this reusable function (1 to 200 characters).",
+    "namePlaceholder": "Line net after discount",
+    "descriptionLabel": "Description",
+    "descriptionHint": "Optional notes explaining what this function calculates (up to 1,000 characters).",
+    "descriptionPlaceholder": "Describe parameters, units, and rounding behavior..."
+  },
+  "parameters": {
+    "sectionTitle": "Parameters",
+    "count": "{{count}} of {{max}}",
+    "add": "Parameter",
+    "remove": "Remove parameter",
+    "nameLabel": "Name",
+    "nameHint": "Starts with a lowercase letter, using letters, digits, or underscores (up to 40 characters).",
+    "namePlaceholder": "amount",
+    "typeLabel": "Type",
+    "typeHint": "Data type expected for this parameter.",
+    "kindLabel": "Kind",
+    "kindHint": "Unit classification checked by the exact decimal engine.",
+    "nullableLabel": "Null handling",
+    "nullableHint": "Allow callers and test cases to pass an empty (null) value.",
+    "canBeEmpty": "Can be empty",
+    "unnamed": "Unnamed parameter",
+    "nullableBadge": "Nullable"
+  },
+  "result": {
+    "sectionTitle": "Result",
+    "typeLabel": "Result type",
+    "typeHint": "Data type returned by this function.",
+    "kindLabel": "Result kind",
+    "kindHint": "Unit classification returned by the exact decimal engine.",
+    "nullableLabel": "Null handling",
+    "nullableHint": "Allow this function to return an empty (null) value.",
+    "canBeEmpty": "Can be empty"
+  },
+  "expression": {
+    "label": "Expression",
+    "hint": "Typed formula evaluated using only the function parameters and literals.",
+    "edit": "Edit expression",
+    "steps": "{{count}} of 100 steps"
+  },
+  "tests": {
+    "sectionTitle": "Test cases",
+    "count": "{{count}} of {{max}}",
+    "add": "Test",
+    "remove": "Remove test",
+    "defaultName": "Test {{n}}",
+    "nameLabel": "Test name",
+    "nameHint": "Descriptive name for this test case (1 to 100 characters).",
+    "namePlaceholder": "Standard 10% discount",
+    "emptyCheck": "Empty",
+    "emptyCheckHint": "Use an empty (null) value instead of entering one.",
+    "argumentLabel": "Value",
+    "expectedTitle": "Expected result",
+    "expectedLabel": "Expected value",
+    "decimalHint": "Exact decimal value (up to 30 integer and 18 fraction digits).",
+    "textHint": "Text value (up to 1,000 characters).",
+    "booleanHint": "Expected true or false value.",
+    "dateHint": "Calendar date in YYYY-MM-DD format."
+  },
+  "datePicker": {
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "versions": {
+    "emptyTitle": "No published versions yet",
+    "emptyDescription": "Save, validate, and publish this function to create version 1.",
+    "tableAria": "Published function versions",
+    "columns": {
+      "version": "Version",
+      "publishedAt": "Published at",
+      "changeNote": "Change note",
+      "tests": "Tests"
+    },
+    "current": "Current",
+    "testsSummary": "{{passed}} of {{total}}",
+    "detail": {
+      "title": "Version {{version}}",
+      "versionLabel": "Version",
+      "versionHint": "Immutable published version number.",
+      "publishedAtLabel": "Published at",
+      "publishedAtHint": "Date and time when this version was published.",
+      "testsLabel": "Tests passed",
+      "testsHint": "Validation test proof recorded when publishing this version.",
+      "changeNoteLabel": "Change note",
+      "changeNoteHint": "Summary provided when this version was published.",
+      "parametersTitle": "Parameters",
+      "resultTitle": "Result"
+    }
+  },
+  "usage": {
+    "versionFilterLabel": "Function version",
+    "versionFilterHint": "Filter templates referencing a specific published version.",
+    "allVersions": "All versions",
+    "versionOption": "Version {{number}}",
+    "versionNumber": "v{{number}}",
+    "checkImpact": "Check impact of version {{version}}",
+    "emptyTitle": "Not used in templates",
+    "emptyDescription": "No template drafts or published versions reference this function yet.",
+    "tableAria": "Templates using this function",
+    "columns": {
+      "template": "Template",
+      "source": "Source",
+      "functionVersion": "Function version"
+    },
+    "draftRevision": "Draft r{{revision}}",
+    "publishedVersion": "Version {{version}}"
+  },
+  "reasonModal": {
+    "tooLong": "Enter 1,000 characters or fewer.",
+    "publish": {
+      "title": "Publish function",
+      "label": "Change note",
+      "hint": "Describe what changed in this version (1 to 1,000 characters).",
+      "placeholder": "Summarize the calculation changes or new test coverage...",
+      "required": "Enter a change note before publishing.",
+      "confirm": "Publish"
+    },
+    "archive": {
+      "title": "Archive function",
+      "label": "Reason",
+      "hint": "Explain why this function is being archived (1 to 1,000 characters).",
+      "placeholder": "Enter the reason for archiving this function...",
+      "required": "Enter a reason before archiving.",
+      "confirm": "Archive"
+    },
+    "restore": {
+      "title": "Restore function",
+      "label": "Reason",
+      "hint": "Explain why this function is being restored (1 to 1,000 characters).",
+      "placeholder": "Enter the reason for restoring this function...",
+      "required": "Enter a reason before restoring.",
+      "confirm": "Restore"
+    }
+  },
+  "impact": {
+    "title": "Check impact of version {{version}}",
+    "stepsAria": "Impact check steps",
+    "steps": {
+      "targets": "Targets",
+      "results": "Results",
+      "apply": "Apply"
+    },
+    "defaultFixture": "Default sample data",
+    "noDraftTargetsTitle": "No draft templates to check",
+    "noDraftTargetsDescription": "Only template drafts that reference this function can be checked and updated.",
+    "targetsHelp": "Select up to 20 draft templates and choose sample data for each.",
+    "selectedCount": "{{count}} of {{max}} selected",
+    "targetLabel": "Draft template",
+    "targetHint": "Select this draft to check it against the new version. Up to 20 drafts can be selected.",
+    "fixtureLabel": "Sample data",
+    "fixtureHint": "Sample fixture used to compare previous and proposed formula values.",
+    "targetsEvaluated": "{{count}} draft(s) evaluated",
+    "validUntil": "Valid until {{time}}",
+    "expired": "Impact check expired. Go back and run the check again.",
+    "comparisonsAria": "Formula output comparisons",
+    "table": {
+      "node": "Node",
+      "previous": "Previous",
+      "proposed": "Proposed"
+    },
+    "truncatedCount": "{{shown}} of {{total}} comparisons",
+    "applySummary": "Update {{count}} draft(s) to version {{version}}.",
+    "reasonLabel": "Reason",
+    "reasonHint": "Explain why these template drafts are being updated (1 to 1,000 characters).",
+    "reasonPlaceholder": "Enter the reason for applying the new function version...",
+    "reasonRequired": "Enter a reason before applying.",
+    "reasonTooLong": "Enter 1,000 characters or fewer.",
+    "appliedToast": "{{n}} drafts updated. Check them again before publishing.",
+    "actions": {
+      "checkImpact": "Check impact",
+      "continue": "Continue",
+      "apply": "Apply"
+    },
+    "stepCounter": "Step {{current}} of {{total}}"
+  },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "text": "You have unsaved changes to this function. Save them before closing or discard them?",
+    "save": "Save and close",
+    "discard": "Discard changes",
+    "cancel": "Keep editing"
+  },
+  "conflict": {
+    "title": "Function changed elsewhere",
+    "text": "Another user updated this function after you opened it. Reload the latest revision or keep your local changes.",
+    "reload": "Reload",
+    "keep": "Keep my changes"
+  },
+  "validation": {
+    "codeRequired": "Function code is required.",
+    "codePattern": "Use uppercase letters, digits, underscores, or hyphens (start with a letter or digit).",
+    "companyRequired": "Select a company for a company-scoped function.",
+    "nameRequired": "Function name is required.",
+    "nameTooLong": "Name must be 200 characters or fewer.",
+    "descriptionTooLong": "Description must be 1,000 characters or fewer.",
+    "expressionTooLarge": "Expression cannot exceed 100 steps.",
+    "paramNameRequired": "Parameter name is required.",
+    "paramNamePattern": "Start with a lowercase letter and use only letters, digits, or underscores.",
+    "paramNameUnique": "Parameter names must be unique.",
+    "testNameRequired": "Test name is required.",
+    "testNameTooLong": "Test name must be 100 characters or fewer.",
+    "decimalInvalid": "Enter a valid decimal number.",
+    "dateRequired": "Choose a valid date.",
+    "stringTooLong": "Text value must be 1,000 characters or fewer."
+  },
+  "toasts": {
+    "created": "Function created.",
+    "saved": "Function changes saved.",
+    "validatedPassed": "Validation passed.",
+    "validatedFailed": "Validation failed. Review the issues on the Tests tab.",
+    "published": "Published version {{version}}.",
+    "archived": "Function archived.",
+    "restored": "Function restored."
+  },
+  "formulaWords": {
+    "yes": "Yes",
+    "no": "No",
+    "empty": "Empty",
+    "fnGated": "Function call",
+    "sumRows": "Sum rows",
+    "if": "IF",
+    "then": "THEN",
+    "else": "ELSE",
+    "isEmpty": "is empty",
+    "round": "Round",
+    "abs": "Abs",
+    "trim": "Trim",
+    "min": "Min",
+    "max": "Max",
+    "coalesce": "First non-empty",
+    "concat": "Join",
+    "addDays": "Add days",
+    "diffDays": "Days between",
+    "unset": "…"
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again.",
+    "network": "Could not reach the server. Check your connection and try again.",
+    "forbidden": "You do not have permission for this action.",
+    "featureDisabled": "Reusable template functions are unavailable for this workspace.",
+    "notFound": "This function could not be found.",
+    "STALE": "This function was updated elsewhere. Reload the latest version before saving.",
+    "FUNCTION_CODE_CONFLICT": "A function with this code already exists. Choose a different code.",
+    "FUNCTION_ARCHIVED": "This function is archived. Restore it before making changes.",
+    "FUNCTION_NOT_ARCHIVED": "This function is already active and does not need to be restored.",
+    "FUNCTION_VALIDATION_STALE": "The function changed or its 30-minute proof expired. Validate again before publishing.",
+    "FUNCTION_VALIDATION_FAILED": "Validation failed. Fix the reported issues and validate again.",
+    "FUNCTION_DEPENDENCY_CHANGED": "A referenced function changed. Re-validate this function to refresh its dependency checksum.",
+    "FUNCTION_DEPENDENCY_CYCLE": "This function calls itself through other functions. Remove the loop.",
+    "FUNCTION_DEPENDENCY_INVALID": "A referenced function version is missing or invalid. Update the expression.",
+    "FUNCTION_ARGUMENT_TYPE_MISMATCH": "An argument or result type or kind does not match the definition. Update the expression or test values.",
+    "FUNCTION_LIMIT_EXCEEDED": "The function exceeds the allowed size, node count, or test limit. Simplify it and try again.",
+    "FUNCTION_DEFINITION_INVALID": "The function definition or expression contains an invalid field. Review all parameters and expression blocks.",
+    "FUNCTION_SCOPE_MISMATCH": "Scope rules prevent this company/tenant reference. Match the scopes and try again.",
+    "FUNCTION_NOT_REFERENCED": "One or more selected drafts no longer reference this function. Refresh usage and try again.",
+    "FUNCTION_IMPACT_STALE": "The impact check is out of date. Check again.",
+    "FUNCTION_IMPACT_FAILED": "Impact check failed for one or more drafts. Fix the reported draft issues and check again.",
+    "FUNCTION_TEST_MISMATCH": "A test result does not match the expected value. Fix the expression or expected output.",
+    "FUNCTION_TEST_PROOF_INVALID": "Add at least one passing test case and validate again before publishing.",
+    "FUNCTION_PACKAGE_INCOMPATIBLE": "The template engine or schema version is incompatible with this function. Re-validate and try again.",
+    "FUNCTION_CHECKSUM_INVALID": "The function checksum does not match the saved revision. Reload and validate again.",
+    "CORE_TEMPLATE_FUNCTION_IMPACT_TIMEOUT": "The impact check timed out. Select fewer drafts and try again."
+  }
+}

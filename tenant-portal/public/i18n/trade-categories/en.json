@@ -1,0 +1,103 @@
+{
+  "toolbar": {
+    "new": "New category",
+    "search": "Search categories",
+    "clearSearch": "Clear search",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
+  },
+  "view": {
+    "label": "View",
+    "rows": "Card rows",
+    "columns": "Columns",
+    "chart": "Chart",
+    "treeOnly": "Clear the search and filter to use this view."
+  },
+  "filter": {
+    "label": "Category status",
+    "hint": "Filter the categories by status",
+    "all": "All",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "type": "Category",
+  "children": "{{count}} subcategories",
+  "expand": "Expand",
+  "collapse": "Collapse",
+  "dragHandle": "Drag to reorder",
+  "active": "Active",
+  "inactive": "Inactive",
+  "inactiveBecause": "Inactive because {{parent}} is inactive.",
+  "loadMore": "Load more",
+  "actions": {
+    "addChild": "Add subcategory",
+    "move": "Move to…",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "showInTree": "Show in tree"
+  },
+  "reason": {
+    "maxDepth": "The tree allows 8 levels.",
+    "parentInactive": "Activate this category first.",
+    "activateParentFirst": "Activate {{parent}} first.",
+    "deactivateFirst": "Deactivate first",
+    "hasChildren": "Has subcategories",
+    "itemsUseIt": "Items use it",
+    "deactivateTitle": "Deactivate “{{name}}”?",
+    "activateTitle": "Activate “{{name}}”?",
+    "deleteTitle": "Delete “{{name}}”?",
+    "deactivateText": "Subcategories become inactive too.",
+    "activateText": "Items can use it again.",
+    "deleteText": "Its code can never be reused.",
+    "field": "Reason",
+    "hint": "Required, up to 500 characters, kept in the audit log."
+  },
+  "modal": {
+    "newTitle": "New category",
+    "codeHint": "Up to 80 characters. It can never change or be reused.",
+    "displayName": "Display name",
+    "displayNameHint": "Unique under the same parent, up to 160 characters.",
+    "nameEnHint": "Shown in the English interface.",
+    "nameArHint": "Shown in the Arabic interface.",
+    "parent": "Parent",
+    "parentHint": "Use Move to change it.",
+    "topLevel": "Top level",
+    "itemsHere": "Items here",
+    "itemsHereHint": "Assigned directly.",
+    "itemsSubtree": "Items in subtree",
+    "itemsSubtreeHint": "Here and in all subcategories.",
+    "descendants": "Subcategories",
+    "descendantsHint": "All levels below.",
+    "codePattern": "Use letters, digits, dot, dash or underscore (up to 80).",
+    "codeTaken": "This code is used, even by a deleted category.",
+    "nameTaken": "This parent already has a category with this name."
+  },
+  "move": {
+    "title": "Move “{{name}}”",
+    "search": "Find a parent",
+    "searchHint": "The category goes to the end of the chosen parent.",
+    "tooDeep": "Too deep: 8 levels at most.",
+    "inactive": "Inactive parent",
+    "confirm": "Move"
+  },
+  "empty": {
+    "title": "No categories yet",
+    "text": "Group your items into categories.",
+    "search": "No categories match."
+  },
+  "toast": {
+    "created": "Category created.",
+    "saved": "Changes saved.",
+    "moved": "Category moved.",
+    "statusChanged": "Status changed.",
+    "deleted": "Category deleted.",
+    "noChange": "Nothing changed."
+  },
+  "conflict": {
+    "tree": "Someone else changed the category tree. Reload it and try again.",
+    "node": "Someone else changed this category."
+  }
+}

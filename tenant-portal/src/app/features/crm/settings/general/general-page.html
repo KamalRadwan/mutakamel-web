@@ -1,0 +1,572 @@
+@if (failed()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerSettings" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'general.load.failed' | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="reloadSettings()">
+      {{ 'settings.common.retry' | transloco }}
+    </button>
+  </div>
+} @else if (loading() && !settings()) {
+  <div class="flex flex-col gap-8" aria-busy="true">
+    @for (card of [0, 1, 2]; track card) {
+      <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+        <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+        <span class="h-skeleton-line w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+        <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+      </div>
+    }
+  </div>
+} @else if (settings(); as current) {
+  <!-- 1. Leads and opportunities -->
+  <app-settings-section
+    icon="tablerLayoutKanban"
+    tile="bg-icon-navy"
+    [title]="'general.sections.modules.title' | transloco"
+    [description]="'general.sections.modules.desc' | transloco"
+  >
+    <div class="flex flex-col gap-8">
+      <div class="flex flex-col gap-2">
+        <h3 class="text-12 leading-18 font-medium text-text">{{ 'general.modules.defaultTitle' | transloco }}</h3>
+        <p class="text-11 leading-16 text-text-muted">{{ 'general.modules.defaultHelp' | transloco }}</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+        <div class="flex flex-col gap-8">
+          <ui-field
+            size="bare"
+            [label]="'general.modules.leads' | transloco"
+            [for]="uid + '-leads-default'"
+            [hint]="'general.modules.leadsHelp' | transloco"
+          >
+            <div class="flex items-start gap-8">
+              <ui-switch
+                [id]="uid + '-leads-default'"
+                [label]="'general.modules.leads' | transloco"
+                [describedBy]="uid + '-leads-default-hint'"
+                [checked]="current.leadsEnabled"
+                [disabled]="!canManage || moduleSaving().leads"
+                (checkedChange)="toggleModuleDefault('leads', $event)"
+              />
+              <span [id]="uid + '-leads-default-help'" class="min-w-0 flex-1 text-11 leading-16 text-text-muted">
+                {{ 'general.modules.leadsHelp' | transloco }}
+              </span>
+            </div>
+          </ui-field>
+
+          @if (crmModules.leadsAnywhere()) {
+            <div class="ps-tree-indent">
+              <ui-field
+                size="bare"
+                [label]="'general.modules.requireQualified' | transloco"
+                [for]="uid + '-require-qualified'"
+                [hint]="'general.modules.requireQualifiedHelp' | transloco"
+              >
+                <div class="flex items-start gap-8">
+                  <ui-switch
+                    [id]="uid + '-require-qualified'"
+                    [label]="'general.modules.requireQualified' | transloco"
+                    [describedBy]="uid + '-require-qualified-hint'"
+                    [checked]="current.requireQualifiedStageForConversion"
+                    [disabled]="!canManage || conversionSaving()"
+                    (checkedChange)="toggleQualifiedRequired($event)"
+                  />
+                  <span [id]="uid + '-require-qualified-help'" class="min-w-0 flex-1 text-11 leading-16 text-text-muted">
+                    {{ 'general.modules.requireQualifiedHelp' | transloco }}
+                  </span>
+                </div>
+              </ui-field>
+            </div>
+          }
+        </div>
+
+        <div class="flex flex-col gap-8">
+          <ui-field
+            size="bare"
+            [label]="'general.modules.opportunities' | transloco"
+            [for]="uid + '-opportunities-default'"
+            [hint]="'general.modules.opportunitiesHelp' | transloco"
+          >
+            <div class="flex items-start gap-8">
+              <ui-switch
+                [id]="uid + '-opportunities-default'"
+                [label]="'general.modules.opportunities' | transloco"
+                [describedBy]="uid + '-opportunities-default-hint'"
+                [checked]="current.opportunitiesEnabled"
+                [disabled]="!canManage || moduleSaving().opportunities"
+                (checkedChange)="toggleModuleDefault('opportunities', $event)"
+              />
+              <span [id]="uid + '-opportunities-default-help'" class="min-w-0 flex-1 text-11 leading-16 text-text-muted">
+                {{ 'general.modules.opportunitiesHelp' | transloco }}
+              </span>
+            </div>
+          </ui-field>
+
+          @if (crmModules.opportunitiesAnywhere()) {
+            <div class="flex flex-wrap items-center gap-8 ps-tree-indent">
+              <span class="text-12 leading-18 text-text-muted">{{ 'general.modules.defaultPipeline' | transloco }}</span>
+              <span class="min-w-0 truncate text-12 leading-18 font-medium text-text">{{ defaultPipelineName() }}</span>
+              <a routerLink="/crm/settings/pipelines" uiButton variant="ghost" size="small">
+                {{ 'general.modules.managePipelines' | transloco }}
+              </a>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="my-8 border-t border-border"></div>
+
+      <div class="flex flex-col gap-2">
+        <h3 class="text-12 leading-18 font-medium text-text">{{ 'general.modules.companiesTitle' | transloco }}</h3>
+        <p class="text-11 leading-16 text-text-muted">{{ 'general.modules.companiesHelp' | transloco }}</p>
+      </div>
+
+      @if (modulesLoading() && !crmModules.state()) {
+        <div class="flex flex-col gap-6" aria-busy="true">
+          @for (row of [0, 1, 2]; track row) {
+            <div class="grid h-table-row grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center rounded-10 border border-border bg-surface px-10 shadow-card">
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </div>
+          }
+        </div>
+      } @else if (modulesFailed() || !crmModules.state()) {
+        <div class="flex items-center gap-8 py-4" role="alert">
+          <span class="text-12 leading-18 text-text-muted">{{ 'general.modules.loadFailed' | transloco }}</span>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retryModules()">
+            {{ 'general.modules.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (companies().length === 0) {
+        <p class="text-12 leading-18 text-text-muted">{{ 'general.modules.noCompanies' | transloco }}</p>
+      } @else {
+        @if (showCompanySearch()) {
+          <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+            <ui-field
+              [label]="'general.modules.search' | transloco"
+              [for]="uid + '-company-search'"
+              [hint]="'general.modules.searchHint' | transloco"
+            >
+              <input
+                [id]="uid + '-company-search'"
+                type="search"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="companySearch()"
+                (input)="onCompanySearchInput($event)"
+              />
+              @if (companySearch()) {
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'settings.common.clearSearch' | transloco"
+                  (click)="companySearch.set('')"
+                >
+                  <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                </button>
+              }
+            </ui-field>
+          </div>
+        }
+
+        <div class="overflow-x-auto pb-4">
+          <div role="table" class="min-w-bp-form-1col" [attr.aria-label]="'general.modules.companiesTitle' | transloco">
+            <div
+              role="row"
+              class="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center px-10 text-11 leading-16 font-medium text-text-muted"
+            >
+              <span role="columnheader" class="truncate py-4">{{ 'general.modules.colCompany' | transloco }}</span>
+
+              <span role="columnheader" class="flex min-w-0 items-center gap-4 border-s border-border px-10 py-4">
+                <span class="truncate">{{ 'general.modules.colLeads' | transloco }}</span>
+                <span
+                  #leadsTipTrigger
+                  class="relative inline-flex shrink-0 items-center text-accent"
+                  (mouseenter)="placeHeaderTooltip('leads', leadsTipTrigger)"
+                  (mouseleave)="hideHeaderTooltip()"
+                >
+                  <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+                  <span
+                    #leadsHeaderTip
+                    [id]="uid + '-col-leads-hint'"
+                    role="tooltip"
+                    class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                    [class]="activeHeaderTip() === 'leads' ? 'visible' : 'invisible'"
+                    [style.top.px]="headerTipPlace().top"
+                    [style.inset-inline-start.px]="headerTipPlace().start"
+                  >
+                    {{ 'general.modules.colHint' | transloco }}
+                  </span>
+                </span>
+              </span>
+
+              <span role="columnheader" class="flex min-w-0 items-center gap-4 border-s border-border px-10 py-4">
+                <span class="truncate">{{ 'general.modules.colOpportunities' | transloco }}</span>
+                <span
+                  #oppsTipTrigger
+                  class="relative inline-flex shrink-0 items-center text-accent"
+                  (mouseenter)="placeHeaderTooltip('opportunities', oppsTipTrigger)"
+                  (mouseleave)="hideHeaderTooltip()"
+                >
+                  <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+                  <span
+                    #opportunitiesHeaderTip
+                    [id]="uid + '-col-opportunities-hint'"
+                    role="tooltip"
+                    class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                    [class]="activeHeaderTip() === 'opportunities' ? 'visible' : 'invisible'"
+                    [style.top.px]="headerTipPlace().top"
+                    [style.inset-inline-start.px]="headerTipPlace().start"
+                  >
+                    {{ 'general.modules.colHint' | transloco }}
+                  </span>
+                </span>
+              </span>
+            </div>
+
+            @for (company of filteredCompanies(); track company.companyId) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] rounded-10 border border-border bg-surface text-12 leading-18 text-text shadow-card"
+              >
+                <span role="cell" class="flex min-w-0 items-center gap-6 px-10">
+                  <span class="truncate text-12 font-medium text-text" [title]="company.name">{{ company.name }}</span>
+                  <span dir="ltr" class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-11 font-medium text-text-muted">
+                    {{ company.code }}
+                  </span>
+                </span>
+
+                <!-- Leads cell -->
+                @let leadsSaving = isCellSaving(company.companyId, 'leads');
+                <span
+                  role="cell"
+                  class="flex min-w-0 items-center gap-6 border-s border-border px-10 transition-colors duration-fast"
+                  [class.cursor-pointer]="canManage && !leadsSaving"
+                  [class.hover:bg-row-hover]="canManage && !leadsSaving"
+                  [attr.aria-describedby]="uid + '-col-leads-hint'"
+                  (click)="canManage && !leadsSaving && onCompanyCellClick($event)"
+                >
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                    [class]="company.effective.leadsEnabled ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+                  >
+                    {{ (company.effective.leadsEnabled ? 'general.modules.on' : 'general.modules.off') | transloco }}
+                  </span>
+
+                  @if (company.override.leadsEnabled !== null) {
+                    <span class="inline-flex min-w-0 items-center gap-4 text-11 leading-16 text-text">
+                      <span class="size-radio-dot shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
+                      <span class="truncate">{{ 'general.modules.setHere' | transloco }}</span>
+                    </span>
+                  } @else {
+                    <span class="min-w-0 truncate text-11 leading-16 text-text-muted">
+                      {{ 'general.modules.fromDefault' | transloco }}
+                    </span>
+                  }
+
+                  @if (leadsSaving) {
+                    <ng-icon name="tablerLoader2" size="14" class="ms-auto shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+                  } @else if (canManage) {
+                    <ui-menu
+                      class="ms-auto shrink-0"
+                      variant="icon"
+                      [items]="companyCellMenus()[company.companyId].leads"
+                      [label]="companyCellMenuLabel(company, 'leads')"
+                      (selected)="onCompanyModuleSelected(company, 'leads', $event)"
+                    >
+                      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                    </ui-menu>
+                  }
+                </span>
+
+                <!-- Opportunities cell -->
+                @let oppsSaving = isCellSaving(company.companyId, 'opportunities');
+                <span
+                  role="cell"
+                  class="flex min-w-0 items-center gap-6 border-s border-border px-10 transition-colors duration-fast"
+                  [class.cursor-pointer]="canManage && !oppsSaving"
+                  [class.hover:bg-row-hover]="canManage && !oppsSaving"
+                  [attr.aria-describedby]="uid + '-col-opportunities-hint'"
+                  (click)="canManage && !oppsSaving && onCompanyCellClick($event)"
+                >
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                    [class]="company.effective.opportunitiesEnabled ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+                  >
+                    {{ (company.effective.opportunitiesEnabled ? 'general.modules.on' : 'general.modules.off') | transloco }}
+                  </span>
+
+                  @if (company.override.opportunitiesEnabled !== null) {
+                    <span class="inline-flex min-w-0 items-center gap-4 text-11 leading-16 text-text">
+                      <span class="size-radio-dot shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
+                      <span class="truncate">{{ 'general.modules.setHere' | transloco }}</span>
+                    </span>
+                  } @else {
+                    <span class="min-w-0 truncate text-11 leading-16 text-text-muted">
+                      {{ 'general.modules.fromDefault' | transloco }}
+                    </span>
+                  }
+
+                  @if (oppsSaving) {
+                    <ng-icon name="tablerLoader2" size="14" class="ms-auto shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+                  } @else if (canManage) {
+                    <ui-menu
+                      class="ms-auto shrink-0"
+                      variant="icon"
+                      [items]="companyCellMenus()[company.companyId].opportunities"
+                      [label]="companyCellMenuLabel(company, 'opportunities')"
+                      (selected)="onCompanyModuleSelected(company, 'opportunities', $event)"
+                    >
+                      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                    </ui-menu>
+                  }
+                </span>
+              </div>
+            } @empty {
+              <p class="p-16 text-center text-12 text-text-muted">{{ 'settings.common.noResults' | transloco }}</p>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </app-settings-section>
+
+  <!-- 2. Email -->
+  <app-settings-section
+    icon="tablerMail"
+    tile="bg-icon-blue"
+    [title]="'general.sections.email.title' | transloco"
+    [description]="'general.sections.email.desc' | transloco"
+  >
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+      <div class="flex items-start gap-8">
+        <div class="min-w-0 flex-1">
+          <ui-field
+            [label]="'general.email.retention' | transloco"
+            [for]="uid + '-retention-days'"
+            [required]="true"
+            [hint]="'general.email.retentionHint' | transloco"
+            [error]="(retentionTouched() || retentionDirty()) && retentionErrorKey() ? ('general.validation.' + retentionErrorKey() | transloco: { min: limits.retentionMin, max: limits.retentionMax }) : null"
+          >
+            <input
+              [id]="uid + '-retention-days'"
+              type="text"
+              inputmode="numeric"
+              dir="ltr"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [value]="retentionInput()"
+              [readonly]="!canManage"
+              [disabled]="retentionSaving()"
+              [attr.aria-invalid]="(retentionTouched() || retentionDirty()) && retentionErrorKey() ? 'true' : null"
+              (input)="onRetentionInput($event)"
+              (blur)="retentionTouched.set(true)"
+            />
+            <span class="shrink-0 text-12 text-text-muted">{{ 'general.email.days' | transloco }}</span>
+          </ui-field>
+        </div>
+
+        @if (canManage) {
+          <div class="flex shrink-0 flex-col">
+            <span class="mb-2 h-label" aria-hidden="true"></span>
+            <button
+              type="button"
+              uiButton
+              variant="primary"
+              size="small"
+              [loading]="retentionSaving()"
+              [disabled]="!retentionDirty() || !retentionValid() || retentionSaving()"
+              (click)="saveRetention()"
+            >
+              {{ 'settings.common.save' | transloco }}
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </app-settings-section>
+
+  <!-- 3. Telephony -->
+  <app-settings-section
+    icon="tablerPhoneCall"
+    tile="bg-icon-teal"
+    [title]="'general.sections.telephony.title' | transloco"
+    [description]="'general.sections.telephony.desc' | transloco"
+  >
+    <div class="flex flex-col gap-8">
+      <div class="flex flex-wrap items-center justify-between gap-8">
+        @if (phoneSummaryLoading() && !phoneSummary() && !phoneSummaryNotSubscribed() && !phoneSummaryFailed()) {
+          <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft" aria-busy="true"></span>
+        } @else if (phoneSummaryNotSubscribed()) {
+          <span class="inline-flex h-badge w-fit items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-text-muted">
+            {{ 'general.telephony.notSubscribed' | transloco }}
+          </span>
+        } @else if (phoneSummaryFailed() || !phoneSummary()) {
+          <div class="flex flex-wrap items-center gap-8" role="alert">
+            <span class="text-12 leading-18 text-text-muted">{{ 'general.telephony.summaryFailed' | transloco }}</span>
+            <button type="button" uiButton variant="ghost" size="small" (click)="retryPhoneSummary()">
+              {{ 'settings.common.retry' | transloco }}
+            </button>
+          </div>
+        } @else if (phoneSummary(); as summary) {
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'general.telephony.summary' | transloco: { servers: summary.servers, occupied: summary.occupied, allowed: summary.allowed } }}
+          </p>
+        }
+
+        @if (canReadPhoneSettings || (canReadPhoneExtensions && canOpenStaffUsers())) {
+          <div class="flex flex-wrap items-center gap-8">
+            @if (canReadPhoneSettings) {
+              <a routerLink="/workspace/settings/phone" uiButton variant="secondary" size="small">
+                {{ 'general.telephony.manageServers' | transloco }}
+              </a>
+            }
+            @if (canReadPhoneExtensions && canOpenStaffUsers()) {
+              <a routerLink="/workspace/staff/users" uiButton variant="secondary" size="small">
+                {{ 'general.telephony.giveUsersPhone' | transloco }}
+              </a>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="border-t border-border"></div>
+
+      <div class="flex flex-col gap-8">
+        <ui-field
+          size="bare"
+          [label]="'general.telephony.clickToCall' | transloco"
+          [for]="uid + '-click-to-call'"
+          [hint]="'general.telephony.clickToCallHint' | transloco"
+        >
+          <ui-switch
+            [id]="uid + '-click-to-call'"
+            [label]="'general.telephony.clickToCall' | transloco"
+            [describedBy]="uid + '-click-to-call-hint'"
+            [checked]="current.clickToCallEnabled"
+            [disabled]="!canManage || clickToCallSaving()"
+            (checkedChange)="toggleClickToCall($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'general.telephony.logCalls' | transloco"
+          [for]="uid + '-log-calls'"
+          [hint]="'general.telephony.logCallsHint' | transloco"
+        >
+          <ui-switch
+            [id]="uid + '-log-calls'"
+            [label]="'general.telephony.logCalls' | transloco"
+            [describedBy]="uid + '-log-calls-hint'"
+            [checked]="current.logCallsAsActivities"
+            [disabled]="!canManage || logCallsSaving()"
+            (checkedChange)="toggleLogCalls($event)"
+          />
+        </ui-field>
+      </div>
+    </div>
+  </app-settings-section>
+
+  <!-- 4. Reports -->
+  <app-settings-section
+    icon="tablerChartBar"
+    tile="bg-icon-gray"
+    [title]="'general.sections.reports.title' | transloco"
+    [description]="'general.sections.reports.desc' | transloco"
+  >
+    <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-2">
+      <ui-field
+        [label]="'general.reports.timeZone' | transloco"
+        [for]="uid + '-analytics-tz'"
+        [hint]="'general.reports.timeZoneHint' | transloco"
+      >
+        <input
+          [id]="uid + '-analytics-tz'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+          [value]="current.analyticsTimeZone"
+        />
+      </ui-field>
+    </div>
+  </app-settings-section>
+}
+
+<ui-confirm-dialog
+  #confirmOffDialog
+  tone="warning"
+  [title]="confirmOffTitle()"
+  [text]="confirmOffText()"
+  [confirmLabel]="'general.modules.turnOff' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #retentionConflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'general.retention.conflict.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!retentionConflictBusy()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'general.retention.conflict.text' | transloco }}</p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="retentionConflictBusy()"
+    (click)="reloadRetention()"
+  >
+    {{ 'general.conflict.reload' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="retentionConflictBusy()"
+    (click)="saveRetentionOverStale()"
+  >
+    {{ 'general.conflict.keepMine' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-modal
+  #modulesConflictModal
+  size="confirm"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'general.modules.conflict.title' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!modulesConflictBusy()"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'general.modules.conflict.text' | transloco }}</p>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="primary"
+    [loading]="modulesConflictBusy()"
+    (click)="reloadModulesConflict()"
+  >
+    {{ 'general.conflict.reload' | transloco }}
+  </button>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="modulesConflictBusy()"
+    (click)="keepCompanyModuleOverStale()"
+  >
+    {{ 'general.conflict.keepMine' | transloco }}
+  </button>
+</ui-modal>

@@ -1,0 +1,198 @@
+{
+  "summary": {
+    "on": "Phone is on · {{servers}} servers · Phone seats {{occupied}} of {{allowed}}",
+    "off": "Phone is off until a server is enabled"
+  },
+  "toolbar": {
+    "add": "Add server",
+    "limitHint": "Up to 10 servers",
+    "reload": "Reload"
+  },
+  "table": {
+    "ariaLabel": "Phone servers",
+    "dragHandle": "Reorder",
+    "order": "Order",
+    "name": "Name",
+    "address": "Address",
+    "protocol": "Protocol",
+    "ice": "ICE",
+    "enabled": "Enabled",
+    "enabledFor": "Enable {{name}}",
+    "enabledHint": "When on, user phones can register and place calls through this server.",
+    "actions": "Actions",
+    "secure": "Secure",
+    "notSecure": "Not secure",
+    "iceOff": "Off",
+    "hint": "The phone tries servers in this order and moves to the next one if a server does not answer."
+  },
+  "actions": {
+    "open": "Open",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "delete": "Delete"
+  },
+  "placeholder": {
+    "name": "New server"
+  },
+  "states": {
+    "emptyTitle": "No phone servers yet",
+    "emptyLine": "Add a SIP server to turn on the web phone for your workspace.",
+    "loadFailed": "Could not load phone servers.",
+    "retry": "Retry",
+    "notPurchasedTitle": "Phone is not part of your subscription",
+    "notPurchasedLine": "Enable the Phone add-on in your subscription to configure SIP servers.",
+    "viewPlans": "View plans",
+    "provisioningTitle": "Phone is being set up for your workspace",
+    "provisioningLine": "Your phone service is still provisioning. Try again in a moment."
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "text": "Users who have this server in their list lose it. Their phones use the next server.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  },
+  "modal": {
+    "tabsLabel": "Server settings",
+    "tabs": {
+      "connection": "Connection",
+      "advanced": "Advanced",
+      "ice": "ICE"
+    },
+    "groups": {
+      "identity": "SIP identity and routing",
+      "registration": "Registration",
+      "failover": "Failover defaults",
+      "diagnostics": "Diagnostics"
+    },
+    "fields": {
+      "name": "Name",
+      "nameHint": "A short label users and administrators recognize.",
+      "protocol": "Protocol",
+      "protocolHint": "Changes the WebSocket address between secure wss and unencrypted ws.",
+      "protocolWss": "Secure (wss)",
+      "protocolWs": "Not secure (ws)",
+      "websocketUrl": "WebSocket URL",
+      "websocketUrlHint": "The address the browser connects to, for example wss://pbx.example.com:8089/ws.",
+      "sipDomain": "SIP domain",
+      "sipDomainHint": "The domain users register under, for example pbx.example.com.",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "enabledHint": "When on, user phones can register and place calls through this server.",
+      "realm": "Realm",
+      "realmHint": "The SIP authentication realm; leave empty to use the SIP domain.",
+      "fromDomain": "From domain",
+      "fromDomainHint": "The domain sent in the SIP From header; leave empty to use the SIP domain.",
+      "registrarServer": "Registrar server",
+      "registrarServerHint": "The sip: URI used for SIP REGISTER requests when different from the domain.",
+      "outboundProxy": "Outbound proxy",
+      "outboundProxyHint": "The sip: URI of an outbound proxy to route SIP messages through.",
+      "contactUri": "Contact URI",
+      "contactUriHint": "An explicit SIP Contact URI if your PBX requires a fixed contact address.",
+      "defaultCallerId": "Default caller ID",
+      "defaultCallerIdHint": "The fallback outbound number when a user has no caller ID set.",
+      "registerExpires": "Registration expiry",
+      "registerExpiresHint": "How often the phone refreshes its registration, in seconds (30 to 86400).",
+      "sessionTimers": "Session timers",
+      "sessionTimersHint": "Keeps active calls alive and detects dropped calls using SIP session timers.",
+      "defaultTimeoutSeconds": "Time per server",
+      "defaultTimeoutSecondsHint": "Seconds to wait for this server before trying the next one (3 to 120; empty uses 10).",
+      "defaultMaxRetries": "Attempts per server",
+      "defaultMaxRetriesHint": "How many times to retry this server before moving on (0 to 10; empty uses 2).",
+      "traceSip": "Trace SIP in console",
+      "traceSipHint": "Prints raw SIP messages in the browser developer console for troubleshooting.",
+      "allowInvalidTlsCertificate": "Allow invalid TLS certificate",
+      "allowInvalidTlsCertificateHint": "Flags self-signed servers; browsers still require a trusted certificate for wss:// connections.",
+      "iceEnabled": "Use ICE servers",
+      "iceEnabledHint": "Enables STUN and TURN servers for NAT traversal during media setup.",
+      "iceTransportPolicy": "ICE transport",
+      "iceTransportPolicyHint": "Relay only sends all media through a TURN server.",
+      "iceAll": "All",
+      "iceRelay": "Relay only"
+    },
+    "ice": {
+      "empty": "No ICE servers added yet.",
+      "add": "Add ICE server",
+      "kind": "Kind",
+      "kindHint": "Choose STUN for address discovery or TURN to relay media.",
+      "stun": "STUN",
+      "turn": "TURN",
+      "enabled": "Enabled",
+      "enabledHint": "Include this ICE server when establishing call media.",
+      "remove": "Remove",
+      "urls": "URLs",
+      "urlsHint": "Enter one STUN or TURN URL per line, starting with stun:, stuns:, turn:, or turns:.",
+      "username": "Username",
+      "usernameHint": "The TURN account username paired with the credential.",
+      "credential": "Credential",
+      "credentialHint": "Stored write-only on the server; leave blank to keep the existing credential.",
+      "set": "Set",
+      "notSet": "Not set",
+      "change": "Change",
+      "clear": "Clear",
+      "keepCurrent": "Keep current",
+      "show": "Show credential",
+      "hide": "Hide credential"
+    },
+    "footer": {
+      "save": "Save",
+      "undo": "Undo changes",
+      "unsaved": "Unsaved changes",
+      "cancel": "Cancel",
+      "close": "Close",
+      "delete": "Delete"
+    },
+    "discard": {
+      "title": "Discard unsaved changes?",
+      "text": "You have unsaved changes to this phone server. Discard them?",
+      "confirm": "Discard",
+      "cancel": "Keep editing"
+    },
+    "conflict": {
+      "title": "Server settings changed",
+      "text": "Someone else updated this server while you were editing. Reload the latest version or keep your changes.",
+      "reload": "Reload",
+      "keepMine": "Keep my changes"
+    }
+  },
+  "validation": {
+    "nameRequired": "Server name is required",
+    "nameMax": "Up to {{max}} characters",
+    "websocketUrlRequired": "WebSocket URL is required",
+    "websocketUrlPattern": "Must start with ws:// or wss://",
+    "sipDomainRequired": "SIP domain is required",
+    "sipDomainPattern": "Enter a valid domain (letters, digits, dots, optional :port)",
+    "sipUriPattern": "Must start with sip: or sips:",
+    "contactUriPattern": "Cannot contain spaces",
+    "callerIdPattern": "Digits and a leading + only",
+    "registerExpiresRange": "Must be a whole number from 30 to 86400",
+    "timeoutRange": "Must be a whole number from 3 to 120",
+    "retriesRange": "Must be a whole number from 0 to 10",
+    "iceUrlsRequired": "Enter at least one ICE URL",
+    "iceUrlsPattern": "Each line must start with stun:, stuns:, turn:, or turns:",
+    "turnUsernameRequired": "Username is required when a credential is set",
+    "turnCredentialRequired": "Credential is required when a username is set",
+    "stunNoAuth": "STUN servers cannot have a username or credential",
+    "relayWithoutTurn": "Relay only needs at least one enabled TURN server."
+  },
+  "toasts": {
+    "saved": "Phone server saved",
+    "deleted": "Phone server deleted",
+    "reordered": "Server order updated",
+    "enabled": "Server enabled",
+    "disabled": "Server disabled",
+    "iceEnabled": "ICE servers enabled",
+    "iceDisabled": "ICE servers disabled"
+  },
+  "errors": {
+    "WEBPHONE_SERVER_NOT_FOUND": "This phone server no longer exists. Reload the list.",
+    "WEBPHONE_SERVER_LIMIT_REACHED": "You can configure up to 10 phone servers.",
+    "WEBPHONE_SERVER_ORDER_INVALID": "Could not update the server order. Reload and try again.",
+    "WEBPHONE_RELAY_WITHOUT_TURN": "Relay only needs at least one enabled TURN server.",
+    "WEBPHONE_ICE_SERVER_NOT_FOUND": "An ICE entry no longer exists. Reload and try again.",
+    "WEBPHONE_MODULE_NOT_PURCHASED": "Phone is not part of your subscription.",
+    "WEBPHONE_MODULE_INACTIVE": "Your Phone subscription is suspended. Changes are paused.",
+    "WEBPHONE_PROVISIONING_PENDING": "Phone is still being set up for your workspace.",
+    "stillProcessing": "Your previous change is still being processed. Wait a moment, then try again.",
+    "generic": "Something went wrong. Try again."
+  }
+}

@@ -1,0 +1,110 @@
+<div class="overflow-x-auto pb-4">
+  <div
+    role="table"
+    class="min-w-doc-table-min"
+    [attr.aria-label]="'nav.pages.trade.foundation.units' | transloco"
+    [attr.aria-busy]="loading()"
+  >
+    <div
+      role="row"
+      class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+      [class]="gridColumns()"
+    >
+      <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+        {{ 'tradeUnits.cols.code' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeUnits.cols.name' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeUnits.cols.nameEn' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeUnits.cols.nameAr' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeUnits.cols.status' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeUnits.cols.updated' | transloco }}
+      </span>
+      @if (canManage()) {
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'tradeUnits.cols.actions' | transloco }}</span>
+        </span>
+      }
+    </div>
+
+    @if (loading()) {
+      @for (row of skeletonRows; track row) {
+        <div
+          role="row"
+          aria-hidden="true"
+          class="mt-6 h-table-row motion-safe:animate-pulse rounded-8 bg-neutral-soft"
+        ></div>
+      }
+    } @else {
+      @for (unit of units(); track unit.id) {
+        <div
+          role="row"
+          tabindex="0"
+          [attr.aria-label]="currentName(unit) + ' ' + unit.code"
+          class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="gridColumns()"
+          (click)="openUnit.emit(unit)"
+          (keydown)="onRowKeydown($event, unit)"
+        >
+          <span role="cell" class="flex min-w-0 items-center px-10">
+            <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums" [title]="unit.code">
+              {{ unit.code }}
+            </bdi>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span dir="auto" class="truncate text-14 leading-20 text-text" [title]="currentName(unit)">
+              {{ currentName(unit) }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span dir="ltr" class="truncate text-14 leading-20 text-text" [title]="englishName(unit)">
+              {{ englishName(unit) }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span dir="rtl" class="truncate text-14 leading-20 text-text" [title]="arabicName(unit)">
+              {{ arabicName(unit) }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span [class]="statusBadgeClass(unit.status)">
+              {{ statusLabelKey(unit.status) | transloco }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <bdi class="truncate text-12 leading-18 text-text-muted tabular-nums">
+              {{ formattedDate(unit.updatedAt) }}
+            </bdi>
+          </span>
+
+          @if (canManage()) {
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border"
+              (click)="$event.stopPropagation()"
+            >
+              <ui-actions-menu
+                [items]="rowActions(unit)"
+                [label]="'tradeUnits.cols.actions' | transloco"
+                (selected)="onAction(unit, $event)"
+              />
+            </span>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>

@@ -1,0 +1,447 @@
+<app-bulk-run-modal
+  #formModal
+  size="wide"
+  icon="tablerCalendarPlus"
+  tile="bg-icon-teal"
+  [title]="'bulkAct.title' | transloco"
+  [count]="rows().length"
+  [summary]="'bulkAct.leads' | transloco: { n: rows().length }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="!submitBlocked()"
+  [dismissable]="!resolving() && !submitting()"
+  [closeOnCancel]="false"
+  [submitLabel]="'bulkAct.go' | transloco: { n: rows().length }"
+  [cancelLabel]="'bulkAct.cancel' | transloco"
+  (submit)="submit()"
+  (cancel)="requestClose()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      <!-- Section 1: Activity -->
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [label]="'bulkAct.type' | transloco"
+          [hint]="'bulkAct.hints.type' | transloco"
+          [required]="true"
+        >
+          <div
+            role="radiogroup"
+            [attr.aria-label]="'bulkAct.type' | transloco"
+            class="grid grid-cols-7 gap-6"
+          >
+            @for (itemType of activityTypes; track itemType; let index = $index) {
+              <button
+                #typeBtn
+                type="button"
+                role="radio"
+                class="flex cursor-pointer flex-col items-center gap-4 rounded-8 border px-2 py-6 text-center text-11 leading-16 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  type() === itemType
+                    ? 'border-brand bg-brand-soft font-medium text-on-brand-soft'
+                    : 'border-border bg-surface text-text hover:bg-row-hover'
+                "
+                [attr.aria-checked]="type() === itemType"
+                [tabIndex]="type() === itemType ? 0 : -1"
+                [title]="'bulkAct.types.' + itemType | transloco"
+                (click)="setType(itemType)"
+                (keydown)="onTypeKeydown($event, index)"
+              >
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                  [class]="typeLook[itemType].tile"
+                  aria-hidden="true"
+                >
+                  <ng-icon [name]="typeLook[itemType].icon" size="14" />
+                </span>
+                <span class="max-w-full truncate">{{ 'bulkAct.types.' + itemType | transloco }}</span>
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          [label]="'bulkAct.subject' | transloco"
+          [for]="uid + '-subject'"
+          [hint]="'bulkAct.hints.subject' | transloco"
+          [required]="true"
+          [count]="subjectCount()"
+          [max]="limits.subject"
+          [error]="subjectError()"
+        >
+          <input
+            [id]="uid + '-subject'"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'bulkAct.subjectPlaceholder' | transloco"
+            [value]="subject()"
+            [attr.aria-invalid]="subjectError() ? 'true' : null"
+            (input)="onTextInput('subject', $event)"
+            (blur)="markTouched('subject')"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'bulkAct.priority' | transloco"
+          [for]="uid + '-priority'"
+          [hint]="'bulkAct.hints.priority' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-priority'"
+            [options]="priorityOptions()"
+            [value]="priority()"
+            [label]="'bulkAct.priority' | transloco"
+            (valueChange)="priority.set($event)"
+          />
+        </ui-field>
+      </div>
+
+      @if (typeFields().direction) {
+        <div class="col-span-1">
+          <ui-field
+            size="bare"
+            [label]="'bulkAct.direction' | transloco"
+            [for]="uid + '-direction'"
+            [hint]="'bulkAct.hints.direction' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-direction'"
+              [options]="directionOptions()"
+              [value]="direction()"
+              [label]="'bulkAct.direction' | transloco"
+              (valueChange)="direction.set($event)"
+            />
+          </ui-field>
+        </div>
+      }
+
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [label]="'bulkAct.duration' | transloco"
+          [for]="uid + '-duration'"
+          [hint]="'bulkAct.hints.duration' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-duration'"
+            [options]="durationOptions()"
+            [value]="duration()"
+            [label]="'bulkAct.duration' | transloco"
+            (valueChange)="duration.set($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div [class]="typeFields().direction ? 'col-span-1' : 'col-span-2'">
+        <ui-field
+          size="bare"
+          [label]="'bulkAct.reminder' | transloco"
+          [for]="uid + '-reminder'"
+          [hint]="'bulkAct.hints.reminder' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-reminder'"
+            [options]="reminderOptions()"
+            [value]="reminder()"
+            [label]="'bulkAct.reminder' | transloco"
+            (valueChange)="reminder.set($event)"
+          />
+        </ui-field>
+      </div>
+
+      @if (typeFields().location) {
+        <div [class]="typeFields().meetingUrl ? 'col-span-1' : 'col-span-3'">
+          <ui-field
+            [label]="'bulkAct.location' | transloco"
+            [for]="uid + '-location'"
+            [hint]="'bulkAct.hints.location' | transloco"
+            [count]="locationCount()"
+            [max]="limits.location"
+            [error]="locationError()"
+          >
+            <input
+              [id]="uid + '-location'"
+              type="text"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [value]="location()"
+              [attr.aria-invalid]="locationError() ? 'true' : null"
+              (input)="onTextInput('location', $event)"
+              (blur)="markTouched('location')"
+            />
+          </ui-field>
+        </div>
+      }
+
+      @if (typeFields().meetingUrl) {
+        <div [class]="typeFields().location ? 'col-span-2' : 'col-span-3'">
+          <ui-field
+            [label]="'bulkAct.meetingUrl' | transloco"
+            [for]="uid + '-meeting-url'"
+            [hint]="'bulkAct.hints.meetingUrl' | transloco"
+            [error]="meetingUrlError()"
+          >
+            <input
+              [id]="uid + '-meeting-url'"
+              type="url"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [value]="meetingUrl()"
+              [attr.aria-invalid]="meetingUrlError() ? 'true' : null"
+              (input)="onTextInput('meetingUrl', $event)"
+              (blur)="markTouched('meetingUrl')"
+            />
+            @if (meetingLinkValid()) {
+              <ng-icon name="tablerCheck" size="12" class="shrink-0 text-success-text" aria-hidden="true" />
+            }
+          </ui-field>
+        </div>
+      }
+
+      <div class="col-span-3">
+        <ui-field
+          size="multiline"
+          [label]="'bulkAct.description' | transloco"
+          [for]="uid + '-description'"
+          [hint]="'bulkAct.hints.description' | transloco"
+          [count]="descriptionCount()"
+          [max]="limits.description"
+          [error]="descriptionError()"
+        >
+          <textarea
+            [id]="uid + '-description'"
+            rows="2"
+            class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [value]="description()"
+            [attr.aria-invalid]="descriptionError() ? 'true' : null"
+            (input)="onTextInput('description', $event)"
+            (blur)="markTouched('description')"
+          ></textarea>
+        </ui-field>
+      </div>
+
+      <!-- Section 2: Schedule -->
+      <div class="col-span-3 border-t border-border pt-8">
+        <h3 class="text-13 leading-18 font-medium text-text">{{ 'bulkAct.sec.schedule' | transloco }}</h3>
+      </div>
+
+      <div class="col-span-3 flex flex-wrap items-start gap-10">
+        <div class="min-w-0 flex-1">
+          <ui-field
+            size="bare"
+            [label]="'bulkAct.start' | transloco"
+            [for]="uid + '-start-date'"
+            [hint]="'bulkAct.hints.start' | transloco"
+            [required]="true"
+            [error]="startError()"
+          >
+            <div class="flex items-center gap-6">
+              <ui-date-field
+                class="min-w-0 flex-1"
+                [id]="uid + '-start-date'"
+                [ariaLabel]="'bulkAct.start' | transloco"
+                [todayLabel]="todayLabel()"
+                [min]="todayIso()"
+                [value]="startDate()"
+                [invalid]="!!startError()"
+                (valueChange)="onStartDateChange($event)"
+              />
+              <ui-time-field
+                class="shrink-0"
+                [id]="uid + '-start-time'"
+                [ariaLabel]="'bulkAct.start' | transloco"
+                [hourLabel]="'bulkAct.hour' | transloco"
+                [minuteLabel]="'bulkAct.minute' | transloco"
+                [value]="startTime()"
+                [invalid]="!!startError()"
+                (valueChange)="onStartTimeChange($event)"
+              />
+            </div>
+          </ui-field>
+        </div>
+
+        <div class="shrink-0">
+          <ui-field
+            size="bare"
+            [label]="'bulkAct.order' | transloco"
+            [hint]="'bulkAct.hints.order' | transloco"
+          >
+            <ui-segmented
+              [options]="orderOptions()"
+              [label]="'bulkAct.order' | transloco"
+              [value]="order()"
+              (valueChange)="onOrderChange($event)"
+            />
+          </ui-field>
+        </div>
+      </div>
+
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [label]="'bulkAct.gap' | transloco"
+          [for]="gapPreset() === 'custom' ? uid + '-custom-gap' : ''"
+          [hint]="'bulkAct.hints.gap' | transloco"
+          [required]="true"
+          [error]="gapError()"
+        >
+          <div class="flex flex-wrap items-center gap-8">
+            <ui-segmented
+              [options]="gapOptions()"
+              [label]="'bulkAct.gap' | transloco"
+              [value]="gapPreset()"
+              (valueChange)="onGapPresetChange($event)"
+            />
+            @if (gapPreset() === 'custom') {
+              <div
+                class="flex h-field w-preset items-center gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text transition-colors duration-fast"
+                [class]="
+                  gapError()
+                    ? 'border-danger-border ring-2 ring-danger-halo'
+                    : 'border-border-field hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo'
+                "
+              >
+                <input
+                  [id]="uid + '-custom-gap'"
+                  type="number"
+                  min="1"
+                  max="1440"
+                  step="1"
+                  dir="ltr"
+                  placeholder="1–1440"
+                  class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                  [value]="customGap()"
+                  [attr.aria-label]="'bulkAct.gapCustom' | transloco"
+                  [attr.aria-invalid]="gapError() ? 'true' : null"
+                  (input)="onCustomGapInput($event)"
+                  (blur)="markTouched('gap')"
+                />
+              </div>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <div class="col-span-3">
+        <ui-field
+          size="bare"
+          [label]="'bulkAct.assignee' | transloco"
+          [for]="assigneeMode() === 'other' ? uid + '-assignee-person' : ''"
+          [hint]="'bulkAct.hints.assignee' | transloco"
+        >
+          <div class="flex flex-wrap items-center gap-8">
+            <ui-segmented
+              [options]="assigneeModeOptions()"
+              [label]="'bulkAct.assignee' | transloco"
+              [value]="assigneeMode()"
+              (valueChange)="onAssigneeModeChange($event)"
+            />
+            @if (assigneeMode() === 'other') {
+              <ui-dropdown
+                class="min-w-0 flex-1"
+                size="field"
+                [id]="uid + '-assignee-person'"
+                [options]="assigneeDropdownOptions()"
+                [value]="chosenAssigneeId()"
+                [label]="'bulkAct.assigneeOther' | transloco"
+                [disabled]="assigneeDropdownOptions().length === 0"
+                (valueChange)="onChosenAssigneeChange($event)"
+              />
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      @if (assigneeMode() === 'owner') {
+        <div class="col-span-3">
+          <ui-field
+            size="bare"
+            [label]="'bulkAct.perAssignee' | transloco"
+            [for]="uid + '-per-assignee'"
+            [hint]="'bulkAct.hints.perAssignee' | transloco"
+            [hintText]="'bulkAct.perAssigneeHelp' | transloco"
+          >
+            <div class="flex items-center gap-8 py-2">
+              <ui-switch
+                [id]="uid + '-per-assignee'"
+                [label]="'bulkAct.perAssignee' | transloco"
+                [(checked)]="spacePerAssignee"
+              />
+            </div>
+          </ui-field>
+        </div>
+      }
+
+      <!-- Preview -->
+      <div class="col-span-3 flex flex-col gap-6 border-t border-border pt-8">
+        <div class="flex flex-wrap items-baseline justify-between gap-8">
+          <h3 class="text-13 leading-18 font-medium text-text">{{ 'bulkAct.sec.preview' | transloco }}</h3>
+          @if (computedSchedule().items.length > 0) {
+            <span class="text-12 leading-18 text-text-muted">
+              {{ 'bulkAct.summary' | transloco: { first: summaryFirst(), last: summaryLast() } }}
+            </span>
+          }
+        </div>
+
+        @if (computedSchedule().runsPastMidnight) {
+          <p class="flex items-center gap-6 text-12 leading-18 text-warning-text">
+            <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+            <span>{{ 'bulkAct.pastMidnight' | transloco }}</span>
+          </p>
+        }
+
+        @if (noOwnerCount() > 0) {
+          <p class="flex items-center gap-6 text-12 leading-18 text-warning-text">
+            <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+            <span>{{ 'bulkAct.noOwner' | transloco: { n: noOwnerCount() } }}</span>
+          </p>
+        }
+
+        @if (previewRows().length > 0) {
+          <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+            @for (item of previewRows(); track item.row.id) {
+              <div
+                class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface px-8 py-6 text-12 leading-18 shadow-card"
+              >
+                <div class="flex min-w-0 items-center gap-4">
+                  <span class="truncate font-medium text-text">{{ item.row.displayName }}</span>
+                  <span class="shrink-0 text-text-muted" aria-hidden="true">·</span>
+                  <span class="truncate text-text-muted">{{ item.assigneeName }}</span>
+                </div>
+                <span class="shrink-0 whitespace-nowrap text-text-muted tabular-nums">
+                  {{ formatRowWindow(item.dueDate, item.endDate) }}
+                </span>
+              </div>
+            }
+            @if (moreCount() > 0) {
+              <p class="px-2 text-12 leading-18 text-text-muted">
+                {{ 'bulkAct.more' | transloco: { n: moreCount() } }}
+              </p>
+            }
+          </div>
+        }
+      </div>
+    </div>
+</app-bulk-run-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'bulkAct.discard.title' | transloco"
+  [text]="'bulkAct.discard.text' | transloco"
+  [confirmLabel]="'bulkAct.discard.confirm' | transloco"
+  [cancelLabel]="'bulkAct.cancel' | transloco"
+/>

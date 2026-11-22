@@ -1,0 +1,264 @@
+@if (!canRenderContent()) {
+  <app-billing-forbidden />
+} @else if (notFound() && !loading()) {
+  <app-not-found-page />
+} @else if (loadFailed() && !loading()) {
+  <app-billing-failed [correlationId]="correlationId()" (retry)="reload()" />
+} @else if (loading() && !data()) {
+  <div class="mx-auto flex w-full max-w-design flex-col gap-12" aria-busy="true">
+    <div class="flex items-center gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
+      <span class="size-btn shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+      <span class="size-icon-tile shrink-0 animate-pulse rounded-8 bg-neutral-soft"></span>
+      <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft"></span>
+    </div>
+
+    <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <span class="h-skeleton-line w-preset animate-pulse rounded-4 bg-neutral-soft"></span>
+      <div class="grid grid-cols-2 gap-x-10 gap-y-6 desktop:grid-cols-3 wide:grid-cols-4">
+        @for (field of [1, 2, 3, 4, 5, 6]; track field) {
+          <span class="h-field-h-compact animate-pulse rounded-8 bg-neutral-soft"></span>
+        }
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-6">
+      <div class="h-table-head animate-pulse rounded-10 bg-neutral-soft"></div>
+      <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+      <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+    </div>
+  </div>
+} @else if (data(); as doc) {
+  @let inv = doc.invoice;
+  <div class="mx-auto flex w-full max-w-design flex-col gap-12">
+    <header class="flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'bill.common.back' | transloco"
+        [title]="'bill.common.back' | transloco"
+        (click)="goBack()"
+      >
+        <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+
+      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+        <ng-icon name="tablerFileInvoice" size="15" aria-hidden="true" />
+      </span>
+
+      <h1 dir="ltr" class="truncate text-16 leading-24 font-medium text-text tabular-nums">
+        {{ inv.number }}
+      </h1>
+
+      @let badge = statusBadge(inv.status);
+      <span [class]="badge.classes">{{ badge.labelKey | transloco }}</span>
+
+      @let purpose = purposeBadge(inv.purpose);
+      <span [class]="purpose.classes">{{ purpose.labelKey | transloco }}</span>
+
+      <span class="flex-1"></span>
+
+      @if (canPay()) {
+        <button type="button" uiButton (click)="openPayModal()">
+          <ng-icon name="tablerCreditCard" size="15" aria-hidden="true" />
+          <span>{{ 'bill.common.pay' | transloco }}</span>
+        </button>
+      }
+    </header>
+
+    <section class="rounded-10 border border-border bg-surface p-8 shadow-card">
+      <div class="flex items-center gap-8">
+        <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon">
+          <ng-icon name="tablerFileDescription" size="15" aria-hidden="true" />
+        </span>
+        <h2 class="text-13 leading-18 font-medium text-text">
+          {{ 'binv.detail.detailsTitle' | transloco }}
+        </h2>
+      </div>
+
+      <div class="mt-8 grid grid-cols-2 gap-x-10 gap-y-6 desktop:grid-cols-3 wide:grid-cols-4">
+        <ui-field
+          size="bare"
+          [label]="'binv.detail.fields.issued' | transloco"
+          [for]="uid + '-issued'"
+          [hint]="'binv.detail.fields.issuedHint' | transloco"
+        >
+          <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-issued'"
+              type="text"
+              readonly
+              [value]="formatDate(inv.issuedAt)"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'binv.detail.fields.due' | transloco"
+          [for]="uid + '-due'"
+          [hint]="'binv.detail.fields.dueHint' | transloco"
+        >
+          <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12">
+            <input
+              [id]="uid + '-due'"
+              type="text"
+              readonly
+              [value]="formatDate(inv.dueAt)"
+              class="w-full bg-transparent text-12 outline-none"
+              [class]="inv.status === 'OVERDUE' ? 'font-medium text-danger-text' : 'text-text'"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'binv.detail.fields.paidOn' | transloco"
+          [for]="uid + '-paid'"
+          [hint]="'binv.detail.fields.paidOnHint' | transloco"
+        >
+          <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-paid'"
+              type="text"
+              readonly
+              [value]="formatDate(inv.paidAt)"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'binv.detail.fields.periodFrom' | transloco"
+          [for]="uid + '-period-start'"
+          [hint]="'binv.detail.fields.periodFromHint' | transloco"
+        >
+          <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-period-start'"
+              type="text"
+              readonly
+              [value]="formatDate(inv.periodStart)"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'binv.detail.fields.periodTo' | transloco"
+          [for]="uid + '-period-end'"
+          [hint]="'binv.detail.fields.periodToHint' | transloco"
+        >
+          <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-period-end'"
+              type="text"
+              readonly
+              [value]="formatDate(inv.periodEnd)"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [label]="'binv.detail.fields.currency' | transloco"
+          [for]="uid + '-currency'"
+          [hint]="'binv.detail.fields.currencyHint' | transloco"
+        >
+          <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+            <input
+              [id]="uid + '-currency'"
+              type="text"
+              readonly
+              dir="ltr"
+              [value]="inv.currencyCode"
+              class="w-full bg-transparent text-12 text-text outline-none"
+            />
+          </div>
+        </ui-field>
+
+        @if (showSettlementCurrency()) {
+          <ui-field
+            size="bare"
+            [label]="'binv.detail.fields.settlementCurrency' | transloco"
+            [for]="uid + '-settlement-currency'"
+            [hint]="'binv.detail.fields.settlementCurrencyHint' | transloco"
+          >
+            <div class="flex h-field-h-compact w-full items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+              <input
+                [id]="uid + '-settlement-currency'"
+                type="text"
+                readonly
+                dir="ltr"
+                [value]="inv.settlementCurrencyCode"
+                class="w-full bg-transparent text-12 text-text outline-none"
+              />
+            </div>
+          </ui-field>
+        }
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-8">
+      <app-invoice-lines [lines]="doc.lines" [currencyCode]="inv.currencyCode" />
+    </section>
+
+    <div class="flex justify-end">
+      <section class="flex w-full flex-col gap-6 rounded-10 border border-border bg-surface p-10 shadow-card desktop:w-1/3 desktop:min-w-modal-confirm">
+        <div class="flex items-center justify-between gap-8 text-12 leading-18">
+          <span class="text-text-muted">{{ 'binv.detail.totals.subtotal' | transloco }}</span>
+          <span dir="ltr" class="tabular-nums text-text">{{ formatAmount(inv.subtotal, inv.currencyCode) }}</span>
+        </div>
+
+        <div class="flex items-center justify-between gap-8 text-12 leading-18">
+          <span class="text-text-muted">{{ 'binv.detail.totals.tax' | transloco }}</span>
+          <span dir="ltr" class="tabular-nums text-text">{{ formatAmount(inv.taxTotal, inv.currencyCode) }}</span>
+        </div>
+
+        <div class="border-t border-border"></div>
+
+        <div class="flex items-center justify-between gap-8 text-14 leading-20 font-medium text-text">
+          <span>{{ 'binv.detail.totals.total' | transloco }}</span>
+          <span dir="ltr" class="tabular-nums">{{ formatAmount(inv.total, inv.currencyCode) }}</span>
+        </div>
+
+        @if (showSettlementTotals()) {
+          <div class="border-t border-border"></div>
+
+          @if (inv.settlementSubtotalUsd !== null) {
+            <div class="flex items-center justify-between gap-8 text-12 leading-18">
+              <span class="text-text-muted">{{ 'binv.detail.totals.settlementSubtotal' | transloco }}</span>
+              <span dir="ltr" class="tabular-nums text-text">{{ formatUsd(inv.settlementSubtotalUsd) }}</span>
+            </div>
+          }
+
+          @if (inv.settlementTaxTotalUsd !== null) {
+            <div class="flex items-center justify-between gap-8 text-12 leading-18">
+              <span class="text-text-muted">{{ 'binv.detail.totals.settlementTax' | transloco }}</span>
+              <span dir="ltr" class="tabular-nums text-text">{{ formatUsd(inv.settlementTaxTotalUsd) }}</span>
+            </div>
+          }
+
+          @if (inv.settlementTotalUsd !== null) {
+            <div class="flex items-center justify-between gap-8 text-13 leading-18 font-medium text-text">
+              <span>{{ 'binv.detail.totals.settlementTotal' | transloco }}</span>
+              <span dir="ltr" class="tabular-nums">{{ formatUsd(inv.settlementTotalUsd) }}</span>
+            </div>
+          }
+        }
+
+        <div class="border-t border-border"></div>
+
+        <div class="flex items-center justify-between gap-8 text-12 leading-18">
+          <span class="text-text-muted">{{ 'binv.detail.totals.paid' | transloco }}</span>
+          <span dir="ltr" class="font-medium tabular-nums text-text">{{ formatUsd(inv.amountPaidUsd) }}</span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <app-pay-modal (paid)="reload()" (closed)="onPayModalClosed()" />
+}

@@ -1,0 +1,38 @@
+{
+  "grace": {
+    "title": "Too many users for your seats",
+    "text": "Reduce {{module}} to {{capacity}} users by {{date}}, or add seats.",
+    "action": "Choose who keeps a seat"
+  },
+  "over": {
+    "title": "Some users are read-only",
+    "text": "{{n}} {{module}} users are read-only because of the seat limit.",
+    "action": "Manage seats"
+  },
+  "me": {
+    "title": "Read-only access",
+    "text": "Your {{module}} access is read-only because the workspace has more users than seats. Ask the workspace owner."
+  },
+  "close": "Hide",
+  "swap": {
+    "title": "Who keeps a seat",
+    "module": "Application",
+    "moduleHint": "Applications over their seat limit or in a grace period.",
+    "header": "{{module}}: {{used}} users, {{capacity}} seats",
+    "graceUntil": "Grace period ends {{date}}",
+    "since": "Read-only since {{date}}",
+    "haveSeat": "Have a seat",
+    "readOnly": "Read-only",
+    "haveSeatHint": "Choose the user who gives up the seat and becomes read-only.",
+    "readOnlyHint": "Choose the read-only user who gets the seat.",
+    "willBe": "From {{date}}",
+    "go": "Swap",
+    "confirm": "{{keep}} gets the seat, and {{release}} becomes read-only.",
+    "done": "Seats swapped.",
+    "graceDisabled": "Available after the grace period. Remove roles or add seats now.",
+    "help": "During the grace period nobody is read-only yet; choose now who keeps a seat by removing roles, or add seats.",
+    "reduce": "Reduce seats",
+    "empty": "No application is over its seat limit.",
+    "back": "Back to seats"
+  }
+}

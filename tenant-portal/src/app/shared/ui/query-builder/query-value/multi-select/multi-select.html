@@ -1,0 +1,266 @@
+<div
+  #trigger
+  role="combobox"
+  [class]="triggerClasses()"
+  [attr.tabindex]="disabled() ? -1 : 0"
+  aria-haspopup="listbox"
+  [attr.aria-expanded]="open()"
+  [attr.aria-label]="field().label"
+  [attr.aria-disabled]="disabled() ? 'true' : null"
+  [attr.aria-invalid]="invalid() ? 'true' : null"
+  [attr.aria-describedby]="describedBy() || null"
+  (click)="toggle()"
+  (keydown)="onTriggerKeydown($event)"
+>
+  <span class="flex min-w-0 flex-1 flex-wrap items-center gap-4 py-2">
+    @if (visibleChips().length === 0) {
+      <span class="truncate text-text-placeholder">{{ 'qv.chooseValues' | transloco }}</span>
+    } @else {
+      @for (chip of visibleChips(); track chip.value) {
+        @if (isTags()) {
+          @let tagColors = resolveTagColors(chip);
+          @if (tagColors) {
+            <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+            <span
+              class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 px-6 text-11 font-medium"
+              [style.background-color]="tagColors.bg"
+              [style.color]="tagColors.text"
+            >
+              <span class="truncate">{{ chip.label }}</span>
+              @if (!disabled()) {
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'qv.remove' | transloco: { label: chip.label }"
+                  (click)="$event.stopPropagation(); removeValue(chip.value)"
+                >
+                  <ng-icon name="tablerX" size="11" aria-hidden="true" />
+                </button>
+              }
+            </span>
+          } @else {
+            <span
+              class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 px-6 text-11 font-medium"
+              [class]="chip.colorClass || 'bg-neutral-soft text-text'"
+            >
+              <span class="truncate">{{ chip.label }}</span>
+              @if (!disabled()) {
+                <button
+                  type="button"
+                  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'qv.remove' | transloco: { label: chip.label }"
+                  (click)="$event.stopPropagation(); removeValue(chip.value)"
+                >
+                  <ng-icon name="tablerX" size="11" aria-hidden="true" />
+                </button>
+              }
+            </span>
+          }
+        } @else {
+          <span
+            class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 px-6 text-11 font-medium"
+            [class]="disabled() ? 'bg-surface text-text-muted' : 'bg-brand-soft text-on-brand-soft'"
+          >
+            @if (chip.icon) {
+              @if (isIconUrl(chip.icon)) {
+                <img [src]="chip.icon" alt="" class="size-12 shrink-0 rounded-2 object-cover" />
+              } @else {
+                <ng-icon [name]="chip.icon" size="11" class="shrink-0" aria-hidden="true" />
+              }
+            } @else if (chip.colorClass) {
+              <span
+                class="size-8 shrink-0 rounded-full"
+                [class]="isHexColor(chip.colorClass) ? 'border border-border' : chip.colorClass"
+                [style.background-color]="isHexColor(chip.colorClass) ? chip.colorClass : null"
+                aria-hidden="true"
+              ></span>
+            }
+            <span class="truncate">{{ chip.label }}</span>
+            @if (!disabled()) {
+              <button
+                type="button"
+                class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'qv.remove' | transloco: { label: chip.label }"
+                (click)="$event.stopPropagation(); removeValue(chip.value)"
+              >
+                <ng-icon name="tablerX" size="11" aria-hidden="true" />
+              </button>
+            }
+          </span>
+        }
+      }
+
+      @if (overflowCount() > 0) {
+        <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft tabular-nums">
+          {{ 'qv.more' | transloco: { n: overflowCount() } }}
+        </span>
+      }
+    }
+  </span>
+
+  <span class="inline-flex shrink-0 text-text-muted">
+    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+  </span>
+</div>
+
+@if (open()) {
+  <div
+    #popover
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().width"
+    [style.max-height.px]="place().maxHeight"
+    (keydown.escape)="onEscape($event)"
+  >
+    <div class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo-strong">
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #searchEl
+        type="text"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'qv.search' | transloco"
+        [attr.aria-label]="'qv.search' | transloco"
+        [value]="searchTerm()"
+        (input)="onSearchInput($event)"
+        (keydown.escape)="onEscape($event)"
+      />
+      @if (remoteLoading()) {
+        <ng-icon name="tablerLoader2" size="12" class="shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+      }
+    </div>
+
+    <div class="flex shrink-0 items-center justify-between gap-8 border-b border-border px-4 pb-4">
+      <button
+        type="button"
+        class="inline-flex h-btn-h-sm cursor-pointer items-center rounded-6 px-6 text-11 font-medium text-accent outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+        [disabled]="allVisibleOptions().length === 0 || allVisibleSelected()"
+        (click)="selectAll()"
+      >
+        {{ 'qv.selectAll' | transloco }}
+      </button>
+
+      <button
+        type="button"
+        class="inline-flex h-btn-h-sm cursor-pointer items-center rounded-6 px-6 text-11 font-medium text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+        [disabled]="values().length === 0"
+        (click)="clearAll()"
+      >
+        {{ 'qv.clearAll' | transloco }}
+      </button>
+    </div>
+
+    <ul
+      role="listbox"
+      aria-multiselectable="true"
+      class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+      [attr.aria-label]="field().label"
+    >
+      @for (option of visibleSpecials(); track option.value) {
+        @let checked = selectedSet().has(option.value);
+        <li role="option" [attr.aria-selected]="checked">
+          <button
+            type="button"
+            class="flex h-menu-item w-full cursor-pointer items-center gap-8 whitespace-nowrap rounded-6 px-8 text-12 text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="toggleOption(option)"
+          >
+            <span
+              class="inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-4 border-check transition-colors duration-fast"
+              [class]="checked ? 'border-brand bg-brand text-on-brand' : 'border-border-field bg-surface-field'"
+              aria-hidden="true"
+            >
+              @if (checked) {
+                <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+              }
+            </span>
+            @if (option.icon) {
+              @if (isIconUrl(option.icon)) {
+                <img [src]="option.icon" alt="" class="size-16 shrink-0 rounded-2 object-cover" />
+              } @else {
+                <ng-icon [name]="option.icon" size="16" class="shrink-0 text-text-muted" aria-hidden="true" />
+              }
+            } @else if (option.colorClass) {
+              <span
+                class="size-12 shrink-0 rounded-full"
+                [class]="isHexColor(option.colorClass) ? 'border border-border' : option.colorClass"
+                [style.background-color]="isHexColor(option.colorClass) ? option.colorClass : null"
+                aria-hidden="true"
+              ></span>
+            }
+            <span class="min-w-0 truncate text-start">{{ option.label }}</span>
+          </button>
+        </li>
+      }
+
+      @if (showDivider()) {
+        <li role="separator" class="my-2 h-border shrink-0 bg-border"></li>
+      }
+
+      @for (option of visibleRegulars(); track option.value) {
+        @let checked = selectedSet().has(option.value);
+        <li role="option" [attr.aria-selected]="checked">
+          <button
+            type="button"
+            class="flex h-menu-item w-full cursor-pointer items-center gap-8 whitespace-nowrap rounded-6 px-8 text-12 text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="toggleOption(option)"
+          >
+            <span
+              class="inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-4 border-check transition-colors duration-fast"
+              [class]="checked ? 'border-brand bg-brand text-on-brand' : 'border-border-field bg-surface-field'"
+              aria-hidden="true"
+            >
+              @if (checked) {
+                <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+              }
+            </span>
+
+            @if (isTags()) {
+              @let tagColors = resolveTagColors(option);
+              @if (tagColors) {
+                <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+                <span
+                  class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+                  [style.background-color]="tagColors.bg"
+                  [style.color]="tagColors.text"
+                >
+                  {{ option.label }}
+                </span>
+              } @else {
+                <span
+                  class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+                  [class]="option.colorClass || 'bg-neutral-soft text-text'"
+                >
+                  {{ option.label }}
+                </span>
+              }
+            } @else {
+              @if (option.icon) {
+                @if (isIconUrl(option.icon)) {
+                  <img [src]="option.icon" alt="" class="size-16 shrink-0 rounded-2 object-cover" />
+                } @else {
+                  <ng-icon [name]="option.icon" size="16" class="shrink-0 text-text-muted" aria-hidden="true" />
+                }
+              } @else if (option.colorClass) {
+                <span
+                  class="size-12 shrink-0 rounded-full"
+                  [class]="isHexColor(option.colorClass) ? 'border border-border' : option.colorClass"
+                  [style.background-color]="isHexColor(option.colorClass) ? option.colorClass : null"
+                  aria-hidden="true"
+                ></span>
+              }
+              <span class="min-w-0 truncate text-start">{{ option.label }}</span>
+            }
+          </button>
+        </li>
+      }
+
+      @if (visibleSpecials().length === 0 && visibleRegulars().length === 0) {
+        <li class="px-8 py-6 text-center text-12 text-text-muted">
+          {{ (remoteLoading() ? 'qv.loading' : 'qv.noMatches') | transloco }}
+        </li>
+      }
+    </ul>
+  </div>
+}

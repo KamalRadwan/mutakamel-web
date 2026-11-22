@@ -1,0 +1,12 @@
+<app-record-custom-fields
+  [fields]="fields()"
+  [values]="draft().customFields"
+  [layout]="layout()"
+  [errors]="errors()"
+  [readonly]="readonly()"
+  [mode]="mode()"
+  [scope]="scope()"
+  [stacked]="stacked()"
+  [countries]="countries()"
+  (valuesChange)="onValuesChange($event)"
+/>

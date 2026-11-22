@@ -1,0 +1,450 @@
+<ui-modal
+  size="wide"
+  icon="tablerTruck"
+  [tile]="headerTile()"
+  [title]="modalTitle()"
+  [subtitle]="modalSubtitle()"
+  [closeLabel]="'tradeInventory.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (loading()) {
+    <div class="flex flex-col gap-12" aria-busy="true">
+      @for (row of skeletonRows; track row) {
+        <div class="flex flex-col gap-8">
+          <div class="h-table-head w-full motion-safe:animate-pulse rounded-10 bg-neutral-soft"></div>
+          <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+            <div class="flex flex-col gap-4">
+              <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              <span class="h-field w-full motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+            </div>
+            <div class="flex flex-col gap-4">
+              <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              <span class="h-field w-full motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="alert">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ errorMessageKey() | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="reload()">
+        {{ 'invMoves.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (movement(); as m) {
+    <div class="flex flex-col gap-12">
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="navy"
+          icon="tablerCalculator"
+          [headingLevel]="3"
+          [title]="'invMoves.detail.sections.quantity' | transloco"
+        />
+
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <div class="col-span-2">
+            <ui-field
+              [for]="uid + '-item'"
+              [label]="'tradeInventory.common.item' | transloco"
+              [hint]="'invMoves.detail.itemHint' | transloco"
+            >
+              <input
+                [id]="uid + '-item'"
+                type="text"
+                readonly
+                dir="auto"
+                class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+                [value]="itemLabel()"
+                [title]="itemLabel()"
+              />
+            </ui-field>
+          </div>
+
+          <ui-field
+            [for]="uid + '-base-qty'"
+            [label]="'invMoves.detail.baseQuantity' | transloco"
+            [hint]="'invMoves.detail.baseQuantityHint' | transloco"
+          >
+            <input
+              [id]="uid + '-base-qty'"
+              type="text"
+              readonly
+              dir="ltr"
+              class="w-full min-w-0 cursor-default bg-transparent text-12 font-medium tabular-nums outline-none"
+              [class]="baseQtyToneClass()"
+              [value]="baseQtyText()"
+            />
+          </ui-field>
+
+          <ui-field
+            [for]="uid + '-original-qty'"
+            [label]="'invMoves.detail.originalQuantity' | transloco"
+            [hint]="'invMoves.detail.originalQuantityHint' | transloco"
+          >
+            <input
+              [id]="uid + '-original-qty'"
+              type="text"
+              readonly
+              dir="ltr"
+              class="w-full min-w-0 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="originalQtyText()"
+            />
+          </ui-field>
+
+          <div class="col-span-2">
+            <ui-field
+              [for]="uid + '-conversion'"
+              [label]="'invMoves.detail.conversion' | transloco"
+              [hint]="'invMoves.detail.conversionHint' | transloco"
+            >
+              <input
+                [id]="uid + '-conversion'"
+                type="text"
+                readonly
+                dir="auto"
+                class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+                [value]="conversionText()"
+                [title]="conversionText()"
+              />
+            </ui-field>
+          </div>
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="blue"
+          icon="tablerBuildingWarehouse"
+          [headingLevel]="3"
+          [title]="'invMoves.detail.sections.where' | transloco"
+        />
+
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <ui-field
+            [for]="uid + '-node'"
+            [label]="'tradeInventory.common.node' | transloco"
+            [hint]="'invMoves.detail.nodeHint' | transloco"
+          >
+            <input
+              [id]="uid + '-node'"
+              type="text"
+              readonly
+              dir="auto"
+              class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+              [value]="nodeLabel()"
+              [title]="nodeLabel()"
+            />
+          </ui-field>
+
+          <ui-field
+            [for]="uid + '-period'"
+            [label]="'invMoves.detail.periodCode' | transloco"
+            [hint]="'invMoves.detail.periodCodeHint' | transloco"
+          >
+            <input
+              [id]="uid + '-period'"
+              type="text"
+              readonly
+              dir="ltr"
+              class="w-full min-w-0 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="periodDisplay()"
+            />
+          </ui-field>
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="violet"
+          icon="tablerFileText"
+          [headingLevel]="3"
+          [title]="'invMoves.detail.sections.source' | transloco"
+        />
+
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <div class="col-span-2">
+            <ui-field
+              size="bare"
+              [for]="uid + '-doc-number'"
+              [label]="'invMoves.detail.documentNumber' | transloco"
+              [hint]="'invMoves.detail.documentNumberHint' | transloco"
+            >
+              <div class="flex items-center gap-6">
+                <input
+                  [id]="uid + '-doc-number'"
+                  type="text"
+                  readonly
+                  dir="ltr"
+                  class="flex h-field min-w-0 flex-1 cursor-default items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 tabular-nums text-text outline-none"
+                  [attr.aria-describedby]="uid + '-doc-number-hint'"
+                  [value]="sourceDocDisplay()"
+                />
+                @if (m.sourceId || m.sourceNumber) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    aria-disabled="true"
+                    class="cursor-not-allowed opacity-drag-source"
+                    [attr.aria-describedby]="uid + '-open-doc-note'"
+                  >
+                    <ng-icon name="tablerExternalLink" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                    {{ 'invMoves.detail.openDocument' | transloco }}
+                  </button>
+                }
+              </div>
+              @if (m.sourceId || m.sourceNumber) {
+                <p [id]="uid + '-open-doc-note'" class="mt-4 text-12 leading-18 text-text-muted">
+                  {{ 'invMoves.detail.openDocumentUnavailable' | transloco }}
+                </p>
+              }
+            </ui-field>
+          </div>
+
+          <div class="col-span-2">
+            <ui-field
+              [for]="uid + '-op-key'"
+              [label]="'invMoves.detail.operationKey' | transloco"
+              [hint]="'invMoves.detail.operationKeyHint' | transloco"
+            >
+              <input
+                [id]="uid + '-op-key'"
+                type="text"
+                readonly
+                dir="ltr"
+                class="min-w-0 flex-1 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+                [value]="m.operationKey"
+                [title]="m.operationKey"
+              />
+              <button
+                type="button"
+                class="inline-flex size-badge shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'invMoves.detail.copyOperationKey' | transloco"
+                [title]="'tradeInventory.common.copy' | transloco"
+                (click)="copyText(m.operationKey)"
+              >
+                <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+              </button>
+            </ui-field>
+          </div>
+
+          @if (m.reversalOfId; as revOfId) {
+            <div class="col-span-2">
+              <ui-field
+                size="bare"
+                [for]="uid + '-reversal-of'"
+                [label]="'invMoves.detail.reversalOf' | transloco"
+                [hint]="'invMoves.detail.reversalOfHint' | transloco"
+              >
+                <div class="flex items-center gap-6">
+                  <div class="flex h-field min-w-0 flex-1 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8">
+                    <input
+                      [id]="uid + '-reversal-of'"
+                      type="text"
+                      readonly
+                      dir="ltr"
+                      class="min-w-0 flex-1 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+                      [attr.aria-describedby]="uid + '-reversal-of-hint'"
+                      [value]="reversalOfDisplay()"
+                      [title]="revOfId"
+                    />
+                    <button
+                      type="button"
+                      class="inline-flex size-badge shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [attr.aria-label]="'invMoves.detail.copyReversalOf' | transloco"
+                      [title]="'tradeInventory.common.copy' | transloco"
+                      (click)="copyText(revOfId)"
+                    >
+                      <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    (click)="onOpenMovement(revOfId)"
+                  >
+                    <ng-icon name="tablerExternalLink" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                    {{ 'invMoves.detail.openMovement' | transloco }}
+                  </button>
+                </div>
+              </ui-field>
+            </div>
+          }
+
+          @if (reversalReasonDisplay(); as reasonText) {
+            <div class="col-span-2">
+              <ui-field
+                [for]="uid + '-reversal-reason'"
+                [label]="'invMoves.detail.reversalReason' | transloco"
+                [hint]="'invMoves.detail.reversalReasonHint' | transloco"
+              >
+                <input
+                  [id]="uid + '-reversal-reason'"
+                  type="text"
+                  readonly
+                  dir="auto"
+                  class="w-full min-w-0 cursor-default bg-transparent text-12 text-text outline-none"
+                  [value]="reasonText"
+                />
+              </ui-field>
+            </div>
+          }
+
+          @if (m.reversals.length > 0) {
+            <div class="col-span-2">
+              <ui-field
+                size="bare"
+                [for]="uid + '-reversed-by'"
+                [label]="'invMoves.detail.reversedBy' | transloco"
+                [hint]="'invMoves.detail.reversedByHint' | transloco"
+              >
+                <div
+                  [id]="uid + '-reversed-by'"
+                  role="list"
+                  [attr.aria-describedby]="uid + '-reversed-by-hint'"
+                  class="flex flex-col gap-4 rounded-8 border border-border-field bg-surface-field px-8 py-6"
+                >
+                  @for (rev of m.reversals; track rev.id) {
+                    <div role="listitem" class="flex flex-wrap items-center gap-8 text-12 leading-18">
+                      <bdi dir="ltr" class="shrink-0 tabular-nums text-text-muted">
+                        {{ formatDateTime(rev.occurredAt) }}
+                      </bdi>
+                      <app-inventory-quantity
+                        [value]="rev.normalizedSignedQuantity"
+                        [uom]="m.normalizedUomCode"
+                        [signed]="true"
+                      />
+                      <bdi dir="ltr" class="min-w-0 truncate tabular-nums text-text-muted" [title]="rev.operationKey">
+                        {{ rev.operationKey }}
+                      </bdi>
+                      <button
+                        type="button"
+                        class="ms-auto inline-flex shrink-0 cursor-pointer items-center gap-4 rounded-4 px-4 text-12 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                        (click)="onOpenMovement(rev.id)"
+                      >
+                        <span>{{ 'invMoves.detail.openMovement' | transloco }}</span>
+                        <ng-icon name="tablerExternalLink" size="12" class="shrink-0 rtl:-scale-x-100" aria-hidden="true" />
+                      </button>
+                    </div>
+                  }
+                </div>
+              </ui-field>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-8">
+        <ui-section-bar
+          tone="orange"
+          icon="tablerBarcode"
+          [headingLevel]="3"
+          [title]="'invMoves.detail.sections.tracking' | transloco"
+        />
+
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <ui-field
+            [for]="uid + '-lot-key'"
+            [label]="'invMoves.detail.lotKey' | transloco"
+            [hint]="'invMoves.detail.lotKeyHint' | transloco"
+          >
+            <input
+              [id]="uid + '-lot-key'"
+              type="text"
+              readonly
+              dir="ltr"
+              class="w-full min-w-0 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="lotDisplay()"
+            />
+          </ui-field>
+
+          <ui-field
+            [for]="uid + '-expiry'"
+            [label]="'invMoves.detail.expiryDate' | transloco"
+            [hint]="'invMoves.detail.expiryDateHint' | transloco"
+          >
+            <input
+              [id]="uid + '-expiry'"
+              type="text"
+              readonly
+              dir="ltr"
+              class="w-full min-w-0 cursor-default bg-transparent text-12 tabular-nums text-text outline-none"
+              [value]="expiryDisplay()"
+            />
+          </ui-field>
+
+          <div class="col-span-2">
+            <ui-field
+              size="bare"
+              [for]="uid + '-serials'"
+              [label]="'tradeInventory.common.serials' | transloco"
+              [hint]="'invMoves.detail.serialsHint' | transloco"
+            >
+              @if (serials().length > 0) {
+                <div
+                  [id]="uid + '-serials'"
+                  role="list"
+                  [attr.aria-describedby]="uid + '-serials-hint'"
+                  class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border border-border-field bg-surface-field px-8 py-4"
+                >
+                  @for (sk of visibleSerials(); track sk) {
+                    <span
+                      role="listitem"
+                      class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 leading-16 font-medium text-on-neutral-soft"
+                    >
+                      <bdi dir="ltr" class="tabular-nums">{{ sk }}</bdi>
+                    </span>
+                  }
+                  @if (extraSerialCount() > 0) {
+                    <span
+                      role="listitem"
+                      class="inline-flex h-chip items-center rounded-6 bg-brand-soft px-6 text-11 leading-16 font-medium text-on-brand-soft"
+                    >
+                      <bdi dir="ltr" class="tabular-nums">+{{ extraSerialCount() }}</bdi>
+                    </span>
+                  }
+                </div>
+              } @else {
+                <input
+                  [id]="uid + '-serials'"
+                  type="text"
+                  readonly
+                  class="flex h-field w-full cursor-default items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+                  [attr.aria-describedby]="uid + '-serials-hint'"
+                  [value]="'tradeInventory.common.none' | transloco"
+                />
+              }
+            </ui-field>
+          </div>
+        </div>
+      </section>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (movement(); as m) {
+      @if (m.policyDecisionReceiptId; as decisionId) {
+        <button type="button" uiButton variant="secondary" (click)="onOpenDecision(decisionId)">
+          <ng-icon name="tablerExternalLink" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+          {{ 'invMoves.actions.openDecision' | transloco }}
+        </button>
+      }
+    }
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'tradeInventory.common.close' | transloco }}
+    </button>
+    @if (canReverse()) {
+      <button type="button" uiButton variant="danger" class="ms-auto" (click)="onReverseClick()">
+        <ng-icon name="tablerArrowBackUp" size="15" aria-hidden="true" />
+        {{ 'invMoves.actions.reverse' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

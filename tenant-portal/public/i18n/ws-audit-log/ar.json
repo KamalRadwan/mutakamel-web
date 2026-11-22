@@ -1,0 +1,204 @@
+{
+  "tableLabel": "أحداث سجل التدقيق",
+  "forbidden": {
+    "title": "يلزم توفر صلاحية التدقيق",
+    "text": "تحتاج إلى صلاحية الوصول إلى التدقيق لعرض سجل التدقيق."
+  },
+  "filters": {
+    "dateRange": "النطاق الزمني",
+    "dateRangeHint": "فترة مطلوبة بين تاريخ البداية وتاريخ النهاية (بحد أقصى 92 يومًا).",
+    "dateRangePlaceholder": "اختر فترة زمنية",
+    "show": "العرض",
+    "showHint": "التبديل بين جميع الأحداث والسجلات المحذوفة فقط.",
+    "showAll": "جميع الأحداث",
+    "showDeleted": "السجلات المحذوفة",
+    "deletedPrefix": "اسم السجل يبدأ بـ",
+    "deletedPrefixHint": "يطابق بداية اسم السجل المحذوف.",
+    "deletedPrefixPlaceholder": "على سبيل المثال: النيل",
+    "app": "التطبيق",
+    "appHint": "التصفية حسب التطبيق أو الخدمة التي أصدرت الحدث.",
+    "allApps": "جميع التطبيقات",
+    "outcome": "النتيجة",
+    "outcomeHint": "التصفية حسب نجاح العملية أو فشلها.",
+    "allOutcomes": "جميع النتائج",
+    "sensitivity": "الحساسية",
+    "sensitivityHint": "التصفية حسب مستوى حساسية الحدث.",
+    "allSensitivities": "جميع مستويات الحساسية",
+    "user": "المستخدم",
+    "userHint": "التصفية حسب المستخدم الذي نفذ الإجراء.",
+    "allUsers": "جميع المستخدمين",
+    "branch": "الفرع",
+    "branchHint": "التصفية حسب الفرع المرتبط بالحدث.",
+    "allBranches": "جميع الفروع",
+    "entityType": "نوع السجل",
+    "entityTypeHint": "على سبيل المثال: Party أو Lead",
+    "entityTypePlaceholder": "على سبيل المثال: Party أو Lead",
+    "action": "الإجراء",
+    "actionHint": "رمز الإجراء المطابق تمامًا، على سبيل المثال LEAD_STAGE_CHANGED",
+    "actionPlaceholder": "على سبيل المثال: LEAD_STAGE_CHANGED",
+    "includeRequests": "تضمين سجلات الطلبات",
+    "includeRequestsHint": "يعرض أدلة الطلبات الأولية المخفية افتراضيًا.",
+    "correlationChipLabel": "الارتباط المحدد:",
+    "clearCorrelation": "مسح تصفية الارتباط",
+    "apply": "تطبيق",
+    "clear": "مسح التصفية",
+    "reload": "إعادة التحميل"
+  },
+  "validation": {
+    "rangeRequired": "اختر نطاقًا زمنيًا لعرض سجل التدقيق.",
+    "rangeOrder": "يجب أن يكون تاريخ ووقت البداية قبل تاريخ ووقت النهاية.",
+    "rangeMaxDays": "لا يمكن أن يتجاوز النطاق الزمني 92 يومًا."
+  },
+  "apps": {
+    "CORE": "النظام الأساسي",
+    "CRM": "إدارة العملاء",
+    "TRADE": "التجارة",
+    "WORKER": "المهام الخلفية",
+    "GATEWAY": "البوابة",
+    "REALTIME": "البث الفوري",
+    "ACCOUNTING": "المحاسبة",
+    "HR": "الموارد البشرية"
+  },
+  "sourceKinds": {
+    "HTTP_COMMAND": "طلب HTTP",
+    "DOMAIN_MUTATION": "تغيير في البيانات",
+    "BROKER_CONSUMER": "رسالة خلفية",
+    "CRON_JOB": "مهمة مجدولة",
+    "DB_FALLBACK": "تحديث قاعدة بيانات",
+    "SECURITY_EVENT": "حدث أمني"
+  },
+  "outcomes": {
+    "SUCCESS": "نجح",
+    "FAILURE": "فشل"
+  },
+  "sensitivities": {
+    "LOW": "منخفضة",
+    "NORMAL": "عادية",
+    "HIGH": "عالية",
+    "HIGH_CHIP": "حساس"
+  },
+  "actor": {
+    "system": "النظام"
+  },
+  "cols": {
+    "time": "الوقت",
+    "user": "المستخدم",
+    "action": "الإجراء",
+    "record": "السجل",
+    "app": "التطبيق",
+    "outcome": "النتيجة",
+    "sensitivity": "الحساسية"
+  },
+  "paging": {
+    "showing": "عرض {{count}} من الأحداث",
+    "loadMore": "تحميل المزيد"
+  },
+  "empty": {
+    "text": "لا توجد أحداث في هذه الفترة",
+    "clearFilters": "مسح التصفية"
+  },
+  "failed": {
+    "title": "تعذّر تحميل سجل التدقيق",
+    "supportRef": "مرجع الدعم",
+    "retry": "إعادة المحاولة"
+  },
+  "modal": {
+    "close": "إغلاق",
+    "showRelated": "عرض الأحداث ذات الصلة",
+    "noCorrelationHint": "لا يحتوي هذا الحدث على معرّف ارتباط.",
+    "copied": "تم النسخ إلى الحافظة",
+    "copyFailed": "تعذّر النسخ إلى الحافظة",
+    "copyEntityId": "نسخ معرّف السجل",
+    "copyCorrelationId": "نسخ معرّف الارتباط",
+    "facts": {
+      "record": "السجل",
+      "appKind": "التطبيق ونوع المصدر",
+      "outcome": "النتيجة",
+      "sensitivity": "الحساسية",
+      "branch": "الفرع",
+      "onBehalfOf": "نيابة عن",
+      "correlationId": "معرّف الارتباط"
+    },
+    "changes": {
+      "title": "التغييرات",
+      "field": "الحقل",
+      "before": "قبل",
+      "after": "بعد",
+      "empty": "لم تُسجّل تغييرات في الحقول."
+    },
+    "technical": {
+      "title": "التفاصيل التقنية",
+      "ip": "عنوان IP",
+      "userAgent": "وكيل المستخدم",
+      "requestId": "معرّف الطلب",
+      "operationId": "معرّف العملية",
+      "idempotencyKey": "مفتاح عدم التكرار",
+      "metadata": "البيانات الوصفية"
+    }
+  },
+  "actions": {
+    "CREATE": "إنشاء سجل",
+    "UPDATE": "تحديث سجل",
+    "SOFT_DELETE": "حذف مبدئي لسجل",
+    "DELETE": "حذف سجل",
+    "RESTORE": "استعادة سجل",
+    "LEAD_CREATED": "إنشاء عميل محتمل",
+    "LEAD_UPDATED": "تحديث عميل محتمل",
+    "LEAD_STAGE_CHANGED": "تغيير مرحلة العميل المحتمل",
+    "LEAD_CONVERTED": "تحويل العميل المحتمل",
+    "LEAD_DISQUALIFIED": "استبعاد العميل المحتمل",
+    "LEAD_ASSIGNED": "تعيين العميل المحتمل",
+    "PARTY_CREATED": "إنشاء طرف",
+    "PARTY_UPDATED": "تحديث طرف",
+    "PARTY_MERGED": "دمج طرف",
+    "ACTIVITY_CREATED": "إنشاء نشاط",
+    "ACTIVITY_UPDATED": "تحديث نشاط",
+    "ACTIVITY_COMPLETED": "إكمال نشاط",
+    "ACTIVITY_CANCELLED": "إلغاء نشاط",
+    "LOGIN_SUCCEEDED": "تسجيل دخول ناجح",
+    "LOGIN_FAILED": "فشل تسجيل الدخول",
+    "LOGOUT": "تسجيل الخروج",
+    "SESSION_REVOKED": "إلغاء جلسة",
+    "PASSWORD_CHANGED": "تغيير كلمة المرور",
+    "USER_INVITED": "دعوة مستخدم",
+    "USER_UPDATED": "تحديث مستخدم",
+    "USER_SUSPENDED": "تعليق مستخدم",
+    "USER_ACTIVATED": "تفعيل مستخدم",
+    "ROLE_CREATED": "إنشاء دور",
+    "ROLE_UPDATED": "تحديث دور",
+    "ROLE_ASSIGNED": "تعيين دور",
+    "ROLE_PERMISSIONS_UPDATED": "تحديث صلاحيات الدور",
+    "SEAT_ALLOCATED": "تخصيص مقعد",
+    "SEAT_RELEASED": "تحرير مقعد",
+    "MODULE_ACTIVATED": "تفعيل تطبيق",
+    "QUOTATION_CREATED": "إنشاء عرض سعر",
+    "INVOICE_ISSUED": "إصدار فاتورة",
+    "JOURNAL_POSTED": "ترحيل قيد يومية",
+    "NOTIFICATION_DISPATCHED": "إرسال إشعار",
+    "HTTP_COMMAND_EXECUTED": "تنفيذ طلب",
+    "HTTP_COMMAND_REJECTED": "رفض طلب"
+  },
+  "entityTypes": {
+    "Party": "طرف",
+    "Lead": "عميل محتمل",
+    "TenantUser": "مستخدم",
+    "Role": "دور",
+    "Activity": "نشاط",
+    "CrmNote": "ملاحظة إدارة العملاء",
+    "Branch": "فرع",
+    "Company": "شركة",
+    "Opportunity": "فرصة",
+    "Quotation": "عرض سعر",
+    "Invoice": "فاتورة",
+    "AddonSeat": "مقعد إضافي",
+    "Session": "جلسة",
+    "Template": "قالب"
+  },
+  "errors": {
+    "AUDIT_QUERY_INVALID": "استعلام سجل التدقيق غير صالح. تحقّق من التواريخ وعوامل التصفية المحددة.",
+    "AUDIT_EVENT_NOT_FOUND": "لم يُعثر على حدث التدقيق أو أنه خارج نطاق صلاحيتك.",
+    "MISSING_REQUIRED_PERMISSIONS": "ليست لديك صلاحية عرض سجل التدقيق.",
+    "CORE_VALIDATION_FAILED": "بعض قيم التصفية غير صالحة.",
+    "generic": "تعذّر تحميل بيانات التدقيق. حاول مرة أخرى."
+  }
+}

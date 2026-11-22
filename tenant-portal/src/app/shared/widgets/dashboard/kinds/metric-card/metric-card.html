@@ -1,0 +1,33 @@
+@if (breakdownCards().length > 1) {
+  <div class="grid h-full min-w-0 items-stretch" [class]="gridColsClass()">
+    @for (card of breakdownCards(); track card.key; let isFirst = $first; let isLast = $last) {
+      <div
+        class="min-w-0"
+        [class.border-s]="!isFirst"
+        [class.border-border]="!isFirst"
+        [class.ps-8]="!isFirst"
+        [class.pe-8]="!isLast"
+      >
+        <ui-stat-card
+          [framed]="false"
+          [label]="card.label"
+          [value]="card.value"
+          [valueTitle]="card.valueTitle"
+          [delta]="card.delta"
+          [direction]="card.direction"
+          [chart]="card.chart"
+        />
+      </div>
+    }
+  </div>
+} @else if (singleCard(); as card) {
+  <ui-stat-card
+    [framed]="false"
+    [label]="card.label"
+    [value]="card.value"
+    [valueTitle]="card.valueTitle"
+    [delta]="card.delta"
+    [direction]="card.direction"
+    [chart]="card.chart"
+  />
+}

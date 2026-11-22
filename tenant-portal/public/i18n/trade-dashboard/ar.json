@@ -1,0 +1,222 @@
+{
+  "header": {
+    "fromTemplate": "من قالب",
+    "sharedBy": "مشارَكة من {{name}} · {{level}}",
+    "access": {
+      "VIEW": "عرض",
+      "EDIT": "تعديل"
+    },
+    "updated": "آخر تحديث",
+    "refresh": "تحديث",
+    "editLayout": "تعديل التخطيط",
+    "menuLabel": "إجراءات لوحة التحكم",
+    "menu": {
+      "newDashboard": "لوحة جديدة",
+      "fromTemplate": "من قالب…",
+      "editDetails": "تعديل التفاصيل",
+      "duplicate": "تكرار",
+      "share": "مشاركة",
+      "setDefault": "تعيين كافتراضية",
+      "addFavorite": "إضافة إلى المفضلة",
+      "removeFavorite": "إزالة من المفضلة",
+      "delete": "حذف"
+    }
+  },
+  "switcher": {
+    "trigger": "تبديل اللوحة",
+    "tabsLabel": "قوائم اللوحات",
+    "tabs": {
+      "favourites": "المفضلة",
+      "mine": "لوحاتي",
+      "shared": "المشارَكة معي"
+    },
+    "search": "ابحث في اللوحات",
+    "default": "افتراضية",
+    "empty": "لا توجد لوحات هنا."
+  },
+  "filters": {
+    "regionLabel": "عوامل تصفية اللوحة",
+    "period": {
+      "label": "الفترة",
+      "hint": "التواريخ التي تستخدمها كل العناصر."
+    },
+    "from": {
+      "label": "من",
+      "hint": "أول يوم مشمول."
+    },
+    "to": {
+      "label": "إلى",
+      "hint": "آخر يوم مشمول."
+    },
+    "datePlaceholder": "اختر التاريخ",
+    "dateToday": "اليوم",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "compare": {
+      "label": "المقارنة مع",
+      "hint": "يعرض التغيّر مقارنة بفترة سابقة."
+    },
+    "scope": {
+      "label": "النطاق",
+      "hint": "أرقام مَن تُعرض، ولا تُجمع أرقام الشركات معًا أبدًا."
+    },
+    "reset": "إعادة تعيين",
+    "presets": {
+      "TODAY": "اليوم",
+      "CURRENT_WEEK": "هذا الأسبوع",
+      "CURRENT_MONTH": "هذا الشهر",
+      "CURRENT_QUARTER": "هذا الربع",
+      "CURRENT_YEAR": "هذه السنة",
+      "LAST_30_DAYS": "آخر 30 يومًا",
+      "CUSTOM": "فترة مخصصة"
+    },
+    "compareOptions": {
+      "NONE": "بدون",
+      "PREVIOUS_PERIOD": "الفترة السابقة",
+      "PREVIOUS_YEAR": "الفترة نفسها من العام الماضي"
+    },
+    "scopeOptions": {
+      "SAVED_TARGETS": "النطاق المحفوظ",
+      "COMPANY": "هذه الشركة",
+      "BRANCH": "هذا الفرع",
+      "ALL_ACCESSIBLE": "كل شركاتي"
+    },
+    "errors": {
+      "order": "يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.",
+      "maxRange": "لا يجوز أن تتجاوز الفترة 24 شهرًا."
+    }
+  },
+  "editBar": {
+    "regionLabel": "تعديل التخطيط",
+    "title": "تعديل التخطيط",
+    "keyboardLabel": "اختصارات لوحة المفاتيح",
+    "keyboardHint": "الأسهم للتحريك · Shift+الأسهم لتغيير الحجم",
+    "addWidget": "إضافة عنصر",
+    "addDisabledDirty": "احفظ تغييرات التخطيط أو تراجع عنها قبل إضافة عنصر.",
+    "addDisabledLimit": "تحتوي هذه اللوحة على 20 عنصرًا بالفعل.",
+    "removeDisabledDirty": "احفظ تغييرات التخطيط أو تراجع عنها قبل إزالة عنصر.",
+    "undo": "تراجع",
+    "cancel": "إلغاء",
+    "saveLayout": "حفظ التخطيط"
+  },
+  "frame": {
+    "unavailable": "عنصر غير متاح",
+    "asOf": "حتى {{time}}",
+    "otherCompanies": "الشركات الأخرى: {{list}}",
+    "multiSeriesNote": "خط واحد لكل شركة وعملة، ولا تُجمع القيم معًا أبدًا.",
+    "menuLabel": "إجراءات العنصر",
+    "showTable": "عرض الجدول",
+    "showChart": "عرض الرسم البياني",
+    "openList": "فتح القائمة",
+    "grip": "تحريك العنصر",
+    "remove": "إزالة العنصر"
+  },
+  "page": {
+    "emptyTitle": "لا توجد لوحة بعد.",
+    "createDashboard": "إنشاء لوحة",
+    "forbiddenTitle": "تحليلات التجارة غير مشمولة في اشتراكك.",
+    "loadFailedText": "حدث خطأ أثناء تحميل اللوحة، فحاول مرة أخرى.",
+    "emptyDashboard": "لا تحتوي هذه اللوحة على عناصر بعد."
+  },
+  "confirm": {
+    "deleteTitle": "حذف اللوحة",
+    "deleteText": "هل تريد حذف {{name}}؟ سيفقد من شاركتها معهم صلاحية الوصول، ولا يمكن التراجع عن هذا الإجراء.",
+    "deleteAction": "حذف",
+    "removeTitle": "إزالة العنصر",
+    "removeText": "هل تريد إزالة هذا العنصر من اللوحة؟",
+    "removeAction": "إزالة",
+    "conflictTitle": "تغيّرت هذه اللوحة",
+    "conflictText": "حفظ شخص آخر تغييرات، فأعد التحميل لرؤيتها أو احتفظ بتغييراتك واحفظ مجددًا.",
+    "unsavedTitle": "تغييرات تخطيط غير محفوظة",
+    "unsavedText": "لديك تغييرات تخطيط غير محفوظة، فهل تريد حفظها قبل المغادرة؟",
+    "unsavedSave": "حفظ التخطيط",
+    "unsavedDiscard": "تجاهل",
+    "unsavedCancel": "إلغاء"
+  },
+  "state": {
+    "loading": "جارٍ تحميل العنصر",
+    "empty": "لا توجد بيانات في هذه الفترة.",
+    "noAccess": "ليست لديك صلاحية على هذه البيانات.",
+    "wholeCompany": "يحتاج هذا الرقم إلى الشركة كلها، فاختر هذه الشركة.",
+    "timeout": "استغرق تحميل هذا العنصر وقتًا طويلًا."
+  },
+  "unavailable": {
+    "WIDGET_DELETED": "حُذف هذا العنصر.",
+    "WIDGET_ACCESS_REVOKED": "لم يعد المالك يرى هذا العنصر.",
+    "WIDGET_PERMISSION_REQUIRED": "ليست لديك صلاحية على هذا العنصر.",
+    "METRIC_RETIRED_OR_INCOMPATIBLE": "لم يعد هذا الرقم متاحًا."
+  },
+  "toast": {
+    "omitted": "لم تُنسخ {{n}} من العناصر غير المتاحة.",
+    "coverUnavailable": "لا يجوز أن يغطي عنصرٌ عنصرًا غير متاح، فانقله أو أزل العنصر غير المتاح.",
+    "sourcesDown": "مصادر البيانات لا تستجيب، فأعد المحاولة بعد قليل.",
+    "defaultSet": "عُيِّنت لوحتك الافتراضية.",
+    "favoriteAdded": "أُضيفت إلى المفضلة.",
+    "favoriteRemoved": "أُزيلت من المفضلة.",
+    "duplicated": "تم تكرار اللوحة.",
+    "deleted": "حُذفت اللوحة.",
+    "layoutSaved": "حُفظ التخطيط.",
+    "layoutOverlap": "يتداخل عنصران، فلم يُحفظ التخطيط. انقل أحدهما أو غيّر حجمه ثم احفظ من جديد.",
+    "widgetRemoved": "أُزيل العنصر."
+  },
+  "labels": {
+    "trade_document_status_draft": "مسودة",
+    "trade_document_status_sent": "مُرسَل",
+    "trade_document_status_accepted": "مقبول",
+    "trade_document_status_rejected": "مرفوض",
+    "trade_document_status_expired": "منتهي الصلاحية",
+    "trade_document_status_confirmed": "مؤكد",
+    "trade_document_status_closed": "مغلق",
+    "trade_document_status_cancelled": "ملغى",
+    "trade_fulfillment_status_unfulfilled": "غير مُنفَّذ",
+    "trade_fulfillment_status_partially_fulfilled": "مُنفَّذ جزئيًا",
+    "trade_fulfillment_status_fulfilled": "مُنفَّذ",
+    "trade_approval_status_pending": "بانتظار الاعتماد",
+    "trade_approval_status_approved": "معتمد",
+    "trade_approval_status_rejected": "مرفوض",
+    "trade_item_kind_product": "منتج",
+    "trade_item_kind_service": "خدمة",
+    "trade_item_kind_combo": "مجموعة",
+    "trade_price_purpose_sales": "البيع",
+    "trade_price_purpose_purchase": "الشراء",
+    "trade_price_purpose_pos": "نقاط البيع",
+    "trade_exception_severity_low": "منخفضة",
+    "trade_exception_severity_medium": "متوسطة",
+    "trade_exception_severity_high": "عالية",
+    "trade_exception_severity_critical": "حرجة",
+    "trade_catalog_capability_sell": "البيع",
+    "trade_catalog_capability_purchase": "الشراء",
+    "trade_catalog_capability_pos": "نقاط البيع",
+    "trade_inventory_availability_in_stock": "متوفر",
+    "trade_inventory_availability_low_stock": "مخزون منخفض",
+    "trade_inventory_availability_out_of_stock": "نفد المخزون"
+  },
+  "columns": {
+    "company": "الشركة",
+    "documentNumber": "رقم المستند",
+    "validUntil": "صالح حتى",
+    "lifecycleStatus": "الحالة",
+    "currencyCode": "العملة",
+    "grandTotal": "الإجمالي",
+    "purchaseOrderId": "أمر الشراء",
+    "lineId": "البند",
+    "expectedDate": "التاريخ المتوقع",
+    "orderedQuantity": "الكمية المطلوبة",
+    "receivedQuantity": "الكمية المستلمة",
+    "uomId": "الوحدة",
+    "itemId": "الصنف",
+    "itemCompanyProfileId": "ملف الصنف",
+    "fulfillmentNodeId": "موقع التخزين",
+    "onHand": "المتاح فعليًا",
+    "reserved": "المحجوز",
+    "available": "المتاح للبيع",
+    "id": "المعرّف",
+    "sourceType": "نوع المصدر",
+    "sourceId": "المصدر",
+    "category": "الفئة",
+    "severity": "الخطورة",
+    "safeErrorCode": "رمز الخطأ",
+    "createdAt": "تاريخ الإنشاء",
+    "quotationId": "عرض السعر"
+  }
+}

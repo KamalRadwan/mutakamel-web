@@ -1,0 +1,77 @@
+@if (selectedCount() > 0) {
+  <div
+    role="region"
+    [attr.aria-label]="'itemsBulk.selection.label' | transloco"
+    class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 text-12 text-on-brand-soft"
+  >
+    <div class="flex min-w-0 flex-wrap items-center gap-6">
+      @if (selectionMode() === 'ids') {
+        @if (hidden() === 0) {
+          <span class="font-medium tabular-nums" aria-live="polite" aria-atomic="true">
+            {{ 'itemsBulk.selection.page' | transloco: { count: selectedCount() } }}
+          </span>
+        } @else {
+          <span class="font-medium tabular-nums" aria-live="polite" aria-atomic="true">
+            {{ 'itemsBulk.selection.selected' | transloco: { count: selectedCount() } }}
+          </span>
+          <span class="text-text-muted" aria-hidden="true">·</span>
+          <span class="text-text-muted tabular-nums">
+            {{ 'itemsBulk.selection.hidden' | transloco: { count: hidden() } }}
+          </span>
+        }
+
+        @if (canOfferSelectAll()) {
+          <span class="text-text-muted" aria-hidden="true">·</span>
+          <button
+            uiButton
+            variant="ghost"
+            size="small"
+            type="button"
+            [disabled]="tooMany()"
+            [attr.title]="tooMany() ? ('itemsBulk.selection.tooMany' | transloco: { max: maxLimit }) : null"
+            (click)="selectAllMatching()"
+          >
+            {{ 'itemsBulk.selection.all' | transloco: { total: total() } }}
+          </button>
+          @if (tooMany()) {
+            <span class="text-text-muted">{{ 'itemsBulk.selection.tooMany' | transloco: { max: maxLimit } }}</span>
+          }
+        }
+      } @else {
+        @if (selectedCount() < allTotal()) {
+          <span class="font-medium tabular-nums" aria-live="polite" aria-atomic="true">
+            {{ 'itemsBulk.selection.allSelectedExcluded' | transloco: { count: selectedCount(), total: allTotal() } }}
+          </span>
+        } @else {
+          <span class="font-medium tabular-nums" aria-live="polite" aria-atomic="true">
+            {{ 'itemsBulk.selection.allSelected' | transloco: { total: allTotal() } }}
+          </span>
+        }
+
+        @if (pageRows().length > 0) {
+          <span class="text-text-muted" aria-hidden="true">·</span>
+          <button
+            uiButton
+            variant="ghost"
+            size="small"
+            type="button"
+            (click)="selectOnlyPage()"
+          >
+            {{ 'itemsBulk.selection.onlyPage' | transloco }}
+          </button>
+        }
+      }
+    </div>
+
+    <button
+      uiButton
+      variant="ghost"
+      size="small"
+      type="button"
+      class="shrink-0"
+      (click)="clear()"
+    >
+      {{ 'itemsBulk.selection.clear' | transloco }}
+    </button>
+  </div>
+}

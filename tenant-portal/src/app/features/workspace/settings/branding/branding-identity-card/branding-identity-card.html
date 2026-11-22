@@ -1,0 +1,60 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-12 shadow-card">
+  <div class="flex items-center gap-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+      <ng-icon name="tablerId" size="15" aria-hidden="true" />
+    </span>
+    <h2 class="min-w-0 truncate text-13 leading-18 font-medium text-text">
+      {{ 'wsBranding.identity.title' | transloco }}
+    </h2>
+  </div>
+
+  <div class="flex flex-col gap-8">
+    <ui-field
+      [for]="uid + '-app-name'"
+      [label]="'wsBranding.fields.appName' | transloco"
+      [hint]="'wsBranding.fields.appNameHint' | transloco"
+      [count]="appName().length"
+      [max]="textMax"
+      [error]="errors().appName"
+    >
+      <input
+        #appNameInput
+        [id]="uid + '-app-name'"
+        type="text"
+        autocomplete="off"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [attr.maxlength]="textMax"
+        [value]="appName()"
+        [readonly]="readOnly()"
+        [attr.aria-invalid]="errors().appName ? 'true' : null"
+        [attr.aria-describedby]="uid + '-app-name-hint' + (errors().appName ? ' ' + uid + '-app-name-error' : '')"
+        (input)="onAppNameInput($event)"
+        (blur)="fieldBlur.emit('appName')"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="uid + '-tab-title'"
+      [label]="'wsBranding.fields.tabTitle' | transloco"
+      [hint]="'wsBranding.fields.tabTitleHint' | transloco"
+      [count]="tabTitle().length"
+      [max]="textMax"
+      [error]="errors().tabTitle"
+    >
+      <input
+        #tabTitleInput
+        [id]="uid + '-tab-title'"
+        type="text"
+        autocomplete="off"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [attr.maxlength]="textMax"
+        [value]="tabTitle()"
+        [readonly]="readOnly()"
+        [attr.aria-invalid]="errors().tabTitle ? 'true' : null"
+        [attr.aria-describedby]="uid + '-tab-title-hint' + (errors().tabTitle ? ' ' + uid + '-tab-title-error' : '')"
+        (input)="onTabTitleInput($event)"
+        (blur)="fieldBlur.emit('tabTitle')"
+      />
+    </ui-field>
+  </div>
+</section>

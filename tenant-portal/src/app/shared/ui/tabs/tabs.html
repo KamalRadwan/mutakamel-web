@@ -1,0 +1,57 @@
+<div
+  role="tablist"
+  class="no-scrollbar flex items-stretch gap-2 overflow-x-auto border-b border-border"
+  [attr.aria-label]="label() || null"
+>
+  @for (tab of tabs(); track tab.id; let index = $index) {
+    @let isActive = !tab.disabled && tab.id === active();
+    <button
+      #tabBtn
+      type="button"
+      role="tab"
+      [id]="tabButtonId(tab.id)"
+      class="inline-flex h-tab shrink-0 items-center gap-6 border-b-2 px-10 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        tab.disabled
+          ? 'cursor-not-allowed border-transparent text-text-placeholder'
+          : isActive
+            ? 'cursor-pointer border-accent font-medium text-accent'
+            : 'cursor-pointer border-transparent text-text-muted hover:text-text'
+      "
+      [disabled]="!!tab.disabled"
+      [attr.aria-selected]="isActive"
+      [attr.aria-disabled]="tab.disabled ? 'true' : null"
+      [attr.aria-controls]="tabPanelId(tab.id)"
+      [tabIndex]="index === focusableIndex() ? 0 : -1"
+      (click)="select(tab)"
+      (keydown)="onKeydown($event, index)"
+    >
+      @if (tab.icon; as iconName) {
+        <ng-icon
+          [name]="iconName"
+          size="var(--icon-sm)"
+          class="shrink-0"
+          [class]="tab.disabled ? '' : (tab.color ?? '')"
+          aria-hidden="true"
+        />
+      }
+
+      <span>{{ tab.label }}</span>
+
+      @if (tab.count !== null && tab.count !== undefined) {
+        <span
+          class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-8 px-4 text-11 leading-16 font-medium tabular-nums"
+          [class]="
+            tab.disabled
+              ? 'bg-neutral-soft text-text-placeholder'
+              : isActive
+                ? 'bg-brand-soft text-on-brand-soft'
+                : 'bg-neutral-soft text-on-neutral-soft'
+          "
+        >
+          <bdi dir="ltr">{{ tab.count }}</bdi>
+        </span>
+      }
+    </button>
+  }
+</div>

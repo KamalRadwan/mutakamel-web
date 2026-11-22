@@ -1,0 +1,186 @@
+<ui-modal
+  size="form"
+  icon="tablerPrinter"
+  tile="bg-icon-gray"
+  [title]="modalTitle()"
+  [closeLabel]="'td.common.close' | transloco"
+  [dismissable]="true"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10" [attr.aria-busy]="templatesLoading() || running()">
+    @if (templatesLoading()) {
+      <div class="flex flex-col gap-6">
+        <div class="h-time-dd animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-time-dd animate-pulse rounded-10 bg-neutral-soft"></div>
+      </div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft"></div>
+    } @else {
+      <ui-field
+        size="bare"
+        [for]="uid + '-template'"
+        [label]="'tdp.template' | transloco"
+        [hint]="'tdp.templateHint' | transloco"
+        [error]="templateErrorKey() ? (templateErrorKey()! | transloco) : null"
+      >
+        <div
+          [id]="uid + '-template'"
+          role="radiogroup"
+          class="flex flex-col gap-6"
+          [attr.aria-label]="'tdp.template' | transloco"
+          [attr.aria-invalid]="templateErrorKey() ? 'true' : null"
+        >
+          @for (item of choices(); track item.id; let idx = $index) {
+            @let selected = selectedChoice() === item.id;
+
+            <button
+              #choiceBtn
+              type="button"
+              role="radio"
+              class="flex w-full items-center gap-6 rounded-10 border p-6 text-start transition-colors duration-fast outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                (running() ? 'cursor-not-allowed ' : 'cursor-pointer ') +
+                (selected
+                  ? 'border-brand bg-brand-soft'
+                  : running()
+                    ? 'border-border-field bg-surface'
+                    : 'border-border-field bg-surface hover:border-border-field-hover hover:bg-row-hover')
+              "
+              [disabled]="running()"
+              [attr.tabindex]="isChoiceTabStop(item.id) ? 0 : -1"
+              [attr.aria-checked]="selected"
+              (click)="selectChoice(item.id)"
+              (keydown)="onChoiceKeydown($event, idx)"
+            >
+              <span
+                class="flex h-time-dd w-subnav shrink-0 flex-col gap-3 rounded-4 border border-border bg-paper p-4 shadow-card"
+                aria-hidden="true"
+              >
+                <span class="block h-4 w-full rounded-2 bg-nav-gradient"></span>
+                <span class="block h-2 w-3/4 rounded-2 bg-border"></span>
+                <span class="block h-2 w-full rounded-2 bg-border"></span>
+                <span class="block h-2 w-2/3 rounded-2 bg-border"></span>
+                <span class="mt-auto block h-2 w-1/2 rounded-2 bg-brand-soft"></span>
+              </span>
+
+              <span class="flex min-w-0 flex-1 flex-col gap-2">
+                @switch (item.kind) {
+                  @case ('default') {
+                    <span class="truncate text-13 leading-18 font-medium text-text">
+                      {{ 'tdp.default' | transloco }}
+                    </span>
+                    <span class="truncate text-11 leading-16 text-text-muted">
+                      {{ 'tdp.defaultSub' | transloco }}
+                    </span>
+                  }
+                  @case ('built-in') {
+                    <span class="truncate text-13 leading-18 font-medium text-text">
+                      {{ 'tdp.builtIn' | transloco }}
+                    </span>
+                    <span class="truncate text-11 leading-16 text-text-muted">
+                      {{ 'tdp.builtInSub' | transloco }}
+                    </span>
+                  }
+                  @case ('template') {
+                    <span
+                      class="truncate text-13 leading-18 font-medium text-text"
+                      dir="auto"
+                      [title]="item.template.name"
+                    >
+                      {{ item.template.name }}
+                    </span>
+                    <span class="truncate text-11 leading-16 text-text-muted">
+                      {{ ('tdp.lang.' + item.template.locale) | transloco }} · {{ 'tdp.version' | transloco: { n: item.template.versionNumber } }}
+                    </span>
+                  }
+                }
+              </span>
+
+              <span
+                class="inline-flex size-checkbox-size shrink-0 items-center justify-center rounded-full border"
+                [class]="selected ? 'border-brand bg-brand' : 'border-border-field bg-surface-field'"
+                aria-hidden="true"
+              >
+                @if (selected) {
+                  <span class="size-radio-dot rounded-full bg-on-brand"></span>
+                }
+              </span>
+            </button>
+          }
+        </div>
+      </ui-field>
+
+      @if (languageReadonly()) {
+        <ui-field
+          [for]="uid + '-language'"
+          [label]="'tdp.language' | transloco"
+          [hint]="'tdp.languageHint' | transloco"
+        >
+          <input
+            [id]="uid + '-language'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 cursor-default bg-transparent text-12 text-text outline-none"
+            [value]="readonlyLanguageLabel()"
+          />
+          <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        </ui-field>
+      } @else {
+        <ui-field
+          size="bare"
+          [for]="uid + '-language'"
+          [label]="'tdp.language' | transloco"
+          [hint]="'tdp.languageHint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-language'"
+            [label]="'tdp.language' | transloco"
+            [describedBy]="uid + '-language-hint'"
+            [options]="languageOptions()"
+            [value]="editableLocale()"
+            [disabled]="running()"
+            (valueChange)="onLocaleChange($event)"
+          />
+        </ui-field>
+      }
+
+      <div class="flex h-field items-center gap-6 text-12 leading-18 text-text-muted" role="status" aria-live="polite">
+        @if (running()) {
+          <ng-icon
+            name="tablerLoader2"
+            size="16"
+            class="shrink-0 animate-spin text-accent motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <span class="min-w-0 truncate">{{ 'tdp.preparing' | transloco: { n: attempt() } }}</span>
+        } @else if (phase() === 'unavailable') {
+          <ng-icon name="tablerCloudOff" size="16" class="shrink-0" aria-hidden="true" />
+          <span class="min-w-0 truncate">{{ 'tdp.renderUnavailable' | transloco }}</span>
+        } @else if (phase() === 'timeout') {
+          <span class="min-w-0 truncate">{{ 'tdp.stillPreparing' | transloco }}</span>
+        }
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="running()"
+      [disabled]="!canPrint()"
+      (click)="print()"
+    >
+      @if (!running()) {
+        <ng-icon name="tablerPrinter" size="15" aria-hidden="true" />
+      }
+      {{ printButtonLabelKey() | transloco }}
+    </button>
+
+    <button type="button" uiButton variant="secondary" (click)="requestClose()">
+      {{ 'td.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

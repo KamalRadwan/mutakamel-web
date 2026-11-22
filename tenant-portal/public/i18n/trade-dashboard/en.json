@@ -1,0 +1,222 @@
+{
+  "header": {
+    "fromTemplate": "From template",
+    "sharedBy": "Shared by {{name}} · {{level}}",
+    "access": {
+      "VIEW": "View",
+      "EDIT": "Edit"
+    },
+    "updated": "Updated",
+    "refresh": "Refresh",
+    "editLayout": "Edit layout",
+    "menuLabel": "Dashboard actions",
+    "menu": {
+      "newDashboard": "New dashboard",
+      "fromTemplate": "From template…",
+      "editDetails": "Edit details",
+      "duplicate": "Duplicate",
+      "share": "Share",
+      "setDefault": "Set as default",
+      "addFavorite": "Add to favourites",
+      "removeFavorite": "Remove from favourites",
+      "delete": "Delete"
+    }
+  },
+  "switcher": {
+    "trigger": "Switch dashboard",
+    "tabsLabel": "Dashboard lists",
+    "tabs": {
+      "favourites": "Favourites",
+      "mine": "Mine",
+      "shared": "Shared with me"
+    },
+    "search": "Search dashboards",
+    "default": "Default",
+    "empty": "No dashboards here."
+  },
+  "filters": {
+    "regionLabel": "Dashboard filters",
+    "period": {
+      "label": "Period",
+      "hint": "The dates every widget uses."
+    },
+    "from": {
+      "label": "From",
+      "hint": "First day included."
+    },
+    "to": {
+      "label": "To",
+      "hint": "Last day included."
+    },
+    "datePlaceholder": "Select date",
+    "dateToday": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "compare": {
+      "label": "Compare with",
+      "hint": "Shows the change against an earlier period."
+    },
+    "scope": {
+      "label": "Scope",
+      "hint": "Whose numbers to show. Companies are never added together."
+    },
+    "reset": "Reset",
+    "presets": {
+      "TODAY": "Today",
+      "CURRENT_WEEK": "This week",
+      "CURRENT_MONTH": "This month",
+      "CURRENT_QUARTER": "This quarter",
+      "CURRENT_YEAR": "This year",
+      "LAST_30_DAYS": "Last 30 days",
+      "CUSTOM": "Custom"
+    },
+    "compareOptions": {
+      "NONE": "None",
+      "PREVIOUS_PERIOD": "Previous period",
+      "PREVIOUS_YEAR": "Same period last year"
+    },
+    "scopeOptions": {
+      "SAVED_TARGETS": "Saved scope",
+      "COMPANY": "This company",
+      "BRANCH": "This branch",
+      "ALL_ACCESSIBLE": "All my companies"
+    },
+    "errors": {
+      "order": "Start date must be on or before end date.",
+      "maxRange": "Date range cannot exceed 24 months."
+    }
+  },
+  "editBar": {
+    "regionLabel": "Layout editing",
+    "title": "Editing layout",
+    "keyboardLabel": "Keyboard shortcuts",
+    "keyboardHint": "Arrows move · Shift+arrows resize",
+    "addWidget": "Add widget",
+    "addDisabledDirty": "Save or undo layout changes before adding a widget.",
+    "addDisabledLimit": "This dashboard already has 20 widgets.",
+    "removeDisabledDirty": "Save or undo layout changes before removing a widget.",
+    "undo": "Undo",
+    "cancel": "Cancel",
+    "saveLayout": "Save layout"
+  },
+  "frame": {
+    "unavailable": "Unavailable widget",
+    "asOf": "As of {{time}}",
+    "otherCompanies": "Other companies: {{list}}",
+    "multiSeriesNote": "One line per company and currency; values are never added together.",
+    "menuLabel": "Widget actions",
+    "showTable": "Show table",
+    "showChart": "Show chart",
+    "openList": "Open list",
+    "grip": "Move widget",
+    "remove": "Remove widget"
+  },
+  "page": {
+    "emptyTitle": "No dashboard yet.",
+    "createDashboard": "Create dashboard",
+    "forbiddenTitle": "Trade analytics is not part of your subscription.",
+    "loadFailedText": "An error occurred while loading the dashboard. Try again.",
+    "emptyDashboard": "This dashboard has no widgets yet."
+  },
+  "confirm": {
+    "deleteTitle": "Delete dashboard",
+    "deleteText": "Delete {{name}}? People you shared it with lose access. This cannot be undone.",
+    "deleteAction": "Delete",
+    "removeTitle": "Remove widget",
+    "removeText": "Remove this widget from the dashboard?",
+    "removeAction": "Remove",
+    "conflictTitle": "This dashboard changed",
+    "conflictText": "Someone else saved changes. Reload their layout, or keep yours and save again.",
+    "unsavedTitle": "Unsaved layout changes",
+    "unsavedText": "You have unsaved layout changes. Save them before leaving?",
+    "unsavedSave": "Save layout",
+    "unsavedDiscard": "Discard",
+    "unsavedCancel": "Cancel"
+  },
+  "state": {
+    "loading": "Loading widget",
+    "empty": "No data in this period.",
+    "noAccess": "You do not have access to this data.",
+    "wholeCompany": "This number needs the whole company. Choose This company.",
+    "timeout": "This widget took too long to load."
+  },
+  "unavailable": {
+    "WIDGET_DELETED": "This widget was deleted.",
+    "WIDGET_ACCESS_REVOKED": "The owner can no longer see this widget.",
+    "WIDGET_PERMISSION_REQUIRED": "You do not have access to this widget.",
+    "METRIC_RETIRED_OR_INCOMPATIBLE": "This number is no longer available."
+  },
+  "toast": {
+    "omitted": "{{n}} unavailable widgets were not copied.",
+    "coverUnavailable": "A widget cannot cover an unavailable widget. Move it or remove the unavailable one.",
+    "sourcesDown": "The data sources are not responding. Try again shortly.",
+    "defaultSet": "Set as your default dashboard.",
+    "favoriteAdded": "Added to favourites.",
+    "favoriteRemoved": "Removed from favourites.",
+    "duplicated": "Dashboard duplicated.",
+    "deleted": "Dashboard deleted.",
+    "layoutSaved": "Layout saved.",
+    "layoutOverlap": "Two widgets overlap, so the layout was not saved. Move or resize one of them and save again.",
+    "widgetRemoved": "Widget removed."
+  },
+  "labels": {
+    "trade_document_status_draft": "Draft",
+    "trade_document_status_sent": "Sent",
+    "trade_document_status_accepted": "Accepted",
+    "trade_document_status_rejected": "Rejected",
+    "trade_document_status_expired": "Expired",
+    "trade_document_status_confirmed": "Confirmed",
+    "trade_document_status_closed": "Closed",
+    "trade_document_status_cancelled": "Cancelled",
+    "trade_fulfillment_status_unfulfilled": "Unfulfilled",
+    "trade_fulfillment_status_partially_fulfilled": "Partially fulfilled",
+    "trade_fulfillment_status_fulfilled": "Fulfilled",
+    "trade_approval_status_pending": "Pending",
+    "trade_approval_status_approved": "Approved",
+    "trade_approval_status_rejected": "Rejected",
+    "trade_item_kind_product": "Product",
+    "trade_item_kind_service": "Service",
+    "trade_item_kind_combo": "Combo",
+    "trade_price_purpose_sales": "Sales",
+    "trade_price_purpose_purchase": "Purchase",
+    "trade_price_purpose_pos": "POS",
+    "trade_exception_severity_low": "Low",
+    "trade_exception_severity_medium": "Medium",
+    "trade_exception_severity_high": "High",
+    "trade_exception_severity_critical": "Critical",
+    "trade_catalog_capability_sell": "Sell",
+    "trade_catalog_capability_purchase": "Purchase",
+    "trade_catalog_capability_pos": "POS",
+    "trade_inventory_availability_in_stock": "In stock",
+    "trade_inventory_availability_low_stock": "Low stock",
+    "trade_inventory_availability_out_of_stock": "Out of stock"
+  },
+  "columns": {
+    "company": "Company",
+    "documentNumber": "Document number",
+    "validUntil": "Valid until",
+    "lifecycleStatus": "Status",
+    "currencyCode": "Currency",
+    "grandTotal": "Grand total",
+    "purchaseOrderId": "Purchase order",
+    "lineId": "Line",
+    "expectedDate": "Expected date",
+    "orderedQuantity": "Ordered quantity",
+    "receivedQuantity": "Received quantity",
+    "uomId": "Unit",
+    "itemId": "Item",
+    "itemCompanyProfileId": "Item profile",
+    "fulfillmentNodeId": "Fulfilment node",
+    "onHand": "On hand",
+    "reserved": "Reserved",
+    "available": "Available",
+    "id": "ID",
+    "sourceType": "Source type",
+    "sourceId": "Source",
+    "category": "Category",
+    "severity": "Severity",
+    "safeErrorCode": "Error code",
+    "createdAt": "Created at",
+    "quotationId": "Quotation"
+  }
+}

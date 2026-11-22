@@ -1,0 +1,280 @@
+<ui-modal
+  #mainModal
+  data-main-modal
+  size="record"
+  [ariaLabel]="modalAriaLabel()"
+  [hasFooter]="true"
+  bodyClass="flex flex-col p-0 overflow-hidden"
+  [dismissable]="!saving() && !uploadingImage() && !updatingStatus() && !guardBusy() && !formDialogBusy()"
+  (closed)="onModalClosed()"
+>
+  <header class="flex shrink-0 items-center gap-8 border-b border-border bg-surface px-10 py-8">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="kindTile().tile"
+      aria-hidden="true"
+    >
+      <ng-icon [name]="kindTile().icon" size="15" />
+    </span>
+
+    <div class="min-w-0 flex-1">
+      <h2 class="truncate text-15 leading-22 font-medium text-text">
+        {{ (mode() === 'create' ? 'itemForm.modal.newTitle' : 'itemForm.modal.title') | transloco }}
+      </h2>
+      @if (subtitleName(); as sub) {
+        <p dir="auto" class="truncate text-12 leading-18 text-text-muted">{{ sub }}</p>
+      }
+    </div>
+
+    @if (mode() === 'edit' && navPosition(); as pos) {
+      <div class="flex shrink-0 items-center gap-4">
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+          [disabled]="pos.index <= 1 || loading() || saving() || uploadingImage() || updatingStatus()"
+          [attr.aria-label]="'itemForm.nav.prev' | transloco"
+          [title]="'itemForm.nav.prev' | transloco"
+          (click)="goPrev()"
+        >
+          <ng-icon name="tablerChevronLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+
+        <span class="px-4 text-12 leading-18 text-text-muted tabular-nums">
+          {{ 'itemForm.modal.position' | transloco: { n: pos.index, total: pos.total } }}
+        </span>
+
+        <button
+          type="button"
+          class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+          [disabled]="pos.index >= pos.total || loading() || saving() || uploadingImage() || updatingStatus()"
+          [attr.aria-label]="'itemForm.nav.next' | transloco"
+          [title]="'itemForm.nav.next' | transloco"
+          (click)="goNext()"
+        >
+          <ng-icon name="tablerChevronRight" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
+        </button>
+      </div>
+    }
+
+    <button
+      type="button"
+      class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'tradeShared.common.close' | transloco"
+      [title]="'tradeShared.common.close' | transloco"
+      (click)="requestClose()"
+    >
+      <ng-icon name="tablerX" size="15" aria-hidden="true" />
+    </button>
+  </header>
+
+  <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden" [attr.aria-busy]="loading()">
+    @if (loading()) {
+      <div class="flex min-h-0 flex-1 overflow-hidden">
+        <div class="flex min-w-0 flex-1 flex-col gap-y-10 px-16 py-10">
+          <div class="h-table-head motion-safe:animate-pulse rounded-10 bg-neutral-soft"></div>
+          <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+            <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+            <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+            <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+            <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+          </div>
+          <div class="h-table-head motion-safe:animate-pulse rounded-10 bg-neutral-soft"></div>
+          <div class="h-dropzone motion-safe:animate-pulse rounded-10 bg-neutral-soft"></div>
+        </div>
+
+        <aside class="flex w-record-side shrink-0 flex-col gap-y-8 border-s border-border bg-surface-muted px-16 py-10">
+          <div class="h-table-head motion-safe:animate-pulse rounded-10 bg-neutral-soft"></div>
+          <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+          <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+        </aside>
+      </div>
+    } @else if (notFound()) {
+      <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+          <ng-icon name="tablerFileSearch" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'itemForm.states.notFound' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" (click)="requestClose()">
+          {{ 'tradeShared.common.close' | transloco }}
+        </button>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'itemForm.states.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="primary" (click)="retryLoad()">
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else {
+      <app-item-form
+        class="h-full min-h-0 flex-1"
+        layout="modal"
+        [mode]="mode()"
+        [readonly]="isReadonly()"
+        [errors]="errors()"
+        [itemId]="activeId()"
+        [image]="detail()?.image ?? null"
+        [pendingImage]="pendingImageFile()"
+        [uploadingImage]="uploadingImage()"
+        [updatingStatus]="updatingStatus()"
+        [owners]="owners()"
+        [baseUom]="baseUom()"
+        [categoryLabel]="categoryLabel()"
+        [draft]="draft()"
+        (draftChange)="onDraftChange($event)"
+        (statusChange)="onStatusChange($event)"
+        (imagePicked)="onImagePicked($event)"
+        (imageRemove)="onImageRemove()"
+        (imageClientError)="onImageClientError($event)"
+        (dialogBusyChange)="formDialogBusy.set($event)"
+        (submitRequest)="save(false)"
+      />
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage && !notFound() && !loadFailed()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="
+          saving() ||
+          uploadingImage() ||
+          updatingStatus() ||
+          loading() ||
+          (mode() === 'edit' && !isDirty())
+        "
+        (click)="save(false)"
+      >
+        {{ (mode() === 'create' ? 'itemForm.actions.create' : 'tradeShared.common.save') | transloco }}
+      </button>
+    }
+
+    @if (mode() === 'create' && canManage) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="saving() || uploadingImage() || loading()"
+        (click)="save(true)"
+      >
+        {{ 'itemForm.actions.createAnother' | transloco }}
+      </button>
+    }
+
+    @if (!notFound() && !loadFailed()) {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving() || uploadingImage() || loading()"
+        (click)="continueInFullPage()"
+      >
+        <ng-icon name="tablerArrowsMaximize" size="15" aria-hidden="true" />
+        {{ 'itemForm.actions.full' | transloco }}
+      </button>
+    }
+
+    @if (canManage && isDirty()) {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving() || uploadingImage() || updatingStatus()"
+        (click)="undoChanges()"
+      >
+        {{ 'tradeShared.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.unsaved' | transloco }}</span>
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="saving() || uploadingImage() || updatingStatus()"
+        (click)="requestClose()"
+      >
+        {{ (mode() === 'create' ? 'tradeShared.common.cancel' : 'tradeShared.common.close') | transloco }}
+      </button>
+    }
+
+    @if (canDiscontinue()) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [disabled]="saving() || uploadingImage() || updatingStatus() || loading()"
+        (click)="onStatusChange('DISCONTINUED')"
+      >
+        {{ 'tradeItems.actions.discontinue' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'itemForm.unsaved.title' | transloco"
+  [text]="'itemForm.unsaved.text' | transloco"
+  [saveLabel]="'tradeShared.common.save' | transloco"
+  [discardLabel]="'itemForm.unsaved.discard' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  #conflictDialog
+  [title]="'tradeItems.conflict.title' | transloco"
+  [text]="'tradeItems.conflict.text' | transloco"
+  [saveLabel]="'tradeShared.common.reload' | transloco"
+  [discardLabel]="'tradeItems.conflict.keep' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #discontinueModal
+  size="confirm"
+  icon="tablerBan"
+  tile="bg-icon-red"
+  [title]="'tradeItems.discontinue.title' | transloco: { name: subtitleName() }"
+  [closeLabel]="'tradeShared.common.cancel' | transloco"
+  [dismissable]="false"
+  (closed)="onDiscontinueClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeItems.discontinue.text' | transloco }}</p>
+    @if (discontinueOpen()) {
+      <app-trade-reason-picker
+        #discontinueReasonPicker
+        kind="ITEM_DISCONTINUE"
+        idPrefix="item-modal-discontinue"
+        [showErrors]="discontinueSubmitted()"
+        [(value)]="discontinueReason"
+      />
+    }
+  </div>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="danger"
+      [disabled]="!(discontinueReasonPicker()?.valid() ?? false)"
+      (click)="confirmDiscontinue()"
+    >
+      {{ 'tradeItems.actions.discontinue' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="cancelDiscontinue()">
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

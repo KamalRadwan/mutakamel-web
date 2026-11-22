@@ -1,0 +1,299 @@
+<ui-modal
+  size="wide"
+  icon="tablerVersions"
+  tile="bg-icon-blue"
+  [title]="'priceBooks.newVersion.title' | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form class="grid grid-cols-3 gap-x-10 gap-y-8" (submit)="$event.preventDefault(); submit()">
+    <div class="col-span-3">
+      <ui-field
+        [bare]="true"
+        [label]="'priceBooks.newVersion.fields.startFrom' | transloco"
+        [for]="uid + '-start-from'"
+        [hint]="'priceBooks.newVersion.hints.startFrom' | transloco"
+        [hintText]="isEmpty() ? ('priceBooks.newVersion.emptyHelp' | transloco) : null"
+        [required]="true"
+      >
+        <ui-segmented
+          [id]="uid + '-start-from'"
+          [label]="'priceBooks.newVersion.fields.startFrom' | transloco"
+          [describedBy]="uid + '-start-from-hint'"
+          [options]="modeOptions()"
+          [value]="sourceMode()"
+          (valueChange)="onModeChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (isClone()) {
+      <div class="col-span-2">
+        <ui-field
+          [bare]="true"
+          [label]="'priceBooks.newVersion.fields.sourceVersion' | transloco"
+          [for]="uid + '-source-version'"
+          [hint]="'priceBooks.newVersion.hints.sourceVersion' | transloco"
+          [hintText]="!loadingSources() && sourceVersionOptions().length === 0 ? ('priceBooks.newVersion.noSourceVersions' | transloco) : null"
+          [required]="true"
+          [error]="sourceVersionError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-source-version'"
+            [label]="'priceBooks.newVersion.fields.sourceVersion' | transloco"
+            [describedBy]="uid + '-source-version-hint' + (sourceVersionError() ? ' ' + uid + '-source-version-error' : '')"
+            [options]="sourceVersionOptions()"
+            [value]="sourceVersionId()"
+            [disabled]="saving() || loadingSources() || sourceVersionOptions().length === 0"
+            (valueChange)="onSourceVersionChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-1">
+        <ui-field
+          [bare]="true"
+          [label]="'priceBooks.newVersion.fields.includePromotions' | transloco"
+          [for]="uid + '-include-promos'"
+          [hint]="'priceBooks.newVersion.hints.includePromotions' | transloco"
+        >
+          <div class="flex h-field items-center gap-8">
+            <ui-switch
+              [id]="uid + '-include-promos'"
+              [label]="'priceBooks.newVersion.fields.includePromotions' | transloco"
+              [describedBy]="uid + '-include-promos-hint'"
+              [disabled]="saving()"
+              [(checked)]="includePromotions"
+            />
+            <span class="text-12 text-text">
+              {{ (includePromotions() ? 'tradeShared.common.yes' : 'tradeShared.common.no') | transloco }}
+            </span>
+          </div>
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-3 grid grid-cols-2 gap-10">
+      <div>
+        <ui-field
+          [bare]="true"
+          [label]="'priceBooks.newVersion.fields.effectiveFrom' | transloco"
+          [for]="uid + '-effective-from'"
+          [hint]="'priceBooks.newVersion.hints.effectiveFrom' | transloco"
+          [required]="true"
+          [error]="effectiveFromError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-effective-from'"
+              [ariaLabel]="'priceBooks.newVersion.fields.effectiveFrom' | transloco"
+              [describedBy]="uid + '-effective-from-hint' + (effectiveFromError() ? ' ' + uid + '-effective-from-error' : '')"
+              [placeholder]="'priceBooks.newVersion.placeholders.effectiveFrom' | transloco"
+              [todayLabel]="'priceBooks.newVersion.today' | transloco"
+              [prevMonthLabel]="'priceBooks.newVersion.prevMonth' | transloco"
+              [nextMonthLabel]="'priceBooks.newVersion.nextMonth' | transloco"
+              [invalid]="!!effectiveFromError()"
+              [disabled]="saving()"
+              [value]="fromDate()"
+              (valueChange)="onFromDateChange($event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [ariaLabel]="'priceBooks.newVersion.fields.effectiveFrom' | transloco"
+              [describedBy]="uid + '-effective-from-hint' + (effectiveFromError() ? ' ' + uid + '-effective-from-error' : '')"
+              [hourLabel]="'priceBooks.newVersion.hour' | transloco"
+              [minuteLabel]="'priceBooks.newVersion.minute' | transloco"
+              [invalid]="!!effectiveFromError()"
+              [disabled]="saving()"
+              [value]="fromTime()"
+              (valueChange)="onFromTimeChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      <div>
+        <ui-field
+          [bare]="true"
+          [label]="'priceBooks.newVersion.fields.effectiveTo' | transloco"
+          [for]="uid + '-effective-to'"
+          [hint]="'priceBooks.newVersion.hints.effectiveTo' | transloco"
+          [error]="effectiveToError()"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="uid + '-effective-to'"
+              [ariaLabel]="'priceBooks.newVersion.fields.effectiveTo' | transloco"
+              [describedBy]="uid + '-effective-to-hint' + (effectiveToError() ? ' ' + uid + '-effective-to-error' : '')"
+              [placeholder]="'priceBooks.newVersion.placeholders.effectiveTo' | transloco"
+              [todayLabel]="'priceBooks.newVersion.today' | transloco"
+              [prevMonthLabel]="'priceBooks.newVersion.prevMonth' | transloco"
+              [nextMonthLabel]="'priceBooks.newVersion.nextMonth' | transloco"
+              [min]="fromDate()"
+              [invalid]="!!effectiveToError()"
+              [disabled]="saving()"
+              [value]="toDate()"
+              (valueChange)="onToDateChange($event)"
+            />
+            @if (toDate()) {
+              <ui-time-field
+                class="shrink-0"
+                [ariaLabel]="'priceBooks.newVersion.fields.effectiveTo' | transloco"
+                [describedBy]="uid + '-effective-to-hint' + (effectiveToError() ? ' ' + uid + '-effective-to-error' : '')"
+                [hourLabel]="'priceBooks.newVersion.hour' | transloco"
+                [minuteLabel]="'priceBooks.newVersion.minute' | transloco"
+                [invalid]="!!effectiveToError()"
+                [disabled]="saving()"
+                [value]="toTime()"
+                (valueChange)="onToTimeChange($event)"
+              />
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'priceBooks.newVersion.clearEnd' | transloco"
+                [title]="'priceBooks.newVersion.clearEnd' | transloco"
+                [disabled]="saving()"
+                (click)="clearTo()"
+              >
+                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+    </div>
+
+    @if (showsAdjustment()) {
+      <div [class]="showsChangeValue() ? 'col-span-2' : 'col-span-3'">
+        <ui-field
+          [bare]="true"
+          [label]="'priceBooks.newVersion.fields.priceChange' | transloco"
+          [for]="uid + '-price-change'"
+          [hint]="'priceBooks.newVersion.hints.priceChange' | transloco"
+        >
+          <ui-segmented
+            [id]="uid + '-price-change'"
+            [label]="'priceBooks.newVersion.fields.priceChange' | transloco"
+            [describedBy]="uid + '-price-change-hint'"
+            [options]="adjustmentOptions()"
+            [value]="adjustmentMode()"
+            (valueChange)="onAdjustmentModeChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      @if (showsChangeValue()) {
+        <div class="col-span-1">
+          <ui-field
+            [label]="'priceBooks.newVersion.fields.changeValue' | transloco"
+            [for]="uid + '-change-value'"
+            [hint]="'priceBooks.newVersion.hints.changeValue' | transloco"
+            [required]="true"
+            [error]="changeValueError()"
+          >
+            <input
+              [id]="uid + '-change-value'"
+              type="text"
+              dir="ltr"
+              inputmode="decimal"
+              autocomplete="off"
+              class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="'priceBooks.newVersion.placeholders.changeValue' | transloco"
+              [value]="adjustmentValue()"
+              [disabled]="saving()"
+              [attr.aria-invalid]="changeValueError() ? 'true' : null"
+              (input)="onAdjustmentValueInput($event)"
+            />
+          </ui-field>
+        </div>
+      }
+
+      <div class="col-span-2">
+        <ui-field
+          [bare]="true"
+          [label]="'priceBooks.newVersion.fields.rounding' | transloco"
+          [for]="uid + '-rounding'"
+          [hint]="'priceBooks.newVersion.hints.rounding' | transloco"
+          [hintText]="lowDecimals() ? ('priceBooks.newVersion.roundingDisabledHint' | transloco) : null"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-rounding'"
+            [label]="'priceBooks.newVersion.fields.rounding' | transloco"
+            [describedBy]="uid + '-rounding-hint'"
+            [options]="roundingOptions()"
+            [value]="roundingMode()"
+            [disabled]="saving()"
+            (valueChange)="onRoundingChange($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-3">
+      <ui-field
+        size="multiline"
+        [label]="'priceBooks.newVersion.fields.notes' | transloco"
+        [for]="uid + '-notes'"
+        [hint]="'priceBooks.newVersion.hints.notes' | transloco"
+        [count]="notes().length"
+        [max]="maxNotes"
+        [error]="notesError()"
+      >
+        <textarea
+          [id]="uid + '-notes'"
+          rows="3"
+          [attr.maxlength]="maxNotes"
+          class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'priceBooks.newVersion.placeholders.notes' | transloco"
+          [value]="notes()"
+          [disabled]="saving()"
+          [attr.aria-invalid]="notesError() ? 'true' : null"
+          (input)="onNotesInput($event)"
+        ></textarea>
+      </ui-field>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="submit()"
+    >
+      {{ 'priceBooks.newVersion.submit' | transloco }}
+    </button>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="requestClose()"
+    >
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'priceBooks.discardConfirm.title' | transloco"
+  [text]="'priceBooks.discardConfirm.text' | transloco"
+  [confirmLabel]="'priceBooks.discardConfirm.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>
+
+<app-conflict-dialog
+  (reload)="onConflictReload()"
+  (keep)="onConflictKeep()"
+/>

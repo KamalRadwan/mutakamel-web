@@ -1,0 +1,202 @@
+{
+  "toolbar": {
+    "changePlan": "Change plan",
+    "continueChange": "Continue your change",
+    "viewInvoice": "View invoice",
+    "reload": "Reload",
+    "disabledReasons": {
+      "collection": "Pay the open invoice first",
+      "PENDING_ACTIVATION": "Wait until your workspace activation finishes before changing your plan.",
+      "PAST_DUE": "Pay the overdue invoice before changing your plan.",
+      "CANCELLED": "Cancelled subscriptions cannot be modified."
+    }
+  },
+  "plan": {
+    "title": "Plan",
+    "fields": {
+      "status": "Status",
+      "statusHint": "Current commercial state of your workspace subscription.",
+      "access": "Access",
+      "accessHint": "Whether workspace modules have full, dunning, read-only, or blocked access.",
+      "cycle": "Billing cycle",
+      "cycleHint": "How often recurring charges are billed.",
+      "started": "Started",
+      "startedHint": "Date your workspace subscription began.",
+      "period": "Current period",
+      "periodHint": "Start and end dates of the active billing period.",
+      "renewsOn": "Renews on",
+      "renewsOnHint": "Date the subscription next renews or bills.",
+      "trialEnds": "Trial ends",
+      "trialEndsHint": "Date the trial period ends.",
+      "cancelsOn": "Cancels on",
+      "cancelsOnHint": "Scheduled date when the subscription ends.",
+      "allowedUsers": "Users allowed",
+      "allowedUsersHint": "Total user seat allowance included across your subscribed applications."
+    },
+    "totals": {
+      "applications": "Applications",
+      "addons": "Add-ons",
+      "total": "Total"
+    }
+  },
+  "items": {
+    "title": "Applications",
+    "cols": {
+      "application": "Application",
+      "tier": "Tier / Status",
+      "seats": "Seats",
+      "recurring": "Recurring",
+      "actions": "Actions"
+    },
+    "seatsUsed": "{{used}} of {{seats}} used",
+    "empty": "No applications are subscribed yet.",
+    "expand": "Show price brackets",
+    "collapse": "Hide price brackets",
+    "bracketRange": "{{min}}–{{max}} users · {{charged}} charged × {{unit}} = {{amount}}",
+    "bracketOpen": "{{min}} and more users · {{charged}} charged × {{unit}} = {{amount}}",
+    "tags": {
+      "revoked": "Definition withdrawn",
+      "deprecated": "Being retired"
+    },
+    "actions": {
+      "label": "Application actions",
+      "addSeats": "Add seats",
+      "upgradeTier": "Upgrade tier",
+      "addAddon": "Add an add-on",
+      "reduceSeats": "Reduce seats"
+    }
+  },
+  "change": {
+    "title": "Change plan",
+    "back": "Back to subscription",
+    "stepCounter": "Step {{current}} of {{total}}",
+    "steps": {
+      "changes": "Changes",
+      "review": "Review",
+      "done": "Done"
+    },
+    "addChange": "Add a change",
+    "addMenu": {
+      "addApp": "Add application",
+      "changeSeats": "Change seats",
+      "upgradeTier": "Upgrade tier",
+      "noAppsLeft": "All available applications are already subscribed or in your cart.",
+      "noItemsLeft": "No subscribed applications or add-ons left to change.",
+      "noUpgradesLeft": "No subscribed applications have a higher tier available."
+    },
+    "emptyCart": "Add one or more changes below to build your plan update.",
+    "reason": "Reason",
+    "reasonHint": "Shown in the subscription history.",
+    "reasonPlaceholder": "Optional note about why you are updating your plan",
+    "reviewBtn": "Review",
+    "confirmBtn": "Confirm change",
+    "refreshPrice": "Refresh price",
+    "topUpWallet": "Top up wallet",
+    "preparing": "Preparing your change…",
+    "quoting": "Calculating your price…",
+    "freeSeats": "Free seats",
+    "row": {
+      "remove": "Remove change",
+      "kinds": {
+        "addApp": "Add application",
+        "changeSeats": "Change seats",
+        "upgradeTier": "Upgrade tier",
+        "addAddon": "Add add-on"
+      },
+      "application": "Application",
+      "applicationHint": "Application to add or modify in your subscription.",
+      "item": "Item",
+      "itemHint": "Subscribed application or add-on whose seats you want to change.",
+      "tier": "Tier",
+      "tierHint": "Plan tier to subscribe to for this application.",
+      "currentTier": "Current tier",
+      "currentTierHint": "Tier currently active for this application.",
+      "newTier": "New tier",
+      "newTierHint": "Higher tier to upgrade this application to.",
+      "addon": "Add-on",
+      "addonHint": "Add-on being added to your subscription.",
+      "forApplication": "For application",
+      "forApplicationHint": "Parent application this add-on belongs to.",
+      "currentSeats": "Current seats",
+      "currentSeatsHint": "Number of seats currently included.",
+      "seats": "Seats",
+      "seatsHint": "Number of seats to include (1 to 100,000).",
+      "newSeats": "New seats",
+      "newSeatsHint": "Target seat count. Lowering application seats requires enough free seats.",
+      "addonSeatsHint": "Add-on seats must be higher than current and not exceed the parent application seats.",
+      "selectApplication": "Select application",
+      "selectTier": "Select tier",
+      "selectItem": "Select item",
+      "errors": {
+        "appRequired": "Select an application.",
+        "itemRequired": "Select an application or add-on.",
+        "tierRequired": "Select an available tier.",
+        "noHigherTier": "No higher tier is available for this application.",
+        "seatsRange": "Enter a whole number between 1 and 100,000.",
+        "seatsUnchanged": "Enter a seat count different from the current count.",
+        "addonSeatsHigher": "Add-on seats must be higher than {{current}}.",
+        "addonSeatsMax": "Add-on seats cannot exceed {{max}} (parent application seats).",
+        "reasonTooLong": "Reason must be 256 characters or fewer."
+      }
+    },
+    "quote": {
+      "tableLabel": "Price preview breakdown",
+      "cols": {
+        "item": "Item",
+        "change": "Change",
+        "before": "Before",
+        "after": "After",
+        "periodDelta": "Change per period",
+        "dueNow": "Due now"
+      },
+      "seatsCount": "{{n}} seats",
+      "seatsCountPlural": {
+        "one": "{{n}} seat",
+        "other": "{{n}} seats"
+      },
+      "summaryTitle": "Summary",
+      "recurring": "Recurring",
+      "dueNow": "Due now",
+      "direction": {
+        "DEBIT": "Charged to your wallet",
+        "CREDIT": "Credited to your wallet",
+        "NONE": "Nothing to pay"
+      },
+      "walletAvailable": "Wallet available",
+      "shortfall": "Shortfall",
+      "validFor": "Price valid for {{time}}",
+      "expired": "This price preview expired"
+    },
+    "done": {
+      "title": "Your plan is updated",
+      "newRecurring": "New recurring total",
+      "settlementDebit": "{{amount}} charged to your wallet · balance {{balance}}",
+      "settlementCredit": "{{amount}} credited to your wallet · balance {{balance}}",
+      "backToSubscription": "Back to subscription",
+      "viewWallet": "View wallet activity"
+    },
+    "journal": {
+      "title": "You have an unfinished change",
+      "text": "A plan change preparation is still open from earlier. Would you like to continue reviewing it or discard it?",
+      "continue": "Continue",
+      "discard": "Discard"
+    },
+    "conflict": {
+      "title": "Your subscription changed",
+      "text": "Your subscription was updated since you started. Reload to review the latest plan before continuing.",
+      "reload": "Reload",
+      "keep": "Keep my changes"
+    },
+    "unsaved": {
+      "title": "Leave without applying changes?",
+      "text": "Your selected plan changes have not been applied yet.",
+      "keep": "Keep editing",
+      "discard": "Discard and leave",
+      "cancel": "Cancel"
+    },
+    "toasts": {
+      "pollTimeout": "Preparing your change took longer than expected. Please try reviewing again.",
+      "prefillSkipped": "The pre-selected item is no longer available for this change."
+    }
+  }
+}

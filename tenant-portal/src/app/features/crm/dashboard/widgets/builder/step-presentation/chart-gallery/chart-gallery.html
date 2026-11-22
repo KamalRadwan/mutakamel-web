@@ -1,0 +1,49 @@
+<div
+  role="radiogroup"
+  [attr.aria-label]="label() || ('builder2.presentation.chart' | transloco)"
+  [attr.aria-describedby]="describedBy() || null"
+  class="flex flex-col gap-10"
+>
+  @for (group of groups(); track group.id) {
+    <div class="flex flex-col gap-4">
+      <div class="text-11 leading-16 font-medium text-text-muted">{{ group.label }}</div>
+      <div class="grid grid-cols-2 gap-6 wide:grid-cols-3">
+        @for (tile of group.tiles; track tile.key) {
+          <button
+            #tileBtn
+            type="button"
+            role="radio"
+            [attr.id]="group.id === 'kpi' && $first ? (id() || null) : null"
+            class="flex min-w-0 items-center gap-6 rounded-10 border p-6 text-start text-12 leading-18 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              tile.disabled
+                ? 'cursor-not-allowed border-border bg-neutral-soft text-text-placeholder'
+                : tile.selected
+                  ? 'cursor-pointer border-brand bg-brand-soft font-medium text-on-brand-soft shadow-card'
+                  : 'cursor-pointer border-border bg-surface text-text shadow-card hover:border-border-field-hover hover:bg-row-hover'
+            "
+            [attr.aria-checked]="tile.selected"
+            [attr.aria-disabled]="tile.disabled ? 'true' : null"
+            [attr.aria-describedby]="tileDescribedBy(tile)"
+            [attr.title]="tile.disabled ? tile.reason : tile.label"
+            [tabIndex]="tile.key === activeTileKey() ? 0 : -1"
+            (click)="selectTile(tile)"
+            (keydown)="onTileKeydown($event, tile.key)"
+          >
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8"
+              [class]="tile.disabled ? 'bg-status-none text-text-placeholder' : tile.familyTileClass + ' text-on-icon'"
+              aria-hidden="true"
+            >
+              <ng-icon [name]="tile.familyIcon" size="14" aria-hidden="true" />
+            </span>
+            <span class="min-w-0 flex-1 truncate">{{ tile.label }}</span>
+            @if (tile.disabled) {
+              <span [id]="reasonId(tile.key)" class="sr-only">{{ tile.reason }}</span>
+            }
+          </button>
+        }
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,42 @@
+<ui-modal
+  #reasonModal
+  size="form"
+  [icon]="modalIcon()"
+  [tile]="modalTile()"
+  [title]="('tplFunctions.reasonModal.' + options().mode + '.title') | transloco"
+  [subtitle]="options().functionName"
+  [closeLabel]="'tplFunctions.actions.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="flex flex-col gap-10" novalidate (submit)="submit($event)">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-input'"
+      [label]="('tplFunctions.reasonModal.' + options().mode + '.label') | transloco"
+      [hint]="('tplFunctions.reasonModal.' + options().mode + '.hint') | transloco"
+      [required]="true"
+      [count]="text().length"
+      [max]="1000"
+      [error]="textError()"
+    >
+      <textarea
+        [id]="uid + '-input'"
+        rows="3"
+        maxlength="1000"
+        class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="('tplFunctions.reasonModal.' + options().mode + '.placeholder') | transloco"
+        [value]="text()"
+        (input)="onTextInput($event)"
+      ></textarea>
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button type="submit" [attr.form]="uid + '-form'" uiButton variant="primary">
+      {{ ('tplFunctions.reasonModal.' + options().mode + '.confirm') | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="cancel()">
+      {{ 'tplFunctions.actions.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

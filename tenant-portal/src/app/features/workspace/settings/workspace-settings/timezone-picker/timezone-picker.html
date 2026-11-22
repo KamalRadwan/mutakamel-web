@@ -1,0 +1,63 @@
+@if (useFallback()) {
+  <ui-field
+    [for]="uid + '-manual'"
+    [label]="'wsGeneral.timezone.manualLabel' | transloco"
+    [hint]="'wsGeneral.timezone.manualHint' | transloco"
+    [required]="required()"
+    [error]="error()"
+  >
+    <input
+      [id]="uid + '-manual'"
+      type="text"
+      dir="ltr"
+      [attr.maxlength]="maxLength"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [value]="value()"
+      [readOnly]="disabled()"
+      [attr.aria-readonly]="disabled() ? 'true' : null"
+      [attr.aria-invalid]="error() ? 'true' : null"
+      (input)="onManualInput($event)"
+    />
+  </ui-field>
+} @else {
+  <div class="flex flex-col gap-8">
+    <ui-field
+      [for]="uid + '-search'"
+      [label]="'wsGeneral.timezone.searchLabel' | transloco"
+      [hint]="'wsGeneral.timezone.searchHint' | transloco"
+    >
+      <input
+        [id]="uid + '-search'"
+        type="search"
+        dir="ltr"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'wsGeneral.timezone.searchPlaceholder' | transloco"
+        [value]="search()"
+        [readOnly]="disabled()"
+        [attr.aria-readonly]="disabled() ? 'true' : null"
+        (input)="onSearchInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-select'"
+      [label]="'wsGeneral.timezone.label' | transloco"
+      [hint]="'wsGeneral.timezone.hint' | transloco"
+      [required]="required()"
+      [error]="error()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-select'"
+        [describedBy]="error() ? uid + '-select-hint ' + uid + '-select-error' : uid + '-select-hint'"
+        [label]="'wsGeneral.timezone.label' | transloco"
+        [options]="dropdownOptions()"
+        [value]="value()"
+        [disabled]="disabled()"
+        (valueChange)="onSelect($event)"
+      />
+    </ui-field>
+  </div>
+}

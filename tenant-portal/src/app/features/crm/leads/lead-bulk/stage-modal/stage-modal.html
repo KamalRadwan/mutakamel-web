@@ -1,0 +1,137 @@
+<app-bulk-run-modal
+  size="form"
+  icon="tablerArrowsExchange"
+  tile="bg-icon-green"
+  [title]="'leadBulk.stage.title' | transloco"
+  [count]="displayCount()"
+  [summary]="'leadBulk.leadsCount' | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="canSubmit()"
+  [dismissable]="!submitting()"
+  [submitLabel]="'leadBulk.stage.go' | transloco: { n: actionableRows().length }"
+  (submit)="submit()"
+  (cancel)="closeStageMenu()"
+  (closed)="onModalClosed()"
+>
+  <ui-field
+    size="bare"
+    [label]="'leadBulk.stage.stage' | transloco"
+    [for]="uid + '-stage'"
+    [hint]="'leadBulk.stage.stageHint' | transloco"
+    [required]="true"
+  >
+    <div class="relative inline-flex w-full">
+      <button
+        #stageTrigger
+        type="button"
+        [id]="uid + '-stage'"
+        class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+        [class]="
+          stageMenuOpen()
+            ? 'border-focus-ring ring-3 ring-focus-halo'
+            : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+        "
+        aria-haspopup="listbox"
+        [attr.aria-expanded]="stageMenuOpen()"
+        [attr.aria-label]="'leadBulk.stage.stage' | transloco"
+        [attr.aria-describedby]="uid + '-stage-hint'"
+        [disabled]="selectableStages().length === 0"
+        (click)="toggleStageMenu()"
+      >
+        <span class="flex min-w-0 items-center gap-6">
+          @if (selectedStage(); as currentStage) {
+            @if (currentStage.flag === 'DISQUALIFIED') {
+              <span class="size-8 shrink-0 rounded-full bg-danger" aria-hidden="true"></span>
+              <span class="truncate font-medium text-danger-text">{{ stageLabel(currentStage) }}</span>
+            } @else {
+              <span class="truncate">{{ stageLabel(currentStage) }}</span>
+            }
+          } @else {
+            <span class="truncate text-text-placeholder">—</span>
+          }
+        </span>
+        <span class="inline-flex shrink-0 text-text-muted">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+
+      @if (stageMenuOpen()) {
+        <ul
+          #stageList
+          role="listbox"
+          class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+          [class.invisible]="!stageMenuPlaced()"
+          [style.top.px]="stageMenuPlace().top"
+          [style.inset-inline-start.px]="stageMenuPlace().start"
+          [style.min-width.px]="stageMenuPlace().width"
+          [style.max-height.px]="stageMenuPlace().maxHeight"
+          [attr.aria-label]="'leadBulk.stage.stage' | transloco"
+          (keydown)="onStageListKeydown($event)"
+        >
+          @for (stage of selectableStages(); track stage.id) {
+            @let isDanger = stage.flag === 'DISQUALIFIED';
+            @let isSelected = selectedStage()?.id === stage.id;
+            <li role="option" [attr.aria-selected]="isSelected">
+              <button
+                type="button"
+                class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  isSelected
+                    ? isDanger
+                      ? 'bg-danger-soft text-on-danger-soft'
+                      : 'bg-brand-soft text-on-brand-soft'
+                    : isDanger
+                      ? 'text-danger-text hover:bg-danger-soft'
+                      : 'text-text hover:bg-row-hover'
+                "
+                (click)="selectStage(stage.id)"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  @if (isDanger) {
+                    <span class="size-8 shrink-0 rounded-full bg-danger" aria-hidden="true"></span>
+                  }
+                  <span class="truncate">{{ stageLabel(stage) }}</span>
+                </span>
+                @if (isSelected) {
+                  <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </ui-field>
+
+  @if (isDisqualified()) {
+    <ui-field
+      size="bare"
+      [label]="'leadBulk.stage.reason' | transloco"
+      [for]="uid + '-reason'"
+      [hint]="'leadBulk.stage.reasonHint' | transloco"
+      [required]="true"
+      [error]="serverReasonError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-reason'"
+        [label]="'leadBulk.stage.reason' | transloco"
+        [describedBy]="uid + '-reason-hint'"
+        [options]="reasonOptions()"
+        [value]="selectedReasonId()"
+        [disabled]="reasonsLoading() || reasons().length === 0"
+        (valueChange)="onReasonChange($event)"
+      />
+    </ui-field>
+  }
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'leadBulk.stage.convertedNote' | transloco }}
+  </p>
+
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'leadBulk.stage.preview' | transloco: previewParams() }}
+  </p>
+</app-bulk-run-modal>

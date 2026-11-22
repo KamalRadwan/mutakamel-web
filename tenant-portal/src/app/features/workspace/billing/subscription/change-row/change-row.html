@@ -1,0 +1,315 @@
+@let currentRow = row();
+@let kind = kindLook();
+
+<article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <header class="flex items-center justify-between gap-8">
+    <div class="flex min-w-0 items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="kind.tile"
+      >
+        <ng-icon [name]="kind.icon" size="14" aria-hidden="true" />
+      </span>
+      <h3 class="truncate text-13 leading-18 font-medium text-text">{{ kind.labelKey | transloco }}</h3>
+    </div>
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'bsub.change.row.remove' | transloco"
+      [title]="'bsub.change.row.remove' | transloco"
+      (click)="removed.emit()"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+  </header>
+
+  @switch (currentRow.kind) {
+    @case ('add-app') {
+      <div class="grid grid-cols-1 gap-8 desktop:grid-cols-3">
+        <ui-field
+          size="bare"
+          [for]="uid + '-app'"
+          [label]="'bsub.change.row.application' | transloco"
+          [required]="true"
+          [hint]="'bsub.change.row.applicationHint' | transloco"
+          [error]="appFieldError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-app'"
+            [describedBy]="uid + '-app-hint' + (appFieldError() ? ' ' + uid + '-app-error' : '')"
+            [options]="appOptions()"
+            [value]="currentRow.applicationId"
+            [label]="'bsub.change.row.application' | transloco"
+            (valueChange)="onAddAppChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-tier'"
+          [label]="'bsub.change.row.tier' | transloco"
+          [required]="true"
+          [hint]="'bsub.change.row.tierHint' | transloco"
+          [error]="tierFieldError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-tier'"
+            [describedBy]="uid + '-tier-hint' + (tierFieldError() ? ' ' + uid + '-tier-error' : '')"
+            [options]="addAppTierOptions()"
+            [value]="currentRow.tierId"
+            [label]="'bsub.change.row.tier' | transloco"
+            [disabled]="!currentRow.applicationId"
+            (valueChange)="onAddAppTierChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-seats'"
+          [label]="'bsub.change.row.seats' | transloco"
+          [required]="true"
+          [hint]="'bsub.change.row.seatsHint' | transloco"
+          [error]="seatsFieldError()"
+        >
+          <input
+            [id]="uid + '-seats'"
+            type="number"
+            inputmode="numeric"
+            dir="ltr"
+            [min]="1"
+            [max]="100000"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [value]="currentRow.seats"
+            [attr.aria-invalid]="seatsFieldError() ? 'true' : null"
+            (input)="onAddAppSeatsInput($event)"
+            (blur)="markTouched()"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @case ('change-seats') {
+      <div class="grid grid-cols-1 gap-8 desktop:grid-cols-3">
+        @if (currentRow.locked) {
+          <ui-field
+            [for]="uid + '-item'"
+            [label]="'bsub.change.row.item' | transloco"
+            [hint]="'bsub.change.row.itemHint' | transloco"
+          >
+            <input
+              [id]="uid + '-item'"
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="seatTargetLabel()"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-item'"
+            [label]="'bsub.change.row.item' | transloco"
+            [required]="true"
+            [hint]="'bsub.change.row.itemHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-item'"
+              [describedBy]="uid + '-item-hint'"
+              [options]="seatTargetOptions()"
+              [value]="currentSeatTargetToken()"
+              [label]="'bsub.change.row.item' | transloco"
+              (valueChange)="onSeatTargetChange($event)"
+            />
+          </ui-field>
+        }
+
+        <ui-field
+          [for]="uid + '-current-seats'"
+          [label]="'bsub.change.row.currentSeats' | transloco"
+          [hint]="'bsub.change.row.currentSeatsHint' | transloco"
+        >
+          <input
+            [id]="uid + '-current-seats'"
+            type="text"
+            readonly
+            dir="ltr"
+            class="min-w-0 flex-1 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+            [value]="currentSeatsValue()"
+          />
+        </ui-field>
+
+        <div class="flex flex-col gap-6">
+          <ui-field
+            [for]="uid + '-new-seats'"
+            [label]="'bsub.change.row.newSeats' | transloco"
+            [required]="true"
+            [hint]="seatHintKey() | transloco"
+            [error]="seatsFieldError()"
+          >
+            <input
+              [id]="uid + '-new-seats'"
+              type="number"
+              inputmode="numeric"
+              dir="ltr"
+              [min]="1"
+              [max]="seatInputMax()"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+              [value]="currentRow.newSeats"
+              [attr.aria-invalid]="seatsFieldError() ? 'true' : null"
+              (input)="onNewSeatsInput($event)"
+              (blur)="markTouched()"
+            />
+          </ui-field>
+
+          @if (currentRow.freeSeatsModuleKey; as moduleKey) {
+            <div>
+              <a
+                uiButton
+                variant="secondary"
+                size="small"
+                [routerLink]="['/workspace/billing/subscription/seats/reduce']"
+                [queryParams]="{ module: moduleKey }"
+              >
+                {{ 'bsub.change.freeSeats' | transloco }}
+              </a>
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @case ('upgrade-tier') {
+      <div class="grid grid-cols-1 gap-8 desktop:grid-cols-3">
+        @if (currentRow.locked) {
+          <ui-field
+            [for]="uid + '-upgrade-app'"
+            [label]="'bsub.change.row.application' | transloco"
+            [hint]="'bsub.change.row.applicationHint' | transloco"
+          >
+            <input
+              [id]="uid + '-upgrade-app'"
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="upgradeBaseItem()?.applicationName ?? upgradeBaseItem()?.applicationKey ?? currentRow.itemId"
+            />
+          </ui-field>
+        } @else {
+          <ui-field
+            size="bare"
+            [for]="uid + '-upgrade-app'"
+            [label]="'bsub.change.row.application' | transloco"
+            [required]="true"
+            [hint]="'bsub.change.row.applicationHint' | transloco"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-upgrade-app'"
+              [describedBy]="uid + '-upgrade-app-hint'"
+              [options]="upgradeItemOptions()"
+              [value]="currentRow.itemId"
+              [label]="'bsub.change.row.application' | transloco"
+              (valueChange)="onUpgradeItemChange($event)"
+            />
+          </ui-field>
+        }
+
+        <ui-field
+          [for]="uid + '-current-tier'"
+          [label]="'bsub.change.row.currentTier' | transloco"
+          [hint]="'bsub.change.row.currentTierHint' | transloco"
+        >
+          <input
+            [id]="uid + '-current-tier'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="upgradeBaseItem()?.tierName ?? upgradeBaseItem()?.tierKey ?? '—'"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-new-tier'"
+          [label]="'bsub.change.row.newTier' | transloco"
+          [required]="true"
+          [hint]="'bsub.change.row.newTierHint' | transloco"
+          [error]="tierFieldError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-new-tier'"
+            [describedBy]="uid + '-new-tier-hint' + (tierFieldError() ? ' ' + uid + '-new-tier-error' : '')"
+            [options]="upgradeTierOptions()"
+            [value]="currentRow.tierId"
+            [label]="'bsub.change.row.newTier' | transloco"
+            [disabled]="!upgradeBaseItem() || (upgradeTierOptions().length === 1 && upgradeTierOptions()[0].value === '')"
+            (valueChange)="onUpgradeTierChange($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    @case ('add-addon') {
+      <div class="grid grid-cols-1 gap-8 desktop:grid-cols-3">
+        <ui-field
+          [for]="uid + '-addon'"
+          [label]="'bsub.change.row.addon' | transloco"
+          [hint]="'bsub.change.row.addonHint' | transloco"
+        >
+          <input
+            [id]="uid + '-addon'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="addAddonDisplayName()"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-for-app'"
+          [label]="'bsub.change.row.forApplication' | transloco"
+          [hint]="'bsub.change.row.forApplicationHint' | transloco"
+        >
+          <input
+            [id]="uid + '-for-app'"
+            type="text"
+            readonly
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="addAddonParentName()"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-addon-seats'"
+          [label]="'bsub.change.row.seats' | transloco"
+          [required]="true"
+          [hint]="'bsub.change.row.addonSeatsHint' | transloco"
+          [error]="seatsFieldError()"
+        >
+          <input
+            [id]="uid + '-addon-seats'"
+            type="number"
+            inputmode="numeric"
+            dir="ltr"
+            [min]="1"
+            [max]="addAddonMaxSeats()"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+            [value]="currentRow.seats"
+            [attr.aria-invalid]="seatsFieldError() ? 'true' : null"
+            (input)="onAddonSeatsInput($event)"
+            (blur)="markTouched()"
+          />
+        </ui-field>
+      </div>
+    }
+  }
+</article>

@@ -1,0 +1,146 @@
+@let customerErr = customerError();
+@let contactErr = contactError();
+@let customerName = customerDisplayName();
+@let customerId = draft().customerProfileId;
+
+<div [class]="layout() === 'page' ? pageGrid : 'flex flex-col gap-8'">
+  <div [class]="layout() === 'page' ? 'contents' : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+    <ui-field
+      size="bare"
+      [label]="'oppForm.customer.label' | transloco"
+      [for]="uid + '-customer'"
+      [hint]="'oppForm.customer.hint' | transloco"
+      [required]="mode() === 'create'"
+      [error]="customerErr"
+    >
+      @if (canPickCustomer()) {
+        <app-opportunity-customer-picker
+          [value]="selectedCustomerOption()"
+          (valueChange)="onCustomerChange($event)"
+          [branchId]="draft().branchId"
+          [inputId]="uid + '-customer'"
+          [describedBy]="fieldDescribedBy(uid + '-customer', !!customerErr)"
+          [label]="'oppForm.customer.label' | transloco"
+          [placeholder]="'oppForm.customer.searchPlaceholder' | transloco"
+          [displayText]="draft().customerLabel"
+          [invalid]="!!customerErr"
+        />
+      } @else {
+        <div class="flex items-center gap-6">
+          <div
+            class="flex h-field min-w-0 flex-1 items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+            [class]="customerErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+          >
+            <input
+              [id]="uid + '-customer'"
+              type="text"
+              readonly
+              dir="auto"
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="customerName || '—'"
+              [attr.aria-invalid]="customerErr ? 'true' : null"
+            />
+          </div>
+          @if (customerId) {
+            <a
+              [routerLink]="['/crm/customers', customerId]"
+              class="inline-flex size-btn-h-sm shrink-0 items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'oppForm.customer.openCustomer' | transloco: { name: customerName || customerId }"
+              [title]="'oppForm.customer.openCustomerTitle' | transloco"
+            >
+              <ng-icon name="tablerExternalLink" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+            </a>
+          }
+        </div>
+      }
+    </ui-field>
+
+    <div class="min-w-0">
+      <ui-field
+        size="bare"
+        [label]="'oppForm.customer.contact' | transloco"
+        [for]="uid + '-contact'"
+        [hint]="'oppForm.customer.contactHint' | transloco"
+        [error]="contactErr"
+      >
+        @if (readonly()) {
+          <div
+            class="flex h-field w-full items-center rounded-8 border bg-surface-field px-8 text-12 text-text"
+            [class]="contactErr ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border-field'"
+          >
+            <input
+              [id]="uid + '-contact'"
+              type="text"
+              readonly
+              dir="auto"
+              class="w-full bg-transparent text-12 text-text outline-none"
+              [value]="readonlyContactLabel()"
+              [attr.aria-invalid]="contactErr ? 'true' : null"
+            />
+          </div>
+        } @else {
+          <div [attr.aria-invalid]="contactErr ? 'true' : null">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-contact'"
+              [describedBy]="fieldDescribedBy(uid + '-contact', !!contactErr)"
+              [label]="'oppForm.customer.contact' | transloco"
+              [options]="contactOptions()"
+              [value]="contactDropdownValue()"
+              [disabled]="contactDisabled()"
+              (valueChange)="onContactChange($event)"
+            />
+          </div>
+        }
+      </ui-field>
+      @if (showContactsRetry()) {
+        <app-opp-lookup-retry
+          messageKey="oppForm.lookups.contactsFailed"
+          [busy]="lookups.contactsLoading()"
+          (retry)="lookups.reloadContacts()"
+        />
+      }
+    </div>
+  </div>
+
+  @if (resolvedReadContact(); as contact) {
+    <div [class]="layout() === 'page' ? 'col-span-2' : ''">
+      <article class="flex flex-col gap-6 rounded-10 border border-border bg-surface px-8 py-6">
+        <div class="min-w-0 truncate text-13 leading-18">
+          <span dir="auto" class="font-medium text-text">{{ contact.displayName }}</span>
+          @if (contact.jobTitle) {
+            <span class="text-text-muted"> — </span>
+            <span dir="auto" class="text-text-muted">{{ contact.jobTitle }}</span>
+          }
+        </div>
+
+        <app-phone-list
+          display="read"
+          [phones]="contact.phones"
+          [countries]="emptyCountries"
+          [crm]="true"
+          [source]="phoneSource()"
+          [idPrefix]="uid + '-contact-phone'"
+          [label]="'oppForm.customer.contactPhones' | transloco"
+          [hint]="'oppForm.customer.contactPhonesHint' | transloco"
+          addLabel=""
+          removeLabel=""
+        />
+
+        @if (contact.email; as mail) {
+          <div class="flex min-w-0 items-center gap-6 text-12 leading-18">
+            <span class="shrink-0 text-text-muted">{{ 'oppForm.customer.contactEmail' | transloco }}</span>
+            <a
+              dir="ltr"
+              [href]="'mailto:' + mail"
+              class="min-w-0 truncate text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            >
+              {{ mail }}
+            </a>
+          </div>
+        }
+      </article>
+    </div>
+  }
+</div>

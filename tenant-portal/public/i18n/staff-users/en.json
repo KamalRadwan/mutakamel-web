@@ -1,0 +1,210 @@
+{
+  "title": "Users",
+  "add": "Invite user",
+  "search": "Search name, email or code",
+  "empty": "No users match.",
+  "clearFilters": "Clear filters",
+  "loadFailed": "Could not load users.",
+  "retry": "Try again",
+  "invite": {
+    "title": "Invite user",
+    "send": "Send invitation"
+  },
+  "filters": {
+    "status": "Status",
+    "company": "Company",
+    "branch": "Branch",
+    "department": "Department",
+    "team": "Team",
+    "seat": "Seat",
+    "seatModule": "Has a {{module}} seat",
+    "seatReadOnly": "Read-only seats"
+  },
+  "sort": {
+    "newest": "Newest",
+    "name": "Name",
+    "email": "Email",
+    "code": "Employee code"
+  },
+  "cols": {
+    "user": "User",
+    "placement": "Placement",
+    "seats": "Seats",
+    "jobTitle": "Job title",
+    "code": "Employee code",
+    "status": "Status",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "badge": {
+    "owner": "Owner",
+    "you": "You"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "resend": "Resend invitation",
+    "revoke": "Revoke invitation",
+    "suspend": "Suspend",
+    "activate": "Activate",
+    "releaseSeats": "Release seats",
+    "revokeSessions": "Sign out everywhere",
+    "delete": "Delete"
+  },
+  "confirm": {
+    "suspendTitle": "Suspend user?",
+    "suspend": "Suspend {{name}}? They are signed out at once and can't sign in until activated.",
+    "revokeTitle": "Revoke invitation?",
+    "revoke": "Revoke the invitation for {{email}}? The invitation link stops working.",
+    "activateTitle": "Activate user?",
+    "activate": "Activate {{name}}?",
+    "releaseSeats": "Release {{name}}'s seats? Their roles that give application access are removed.",
+    "revokeSessionsTitle": "Sign out everywhere?",
+    "revokeSessions": "Sign {{name}} out of every device?",
+    "deleteTitle": "Delete user?",
+    "delete": "{{name}} will lose access. Their seats and team memberships are released. This can't be undone.",
+    "discardTitle": "Discard your changes?",
+    "discardText": "Your unsaved changes will be lost.",
+    "discardConfirm": "Discard",
+    "unsavedTitle": "Unsaved changes",
+    "unsavedText": "Save your changes to this user's profile before leaving?"
+  },
+  "toast": {
+    "invited": "Invitation sent to {{email}}.",
+    "resent": "Invitation sent again.",
+    "suspended": "User suspended.",
+    "activated": "User activated.",
+    "activatedInvited": "A new invitation was sent because the user never signed in.",
+    "revoked": "Invitation revoked.",
+    "seatsReleased": "Seats released.",
+    "signedOut": "The user was signed out everywhere.",
+    "deleted": "User deleted.",
+    "saved": "Changes saved.",
+    "tooMany": "Too many invitations. Wait a minute and try again."
+  },
+  "bulk": {
+    "selected": "{{n}} selected",
+    "selectedPlural": {
+      "one": "{{n}} selected",
+      "other": "{{n}} selected"
+    },
+    "assignRole": "Assign role…",
+    "title": "Assign a role to {{n}} users",
+    "titlePlural": {
+      "one": "Assign a role to {{n}} user",
+      "other": "Assign a role to {{n}} users"
+    },
+    "role": "Role",
+    "roleHint": "The role is added to every selected user.",
+    "scope": "Scope",
+    "scopeHint": "Where the role applies.",
+    "scopeBranch": "Branch",
+    "scopeCompany": "Company",
+    "scopeWorkspace": "Workspace",
+    "check": "Check seats",
+    "go": "Assign to {{n}} users",
+    "goPlural": {
+      "one": "Assign to {{n}} user",
+      "other": "Assign to {{n}} users"
+    },
+    "done": "Role assigned to {{n}} users.",
+    "donePlural": {
+      "one": "Role assigned to {{n}} user.",
+      "other": "Role assigned to {{n}} users."
+    }
+  },
+  "import": {
+    "button": "Import users",
+    "title": "Import users",
+    "file": "CSV file",
+    "fileHint": "Up to 500 rows and 1 MB. Use the template columns.",
+    "template": "Download template",
+    "parseError": "Row {{n}}: {{message}}",
+    "unknownCode": "Unknown {{field}} \"{{value}}\"",
+    "mode": "If seats don't fit",
+    "modeHint": "Choose what happens when some roles need more seats than are free.",
+    "modeAll": "All or nothing",
+    "rowError": "Row {{row}}: {{message}}",
+    "modeSkip": "Import without the roles that don't fit",
+    "check": "Check",
+    "go": "Import {{n}} users",
+    "goPlural": {
+      "one": "Import {{n}} user",
+      "other": "Import {{n}} users"
+    },
+    "done": "{{n}} users imported.",
+    "donePlural": {
+      "one": "{{n}} user imported.",
+      "other": "{{n}} users imported."
+    }
+  },
+  "seatsShort": "Not enough seats for this change.",
+  "fields": {
+    "email": "Email",
+    "emailHint": "The invitation is sent here. Can't be changed later.",
+    "emailPlaceholder": "name@company.com",
+    "emailLocked": "Email can't be changed.",
+    "firstName": "First name",
+    "firstNameHint": "Up to 80 characters.",
+    "lastName": "Last name",
+    "lastNameHint": "Up to 80 characters.",
+    "code": "Employee code",
+    "codeHint": "Optional. Letters, digits, \".\", \"_\" and \"-\", up to 32, unique in the workspace.",
+    "codePlaceholder": "e.g. EMP-0009",
+    "jobTitle": "Job title",
+    "jobTitleHint": "Optional, up to 120 characters.",
+    "manager": "Manager",
+    "managerHint": "Optional. The person this user reports to.",
+    "managerSearch": "Search active users",
+    "noManager": "No manager",
+    "roles": "Roles",
+    "rolesHint": "Optional. You can also add roles later.",
+    "roleBranch": "Branch",
+    "role": "Role",
+    "addRole": "Add role",
+    "removeRole": "Remove role",
+    "moveHint": "Moving a user to another branch needs permission in both branches."
+  },
+  "tabs": {
+    "profile": "Profile",
+    "roles": "Roles",
+    "teams": "Teams",
+    "apps": "Applications",
+    "phone": "Phone",
+    "calls": "Calls"
+  },
+  "calls": {
+    "description": "Calls made and received on this user's phone.",
+    "noAccess": "You do not have access to this user's calls."
+  },
+  "facts": {
+    "status": "Status",
+    "created": "Created",
+    "updated": "Updated"
+  },
+  "validation": {
+    "emailRequired": "Email is required.",
+    "emailInvalid": "Enter a valid email address.",
+    "emailMaxLength": "Email must be at most {{max}} characters.",
+    "firstNameRequired": "First name is required.",
+    "firstNameMaxLength": "First name must be at most {{max}} characters.",
+    "lastNameRequired": "Last name is required.",
+    "lastNameMaxLength": "Last name must be at most {{max}} characters.",
+    "codeInvalid": "Use letters, digits, \".\", \"_\" and \"-\", up to 32 characters.",
+    "jobTitleMaxLength": "Job title must be at most {{max}} characters.",
+    "companyRequired": "Select a company.",
+    "branchRequired": "Select a branch.",
+    "departmentRequired": "Select a department."
+  },
+  "errors": {
+    "cycle": "This would create a reporting loop."
+  },
+  "common": {
+    "save": "Save",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "discard": "Discard"
+  }
+}

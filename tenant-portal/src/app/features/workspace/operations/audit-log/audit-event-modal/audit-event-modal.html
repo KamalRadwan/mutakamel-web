@@ -1,0 +1,295 @@
+<ui-modal
+  size="wide"
+  [icon]="headerIcon()"
+  [tile]="headerTile()"
+  [title]="headerTitle()"
+  [subtitle]="headerSubtitle()"
+  [closeLabel]="'wsAudit.modal.close' | transloco"
+  (closed)="onClosed()"
+>
+  @if (event(); as ev) {
+    <div class="flex flex-col gap-12">
+      <dl class="grid grid-cols-2 gap-x-12 gap-y-8 rounded-10 border border-border bg-surface-muted p-10">
+        <div class="col-span-2 flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.record' | transloco }}</dt>
+          <dd class="flex min-w-0 flex-wrap items-center gap-6 text-12 leading-18 text-text">
+            <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+              {{ translateEntityType(ev.entityType) }}
+            </span>
+            @if (ev.entityLabel) {
+              <span class="font-medium text-text">{{ ev.entityLabel }}</span>
+            }
+            @if (ev.entityId) {
+              <span class="flex min-w-0 items-center gap-4 text-text-muted">
+                <bdi dir="ltr" class="truncate tabular-nums" [title]="ev.entityId">{{ ev.entityId }}</bdi>
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'wsAudit.modal.copyEntityId' | transloco"
+                  [title]="'wsAudit.modal.copyEntityId' | transloco"
+                  (click)="copyText('entityId', ev.entityId)"
+                >
+                  <ng-icon
+                    [name]="copiedField() === 'entityId' ? 'tablerCheck' : 'tablerCopy'"
+                    size="14"
+                    aria-hidden="true"
+                  />
+                </button>
+              </span>
+            }
+          </dd>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.appKind' | transloco }}</dt>
+          <dd class="truncate text-12 leading-18 text-text">
+            {{ ('wsAudit.apps.' + ev.sourceApp) | transloco }} · {{ ('wsAudit.sourceKinds.' + ev.sourceKind) | transloco }}
+          </dd>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.outcome' | transloco }}</dt>
+          <dd class="flex min-w-0 flex-col items-start gap-4">
+            <span
+              class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+              [class]="
+                ev.outcome === 'SUCCESS'
+                  ? 'bg-success-soft text-on-success-soft'
+                  : 'bg-danger-soft text-on-danger-soft'
+              "
+            >
+              {{ ('wsAudit.outcomes.' + ev.outcome) | transloco }}
+            </span>
+            @if (ev.outcome === 'FAILURE' && ev.reason) {
+              <span class="text-12 leading-18 text-danger-text">{{ ev.reason }}</span>
+            }
+          </dd>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.sensitivity' | transloco }}</dt>
+          <dd class="flex items-center text-12 leading-18 text-text">
+            @if (ev.sensitivity === 'HIGH') {
+              <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium text-on-warning whitespace-nowrap">
+                {{ 'wsAudit.sensitivities.HIGH_CHIP' | transloco }}
+              </span>
+            } @else {
+              <span>{{ ('wsAudit.sensitivities.' + ev.sensitivity) | transloco }}</span>
+            }
+          </dd>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.branch' | transloco }}</dt>
+          <dd class="truncate text-12 leading-18 text-text" [title]="branchDisplay(ev.branchId)">
+            {{ branchDisplay(ev.branchId) }}
+          </dd>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.onBehalfOf' | transloco }}</dt>
+          <dd class="truncate text-12 leading-18 text-text" [title]="userDisplay(ev.onBehalfOfUserId)">
+            {{ userDisplay(ev.onBehalfOfUserId) }}
+          </dd>
+        </div>
+
+        <div class="flex min-w-0 flex-col gap-2">
+          <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.facts.correlationId' | transloco }}</dt>
+          <dd class="flex min-w-0 items-center gap-4 text-12 leading-18 text-text">
+            @if (ev.correlationId) {
+              <bdi dir="ltr" class="truncate tabular-nums" [title]="ev.correlationId">{{ ev.correlationId }}</bdi>
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'wsAudit.modal.copyCorrelationId' | transloco"
+                [title]="'wsAudit.modal.copyCorrelationId' | transloco"
+                (click)="copyText('correlationId', ev.correlationId)"
+              >
+                <ng-icon
+                  [name]="copiedField() === 'correlationId' ? 'tablerCheck' : 'tablerCopy'"
+                  size="14"
+                  aria-hidden="true"
+                />
+              </button>
+            } @else {
+              <span class="text-text-muted">—</span>
+            }
+          </dd>
+        </div>
+      </dl>
+
+      <section class="flex flex-col gap-6" [attr.aria-busy]="loading()">
+        <h3 class="text-13 leading-18 font-medium text-text">{{ 'wsAudit.modal.changes.title' | transloco }}</h3>
+
+        @if (loading()) {
+          <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-10" aria-hidden="true">
+            <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft"></span>
+            <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
+          </div>
+        } @else if (diffRows().length === 0) {
+          <p class="rounded-10 border border-border bg-surface p-10 text-12 leading-18 text-text-muted">
+            {{ 'wsAudit.modal.changes.empty' | transloco }}
+          </p>
+        } @else {
+          <div class="overflow-hidden rounded-10 border border-border bg-surface">
+            <div role="table" [attr.aria-label]="'wsAudit.modal.changes.title' | transloco">
+              <div
+                role="row"
+                class="grid grid-cols-ops-audit-diff border-b border-border bg-surface-muted text-12 leading-18 font-medium text-text-muted"
+              >
+                <span role="columnheader" class="truncate px-8 py-6">
+                  {{ 'wsAudit.modal.changes.field' | transloco }}
+                </span>
+                <span role="columnheader" class="truncate border-s border-border px-8 py-6">
+                  {{ 'wsAudit.modal.changes.before' | transloco }}
+                </span>
+                <span role="columnheader" class="truncate border-s border-border px-8 py-6">
+                  {{ 'wsAudit.modal.changes.after' | transloco }}
+                </span>
+              </div>
+
+              @for (row of diffRows(); track row.field) {
+                <div
+                  role="row"
+                  class="grid grid-cols-ops-audit-diff border-b border-border text-12 leading-18 last:border-b-0"
+                >
+                  <span role="cell" class="flex min-w-0 items-start px-8 py-6">
+                    <span class="block min-w-0 truncate font-medium text-text" [title]="row.field">
+                      {{ row.field }}
+                    </span>
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-start border-s border-border px-8 py-6">
+                    @if (isNullish(row.before)) {
+                      <span class="text-text-muted">—</span>
+                    } @else if (isObjectValue(row.before)) {
+                      <pre
+                        dir="ltr"
+                        class="scrollbar-thin max-h-time-list-max w-full overflow-auto rounded-6 bg-surface-muted p-6 text-11 leading-16 text-text-muted whitespace-pre-wrap break-all tabular-nums"
+                      >{{ formatJson(row.before) }}</pre>
+                    } @else {
+                      <span
+                        class="block min-w-0 truncate text-text-muted line-through"
+                        [title]="formatScalar(row.before)"
+                      >
+                        {{ formatScalar(row.before) }}
+                      </span>
+                    }
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-start border-s border-border px-8 py-6">
+                    @if (isNullish(row.after)) {
+                      <span class="text-text-muted">—</span>
+                    } @else if (isObjectValue(row.after)) {
+                      <pre
+                        dir="ltr"
+                        class="scrollbar-thin max-h-time-list-max w-full overflow-auto rounded-6 bg-surface-muted p-6 text-11 leading-16 text-text whitespace-pre-wrap break-all tabular-nums"
+                      >{{ formatJson(row.after) }}</pre>
+                    } @else {
+                      <span
+                        class="block min-w-0 truncate font-medium text-text"
+                        [title]="formatScalar(row.after)"
+                      >
+                        {{ formatScalar(row.after) }}
+                      </span>
+                    }
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="overflow-hidden rounded-10 border border-border bg-surface">
+        <button
+          type="button"
+          class="flex h-btn w-full cursor-pointer items-center justify-between gap-8 px-10 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-expanded]="technicalOpen()"
+          [attr.aria-controls]="uid + '-technical'"
+          (click)="toggleTechnical()"
+        >
+          <span>{{ 'wsAudit.modal.technical.title' | transloco }}</span>
+          <ng-icon
+            name="tablerChevronDown"
+            size="14"
+            class="shrink-0 text-text-muted transition-transform duration-fast"
+            [class.rotate-180]="technicalOpen()"
+            aria-hidden="true"
+          />
+        </button>
+
+        @if (technicalOpen()) {
+          <div [id]="uid + '-technical'" class="flex flex-col gap-8 border-t border-border p-10">
+            <dl class="grid grid-cols-2 gap-x-12 gap-y-6">
+              <div class="flex min-w-0 flex-col gap-2">
+                <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.technical.ip' | transloco }}</dt>
+                <dd dir="ltr" class="truncate text-12 leading-18 text-text tabular-nums">
+                  {{ ev.ip || '—' }}
+                </dd>
+              </div>
+
+              <div class="flex min-w-0 flex-col gap-2">
+                <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.technical.requestId' | transloco }}</dt>
+                <dd dir="ltr" class="truncate text-12 leading-18 text-text tabular-nums" [title]="ev.requestId ?? ''">
+                  {{ ev.requestId || '—' }}
+                </dd>
+              </div>
+
+              <div class="flex min-w-0 flex-col gap-2">
+                <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.technical.operationId' | transloco }}</dt>
+                <dd dir="ltr" class="truncate text-12 leading-18 text-text tabular-nums" [title]="ev.operationId ?? ''">
+                  {{ ev.operationId || '—' }}
+                </dd>
+              </div>
+
+              <div class="flex min-w-0 flex-col gap-2">
+                <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.technical.idempotencyKey' | transloco }}</dt>
+                <dd dir="ltr" class="truncate text-12 leading-18 text-text tabular-nums" [title]="ev.idempotencyKey ?? ''">
+                  {{ ev.idempotencyKey || '—' }}
+                </dd>
+              </div>
+
+              <div class="col-span-2 flex min-w-0 flex-col gap-2">
+                <dt class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.technical.userAgent' | transloco }}</dt>
+                <dd dir="ltr" class="text-11 leading-16 break-all text-text-muted">
+                  {{ ev.userAgent || '—' }}
+                </dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-col gap-4">
+              <span class="text-12 leading-18 text-text-muted">{{ 'wsAudit.modal.technical.metadata' | transloco }}</span>
+              @if (hasMetadata(ev)) {
+                <pre
+                  dir="ltr"
+                  class="scrollbar-thin max-h-time-list-max overflow-auto rounded-6 border border-border bg-surface-muted p-8 text-11 leading-16 text-text whitespace-pre-wrap break-all tabular-nums"
+                >{{ formatJson(ev.metadata) }}</pre>
+              } @else {
+                <span class="text-12 leading-18 text-text-muted">—</span>
+              }
+            </div>
+          </div>
+        }
+      </section>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="!event()?.correlationId"
+      [title]="!event()?.correlationId ? ('wsAudit.modal.noCorrelationHint' | transloco) : ''"
+      (click)="onShowRelated()"
+    >
+      <ng-icon name="tablerLink" size="15" aria-hidden="true" />
+      <span>{{ 'wsAudit.modal.showRelated' | transloco }}</span>
+    </button>
+
+    <button type="button" uiButton variant="ghost" class="ms-auto" (click)="close()">
+      {{ 'wsAudit.modal.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

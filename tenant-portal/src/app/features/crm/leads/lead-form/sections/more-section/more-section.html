@@ -1,0 +1,347 @@
+@if (layout() === 'page') {
+  @if (showAddress() || showLegal() || showQualification()) {
+    <div class="flex flex-col gap-10">
+      @if (showAddress()) {
+        <section class="flex flex-col gap-8">
+          <h3 class="text-12 leading-18 font-medium text-text">{{ 'leadSide.address' | transloco }}</h3>
+          @if (hideExistingCompanyAddress()) {
+            <p class="text-12 leading-18 text-text-muted">{{ 'leadSide.addressExisting' | transloco }}</p>
+          } @else {
+            <app-address-fields
+              class="page-address-grid"
+              [canAddPlaces]="canAddPlaces"
+              [readonly]="readonly()"
+              [errors]="addressErrors()"
+              [value]="draft().address"
+              (valueChange)="onAddressChange($event)"
+            />
+          }
+        </section>
+      }
+
+      @if (showAddress() && showLegal()) {
+        <div class="h-border bg-border" aria-hidden="true"></div>
+      }
+
+      @if (showLegal()) {
+        <section class="flex flex-col gap-8">
+          <h3 class="text-12 leading-18 font-medium text-text">{{ 'leadSide.legal' | transloco }}</h3>
+          <div [class]="pageGrid">
+            @let legalNameErr = errorFor('legalName', limits.company);
+            <ui-field
+              [label]="'leadSide.legalName' | transloco"
+              [for]="uid + '-legal-name'"
+              [hint]="'leadSide.legalNameHint' | transloco"
+              [count]="legalNameCount()"
+              [max]="limits.company"
+              [error]="legalNameErr ? (legalNameErr.key | transloco: legalNameErr.params) : null"
+            >
+              <input
+                [id]="uid + '-legal-name'"
+                type="text"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().legalName"
+                [attr.aria-invalid]="legalNameErr ? 'true' : null"
+                (input)="onTextFieldInput('legalName', $event)"
+              />
+            </ui-field>
+
+            @let taxErr = errorFor('taxNumber', limits.tax);
+            <ui-field
+              [label]="'leadSide.taxNumber' | transloco"
+              [for]="uid + '-tax-number'"
+              [hint]="'leadSide.taxNumberHint' | transloco"
+              [count]="taxNumberCount()"
+              [max]="limits.tax"
+              [error]="taxErr ? (taxErr.key | transloco: taxErr.params) : null"
+            >
+              <input
+                [id]="uid + '-tax-number'"
+                type="text"
+                dir="ltr"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().taxNumber"
+                [attr.aria-invalid]="taxErr ? 'true' : null"
+                (input)="onTextFieldInput('taxNumber', $event)"
+              />
+            </ui-field>
+
+            @let crErr = errorFor('commercialRegistrationNumber', limits.tax);
+            <ui-field
+              [label]="'leadSide.crNumber' | transloco"
+              [for]="uid + '-cr-number'"
+              [hint]="'leadSide.crNumberHint' | transloco"
+              [count]="crNumberCount()"
+              [max]="limits.tax"
+              [error]="crErr ? (crErr.key | transloco: crErr.params) : null"
+            >
+              <input
+                [id]="uid + '-cr-number'"
+                type="text"
+                dir="ltr"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().commercialRegistrationNumber"
+                [attr.aria-invalid]="crErr ? 'true' : null"
+                (input)="onTextFieldInput('commercialRegistrationNumber', $event)"
+              />
+            </ui-field>
+          </div>
+        </section>
+      }
+
+      @if ((showAddress() || showLegal()) && showQualification()) {
+        <div class="h-border bg-border" aria-hidden="true"></div>
+      }
+
+      @if (showQualification()) {
+        <section class="flex flex-col gap-8">
+          <h3 class="text-12 leading-18 font-medium text-text">{{ 'leadSide.qualification' | transloco }}</h3>
+          <div [class]="pageGrid">
+            @let descErr = errorFor('description', limits.description);
+            <ui-field
+              size="multiline"
+              [label]="'leadSide.description' | transloco"
+              [for]="uid + '-description'"
+              [hint]="'leadSide.descriptionHint' | transloco"
+              [count]="descriptionCount()"
+              [max]="limits.description"
+              [error]="descErr ? (descErr.key | transloco: descErr.params) : null"
+            >
+              <textarea
+                [id]="uid + '-description'"
+                rows="2"
+                class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().description"
+                [attr.aria-invalid]="descErr ? 'true' : null"
+                (input)="onTextFieldInput('description', $event)"
+              ></textarea>
+            </ui-field>
+
+            @let interestErr = errorFor('interestSummary', limits.longText);
+            <ui-field
+              size="multiline"
+              [label]="'leadSide.interest' | transloco"
+              [for]="uid + '-interest'"
+              [hint]="'leadSide.interestHint' | transloco"
+              [count]="interestCount()"
+              [max]="limits.longText"
+              [error]="interestErr ? (interestErr.key | transloco: interestErr.params) : null"
+            >
+              <textarea
+                [id]="uid + '-interest'"
+                rows="2"
+                class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().interestSummary"
+                [attr.aria-invalid]="interestErr ? 'true' : null"
+                (input)="onTextFieldInput('interestSummary', $event)"
+              ></textarea>
+            </ui-field>
+
+            @let needErr = errorFor('expectedNeed', limits.longText);
+            <ui-field
+              size="multiline"
+              [label]="'leadSide.need' | transloco"
+              [for]="uid + '-need'"
+              [hint]="'leadSide.needHint' | transloco"
+              [count]="needCount()"
+              [max]="limits.longText"
+              [error]="needErr ? (needErr.key | transloco: needErr.params) : null"
+            >
+              <textarea
+                [id]="uid + '-need'"
+                rows="2"
+                class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().expectedNeed"
+                [attr.aria-invalid]="needErr ? 'true' : null"
+                (input)="onTextFieldInput('expectedNeed', $event)"
+              ></textarea>
+            </ui-field>
+          </div>
+        </section>
+      }
+    </div>
+  }
+} @else {
+  @if (showAddress() || showLegal() || showQualification()) {
+  <div class="flex flex-col gap-10">
+    @if (showAddress()) {
+      <section class="flex flex-col gap-8">
+        @if (part() === 'all') {
+          <h3 class="text-12 leading-18 font-medium text-text">{{ 'leadSide.address' | transloco }}</h3>
+        }
+        @if (hideExistingCompanyAddress()) {
+          <p class="text-12 leading-18 text-text-muted">{{ 'leadSide.addressExisting' | transloco }}</p>
+        } @else {
+          <app-address-fields
+            [canAddPlaces]="canAddPlaces"
+            [readonly]="readonly()"
+            [errors]="addressErrors()"
+            [value]="draft().address"
+            (valueChange)="onAddressChange($event)"
+          />
+        }
+      </section>
+    }
+
+    @if (showLegal()) {
+      @if (part() === 'all') {
+        <div class="h-border bg-border" aria-hidden="true"></div>
+      }
+      <section class="flex flex-col gap-8">
+        @if (part() === 'all') {
+          <h3 class="text-12 leading-18 font-medium text-text">{{ 'leadSide.legal' | transloco }}</h3>
+        }
+        <div
+          class="grid gap-x-10 gap-y-8"
+          [class]="effectiveColumns() === 2 ? 'grid-cols-1 desktop:grid-cols-2' : 'grid-cols-1'"
+        >
+          @let legalNameErr = errorFor('legalName', limits.company);
+          <div [class]="effectiveColumns() === 2 ? 'desktop:col-span-2' : ''">
+            <ui-field
+              [label]="'leadSide.legalName' | transloco"
+              [for]="uid + '-legal-name'"
+              [hint]="'leadSide.legalNameHint' | transloco"
+              [count]="legalNameCount()"
+              [max]="limits.company"
+              [error]="legalNameErr ? (legalNameErr.key | transloco: legalNameErr.params) : null"
+            >
+              <input
+                [id]="uid + '-legal-name'"
+                type="text"
+                class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [readonly]="readonly()"
+                [value]="draft().legalName"
+                [attr.aria-invalid]="legalNameErr ? 'true' : null"
+                (input)="onTextFieldInput('legalName', $event)"
+              />
+            </ui-field>
+          </div>
+
+          @let taxErr = errorFor('taxNumber', limits.tax);
+          <ui-field
+            [label]="'leadSide.taxNumber' | transloco"
+            [for]="uid + '-tax-number'"
+            [hint]="'leadSide.taxNumberHint' | transloco"
+            [count]="taxNumberCount()"
+            [max]="limits.tax"
+            [error]="taxErr ? (taxErr.key | transloco: taxErr.params) : null"
+          >
+            <input
+              [id]="uid + '-tax-number'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().taxNumber"
+              [attr.aria-invalid]="taxErr ? 'true' : null"
+              (input)="onTextFieldInput('taxNumber', $event)"
+            />
+          </ui-field>
+
+          @let crErr = errorFor('commercialRegistrationNumber', limits.tax);
+          <ui-field
+            [label]="'leadSide.crNumber' | transloco"
+            [for]="uid + '-cr-number'"
+            [hint]="'leadSide.crNumberHint' | transloco"
+            [count]="crNumberCount()"
+            [max]="limits.tax"
+            [error]="crErr ? (crErr.key | transloco: crErr.params) : null"
+          >
+            <input
+              [id]="uid + '-cr-number'"
+              type="text"
+              dir="ltr"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().commercialRegistrationNumber"
+              [attr.aria-invalid]="crErr ? 'true' : null"
+              (input)="onTextFieldInput('commercialRegistrationNumber', $event)"
+            />
+          </ui-field>
+        </div>
+      </section>
+    }
+
+    @if (showQualification()) {
+      @if (part() === 'all') {
+        <div class="h-border bg-border" aria-hidden="true"></div>
+      }
+      <section class="flex flex-col gap-8">
+        @if (part() === 'all') {
+          <h3 class="text-12 leading-18 font-medium text-text">{{ 'leadSide.qualification' | transloco }}</h3>
+        }
+        <div class="flex flex-col gap-8">
+          @let descErr = errorFor('description', limits.description);
+          <ui-field
+            size="multiline"
+            [label]="'leadSide.description' | transloco"
+            [for]="uid + '-description'"
+            [hint]="'leadSide.descriptionHint' | transloco"
+            [count]="descriptionCount()"
+            [max]="limits.description"
+            [error]="descErr ? (descErr.key | transloco: descErr.params) : null"
+          >
+            <textarea
+              [id]="uid + '-description'"
+              rows="2"
+              class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().description"
+              [attr.aria-invalid]="descErr ? 'true' : null"
+              (input)="onTextFieldInput('description', $event)"
+            ></textarea>
+          </ui-field>
+
+          @let interestErr = errorFor('interestSummary', limits.longText);
+          <ui-field
+            size="multiline"
+            [label]="'leadSide.interest' | transloco"
+            [for]="uid + '-interest'"
+            [hint]="'leadSide.interestHint' | transloco"
+            [count]="interestCount()"
+            [max]="limits.longText"
+            [error]="interestErr ? (interestErr.key | transloco: interestErr.params) : null"
+          >
+            <textarea
+              [id]="uid + '-interest'"
+              rows="2"
+              class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().interestSummary"
+              [attr.aria-invalid]="interestErr ? 'true' : null"
+              (input)="onTextFieldInput('interestSummary', $event)"
+            ></textarea>
+          </ui-field>
+
+          @let needErr = errorFor('expectedNeed', limits.longText);
+          <ui-field
+            size="multiline"
+            [label]="'leadSide.need' | transloco"
+            [for]="uid + '-need'"
+            [hint]="'leadSide.needHint' | transloco"
+            [count]="needCount()"
+            [max]="limits.longText"
+            [error]="needErr ? (needErr.key | transloco: needErr.params) : null"
+          >
+            <textarea
+              [id]="uid + '-need'"
+              rows="2"
+              class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().expectedNeed"
+              [attr.aria-invalid]="needErr ? 'true' : null"
+              (input)="onTextFieldInput('expectedNeed', $event)"
+            ></textarea>
+          </ui-field>
+        </div>
+      </section>
+    }
+  </div>
+  }
+}

@@ -1,0 +1,143 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerShieldLock"
+  tile="bg-icon-violet"
+  [title]="('users.bulk.titlePlural' | pluralKey: userIds().length) | transloco: { n: userIds().length }"
+  [closeLabel]="'users.common.close' | transloco"
+  [dismissable]="!busy()"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <div class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-10 py-6">
+      <span class="text-12 font-medium text-text">
+        {{ ('users.bulk.selectedPlural' | pluralKey: userIds().length) | transloco: { n: userIds().length } }}
+      </span>
+
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [loading]="checking()"
+        [disabled]="!canCheck()"
+        (click)="checkSeats()"
+      >
+        {{ 'users.bulk.check' | transloco }}
+      </button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-role'"
+          [label]="'users.bulk.role' | transloco"
+          [hint]="'users.bulk.roleHint' | transloco"
+          [required]="true"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-role'"
+            [describedBy]="uid + '-role-hint'"
+            [options]="roleOptions()"
+            [value]="selectedRoleId()"
+            [label]="'users.bulk.role' | transloco"
+            [disabled]="busy()"
+            (valueChange)="onRoleChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-scope'"
+          [label]="'users.bulk.scope' | transloco"
+          [hint]="'users.bulk.scopeHint' | transloco"
+          [required]="true"
+        >
+          <div>
+            <ui-segmented
+              [id]="uid + '-scope'"
+              [describedBy]="uid + '-scope-hint'"
+              [options]="scopeOptions()"
+              [label]="'users.bulk.scope' | transloco"
+              [value]="scopeTarget()"
+              (valueChange)="onScopeChange($event)"
+            />
+          </div>
+        </ui-field>
+      </div>
+
+      @if (scopeTarget() === 'COMPANY' || scopeTarget() === 'BRANCH') {
+        <div [class]="scopeTarget() === 'BRANCH' ? 'col-span-1' : 'col-span-2'">
+          <ui-field
+            size="bare"
+            [for]="uid + '-company'"
+            [label]="'staff.cascade.company' | transloco"
+            [hint]="'staff.cascade.companyHint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-company'"
+              [describedBy]="uid + '-company-hint'"
+              [options]="companyOptions()"
+              [value]="selectedCompanyId()"
+              [label]="'staff.cascade.company' | transloco"
+              [disabled]="busy()"
+              (valueChange)="onCompanyChange($event)"
+            />
+          </ui-field>
+        </div>
+      }
+
+      @if (scopeTarget() === 'BRANCH') {
+        <div class="col-span-1">
+          <ui-field
+            size="bare"
+            [for]="uid + '-branch'"
+            [label]="'staff.cascade.branch' | transloco"
+            [hint]="'staff.cascade.branchHint' | transloco"
+            [required]="true"
+          >
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-branch'"
+              [describedBy]="uid + '-branch-hint'"
+              [options]="branchOptions()"
+              [value]="selectedBranchId()"
+              [label]="'staff.cascade.branch' | transloco"
+              [disabled]="busy()"
+              (valueChange)="onBranchChange($event)"
+            />
+          </ui-field>
+        </div>
+      }
+    </div>
+
+    @if (dryRunResult(); as report) {
+      <app-dry-run-report [result]="report" kind="bulk" />
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      [loading]="assigning()"
+      [disabled]="!canAssign()"
+      (click)="assign()"
+    >
+      {{ ('users.bulk.goPlural' | pluralKey: userIds().length) | transloco: { n: userIds().length } }}
+    </button>
+
+    <button type="button" uiButton variant="secondary" [disabled]="busy()" (click)="close()">
+      {{ 'users.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

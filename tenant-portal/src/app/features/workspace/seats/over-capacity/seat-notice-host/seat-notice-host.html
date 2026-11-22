@@ -1,0 +1,42 @@
+@if (cards().length > 0) {
+  <div
+    class="fixed end-toast-edge z-toast flex flex-col gap-8"
+    [class]="notify.toasts().length ? 'bottom-preset' : 'bottom-toast-edge'"
+    aria-live="polite"
+  >
+    @for (card of cards(); track card.kind) {
+      <div
+        role="status"
+        class="flex w-toast items-start gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-popover"
+      >
+        <span class="flex size-icon-tile-sm shrink-0 items-center justify-center rounded-full" [class]="card.circle">
+          <ng-icon [name]="card.icon" size="14" aria-hidden="true" />
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <p class="text-13 leading-18 font-medium text-text">{{ card.titleKey | transloco }}</p>
+          <p class="text-12 leading-18 text-text-muted">{{ card.textKey | transloco: card.textParams }}</p>
+          @if (card.actionKey) {
+            <a
+              [routerLink]="['/workspace/billing/subscription/seats/over-capacity']"
+              [queryParams]="{ module: card.moduleKey }"
+              class="mt-4 inline-flex items-center rounded-4 text-12 leading-18 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            >
+              {{ card.actionKey | transloco }}
+            </a>
+          }
+        </div>
+
+        <button
+          type="button"
+          class="flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'oc.close' | transloco"
+          [title]="'oc.close' | transloco"
+          (click)="dismiss(card.kind)"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      </div>
+    }
+  </div>
+}

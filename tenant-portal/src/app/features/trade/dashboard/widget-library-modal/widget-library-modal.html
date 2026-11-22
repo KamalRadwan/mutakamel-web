@@ -1,0 +1,197 @@
+<ui-modal
+  size="wide"
+  icon="tablerApps"
+  tile="bg-icon-violet"
+  [title]="'tradeDashboardModals.library.title' | transloco"
+  [subtitle]="dashboardName()"
+  [closeLabel]="'tradeShared.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      [for]="uid + '-search'"
+      [label]="'tradeDashboardModals.library.searchLabel' | transloco"
+      [hint]="'tradeDashboardModals.library.searchHint' | transloco"
+    >
+      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+      <input
+        #searchInput
+        [id]="uid + '-search'"
+        type="search"
+        autocomplete="off"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'tradeDashboardModals.library.searchPlaceholder' | transloco"
+        [value]="searchText()"
+        [disabled]="submitting()"
+        (input)="onSearchInput(searchInput.value)"
+      />
+      @if (searchText()) {
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'tradeDashboardModals.library.clearSearch' | transloco"
+          [title]="'tradeDashboardModals.library.clearSearch' | transloco"
+          (click)="clearSearch()"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      }
+    </ui-field>
+
+    @if (loading()) {
+      <div class="flex flex-col gap-6" [attr.aria-busy]="true">
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <div class="h-table-row animate-pulse rounded-10 bg-neutral-soft"></div>
+        <span class="sr-only" role="status">{{ 'tradeDashboardModals.library.loading' | transloco }}</span>
+      </div>
+    } @else if (loadFailed()) {
+      <div class="flex flex-col items-center justify-center gap-8 py-8 text-center">
+        <p class="text-12 leading-18 text-text-muted">{{ 'tradeShared.common.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (allWidgets().length === 0) {
+      <div class="flex items-center justify-center py-8 text-center text-12 leading-18 text-text-muted">
+        {{ 'tradeDashboardModals.library.none' | transloco }}
+      </div>
+    } @else if (unplacedWidgets().length === 0) {
+      <div class="flex items-center justify-center py-8 text-center text-12 leading-18 text-text-muted">
+        {{ 'tradeDashboardModals.library.allPlaced' | transloco }}
+      </div>
+    } @else if (filteredWidgets().length === 0) {
+      <div class="flex items-center justify-center py-8 text-center text-12 leading-18 text-text-muted">
+        {{ 'tradeShared.common.noResults' | transloco }}
+      </div>
+    } @else {
+      <div
+        role="radiogroup"
+        [attr.aria-label]="'tradeDashboardModals.library.listLabel' | transloco"
+        class="flex max-h-notif-list-max flex-col gap-6 overflow-y-auto p-2 scrollbar-thin"
+      >
+        @for (widget of filteredWidgets(); track widget.id; let idx = $index) {
+          @let selected = selectedId() === widget.id;
+          @let size = defaultSizeOf(widget.visualizationType);
+          <button
+            #rowBtn
+            type="button"
+            role="radio"
+            [attr.aria-checked]="selected"
+            [tabIndex]="idx === activeRowIndex() ? 0 : -1"
+            [disabled]="submitting()"
+            class="flex h-table-row w-full shrink-0 cursor-pointer items-center gap-8 rounded-10 border px-8 text-start outline-none transition-colors duration-fast ease-enter focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              selected
+                ? 'border-brand bg-brand-soft text-text'
+                : 'border-border bg-surface text-text shadow-card hover:bg-row-hover'
+            "
+            (click)="selectWidget(widget)"
+            (keydown)="onRowKeydown($event, idx)"
+          >
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+              aria-hidden="true"
+            >
+              <ng-icon [name]="vizIcon(widget.visualizationType)" size="14" />
+            </span>
+
+            <span class="flex min-w-0 flex-1 flex-col">
+              <span class="truncate text-12 leading-16 font-medium text-text" dir="auto">
+                {{ widget.name }}
+              </span>
+              <span class="truncate text-11 leading-16 text-text-muted">
+                {{ 'tradeDashboardModals.viz.' + widget.visualizationType | transloco }}
+                @if (size) {
+                  · <bdi dir="ltr">{{ size.w }} × {{ size.h }}</bdi>
+                }
+              </span>
+            </span>
+
+            @if (widget.accessLevel !== 'OWNER' && widget.ownerName) {
+              <span class="shrink-0 truncate text-11 leading-16 text-text-muted" dir="auto">
+                {{ 'tradeDashboardModals.library.sharedBy' | transloco: { name: widget.ownerName } }}
+              </span>
+            }
+
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0 text-brand-text" aria-hidden="true" />
+            }
+          </button>
+        }
+      </div>
+    }
+
+    @if (selectedWidget(); as sel) {
+      <div class="grid grid-cols-3 gap-10 pt-2">
+        <ui-field
+          [for]="uid + '-detail-type'"
+          [label]="'tradeDashboardModals.library.type' | transloco"
+          [hint]="'tradeDashboardModals.library.typeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-detail-type'"
+            type="text"
+            readonly
+            class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="selectedTypeLabel()"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-detail-size'"
+          [label]="'tradeDashboardModals.library.size' | transloco"
+          [hint]="'tradeDashboardModals.library.sizeHint' | transloco"
+        >
+          <input
+            [id]="uid + '-detail-size'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="h-full min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none"
+            [value]="selectedSizeLabel()"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-detail-owner'"
+          [label]="'tradeDashboardModals.library.owner' | transloco"
+          [hint]="'tradeDashboardModals.library.ownerHint' | transloco"
+        >
+          <input
+            [id]="uid + '-detail-owner'"
+            type="text"
+            dir="auto"
+            readonly
+            class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+            [value]="sel.ownerName"
+          />
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="!selectedWidget() || submitting()"
+      (click)="submit()"
+    >
+      {{ 'tradeDashboardModals.library.addAction' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="cancel()"
+    >
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

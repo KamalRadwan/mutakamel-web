@@ -1,0 +1,205 @@
+<div class="min-h-0 flex-1 overflow-y-auto p-10">
+  @if (isReadonly()) {
+    <p class="mb-10 flex items-center gap-6 text-12 leading-18 text-text-muted">
+      <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+      <span>{{ readonlyReason() }}</span>
+    </p>
+  }
+
+  <form [id]="uid + '-form'" class="grid grid-cols-3 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-first-name'"
+        [label]="'users.fields.firstName' | transloco"
+        [hint]="'users.fields.firstNameHint' | transloco"
+        [required]="!isReadonly()"
+        [count]="!isReadonly() ? firstNameCount() : null"
+        [max]="!isReadonly() ? limits.personName : null"
+        [error]="firstNameError()"
+      >
+        <input
+          [id]="uid + '-first-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="profileForm.firstName"
+          [readOnly]="isReadonly() || saving()"
+          [attr.aria-readonly]="isReadonly() ? 'true' : null"
+          [attr.aria-invalid]="firstNameError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-last-name'"
+        [label]="'users.fields.lastName' | transloco"
+        [hint]="'users.fields.lastNameHint' | transloco"
+        [required]="!isReadonly()"
+        [count]="!isReadonly() ? lastNameCount() : null"
+        [max]="!isReadonly() ? limits.personName : null"
+        [error]="lastNameError()"
+      >
+        <input
+          [id]="uid + '-last-name'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="profileForm.lastName"
+          [readOnly]="isReadonly() || saving()"
+          [attr.aria-readonly]="isReadonly() ? 'true' : null"
+          [attr.aria-invalid]="lastNameError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'users.fields.code' | transloco"
+        [hint]="'users.fields.codeHint' | transloco"
+        [count]="!isReadonly() ? codeCount() : null"
+        [max]="!isReadonly() ? limits.employeeCode : null"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="!isReadonly() ? ('users.fields.codePlaceholder' | transloco) : ''"
+          [formField]="profileForm.employeeCode"
+          [readOnly]="isReadonly() || saving()"
+          [attr.aria-readonly]="isReadonly() ? 'true' : null"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-2">
+      <ui-field
+        [for]="uid + '-job-title'"
+        [label]="'users.fields.jobTitle' | transloco"
+        [hint]="'users.fields.jobTitleHint' | transloco"
+        [count]="!isReadonly() ? jobTitleCount() : null"
+        [max]="!isReadonly() ? limits.jobTitle : null"
+        [error]="jobTitleError()"
+      >
+        <input
+          [id]="uid + '-job-title'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="profileForm.jobTitle"
+          [readOnly]="isReadonly() || saving()"
+          [attr.aria-readonly]="isReadonly() ? 'true' : null"
+          [attr.aria-invalid]="jobTitleError() ? 'true' : null"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-email'"
+        [label]="'users.fields.email' | transloco"
+        [hint]="'users.fields.emailLocked' | transloco"
+      >
+        <input
+          [id]="uid + '-email'"
+          type="email"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+          [value]="user().email"
+          [readOnly]="true"
+          aria-readonly="true"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-3 grid grid-cols-3 gap-x-10 gap-y-8">
+      <app-org-cascade
+        [levels]="['company', 'branch', 'department', 'team']"
+        [required]="isReadonly() ? [] : ['company', 'branch', 'department']"
+        [readonly]="isReadonly()"
+        [disabledLevels]="saving() ? ['company', 'branch', 'department', 'team'] : []"
+        [activeOnly]="!isReadonly()"
+        [errors]="cascadeErrors()"
+        [hints]="isReadonly() ? {} : { branch: ('users.fields.moveHint' | transloco) }"
+        [value]="cascadeValue()"
+        (pointerdown)="markCascadeInteracted()"
+        (keydown)="markCascadeInteracted()"
+        (valueChange)="onCascadeChange($event)"
+      />
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-manager'"
+          [label]="'users.fields.manager' | transloco"
+          [hint]="'users.fields.managerHint' | transloco"
+          [error]="managerError()"
+        >
+          <app-user-manager-picker
+            [fieldId]="uid + '-manager'"
+            [describedBy]="uid + '-manager-hint' + (managerError() ? ' ' + uid + '-manager-error' : '')"
+            [hasError]="!!managerError()"
+            [readonly]="isReadonly()"
+            [disabled]="saving()"
+            [excludeUserId]="user().id"
+            [knownUsers]="knownUsers()"
+            [label]="'users.fields.manager' | transloco"
+            [emptyLabel]="'users.fields.noManager' | transloco"
+            [searchPlaceholder]="'users.fields.managerSearch' | transloco"
+            [value]="managerId()"
+            (valueChange)="onManagerChange($event)"
+          />
+        </ui-field>
+      </div>
+
+    </div>
+
+    <div class="col-span-3 flex flex-wrap items-center gap-16 rounded-8 border border-border bg-surface-muted px-10 py-8 text-12">
+      <span class="flex items-center gap-6">
+        <span class="text-text-muted">{{ 'users.facts.status' | transloco }}</span>
+        <app-staff-status-badge [status]="user().status" />
+      </span>
+
+      <span class="flex items-center gap-6">
+        <span class="text-text-muted">{{ 'users.facts.created' | transloco }}</span>
+        <span class="font-medium text-text">{{ formatDate(user().createdAt) }}</span>
+      </span>
+
+      <span class="flex items-center gap-6">
+        <span class="text-text-muted">{{ 'users.facts.updated' | transloco }}</span>
+        <span class="font-medium text-text">{{ formatDate(user().updatedAt) }}</span>
+      </span>
+    </div>
+  </form>
+</div>
+
+<footer class="flex shrink-0 flex-wrap items-center gap-8 rounded-b-14 border-t border-border bg-surface-muted px-10 py-8">
+  @if (!isReadonly()) {
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      [loading]="saving()"
+      [disabled]="saving() || !dirty()"
+    >
+      {{ 'users.common.save' | transloco }}
+    </button>
+
+    @if (dirty()) {
+      <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
+        {{ 'users.common.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'users.common.unsaved' | transloco }}</span>
+    }
+  }
+
+  <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="closeRequested.emit()">
+    {{ 'users.common.close' | transloco }}
+  </button>
+
+  <ng-content select="[footerEnd]" />
+</footer>

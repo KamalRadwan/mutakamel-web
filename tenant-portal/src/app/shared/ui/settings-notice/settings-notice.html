@@ -1,0 +1,12 @@
+<div
+  role="note"
+  class="flex items-start gap-8 rounded-10 border px-10 py-6 text-12 leading-18"
+  [class]="tone() === 'warning' ? 'border-warning bg-surface-muted text-text' : 'border-border bg-surface-muted text-text'"
+>
+  <span class="mt-2 inline-flex shrink-0" [class]="tone() === 'warning' ? 'text-warning-text' : 'text-accent'">
+    <ng-icon [name]="tone() === 'warning' ? 'tablerAlertTriangle' : 'tablerInfoCircle'" size="14" aria-hidden="true" />
+  </span>
+  <div class="min-w-0 flex-1">
+    <ng-content />
+  </div>
+</div>

@@ -1,0 +1,1 @@
+Tabular list where each row is a separate card. Header is a gradient bar with column lines; rows are 40px, 6px apart, with column lines. You provide the columns and rows; row actions go in a '...' button that opens the Actions menu (no Edit item). Use TanStack Table for sorting, filtering and paging.

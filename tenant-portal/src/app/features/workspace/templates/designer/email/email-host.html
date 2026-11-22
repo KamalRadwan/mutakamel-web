@@ -1,0 +1,12 @@
+<app-tpl-email-settings-modal
+  #settingsModal
+  [pickField]="pickScalarBinding"
+  [busy]="pickerOpen()"
+/>
+<app-tpl-link-modal
+  #linkModal
+  [pickScalarField]="pickScalarBinding"
+  [pickUrlField]="pickUrlBinding"
+  [busy]="pickerOpen()"
+/>
+<app-tpl-field-picker #picker />

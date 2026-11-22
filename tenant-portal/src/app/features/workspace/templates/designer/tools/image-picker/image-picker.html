@@ -1,0 +1,197 @@
+<ui-modal
+  size="wide"
+  icon="tablerPhoto"
+  tile="bg-icon-violet"
+  [title]="(mode() === 'replace' ? 'tplTools.image.replaceTitle' : 'tplTools.image.insertTitle') | transloco"
+  [closeLabel]="'templates.actions.close' | transloco"
+>
+  <div class="flex flex-col gap-10">
+    <!-- Toolbar: search + type filter -->
+    <div class="flex flex-wrap items-end gap-8">
+      <ui-field
+        class="min-w-tpl-search flex-1"
+        [for]="uid + '-search'"
+        [label]="'tplTools.image.search' | transloco"
+        [hint]="'tplTools.image.searchHint' | transloco"
+      >
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          #searchInput
+          [id]="uid + '-search'"
+          type="text"
+          maxlength="100"
+          autocomplete="off"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [placeholder]="'tplTools.image.search' | transloco"
+          [value]="search()"
+          (input)="onSearchInput($event)"
+          (keydown.escape)="onSearchEscape($event)"
+        />
+        @if (search()) {
+          <button
+            type="button"
+            class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'tplTools.image.clearSearch' | transloco"
+            (click)="clearSearch(); searchInput.focus()"
+          >
+            <ng-icon name="tablerX" size="12" aria-hidden="true" />
+          </button>
+        }
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'tplTools.image.type' | transloco"
+        [hint]="'tplTools.image.typeHint' | transloco"
+      >
+        <ui-segmented
+          [options]="typeOptions()"
+          [label]="'tplTools.image.type' | transloco"
+          [value]="assetType()"
+          (valueChange)="onTypeChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    <!-- Asset grid / states -->
+    <div class="max-h-tpl-list overflow-y-auto scrollbar-thin pe-2">
+      @if (loading()) {
+        <div class="grid grid-cols-3 gap-8" aria-busy="true">
+          @for (card of skeletonCards; track card) {
+            <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+              <div class="h-tpl-image-tile animate-pulse rounded-6 bg-neutral-soft"></div>
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </div>
+          }
+        </div>
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface-muted p-16 text-center">
+          <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+            <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+          </span>
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'tplTools.image.loadFailed' | transloco }}
+          </p>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retryLoad()">
+            {{ 'tplTools.image.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (items().length === 0) {
+        <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface-muted p-16 text-center">
+          <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+            <ng-icon name="tablerPhoto" size="18" aria-hidden="true" />
+          </span>
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'tplTools.image.empty' | transloco }}
+          </p>
+          <a
+            uiButton
+            variant="ghost"
+            size="small"
+            href="/workspace/operations/template-assets"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ng-icon name="tablerExternalLink" size="14" aria-hidden="true" />
+            {{ 'tplTools.image.openAssets' | transloco }}
+          </a>
+        </div>
+      } @else {
+        <div class="flex flex-col gap-8">
+          <div class="grid grid-cols-3 gap-8">
+            @for (asset of items(); track asset.assetId) {
+              @let selected = selectedAssetId() === asset.assetId;
+              <button
+                type="button"
+                class="flex cursor-pointer flex-col gap-4 rounded-10 border p-8 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="selected ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+                [attr.aria-pressed]="selected"
+                (click)="selectAsset(asset)"
+              >
+                <div class="flex h-tpl-image-tile w-full items-center justify-center overflow-hidden rounded-6 bg-surface-muted p-4">
+                  @if (previewUrl(asset.assetId); as url) {
+                    <img [src]="url" [alt]="asset.originalFileName" class="max-h-full max-w-full object-contain" />
+                  } @else {
+                    <ng-icon name="tablerPhoto" size="20" class="text-text-muted" aria-hidden="true" />
+                  }
+                </div>
+                <span dir="ltr" class="w-full truncate text-12 leading-18 font-medium text-text">
+                  {{ asset.originalFileName }}
+                </span>
+                <span dir="ltr" class="w-full truncate text-11 leading-16 tabular-nums text-text-muted">
+                  {{ formatMime(asset.mimeType) }} · {{ asset.widthPx }} × {{ asset.heightPx }}
+                </span>
+              </button>
+            }
+          </div>
+
+          @if (hasNextPage()) {
+            <div class="flex justify-center pt-2">
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [loading]="loadingMore()"
+                (click)="loadMore()"
+              >
+                {{ 'tplTools.image.loadMore' | transloco }}
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Alt text and decorative toggle -->
+    <div class="flex flex-col gap-8">
+      <ui-field
+        [for]="uid + '-alt'"
+        [label]="'tplTools.image.alt' | transloco"
+        [hint]="'tplTools.image.altHint' | transloco"
+        [required]="!decorative()"
+        [count]="alt().length"
+        [max]="500"
+        [error]="altError()"
+      >
+        <input
+          [id]="uid + '-alt'"
+          type="text"
+          maxlength="500"
+          class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+          [disabled]="decorative()"
+          [value]="alt()"
+          (input)="onAltInput($event)"
+          (blur)="markAltTouched()"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-decorative'"
+        [label]="'tplTools.image.decorative' | transloco"
+        [hint]="'tplTools.image.decorativeHint' | transloco"
+      >
+        <div class="flex h-field items-center">
+          <ui-checkbox [checked]="decorative()" (checkedChange)="onDecorativeChange($event)" />
+        </div>
+      </ui-field>
+    </div>
+  </div>
+
+  <div modal-footer class="flex flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [disabled]="!canConfirm()"
+      (click)="confirm()"
+    >
+      {{ (mode() === 'replace' ? 'tplTools.image.replace' : 'tplTools.image.insert') | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'tplTools.image.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

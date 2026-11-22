@@ -1,0 +1,41 @@
+<div [class]="layout() === 'page' ? pageGrid : 'grid grid-cols-2 items-start gap-x-10 gap-y-8'">
+  <div [class]="layout() === 'page' ? 'col-span-2 desktop:col-span-1' : ''">
+    <app-phone-list
+      [phones]="phones()"
+      (phonesChange)="onPhonesChange($event)"
+      [countries]="countries()"
+      [max]="limits.phonesMax"
+      [maxLength]="limits.phoneMax"
+      [readonly]="readonly()"
+      [label]="'leadForm.reach.mobile' | transloco"
+      [hint]="'leadForm.reach.mobileHint' | transloco"
+      [addLabel]="'leadForm.reach.addPhone' | transloco"
+      [removeLabel]="'leadForm.reach.removePhone' | transloco"
+      [idPrefix]="uid + '-phone'"
+      [errors]="phoneErrors()"
+      [crm]="crm()"
+      [source]="source()"
+    />
+  </div>
+
+  <ui-field
+    [label]="'leadForm.reach.email' | transloco"
+    [for]="uid + '-email'"
+    [hint]="'leadForm.reach.emailHint' | transloco"
+    [count]="draft().email.length"
+    [max]="limits.email"
+    [error]="emailError()"
+  >
+    <input
+      [id]="uid + '-email'"
+      type="email"
+      dir="ltr"
+      autocomplete="email"
+      class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+      [readonly]="readonly()"
+      [value]="draft().email"
+      [attr.aria-invalid]="emailError() ? 'true' : null"
+      (input)="setEmail($event)"
+    />
+  </ui-field>
+</div>

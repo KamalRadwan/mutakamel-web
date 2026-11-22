@@ -1,0 +1,65 @@
+<article
+  class="flex h-full flex-col gap-6 rounded-10 border border-border p-8 shadow-popover transition-colors duration-fast"
+  [class]="
+    disabled()
+      ? 'cursor-not-allowed bg-neutral-soft text-text-placeholder'
+      : 'cursor-pointer bg-surface text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong'
+  "
+  [attr.role]="disabled() ? null : 'link'"
+  [attr.tabindex]="disabled() ? null : 0"
+  [attr.aria-disabled]="disabled() ? 'true' : null"
+  [attr.title]="disabled() ? ('repCatalogue.notConnectedReason' | transloco) : null"
+  [attr.aria-description]="disabled() ? ('repCatalogue.notConnectedReason' | transloco) : null"
+  (click)="onCardClick($event)"
+  (keydown)="onCardKeydown($event)"
+>
+  <div class="flex items-center gap-8">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="disabled() ? 'bg-icon-gray' : domainMeta().tile"
+      aria-hidden="true"
+    >
+      <ng-icon [name]="domainMeta().icon" size="15" aria-hidden="true" />
+    </span>
+
+    <div class="flex min-w-0 flex-1 items-center gap-4">
+      @if (disabled()) {
+        <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-placeholder" aria-hidden="true" />
+      }
+      <h3
+        class="min-w-0 flex-1 line-clamp-2 text-13 leading-18 font-medium"
+        [class]="disabled() ? 'text-text-placeholder' : 'text-text'"
+        [attr.title]="disabled() ? null : title()"
+      >
+        {{ title() }}
+      </h3>
+    </div>
+  </div>
+
+  @if (summary(); as text) {
+    <p class="line-clamp-3 text-12 leading-18" [class]="disabled() ? 'text-text-placeholder' : 'text-text-muted'">
+      {{ text }}
+    </p>
+  }
+
+  <div class="mt-auto flex items-center gap-6">
+    <ui-badge tone="tag">{{ 'repCatalogue.' + domainMeta().basis | transloco }}</ui-badge>
+    <span class="flex-1" aria-hidden="true"></span>
+    <ui-badge [tone]="badge().tone">{{ 'repCatalogue.' + badge().key | transloco }}</ui-badge>
+
+    @if (!disabled()) {
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="report().favourite ? 'text-icon-orange' : 'text-text-muted hover:text-icon-orange'"
+        [disabled]="togglingFavourite()"
+        [attr.aria-pressed]="report().favourite"
+        [attr.aria-label]="(report().favourite ? 'repCatalogue.unfavourite' : 'repCatalogue.favourite') | transloco"
+        [title]="(report().favourite ? 'repCatalogue.unfavourite' : 'repCatalogue.favourite') | transloco"
+        (click)="onStarClick($event)"
+      >
+        <ng-icon [name]="report().favourite ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+      </button>
+    }
+  </div>
+</article>

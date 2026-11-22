@@ -1,0 +1,191 @@
+<app-settings-frame
+  [addLabel]="'tags.new' | transloco"
+  [addDisabled]="atLimit()"
+  [addHint]="atLimit() ? ('tags.limitReached' | transloco: { max: maxTags }) : null"
+  [searchPlaceholder]="'tags.search' | transloco"
+  [loading]="loading()"
+  [showAdd]="canManage"
+  [(search)]="search"
+  (add)="openNew()"
+  (reload)="load()"
+>
+  @if (loadError()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <p class="text-12 text-danger-text" role="alert">{{ 'settings.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" (click)="load()">
+        {{ 'settings.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'tags.title' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumnsClass()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'tags.table.tag' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'tags.table.colour' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'settings.common.lastUpdated' | transloco }}
+          </span>
+          @if (canManage) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="grid mt-6 h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumnsClass()"
+              aria-hidden="true"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+                <span class="size-16 shrink-0 rounded-full bg-neutral-soft motion-safe:animate-pulse"></span>
+                <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-stat-chart-w max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              @if (canManage) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (tag of filteredTags(); track tag.id) {
+            <div
+              role="row"
+              class="grid mt-6 h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="gridColumnsClass()"
+              (click)="openTag(tag)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                @if (tag.backgroundColor && tag.textColor) {
+                  <!-- Approved data exception: tag chip colours come from API data, bound inline. -->
+                  <button
+                    type="button"
+                    class="inline-flex h-chip max-w-full cursor-pointer items-center truncate rounded-6 px-6 text-11 font-medium outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [style.background-color]="tag.backgroundColor"
+                    [style.color]="tag.textColor"
+                    (click)="openTag(tag); $event.stopPropagation()"
+                  >
+                    {{ tag.name }}
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="inline-flex h-chip max-w-full cursor-pointer items-center truncate rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    (click)="openTag(tag); $event.stopPropagation()"
+                  >
+                    {{ tag.name }}
+                  </button>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+                @if (tag.backgroundColor && tag.textColor) {
+                  <!-- Approved data exception: tag swatch colour comes from API data, bound inline. -->
+                  <span
+                    class="size-16 shrink-0 rounded-full border border-border"
+                    [style.background-color]="tag.backgroundColor"
+                    aria-hidden="true"
+                  ></span>
+                  @if (presetKey(tag); as preset) {
+                    <span class="truncate text-12 text-text">{{ 'tags.presets.' + preset | transloco }}</span>
+                  } @else {
+                    <span class="truncate text-12 text-text">{{ 'tags.color.custom' | transloco }}</span>
+                    <span dir="ltr" class="truncate text-12 tabular-nums text-text-muted">
+                      {{ tag.backgroundColor }} / {{ tag.textColor }}
+                    </span>
+                  }
+                } @else {
+                  <span class="truncate text-12 text-text-muted">{{ 'tags.color.none' | transloco }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(tag.updatedAt) }}</span>
+              </span>
+
+              @if (canManage) {
+                <span
+                  role="cell"
+                  class="flex items-center justify-center border-s border-border"
+                  (click)="$event.stopPropagation()"
+                >
+                  <ui-actions-menu
+                    [items]="rowActionItems()"
+                    [label]="'settings.common.actions' | transloco"
+                    (selected)="onRowAction(tag, $event)"
+                  />
+                </span>
+              }
+            </div>
+          } @empty {
+            <div role="row">
+              <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+                {{ (search().trim() ? 'settings.common.noResults' : 'tags.empty') | transloco }}
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
+  <span footer>{{ 'settings.common.of' | transloco: { count: tags().length, max: maxTags } }}</span>
+</app-settings-frame>
+
+<app-tag-modal
+  [canManage]="canManage"
+  (saved)="onTagSaved()"
+  (deletedRemotely)="onTagDeletedRemotely()"
+  (deleteRequested)="requestDelete($event)"
+/>
+
+<ui-confirm-dialog
+  #deleteDialog
+  tone="danger"
+  [title]="'tags.delete.title' | transloco"
+  [text]="'tags.delete.text' | transloco: { name: pendingDeleteTag()?.name ?? '' }"
+  [confirmLabel]="'settings.common.delete' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #detachWarningModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'tags.delete.blockedTitle' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'tags.delete.blockedText' | transloco: { count: detachWarningCount() ?? 0 } }}
+  </p>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="closeDetachWarning()">
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

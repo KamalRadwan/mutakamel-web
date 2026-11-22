@@ -1,0 +1,246 @@
+@if (effectiveReadonly()) {
+  <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+    <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+    <span>{{ effectiveReadonlyReason() || ('access.common.readonly' | transloco) }}</span>
+  </p>
+}
+
+@if (!effectiveReadonly() && availableModules().length) {
+  <div class="flex flex-wrap items-end gap-8">
+    <ui-field
+      size="bare"
+      class="min-w-0 flex-1"
+      [for]="uid + '-app'"
+      [label]="'access.apps.field' | transloco"
+      [hint]="'access.apps.fieldHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-app'"
+        [describedBy]="uid + '-app-hint'"
+        [options]="availableModuleOptions()"
+        [value]="selectedModule()"
+        [label]="'access.apps.field' | transloco"
+        (valueChange)="selectedModule.set($event)"
+      />
+    </ui-field>
+
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      size="small"
+      [loading]="assigning()"
+      [disabled]="assigning() || !selectedModule()"
+      (click)="assign()"
+    >
+      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+      <span>{{ 'access.apps.assign' | transloco }}</span>
+    </button>
+  </div>
+}
+
+@if (loadFailed()) {
+  <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <span
+      class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+      aria-hidden="true"
+    >
+      <ng-icon name="tablerCloudOff" size="20" />
+    </span>
+    <p class="text-12 text-danger-text">{{ 'access.common.loadFailed' | transloco }}</p>
+    <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+      {{ 'access.common.retry' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-modal-form"
+      [attr.aria-label]="'access.apps.cols.app' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [class]="gridColumns()"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'access.apps.cols.app' | transloco }}
+        </span>
+        @if (isDerivedMode()) {
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'access.apps.cols.state' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'access.apps.since' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'access.apps.cols.source' | transloco }}
+          </span>
+        } @else {
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'access.apps.cols.assigned' | transloco }}
+          </span>
+          @if (!effectiveReadonly()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'access.common.actions' | transloco }}</span>
+            </span>
+          }
+        }
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+            [class]="gridColumns()"
+            aria-hidden="true"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+              <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+            </span>
+            @if (isDerivedMode()) {
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-badge w-time-dd rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-stat-chart-w max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+            } @else {
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-stat-chart-w max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              @if (!effectiveReadonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+              }
+            }
+          </div>
+        }
+      } @else {
+        @for (row of assignments(); track row.id) {
+          @let look = lookFor(row.moduleKey);
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+            [class]="gridColumns()"
+          >
+            <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="look.tile"
+              >
+                <ng-icon [name]="look.icon" size="14" aria-hidden="true" />
+              </span>
+              <span class="truncate font-medium">{{ moduleLabel(row.moduleKey) }}</span>
+            </span>
+
+            @if (isDerivedMode()) {
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (row.accessState === 'OVER_CAPACITY') {
+                  <span
+                    class="inline-flex h-chip items-center gap-4 rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning"
+                    [title]="'seats.chips.readOnly' | transloco"
+                  >
+                    <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+                    <span>{{ 'access.apps.state.OVER_CAPACITY' | transloco }}</span>
+                  </span>
+                } @else {
+                  <span class="inline-flex h-chip items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft">
+                    {{ 'access.apps.state.ACTIVE' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ row.createdAt ? formatDate(row.createdAt) : '—' }}</span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ ('access.apps.source.' + row.source) | transloco }}</span>
+              </span>
+            } @else {
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(row.createdAt) }}</span>
+              </span>
+
+              @if (!effectiveReadonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                    [disabled]="removingModuleKey() === row.moduleKey"
+                    [attr.aria-label]="'access.common.remove' | transloco"
+                    [title]="'access.common.remove' | transloco"
+                    (click)="requestRemove(row)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                </span>
+              }
+            }
+          </div>
+        } @empty {
+          <div role="row">
+            <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+              {{ 'access.apps.empty' | transloco }}
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+<div class="flex items-center">
+  <a
+    uiButton
+    variant="secondary"
+    size="small"
+    routerLink="/workspace/operations/addon-seats"
+  >
+    {{ 'access.apps.openAddons' | transloco }}
+  </a>
+</div>
+
+<ui-confirm-dialog
+  #removeAppConfirm
+  tone="danger"
+  [title]="'access.apps.removeTitle' | transloco"
+  [text]="'access.apps.removeText' | transloco: { module: pendingRemoveName() }"
+  [confirmLabel]="'access.common.remove' | transloco"
+  [cancelLabel]="'access.common.cancel' | transloco"
+/>
+
+<ui-modal
+  #addonsModal
+  size="alert"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'access.apps.addonsFirstTitle' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+>
+  <p class="text-12 leading-18 text-text-muted">{{ 'access.apps.addonsFirst' | transloco }}</p>
+
+  <a
+    modal-footer
+    uiButton
+    variant="primary"
+    routerLink="/workspace/operations/addon-seats"
+    (click)="addonsModal.close()"
+  >
+    {{ 'access.apps.openAddons' | transloco }}
+  </a>
+  <button modal-footer type="button" uiButton variant="secondary" (click)="addonsModal.close()">
+    {{ 'access.common.close' | transloco }}
+  </button>
+</ui-modal>

@@ -1,0 +1,53 @@
+<div
+  role="region"
+  [attr.aria-label]="'accountsBulk.selection.label' | transloco"
+  class="flex min-h-bulk-bar shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 bg-brand-soft px-10 py-4 text-12 text-on-brand-soft"
+>
+  <div class="flex min-w-0 flex-wrap items-center gap-6">
+    @if (mode() === 'ids') {
+      <span class="font-medium tabular-nums" aria-live="polite" aria-atomic="true">
+        {{ 'accountsBulk.selection.page' | transloco: { count: count() } }}
+      </span>
+
+      @if (hidden() > 0) {
+        <span class="text-text-muted tabular-nums">
+          {{ 'accountsBulk.selection.hidden' | transloco: { hidden: hidden() } }}
+        </span>
+      }
+
+      @if (canOfferSelectAll()) {
+        <button
+          uiButton
+          variant="ghost"
+          size="small"
+          type="button"
+          [disabled]="tooMany()"
+          [attr.title]="tooMany() ? ('accountsBulk.selection.tooMany' | transloco) : null"
+          (click)="selectAllMatching()"
+        >
+          {{ 'accountsBulk.selection.all' | transloco: { total: total() } }}
+        </button>
+        @if (tooMany()) {
+          <span class="text-text-muted">{{ 'accountsBulk.selection.tooMany' | transloco }}</span>
+        }
+      }
+    } @else {
+      <span class="font-medium tabular-nums" aria-live="polite" aria-atomic="true">
+        {{
+          (count() === allTotal() ? 'accountsBulk.selection.allSelected' : 'accountsBulk.selection.selected')
+            | transloco: { total: allTotal(), count: count() }
+        }}
+      </span>
+
+      @if (pageRows().length > 0) {
+        <button uiButton variant="ghost" size="small" type="button" (click)="selectOnlyPage()">
+          {{ 'accountsBulk.selection.onlyPage' | transloco }}
+        </button>
+      }
+    }
+  </div>
+
+  <button uiButton variant="ghost" size="small" type="button" class="shrink-0" (click)="clear()">
+    {{ 'accountsBulk.selection.clear' | transloco }}
+  </button>
+</div>

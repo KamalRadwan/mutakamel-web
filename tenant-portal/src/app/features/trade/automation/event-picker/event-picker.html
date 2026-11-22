@@ -1,0 +1,88 @@
+<div class="flex flex-wrap items-center justify-between gap-8">
+  <div class="flex items-center gap-6">
+    <h3 class="text-13 leading-18 font-medium text-text">{{ 'webhooks.eventsSection.title' | transloco }}</h3>
+    <span
+      class="inline-flex h-counter min-w-counter items-center justify-center rounded-full bg-neutral-soft px-6 text-11 leading-16 font-medium text-on-neutral-soft tabular-nums"
+    >
+      <bdi dir="ltr">{{ selectedCount() }}</bdi>
+    </span>
+  </div>
+  <span class="text-11 leading-16 text-text-muted">{{ 'webhooks.eventsSection.caption' | transloco }}</span>
+</div>
+
+@if (catalogue().length === 0) {
+  <p class="rounded-10 border border-border bg-surface-muted p-10 text-12 leading-18 text-text-muted">
+    {{ 'webhooks.eventsSection.empty' | transloco }}
+  </p>
+} @else {
+  <ui-field
+    size="bare"
+    [label]="'webhooks.eventsSection.listLabel' | transloco"
+    [for]="uid + '-events'"
+    [hint]="'webhooks.eventsSection.listHint' | transloco"
+  >
+    <div class="flex flex-col gap-6">
+      @for (def of catalogue(); track trackDef(def)) {
+        @let checked = isChecked(def);
+        @let disabledCheck = readonly() || (!checked && atMax());
+        <div
+          class="flex flex-col gap-6 rounded-10 border bg-surface p-8 transition-colors duration-fast"
+          [class]="error() && selectedCount() === 0 ? 'border-danger-border' : 'border-border'"
+        >
+          <div class="flex flex-wrap items-center gap-8">
+            <span
+              class="inline-flex items-center"
+              [class]="disabledCheck ? 'pointer-events-none opacity-drag-source' : ''"
+              [attr.inert]="disabledCheck ? '' : null"
+              [attr.title]="!checked && atMax() ? ('webhooks.eventsSection.maxReached' | transloco) : null"
+            >
+              <ui-checkbox [checked]="checked" (checkedChange)="onToggleEvent(def, $event)">
+                <span class="text-13 leading-18 font-medium text-text">{{ eventLabel(def) }}</span>
+              </ui-checkbox>
+            </span>
+            <bdi dir="ltr" class="text-11 leading-16 text-text-muted tabular-nums">{{ eventCode(def) }}</bdi>
+          </div>
+
+          @if (checked) {
+            <div class="flex flex-wrap items-center gap-6 ps-icon-tile-sm">
+              @for (field of eventFields(def); track field) {
+                @let included = isFieldIncluded(def, field);
+                @let lockedLast = isLastSelectedField(def, field);
+                @if (readonly()) {
+                  <span
+                    class="inline-flex h-chip items-center rounded-6 px-6 text-11 font-medium"
+                    [class]="included ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text-muted'"
+                  >
+                    <bdi dir="ltr">{{ field }}</bdi>
+                  </span>
+                } @else {
+                  <button
+                    type="button"
+                    class="inline-flex h-chip items-center rounded-6 px-6 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="
+                      included
+                        ? lockedLast
+                          ? 'cursor-not-allowed bg-brand-soft text-on-brand-soft'
+                          : 'cursor-pointer bg-brand-soft text-on-brand-soft hover:bg-brand hover:text-on-brand'
+                        : 'cursor-pointer bg-neutral-soft text-text-muted hover:bg-row-hover hover:text-text'
+                    "
+                    [attr.aria-pressed]="included"
+                    [attr.aria-disabled]="lockedLast ? 'true' : null"
+                    [attr.title]="lockedLast ? ('webhooks.eventsSection.keepOneField' | transloco) : null"
+                    (click)="onToggleField(def, field)"
+                  >
+                    <bdi dir="ltr">{{ field }}</bdi>
+                  </button>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </ui-field>
+}
+
+@if (error(); as err) {
+  <p class="text-11 leading-16 text-danger-text" role="alert">{{ err }}</p>
+}

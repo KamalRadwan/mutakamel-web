@@ -1,0 +1,159 @@
+{
+  "title": "Party directory",
+  "newParty": "New party",
+  "searchPlaceholder": "Search name, tax number, phone or email",
+  "clearSearch": "Clear search",
+  "shared": "Shared",
+  "managedByCrm": "Managed by CRM",
+  "managedByApp": "Managed by another application",
+  "pagination": "Party directory pagination",
+  "types": {
+    "PERSON": "Person",
+    "ORGANIZATION": "Organization"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive",
+    "BLOCKED": "Blocked"
+  },
+  "roles": {
+    "CUSTOMER": "Customer",
+    "SUPPLIER": "Supplier",
+    "EMPLOYEE": "Employee",
+    "LEAD": "Lead",
+    "SHIPPING_RECIPIENT": "Shipping recipient",
+    "CONTACT_PERSON": "Contact person",
+    "BILLING_CONTACT": "Billing contact",
+    "LEGAL_ENTITY": "Legal entity",
+    "GUARANTOR": "Guarantor",
+    "PARTNER": "Partner"
+  },
+  "contactTypes": {
+    "PHONE": "Phone",
+    "MOBILE": "Mobile",
+    "EMAIL": "Email",
+    "WHATSAPP": "WhatsApp",
+    "WEBSITE": "Website",
+    "OTHER": "Other"
+  },
+  "addressTypes": {
+    "LEGAL": "Legal",
+    "BILLING": "Billing",
+    "SHIPPING": "Shipping",
+    "HOME": "Home",
+    "WORK": "Work",
+    "OTHER": "Other"
+  },
+  "relationshipTypes": {
+    "CONTACT_PERSON": "Contact person",
+    "BILLING_CONTACT": "Billing contact",
+    "LEGAL_CONTACT": "Legal contact",
+    "GUARANTOR": "Guarantor",
+    "PARTNER_OF": "Partner of",
+    "EMPLOYEE_OF": "Employee of",
+    "OTHER": "Other"
+  },
+  "filters": {
+    "toggle": "Filters",
+    "all": "All",
+    "clear": "Clear filters",
+    "remove": "Remove filter",
+    "type": "Type",
+    "typeHint": "Filter by person or organization.",
+    "status": "Status",
+    "statusHint": "Filter by current party status.",
+    "role": "Role",
+    "roleHint": "Match parties with an active role of this type.",
+    "branch": "Branch",
+    "branchHint": "Choose a branch or shared workspace parties.",
+    "owner": "Owner",
+    "ownerHint": "Filter by the assigned owner user."
+  },
+  "cols": {
+    "party": "Party",
+    "phone": "Phone",
+    "email": "Email",
+    "roles": "Roles",
+    "branch": "Branch",
+    "owner": "Owner",
+    "status": "Status",
+    "created": "Created",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "sort": {
+    "asc": "Sort ascending",
+    "desc": "Sort descending"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noPermissionBranch": "You do not have permission for this branch.",
+    "noPermissionShared": "Managing shared parties requires workspace-wide permission."
+  },
+  "confirmDelete": {
+    "title": "Delete party",
+    "text": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
+    "confirm": "Delete",
+    "cancel": "Cancel"
+  },
+  "inUse": {
+    "title": "This party is in use",
+    "text": "It is linked to other records or apps, so it cannot be deleted. Set its status to Inactive instead.",
+    "setInactive": "Set to inactive",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "toast": {
+    "deleted": "Party deleted.",
+    "setInactive": "Party set to inactive."
+  },
+  "states": {
+    "emptyFirstUse": "No people or organizations yet",
+    "emptyFiltered": "No matching people or organizations.",
+    "loadFailed": "Could not load the party directory.",
+    "retry": "Try again",
+    "referenceLabel": "Reference:",
+    "reference": "Reference: {{id}}",
+    "forbiddenTitle": "Access denied",
+    "forbiddenText": "You do not have permission to view the party directory.",
+    "backToHome": "Back to home"
+  },
+  "errors": {
+    "PARTY_NOT_FOUND": "Party not found.",
+    "PARTY_CONTACT_METHOD_NOT_FOUND": "Party contact method not found.",
+    "PARTY_ADDRESS_NOT_FOUND": "Party address not found.",
+    "PARTY_ROLE_NOT_FOUND": "Party role not found.",
+    "PARTY_RELATIONSHIP_NOT_FOUND": "Party relationship not found.",
+    "PARTY_IMAGE_NOT_FOUND": "Party image not found.",
+    "PARTY_IMAGE_REQUIRED": "A party image file is required.",
+    "PARTY_CONTACT_VALUE_INVALID": "Contact value must match its method type.",
+    "PARTY_IMAGE_INVALID": "The party image is not a safe PNG, JPEG, or WebP file.",
+    "PARTY_IMAGE_TOO_LARGE": "The party image must not exceed 2 MB.",
+    "PARTY_IMAGE_STORAGE_UNAVAILABLE": "Party image storage is unavailable.",
+    "PARTY_DUPLICATE_CONTACT_METHOD": "This contact method is already used by another party.",
+    "PARTY_ROLE_ALREADY_EXISTS": "This party role already exists in the same scope.",
+    "PARTY_ROLE_MANAGED_BY_APP": "This party role is managed by another application and cannot be deleted here.",
+    "DIRECTORY_PARTY_IN_USE": "This party is in use and cannot be deleted.",
+    "PARTY_RELATIONSHIP_ALREADY_EXISTS": "This relationship already exists.",
+    "PARTY_ALREADY_LINKED": "This party is already linked to a tenant user.",
+    "PARTY_CONTACT_METHOD_LIMIT_EXCEEDED": "Party contact method limit exceeded.",
+    "PARTY_ADDRESS_LIMIT_EXCEEDED": "Party address limit exceeded.",
+    "PARTY_ROLE_LIMIT_EXCEEDED": "Party role limit exceeded.",
+    "PARTY_CHILD_BATCH_INVALID": "Party child collections are invalid.",
+    "PARTY_ROLE_METADATA_INVALID": "Party role metadata must be a flat object of at most 4096 UTF-8 bytes.",
+    "PARTY_FIELDS_INVALID": "Party fields must match the party type.",
+    "PARTY_RELATIONSHIP_INVALID": "Party relationship is invalid.",
+    "PARTY_BRANCH_INVALID": "Branch must exist and be active.",
+    "PARTY_OWNER_INVALID": "Party owner must be an active user in the party scope.",
+    "PARTY_TENANT_USER_INVALID": "Tenant users can only link to active person parties.",
+    "DIRECTORY_SETTINGS_INVALID": "Directory settings are invalid.",
+    "DIRECTORY_PARTY_CHILD_AUTHORITY_EXCEEDED": "Stored party children exceed the supported authority.",
+    "BRANCH_PERMISSION_DENIED": "Required permission is not granted for this branch.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "Permission scope resolution is unavailable.",
+    "INVALID_FIELD": "The requested sort field is not allowed.",
+    "CORE_VALIDATION_FAILED": "Validation failed for the submitted request.",
+    "generic": "Something went wrong. Try again."
+  }
+}

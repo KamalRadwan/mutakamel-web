@@ -1,0 +1,82 @@
+body { margin: 0; padding: var(--space-10); background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 12px; line-height: 18px; }
+.ds-row { display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap; }
+.ds-col { display: flex; flex-direction: column; gap: var(--space-6); }
+
+/* Buttons */
+.ds-btn { font: inherit; height: var(--btn-h); padding: 0 var(--space-12); border-radius: var(--radius-8); border: 1px solid transparent; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: var(--space-4); cursor: pointer; white-space: nowrap; line-height: 1; }
+.ds-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-halo-strong); }
+.ds-btn-primary { background: var(--brand); color: var(--on-brand); }
+.ds-btn-primary:hover { background: var(--brand-hover); }
+.ds-btn-primary:active { background: var(--brand-pressed); }
+.ds-btn-secondary { background: var(--surface); border-color: var(--border-field); color: var(--text); }
+.ds-btn-secondary:hover { background: var(--surface-muted); border-color: var(--border-field-hover); }
+.ds-btn-secondary:active { background: var(--neutral-soft); border-color: var(--border-field-hover); }
+.ds-btn-ghost { background: none; color: var(--accent); }
+.ds-btn-ghost:hover { background: var(--neutral-soft); }
+.ds-btn-ghost:active { background: var(--border); }
+.ds-btn-danger { background: var(--danger); color: var(--on-danger); }
+.ds-btn-danger:hover { background: var(--danger-hover); }
+.ds-btn-danger:active { background: var(--danger-pressed); }
+.ds-btn-sm { height: var(--btn-h-sm); padding: 0 var(--space-8); font-size: 11px; border-radius: var(--radius-6); }
+.ds-btn:disabled { background: var(--neutral-soft); color: var(--text-placeholder); border-color: transparent; cursor: not-allowed; }
+
+/* Fields */
+.ds-label { display: flex; align-items: center; gap: var(--space-4); height: 18px; margin-bottom: var(--space-2); color: var(--text-muted); font-size: 12px; }
+.ds-req { color: var(--danger-text); }
+.ds-hint { display: inline-flex; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--accent); color: var(--accent); font-size: 10px; font-weight: 500; align-items: center; justify-content: center; box-sizing: border-box; cursor: help; }
+.ds-field { display: flex; align-items: center; gap: var(--space-6); height: var(--field-h); padding: 0 var(--space-8); border: 1px solid var(--border-field); border-radius: var(--radius-8); background: var(--surface-field); color: var(--text); font-size: 12px; box-sizing: border-box; min-width: 0; }
+.ds-field:hover { border-color: var(--border-field-hover); }
+.ds-field-compact { height: var(--field-h-compact); }
+.ds-field-focus, .ds-field:focus-within { border-color: var(--focus-ring); box-shadow: 0 0 0 3px var(--focus-halo); }
+.ds-field-error { border-color: var(--danger-border); box-shadow: 0 0 0 2px var(--danger-halo); }
+.ds-field-disabled { background: var(--neutral-soft); color: var(--text-placeholder); }
+.ds-msg { display: flex; align-items: center; gap: 3px; margin-top: var(--space-2); font-size: 11px; line-height: 16px; color: var(--danger-text); }
+.ds-msg-warn { color: var(--warning-text); }
+.ds-form-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.ds-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-8) var(--space-10); align-items: start; }
+
+/* Badges and tags */
+.ds-badge { display: inline-flex; align-items: center; height: var(--badge-h); padding: 0 var(--space-8); border-radius: var(--radius-8); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.ds-badge-success { background: var(--success); color: var(--on-success); }
+.ds-badge-warning { background: var(--warning); color: var(--on-warning); }
+.ds-badge-danger { background: var(--danger); color: var(--on-danger); }
+.ds-tag { background: var(--neutral-soft); color: var(--on-neutral-soft); }
+.ds-tag-brand { background: var(--brand-soft); color: var(--on-brand-soft); }
+
+/* Cards */
+.ds-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-10); box-shadow: var(--shadow-card); padding: var(--space-8); }
+.ds-muted { color: var(--text-muted); }
+.ds-stat { display: grid; grid-template-columns: minmax(0, 1fr) 84px; gap: var(--space-6); align-items: end; }
+.ds-stat-value { font-size: 20px; line-height: 26px; font-weight: 500; }
+.ds-up { color: var(--success-text); }
+.ds-tile { width: var(--icon-tile-sm); height: var(--icon-tile-sm); border-radius: var(--radius-8); display: inline-flex; align-items: center; justify-content: center; color: var(--on-icon); font-size: 11px; font-weight: 500; flex: none; }
+
+/* Navigation */
+.ds-nav { display: flex; align-items: center; gap: var(--space-4); height: var(--nav-h); padding: 0 var(--space-12); background: linear-gradient(120deg, var(--nav-start), var(--nav-end)); color: var(--on-nav); border-radius: var(--radius-10) var(--radius-10) 0 0; }
+.ds-nav-item { display: flex; align-items: center; height: var(--nav-item-h); padding: 0 var(--space-10); border-radius: var(--radius-8); color: var(--on-nav-muted); font-size: 13px; white-space: nowrap; }
+.ds-nav-item-active { background: var(--nav-glass); box-shadow: inset 0 0 0 1px var(--nav-glass-ring); color: var(--on-nav); font-weight: 500; }
+.ds-subnav { display: flex; height: var(--subnav-h); padding: 0 var(--space-12); background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius-10) var(--radius-10); }
+.ds-subnav-item { display: flex; align-items: center; padding: 0 var(--space-10); color: var(--text-muted); font-size: 13px; white-space: nowrap; }
+.ds-subnav-item-active { color: var(--accent); font-weight: 500; box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* Table: rows as cards */
+.ds-thead, .ds-trow { display: grid; grid-template-columns: 64px minmax(0, 1fr) 130px 90px; }
+.ds-thead { height: var(--table-head-h); border-radius: var(--radius-10); background: linear-gradient(120deg, var(--nav-start), var(--nav-end)); color: var(--on-nav); font-size: 13px; font-weight: 500; }
+.ds-trow { min-height: var(--table-row-h); margin-top: var(--space-6); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-10); box-shadow: var(--shadow-card); font-size: 14px; }
+.ds-thead > span, .ds-trow > span { display: flex; align-items: center; gap: var(--space-6); padding: 0 var(--space-10); min-width: 0; white-space: nowrap; overflow: hidden; }
+.ds-thead > span + span { border-inline-start: 1px solid var(--on-nav-line); }
+.ds-trow > span + span { border-inline-start: 1px solid var(--border); }
+
+/* Toast */
+.ds-toast { position: relative; display: flex; align-items: flex-start; gap: var(--space-8); width: var(--toast-w); padding: var(--space-8) var(--space-10); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-10); box-shadow: var(--shadow-popover); overflow: hidden; box-sizing: border-box; }
+.ds-toast-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex: none; }
+.ds-toast-title { font-size: 13px; font-weight: 500; }
+.ds-toast-bar { position: absolute; bottom: 0; inset-inline-start: 0; height: 3px; width: 60%; }
+
+/* Modal */
+.ds-backdrop { background: var(--overlay); border-radius: var(--radius-14); padding: var(--space-16) var(--space-10); display: flex; justify-content: center; }
+.ds-modal { width: 100%; max-width: var(--modal-form); background: var(--surface); border-radius: var(--radius-14); box-shadow: var(--shadow-modal); }
+.ds-modal-head { display: flex; align-items: center; gap: var(--space-8); padding: var(--space-8) var(--space-10); border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 500; }
+.ds-modal-body { padding: var(--space-10); }
+.ds-modal-foot { display: flex; align-items: center; gap: var(--space-8); padding: var(--space-8) var(--space-10); border-top: 1px solid var(--border); background: var(--surface-muted); border-radius: 0 0 var(--radius-14) var(--radius-14); }
+.ds-spacer { flex: 1; }

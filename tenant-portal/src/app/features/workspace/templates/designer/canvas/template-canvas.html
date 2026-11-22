@@ -1,0 +1,212 @@
+<div
+  #canvasRoot
+  tabindex="0"
+  role="application"
+  [attr.aria-label]="'tplDesigner.canvas.label' | transloco"
+  class="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-focus-halo-strong"
+  (keydown)="onKeydown($event)"
+>
+  @if (!isEmail() && state.currentPage(); as page) {
+    <div class="flex h-ruler shrink-0">
+      <div class="size-ruler shrink-0 border-r border-b border-border bg-surface" aria-hidden="true"></div>
+      <app-tpl-ruler
+        class="min-w-0 flex-1"
+        orientation="H"
+        [lengthMm]="page.widthMm"
+        [zoom]="state.zoom()"
+        [offsetPx]="paperOffsetX()"
+        [scroll]="scrollLeft()"
+      />
+    </div>
+  }
+
+  <div class="flex min-h-0 flex-1">
+    @if (!isEmail() && state.currentPage(); as page) {
+      <app-tpl-ruler
+        class="shrink-0"
+        orientation="V"
+        [lengthMm]="page.heightMm"
+        [zoom]="state.zoom()"
+        [offsetPx]="paperOffsetY()"
+        [scroll]="scrollTop()"
+      />
+    }
+
+    <div
+      #scrollArea
+      class="relative min-h-0 min-w-0 flex-1 overflow-auto p-16"
+      [style.background-color]="isEmail() ? (state.document()?.email?.backgroundColor ?? null) : null"
+      (scroll)="onScroll()"
+      (wheel)="onWheel($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+    >
+      @if (state.document(); as doc) {
+        @if (isEmail()) {
+          <!-- Email column -->
+          <div
+            #paperEl
+            class="relative mx-auto bg-paper p-16 shadow-card"
+            [style.width.px]="paperSizePx().width"
+            (pointerdown)="onPaperPointerDown($event)"
+          >
+            <div class="relative isolate z-0 flex flex-col">
+              @for (rootId of rootNodeIds(); track rootId) {
+                <app-tpl-node-view
+                  [nodeId]="rootId"
+                  [doc]="doc"
+                  [page]="null"
+                  [zoom]="state.zoom()"
+                  [movingIds]="movingNodeSet()"
+                  [dragOffsetPx]="dragOffsetPx()"
+                  [resizeOverrideMm]="resizePreview()"
+                  (nodePointerDown)="onNodePointerDown($event)"
+                  (nodeDoubleClick)="onNodeDoubleClick($event)"
+                />
+              }
+            </div>
+          </div>
+        } @else if (state.currentPage(); as page) {
+          <!-- Print paper -->
+          <div
+            #paperEl
+            class="relative mx-auto bg-paper shadow-card"
+            [style.width.px]="paperSizePx().width"
+            [style.height.px]="isFixedCanvas() ? paperSizePx().height : null"
+            [style.min-height.px]="isFixedCanvas() ? null : paperSizePx().height"
+            [style.background-color]="pageBgColor()"
+            (pointerdown)="onPaperPointerDown($event)"
+          >
+            @if (pageBgAsset(); as bgAsset) {
+              @if (bgAsset.entry.status === 'READY' && bgAsset.entry.url) {
+                <img
+                  [src]="bgAsset.entry.url"
+                  alt=""
+                  class="pointer-events-none absolute inset-0 h-full w-full"
+                  [style.object-fit]="bgAsset.fit.toLowerCase()"
+                  [style.opacity]="bgAsset.opacity"
+                />
+              }
+            }
+
+            @if (printableBoxPx(); as printBox) {
+              <div
+                class="pointer-events-none absolute border border-dashed border-border-field"
+                [style.left.px]="printBox.left"
+                [style.top.px]="printBox.top"
+                [style.width.px]="printBox.width"
+                [style.height.px]="printBox.height"
+                aria-hidden="true"
+              ></div>
+            }
+
+            @if (isFixedCanvas()) {
+              <div class="relative isolate z-0 h-full w-full">
+                @for (rootId of rootNodeIds(); track rootId) {
+                  <app-tpl-node-view
+                    [nodeId]="rootId"
+                    [doc]="doc"
+                    [page]="page"
+                    [zoom]="state.zoom()"
+                    [movingIds]="movingNodeSet()"
+                    [dragOffsetPx]="dragOffsetPx()"
+                    [resizeOverrideMm]="resizePreview()"
+                    (nodePointerDown)="onNodePointerDown($event)"
+                    (nodeDoubleClick)="onNodeDoubleClick($event)"
+                  />
+                }
+              </div>
+            } @else {
+              @let margins = flowMarginsPx();
+              <div
+                class="relative isolate z-0 flex min-h-full flex-col"
+                [style.padding-top]="margins?.paddingTop"
+                [style.padding-right]="margins?.paddingRight"
+                [style.padding-bottom]="margins?.paddingBottom"
+                [style.padding-left]="margins?.paddingLeft"
+              >
+                @for (rootId of rootNodeIds(); track rootId) {
+                  <app-tpl-node-view
+                    [nodeId]="rootId"
+                    [doc]="doc"
+                    [page]="page"
+                    [zoom]="state.zoom()"
+                    [movingIds]="movingNodeSet()"
+                    [dragOffsetPx]="dragOffsetPx()"
+                    [resizeOverrideMm]="resizePreview()"
+                    (nodePointerDown)="onNodePointerDown($event)"
+                    (nodeDoubleClick)="onNodeDoubleClick($event)"
+                  />
+                }
+              </div>
+            }
+
+            <!-- 8 resize handles for single unlocked 0-deg ABSOLUTE node -->
+            @if (singleResizeTarget(); as target) {
+              <div
+                class="pointer-events-none absolute z-sticky"
+                [style.left.px]="target.left"
+                [style.top.px]="target.top"
+                [style.width.px]="target.width"
+                [style.height.px]="target.height"
+              >
+                @for (h of handles; track h.id) {
+                  <div
+                    class="pointer-events-auto absolute size-canvas-handle -translate-x-1/2 -translate-y-1/2 rounded-2 border border-brand bg-paper"
+                    [class]="h.cursorClass"
+                    [style.left]="h.leftPct"
+                    [style.top]="h.topPct"
+                    (pointerdown)="onHandlePointerDown($event, h.id)"
+                  ></div>
+                }
+              </div>
+            }
+
+            <!-- Snap guides -->
+            @for (guide of snapGuides(); track $index) {
+              @let pos = guidePosPx(guide);
+              @if (guide.axis === 'X') {
+                <div
+                  class="pointer-events-none absolute top-0 bottom-0 z-sticky w-border bg-chart-7"
+                  [style.left.px]="pos"
+                  aria-hidden="true"
+                >
+                  <span class="absolute top-6 left-4 inline-flex h-tooltip items-center rounded-6 bg-tooltip-bg px-8 text-12 leading-20 whitespace-nowrap text-on-tooltip">
+                    {{ guideLabel(guide) }}
+                  </span>
+                </div>
+              } @else {
+                <div
+                  class="pointer-events-none absolute right-0 left-0 z-sticky h-border bg-chart-7"
+                  [style.top.px]="pos"
+                  aria-hidden="true"
+                >
+                  <span class="absolute top-4 left-6 inline-flex h-tooltip items-center rounded-6 bg-tooltip-bg px-8 text-12 leading-20 whitespace-nowrap text-on-tooltip">
+                    {{ guideLabel(guide) }}
+                  </span>
+                </div>
+              }
+            }
+
+            <!-- Marquee selection rectangle -->
+            @if (marqueePx(); as mq) {
+              <div
+                class="pointer-events-none absolute z-sticky border border-brand"
+                [style.left.px]="mq.left"
+                [style.top.px]="mq.top"
+                [style.width.px]="mq.width"
+                [style.height.px]="mq.height"
+                aria-hidden="true"
+              >
+                <div class="h-full w-full bg-brand-soft opacity-40"></div>
+              </div>
+            }
+          </div>
+        }
+      }
+    </div>
+  </div>
+</div>
+
+<div class="sr-only" aria-live="polite">{{ liveAnnouncement() }}</div>

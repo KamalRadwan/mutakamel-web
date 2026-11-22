@@ -1,0 +1,128 @@
+<div class="flex items-end justify-between gap-8">
+  <ui-field size="bare" [label]="'qb.group.combineLabel' | transloco" [hint]="'qb.group.combineHint' | transloco">
+    <ui-segmented
+      class="self-start"
+      [options]="combineOptions()"
+      [value]="group().op"
+      [label]="'qb.group.combine' | transloco"
+      (valueChange)="onOpChange($event)"
+    />
+  </ui-field>
+
+  @if (depth() > 1) {
+    <button
+      type="button"
+      class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder"
+      [attr.aria-label]="'qb.group.remove' | transloco: { n: groupNumber() }"
+      [disabled]="disabled()"
+      (click)="removeNodeClick.emit(group().id)"
+    >
+      <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+    </button>
+  }
+</div>
+
+@for (child of group().children; track child.id; let first = $first) {
+  @if (!first) {
+    <span
+      class="inline-flex h-badge items-center self-start rounded-8 bg-neutral-soft px-8 text-11 leading-16 font-medium text-on-neutral-soft"
+    >
+      {{ (group().op === 'AND' ? 'qb.and' : 'qb.or') | transloco }}
+    </span>
+  }
+
+  @if (child.kind === 'condition') {
+    <ui-query-condition
+      [condition]="child"
+      [fields]="fields()"
+      [availability]="groupAvailability()"
+      [issues]="issues()"
+      [touched]="allTouched() || touchedNodes().has(child.id)"
+      [timeZone]="timeZone()"
+      [operatorLabel]="operatorLabel()"
+      [disabled]="disabled()"
+      (conditionChange)="conditionPatch.emit({ id: child.id, patch: $event })"
+      (remove)="removeNodeClick.emit(child.id)"
+      (applyFix)="applyFix.emit($event)"
+      (commit)="commit.emit()"
+    />
+  } @else {
+    <ui-query-group
+      [group]="child"
+      [query]="query()"
+      [fields]="fields()"
+      [depth]="depth() + 1"
+      [totalConditions]="totalConditions()"
+      [issues]="issues()"
+      [touchedNodes]="touchedNodes()"
+      [allTouched]="allTouched()"
+      [timeZone]="timeZone()"
+      [operatorLabel]="operatorLabel()"
+      [disabled]="disabled()"
+      (opChange)="opChange.emit($event)"
+      (addConditionClick)="addConditionClick.emit($event)"
+      (addGroupClick)="addGroupClick.emit($event)"
+      (removeNodeClick)="removeNodeClick.emit($event)"
+      (conditionPatch)="conditionPatch.emit($event)"
+      (applyFix)="applyFix.emit($event)"
+      (commit)="commit.emit()"
+    />
+  }
+}
+
+@if (groupIssues().length > 0) {
+  <div aria-live="polite" class="flex flex-col gap-2">
+    @for (issue of groupIssues(); track $index) {
+      <p
+        class="flex flex-wrap items-center gap-4 text-11 leading-16"
+        [class]="issue.severity === 'error' ? 'text-danger-text' : 'text-warning-text'"
+      >
+        <ng-icon
+          [name]="issue.severity === 'error' ? 'tablerCircleX' : 'tablerAlertTriangle'"
+          size="11"
+          class="shrink-0"
+          aria-hidden="true"
+        />
+        <span>{{ issueKey(issue) | transloco: issueParams(issue) }}</span>
+        @if (issue.fix; as fix) {
+          <button
+            type="button"
+            class="cursor-pointer rounded-4 font-medium text-accent underline outline-none hover:text-brand-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [disabled]="disabled()"
+            (click)="applyFix.emit(fix)"
+          >
+            {{ 'qb.fix.' + fix.label | transloco }}
+          </button>
+        }
+      </p>
+    }
+  </div>
+}
+
+<div class="flex flex-wrap items-center gap-8">
+  <button
+    type="button"
+    uiButton
+    variant="ghost"
+    size="small"
+    [disabled]="!canAddCondition()"
+    [attr.title]="conditionLimitTitle()"
+    (click)="addConditionClick.emit(group().id)"
+  >
+    <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+    <span>{{ 'qb.add.condition' | transloco }}</span>
+  </button>
+
+  <button
+    type="button"
+    uiButton
+    variant="ghost"
+    size="small"
+    [disabled]="!canAddGroup()"
+    [attr.title]="groupLimitTitle()"
+    (click)="onAddGroup()"
+  >
+    <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+    <span>{{ 'qb.add.group' | transloco }}</span>
+  </button>
+</div>

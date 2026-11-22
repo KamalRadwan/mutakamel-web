@@ -1,0 +1,327 @@
+<div class="flex flex-col gap-6">
+  <h4 class="text-12 leading-18 font-medium text-text-muted">{{ 'tradeAccounts.credit.summary' | transloco }}</h4>
+
+  @if (summaryLoading()) {
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8" aria-busy="true">
+      @for (item of skeletonFields; track item) {
+        <div class="flex flex-col gap-2" [class.col-span-2]="item === 5">
+          <div class="h-label w-1/2 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></div>
+          <div class="h-field motion-safe:animate-pulse rounded-8 bg-neutral-soft"></div>
+        </div>
+      }
+    </div>
+  } @else if (summary(); as pos) {
+    <div class="grid grid-cols-3 items-start gap-x-10 gap-y-8">
+      <ui-field
+        [label]="'tradeAccounts.fields.summaryLimit' | transloco"
+        [for]="uid + '-summary-limit'"
+        [hint]="'tradeAccounts.fields.effectiveLimitHint' | transloco"
+      >
+        <input
+          [id]="uid + '-summary-limit'"
+          type="text"
+          readonly
+          [attr.dir]="pos.effectiveLimit === null ? null : 'ltr'"
+          [value]="
+            pos.effectiveLimit === null
+              ? ('tradeAccounts.unlimited' | transloco)
+              : formatMoney(pos.currencyCode, pos.effectiveLimit)
+          "
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'tradeAccounts.fields.balanceOwed' | transloco"
+        [for]="uid + '-summary-exposure'"
+        [hint]="'tradeAccounts.fields.balanceOwedHint' | transloco"
+      >
+        <input
+          [id]="uid + '-summary-exposure'"
+          type="text"
+          readonly
+          [attr.dir]="pos.exposureAmount === null ? null : 'ltr'"
+          [value]="
+            pos.exposureAmount === null
+              ? '—'
+              : formatMoney(pos.currencyCode, pos.exposureAmount)
+          "
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'tradeAccounts.fields.openOrders' | transloco"
+        [for]="uid + '-summary-orders'"
+        [hint]="'tradeAccounts.fields.openOrdersHint' | transloco"
+      >
+        <input
+          [id]="uid + '-summary-orders'"
+          type="text"
+          readonly
+          dir="ltr"
+          [value]="formatMoney(pos.currencyCode, pos.openCommitments)"
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+        />
+      </ui-field>
+
+      <ui-field
+        [label]="'tradeAccounts.fields.remaining' | transloco"
+        [for]="uid + '-summary-remaining'"
+        [hint]="'tradeAccounts.fields.remainingHint' | transloco"
+      >
+        <input
+          [id]="uid + '-summary-remaining'"
+          type="text"
+          readonly
+          [attr.dir]="pos.effectiveLimit !== null && pos.remainingAmount !== null ? 'ltr' : null"
+          [value]="
+            pos.effectiveLimit === null
+              ? ('tradeAccounts.unlimited' | transloco)
+              : pos.remainingAmount === null
+                ? '—'
+                : formatMoney(pos.currencyCode, pos.remainingAmount)
+          "
+          class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [label]="'tradeAccounts.fields.asOf' | transloco"
+          [for]="uid + '-summary-as-of'"
+          [hint]="'tradeAccounts.fields.asOfHint' | transloco"
+          [hintText]="pos.stale ? ('tradeAccounts.credit.stale' | transloco) : null"
+        >
+          <input
+            [id]="uid + '-summary-as-of'"
+            type="text"
+            readonly
+            [attr.dir]="pos.asOf === null ? null : 'ltr'"
+            [value]="formatAsOf(pos.asOf)"
+            class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+          />
+        </ui-field>
+      </div>
+    </div>
+  }
+</div>
+
+<div class="h-border bg-border" aria-hidden="true"></div>
+
+<div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+  <ui-field
+    [label]="'tradeAccounts.fields.checkAmount' | transloco"
+    [for]="uid + '-amount'"
+    [hint]="'tradeAccounts.fields.checkAmountHint' | transloco"
+    [required]="true"
+    [error]="amountError()"
+  >
+    <input
+      [id]="uid + '-amount'"
+      type="text"
+      inputmode="decimal"
+      dir="ltr"
+      placeholder="0.00"
+      class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+      [value]="amount()"
+      [disabled]="checking()"
+      [attr.aria-invalid]="amountError() ? 'true' : null"
+      (input)="onAmountInput($event)"
+      (keydown.enter)="$event.preventDefault(); runCheck()"
+    />
+  </ui-field>
+
+  <ui-field
+    [size]="fixedCurrency() ? 'default' : 'bare'"
+    [label]="'tradeAccounts.fields.checkCurrency' | transloco"
+    [for]="uid + '-currency'"
+    [hint]="'tradeAccounts.fields.checkCurrencyHint' | transloco"
+  >
+    @if (fixedCurrency(); as currency) {
+      <input
+        [id]="uid + '-currency'"
+        type="text"
+        readonly
+        dir="ltr"
+        [value]="currency"
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    } @else {
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-currency'"
+        [options]="currencyOptions()"
+        [value]="selectedCurrency()"
+        [label]="'tradeAccounts.fields.checkCurrency' | transloco"
+        [describedBy]="uid + '-currency-hint'"
+        [disabled]="checking()"
+        (valueChange)="onCurrencyChange($event)"
+      />
+    }
+  </ui-field>
+</div>
+
+<div class="flex flex-wrap items-center gap-8">
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    [loading]="checking()"
+    [disabled]="dirty() || checking()"
+    [attr.title]="dirty() ? ('tradeAccounts.credit.saveFirst' | transloco) : null"
+    (click)="runCheck()"
+  >
+    <ng-icon name="tablerShieldCheck" size="15" aria-hidden="true" />
+    <span>{{ 'tradeAccounts.actions.checkCredit' | transloco }}</span>
+  </button>
+
+  @if (dirty()) {
+    <span class="text-12 leading-18 text-text-muted">{{ 'tradeAccounts.credit.saveFirst' | transloco }}</span>
+  }
+</div>
+
+@if (decision(); as res) {
+  <div class="grid grid-cols-3 items-start gap-x-10 gap-y-8 pt-2">
+    <ui-field
+      size="bare"
+      [label]="'tradeAccounts.fields.outcome' | transloco"
+      [for]="uid + '-outcome'"
+      [hint]="'tradeAccounts.fields.outcomeHint' | transloco"
+    >
+      <div class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8">
+        <input
+          [id]="uid + '-outcome'"
+          type="text"
+          readonly
+          class="sr-only"
+          [value]="(res.result.outcome === 'ALLOW' ? 'tradeAccounts.credit.allowed' : 'tradeAccounts.credit.blocked') | transloco"
+        />
+        <span [class]="res.result.outcome === 'ALLOW' ? allowBadgeClass : blockBadgeClass">
+          {{ (res.result.outcome === 'ALLOW' ? 'tradeAccounts.credit.allowed' : 'tradeAccounts.credit.blocked') | transloco }}
+        </span>
+      </div>
+    </ui-field>
+
+    <div class="col-span-2">
+      <ui-field
+        [label]="'tradeAccounts.fields.reason' | transloco"
+        [for]="uid + '-reason'"
+        [hint]="'tradeAccounts.fields.reasonHint' | transloco"
+      >
+        <input
+          [id]="uid + '-reason'"
+          type="text"
+          readonly
+          [value]="'tradeAccounts.credit.reason.' + res.result.reasonCode | transloco"
+          class="w-full bg-transparent text-12 text-text outline-none"
+        />
+      </ui-field>
+    </div>
+
+    <ui-field
+      [label]="'tradeAccounts.fields.effectiveLimit' | transloco"
+      [for]="uid + '-effective-limit'"
+      [hint]="'tradeAccounts.fields.effectiveLimitHint' | transloco"
+    >
+      <input
+        [id]="uid + '-effective-limit'"
+        type="text"
+        readonly
+        [attr.dir]="res.result.effectiveLimit === null ? null : 'ltr'"
+        [value]="
+          res.result.effectiveLimit === null
+            ? ('tradeAccounts.unlimited' | transloco)
+            : formatMoney(res.result.currencyCode, res.result.effectiveLimit)
+        "
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'tradeAccounts.fields.currentExposure' | transloco"
+      [for]="uid + '-exposure'"
+      [hint]="'tradeAccounts.fields.currentExposureHint' | transloco"
+    >
+      <input
+        [id]="uid + '-exposure'"
+        type="text"
+        readonly
+        [attr.dir]="res.result.exposureAmount === null ? null : 'ltr'"
+        [value]="
+          res.result.exposureAmount === null
+            ? '—'
+            : formatMoney(res.result.currencyCode, res.result.exposureAmount)
+        "
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'tradeAccounts.fields.openOrders' | transloco"
+      [for]="uid + '-open-orders'"
+      [hint]="'tradeAccounts.fields.openOrdersHint' | transloco"
+    >
+      <input
+        [id]="uid + '-open-orders'"
+        type="text"
+        readonly
+        dir="ltr"
+        [value]="formatMoney(res.result.currencyCode, res.result.openCommitments)"
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'tradeAccounts.fields.thisAmount' | transloco"
+      [for]="uid + '-this-amount'"
+      [hint]="'tradeAccounts.fields.thisAmountHint' | transloco"
+    >
+      <input
+        [id]="uid + '-this-amount'"
+        type="text"
+        readonly
+        dir="ltr"
+        [value]="formatMoney(res.result.currencyCode, res.result.proposedAmount)"
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'tradeAccounts.fields.remaining' | transloco"
+      [for]="uid + '-remaining'"
+      [hint]="'tradeAccounts.fields.remainingHint' | transloco"
+    >
+      <input
+        [id]="uid + '-remaining'"
+        type="text"
+        readonly
+        [attr.dir]="res.result.effectiveLimit === null ? null : (res.result.remainingAmount === null ? null : 'ltr')"
+        [value]="
+          res.result.effectiveLimit === null
+            ? ('tradeAccounts.unlimited' | transloco)
+            : res.result.remainingAmount === null
+              ? '—'
+              : formatMoney(res.result.currencyCode, res.result.remainingAmount)
+        "
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'tradeAccounts.fields.asOf' | transloco"
+      [for]="uid + '-as-of'"
+      [hint]="'tradeAccounts.fields.asOfHint' | transloco"
+    >
+      <input
+        [id]="uid + '-as-of'"
+        type="text"
+        readonly
+        [attr.dir]="res.result.asOf === null ? null : 'ltr'"
+        [value]="formatAsOf(res.result.asOf)"
+        class="w-full bg-transparent text-12 tabular-nums text-text outline-none"
+      />
+    </ui-field>
+  </div>
+}

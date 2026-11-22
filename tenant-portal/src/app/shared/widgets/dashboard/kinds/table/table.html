@@ -1,0 +1,11 @@
+@if (vm().rows.length > 0) {
+  <ui-data-table
+    [columns]="vm().columns"
+    [rows]="vm().rows"
+    [rowKey]="rowKey"
+    [totals]="vm().totals"
+    [rowClickable]="vm().hasClickable"
+    [label]="title()"
+    (rowClick)="onRowClick($event)"
+  />
+}

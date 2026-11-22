@@ -1,0 +1,117 @@
+{
+  "addons": {
+    "crm": {
+      "homes": "Real estate (homes)",
+      "telephony": "Telephony"
+    },
+    "unknown": "Add-on {{key}}"
+  },
+  "apps": {
+    "crm": "CRM",
+    "trade": "Trade",
+    "accounting": "Accounting"
+  },
+  "userField": {
+    "label": "User",
+    "hint": "Choose the person whose add-on seats you want to see.",
+    "placeholder": "Choose a user…",
+    "searchPlaceholder": "Search by name or email…",
+    "clear": "Clear user",
+    "noResults": "No matching users."
+  },
+  "toolbar": {
+    "reload": "Reload"
+  },
+  "empty": {
+    "chooseUser": "Choose a user to see their add-on seats.",
+    "options": "This user has no add-on options. Add-ons appear here once they are purchased.",
+    "assignments": "This user currently holds no add-on seats."
+  },
+  "forbidden": {
+    "title": "You can't view add-on seats",
+    "text": "You need the permission to view add-on seats.",
+    "backHome": "Back to home"
+  },
+  "failed": {
+    "title": "Could not load add-on seats",
+    "options": "Could not load available add-on options.",
+    "assignments": "Could not load current add-on seats.",
+    "unavailable": "Add-on seat service is temporarily unavailable. Try again shortly.",
+    "supportRef": "Support reference",
+    "retry": "Try again"
+  },
+  "userHeader": {
+    "notActive": "Not active"
+  },
+  "options": {
+    "title": "Add-ons this user can hold",
+    "cols": {
+      "addon": "Add-on",
+      "appSeat": "App seat",
+      "ready": "Ready",
+      "seat": "Seat",
+      "actions": "Action"
+    },
+    "hasAppSeat": "Has the {{app}} seat",
+    "noAppSeat": "No {{app}} seat",
+    "openUserApps": "Open {{user}}'s apps",
+    "ready": "Ready",
+    "notReady": "Not ready",
+    "reasons": {
+      "needParentSeat": "Give the {{app}} seat first.",
+      "userNotActive": "This user is not active.",
+      "noManagePermission": "You need permission to manage add-on seats.",
+      "addonDenied": "This add-on is blocked by your workspace access policy.",
+      "parentDenied": "{{app}} is blocked by your workspace access policy.",
+      "adoptionPending": "An add-on version update is waiting to be adopted.",
+      "capacityChangePending": "A seat capacity change is in progress.",
+      "addonNotReady": "This add-on is not ready for seat assignment yet.",
+      "addonBlocked": "This add-on is blocked and cannot be assigned.",
+      "parentNotReady": "{{app}} is not ready yet.",
+      "parentBlocked": "{{app}} is blocked."
+    }
+  },
+  "assignments": {
+    "title": "Current add-on seats",
+    "cols": {
+      "addon": "Add-on",
+      "parentApp": "Parent app",
+      "assignedAt": "Assigned",
+      "actions": "Action"
+    }
+  },
+  "seat": {
+    "assigned": "Assigned",
+    "notAssigned": "Not assigned"
+  },
+  "actions": {
+    "assign": "Assign",
+    "remove": "Remove"
+  },
+  "confirm": {
+    "removeTitle": "Remove add-on seat",
+    "removeText": "Remove the {{addon}} seat from {{user}}?",
+    "removeConfirm": "Remove",
+    "cancel": "Cancel"
+  },
+  "toast": {
+    "assigned": "{{addon}} seat given to {{user}}.",
+    "alreadyAssigned": "{{user}} already has this seat.",
+    "removed": "{{addon}} seat removed from {{user}}.",
+    "alreadyRemoved": "This seat was already removed from {{user}}."
+  },
+  "errors": {
+    "SEAT_LIMIT_REACHED": "There are no free {{addon}} seats. Remove one from another user or buy more seats.",
+    "ASSIGNMENT_NOT_FOUND": "{{user}} needs the {{app}} seat first.",
+    "ASSIGNMENT_ALREADY_GONE": "This add-on seat assignment no longer exists.",
+    "REVISION_STALE": "This changed since you opened it. The list was refreshed.",
+    "APPLICATION_ALLOWANCE_NOT_READY": "This add-on is not ready right now.",
+    "IDEMPOTENCY_BODY_MISMATCH": "This request no longer matches an earlier attempt. Try again.",
+    "INVALID_IDEMPOTENCY_KEY": "The request key is invalid. Try again.",
+    "ADDON_OPERATION_UNCERTAIN": "The previous operation did not confirm. Reload and check before trying again.",
+    "ACCESS_POLICY_BLOCKED": "You don't have permission for this action.",
+    "ACCESS_POLICY_UNAVAILABLE": "Access policy is temporarily unavailable. Try again shortly.",
+    "TENANT_USER_NOT_FOUND": "This user could not be found.",
+    "generic": "Something went wrong. Try again."
+  }
+}

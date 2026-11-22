@@ -1,0 +1,41 @@
+@if (failed()) {
+  <p class="p-16 text-center text-12 text-danger-text" role="alert">{{ 'leads.loadFailed' | transloco }}</p>
+}
+
+<app-record-board
+  [lanes]="boardLanes()"
+  [itemTemplate]="leadCardTpl"
+  [idOf]="leadId"
+  [canDrag]="canDragLead"
+  [loading]="loading()"
+  [collapseStorageKey]="collapseStorageKey"
+  [labels]="boardLabels()"
+  (loadMore)="onLoadMore($event)"
+  (create)="create.emit($event)"
+  (move)="onMove($event)"
+/>
+
+<ng-template #leadCardTpl let-lead let-lane="lane">
+  <app-lead-card
+    [lead]="lead"
+    [stages]="stages()"
+    [expanded]="openCards()[lane.id] === lead.id"
+    (expandedChange)="setExpanded(lane.id, lead.id, $event)"
+    (moveTo)="move(lead.id, $event)"
+    (rate)="rate(lead, $event)"
+    (recolor)="recolor(lead, $event)"
+    (delete)="remove(lead)"
+    (view)="view.emit(lead)"
+    (activities)="activities.emit(lead)"
+  />
+</ng-template>
+
+<ui-confirm-dialog
+  class="absolute"
+  [title]="'leads.delete.title' | transloco"
+  [text]="'leads.delete.text' | transloco: { name: deletingName() }"
+  [confirmLabel]="'common.delete' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>
+
+<app-lead-disqualify />

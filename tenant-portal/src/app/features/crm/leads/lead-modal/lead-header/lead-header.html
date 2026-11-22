@@ -1,0 +1,14 @@
+<app-record-modal-header
+  typeIcon="tablerUserPlus"
+  typeTile="bg-icon-green"
+  [typeTitle]="(mode() === 'create' ? 'leadModal.newTitle' : 'leadModal.title') | transloco"
+  [subtitle]="mode() === 'edit' ? subtitle() : null"
+  [position]="mode() === 'edit' ? position() : null"
+  [updating]="updating()"
+  [showClose]="showClose()"
+  [prevLabel]="'leadModal.nav.prev' | transloco"
+  [nextLabel]="'leadModal.nav.next' | transloco"
+  (prev)="prev.emit()"
+  (next)="next.emit()"
+  (close)="close.emit()"
+><ng-container ngProjectAs="[headerRelated]"><ng-content select="[headerRelated]" /></ng-container></app-record-modal-header>

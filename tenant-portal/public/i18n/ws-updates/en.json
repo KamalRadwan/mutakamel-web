@@ -1,0 +1,166 @@
+{
+  "search": "Search by component (for example crm.core)",
+  "filters": {
+    "risk": "Risk",
+    "riskHint": "Shows only updates with this risk level.",
+    "backup": "Backup",
+    "backupHint": "Filters by whether a backup is required first.",
+    "maintenance": "Maintenance window",
+    "maintenanceHint": "Filters by whether a maintenance window is needed.",
+    "sort": "Sort by",
+    "sortHint": "Newest published first by default.",
+    "all": "All",
+    "required": "Required",
+    "notRequired": "Not required",
+    "clear": "Clear filters",
+    "publishedAt": "Published date"
+  },
+  "risk": {
+    "LOW": "Low",
+    "MEDIUM": "Medium",
+    "HIGH": "High"
+  },
+  "total": "{{count}} updates",
+  "totalPlural": {
+    "one": "{{count}} update",
+    "other": "{{count}} updates"
+  },
+  "selectedBadge": "{{count}} selected",
+  "selectedBadgePlural": {
+    "one": "{{count}} selected",
+    "other": "{{count}} selected"
+  },
+  "clearSelection": "Clear selection",
+  "applySelected": "Apply selected ({{count}})",
+  "table": {
+    "ariaLabel": "Available updates",
+    "component": "Component",
+    "current": "Current version",
+    "available": "Available version",
+    "risk": "Risk",
+    "requirements": "Requirements",
+    "status": "Status",
+    "app": "App: {{app}}",
+    "notRecorded": "Not recorded",
+    "notRequired": "Not required",
+    "backupRequired": "Backup required",
+    "maintenanceRequired": "Maintenance window required",
+    "selected": "Selected",
+    "selectAll": "Select all available updates on this page",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details"
+  },
+  "details": {
+    "schemaTarget": "Schema target",
+    "checksum": "Manifest checksum"
+  },
+  "eligibility": {
+    "ELIGIBLE": "Available",
+    "PLANNED": "Scheduled",
+    "ADMIN_MANAGED": "Administrator managed",
+    "NEEDS_BACKUP_OR_MAINTENANCE": "Needs backup or maintenance (administrator)",
+    "INCOMPLETE_EVIDENCE": "Unavailable"
+  },
+  "empty": {
+    "title": "No updates available",
+    "text": "Your installed components are on their latest available versions.",
+    "support": "If you expect an update and do not see it, contact support."
+  },
+  "filteredEmpty": {
+    "title": "No matching updates",
+    "text": "No available updates match the current filters."
+  },
+  "noPermission": {
+    "title": "Workspace-wide permission required",
+    "text": "Viewing updates needs workspace-wide read access.",
+    "readOnly": "View only. Applying updates needs workspace-wide management access."
+  },
+  "loadFailed": {
+    "title": "Could not load updates",
+    "refreshFailed": "The list could not be refreshed and may be out of date."
+  },
+  "apply": {
+    "title": "Confirm updates",
+    "text": "Updates will start for these components:",
+    "warnBackup": "A selected update requires a backup or a maintenance window.",
+    "consent": "I understand that accepting starts processing and does not complete immediately.",
+    "consentLabel": "Confirmation",
+    "consentHint": "Required before the update request is sent.",
+    "confirm": "Confirm and apply ({{count}})",
+    "submitting": "Submitting update request…",
+    "staleTitle": "The list has changed",
+    "nowVersion": "now {{version}}",
+    "reload": "Reload list",
+    "blockedTitle": "Updates cannot start now",
+    "refusedTitle": "Administrator action required",
+    "accepted": "Update request accepted",
+    "replayed": "Request already received"
+  },
+  "ambiguous": {
+    "title": "Update request not confirmed",
+    "text": "The connection dropped before confirmation. Retry safely without duplicating the request.",
+    "retry": "Retry request"
+  },
+  "reconcile": {
+    "title": "Update request received",
+    "text": "The server accepted the request but its status could not be read. Check the status.",
+    "check": "Check status"
+  },
+  "operation": {
+    "strip": "Update status: {{status}}",
+    "updated": "Last updated {{time}}",
+    "title": "Update status",
+    "view": "View status",
+    "refresh": "Refresh status",
+    "loadFailed": "Could not load the update status",
+    "lastConfirmed": "Showing last confirmed status.",
+    "progress": "{{done}} of {{total}} steps completed ({{percent}}%)",
+    "addedAuto": "Added automatically",
+    "autoStopped": "Automatic refresh stopped. Use Refresh status.",
+    "manualTitle": "Administrator action required",
+    "phase": "Waiting for prerequisites."
+  },
+  "status": {
+    "REQUESTED": "Requested",
+    "PLANNING": "Preparing",
+    "QUEUED": "Queued",
+    "RUNNING": "In progress",
+    "WAITING_RETRY": "Waiting to retry",
+    "CANCEL_REQUESTED": "Cancellation requested",
+    "SUCCEEDED": "Completed",
+    "FAILED_RETRYABLE": "Failed (retryable)",
+    "MANUAL_RECOVERY_REQUIRED": "Needs administrator review",
+    "CANCELLED": "Cancelled",
+    "unknown": "Unrecognized status"
+  },
+  "guidance": {
+    "RUNNING": "Request accepted. Updates are in progress.",
+    "WAITING_RETRY": "Execution paused temporarily and will resume.",
+    "CANCEL_REQUESTED": "The cancellation request is being processed.",
+    "SUCCEEDED": "Update completed.",
+    "CANCELLED": "The update request was cancelled.",
+    "FAILED_RETRYABLE": "Could not complete the update. Contact a system administrator.",
+    "MANUAL_RECOVERY_REQUIRED": "A system administrator must act manually to complete this update."
+  },
+  "errors": {
+    "IDEMPOTENCY_KEY_REQUIRED": "Could not send the request safely. Reload the page and start again.",
+    "INVALID_IDEMPOTENCY_KEY": "Could not send the request safely. Reload the page and start again.",
+    "IDEMPOTENCY_BODY_MISMATCH": "Could not send the request safely. Reload the page and start again.",
+    "IDEMPOTENCY_KEY_REUSED": "Could not send the request safely. Reload the page and start again.",
+    "TENANT_PROVISIONING_UPDATE_SELECTION_INVALID": "The selection is not valid. Select again.",
+    "TENANT_OPERATION_NOT_FOUND": "The update operation was not found.",
+    "TENANT_PROVISIONING_OPERATION_STATE_INVALID": "Updates cannot start now. The workspace must be active and its last provisioning operation completed.",
+    "TENANT_PROVISIONING_UPDATE_SELECTION_STALE": "The available updates changed. Reload the list and review it.",
+    "TENANT_PROVISIONING_PLAN_STALE": "The available updates changed. Reload the list and review it.",
+    "TENANT_PROVISIONING_OPERATION_SUPERSEDED": "The available updates changed. Reload the list and review it.",
+    "TENANT_PROVISIONING_ADDON_REBIND_REQUIRED": "An add-on is tied to a component this update changes. An administrator must re-bind it.",
+    "TENANT_PROVISIONING_NO_SELF_SERVICE_UPDATES": "Only the platform administrator can apply a selected update, because it is administrator managed or needs a backup or a maintenance window. Reload the list, or contact the platform administrator.",
+    "TENANT_PROVISIONING_UPDATE_INCOMPATIBLE": "The selected updates are not compatible with each other or with the installed components.",
+    "TENANT_PROVISIONING_MODULE_SELECTION_INVALID": "The update plan is unavailable. Contact support.",
+    "TENANT_PROVISIONING_CATALOG_INVALID": "The update plan is unavailable. Contact support.",
+    "IDEMPOTENCY_REQUEST_PROCESSING": "The original request is still being processed. Retry in a moment.",
+    "STEP_FAILED": "A step of the update did not complete.",
+    "CORE_VALIDATION_FAILED": "Some fields are not valid. Check them and try again.",
+    "MISSING_REQUIRED_PERMISSIONS": "You do not have permission for this action."
+  }
+}

@@ -1,0 +1,100 @@
+<ui-modal
+  #layersModal
+  size="wide"
+  icon="tablerStack2"
+  tile="bg-icon-navy"
+  [title]="'tplFields.layers.title' | transloco"
+  [closeLabel]="'tplFields.layers.close' | transloco"
+>
+  <div class="flex max-h-tpl-list flex-col gap-6 overflow-y-auto scrollbar-thin">
+    @if (rows().length === 0) {
+      <div class="py-16 text-center text-12 text-text-muted">
+        {{ 'tplFields.layers.empty' | transloco }}
+      </div>
+    } @else {
+      @for (row of rows(); track row.node.id) {
+        @let visual = visualFor(row.node.type);
+        @let selected = isSelected(row.node.id);
+        <div
+          class="flex h-table-row shrink-0 items-center gap-8 rounded-10 border px-8 transition-colors duration-fast"
+          [class]="selected ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+        >
+          <button
+            type="button"
+            class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-8 rounded-8 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [style.padding-inline-start]="'calc(' + row.depth + ' * var(--tree-indent))'"
+            (click)="selectRow(row.node.id)"
+          >
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="visual.tile"
+            >
+              <ng-icon [name]="visual.icon" size="14" aria-hidden="true" />
+            </span>
+
+            <span
+              class="min-w-0 flex-1 truncate text-12 leading-18 font-medium"
+              [class]="row.node.hidden ? 'text-text-muted' : selected ? 'text-brand-text' : 'text-text'"
+            >
+              {{ state.nodeDisplayName(row.node) }}
+            </span>
+          </button>
+
+          <div class="flex shrink-0 items-center gap-4">
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [disabled]="state.readOnly()"
+              [attr.aria-pressed]="row.node.hidden"
+              [title]="(row.node.hidden ? 'tplFields.layers.show' : 'tplFields.layers.hide') | transloco"
+              [attr.aria-label]="(row.node.hidden ? 'tplFields.layers.show' : 'tplFields.layers.hide') | transloco"
+              (click)="toggleHidden($event, row.node)"
+            >
+              <ng-icon [name]="row.node.hidden ? 'tablerEyeOff' : 'tablerEye'" size="14" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [disabled]="state.readOnly()"
+              [attr.aria-pressed]="row.node.locked"
+              [title]="(row.node.locked ? 'tplFields.layers.unlock' : 'tplFields.layers.lock') | transloco"
+              [attr.aria-label]="(row.node.locked ? 'tplFields.layers.unlock' : 'tplFields.layers.lock') | transloco"
+              (click)="toggleLocked($event, row.node)"
+            >
+              <ng-icon [name]="row.node.locked ? 'tablerLock' : 'tablerLockOpen'" size="14" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [disabled]="state.readOnly() || row.node.locked || !row.canMoveUp"
+              [title]="(row.isAbsolute ? 'tplFields.layers.bringForward' : 'tplFields.layers.moveUp') | transloco"
+              [attr.aria-label]="(row.isAbsolute ? 'tplFields.layers.bringForward' : 'tplFields.layers.moveUp') | transloco"
+              (click)="moveUp($event, row)"
+            >
+              <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover disabled:cursor-not-allowed disabled:opacity-drag-source focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [disabled]="state.readOnly() || row.node.locked || !row.canMoveDown"
+              [title]="(row.isAbsolute ? 'tplFields.layers.sendBackward' : 'tplFields.layers.moveDown') | transloco"
+              [attr.aria-label]="(row.isAbsolute ? 'tplFields.layers.sendBackward' : 'tplFields.layers.moveDown') | transloco"
+              (click)="moveDown($event, row)"
+            >
+              <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex w-full items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'tplFields.layers.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

@@ -1,0 +1,65 @@
+<div
+  role="tablist"
+  class="flex items-center gap-4 overflow-x-auto border-t border-border px-10 no-scrollbar"
+  [attr.aria-label]="label() || ('recordPage.tabs.label' | transloco)"
+>
+  @for (tab of tabs(); track tab.id; let idx = $index) {
+    @let isActive = !tab.disabled && active() === tab.id;
+    <button
+      #tabBtn
+      type="button"
+      role="tab"
+      [id]="prefix() + '-tab-' + tab.id"
+      class="inline-flex h-tab shrink-0 items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        tab.disabled
+          ? 'cursor-not-allowed text-text-placeholder'
+          : isActive
+            ? 'cursor-pointer subnav-active text-accent'
+            : 'cursor-pointer text-text-muted hover:text-text'
+      "
+      [disabled]="!!tab.disabled"
+      [attr.tabindex]="idx === focusableIndex() ? 0 : -1"
+      [attr.aria-selected]="isActive"
+      [attr.aria-disabled]="tab.disabled ? 'true' : null"
+      [attr.aria-controls]="prefix() + '-panel-' + tab.id"
+      (click)="select(tab)"
+      (keydown)="onTabKeydown($event, idx)"
+    >
+      <ng-icon [name]="tab.icon" size="14" aria-hidden="true" />
+      <span>{{ tab.label }}</span>
+
+      @if (tab.errorDot) {
+        <span
+          class="size-unread-dot shrink-0 rounded-full bg-danger"
+          [title]="'recordPage.tabs.hasErrors' | transloco"
+          aria-hidden="true"
+        ></span>
+        <span class="sr-only">{{ 'recordPage.tabs.hasErrors' | transloco }}</span>
+      }
+
+      @if (tab.count !== null && tab.count !== undefined && tab.count > 0) {
+        <span
+          class="inline-flex h-counter min-w-counter shrink-0 items-center justify-center rounded-full px-4 text-11 leading-16 font-medium tabular-nums"
+          [class]="
+            tab.alert
+              ? 'bg-danger-soft text-on-danger-soft'
+              : isActive
+                ? 'bg-brand-soft text-on-brand-soft'
+                : 'bg-neutral-soft text-text-muted'
+          "
+          [attr.title]="tab.alert || null"
+        >
+          {{ tab.count }}
+        </span>
+        @if (tab.alert) {
+          <span class="sr-only">{{ tab.alert }}</span>
+        }
+      } @else if (tab.alert) {
+        <span class="inline-flex h-counter shrink-0 items-center justify-center rounded-full bg-danger-soft px-6 text-11 leading-16 font-medium text-on-danger-soft tabular-nums">
+          {{ tab.alert }}
+        </span>
+      }
+    </button>
+  }
+</div>

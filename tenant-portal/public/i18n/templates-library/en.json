@@ -1,0 +1,164 @@
+{
+  "newTemplate": "New template",
+  "searchPlaceholder": "Search by template name",
+  "searchAria": "Search templates by name",
+  "clearSearch": "Clear search",
+  "advancedFilters": "Advanced filters",
+  "viewSwitcher": "View mode",
+  "views": {
+    "cards": "Cards view",
+    "table": "Table view"
+  },
+  "chips": {
+    "documentType": "Document",
+    "outputChannel": "Channel",
+    "layoutMode": "Layout",
+    "lifecycleStatus": "Status",
+    "locale": "Language",
+    "definitionScopeType": "Owner scope",
+    "hasPublishedVersion": "Published",
+    "updatedRange": "Updated",
+    "remove": "Remove filter",
+    "clearAll": "Clear filters"
+  },
+  "filtersModal": {
+    "title": "Filter templates",
+    "apply": "Apply filters",
+    "cancel": "Cancel",
+    "clear": "Clear filters",
+    "any": "Any",
+    "yes": "Yes",
+    "no": "No",
+    "scopeTenant": "Tenant",
+    "scopeCompany": "Company",
+    "fields": {
+      "documentType": {
+        "label": "Document type",
+        "hint": "Filter by the business document family this template serves."
+      },
+      "outputChannel": {
+        "label": "Output channel",
+        "hint": "Filter by print document or outbound email output."
+      },
+      "layoutMode": {
+        "label": "Layout mode",
+        "hint": "Filter by how objects are arranged on the template."
+      },
+      "lifecycleStatus": {
+        "label": "Lifecycle status",
+        "hint": "Show active templates or archived templates."
+      },
+      "locale": {
+        "label": "Language",
+        "hint": "Filter by the primary template language."
+      },
+      "definitionScopeType": {
+        "label": "Owner scope",
+        "hint": "Filter by tenant-wide templates or company-owned templates."
+      },
+      "hasPublishedVersion": {
+        "label": "Published status",
+        "hint": "Filter templates by whether they have a published version."
+      },
+      "updatedRange": {
+        "label": "Last updated",
+        "hint": "Filter templates updated within the selected date and time window."
+      }
+    }
+  },
+  "dateRange": {
+    "placeholder": "Select updated date range",
+    "clear": "Clear range",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "startTime": "Start time",
+    "endTime": "End time",
+    "hour": "Hour",
+    "minute": "Minute",
+    "daysCount": "{{count}} days",
+    "oneDay": "1 day",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "presets": {
+      "maximum": "Maximum",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "todayAndYesterday": "Today and yesterday",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year",
+      "lastYear": "Last year",
+      "q1": "First quarter",
+      "q2": "Second quarter",
+      "q3": "Third quarter",
+      "q4": "Fourth quarter"
+    }
+  },
+  "table": {
+    "ariaLabel": "Templates library",
+    "template": "Template",
+    "document": "Document",
+    "layout": "Layout",
+    "language": "Language",
+    "published": "Published",
+    "draftCheck": "Draft check",
+    "usedIn": "Used in {{scope}}",
+    "updated": "Updated",
+    "actions": "Actions",
+    "notPublished": "Not published",
+    "archived": "Archived",
+    "unused": "—",
+    "scopeTypes": {
+      "TENANT": "Tenant",
+      "COMPANY": "Company",
+      "BRANCH": "Branch"
+    }
+  },
+  "row": {
+    "actions": {
+      "label": "Template actions",
+      "open": "Open",
+      "design": "Design",
+      "preview": "Preview",
+      "duplicateFromDraft": "Duplicate from draft",
+      "duplicateFromVersion": "Duplicate from version",
+      "manageAssignments": "Manage assignments",
+      "archive": "Archive",
+      "restore": "Restore",
+      "delete": "Delete",
+      "reasons": {
+        "ARCHIVED": "Unavailable while the template is archived.",
+        "VALIDATION_REQUIRED": "Validate the current draft before publishing.",
+        "NOT_ELIGIBLE": "Not eligible for this template.",
+        "REFERENCED": "Published or assigned templates cannot be deleted.",
+        "NO_PUBLISHED_VERSION": "Publish a version first.",
+        "ACCESS_POLICY_READ_ONLY": "Unavailable in read-only mode."
+      }
+    }
+  },
+  "cards": {
+    "thumbnailPending": "Preview generating",
+    "thumbnailUnavailable": "Preview unavailable",
+    "retryThumbnail": "Generate preview"
+  },
+  "pager": {
+    "label": "Templates pagination",
+    "total": "{{count}} templates",
+    "one": "1 template",
+    "previous": "Previous page",
+    "next": "Next page"
+  },
+  "deleteConfirm": {
+    "title": "Delete template",
+    "text": "Are you sure you want to permanently delete \"{{name}}\"? This action cannot be undone."
+  },
+  "toasts": {
+    "archived": "Template archived.",
+    "restored": "Template restored.",
+    "deleted": "Template deleted.",
+    "thumbnailQueued": "Thumbnail generation requested."
+  },
+  "states": {
+    "backToHome": "Back to home"
+  }
+}

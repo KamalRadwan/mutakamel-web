@@ -1,0 +1,94 @@
+<svg viewBox="0 0 84 38" class="block size-full overflow-hidden" focusable="false">
+  @switch (spec().shape) {
+    @case ('area') {
+      @if (lineGeometry(); as geo) {
+        <g class="text-brand-soft">
+          @for (fillPath of geo.fills; track $index) {
+            <path [attr.d]="fillPath" fill="currentColor" />
+          }
+        </g>
+        @for (strokePath of geo.strokes; track $index) {
+          <path
+            [attr.d]="strokePath"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        }
+        @for (dot of geo.dots; track $index) {
+          <circle [attr.cx]="dot.x" [attr.cy]="dot.y" r="1.5" fill="currentColor" />
+        }
+      }
+    }
+    @case ('bars') {
+      @for (bar of barRects(); track $index) {
+        <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.width" [attr.height]="bar.height" rx="1" fill="currentColor" />
+      }
+    }
+    @case ('half-gauge') {
+      <g class="text-neutral-soft">
+        <path [attr.d]="gauge().path" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" />
+      </g>
+      @if (gauge().dashArray; as dash) {
+        <path
+          [attr.d]="gauge().path"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="6"
+          stroke-linecap="round"
+          [attr.stroke-dasharray]="dash"
+        />
+      }
+    }
+    @case ('progress') {
+      <g class="text-neutral-soft">
+        <rect x="2" y="17" width="80" height="4" rx="2" fill="currentColor" />
+      </g>
+      @if (progressWidth() > 0) {
+        <rect x="2" y="17" [attr.width]="progressWidth()" height="4" rx="2" fill="currentColor" />
+      }
+    }
+    @case ('segmented') {
+      @if (segmentRects().length === 0) {
+        <g class="text-neutral-soft">
+          <rect x="2" y="15" width="80" height="8" rx="2" fill="currentColor" />
+        </g>
+      } @else {
+        @for (seg of segmentRects(); track $index) {
+          @if (!seg.alt) {
+            <rect [attr.x]="seg.x" y="15" [attr.width]="seg.width" height="8" rx="2" fill="currentColor" />
+          }
+        }
+        <g class="text-brand-soft">
+          @for (seg of segmentRects(); track $index) {
+            @if (seg.alt) {
+              <rect [attr.x]="seg.x" y="15" [attr.width]="seg.width" height="8" rx="2" fill="currentColor" />
+            }
+          }
+        </g>
+      }
+    }
+    @default {
+      @if (lineGeometry(); as geo) {
+        @for (strokePath of geo.strokes; track $index) {
+          <path
+            [attr.d]="strokePath"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        }
+        @for (dot of geo.dots; track $index) {
+          <circle [attr.cx]="dot.x" [attr.cy]="dot.y" r="1.5" fill="currentColor" />
+        }
+        @if (geo.arrowPath; as arrow) {
+          <path [attr.d]="arrow" fill="currentColor" />
+        }
+      }
+    }
+  }
+</svg>

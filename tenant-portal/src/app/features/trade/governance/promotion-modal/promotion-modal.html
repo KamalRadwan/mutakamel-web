@@ -1,0 +1,399 @@
+<ui-modal
+  size="wide"
+  icon="tablerPercentage"
+  tile="bg-icon-teal"
+  [title]="(isEdit() ? 'pricing.promoModal.editTitle' : 'pricing.promoModal.createTitle') | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+    <ui-field
+      class="col-span-1"
+      [label]="'pricing.promoModal.code' | transloco"
+      [for]="uid + '-code'"
+      [hint]="'pricing.promoModal.codeHint' | transloco"
+      [required]="true"
+      [error]="codeError()"
+      [count]="code().length"
+      [max]="80"
+    >
+      <input
+        [id]="uid + '-code'"
+        type="text"
+        dir="ltr"
+        maxlength="80"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="code()"
+        (input)="onTextField('code', $event)"
+        (blur)="markTouched('code')"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      [label]="'pricing.promoModal.name' | transloco"
+      [for]="uid + '-name'"
+      [hint]="'pricing.promoModal.nameHint' | transloco"
+      [required]="true"
+      [error]="nameError()"
+      [count]="name().length"
+      [max]="160"
+    >
+      <input
+        [id]="uid + '-name'"
+        type="text"
+        dir="auto"
+        maxlength="160"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="name()"
+        (input)="onTextField('name', $event)"
+        (blur)="markTouched('name')"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-2"
+      [bare]="true"
+      [label]="'pricing.promoModal.benefitType' | transloco"
+      [for]="uid + '-benefit-type'"
+      [hint]="'pricing.promoModal.benefitTypeHint' | transloco"
+      [required]="true"
+    >
+      <ui-segmented
+        [id]="uid + '-benefit-type'"
+        [label]="'pricing.promoModal.benefitType' | transloco"
+        [describedBy]="uid + '-benefit-type-hint'"
+        [options]="benefitOptions()"
+        [value]="benefitType()"
+        (valueChange)="onBenefitTypeChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [label]="'pricing.promoModal.benefitValue' | transloco"
+      [for]="uid + '-value'"
+      [hint]="'pricing.promoModal.benefitValueHint' | transloco"
+      [required]="true"
+      [error]="valueError()"
+    >
+      <div class="flex w-full items-center gap-4" dir="ltr">
+        @if (benefitType() === 'FIXED_AMOUNT') {
+          <span class="shrink-0 text-11 text-text-muted">{{ currencyCode() }}</span>
+        }
+        <input
+          [id]="uid + '-value'"
+          type="text"
+          inputmode="decimal"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [value]="benefitValue()"
+          (input)="onTextField('benefitValue', $event)"
+          (blur)="markTouched('benefitValue')"
+        />
+        @if (benefitType() === 'PERCENTAGE') {
+          <span class="shrink-0 text-11 text-text-muted">%</span>
+        }
+      </div>
+    </ui-field>
+
+    <div class="col-span-1 flex flex-col">
+      <ui-field
+        [label]="'pricing.promoModal.priority' | transloco"
+        [for]="uid + '-priority'"
+        [hint]="'pricing.promoModal.priorityHint' | transloco"
+        [error]="priorityError()"
+      >
+        <input
+          [id]="uid + '-priority'"
+          type="text"
+          inputmode="numeric"
+          dir="ltr"
+          class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+          [value]="priorityText()"
+          (input)="onTextField('priorityText', $event)"
+          (blur)="markTouched('priority')"
+        />
+      </ui-field>
+      @if (!priorityError() && equalPriorityCode(); as conflictCode) {
+        <p class="mt-2 flex items-center gap-4 text-11 leading-16 text-warning-text">
+          <ng-icon name="tablerAlertTriangle" size="11" class="shrink-0" aria-hidden="true" />
+          <span>{{ 'pricing.promoModal.equalPriorityWarning' | transloco: { code: conflictCode } }}</span>
+        </p>
+      }
+    </div>
+
+    <ui-field
+      class="col-span-1"
+      [label]="'pricing.promoModal.stackGroup' | transloco"
+      [for]="uid + '-stack-group'"
+      [hint]="'pricing.promoModal.stackGroupHint' | transloco"
+      [count]="stackGroup().length"
+      [max]="80"
+    >
+      <input
+        [id]="uid + '-stack-group'"
+        type="text"
+        dir="ltr"
+        maxlength="80"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="stackGroup()"
+        (input)="onTextField('stackGroup', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [bare]="true"
+      [label]="'pricing.promoModal.exclusive' | transloco"
+      [for]="uid + '-exclusive'"
+      [hint]="'pricing.promoModal.exclusiveHint' | transloco"
+    >
+      <div class="flex h-field items-center">
+        <ui-switch
+          [id]="uid + '-exclusive'"
+          [label]="'pricing.promoModal.exclusive' | transloco"
+          [describedBy]="uid + '-exclusive-hint'"
+          [(checked)]="exclusive"
+        />
+      </div>
+    </ui-field>
+
+    <div class="col-span-3 flex items-center gap-8 border-t border-border pt-8">
+      <h3 class="text-12 leading-18 font-medium text-text-muted">
+        {{ 'pricing.promoModal.appliesToHeading' | transloco }}
+      </h3>
+    </div>
+
+    <ui-field
+      class="col-span-2"
+      [bare]="true"
+      [label]="'pricing.promoModal.item' | transloco"
+      [for]="uid + '-item'"
+      [hint]="'pricing.promoModal.itemHint' | transloco"
+    >
+      <app-trade-item-picker
+        [id]="uid + '-item'"
+        [context]="companyContext()"
+        [describedBy]="uid + '-item-hint'"
+        [(value)]="itemId"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [bare]="true"
+      [label]="'pricing.promoModal.unit' | transloco"
+      [for]="uid + '-unit'"
+      [hint]="'pricing.promoModal.unitHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-unit'"
+        [label]="'pricing.promoModal.unit' | transloco"
+        [describedBy]="uid + '-unit-hint'"
+        [options]="unitOptions()"
+        [(value)]="uomId"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [bare]="true"
+      [label]="'pricing.promoModal.branch' | transloco"
+      [for]="uid + '-branch'"
+      [hint]="'pricing.promoModal.branchHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-branch'"
+        [label]="'pricing.promoModal.branch' | transloco"
+        [describedBy]="uid + '-branch-hint'"
+        [options]="branchOptions()"
+        [(value)]="branchId"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [bare]="true"
+      [label]="'pricing.promoModal.channel' | transloco"
+      [for]="uid + '-channel'"
+      [hint]="'pricing.promoModal.channelHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-channel'"
+        [label]="'pricing.promoModal.channel' | transloco"
+        [describedBy]="uid + '-channel-hint'"
+        [options]="channelOptions()"
+        [(value)]="channelId"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [bare]="true"
+      [label]="
+        (bookPurpose() === 'PURCHASE'
+          ? 'pricing.promoModal.supplierAccount'
+          : 'pricing.promoModal.customerAccount') | transloco
+      "
+      [for]="uid + '-account'"
+      [hint]="'pricing.promoModal.accountHint' | transloco"
+    >
+      <div class="relative block min-w-0">
+        <div #accountBox [class]="accountBoxClasses()" (click)="onAccountBoxClick()">
+          <input
+            #accountInput
+            [id]="uid + '-account'"
+            type="text"
+            role="combobox"
+            autocomplete="off"
+            aria-autocomplete="list"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [attr.aria-expanded]="accountOpen()"
+            [attr.aria-controls]="accountOpen() ? accountListId : null"
+            [attr.aria-activedescendant]="accountActiveDescendant()"
+            [attr.aria-describedby]="uid + '-account-hint'"
+            [placeholder]="'pricing.promoModal.accountSearchPlaceholder' | transloco"
+            [value]="accountInputText()"
+            (input)="onAccountInput($event)"
+            (keydown)="onAccountKeydown($event)"
+          />
+
+          @if (partyId() !== null) {
+            <button
+              type="button"
+              class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'tradeShared.picker.clear' | transloco"
+              [title]="'tradeShared.picker.clear' | transloco"
+              (mousedown)="$event.preventDefault()"
+              (click)="clearAccount($event)"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+
+          <span class="pointer-events-none inline-flex shrink-0 text-text-muted" aria-hidden="true">
+            <ng-icon name="tablerChevronDown" size="14" />
+          </span>
+        </div>
+
+        @if (accountOpen()) {
+          <ul
+            #accountList
+            [id]="accountListId"
+            role="listbox"
+            class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 text-12 shadow-popover scrollbar-thin"
+            [class.invisible]="!accountPlaced()"
+            [style.top.px]="accountPlace().top"
+            [style.inset-inline-start.px]="accountPlace().start"
+            [style.min-width.px]="accountPlace().width"
+            [style.max-height.px]="accountPlace().maxHeight"
+            (mousedown)="$event.preventDefault()"
+          >
+            @if (accountLoading()) {
+              <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
+                <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
+                <span>{{ 'pricing.promoModal.loadingAccounts' | transloco }}</span>
+              </li>
+            } @else if (accountLoadError()) {
+              <li role="presentation" class="flex items-center justify-between gap-8 px-8 py-6 text-12">
+                <span class="text-danger-text">{{ 'pricing.promoModal.loadAccountsFailed' | transloco }}</span>
+                <button type="button" uiButton variant="secondary" size="small" (click)="retryAccounts()">
+                  <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+                  {{ 'pricing.retry' | transloco }}
+                </button>
+              </li>
+            } @else if (accountResults().length === 0) {
+              <li role="presentation" class="flex h-menu-item shrink-0 items-center px-8 text-12 text-text-muted">
+                {{ 'pricing.promoModal.noAccounts' | transloco }}
+              </li>
+            } @else {
+              @for (acc of accountResults(); track acc.id; let index = $index) {
+                <li
+                  [id]="accountOptionId(index)"
+                  role="option"
+                  [attr.aria-selected]="partyId() === acc.partyId || partyId() === acc.id"
+                  class="flex h-menu-item shrink-0 items-center gap-8 rounded-6 px-8 transition-colors duration-fast"
+                  [class]="accountRowClasses(acc, index)"
+                  (mouseenter)="accountActiveIndex.set(index)"
+                  (click)="chooseAccount(acc)"
+                >
+                  <span class="min-w-0 flex-1 truncate">{{ acc.partyName }}</span>
+                  @if (acc.party.code) {
+                    <bdi dir="ltr" class="shrink-0 text-11 text-text-muted tabular-nums">{{ acc.party.code }}</bdi>
+                  }
+                  @if (partyId() === acc.partyId || partyId() === acc.id) {
+                    <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                  }
+                </li>
+              }
+            }
+          </ul>
+        }
+      </div>
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [label]="'pricing.promoModal.minQty' | transloco"
+      [for]="uid + '-min-qty'"
+      [hint]="'pricing.promoModal.minQtyHint' | transloco"
+      [error]="minQtyError()"
+    >
+      <input
+        [id]="uid + '-min-qty'"
+        type="text"
+        inputmode="decimal"
+        dir="ltr"
+        class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+        [value]="minQty()"
+        (input)="onTextField('minQty', $event)"
+        (blur)="markTouched('minQty')"
+      />
+    </ui-field>
+
+    <ui-field
+      class="col-span-1"
+      [label]="'pricing.promoModal.maxQty' | transloco"
+      [for]="uid + '-max-qty'"
+      [hint]="'pricing.promoModal.maxQtyHint' | transloco"
+      [error]="maxQtyError()"
+    >
+      <input
+        [id]="uid + '-max-qty'"
+        type="text"
+        inputmode="decimal"
+        dir="ltr"
+        class="w-full bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+        [placeholder]="'pricing.emptyDash' | transloco"
+        [value]="maxQty()"
+        (input)="onTextField('maxQty', $event)"
+        (blur)="markTouched('maxQty')"
+      />
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="save()">
+      {{ 'pricing.promoModal.save' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="requestClose()">
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'tradeShared.discard.title' | transloco"
+  [text]="'tradeShared.discard.text' | transloco"
+  [confirmLabel]="'tradeShared.discard.confirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>

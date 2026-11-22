@@ -1,0 +1,62 @@
+<ui-modal
+  size="form"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="'branches.transfer.title' | transloco"
+  [subtitle]="companyName()"
+  [closeLabel]="'branches.close' | transloco"
+  [dismissable]="!submitting()"
+>
+  @if (candidates().length > 0) {
+    <div class="flex flex-col gap-10">
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'branches.transfer.text' | transloco: { company: companyName() } }}
+      </p>
+
+      <ui-field
+        size="bare"
+        [for]="uid + '-branch'"
+        [label]="'branches.transfer.branch' | transloco"
+        [hint]="'branches.transfer.branchHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-branch'"
+          [options]="branchOptions()"
+          [(value)]="selectedBranchId"
+          [label]="'branches.transfer.branch' | transloco"
+          [disabled]="submitting()"
+          [describedBy]="uid + '-branch-hint'"
+        />
+      </ui-field>
+    </div>
+  } @else {
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'branches.transfer.none' | transloco }}
+    </p>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (candidates().length > 0) {
+      <button
+        type="button"
+        uiButton
+        [loading]="submitting()"
+        [disabled]="submitting() || !canTransfer()"
+        (click)="confirmTransfer()"
+      >
+        {{ 'branches.transfer.go' | transloco }}
+      </button>
+    } @else if (canAddBranch()) {
+      <button type="button" uiButton (click)="requestAddBranch()">
+        {{ 'branches.add' | transloco }}
+      </button>
+    }
+
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'branches.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

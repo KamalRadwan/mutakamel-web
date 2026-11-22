@@ -1,0 +1,157 @@
+<button
+  #trigger
+  type="button"
+  class="inline-flex h-btn min-w-0 max-w-full cursor-pointer items-center gap-6 rounded-8 px-6 text-start text-text outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  [class.bg-neutral-soft]="open()"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="open()"
+  [attr.aria-label]="'dashPage.switchDashboard' | transloco"
+  (click)="toggle()"
+>
+  <h1 class="min-w-0 truncate text-16 leading-24 font-medium text-text" dir="auto">
+    {{ currentName() }}
+  </h1>
+  <ng-icon name="tablerChevronDown" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+</button>
+
+@if (open()) {
+  <div
+    #panel
+    role="menu"
+    class="fixed z-dropdown flex min-w-toast max-w-notif flex-col rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [attr.aria-label]="'dashPage.switchDashboard' | transloco"
+  >
+    @if (showSearch()) {
+      <div class="mb-4 flex h-field items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo">
+        <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+        <input
+          #searchInput
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+          [value]="search()"
+          [placeholder]="'dashPage.switcher.search' | transloco"
+          [attr.aria-label]="'dashPage.switcher.search' | transloco"
+          (input)="onSearchInput($event)"
+        />
+      </div>
+    }
+
+    <div class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto scrollbar-thin">
+      @if (loading() && items().length === 0) {
+        <div class="flex flex-col gap-6 p-6">
+          @for (row of skeletonRows; track row) {
+            <div class="h-skeleton-line w-full rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+          }
+        </div>
+      } @else if (!hasAnyVisible()) {
+        <p class="px-8 py-6 text-12 leading-18 text-text-muted">
+          {{ 'dashPage.switcher.empty' | transloco }}
+        </p>
+      } @else {
+        @if (favouriteItems().length > 0) {
+          <div class="px-8 py-2 text-11 leading-16 font-medium text-text-muted" role="presentation">
+            {{ 'dashPage.switcher.favourites' | transloco }}
+          </div>
+          @for (item of favouriteItems(); track item.id) {
+            <button
+              #rowBtn
+              type="button"
+              role="menuitem"
+              class="flex h-menu-item w-full cursor-pointer items-center gap-6 rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                item.id === currentId()
+                  ? 'bg-brand-soft text-on-brand-soft font-medium'
+                  : 'text-text hover:bg-row-hover'
+              "
+              [attr.aria-current]="item.id === currentId() ? 'true' : null"
+              (click)="select(item.id)"
+            >
+              <ng-icon name="tablerStarFill" size="14" class="shrink-0 text-icon-orange" aria-hidden="true" />
+              <span class="min-w-0 flex-1 truncate text-start" dir="auto">{{ item.name }}</span>
+              @if (item.isDefault) {
+                <ui-badge tone="tag">{{ 'dashPage.switcher.default' | transloco }}</ui-badge>
+              }
+              @if (item.id === currentId()) {
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              }
+            </button>
+          }
+        }
+
+        @if (mineItems().length > 0) {
+          <div class="px-8 py-2 text-11 leading-16 font-medium text-text-muted" role="presentation">
+            {{ 'dashPage.switcher.mine' | transloco }}
+          </div>
+          @for (item of mineItems(); track item.id) {
+            <button
+              #rowBtn
+              type="button"
+              role="menuitem"
+              class="flex h-menu-item w-full cursor-pointer items-center gap-6 rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                item.id === currentId()
+                  ? 'bg-brand-soft text-on-brand-soft font-medium'
+                  : 'text-text hover:bg-row-hover'
+              "
+              [attr.aria-current]="item.id === currentId() ? 'true' : null"
+              (click)="select(item.id)"
+            >
+              <span class="min-w-0 flex-1 truncate text-start" dir="auto">{{ item.name }}</span>
+              @if (item.isDefault) {
+                <ui-badge tone="tag">{{ 'dashPage.switcher.default' | transloco }}</ui-badge>
+              }
+              @if (item.id === currentId()) {
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              }
+            </button>
+          }
+        }
+
+        @if (sharedItems().length > 0) {
+          <div class="px-8 py-2 text-11 leading-16 font-medium text-text-muted" role="presentation">
+            {{ 'dashPage.switcher.shared' | transloco }}
+          </div>
+          @for (item of sharedItems(); track item.id) {
+            <button
+              #rowBtn
+              type="button"
+              role="menuitem"
+              class="flex h-menu-item w-full cursor-pointer items-center gap-6 rounded-6 px-8 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="
+                item.id === currentId()
+                  ? 'bg-brand-soft text-on-brand-soft font-medium'
+                  : 'text-text hover:bg-row-hover'
+              "
+              [attr.aria-current]="item.id === currentId() ? 'true' : null"
+              (click)="select(item.id)"
+            >
+              <span class="min-w-0 flex-1 truncate text-start" dir="auto">{{ item.name }}</span>
+              @if (item.isDefault) {
+                <ui-badge tone="tag">{{ 'dashPage.switcher.default' | transloco }}</ui-badge>
+              }
+              @if (item.id === currentId()) {
+                <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+              }
+            </button>
+          }
+        }
+      }
+    </div>
+
+    <div class="mt-4 border-t border-border pt-4">
+      <a
+        uiButton
+        variant="ghost"
+        size="small"
+        routerLink="/crm/dashboard/dashboards"
+        class="w-full"
+        (click)="close()"
+      >
+        {{ 'dashPage.switcher.all' | transloco }}
+      </a>
+    </div>
+  </div>
+}

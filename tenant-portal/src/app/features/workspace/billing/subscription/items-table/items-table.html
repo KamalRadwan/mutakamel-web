@@ -1,0 +1,240 @@
+<section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <header class="flex items-center gap-8">
+    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerApps" size="15" aria-hidden="true" />
+    </span>
+    <h2 class="text-13 leading-18 font-medium text-text">{{ 'bsub.items.title' | transloco }}</h2>
+  </header>
+
+  @if (!baseItems().length) {
+    <p class="p-16 text-center text-12 leading-18 text-text-muted">{{ 'bsub.items.empty' | transloco }}</p>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div role="table" class="min-w-modal-form-wide" [attr.aria-label]="'bsub.items.title' | transloco">
+        <div
+          role="row"
+          class="grid grid-cols-billing-item-row h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        >
+          <span role="columnheader" class="flex items-center justify-center">
+            <span class="sr-only">{{ 'bsub.items.expand' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'bsub.items.cols.application' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'bsub.items.cols.tier' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'bsub.items.cols.seats' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+            {{ 'bsub.items.cols.recurring' | transloco }}
+          </span>
+          <span role="columnheader" class="flex items-center justify-center border-s border-on-nav-line">
+            <span class="sr-only">{{ 'bsub.items.cols.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @for (item of baseItems(); track item.id) {
+          @let visual = appVisual(item.applicationKey);
+          @let modUsage = moduleUsageFor(item.applicationKey);
+          @let expanded = isExpanded(item.id);
+          @let itemAddons = addonsFor(item.id);
+
+          <div
+            role="row"
+            class="mt-6 grid grid-cols-billing-item-row min-h-table-row items-center rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+          >
+            <span role="cell" class="flex items-center justify-center">
+              @if (item.acceptedPricing.breakdown.length) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-expanded]="expanded"
+                  [attr.aria-label]="(expanded ? 'bsub.items.collapse' : 'bsub.items.expand') | transloco"
+                  [title]="(expanded ? 'bsub.items.collapse' : 'bsub.items.expand') | transloco"
+                  (click)="toggleExpand(item.id)"
+                >
+                  <ng-icon
+                    [name]="expanded ? 'tablerChevronDown' : 'tablerChevronRight'"
+                    size="14"
+                    [class]="expanded ? '' : 'rtl:-scale-x-100'"
+                    aria-hidden="true"
+                  />
+                </button>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="visual.tile"
+              >
+                <ng-icon [name]="visual.icon" size="14" aria-hidden="true" />
+              </span>
+              <span class="truncate font-medium text-text">{{ names().app(item.applicationKey, item.applicationName) }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-13 leading-18 text-text">
+              <span class="truncate">{{ names().tier(item.tierKey, item.tierName) }}</span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-13 leading-18 text-text">
+              @if (modUsage) {
+                <span class="truncate tabular-nums">
+                  {{ 'bsub.items.seatsUsed' | transloco: { used: modUsage.used, seats: item.seats } }}
+                </span>
+              } @else {
+                <span dir="ltr" class="truncate tabular-nums">{{ item.seats }}</span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 font-medium text-text">
+              <span dir="ltr" class="truncate tabular-nums">{{ formatUsd(item.acceptedPricing.recurringAmountUsd) }}</span>
+            </span>
+
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <ui-actions-menu
+                [items]="baseActions()"
+                [label]="'bsub.items.actions.label' | transloco"
+                (selected)="onBaseAction(item, $event)"
+              />
+            </span>
+          </div>
+
+          @if (expanded && item.acceptedPricing.breakdown.length) {
+            <div class="ms-tree-indent mt-4 flex flex-col gap-4 rounded-8 border border-border bg-surface-muted p-8">
+              @for (bracket of item.acceptedPricing.breakdown; track bracket.minUsers) {
+                <p class="text-12 leading-18 text-text-muted tabular-nums">
+                  @if (bracket.maxUsers !== null) {
+                    {{
+                      'bsub.items.bracketRange'
+                        | transloco: {
+                          min: bracket.minUsers,
+                          max: bracket.maxUsers,
+                          charged: bracket.chargedUsers,
+                          unit: formatUnitPrice(bracket.unitPriceUsd),
+                          amount: formatUsd(bracket.amountUsd)
+                        }
+                    }}
+                  } @else {
+                    {{
+                      'bsub.items.bracketOpen'
+                        | transloco: {
+                          min: bracket.minUsers,
+                          charged: bracket.chargedUsers,
+                          unit: formatUnitPrice(bracket.unitPriceUsd),
+                          amount: formatUsd(bracket.amountUsd)
+                        }
+                    }}
+                  }
+                </p>
+              }
+            </div>
+          }
+
+          @for (addon of itemAddons; track addon.id) {
+            @let addonExpanded = isExpanded(addon.id);
+            @let addonRevoked = addon.effectiveState.definitionState === 'REVOKED';
+            @let addonDeprecated = !addonRevoked && addon.effectiveState.addonLifecycleStatus === 'DEPRECATED';
+
+            <div class="ms-tree-indent">
+              <div
+                role="row"
+                class="mt-6 grid grid-cols-billing-item-row min-h-table-row items-center rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              >
+                <span role="cell" class="flex items-center justify-center">
+                  @if (addon.acceptedPricing.breakdown.length) {
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [attr.aria-expanded]="addonExpanded"
+                      [attr.aria-label]="(addonExpanded ? 'bsub.items.collapse' : 'bsub.items.expand') | transloco"
+                      [title]="(addonExpanded ? 'bsub.items.collapse' : 'bsub.items.expand') | transloco"
+                      (click)="toggleExpand(addon.id)"
+                    >
+                      <ng-icon
+                        [name]="addonExpanded ? 'tablerChevronDown' : 'tablerChevronRight'"
+                        size="14"
+                        [class]="addonExpanded ? '' : 'rtl:-scale-x-100'"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  }
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+                  <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+                    <ng-icon name="tablerPuzzle" size="14" aria-hidden="true" />
+                  </span>
+                  <span dir="auto" class="truncate text-13 leading-18 font-medium text-text">{{ names().addon(addon.addonKey) }}</span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (addonRevoked) {
+                    <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-warning">
+                      {{ 'bsub.items.tags.revoked' | transloco }}
+                    </span>
+                  } @else if (addonDeprecated) {
+                    <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 leading-16 font-medium whitespace-nowrap text-on-warning">
+                      {{ 'bsub.items.tags.deprecated' | transloco }}
+                    </span>
+                  } @else {
+                    <span class="text-12 leading-18 text-text-muted">{{ 'bill.common.none' | transloco }}</span>
+                  }
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-13 leading-18 text-text">
+                  <span dir="ltr" class="truncate tabular-nums">{{ addon.seats }}</span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 font-medium text-text">
+                  <span dir="ltr" class="truncate tabular-nums">{{ formatUsd(addon.acceptedPricing.recurringAmountUsd) }}</span>
+                </span>
+
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <ui-actions-menu
+                    [items]="addonActions()"
+                    [label]="'bsub.items.actions.label' | transloco"
+                    (selected)="onAddonAction(addon, $event)"
+                  />
+                </span>
+              </div>
+
+              @if (addonExpanded && addon.acceptedPricing.breakdown.length) {
+                <div class="ms-tree-indent mt-4 flex flex-col gap-4 rounded-8 border border-border bg-surface-muted p-8">
+                  @for (bracket of addon.acceptedPricing.breakdown; track bracket.minUsers) {
+                    <p class="text-12 leading-18 text-text-muted tabular-nums">
+                      @if (bracket.maxUsers !== null) {
+                        {{
+                          'bsub.items.bracketRange'
+                            | transloco: {
+                              min: bracket.minUsers,
+                              max: bracket.maxUsers,
+                              charged: bracket.chargedUsers,
+                              unit: formatUnitPrice(bracket.unitPriceUsd),
+                              amount: formatUsd(bracket.amountUsd)
+                            }
+                        }}
+                      } @else {
+                        {{
+                          'bsub.items.bracketOpen'
+                            | transloco: {
+                              min: bracket.minUsers,
+                              charged: bracket.chargedUsers,
+                              unit: formatUnitPrice(bracket.unitPriceUsd),
+                              amount: formatUsd(bracket.amountUsd)
+                            }
+                        }}
+                      }
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</section>

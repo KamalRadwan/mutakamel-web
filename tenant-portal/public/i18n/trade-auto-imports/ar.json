@@ -1,0 +1,376 @@
+{
+  "targets": {
+    "CATALOG_COMPANY_PROFILE": {
+      "label": "إعدادات الأصناف",
+      "hint": "تحديث إعدادات الأصناف على مستوى الشركة للبيع والشراء وتتبع المخزون والوحدات والضرائب."
+    },
+    "CATALOG_BRANCH_ASSIGNMENT": {
+      "label": "تشكيلة الفرع",
+      "hint": "تعيين الأصناف للفروع مع حالة التشكيلة ونقطة التنفيذ وسياسة إعادة التزويد."
+    }
+  },
+  "fields": {
+    "ITEM_CODE": "رمز الصنف",
+    "CAN_SELL": "قابل للبيع",
+    "CAN_PURCHASE": "قابل للشراء",
+    "TRACK_INVENTORY": "تتبع المخزون",
+    "TRACKING_MODE": "طريقة التتبع",
+    "DEFAULT_SALES_UOM_CODE": "وحدة البيع الافتراضية",
+    "DEFAULT_PURCHASE_UOM_CODE": "وحدة الشراء الافتراضية",
+    "TAX_CLASSIFICATION_KEY": "التصنيف الضريبي",
+    "BRANCH_CODE": "رمز الفرع",
+    "IS_ASSORTED": "ضمن تشكيلة الفرع",
+    "DEFAULT_FULFILLMENT_NODE_CODE": "نقطة التنفيذ الافتراضية",
+    "REPLENISHMENT_POLICY_KEY": "سياسة إعادة التزويد"
+  },
+  "transforms": {
+    "NONE": "دون تحويل",
+    "TRIM": "إزالة المسافات الزائدة",
+    "NORMALIZE_CODE": "رمز (أحرف كبيرة)",
+    "ENUM_MAP": "تحويل قيمة"
+  },
+  "lookups": {
+    "BOOLEAN_V1": "كلمات نعم / لا",
+    "TRACKING_MODE_V1": "طريقة التتبع"
+  },
+  "rowErrors": {
+    "TRADE_IMPORT_REQUIRED_VALUE_MISSING": "القيمة المطلوبة فارغة",
+    "TRADE_IMPORT_VALUE_INVALID": "القيمة غير صالحة",
+    "TRADE_IMPORT_OWNER_COMMAND_FAILED": "تعذّر حفظ التغييرات في السجل المستهدف",
+    "TRADE_AUTH_TARGET_DENIED": "ليست لديك صلاحية لتحديث هذا السجل"
+  },
+  "errors": {
+    "generic": "حدث خطأ غير متوقع. حاول مرة أخرى.",
+    "TRADE_IMPORT_SCOPE_MISMATCH": "تعمل عمليات الاستيراد داخل شركة. اختر شركة من مبدّل النطاق.",
+    "TRADE_IMPORT_MAPPING_INVALID": "تحقق من أعمدة التعيين والحقول المطلوبة والتحويلات.",
+    "TRADE_IMPORT_FILE_TOO_LARGE": "يتجاوز الملف المحدد الحد الأقصى المسموح به للحجم.",
+    "TRADE_IMPORT_FILE_TYPE_UNSUPPORTED": "ارفع ملف CSV أو Excel‏ (.xlsx).",
+    "TRADE_IMPORT_SOURCE_IN_USE": "لا يمكن تحرير هذا الملف ما دامت هناك عملية استيراد نشطة عليه.",
+    "TRADE_IMPORT_RUN_FINISHED": "انتهت عملية الاستيراد هذه بالفعل.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE": "لا يمكن بدء عملية الاستيراد هذه حالياً.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_RUN_NOT_PREVIEWED": "انتظر حتى يكتمل فحص الملف قبل الاستيراد.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_NO_VALID_ROWS": "لا يحتوي الملف على أي صفوف صالحة للاستيراد.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_HAS_INVALID_ROWS": "أصلح الصفوف غير الصالحة في الملف قبل بدء الاستيراد.",
+    "TRADE_IMPORT_FILE_TOO_LARGE_XLSX_OVER_8_MIB": "يجب ألا يتجاوز حجم ملف Excel ثمانية ميغابايت.",
+    "TRADE_IMPORT_FILE_UNSAFE": "الملف فارغ أو تعذّر فحصه. اختر ملفاً آخر.",
+    "TRADE_IMPORT_FILE_UNSAFE_IMPORT_SOURCE_FILE_REQUIRED": "اختر ملفاً لرفعه.",
+    "TRADE_IMPORT_FILE_REJECTED": "لم يعد هذا الملف صالحاً للاستخدام. ارفعه مرة أخرى.",
+    "TRADE_IMPORT_SOURCE_RELEASE_FORBIDDEN": "لا يمكن تحرير هذا الملف في الشركة أو الفرع الحالي.",
+    "TRADE_IMPORT_MAPPING_NOT_FOUND": "لم يُعثر على تعيين الاستيراد هذا.",
+    "TRADE_IMPORT_RUN_NOT_FOUND": "لم يُعثر على عملية الاستيراد هذه.",
+    "TRADE_IMPORT_RUN_NOT_EXECUTABLE_BULK_JOB_MISSING": "لا توجد مهمة في الخلفية لهذه العملية لإلغائها.",
+    "BULK_JOB_ACTIVE_ACTIVE_JOB_EXISTS": "توجد عملية مجمّعة أخرى قيد التنفيذ. حاول مرة أخرى بعد انتهائها."
+  },
+  "common": {
+    "none": "—",
+    "company": "الشركة",
+    "branch": "الفرع",
+    "back": "رجوع",
+    "retry": "إعادة المحاولة",
+    "clearFilters": "مسح عوامل التصفية",
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "undo": "التراجع عن التغييرات",
+    "unsaved": "تغييرات غير محفوظة",
+    "open": "فتح",
+    "edit": "تعديل",
+    "yes": "نعم",
+    "no": "لا",
+    "columnsCount": "{{count}} أعمدة",
+    "rowsCount": "{{count}} صف",
+    "versionPrefix": "الإصدار {{number}}",
+    "notFound": "السجل غير موجود."
+  },
+  "scopeGate": {
+    "tenantBlocked": "تعمل عمليات الاستيراد داخل شركة. اختر شركة من مبدّل النطاق."
+  },
+  "mappings": {
+    "toolbar": {
+      "new": "تعيين جديد",
+      "searchPlaceholder": "ابحث في التعيينات بالرمز أو الهدف…",
+      "filterDraft": "مسودة",
+      "filterActive": "نشط",
+      "reload": "تحديث"
+    },
+    "table": {
+      "label": "تعيينات الاستيراد",
+      "code": "الرمز",
+      "target": "الهدف",
+      "scope": "النطاق",
+      "status": "الحالة",
+      "published": "منشور",
+      "updated": "آخر تحديث",
+      "actions": "الإجراءات"
+    },
+    "menu": {
+      "open": "فتح",
+      "edit": "تعديل",
+      "importWithMapping": "الاستيراد بهذا التعيين",
+      "importNeedsActive": "انشر هذا التعيين قبل الاستيراد."
+    },
+    "empty": {
+      "title": "لا توجد تعيينات استيراد بعد.",
+      "filtered": "لا توجد تعيينات تطابق البحث أو التصفية الحالية."
+    },
+    "loadFailed": "تعذّر تحميل تعيينات الاستيراد.",
+    "paginationLabel": "صفحات تعيينات الاستيراد"
+  },
+  "mappingModal": {
+    "title": "تعيين استيراد جديد",
+    "code": "الرمز",
+    "codeHint": "رمز فريد بأحرف إنجليزية كبيرة وأرقام وشرطة سفلية (من 2 إلى 80 حرفاً).",
+    "codePlaceholder": "ITEM_SETTINGS",
+    "codeRequired": "الرمز مطلوب.",
+    "codePattern": "يبدأ بحرف كبير ويستخدم A-Z أو 0-9 أو _ (2 إلى 80 حرفاً).",
+    "codeConflict": "هذا الرمز مستخدم مسبقاً، أو تعذّر إنشاء التعيين.",
+    "target": "الهدف",
+    "targetHint": "اختر نوع سجلات التجارة التي يستورد إليها هذا التعيين.",
+    "level": "المستوى",
+    "levelHint": "اختر ما إذا كان التعيين للشركة كاملة أم للفرع الحالي فقط.",
+    "levelCompany": "الشركة",
+    "levelBranch": "هذا الفرع",
+    "submit": "إنشاء التعيين",
+    "createdToast": "تم إنشاء تعيين الاستيراد."
+  },
+  "mappingPage": {
+    "subtitle": "{{target}} · {{scope}} · {{live}}",
+    "noPublished": "لا يوجد إصدار منشور",
+    "liveVersion": "المنشور {{number}}",
+    "save": "حفظ",
+    "publish": "نشر",
+    "publishSaveFirst": "احفظ تغييرات الأعمدة قبل النشر.",
+    "savedToast": "تم حفظ مسودة التعيين.",
+    "publishedToast": "تم نشر التعيين.",
+    "tabs": {
+      "label": "أقسام التعيين",
+      "columns": "الأعمدة",
+      "versions": "الإصدارات"
+    },
+    "versions": {
+      "empty": "لا توجد إصدارات بعد.",
+      "draft": "مسودة",
+      "published": "منشور",
+      "notPublished": "غير منشور بعد",
+      "publishedOn": "نُشر في {{date}}",
+      "expand": "إظهار الأعمدة",
+      "collapse": "إخفاء الأعمدة"
+    },
+    "notFound": "تعيين الاستيراد غير موجود.",
+    "loadFailed": "تعذّر تحميل تعيين الاستيراد.",
+    "unsavedTitle": "تغييرات غير محفوظة في التعيين",
+    "unsavedText": "احفظ تغييرات الأعمدة قبل المغادرة أو تجاهلها.",
+    "unsavedDiscard": "تجاهل"
+  },
+  "mappingRows": {
+    "help": "يجب أن يحتوي الصف الأول في الملف على أسماء الأعمدة هذه في هذه المواضع.",
+    "position": "الموضع",
+    "positionHint": "ترتيب العمود في الملف المرفوع بدءاً من 1 (من 1 إلى 1,000).",
+    "sourceColumn": "اسم العمود في الملف",
+    "sourceColumnHint": "الاسم المطابق لعنوان العمود في الصف الأول من ملف CSV أو Excel.",
+    "sourceColumnPlaceholder": "ItemCode",
+    "targetField": "حقل النظام",
+    "targetFieldHint": "الحقل المستهدف في نظام التجارة الذي يتلقى قيمة هذا العمود.",
+    "targetFieldPlaceholder": "اختر حقلاً…",
+    "transform": "التحويل",
+    "transformHint": "تنسيق أو تحويل اختياري يُطبَّق قبل التحقق من صحة الخلية.",
+    "lookup": "المرجع",
+    "lookupHint": "جدول قيم مدمج يُستخدم عند تحويل القيم النصية.",
+    "required": "مطلوب",
+    "requiredHint": "يُعد الصف غير صالح إذا كانت قيمة هذا العمود فارغة.",
+    "status": "صالح",
+    "remove": "إزالة العمود",
+    "addColumn": "إضافة عمود",
+    "complete": "الصف مكتمل",
+    "incomplete": "الصف غير مكتمل",
+    "errors": {
+      "positionRange": "يجب أن يكون الموضع بين 1 و 1,000.",
+      "positionDuplicate": "يجب أن يكون موضع كل عمود فريداً.",
+      "columnRequired": "اسم العمود في الملف مطلوب.",
+      "columnPattern": "يبدأ بحرف إنجليزي ويستخدم أحرفاً أو أرقاماً أو مسافات أو _ أو . أو - (بحد أقصى 100).",
+      "columnDuplicate": "يجب أن تكون أسماء الأعمدة في الملف فريدة.",
+      "targetRequired": "اختر حقل النظام.",
+      "missingRequired": "الحقول المطلوبة الناقصة: {{fields}}"
+    }
+  },
+  "runs": {
+    "toolbar": {
+      "new": "استيراد جديد",
+      "searchPlaceholder": "ابحث في العمليات باسم الملف…",
+      "reload": "تحديث"
+    },
+    "steps": {
+      "label": "تصفية العمليات حسب الحالة",
+      "hint": "صفِّ عمليات الاستيراد حسب الحالة",
+      "all": "الكل",
+      "inProgress": "قيد التنفيذ",
+      "ready": "جاهزة للاستيراد",
+      "completed": "مكتملة",
+      "withErrors": "بها أخطاء",
+      "failed": "فشلت",
+      "cancelled": "ملغاة"
+    },
+    "table": {
+      "label": "عمليات الاستيراد",
+      "run": "العملية",
+      "mapping": "التعيين",
+      "status": "الحالة",
+      "rows": "الصفوف",
+      "fileSize": "حجم الملف",
+      "actions": "الإجراءات",
+      "rowsBreakdown": "{{total}} إجمالي · {{valid}} صالحة · {{invalid}} غير صالحة · {{imported}} مستوردة · {{failed}} فاشلة"
+    },
+    "menu": {
+      "openReport": "فتح التقرير",
+      "importNow": "استيراد الآن",
+      "runAgain": "إعادة التشغيل بملف مُصحَّح"
+    },
+    "empty": {
+      "title": "لا توجد عمليات استيراد بعد.",
+      "filtered": "لا توجد عمليات استيراد تطابق هذه الحالة أو البحث."
+    },
+    "loadFailed": "تعذّر تحميل عمليات الاستيراد.",
+    "paginationLabel": "صفحات عمليات الاستيراد",
+    "startedToast": "بدأ الاستيراد في الخلفية."
+  },
+  "wizard": {
+    "title": "استيراد جديد",
+    "stepsLabel": "خطوات الاستيراد",
+    "steps": {
+      "file": "الملف",
+      "mapping": "التعيين",
+      "check": "الفحص",
+      "import": "الاستيراد"
+    },
+    "stepperState": {
+      "done": "مكتمل",
+      "error": "فشل",
+      "current": "الحالي"
+    },
+    "file": {
+      "label": "ملف الاستيراد",
+      "hint": "ارفع ملف CSV بحجم لا يتجاوز 16 ميجابايت أو ملف Excel‏ (.xlsx) بحجم لا يتجاوز 8 ميجابايت.",
+      "dropTitle": "أسقط ملف CSV أو Excel هنا",
+      "dropHint": ".csv حتى 16 ميجابايت · .xlsx حتى 8 ميجابايت",
+      "browse": "اختيار ملف",
+      "xlsxTooLarge": "يجب ألا يتجاوز حجم ملفات Excel‏ 8 ميجابايت.",
+      "typeError": "يُدعم فقط ملفات CSV و Excel‏ (.xlsx).",
+      "sizeError": "يجب ألا يتجاوز حجم الملف 16 ميجابايت.",
+      "uploading": "جارٍ رفع {{name}}…",
+      "uploaded": "تم الرفع والملف جاهز للتعيين",
+      "removeFile": "إزالة الملف",
+      "csvType": "CSV",
+      "xlsxType": "Excel"
+    },
+    "mapping": {
+      "label": "التعيين",
+      "hint": "اختر تعيين استيراد نشطاً يطابق أعمدة الملف المرفوع.",
+      "placeholder": "اختر تعييناً…",
+      "optionFormat": "{{code}} · {{target}}",
+      "noActiveMappings": "لا توجد تعيينات نشطة منشورة بعد. انشر تعييناً أولاً.",
+      "expectedHeaders": "الأعمدة المتوقعة في الملف",
+      "predecessorLabel": "استكمال عملية سابقة",
+      "predecessorHint": "تُتخطّى الصفوف التي نجح استيرادها سابقاً.",
+      "predecessorNone": "البدء من جديد (دون تخطي الصفوف السابقة)",
+      "predecessorOption": "{{file}} · {{date}}"
+    },
+    "check": {
+      "metaLine": "{{size}} · التعيين {{code}}",
+      "checking": "جارٍ فحص الملف في الخلفية. يمكنك إغلاق هذه النافذة وسيستمر الفحص.",
+      "statRows": "الصفوف",
+      "statValid": "صالحة",
+      "statInvalid": "غير صالحة",
+      "invalidCaption": "لا يبدأ الاستيراد إلا إذا لم يكن هناك أي صف غير صالح. أصلح هذه الصفوف في الملف ثم ارفعه من جديد.",
+      "allValid": "اجتازت جميع الصفوف الفحص بنجاح. تابع لبدء الاستيراد.",
+      "tableLabel": "الصفوف غير الصالحة",
+      "colRow": "الصف",
+      "colField": "الحقل",
+      "colProblem": "المشكلة",
+      "invalidCount": "{{count}} صفوف غير صالحة",
+      "invalidPagesLabel": "صفحات الصفوف غير الصالحة",
+      "failedFallback": "تعذّرت قراءة الملف.",
+      "chooseAnotherFile": "اختيار ملف آخر"
+    },
+    "import": {
+      "fileLabel": "الملف",
+      "mappingLabel": "التعيين",
+      "validRowsLabel": "الصفوف الصالحة للاستيراد",
+      "predecessorLabel": "الاستكمال من العملية",
+      "readyCaption": "سيُنشأ عند بدء الاستيراد مهمة في الخلفية يمكن متابعتها من قائمة المهام أو صفحة تقرير العملية.",
+      "startImport": "بدء الاستيراد",
+      "startedToast": "بدأ الاستيراد في الخلفية."
+    },
+    "footer": {
+      "next": "التالي",
+      "previous": "السابق",
+      "uploadFixed": "رفع ملف مُصحَّح",
+      "cancel": "إلغاء"
+    },
+    "backgroundToastTitle": "جارٍ فحص الملف في الخلفية",
+    "backgroundToastText": "يمكنك فتح هذه العملية في أي وقت من صفحة عمليات الاستيراد.",
+    "keptToastTitle": "حُفظ الملف المفحوص عمليةَ استيراد"
+  },
+  "runPage": {
+    "subtitle": "التعيين {{code}} · أُنشئ في {{date}}",
+    "startImport": "بدء الاستيراد",
+    "runAgain": "إعادة التشغيل بملف مُصحَّح",
+    "cancelRun": "إلغاء",
+    "releaseFile": "تحرير الملف",
+    "statRows": "الصفوف",
+    "statRowsHint": "إجمالي صفوف البيانات المقروءة من الملف المرفوع.",
+    "statValid": "صالحة",
+    "statValidHint": "الصفوف التي اجتازت التحقق من الصيغة والتعيين.",
+    "statInvalid": "غير صالحة",
+    "statInvalidHint": "الصفوف الموقوفة بسبب أخطاء التحقق.",
+    "statImported": "المستوردة",
+    "statImportedHint": "الصفوف التي حُفظت بنجاح في التجارة.",
+    "statFailed": "الفاشلة",
+    "statFailedHint": "الصفوف الصالحة التي تعذّر تحديث سجلها المستهدف أثناء التنفيذ.",
+    "progressLabel": "جارٍ استيراد الصفوف…",
+    "progressCounts": "{{done}} / {{total}}",
+    "failureTitle": "فشلت عملية الاستيراد",
+    "failurePhase": {
+      "PREVIEW": "أثناء فحص الملف",
+      "EXECUTE": "أثناء تنفيذ الاستيراد",
+      "DEFAULT": "فشل العملية"
+    },
+    "downloadResults": "تنزيل النتائج",
+    "filterLabel": "تصفية نتائج الصفوف",
+    "filters": {
+      "ALL": "الكل",
+      "VALID": "صالحة",
+      "INVALID": "غير صالحة",
+      "SUCCEEDED": "المستوردة",
+      "FAILED": "الفاشلة",
+      "SKIPPED": "المتخطاة"
+    },
+    "cancelConfirm": {
+      "title": "هل تريد إلغاء عملية الاستيراد هذه؟",
+      "text": "تبقى الصفوف التي تم استيرادها بالفعل، وتُتخطّى بقية الصفوف.",
+      "confirm": "إلغاء العملية"
+    },
+    "releaseConfirm": {
+      "title": "هل تريد تحرير الملف المرفوع؟",
+      "text": "سيُحذف الملف المرفوع من التخزين، وتبقى النتائج محفوظة.",
+      "confirm": "تحرير الملف"
+    },
+    "cancelledToast": "طُلب إلغاء عملية الاستيراد هذه.",
+    "releasedToast": "تم تحرير الملف المرفوع من التخزين.",
+    "startedToast": "بدأ الاستيراد في الخلفية.",
+    "notFound": "عملية الاستيراد غير موجودة.",
+    "loadFailed": "تعذّر تحميل عملية الاستيراد.",
+    "filterHint": "اعرض نتائج الصفوف ذات الحالة المحددة فقط."
+  },
+  "results": {
+    "tableLabel": "نتائج عملية الاستيراد",
+    "colRow": "رقم الصف",
+    "colStatus": "الحالة",
+    "colField": "الحقل",
+    "colProblem": "المشكلة",
+    "colRecord": "السجل",
+    "openItem": "فتح الصنف",
+    "empty": "لا توجد صفوف تطابق هذه التصفية.",
+    "loadFailed": "تعذّر تحميل نتائج الصفوف.",
+    "paginationLabel": "صفحات نتائج العملية"
+  }
+}

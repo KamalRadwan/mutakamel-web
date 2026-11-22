@@ -1,0 +1,42 @@
+<ui-modal
+  size="form"
+  icon="tablerCopy"
+  tile="bg-icon-gray"
+  [title]="'widgets.cloneModal.title' | transloco"
+  [subtitle]="widget()?.name ?? ''"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onClosed()"
+>
+  <form class="flex flex-col gap-10" novalidate (submit)="onFormSubmit($event)">
+    <ui-field
+      [label]="'widgets.cloneModal.name' | transloco"
+      [for]="uid + '-name'"
+      [hint]="'widgets.cloneModal.nameHint' | transloco"
+      [required]="true"
+      [count]="name().length"
+      [max]="120"
+      [error]="nameError()"
+    >
+      <input
+        [id]="uid + '-name'"
+        type="text"
+        maxlength="120"
+        class="w-full min-w-0 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+        [value]="name()"
+        [disabled]="submitting()"
+        (input)="onNameInput($event)"
+        (blur)="onNameBlur()"
+      />
+    </ui-field>
+  </form>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton [loading]="submitting()" [disabled]="!canSubmit()" (click)="submit()">
+      {{ 'widgets.cloneModal.action' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'analytics.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

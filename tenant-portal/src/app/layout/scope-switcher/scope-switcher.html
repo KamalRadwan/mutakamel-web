@@ -1,0 +1,96 @@
+@if (staffRoute()) {
+  @if (visible()) {
+    <span class="inline-flex h-nav-item items-center rounded-8 ps-2 pe-6" [attr.title]="'scope.namesUnavailable' | transloco">
+      <span class="inline-flex size-icon-tile-sm items-center justify-center rounded-8 bg-icon-teal text-on-icon" aria-hidden="true">
+        <ng-icon name="tablerBuilding" size="15" />
+      </span>
+      <span class="sr-only">{{ 'scope.namesUnavailable' | transloco }}</span>
+    </span>
+  }
+} @else if (scope.hasChoice()) {
+  @let triggerLabel = ('scope.label' | transloco) + ': ' + nameOf(scope.company()) + ' · ' + nameOf(scope.branch());
+  <button
+    #triggerBtn
+    type="button"
+    class="inline-flex h-nav-item cursor-pointer items-center gap-4 rounded-8 ps-2 pe-6 text-on-nav outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+    [class]="open() ? 'bg-nav-glass inset-ring inset-ring-nav-glass-ring' : 'hover:bg-nav-glass'"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="triggerLabel"
+    [attr.title]="triggerLabel"
+    (click)="toggle()"
+  >
+    <span
+      class="inline-flex size-icon-tile-sm items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+      aria-hidden="true"
+    >
+      <ng-icon name="tablerBuilding" size="15" aria-hidden="true" />
+    </span>
+    <span class="inline-flex text-on-nav-muted">
+      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+    </span>
+  </button>
+
+  @if (open()) {
+    <div
+      #menuEl
+      role="menu"
+      class="fixed z-dropdown flex flex-col gap-2 rounded-10 border border-border bg-surface p-4 whitespace-nowrap text-text shadow-popover"
+      [style.top.px]="place().top"
+      [style.inset-inline-end.px]="place().end"
+      [attr.aria-label]="'scope.label' | transloco"
+    >
+      <div role="group" class="flex flex-col gap-2" [attr.aria-label]="'scope.company' | transloco">
+        <div class="px-8 pt-6 pb-2 text-11 leading-16 font-medium text-text-muted">
+          {{ 'scope.company' | transloco }}
+        </div>
+        @for (company of scope.companies(); track company.id) {
+          @let selected = company.id === scope.company().id;
+          <button
+            #companyRow
+            type="button"
+            role="menuitemradio"
+            [attr.aria-checked]="selected"
+            class="flex h-menu-item w-full cursor-pointer items-center gap-8 rounded-6 px-8 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+            (click)="chooseCompany(company.id)"
+            (keydown.enter)="onRowEnter($event, 'company', company.id)"
+          >
+            <ng-icon name="tablerBuilding" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            <span class="flex-1 text-start">{{ nameOf(company) }}</span>
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        }
+      </div>
+
+      <div role="separator" class="h-border bg-border"></div>
+
+      <div role="group" class="flex flex-col gap-2" [attr.aria-label]="'scope.branch' | transloco">
+        <div class="px-8 pt-6 pb-2 text-11 leading-16 font-medium text-text-muted">
+          {{ 'scope.branch' | transloco }}
+        </div>
+        @for (branch of scope.branches(); track branch.id) {
+          @let selected = branch.id === scope.branch().id;
+          <button
+            #branchRow
+            type="button"
+            role="menuitemradio"
+            [attr.aria-checked]="selected"
+            class="flex h-menu-item w-full cursor-pointer items-center gap-8 rounded-6 px-8 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="selected ? 'bg-brand-soft text-on-brand-soft' : 'text-text hover:bg-row-hover'"
+            (click)="chooseBranch(branch.id)"
+            (keydown.enter)="onRowEnter($event, 'branch', branch.id)"
+          >
+            <ng-icon name="tablerMapPin" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            <span class="flex-1 text-start">{{ nameOf(branch) }}</span>
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        }
+      </div>
+    </div>
+  }
+}

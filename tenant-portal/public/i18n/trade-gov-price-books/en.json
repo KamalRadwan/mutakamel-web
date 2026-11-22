@@ -1,0 +1,341 @@
+{
+  "purpose": {
+    "all": "All purposes",
+    "SALES": "Sales",
+    "PURCHASE": "Purchase"
+  },
+  "status": {
+    "all": "All statuses",
+    "ACTIVE": "Active",
+    "INACTIVE": "Inactive"
+  },
+  "partyType": {
+    "INDIVIDUAL": "Individual",
+    "ORGANIZATION": "Organization"
+  },
+  "companyDefault": "Company default",
+  "versionNumber": "Version {{n}}",
+  "kpi": {
+    "priceBooks": "Price books",
+    "activeInactive": "{{active}} active · {{inactive}} inactive",
+    "published": "Published",
+    "liveToday": "live today",
+    "scheduled": "Scheduled",
+    "startLater": "start later",
+    "draftOnly": "Draft only",
+    "currencies": "Currencies"
+  },
+  "toolbar": {
+    "new": "New price book",
+    "searchPlaceholder": "Search by code or name",
+    "clearSearch": "Clear search",
+    "purposeLabel": "Purpose",
+    "purposeAll": "Purpose",
+    "purposeOption": "Purpose: {{label}}",
+    "statusLabel": "Status",
+    "statusAll": "Status",
+    "statusOption": "Status: {{label}}",
+    "companyDefaults": "Company defaults",
+    "viewLabel": "View",
+    "viewCards": "Cards",
+    "viewTable": "Table"
+  },
+  "steps": {
+    "label": "Governance state filter",
+    "hint": "Filter the price books by governance state",
+    "all": "All"
+  },
+  "table": {
+    "label": "Price books",
+    "book": "Price book",
+    "purpose": "Purpose",
+    "currency": "Currency",
+    "state": "State",
+    "liveVersion": "Live version",
+    "lines": "Lines",
+    "promotions": "Promotions",
+    "accounts": "Accounts",
+    "actions": "Price book actions",
+    "noLiveVersion": "No live version"
+  },
+  "card": {
+    "summary": "{{lines}} lines · {{promotions}} promotions"
+  },
+  "counts": {
+    "lines": "{{count}} lines",
+    "promotions": "{{count}} promotions"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "newVersion": "New version",
+    "makeDefault": "Make company default",
+    "removeDefault": "Remove company default",
+    "deactivate": "Deactivate",
+    "activate": "Activate"
+  },
+  "empty": {
+    "title": "No price books yet.",
+    "filtered": "No price books match the current filters.",
+    "clearFilters": "Clear filters"
+  },
+  "error": {
+    "load": "Could not load the price books.",
+    "notFound": "This price book no longer exists."
+  },
+  "pagination": {
+    "label": "Price books pages"
+  },
+  "deactivateConfirm": {
+    "title": "Deactivate price book?",
+    "text": "{{name}} will become inactive and will no longer be eligible for new evaluations.",
+    "confirm": "Deactivate"
+  },
+  "discardConfirm": {
+    "title": "Discard unsaved changes?",
+    "text": "Your entered details will be lost if you close now.",
+    "confirm": "Discard"
+  },
+  "deleteDraftConfirm": {
+    "title": "Delete draft version?",
+    "text": "Version {{version}} and all its draft lines and promotions will be permanently deleted.",
+    "confirm": "Delete draft"
+  },
+  "retireDialog": {
+    "title": "Retire version {{version}}?",
+    "text": "Retiring stops this version from being used in pricing evaluations.",
+    "confirm": "Retire"
+  },
+  "create": {
+    "title": "New price book",
+    "submit": "Create",
+    "success": "Price book created.",
+    "fields": {
+      "code": "Code",
+      "purpose": "Purpose",
+      "currency": "Currency",
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "description": "Description"
+    },
+    "placeholders": {
+      "code": "e.g. RETAIL-EGP",
+      "nameEn": "Enter English name",
+      "nameAr": "أدخل الاسم بالعربية",
+      "description": "Describe when and where this price book applies…"
+    },
+    "hints": {
+      "code": "Unique uppercase identifier for this price book, up to 80 characters.",
+      "purpose": "Choose whether this price book governs customer sales or supplier purchases.",
+      "currency": "Fixed ISO currency used by every line in this price book.",
+      "nameEn": "Display name shown when the interface is in English, up to 160 characters.",
+      "nameAr": "Display name shown when the interface is in Arabic, up to 160 characters.",
+      "description": "Optional summary explaining the scope or audience of this price book."
+    },
+    "errors": {
+      "codeRequired": "Enter a price book code.",
+      "codeMax": "Code cannot exceed 80 characters.",
+      "currencyRequired": "Choose a currency.",
+      "nameMax": "Name cannot exceed 160 characters.",
+      "descriptionMax": "Description cannot exceed 500 characters."
+    }
+  },
+  "page": {
+    "back": "Back to price books",
+    "loadFailed": "Could not load this price book.",
+    "notFound": "This price book could not be found.",
+    "tabsLabel": "Price book sections",
+    "tabs": {
+      "versions": "Versions",
+      "accounts": "Accounts",
+      "history": "History"
+    },
+    "details": {
+      "title": "Details",
+      "saved": "Price book details saved.",
+      "fields": {
+        "nameEn": "Name (English)",
+        "nameAr": "Name (Arabic)",
+        "status": "Status",
+        "description": "Description"
+      },
+      "hints": {
+        "nameEn": "Display name shown in English across Trade documents and evaluation.",
+        "nameAr": "Display name shown in Arabic across Trade documents and evaluation.",
+        "status": "Active price books can be evaluated and assigned to commercial accounts.",
+        "description": "Optional notes describing how this price book is used."
+      }
+    },
+    "accounts": {
+      "label": "Linked commercial accounts",
+      "empty": "No commercial accounts are linked to this price book.",
+      "columns": {
+        "account": "Account",
+        "partyType": "Party type",
+        "role": "Role",
+        "status": "Status",
+        "creditLimit": "Credit limit"
+      }
+    },
+    "history": {
+      "empty": "No history entries yet."
+    },
+    "unsaved": {
+      "title": "Save changes?",
+      "text": "You have unsaved changes to this price book's details.",
+      "save": "Save",
+      "discard": "Discard",
+      "cancel": "Cancel"
+    }
+  },
+  "sourceMode": {
+    "MANUAL": "Manual",
+    "CLONE_VERSION": "Copy of a version",
+    "CLONE_VERSION_OF": "Copy of v{{version}}",
+    "SEED_FROM_CATALOG": "From catalog",
+    "EMPTY_DRAFT": "Empty"
+  },
+  "test": {
+    "passed": "Test passed.",
+    "failedTitle": "Test failed: {{count}} conflicts",
+    "failedHint": "Open the version to inspect and resolve the reported conflicts."
+  },
+  "toasts": {
+    "activated": "Price book activated.",
+    "deactivated": "Price book deactivated.",
+    "defaultSet": "Company default price book updated.",
+    "defaultRemoved": "Company default price book removed.",
+    "versionCreated": "Draft version created.",
+    "draftDeleted": "Draft version deleted.",
+    "retired": "Version retired."
+  },
+  "newVersion": {
+    "title": "New version",
+    "submit": "Create draft",
+    "emptyHelp": "An empty version cannot pass a test until you add lines.",
+    "roundingDisabledHint": "Nearest 0.50 and Ends in .95 require a currency with at least 2 decimal places.",
+    "noSourceVersions": "No versions exist yet with this purpose and currency.",
+    "clearEnd": "Clear end date",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minute",
+    "thisBookVersion": "Version {{n}} · {{status}}",
+    "otherBookVersion": "{{code}} · v{{n}}",
+    "fields": {
+      "startFrom": "Start from",
+      "sourceVersion": "Source version",
+      "includePromotions": "Include promotions",
+      "effectiveFrom": "Effective from",
+      "effectiveTo": "Effective to",
+      "priceChange": "Price change",
+      "changeValue": "Change value",
+      "rounding": "Rounding",
+      "notes": "Notes"
+    },
+    "hints": {
+      "startFrom": "Choose whether to copy an existing version, seed from item catalog prices, or start empty.",
+      "sourceVersion": "Pick any version with the same purpose and currency to copy its lines.",
+      "includePromotions": "Copy promotional discount rules from the selected source version.",
+      "effectiveFrom": "Date and 24-hour time when this version begins taking effect.",
+      "effectiveTo": "Optional date and 24-hour time when this version expires; leave empty for open-ended.",
+      "priceChange": "Optionally adjust copied or catalog unit prices by a percentage or fixed amount.",
+      "changeValue": "Signed number to add or subtract from each price, such as 5 or -2.5.",
+      "rounding": "Round adjusted prices to clean price endings.",
+      "notes": "Optional context describing the reason or scope of this draft version."
+    },
+    "modes": {
+      "CLONE_VERSION": "Copy a version",
+      "SEED_FROM_CATALOG": "Catalog prices",
+      "EMPTY_DRAFT": "Empty"
+    },
+    "adjustments": {
+      "NONE": "None",
+      "PERCENTAGE": "Percent",
+      "FIXED_DELTA": "Fixed amount"
+    },
+    "roundings": {
+      "NONE": "None",
+      "NEAREST_1": "Nearest 1",
+      "NEAREST_0_50": "Nearest 0.50",
+      "END_95": "Ends in .95"
+    },
+    "placeholders": {
+      "effectiveFrom": "Select start date",
+      "effectiveTo": "No end date",
+      "changeValue": "e.g. 5 or -2.5",
+      "notes": "Add notes about this version…"
+    },
+    "errors": {
+      "sourceRequired": "Choose a source version to copy.",
+      "effectiveFromRequired": "Choose when this version starts.",
+      "effectiveToAfterFrom": "Effective to must be later than effective from.",
+      "changeValueInvalid": "Enter a valid decimal number such as 5 or -2.5.",
+      "notesMax": "Notes cannot exceed 500 characters."
+    }
+  },
+  "defaults": {
+    "title": "Company defaults",
+    "empty": "No active price books are available to set as company defaults yet.",
+    "loadFailed": "Could not load company default price books.",
+    "saveRow": "Save",
+    "remove": "Remove",
+    "saved": "Company default saved.",
+    "removed": "Company default removed.",
+    "selectBook": "Choose an active price book…",
+    "columns": {
+      "purpose": "Purpose",
+      "currency": "Currency",
+      "priceBook": "Price book",
+      "actions": "Actions"
+    },
+    "removeConfirm": {
+      "title": "Remove company default?",
+      "text": "{{purpose}} · {{currency}} will no longer have a company default price book.",
+      "confirm": "Remove"
+    }
+  },
+  "audit": {
+    "CREATE": "created this price book",
+    "UPDATE": "updated price book details",
+    "ACTIVATE": "activated this price book",
+    "DEACTIVATE": "deactivated this price book",
+    "CLONE": "created a draft by copying a version",
+    "SEED_CATALOG": "created a draft from catalog prices",
+    "CREATE_EMPTY": "created an empty draft version",
+    "UPDATE_DRAFT": "updated a draft version",
+    "DELETE_DRAFT": "deleted a draft version",
+    "TEST_PASSED": "ran a passing test",
+    "TEST_FAILED": "ran a failing test",
+    "PUBLISH": "published a version",
+    "SCHEDULE": "scheduled a version",
+    "SOLO_OWNER_PUBLISH": "self-published a version as solo owner",
+    "SOLO_OWNER_SCHEDULE": "self-scheduled a version as solo owner",
+    "RETIRE": "retired a version",
+    "SET_COMPANY_DEFAULT": "assigned as company default",
+    "REMOVE_COMPANY_DEFAULT": "removed as company default"
+  },
+  "priceErrors": {
+    "TRADE.PRICE.BOOK_IN_USE": "Choose another company default before deactivating this price book.",
+    "TRADE.PRICE.BOOK_IN_USE.mapped_as_company_default": "Choose another company default before deactivating this price book.",
+    "TRADE.PRICE.BOOK_INVALID.version_not_in_book": "The chosen version does not belong to the chosen price book.",
+    "TRADE.PRICE.BOOK_INVALID.preview_status_invalid": "A retired version cannot be previewed. Choose another version.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_tested": "Run a passing test on this version before publishing it.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_editable": "Only draft or tested versions can be changed. Create a new version instead.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.not_live": "Only published or scheduled versions can be retired.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.retroactive_supersession": "A replacement must start now or later. Choose a future start date.",
+    "TRADE.PRICE.PUBLISH_NOT_ALLOWED.predecessor_invalid": "The version to replace must be live or scheduled, start earlier, and still apply when this version starts.",
+    "TRADE.PRICE.TEST_NOT_ALLOWED.not_editable": "Only draft or tested versions can be tested.",
+    "TRADE.PRICE.ENTRY_INVALID.operations_required": "Add, change, or delete at least one price line before saving.",
+    "TRADE.PRICE.ENTRY_INVALID.duplicate_operation": "Each price line can be changed only once in one save.",
+    "TRADE.PRICE.ENTRY_INVALID.entry_not_in_version": "Some price lines no longer exist in this version. Reload and try again.",
+    "TRADE.PRICE.ENTRY_INVALID.row_limit_exceeded": "A version can hold up to 10,000 price lines.",
+    "TRADE.PRICE.RULE_INVALID.operations_required": "Add, change, or delete at least one promotion before saving.",
+    "TRADE.PRICE.RULE_INVALID.duplicate_operation": "Each promotion can be changed only once in one save.",
+    "TRADE.PRICE.RULE_INVALID.entry_not_in_version": "Some promotions no longer exist in this version. Reload and try again.",
+    "TRADE.PRICE.RULE_INVALID.operation_limit_exceeded": "Save up to 500 promotion changes at a time.",
+    "TRADE.PRICE.RULE_INVALID.row_limit_exceeded": "A version can hold up to 500 promotions.",
+    "TRADE.PRICE.RULE_INVALID.equal_precedence": "Give promotions in the same stack group different priorities."
+  }
+}

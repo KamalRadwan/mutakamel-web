@@ -1,0 +1,129 @@
+{
+  "sections": {
+    "modules": {
+      "title": "Leads and opportunities",
+      "desc": "Turn leads and opportunities on or off for the workspace or for each company."
+    },
+    "email": {
+      "title": "Email",
+      "desc": "How long the text of sent CRM emails is kept."
+    },
+    "telephony": {
+      "title": "Telephony",
+      "desc": "Calling from CRM records and logging calls as activities."
+    },
+    "reports": {
+      "title": "Reports",
+      "desc": "Settings used by CRM dashboards and reports."
+    }
+  },
+  "modules": {
+    "defaultTitle": "Workspace default",
+    "defaultHelp": "Used by every company that inherits.",
+    "companiesTitle": "Company settings",
+    "companiesHelp": "A company can follow the workspace default or turn a module on or off for itself.",
+    "colCompany": "Company",
+    "colLeads": "Leads",
+    "colOpportunities": "Opportunities",
+    "colHint": "Inherit follows the workspace default.",
+    "on": "On",
+    "off": "Off",
+    "inherit": "Inherit ({{value}})",
+    "setHere": "Set here",
+    "fromDefault": "Workspace default",
+    "search": "Search companies",
+    "searchHint": "Filter by company name or code.",
+    "noCompanies": "No companies yet.",
+    "loadFailed": "Could not load the company settings.",
+    "retry": "Retry",
+    "leads": "Leads",
+    "leadsHelp": "When off, companies that inherit hide the Leads pages and cannot add leads. Existing leads stay saved.",
+    "opportunities": "Opportunities",
+    "opportunitiesHelp": "When off, companies that inherit hide opportunities and cannot add new ones. Existing ones stay saved.",
+    "requireQualified": "Require a qualified stage before converting",
+    "requireQualifiedHelp": "Only leads in a stage that means Qualified can be converted.",
+    "defaultPipeline": "Default pipeline",
+    "managePipelines": "Manage pipelines",
+    "confirmDefaultOffTitle": "Turn off {{module}} by default?",
+    "confirmDefaultOffText": "{{n}} companies follow the default and will lose {{module}}: their pages are hidden and no one can add or edit records. Existing records stay saved.",
+    "confirmCompanyOffTitle": "Turn off {{module}} for {{company}}?",
+    "confirmCompanyOffText": "Its pages are hidden in {{company}} and no one there can add or edit records. Existing records stay saved.",
+    "confirmCompanyOffOpportunitiesNote": "Turning off opportunities also stops lead conversion from creating one.",
+    "nameLeads": "leads",
+    "nameOpportunities": "opportunities",
+    "turnOff": "Turn off",
+    "conflict": {
+      "title": "Company settings changed",
+      "text": "Someone changed the company settings. Reload to see the latest, or keep yours and save again."
+    }
+  },
+  "email": {
+    "retention": "Keep email content for",
+    "retentionHint": "Between 30 and 2555 days. After that the message text is removed and only the sending record stays.",
+    "days": "days"
+  },
+  "reports": {
+    "timeZone": "Analytics time zone",
+    "timeZoneHint": "Set by the platform. Dates in dashboards and reports use this zone."
+  },
+  "retention": {
+    "title": "Email content retention",
+    "description": "Manage how long outbound email message content is kept.",
+    "fieldLabel": "Keep email content for",
+    "daysUnit": "days",
+    "hint": "Between {{min}} and {{max}} days. After that the message text is removed and only the sending record stays.",
+    "conflict": {
+      "title": "Retention setting changed",
+      "text": "Someone changed this setting. Reload to see the latest value, or keep yours and save again."
+    }
+  },
+  "telephony": {
+    "summary": "Phone servers: {{servers}} · Phone seats: {{occupied}} of {{allowed}}",
+    "notSubscribed": "Not subscribed",
+    "summaryFailed": "Could not load the phone summary.",
+    "manageServers": "Manage phone servers",
+    "giveUsersPhone": "Give users a phone",
+    "clickToCall": "Click-to-call from CRM records",
+    "clickToCallHint": "When on, a phone icon next to a number calls it from the built-in phone. When off, it opens your computer's calling app.",
+    "logCalls": "Log calls as CRM activities",
+    "logCallsHint": "Adds a Call activity to the lead or customer after each call made from or matched to their record."
+  },
+  "conflict": {
+    "reload": "Reload",
+    "keepMine": "Keep my changes"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters.",
+    "range": "Must be a whole number between {{min}} and {{max}}.",
+    "retentionRange": "Must be a whole number between {{min}} and {{max}} days.",
+    "websocketUrl": "Enter a valid WebSocket URL starting with ws:// or wss://.",
+    "reasonCode": "Start with A–Z and use only A–Z, 0–9 or _ (2 to 64 characters)."
+  },
+  "toast": {
+    "saved": "Saved."
+  },
+  "load": {
+    "failed": "Could not load CRM settings."
+  },
+  "errors": {
+    "CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE": "The retention policy was updated by someone else.",
+    "CRM_VALIDATION_FAILED": "Some values are not valid. Check them and try again.",
+    "CRM_SUBSCRIPTION_READ_ONLY": "Your subscription is read-only, so changes cannot be saved.",
+    "CRM_SUBSCRIPTION_BLOCKED": "Your subscription does not allow changes right now.",
+    "CRM_SETTING_INVALID": "The setting value or revision is invalid.",
+    "CRM_SETTINGS_MISSING": "Workspace CRM settings could not be found.",
+    "CRM_MODULE_SETTINGS_STALE": "Someone changed the company settings. Reload to see the latest.",
+    "CRM_COMPANY_NOT_FOUND": "This company no longer exists or is inactive.",
+    "CRM_REASON_CODE_TAKEN": "This code is already used in this reason kind.",
+    "CRM_REASON_KIND_MISMATCH": "Polarity and activity type are only allowed for activity outcomes.",
+    "CRM_REASON_SYSTEM_IMMUTABLE": "System reasons cannot be deactivated.",
+    "CRM_REASON_REVISION_STALE": "This reason was modified by someone else.",
+    "CRM_REASON_NOT_FOUND": "This reason no longer exists.",
+    "CRM_IDEMPOTENCY_KEY_REQUIRED": "A request idempotency key is required.",
+    "CRM_IDEMPOTENCY_KEY_INVALID": "The request idempotency key is invalid.",
+    "CRM_IDEMPOTENCY_KEY_REUSED": "This request key was already used with different data.",
+    "CRM_IDEMPOTENCY_KEY_IN_FLIGHT": "The same request is already being processed.",
+    "CRM_DASHBOARD_REVISION_MISMATCH": "Someone else updated these settings. Reload and try again."
+  }
+}

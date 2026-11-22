@@ -1,0 +1,151 @@
+<div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  @if (loading()) {
+    <div class="flex flex-col gap-10" aria-busy="true">
+      @for (row of skeletonRows; track row) {
+        <div class="flex items-start gap-8">
+          <span
+            class="mt-3 size-timeline-dot shrink-0 animate-pulse rounded-full bg-neutral-soft motion-reduce:animate-none"
+            aria-hidden="true"
+          ></span>
+          <div class="flex min-w-0 flex-1 flex-col gap-6">
+            <span class="h-skeleton-line w-modal-confirm max-w-full animate-pulse rounded-4 bg-neutral-soft motion-reduce:animate-none"></span>
+            <span class="h-skeleton-line w-modal-alert max-w-full animate-pulse rounded-4 bg-neutral-soft motion-reduce:animate-none"></span>
+          </div>
+        </div>
+      }
+    </div>
+  } @else if (denied()) {
+    <div class="flex flex-col items-center justify-center gap-6 py-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+        <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+      </span>
+      <h3 class="text-13 leading-18 font-medium text-text">{{ 'oppPage.stages.denied.title' | transloco }}</h3>
+      <p class="max-w-modal-confirm text-12 leading-18 text-text-muted">
+        {{ 'oppPage.stages.denied.text' | transloco }}
+      </p>
+    </div>
+  } @else if (loadFailed()) {
+    <div class="flex flex-col items-center justify-center gap-8 py-16 text-center">
+      <p class="text-12 leading-18 text-text-muted">{{ 'oppPage.stages.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="retry()">
+        {{ 'oppPage.stages.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (dayGroups().length === 0) {
+    <p class="py-16 text-center text-12 leading-18 text-text-muted">{{ 'oppPage.stages.empty' | transloco }}</p>
+  } @else {
+    <div class="flex flex-col gap-12" [attr.aria-label]="'oppPage.stages.listLabel' | transloco">
+      @for (day of dayGroups(); track day.key) {
+        <section [attr.aria-labelledby]="day.headerId" class="flex flex-col gap-6">
+          <h3 [id]="day.headerId" class="text-11 leading-16 font-medium text-text-muted">{{ day.label }}</h3>
+
+          <div role="list" [attr.aria-labelledby]="day.headerId" class="flex flex-col">
+            @for (item of day.items; track item.id) {
+              <div role="listitem">
+                <article class="flex items-stretch gap-8">
+                  <div class="flex flex-col items-center" aria-hidden="true">
+                    <span class="mt-3 size-timeline-dot shrink-0 rounded-full" [class]="item.dotClass"></span>
+                    @if (!$last) {
+                      <span class="mt-4 w-border flex-1 bg-border"></span>
+                    }
+                  </div>
+
+                  <div class="flex min-w-0 flex-1 flex-col gap-4" [class.pb-12]="!$last">
+                    <div class="flex flex-wrap items-center justify-between gap-8">
+                      <div class="flex min-w-0 flex-wrap items-center gap-6 text-12 leading-18 text-text">
+                        @if (item.isInitial) {
+                          <span class="text-text-muted">{{ 'oppPage.stages.startedIn' | transloco }}</span>
+                          <span class="font-medium" dir="auto">{{ item.toText }}</span>
+                        } @else {
+                          <span class="inline-flex min-w-0 flex-wrap items-center gap-4">
+                            <span class="text-text-muted">
+                              <span class="sr-only">{{ 'oppPage.stages.from' | transloco }} </span>
+                              <span dir="auto">{{ item.fromText }}</span>
+                            </span>
+                            <ng-icon
+                              name="tablerArrowRight"
+                              size="12"
+                              class="shrink-0 text-text-muted rtl:-scale-x-100"
+                              aria-hidden="true"
+                            />
+                            <span class="font-medium text-text">
+                              <span class="sr-only">{{ 'oppPage.stages.to' | transloco }} </span>
+                              <span dir="auto">{{ item.toText }}</span>
+                            </span>
+                          </span>
+                        }
+
+                        @if (item.statusLabel) {
+                          <span
+                            class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 leading-16 font-medium whitespace-nowrap"
+                            [class]="item.statusBadgeClass"
+                          >
+                            {{ item.statusLabel }}
+                          </span>
+                        }
+                      </div>
+
+                      @if (item.timeLabel) {
+                        <time
+                          class="shrink-0 text-11 leading-16 text-text-muted tabular-nums"
+                          [attr.datetime]="item.changedAt"
+                          [title]="item.fullDateTime"
+                        >
+                          {{ item.timeLabel }}
+                        </time>
+                      }
+                    </div>
+
+                    @if (item.durationText) {
+                      <p class="text-11 leading-16 text-text-muted" dir="auto">{{ item.durationText }}</p>
+                    }
+
+                    @if (item.reasonText) {
+                      <p class="text-12 leading-18 text-text-muted" dir="auto">{{ item.reasonText }}</p>
+                    }
+
+                    <div class="flex items-center gap-6 text-11 leading-16 text-text-muted">
+                      @if (item.avatarUrl) {
+                        <img
+                          class="size-avatar shrink-0 rounded-full object-cover"
+                          [src]="item.avatarUrl"
+                          alt=""
+                        />
+                      } @else {
+                        <span
+                          class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-neutral-soft text-text-muted"
+                          aria-hidden="true"
+                        >
+                          <ng-icon name="tablerUser" size="12" />
+                        </span>
+                      }
+                      <span class="truncate" [attr.dir]="item.actorHasCustomName ? 'auto' : null">
+                        {{ item.actorName }}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            }
+          </div>
+        </section>
+      }
+    </div>
+
+    @if (nextCursor() !== null) {
+      <div class="flex justify-center pt-4">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [loading]="loadingMore()"
+          [disabled]="loadingMore()"
+          (click)="loadMore()"
+        >
+          {{ 'oppPage.stages.loadMore' | transloco }}
+        </button>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,46 @@
+<app-bulk-run-modal
+  size="form"
+  icon="tablerTrash"
+  tile="bg-icon-red"
+  tone="danger"
+  [title]="'leadBulk.delete.title' | transloco"
+  [count]="displayCount()"
+  [summary]="'leadBulk.leadsCount' | transloco: { n: displayCount() }"
+  [resolving]="resolving()"
+  [submitting]="submitting()"
+  [canSubmit]="canSubmit()"
+  [dismissable]="false"
+  [typedConfirm]="typedConfirmFrom"
+  [typedConfirmHint]="'leadBulk.delete.typeHint' | transloco"
+  [submitLabel]="'leadBulk.delete.go' | transloco: { n: rows().length }"
+  (submit)="submit()"
+  (closed)="onModalClosed()"
+>
+  <p class="text-12 leading-18 text-text">
+    {{ 'leadBulk.delete.text' | transloco: { n: rows().length } }}
+  </p>
+
+  @if (convertedCount() > 0) {
+    <p class="text-12 leading-18 text-warning-text">
+      {{ 'leadBulk.delete.converted' | transloco: { c: convertedCount() } }}
+    </p>
+  }
+
+  <ui-field
+    size="multiline"
+    [label]="'leadBulk.delete.reason' | transloco"
+    [for]="uid + '-reason'"
+    [hint]="'leadBulk.delete.reasonHint' | transloco"
+    [count]="reasonLength()"
+    [max]="maxReasonLength"
+  >
+    <textarea
+      [id]="uid + '-reason'"
+      rows="2"
+      [attr.maxlength]="maxReasonLength"
+      class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [value]="reason()"
+      (input)="onReasonInput($event)"
+    ></textarea>
+  </ui-field>
+</app-bulk-run-modal>

@@ -1,0 +1,223 @@
+@if (list.failed()) {
+  <p class="p-16 text-center text-12 text-danger-text" role="alert">{{ 'leads.loadFailed' | transloco }}</p>
+} @else if (!list.loading() && !items().length) {
+  <p class="p-16 text-center text-12 text-text-muted">{{ 'leads.noResults' | transloco }}</p>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div role="table" class="min-w-doc-table-min" [attr.aria-label]="'leads.title' | transloco" [attr.aria-busy]="list.loading()">
+      <div role="row" class="grid grid-cols-[var(--select-col-w)_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_var(--table-head-h)] bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav">
+        <span role="columnheader" class="flex items-center justify-center">
+          @if (selection) {
+            <span class="relative inline-flex size-checkbox-size items-center justify-center">
+              <ui-checkbox
+                #pageCb
+                [checked]="pageState() === 'all'"
+                [attr.aria-label]="'leads.table.selectPage' | transloco"
+                [attr.aria-checked]="pageState() === 'some' ? 'mixed' : (pageState() === 'all' ? 'true' : 'false')"
+                (checkedChange)="togglePage(pageCb)"
+              >
+                <span class="sr-only">{{ 'leads.table.selectPage' | transloco }}</span>
+              </ui-checkbox>
+              @if (pageState() === 'some') {
+                <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                  <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+                </span>
+              }
+            </span>
+          }
+        </span>
+        @for (column of columns; track column) {
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'leads.table.' + column | transloco }}
+          </span>
+        }
+        <span role="columnheader" class="border-s border-on-nav-line"><span class="sr-only">{{ 'leads.table.actions' | transloco }}</span></span>
+      </div>
+
+      @if (list.loading()) {
+        @for (row of skeletonRows; track row) {
+          <div role="row" class="grid grid-cols-[var(--select-col-w)_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_var(--table-head-h)] mt-6 h-table-row rounded-10 border border-border bg-surface shadow-card">
+            <span role="cell" class="flex items-center justify-center">
+              @if (selection) {
+                <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+              <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (lead of items(); track lead.id) {
+          <div
+            role="row"
+            tabindex="0"
+            class="grid grid-cols-[var(--select-col-w)_minmax(0,2fr)_minmax(0,1.5fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_var(--table-head-h)] mt-6 h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="isSelected(lead.id) ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+            [attr.aria-selected]="selection ? isSelected(lead.id) : null"
+            (click)="view.emit(lead)"
+            (keydown)="onRowKeydown($event, lead)"
+          >
+            <span
+              role="cell"
+              class="flex items-center justify-center"
+              (click)="onSelectCellClick($event, lead)"
+            >
+              @if (selection) {
+                <ui-checkbox
+                  #rowCb
+                  [checked]="isSelected(lead.id)"
+                  [attr.aria-label]="'leads.table.selectRow' | transloco: { name: lead.displayName }"
+                  (click)="onRowCheckboxClick($event)"
+                  (checkedChange)="onRowCheckedChange(lead, rowCb)"
+                >
+                  <span class="sr-only">{{ 'leads.table.selectRow' | transloco: { name: lead.displayName } }}</span>
+                </ui-checkbox>
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="lead.leadProfileType === 'CORPORATE' ? 'bg-icon-navy' : 'bg-icon-blue'"
+                [title]="'leads.profile.' + lead.leadProfileType | transloco"
+              >
+                <ng-icon [name]="lead.leadProfileType === 'CORPORATE' ? 'tablerBuilding' : 'tablerUser'" size="14" aria-hidden="true" />
+              </span>
+              <button
+                type="button"
+                class="cursor-pointer truncate font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="$event.stopPropagation(); view.emit(lead)"
+              >
+                {{ lead.displayName }}
+              </button>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate">{{ lead.primaryContact?.displayName ?? '' }}</span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10" (click)="$event.stopPropagation()">
+              @if (phone(lead); as leadPhone) {
+                <app-phone-actions [phone]="leadPhone" [crm]="true" [source]="phoneSource(lead)" />
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              @if (location(lead); as place) {
+                @if (place.flag; as code) {
+                  <img [src]="'assets/flags/' + code.toLowerCase() + '.svg'" alt="" class="h-12 w-16 shrink-0 rounded-2 object-cover" />
+                }
+                <span class="truncate">{{ place.label }}</span>
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">{{ stageName(lead) }}</span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate">{{ sourceName(lead) }}</span>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+              @if (ownerName(lead); as owner) {
+                <span class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon" aria-hidden="true">
+                  {{ initials(owner) }}
+                </span>
+                <span class="truncate">{{ owner }}</span>
+              } @else {
+                <span class="truncate text-text-muted">{{ 'leads.card.noOwner' | transloco }}</span>
+              }
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10" (click)="$event.stopPropagation()">
+              <button
+                type="button"
+                class="inline-flex h-badge cursor-pointer items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="dueClass(lead)"
+                (click)="activities.emit(lead)"
+              >
+                {{ 'leads.due.' + due(lead) | transloco }}
+              </button>
+            </span>
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10" (click)="$event.stopPropagation()" (mouseleave)="hovered.set(null)">
+              <span class="flex items-center" role="radiogroup" [attr.aria-label]="'leads.card.rating' | transloco: { value: lead.rating }">
+              @for (star of stars; track star) {
+                <button
+                  type="button"
+                  class="inline-flex cursor-pointer rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [class]="star <= rating(lead) ? 'text-warning-text' : 'text-border-field'"
+                  role="radio"
+                  [attr.aria-checked]="star === lead.rating"
+                  [attr.aria-label]="'leads.card.rate' | transloco: { value: star }"
+                  (mouseenter)="hovered.set({ leadId: lead.id, value: star })"
+                  (focus)="hovered.set({ leadId: lead.id, value: star })"
+                  (blur)="hovered.set(null)"
+                  (click)="rate(lead, star)"
+                >
+                  <ng-icon [name]="star <= rating(lead) ? 'tablerStarFill' : 'tablerStar'" size="14" aria-hidden="true" />
+                </button>
+              }
+              </span>
+            </span>
+            <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
+              <ui-actions-menu
+                [items]="actions(lead)"
+                [label]="'leads.card.actions' | transloco"
+                [noColorLabel]="'leads.color.none' | transloco"
+                (selected)="act(lead, $event)"
+              />
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (!list.failed() && (list.loading() ? totalCount() > 0 : items().length > 0)) {
+  <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
+    <span class="shrink-0 text-12 leading-18 text-text-muted">{{ 'leads.table.showInTable' | transloco }}</span>
+    <ui-pagination
+      class="min-w-0 flex-1"
+      [total]="totalCount()"
+      [pageSizes]="pageSizes()"
+      [label]="'leads.pagination' | transloco"
+      [(page)]="page"
+      [pageSize]="pageSize()"
+      (pageSizeChange)="onPageSizeChange($event)"
+    />
+  </footer>
+}
+
+<ui-confirm-dialog
+  class="contents"
+  [title]="'leads.delete.title' | transloco"
+  [text]="'leads.delete.text' | transloco: { name: deletingName() }"
+  [confirmLabel]="'common.delete' | transloco"
+  [cancelLabel]="'common.cancel' | transloco"
+/>
+
+<app-lead-disqualify />

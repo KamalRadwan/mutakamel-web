@@ -1,0 +1,116 @@
+{
+  "actions": {
+    "openingBalance": "Opening balance",
+    "clearFilters": "Clear filters"
+  },
+  "searchPlaceholder": "Search item code or name",
+  "tableLabel": "Stock availability",
+  "pagination": "Stock availability pages",
+  "filters": {
+    "node": "Node",
+    "nodeHint": "Show the stock of one location.",
+    "allNodes": "All nodes",
+    "onlyInStock": "Only items with stock",
+    "onlyInStockHint": "Hide rows where nothing is on hand."
+  },
+  "cols": {
+    "item": "Item",
+    "node": "Node",
+    "lot": "Lot",
+    "onHand": "On hand",
+    "reserved": "Reserved",
+    "available": "Available",
+    "unit": "Unit",
+    "updated": "Updated"
+  },
+  "serialCount": {
+    "zero": "0 serials",
+    "one": "1 serial",
+    "two": "2 serials",
+    "few": "{{count}} serials",
+    "many": "{{count}} serials",
+    "other": "{{count}} serials"
+  },
+  "empty": {
+    "text": "No stock yet. Record opening balances to start.",
+    "filtered": "No results"
+  },
+  "loadFailed": "Could not load stock availability.",
+  "retry": "Try again",
+  "date": {
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minutes"
+  },
+  "check": {
+    "title": "Stock check",
+    "onHand": "On hand",
+    "reserved": "Reserved",
+    "available": "Available",
+    "onHandHint": "Total quantity currently held at this location.",
+    "reservedHint": "Quantity already promised to open orders.",
+    "availableHint": "Quantity still free to promise: on hand minus reserved.",
+    "nodeHint": "The stock location this figure is for.",
+    "baseUomHint": "Stock is kept in the item base unit.",
+    "advisory": "Advisory figure as of {{time}}. The final check happens when stock is reserved.",
+    "nodeNotFound": "This node is not available in the current branch.",
+    "ambiguousUnit": "Multiple units exist for this balance. Choose a unit to check.",
+    "chooseUnitHint": "Choose the unit to check.",
+    "chooseUnitPlaceholder": "Select a unit",
+    "refresh": "Refresh"
+  },
+  "opening": {
+    "title": "Opening balance",
+    "node": "Node",
+    "nodeHint": "Active stock location linked to the current branch.",
+    "nodePlaceholder": "Select a node",
+    "noActiveNodes": "No active nodes in this branch",
+    "item": "Item",
+    "itemHint": "Only stock-tracked products can have a balance.",
+    "unit": "Unit",
+    "unitHint": "The base unit, or a unit with a published conversion.",
+    "unitPlaceholder": "Select an item first",
+    "quantity": "Quantity",
+    "quantityHint": "Up to 16 digits and 8 decimals.",
+    "effectiveAt": "Effective date and time",
+    "effectiveAtHint": "Must fall in an open period within its backdate limit.",
+    "lotKey": "Lot key",
+    "lotKeyHint": "The batch or lot this stock belongs to.",
+    "expiryDate": "Expiry date",
+    "expiryDateHint": "Leave empty when the lot does not expire.",
+    "expiryDatePlaceholder": "Optional",
+    "serials": "Serial numbers",
+    "serialsHint": "One serial per line; the count must equal the quantity.",
+    "serialsPlaceholder": "One serial per line",
+    "submit": "Record balance",
+    "recorded": "Opening balance recorded.",
+    "quantityConflict": {
+      "title": "Opening balance already exists",
+      "text": "This item already has an opening balance at this node. Use a receipt instead."
+    },
+    "discard": {
+      "title": "Discard changes?",
+      "text": "Your entered opening balance details will be lost.",
+      "confirm": "Discard",
+      "keep": "Keep editing"
+    },
+    "errors": {
+      "required": "This field is required.",
+      "itemNotTracked": "Only stock-tracked products can have a balance.",
+      "quantityInvalid": "Enter a positive number (up to 16 digits and 8 decimals).",
+      "quantityWhole": "Quantity must be a whole number for serialized items.",
+      "quantityMaxSerials": "At most 1,000 units per entry for serialized items.",
+      "lotTooLong": "Lot key must be at most 120 characters.",
+      "serialNone": "Serial number cannot be 'none'.",
+      "serialTooLong": "Each serial number must be at most 120 characters.",
+      "serialDuplicate": "Duplicate serial numbers are not allowed.",
+      "serialMax": "At most 1,000 serial numbers are allowed.",
+      "serialCountMismatch": "Enter exactly {{count}} serial numbers to match the quantity.",
+      "serialConflict": "One of these serials already exists.",
+      "uomConversionUnavailable": "This unit has no published conversion to the base unit.",
+      "dateInvalid": "Choose a valid date and time."
+    }
+  }
+}

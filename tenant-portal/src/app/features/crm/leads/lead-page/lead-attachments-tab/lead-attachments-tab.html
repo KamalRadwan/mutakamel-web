@@ -1,0 +1,10 @@
+<app-record-attachments
+  sourceType="LEAD"
+  [sourceId]="leadId()"
+  [branchId]="branchId()"
+  [canEdit]="canEdit()"
+  [canUpload]="canUpload()"
+  [canDelete]="canDelete()"
+  [uploaderName]="uploaderNameFn()"
+  (countChange)="countChange.emit($event)"
+/>

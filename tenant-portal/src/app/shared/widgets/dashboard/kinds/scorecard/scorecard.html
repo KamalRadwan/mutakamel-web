@@ -1,0 +1,17 @@
+@if (rows().length > 0) {
+  <ui-data-table
+    [columns]="columns()"
+    [rows]="rows()"
+    [rowKey]="rowKey"
+    [rowClickable]="rowClickable()"
+    [label]="title()"
+    (rowClick)="onRowClick($event)"
+  >
+    <ng-template uiCell="metric" let-row>
+      <span class="block min-w-0 truncate" [title]="metricOf(row)">{{ metricOf(row) }}</span>
+    </ng-template>
+    <ng-template uiCell="status" let-row>
+      <ui-badge [tone]="statusToneOf(row)">{{ statusLabelOf(row) }}</ui-badge>
+    </ng-template>
+  </ui-data-table>
+}

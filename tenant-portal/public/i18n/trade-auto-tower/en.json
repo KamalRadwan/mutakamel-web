@@ -1,0 +1,266 @@
+{
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "retry": "Try again",
+    "reload": "Reload",
+    "copy": "Copy",
+    "copied": "Copied",
+    "clearFilters": "Clear filters",
+    "none": "—",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "discardTitle": "Discard changes?",
+    "discardText": "Your resolution details will be lost.",
+    "discardConfirm": "Discard"
+  },
+  "title": "Control tower",
+  "stats": {
+    "open": "Open",
+    "openHint": "Exceptions waiting for an operator to investigate and resolve.",
+    "openSub": "need a person",
+    "actionPending": "Waiting for action",
+    "actionPendingHint": "Exceptions currently running automatic delivery retries.",
+    "actionPendingSub": "retry running",
+    "resolvedToday": "Resolved today",
+    "resolvedTodayHint": "Exceptions resolved by your team today.",
+    "resolvedTodaySub": "by your team",
+    "highOrCritical": "High or critical",
+    "highOrCriticalHint": "High or critical exceptions in any status, out of the total inbox.",
+    "highOrCriticalSub": "of {{total}} shown"
+  },
+  "steps": {
+    "label": "Exception status",
+    "hint": "Filter the exceptions by status",
+    "OPEN": "Open",
+    "ACTION_PENDING": "Waiting for action",
+    "RESOLVED": "Resolved",
+    "QUARANTINED": "Quarantined"
+  },
+  "filters": {
+    "severity": "Severity",
+    "severityHint": "Show only the exceptions of the chosen severity level.",
+    "allSeverities": "All severities",
+    "HIGH": "High",
+    "CRITICAL": "Critical",
+    "category": "Category",
+    "categoryHint": "Show only the exceptions of the chosen category.",
+    "allCategories": "All categories",
+    "reload": "Reload",
+    "branch": "Branch",
+    "branchHint": "Show the exceptions of one branch of this company only. Available in the company scope.",
+    "allBranches": "All branches",
+    "sort": "Sort",
+    "sortHint": "Choose the order of the exceptions in the list.",
+    "sortCreatedAt": "Newest first",
+    "sortSeverity": "Most severe first"
+  },
+  "categories": {
+    "PROFILE_ACTIVATION_CONFLICT": "Profile activation conflict",
+    "RESULT_CONFLICT": "Document result conflict",
+    "OWNER_TRANSPORT_EXHAUSTED": "Delivery to owner failed",
+    "DATA_CORRECTION_REQUIRED": "Data needs correction"
+  },
+  "severities": {
+    "INFO": "Info",
+    "WARNING": "Warning",
+    "HIGH": "High",
+    "CRITICAL": "Critical"
+  },
+  "statuses": {
+    "OPEN": "Open",
+    "ACKNOWLEDGED": "Acknowledged",
+    "ACTION_PENDING": "Waiting for action",
+    "RECONCILIATION_PENDING": "Waiting for reconciliation",
+    "RESOLVED": "Resolved",
+    "QUARANTINED": "Quarantined"
+  },
+  "sourceTypes": {
+    "DOCUMENT_PROFILE_VERSION": "Document profile version",
+    "QUOTATION_PDF_RENDER": "Quotation PDF",
+    "BUSINESS_PDF_RENDER": "Business document PDF"
+  },
+  "resolutions": {
+    "SOURCE_CORRECTED": "Source corrected",
+    "OWNER_RESULT_APPLIED": "Owner result applied",
+    "RESULT_ACCEPTED": "Result accepted"
+  },
+  "attemptStatuses": {
+    "CONFLICT": "Conflict",
+    "EXHAUSTED": "Exhausted",
+    "SUCCEEDED": "Succeeded",
+    "DELIVERED": "Delivered",
+    "FAILED": "Failed",
+    "RETRY_SCHEDULED": "Retry scheduled",
+    "PENDING": "Pending"
+  },
+  "guidance": {
+    "PROFILE_ACTIVATION_CONFLICT": "Fix the source first (retire or change the version), then mark this as resolved.",
+    "RESULT_CONFLICT": "Two document results arrived. Choose the one to keep, then resolve.",
+    "OWNER_TRANSPORT_EXHAUSTED": "This is retried automatically. Mark it resolved only after the owner applied the result.",
+    "DATA_CORRECTION_REQUIRED": "Correct the data at its source, then mark this as resolved."
+  },
+  "problems": {
+    "TRADE_DOCUMENT_PROFILE_EFFECTIVE_OVERLAP": "Another version is live in the same period",
+    "TRADE_DOCUMENT_PROFILE_ACTIVATION_CONFLICT": "Could not activate this document profile version due to a conflict",
+    "TRADE_DOCUMENT_DUPLICATE_ARTIFACT_CONFLICT": "Two conflicting document results arrived for the same record",
+    "TRADE_DOCUMENT_RESULT_CONFLICT": "Document result conflicts with an existing output",
+    "TRADE_DOCUMENT_RENDER_FAILED": "Document rendering failed",
+    "TRADE_DOCUMENT_TEMPLATE_NOT_FOUND": "Assigned document template was not found",
+    "TRADE_DOCUMENT_TEMPLATE_INVALID": "Document template configuration is not valid",
+    "TRADE_OWNER_TRANSPORT_TIMEOUT": "Delivery to the owner module timed out",
+    "TRADE_OWNER_TRANSPORT_HTTP_503": "Owner module was temporarily unavailable (HTTP 503)",
+    "TRADE_OWNER_TRANSPORT_HTTP_502": "Owner module returned a gateway error (HTTP 502)",
+    "TRADE_OWNER_TRANSPORT_HTTP_500": "Owner module encountered an internal error (HTTP 500)",
+    "TRADE_OWNER_TRANSPORT_RATE_LIMITED": "Owner module rate-limited delivery; retry is scheduled",
+    "TRADE_OWNER_TRANSPORT_EXHAUSTED": "All delivery retries to the owner module were exhausted",
+    "TRADE_OWNER_TRANSPORT_NETWORK_ERROR": "Network error while delivering to the owner module",
+    "TRADE_OWNER_CALLBACK_REJECTED": "Owner module rejected the delivered result",
+    "TRADE_TAX_CLASSIFICATION_MISSING": "Tax classification is missing on the source record",
+    "TRADE_ACCOUNT_PARTY_REFERENCE_INACTIVE": "Referenced commercial account party is inactive",
+    "TRADE_DATA_CORRECTION_REQUIRED": "Source data must be corrected before processing can continue",
+    "TRADE_CATALOG_ITEM_INACTIVE": "Referenced catalog item is inactive",
+    "TRADE_VALIDATION_FAILED": "Source payload failed validation",
+    "ARTIFACT_DIGEST_MISMATCH": "Artifact checksum mismatch",
+    "UPSTREAM_TIMEOUT": "Upstream request timed out",
+    "TAX_CODE_REQUIRED": "Tax code is required",
+    "SERVICE_UNAVAILABLE": "Service unavailable",
+    "TOO_MANY_REQUESTS": "Too many requests"
+  },
+  "table": {
+    "label": "Control tower exceptions",
+    "selectPage": "Select all resolvable exceptions on this page",
+    "selectRow": "Select exception {{label}}",
+    "unselectableResolved": "This exception is already closed.",
+    "unselectableCategory": "This category must be resolved outside the bulk inbox.",
+    "columns": {
+      "severity": "Severity",
+      "category": "Category",
+      "source": "Source",
+      "problem": "Problem",
+      "status": "Status",
+      "created": "Created"
+    },
+    "unselectableQuarantined": "Quarantined exceptions cannot be resolved here."
+  },
+  "pagination": {
+    "label": "Exceptions pagination"
+  },
+  "states": {
+    "loadFailed": "Could not load control tower exceptions.",
+    "notFound": "This exception no longer exists.",
+    "emptyOpen": "Nothing needs attention.",
+    "emptyActionPending": "No exceptions are waiting for retry right now.",
+    "emptyResolved": "No resolved exceptions yet.",
+    "countsFailed": "Could not load the exception counts.",
+    "emptyFiltered": "No exceptions match the selected filters.",
+    "emptyQuarantined": "No quarantined exceptions."
+  },
+  "modal": {
+    "fallbackTitle": "Exception",
+    "fields": {
+      "source": "Source",
+      "status": "Status",
+      "problem": "Problem",
+      "created": "Created",
+      "correlationId": "Correlation ID",
+      "attempts": "Attempts"
+    },
+    "hints": {
+      "source": "The record that raised this exception. Use the link to open it.",
+      "status": "Where the exception stands now in its handling.",
+      "problem": "The safe error code reported by the system, shown in plain words.",
+      "created": "When the system first raised this exception.",
+      "correlationId": "The identifier that links this exception to its logs. Quote it when asking for support.",
+      "attempts": "How many delivery attempts were made before the exception was raised."
+    },
+    "openSource": "Open source record",
+    "attemptsTitle": "Delivery attempts",
+    "attemptColumns": {
+      "owner": "Owner",
+      "status": "Status",
+      "tries": "Tries",
+      "nextTry": "Next try",
+      "lastError": "Last error"
+    },
+    "resolveTitle": "Resolve",
+    "resolutionLabel": "Resolution",
+    "resolutionHint": "Choose the resolution action that matches how the underlying issue was handled.",
+    "resolutionPlaceholder": "Choose resolution",
+    "markAsResolved": "Mark as resolved",
+    "emptyReasonsHint": "Add reasons in Trade settings.",
+    "resolvedBanner": "Resolved {{date}}",
+    "resolvedWithCode": "Resolution: {{code}}"
+  },
+  "evidence": {
+    "label": "Evidence",
+    "hint": "Add 1 to 50 key/value pairs proving the issue was fixed. Do not include secrets, tokens, or passwords.",
+    "keyLabel": "Evidence key {{n}}",
+    "valueLabel": "Evidence value {{n}}",
+    "keyPlaceholder": "ticket",
+    "valuePlaceholder": "OPS-4412",
+    "addRow": "Add evidence",
+    "removeRow": "Remove evidence row",
+    "errors": {
+      "required": "Add at least one complete evidence row.",
+      "keyRequired": "Enter an evidence key.",
+      "valueRequired": "Enter an evidence value.",
+      "forbiddenName": "This name is not allowed",
+      "duplicateKey": "This evidence key is already used.",
+      "keyTooLong": "Evidence key must be 64 characters or fewer.",
+      "valueTooLong": "Evidence value must be 500 characters or fewer.",
+      "maxRows": "No more than 50 evidence rows are allowed.",
+      "payloadTooLarge": "Evidence exceeds the 8 KB size limit."
+    }
+  },
+  "bulk": {
+    "label": "Selected exceptions",
+    "selected": "{{n}} selected",
+    "hidden": "· {{h}} not in current page",
+    "selectAll": "Select all {{total}} matching",
+    "allSelected": "All {{total}} matching exceptions are selected",
+    "onlyPage": "Select only this page",
+    "pickCategory": "To select all matching exceptions, filter by one category first.",
+    "tooMany": "Up to {{max}} exceptions can be selected at once.",
+    "resolveAction": "Resolve…",
+    "clear": "Clear",
+    "noCommonResolution": "Selected categories have no shared resolution code.",
+    "busy": "Another bulk resolution is already running.",
+    "modalTitle": "Resolve selected exceptions",
+    "submitAction": "Resolve",
+    "resolutionHint": "This resolution code will be applied to all selected exceptions.",
+    "emptyReasonsHint": "Add reasons in Trade settings."
+  },
+  "toast": {
+    "resolved": "Resolved",
+    "bulkResolving": "Resolving {{n}} exceptions in the background",
+    "copied": "Copied"
+  },
+  "errors": {
+    "TRADE_CONTROL_TOWER_EXCEPTION_NOT_FOUND": "This exception no longer exists. Reload the inbox.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID": "Choose a valid resolution, reason, and safe evidence keys.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_CONFLICT": "This exception was already resolved.",
+    "TRADE_CONTROL_TOWER_RETRY_IN_PROGRESS": "Wait for the automatic retry in progress to finish first.",
+    "TRADE_CONTROL_TOWER_RETRY_DISABLED": "Manual retries are disabled; resolve the underlying issue instead.",
+    "TRADE_CONTROL_TOWER_EVIDENCE_FORBIDDEN": "Remove forbidden words such as secret, token, or password from evidence keys.",
+    "TRADE_CONCURRENCY_STALE_VERSION": "Someone else updated this exception. Reload before saving again.",
+    "TRADE_REASON_NOT_FOUND": "Choose an active reason from Trade settings and try again.",
+    "TRADE_REASON_INACTIVE": "The selected reason is inactive; choose another reason.",
+    "TRADE_REASON_NOTE_REQUIRED": "Enter a note explaining the chosen reason.",
+    "TRADE_REASON_KIND_INVALID": "The selected reason does not belong to this action.",
+    "TRADE_BULK_JOB_ACTIVE": "Another batch operation is already running here.",
+    "BULK_JOB_ACTIVE": "Another batch operation is already running here.",
+    "BULK_SELECTION_TOO_LARGE": "Too many exceptions are selected.",
+    "network": "Cannot reach the server.",
+    "generic": "Something went wrong. Try again.",
+    "TRADE_CONTROL_TOWER_NOT_FOUND": "This exception no longer exists. Reload the inbox.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED": "This exception is outside your current scope. Change the company or branch and try again.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_include_branches_requires_company": "Showing branch exceptions needs the company scope.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_filter_requires_company": "Filtering by branch needs the company scope.",
+    "TRADE_CONTROL_TOWER_RETRY_NOT_ALLOWED": "Manual retry is not available for this exception; resolve the underlying issue instead.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_category_not_resolvable": "This resolution does not fit the exception category.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_source_still_scheduled": "The source version is still scheduled; activate or change it first.",
+    "TRADE_CONTROL_TOWER_RESOLUTION_INVALID_evidence_invalid": "Check the evidence: at least one safe key within the size limits. Accepting a result needs a valid keptArtifactId.",
+    "TRADE_CONTROL_TOWER_SCOPE_DENIED_branch_not_accessible": "This branch is not available in this company. It may be inactive or deleted, or you may not have access to it. Choose another branch."
+  }
+}

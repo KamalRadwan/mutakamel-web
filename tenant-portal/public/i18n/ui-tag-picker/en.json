@@ -1,0 +1,16 @@
+{
+  "placeholder": "Add tags",
+  "create": "Create “{{name}}”",
+  "noMatches": "No matching tags",
+  "remove": "Remove {{name}}",
+  "maxReached": "You can add up to {{max}} tags.",
+  "tooLong": "Tag names are up to 60 characters.",
+  "creating": "Creating…",
+  "errors": {
+    "taken": "A tag with this name already exists.",
+    "limit": "The workspace reached the limit of 500 tags.",
+    "failed": "Could not create the tag. Try again.",
+    "nameInvalid": "Enter a valid tag name up to 60 characters.",
+    "colorInvalid": "Enter valid #RRGGBB hex colours."
+  }
+}

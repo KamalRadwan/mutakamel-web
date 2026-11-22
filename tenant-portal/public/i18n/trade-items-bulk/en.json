@@ -1,0 +1,119 @@
+{
+  "action": {
+    "SET_STATUS": "Change status",
+    "SET_CATEGORY": "Change category",
+    "ENABLE_FOR_COMPANY": "Enable for the company",
+    "SET_CAPABILITIES": "Change capabilities"
+  },
+  "succeeded": "{{count}} items updated",
+  "itemsCount": "{{count}} items",
+  "run": "Run for {{count}} items",
+  "started": "Batch started",
+  "busy": "A batch operation is already running on items.",
+  "activeJob": {
+    "title": "Another batch job is running on this list.",
+    "open": "Open the running job"
+  },
+  "menu": {
+    "button": "{{count}} selected",
+    "label": "Batch actions for {{count}} selected items"
+  },
+  "selection": {
+    "label": "Selected items",
+    "page": "{{count}} selected on this page",
+    "selected": "{{count}} selected",
+    "hidden": "{{count}} on other pages",
+    "all": "Select all {{total}} matching",
+    "allSelected": "All {{total}} matching items are selected",
+    "allSelectedExcluded": "{{count}} of {{total}} matching items selected",
+    "onlyPage": "Select only this page",
+    "tooMany": "Up to {{max}} items can be selected.",
+    "clear": "Clear selection"
+  },
+  "statusModal": {
+    "status": "Target status",
+    "statusHint": "The status to move the selected items to.",
+    "note": "Items that cannot move to the chosen status are reported, not changed."
+  },
+  "categoryModal": {
+    "category": "Category",
+    "categoryHint": "Choose an active category, or leave empty to remove the category.",
+    "note": "Only active categories can be assigned. Leave empty to remove the category from selected items."
+  },
+  "enableModal": {
+    "canSell": "Can sell",
+    "canSellHint": "Allow these items to be sold in this company.",
+    "canPurchase": "Can purchase",
+    "canPurchaseHint": "Allow these items to be purchased in this company.",
+    "canPos": "Point of sale",
+    "canPosHint": "Allow these items in point of sale. Requires Can sell to be turned on.",
+    "trackInventory": "Track stock",
+    "trackInventoryHint": "Track stock quantities for products. Services and combos are never tracked.",
+    "trackingMode": "Tracking mode",
+    "trackingModeHint": "How stock units are tracked for products when stock tracking is enabled.",
+    "salesTax": "Sales tax",
+    "salesTaxHint": "Default tax applied when selling these items in this company.",
+    "purchaseTax": "Purchase tax",
+    "purchaseTaxHint": "Default tax applied when purchasing these items in this company.",
+    "noTax": "None",
+    "note": "Items already enabled for this company are skipped. Services and combos have stock tracking turned off automatically."
+  },
+  "capabilitiesModal": {
+    "keep": "Keep",
+    "canSell": "Can sell",
+    "canSellHint": "Keep the current setting, or turn selling on or off for selected items.",
+    "canPurchase": "Can purchase",
+    "canPurchaseHint": "Keep the current setting, or turn purchasing on or off for selected items.",
+    "canPos": "Point of sale",
+    "canPosHint": "Keep the current setting, or turn point of sale on or off. Requires Can sell.",
+    "trackInventory": "Track stock",
+    "trackInventoryHint": "Keep the current setting, or turn stock tracking on or off for products.",
+    "note": "Items not enabled for this company are skipped. Choices set to Keep remain unchanged."
+  },
+  "codes": {
+    "TRADE": {
+      "CATALOG": {
+        "ITEM_NOT_FOUND": "Item no longer exists.",
+        "ITEM_IDENTITY_INVALID": "This item cannot move to the chosen status.",
+        "CATEGORY_ASSIGNMENT_INVALID": "Choose an active category.",
+        "COMPANY_PROFILE_ALREADY_EXISTS": "Already enabled for this company.",
+        "COMPANY_PROFILE_NOT_FOUND": "Not enabled for this company.",
+        "COMPANY_PROFILE_INVALID": "Tax, currency or price is not valid for this company.",
+        "CAPABILITY_INCOMPATIBLE": "Point of sale requires Can sell, and only products can track stock.",
+        "TRACKING_LOCKED": "Tracking is locked after the first stock movement."
+      },
+      "CONTEXT": {
+        "MISSING_COMPANY": "Choose a company in the top bar.",
+        "COMPANY_REQUIRED": "Choose a company in the top bar."
+      },
+      "REASON": {
+        "NOT_FOUND": "The chosen reason no longer exists.",
+        "INACTIVE": "The chosen reason is no longer active.",
+        "NOTE_REQUIRED": "A note is required for this reason.",
+        "KIND_INVALID": "This reason does not belong to this action."
+      },
+      "VALIDATION_FAILED": "Some values are not valid.",
+      "BULK_JOB_ACTIVE": "Another batch job is running on this list."
+    },
+    "TRADE_CATALOG_ITEM_NOT_FOUND": "Item no longer exists.",
+    "TRADE_CATALOG_ITEM_IDENTITY_INVALID": "This item cannot move to the chosen status.",
+    "TRADE_CATALOG_CATEGORY_ASSIGNMENT_INVALID": "Choose an active category.",
+    "TRADE_CATALOG_COMPANY_PROFILE_ALREADY_EXISTS": "Already enabled for this company.",
+    "TRADE_CATALOG_COMPANY_PROFILE_NOT_FOUND": "Not enabled for this company.",
+    "TRADE_CATALOG_COMPANY_PROFILE_INVALID": "Tax, currency or price is not valid for this company.",
+    "TRADE_CATALOG_CAPABILITY_INCOMPATIBLE": "Point of sale requires Can sell, and only products can track stock.",
+    "TRADE_CATALOG_TRACKING_LOCKED": "Tracking is locked after the first stock movement.",
+    "TRADE_CONTEXT_MISSING_COMPANY": "Choose a company in the top bar.",
+    "TRADE_REASON_NOT_FOUND": "The chosen reason no longer exists.",
+    "TRADE_REASON_INACTIVE": "The chosen reason is no longer active.",
+    "TRADE_REASON_NOTE_REQUIRED": "A note is required for this reason.",
+    "TRADE_REASON_KIND_INVALID": "This reason does not belong to this action.",
+    "TRADE_VALIDATION_FAILED": "Some values are not valid.",
+    "TRADE_BULK_JOB_ACTIVE": "Another batch job is running on this list.",
+    "generic": "Could not be updated.",
+    "TRADE_CONTEXT_COMPANY_REQUIRED": "Choose a company in the top bar.",
+    "COMPANY_PROFILE_ALREADY_EXISTS": "Already enabled for this company.",
+    "COMPANY_PROFILE_NOT_FOUND": "Not enabled for this company.",
+    "CAPABILITY_INCOMPATIBLE": "Point of sale requires Can sell, and only products can track stock."
+  }
+}

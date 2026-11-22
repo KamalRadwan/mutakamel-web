@@ -1,0 +1,14 @@
+<ui-full-state
+  kind="provisioning"
+  [title]="'errors.provisioning.title' | transloco"
+  [text]="'errors.provisioning.text' | transloco"
+  [actionLabel]="'errors.provisioning.retry' | transloco"
+  [busy]="checking()"
+  (action)="retryRequested.emit()"
+/>
+
+<span class="sr-only" role="status">
+  @if (checking()) {
+    {{ 'errors.provisioning.checking' | transloco }}
+  }
+</span>

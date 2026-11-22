@@ -1,0 +1,63 @@
+<button
+  #trigger
+  type="button"
+  uiButton
+  variant="secondary"
+  [size]="size()"
+  aria-haspopup="menu"
+  [attr.aria-expanded]="open()"
+  [disabled]="isDisabled()"
+  [attr.title]="disabledReason()"
+  (click)="toggle()"
+>
+  <span class="tabular-nums">{{ 'accountsBulk.button' | transloco: { count: resolvedCount() } }}</span>
+  <ng-icon name="tablerChevronDown" [size]="size() === 'small' ? '14' : '15'" aria-hidden="true" />
+</button>
+
+@if (open()) {
+  <div
+    #panel
+    role="menu"
+    class="fixed z-dropdown flex flex-col gap-2 whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!panelPlaced()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [attr.aria-label]="'accountsBulk.button' | transloco: { count: resolvedCount() }"
+  >
+    @for (item of items(); track item.id; let first = $first) {
+      @if (item.danger && !first) {
+        <div role="separator" class="h-border bg-border"></div>
+      }
+      <button
+        #menuRow
+        type="button"
+        role="menuitem"
+        class="flex w-full cursor-pointer items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        (click)="onRowClick(item)"
+      >
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="item.tile"
+        >
+          <ng-icon [name]="item.icon" size="14" aria-hidden="true" />
+        </span>
+
+        <span
+          class="min-w-0 flex-1 text-12 font-medium"
+          [class]="item.danger ? 'text-danger-text' : 'text-text'"
+        >
+          {{ item.title }}
+        </span>
+      </button>
+    }
+  </div>
+}
+
+<app-account-reason-modal
+  [selection]="resolvedSelection()"
+  [context]="context()"
+  [filter]="filter()"
+  [total]="total()"
+  (submitted)="onJobSubmitted()"
+  (finished)="onImmediateJobFinished($event)"
+/>

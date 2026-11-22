@@ -1,0 +1,358 @@
+<ui-modal
+  #impactModal
+  size="wide"
+  icon="tablerArrowsRightLeft"
+  tile="bg-icon-violet"
+  [title]="'tplFunctions.impact.title' | transloco: { version: versionNumber() }"
+  [subtitle]="functionName()"
+  [closeLabel]="'tplFunctions.actions.close' | transloco"
+  [dismissable]="!checking() && !applying()"
+  bodyClass="flex flex-col p-0 overflow-hidden"
+  (closed)="onModalClosed()"
+>
+  <nav
+    class="flex h-tab shrink-0 items-center border-b border-border bg-surface px-12"
+    [attr.aria-label]="'tplFunctions.impact.stepsAria' | transloco"
+  >
+    <ol class="flex min-w-0 flex-1 items-center gap-6">
+      @for (s of steps; track s.id; let idx = $index; let last = $last) {
+        @let active = step() === s.id;
+        @let done = isStepDone(idx);
+
+        <li class="flex min-w-0 items-center gap-6" [class.flex-1]="!last">
+          <div
+            class="inline-flex items-center gap-6 px-2 py-2 text-12 leading-18"
+            [attr.aria-current]="active ? 'step' : null"
+          >
+            <span
+              class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 font-medium"
+              [class]="
+                active
+                  ? 'bg-brand text-on-brand'
+                  : done
+                    ? 'bg-success text-on-success'
+                    : 'border border-border-field bg-surface text-text-muted'
+              "
+            >
+              @if (done) {
+                <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+              } @else {
+                {{ s.num }}
+              }
+            </span>
+            <span class="truncate" [class]="active ? 'font-medium text-text' : 'text-text-muted'">
+              {{ s.labelKey | transloco }}
+            </span>
+          </div>
+
+          @if (!last) {
+            <span
+              class="h-border-w-strong min-w-12 flex-1 rounded-full"
+              [class]="done ? 'bg-success' : 'bg-border'"
+              aria-hidden="true"
+            ></span>
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+
+  <div class="min-h-0 flex-1 overflow-y-auto p-10">
+    @switch (step()) {
+      @case ('targets') {
+        @if (targetRows().length === 0) {
+          <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface-muted p-16 text-center">
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+              <ng-icon name="tablerArrowsRightLeft" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-13 leading-18 font-medium text-text">
+              {{ 'tplFunctions.impact.noDraftTargetsTitle' | transloco }}
+            </p>
+            <p class="text-12 leading-18 text-text-muted">
+              {{ 'tplFunctions.impact.noDraftTargetsDescription' | transloco }}
+            </p>
+          </div>
+        } @else {
+          <div class="flex flex-col gap-8">
+            <div class="flex items-center justify-between gap-8">
+              <span class="text-12 leading-18 text-text-muted">
+                {{ 'tplFunctions.impact.targetsHelp' | transloco }}
+              </span>
+              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                <bdi dir="ltr">{{ 'tplFunctions.impact.selectedCount' | transloco: { count: selectedCount(), max: maxTargets } }}</bdi>
+              </span>
+            </div>
+
+            <div class="flex flex-col gap-6">
+              @for (row of targetRows(); track row.templateId) {
+                @let limitReached = !row.selected && selectedCount() >= maxTargets;
+
+                <div
+                  class="grid grid-cols-3 items-center gap-x-10 gap-y-6 rounded-10 border p-8 transition-colors duration-fast"
+                  [class]="row.selected ? 'border-brand bg-brand-soft' : 'border-border bg-surface'"
+                >
+                  <div class="col-span-2 flex min-w-0 items-center gap-8">
+                    <ui-field
+                      size="bare"
+                      class="min-w-0"
+                      [label]="'tplFunctions.impact.targetLabel' | transloco"
+                      [hint]="'tplFunctions.impact.targetHint' | transloco"
+                    >
+                      <span [class.pointer-events-none]="limitReached || checking()" [class.opacity-drag-source]="limitReached">
+                        <ui-checkbox
+                          [checked]="row.selected"
+                          (checkedChange)="toggleTarget(row.templateId, $event)"
+                        >
+                          <span class="truncate text-13 leading-18 font-medium text-text">{{ row.templateName }}</span>
+                        </ui-checkbox>
+                      </span>
+                    </ui-field>
+                    <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft">
+                      <bdi dir="ltr">{{ 'tplFunctions.usage.draftRevision' | transloco: { revision: row.draftRevision } }}</bdi>
+                    </span>
+                  </div>
+
+                  <div class="col-span-1 min-w-0">
+                    <ui-field
+                      size="bare"
+                      [for]="uid + '-fix-' + row.templateId"
+                      [label]="'tplFunctions.impact.fixtureLabel' | transloco"
+                      [hint]="'tplFunctions.impact.fixtureHint' | transloco"
+                    >
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [id]="uid + '-fix-' + row.templateId"
+                        [options]="row.fixtureOptions"
+                        [value]="row.fixtureKey"
+                        [label]="'tplFunctions.impact.fixtureLabel' | transloco"
+                        [describedBy]="uid + '-fix-' + row.templateId + '-hint'"
+                        [disabled]="!row.selected || checking() || loadingFixtures()"
+                        (valueChange)="onFixtureChange(row.templateId, $event)"
+                      />
+                    </ui-field>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      }
+
+      @case ('results') {
+        @if (impactResult(); as impact) {
+          <div class="flex flex-col gap-10">
+            <div class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8">
+              <div class="flex items-center gap-8">
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="impact.state === 'PASSED' ? 'bg-success text-on-success' : 'bg-danger text-on-danger'"
+                >
+                  {{ ('tplFunctions.validationStates.' + impact.state) | transloco }}
+                </span>
+                <span class="text-12 leading-18 text-text">
+                  {{ 'tplFunctions.impact.targetsEvaluated' | transloco: { count: impact.targets.length } }}
+                </span>
+              </div>
+
+              <div class="flex items-center gap-4 text-12 leading-18" [class]="isImpactExpired() ? 'text-danger-text' : 'text-text-muted'">
+                <ng-icon name="tablerClock" size="14" aria-hidden="true" />
+                @if (isImpactExpired()) {
+                  <span>{{ 'tplFunctions.impact.expired' | transloco }}</span>
+                } @else {
+                  <span>
+                    {{ 'tplFunctions.impact.validUntil' | transloco: { time: validUntilLabel() } }}
+                  </span>
+                }
+              </div>
+            </div>
+
+            @for (target of impact.targets; track target.templateId) {
+              <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card">
+                <div class="flex flex-wrap items-center justify-between gap-8">
+                  <div class="flex min-w-0 items-center gap-8">
+                    <span class="truncate text-13 leading-18 font-medium text-text">
+                      {{ targetDisplayName(target.templateId) }}
+                    </span>
+                    <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                      <bdi dir="ltr">{{ 'tplFunctions.usage.draftRevision' | transloco: { revision: target.draftRevision } }}</bdi>
+                    </span>
+                  </div>
+
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium"
+                    [class]="target.state === 'PASSED' ? 'bg-success text-on-success' : 'bg-danger text-on-danger'"
+                  >
+                    {{ ('tplFunctions.validationStates.' + target.state) | transloco }}
+                  </span>
+                </div>
+
+                @if (target.comparisons.length > 0) {
+                  <div class="flex flex-col gap-4">
+                    <div
+                      role="table"
+                      [attr.aria-label]="'tplFunctions.impact.comparisonsAria' | transloco"
+                    >
+                      <div
+                        role="row"
+                        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav grid-cols-tpl-function-impact-row"
+                      >
+                        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                          {{ 'tplFunctions.impact.table.node' | transloco }}
+                        </span>
+                        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                          {{ 'tplFunctions.impact.table.previous' | transloco }}
+                        </span>
+                        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                          {{ 'tplFunctions.impact.table.proposed' | transloco }}
+                        </span>
+                      </div>
+
+                      @for (comp of target.comparisons; track comp.nodeId + '-' + comp.formulaId) {
+                        <div
+                          role="row"
+                          class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-13 leading-18 text-text shadow-card grid-cols-tpl-function-impact-row"
+                        >
+                          <span role="cell" class="flex min-w-0 items-center px-10 text-12 text-text-muted">
+                            <bdi dir="ltr" class="truncate">{{ comp.nodeId.slice(-8) }}</bdi>
+                          </span>
+                          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                            <bdi dir="ltr" class="truncate rounded-6 bg-danger-soft px-6 text-12 font-medium text-on-danger-soft">
+                              {{ formatVal(comp.previous) }}
+                            </bdi>
+                          </span>
+                          <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                            <ng-icon name="tablerArrowRight" size="12" class="shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true" />
+                            <bdi dir="ltr" class="truncate rounded-6 bg-success-soft px-6 text-12 font-medium text-on-success-soft">
+                              {{ formatVal(comp.proposed) }}
+                            </bdi>
+                          </span>
+                        </div>
+                      }
+                    </div>
+
+                    @if (target.truncated) {
+                      <p class="text-11 leading-16 text-text-muted">
+                        {{ 'tplFunctions.impact.truncatedCount' | transloco: { shown: target.comparisons.length, total: target.totalComparisons } }}
+                      </p>
+                    }
+                  </div>
+                }
+
+                @if (target.issueCodes.length > 0) {
+                  <ul class="flex flex-col gap-4 border-t border-border pt-6">
+                    @for (code of target.issueCodes; track code) {
+                      <li class="flex items-start gap-6 text-12 leading-18 text-danger-text">
+                        <ng-icon name="tablerCircleX" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+                        <span>{{ issueText(code) }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </section>
+            }
+          </div>
+        }
+      }
+
+      @case ('apply') {
+        <div class="flex flex-col gap-10">
+          <div class="flex items-center justify-between gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8">
+            <span class="text-12 leading-18 font-medium text-text">
+              {{ 'tplFunctions.impact.applySummary' | transloco: { count: impactResult()?.targets?.length ?? 0, version: versionNumber() } }}
+            </span>
+            <span class="text-12 leading-18" [class]="isImpactExpired() ? 'text-danger-text' : 'text-text-muted'">
+              @if (isImpactExpired()) {
+                {{ 'tplFunctions.impact.expired' | transloco }}
+              } @else {
+                {{ 'tplFunctions.impact.validUntil' | transloco: { time: validUntilLabel() } }}
+              }
+            </span>
+          </div>
+
+          <ui-field
+            size="multiline"
+            [for]="uid + '-reason'"
+            [label]="'tplFunctions.impact.reasonLabel' | transloco"
+            [hint]="'tplFunctions.impact.reasonHint' | transloco"
+            [required]="true"
+            [count]="reason().length"
+            [max]="1000"
+            [error]="reasonError()"
+          >
+            <textarea
+              [id]="uid + '-reason'"
+              rows="3"
+              maxlength="1000"
+              class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="'tplFunctions.impact.reasonPlaceholder' | transloco"
+              [value]="reason()"
+              (input)="onReasonInput($event)"
+            ></textarea>
+          </ui-field>
+        </div>
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @switch (step()) {
+      @case ('targets') {
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [loading]="checking()"
+          [disabled]="selectedCount() === 0 || checking()"
+          (click)="runImpactCheck()"
+        >
+          {{ 'tplFunctions.impact.actions.checkImpact' | transloco }}
+        </button>
+        <button type="button" uiButton variant="ghost" [disabled]="checking()" (click)="close()">
+          {{ 'tplFunctions.actions.cancel' | transloco }}
+        </button>
+      }
+
+      @case ('results') {
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [disabled]="isImpactExpired() || impactResult()?.state === 'FAILED'"
+          (click)="goToApplyStep()"
+        >
+          {{ 'tplFunctions.impact.actions.continue' | transloco }}
+        </button>
+        <button type="button" uiButton variant="secondary" (click)="goPrevious()">
+          {{ 'tplFunctions.actions.previous' | transloco }}
+        </button>
+        <button type="button" uiButton variant="ghost" (click)="close()">
+          {{ 'tplFunctions.actions.cancel' | transloco }}
+        </button>
+      }
+
+      @case ('apply') {
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [loading]="applying()"
+          [disabled]="applying() || isImpactExpired()"
+          (click)="submitApply()"
+        >
+          {{ 'tplFunctions.impact.actions.apply' | transloco }}
+        </button>
+        <button type="button" uiButton variant="secondary" [disabled]="applying()" (click)="goPrevious()">
+          {{ 'tplFunctions.actions.previous' | transloco }}
+        </button>
+        <button type="button" uiButton variant="ghost" [disabled]="applying()" (click)="close()">
+          {{ 'tplFunctions.actions.cancel' | transloco }}
+        </button>
+      }
+    }
+
+    <span class="ms-auto text-12 leading-18 text-text-muted">
+      {{ 'tplFunctions.impact.stepCounter' | transloco: { current: currentStepNumber(), total: 3 } }}
+    </span>
+  </div>
+</ui-modal>

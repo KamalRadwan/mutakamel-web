@@ -1,0 +1,176 @@
+<div class="flex shrink-0 items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
+  @if (canManage) {
+    <button type="button" uiButton variant="primary" (click)="openNew()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      <span>{{ 'repSchedules.new' | transloco }}</span>
+    </button>
+  }
+
+  <div
+    class="flex h-field flex-1 items-center gap-4 overflow-hidden rounded-8 border border-border-field bg-surface-field ps-8 pe-2 text-12 text-text transition-colors duration-fast hover:border-border-field-hover focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+  >
+    <span class="inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerSearch" size="14" aria-hidden="true" />
+    </span>
+    <input
+      #searchInput
+      type="text"
+      autocomplete="off"
+      class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'repSchedules.search' | transloco"
+      [attr.aria-label]="'repSchedules.search' | transloco"
+      [value]="search()"
+      (input)="onSearchInput($event)"
+      (keydown.escape)="clearSearch()"
+    />
+    @if (search()) {
+      <button
+        type="button"
+        class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="'repSchedules.clearSearch' | transloco"
+        (click)="clearSearch(); searchInput.focus()"
+      >
+        <ng-icon name="tablerX" size="12" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="loading()"
+    [attr.aria-label]="'repSchedules.reload' | transloco"
+    [title]="'repSchedules.reload' | transloco"
+    (click)="load()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+  </button>
+</div>
+
+@if (loadError(); as errKind) {
+  <ui-full-state
+    [kind]="errKind"
+    [title]="(errKind === 'forbidden' ? 'repSchedules.forbiddenTitle' : 'analytics.common.loadFailed') | transloco"
+    [text]="errKind === 'forbidden' ? ('repSchedules.forbiddenText' | transloco) : ''"
+    [actionLabel]="errKind === 'load-failure' ? ('analytics.common.retry' | transloco) : ''"
+    (action)="load()"
+  />
+} @else if (!loading() && subscriptions().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerCalendarTime" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'repSchedules.empty' | transloco }}</p>
+  </div>
+} @else {
+  <ui-data-table
+    [columns]="columns()"
+    [rows]="filteredSubscriptions()"
+    [rowKey]="rowKey"
+    [loading]="loading()"
+    [rowClickable]="true"
+    [emptyText]="search().trim() ? ('analytics.common.noResults' | transloco) : ('repSchedules.empty' | transloco)"
+    [label]="'repSchedules.title' | transloco"
+    (rowClick)="openSchedule($event)"
+  >
+    <ng-template uiCell="name" let-row>
+      <span class="truncate text-13 font-medium text-text" dir="auto" [attr.title]="row.name">{{ row.name }}</span>
+    </ng-template>
+
+    <ng-template uiCell="target" let-row>
+      @let label = targetLabel(row);
+      <span class="flex min-w-0 items-center gap-8">
+        <span
+          class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+          [class]="targetTypeOf(row) === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-teal'"
+          aria-hidden="true"
+        >
+          <ng-icon [name]="targetTypeOf(row) === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerChartBar'" size="14" aria-hidden="true" />
+        </span>
+        <span class="truncate text-12 text-text" dir="auto" [attr.title]="label">{{ label }}</span>
+      </span>
+    </ng-template>
+
+    <ng-template uiCell="cadence" let-row>
+      @let cadence = cadenceLabel(row);
+      <span class="truncate text-12 text-text-muted" [attr.title]="cadence">{{ cadence }}</span>
+    </ng-template>
+
+    <ng-template uiCell="periodToken" let-row>
+      <span class="truncate text-12 text-text">{{ 'repSchedules.period.' + row.periodToken | transloco }}</span>
+    </ng-template>
+
+    <ng-template uiCell="recipients" let-row>
+      <ui-badge tone="count">{{ row.recipients.length }}</ui-badge>
+    </ng-template>
+
+    <ng-template uiCell="attachmentFormats" let-row>
+      @if (row.attachmentFormats.length === 0) {
+        <span class="truncate text-12 text-text-muted">{{ 'repSchedules.linkOnly' | transloco }}</span>
+      } @else {
+        <span class="flex min-w-0 flex-wrap items-center gap-4">
+          @for (fmt of row.attachmentFormats; track fmt) {
+            <ui-badge tone="tag">{{ fmt }}</ui-badge>
+          }
+        </span>
+      }
+    </ng-template>
+
+    <ng-template uiCell="nextRunAt" let-row>
+      <span class="truncate text-12 text-text-muted">{{ nextRunLabel(row) }}</span>
+    </ng-template>
+
+    <ng-template uiCell="state" let-row>
+      @let key = stateKey(row);
+      <ui-badge [tone]="stateTone(row)" [attr.title]="row.suspendedReason ? suspendedTooltip(row.suspendedReason) : null">
+        {{ 'repSchedules.state.' + key | transloco }}
+      </ui-badge>
+    </ng-template>
+
+    <ng-template uiCell="actions" let-row>
+      <div class="flex items-center justify-end" (click)="$event.stopPropagation()">
+        <ui-actions-menu
+          [items]="rowActionsFor(row)"
+          [label]="'repSchedules.columns.actions' | transloco"
+          (selected)="onRowAction(row, $event)"
+        />
+      </div>
+    </ng-template>
+  </ui-data-table>
+
+  @if (hasMore()) {
+    <div class="flex justify-center pt-4">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [loading]="loadingMore()"
+        (click)="loadMore()"
+      >
+        {{ 'repSchedules.loadMore' | transloco }}
+      </button>
+    </div>
+  }
+}
+
+<app-schedule-modal
+  [canManage]="canManage"
+  (saved)="onScheduleSaved($event)"
+  (reloaded)="onScheduleReloaded($event)"
+  (deletedRemotely)="onDeletedRemotely()"
+  (deleteRequested)="requestDelete($event)"
+/>
+
+<app-deliveries-modal />
+
+<ui-confirm-dialog
+  #deleteDialog
+  tone="danger"
+  [title]="'repSchedules.delete.title' | transloco"
+  [text]="'repSchedules.delete.text' | transloco: { name: pendingDelete()?.name ?? '' }"
+  [confirmLabel]="'analytics.common.delete' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>

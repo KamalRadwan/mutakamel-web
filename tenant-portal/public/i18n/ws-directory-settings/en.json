@@ -1,0 +1,71 @@
+{
+  "scope": {
+    "TENANT": "Whole workspace",
+    "BRANCH": "Same branch",
+    "PARTY_ROLE": "Parties with the same role"
+  },
+  "sections": {
+    "duplicates": {
+      "title": "Duplicate prevention"
+    },
+    "limits": {
+      "title": "Limits"
+    }
+  },
+  "duplicates": {
+    "scopeLabel": "Check duplicates within",
+    "scopeHint": "Where a phone number or email must be unique.",
+    "scopeHintBranch": "Where a phone number or email must be unique. Shared parties are checked across the workspace.",
+    "scopeDesc": {
+      "TENANT": "Two parties cannot share the same value anywhere in the workspace.",
+      "BRANCH": "Two parties in the same branch cannot share a value. Shared parties are checked across the workspace.",
+      "PARTY_ROLE": "Two parties with the same role, for example two suppliers, cannot share a value."
+    },
+    "emailLabel": "Block duplicate emails",
+    "emailHint": "Stops saving an email address that is already used by another party in the selected scope.",
+    "phoneLabel": "Block duplicate phone numbers",
+    "phoneHint": "Covers phone and mobile numbers.",
+    "whatsappLabel": "Block duplicate WhatsApp numbers",
+    "whatsappHint": "Stops saving a WhatsApp number that is already used by another party in the selected scope.",
+    "crmNote": "CRM leads and customers follow their own duplicate rules in CRM settings.",
+    "openCrmRules": "Open CRM duplicate rules"
+  },
+  "limits": {
+    "maxContactsLabel": "Most contact methods per party",
+    "maxAddressesLabel": "Most addresses per party",
+    "hint": "Lowering a limit does not remove existing entries. It only stops new ones."
+  },
+  "common": {
+    "on": "On",
+    "off": "Off"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "range": "Enter a whole number between {{min}} and {{max}}."
+  },
+  "toast": {
+    "saved": "Directory settings saved."
+  },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "text": "You have unsaved changes to directory settings. Save them before leaving?",
+    "save": "Save changes",
+    "discard": "Discard",
+    "cancel": "Stay"
+  },
+  "states": {
+    "forbiddenTitle": "Access restricted",
+    "forbiddenText": "You need the permission to manage directory settings for the whole workspace.",
+    "backHome": "Back to home",
+    "loadFailedTitle": "Could not load directory settings",
+    "loadFailedText": "Something went wrong while loading the settings. Try again.",
+    "supportRef": "Support reference"
+  },
+  "errors": {
+    "CORE_VALIDATION_FAILED": "Check the highlighted fields and try again.",
+    "DIRECTORY_SETTINGS_INVALID": "Directory settings are invalid.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "You need the permission to manage directory settings for the whole workspace.",
+    "BRANCH_PERMISSION_DENIED": "You do not have permission for this action.",
+    "PERMISSION_SCOPE_UNAVAILABLE": "Permission scope resolution is unavailable. Try again."
+  }
+}

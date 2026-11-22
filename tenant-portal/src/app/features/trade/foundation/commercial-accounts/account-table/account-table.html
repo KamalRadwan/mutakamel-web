@@ -1,0 +1,242 @@
+<div class="overflow-x-auto pb-4">
+  <div
+    role="table"
+    class="min-w-doc-table-min"
+    [attr.aria-label]="'tradeAccounts.title' | transloco"
+    [attr.aria-busy]="loading()"
+  >
+    <div
+      role="row"
+      [class]="gridClass() + ' bg-nav-gradient h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav'"
+    >
+      @if (showSelection()) {
+        <span role="columnheader" class="flex items-center justify-center">
+          <span class="relative inline-flex size-checkbox-size items-center justify-center">
+            <ui-checkbox
+              #pageCb
+              [checked]="pageState() === 'all'"
+              [attr.aria-label]="'tradeAccounts.table.selectPage' | transloco"
+              [attr.aria-checked]="pageState() === 'some' ? 'mixed' : (pageState() === 'all' ? 'true' : 'false')"
+              (checkedChange)="togglePage(pageCb)"
+            >
+              <span class="sr-only">{{ 'tradeAccounts.table.selectPage' | transloco }}</span>
+            </ui-checkbox>
+            @if (pageState() === 'some') {
+              <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
+                <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
+              </span>
+            }
+          </span>
+        </span>
+      }
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center truncate px-10"
+        [class.border-s]="showSelection()"
+        [class.border-on-nav-line]="showSelection()"
+      >
+        {{ 'tradeAccounts.table.party' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeAccounts.table.role' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeAccounts.table.creditLimit' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeAccounts.table.priceBook' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeAccounts.table.status' | transloco }}
+      </span>
+      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+        {{ 'tradeAccounts.table.updated' | transloco }}
+      </span>
+      @if (canManage()) {
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'tradeAccounts.table.actions' | transloco }}</span>
+        </span>
+      }
+    </div>
+
+    @if (loading()) {
+      @for (row of skeletonRows; track row) {
+        <div
+          role="row"
+          aria-hidden="true"
+          [class]="gridClass() + ' mt-6 h-table-row rounded-10 border border-border bg-surface shadow-card'"
+        >
+          @if (showSelection()) {
+            <span role="cell" class="flex items-center justify-center">
+              <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
+            </span>
+          }
+          <span
+            role="cell"
+            class="flex min-w-0 items-center gap-8 px-10"
+            [class.border-s]="showSelection()"
+            [class.border-border]="showSelection()"
+          >
+            <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+            <span class="flex min-w-0 flex-1 flex-col gap-3">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/3 rounded-6 bg-neutral-soft"></span>
+            </span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
+          </span>
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+          </span>
+          @if (canManage()) {
+            <span role="cell" class="flex items-center justify-center border-s border-border">
+              <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
+            </span>
+          }
+        </div>
+      }
+    } @else {
+      @for (account of accounts(); track account.id) {
+        @let partyType = account.party?.partyType ?? 'ORGANIZATION';
+        @let name = partyName(account);
+        @let reason = blockReasonTitle(account);
+        <div
+          role="row"
+          tabindex="0"
+          [attr.aria-label]="name"
+          [class]="
+            gridClass() +
+            ' mt-6 h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong ' +
+            (isSelected(account.id) ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover')
+          "
+          [attr.aria-selected]="showSelection() ? isSelected(account.id) : null"
+          (click)="open.emit(account)"
+          (keydown)="onRowKeydown($event, account)"
+        >
+          @if (showSelection()) {
+            <span
+              role="cell"
+              class="flex items-center justify-center"
+              (click)="onSelectCellClick($event, account, rowCb)"
+            >
+              <ui-checkbox
+                #rowCb
+                [checked]="isSelected(account.id)"
+                [attr.aria-label]="'tradeAccounts.table.selectRow' | transloco: { name: name }"
+                (click)="onRowCheckboxClick($event)"
+                (checkedChange)="onRowCheckedChange(account, rowCb)"
+              >
+                <span class="sr-only">{{ 'tradeAccounts.table.selectRow' | transloco: { name: name } }}</span>
+              </ui-checkbox>
+            </span>
+          }
+
+          <span
+            role="cell"
+            class="flex min-w-0 items-center gap-8 px-10"
+            [class.border-s]="showSelection()"
+            [class.border-border]="showSelection()"
+          >
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="partyType === 'INDIVIDUAL' ? 'bg-icon-teal' : 'bg-icon-blue'"
+              [title]="partyTypeLabel(account)"
+            >
+              <ng-icon [name]="partyType === 'INDIVIDUAL' ? 'tablerUser' : 'tablerBuilding'" size="14" aria-hidden="true" />
+            </span>
+            <span class="flex min-w-0 flex-1 flex-col justify-center">
+              <button
+                type="button"
+                class="cursor-pointer truncate text-start text-13 leading-18 font-medium text-text outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                (click)="$event.stopPropagation(); open.emit(account)"
+              >
+                {{ name }}
+              </button>
+              <span class="truncate text-11 leading-16 text-text-muted">
+                <span>{{ partyTypeLabel(account) }}</span>
+                @if (account.party?.code; as code) {
+                  <span> · </span>
+                  <bdi dir="ltr" class="tabular-nums">{{ code }}</bdi>
+                }
+              </span>
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span
+              class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+              [class]="account.accountRole === 'CUSTOMER' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text'"
+            >
+              {{ roleKey[account.accountRole] | transloco }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            @if (account.accountRole === 'SUPPLIER') {
+              <span class="truncate text-text-muted">—</span>
+            } @else if (account.creditLimit === null) {
+              <span class="truncate text-text-muted">{{ 'tradeAccounts.unlimited' | transloco }}</span>
+            } @else {
+              <bdi dir="ltr" class="truncate tabular-nums">{{ formatMoney(account.creditCurrencyCode, account.creditLimit) }}</bdi>
+            }
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span class="truncate" [class]="account.priceBookId ? 'text-text' : 'text-text-muted'">
+              {{ priceBookLabel(account) }}
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            @if (reason) {
+              <span class="flex min-w-0 flex-col justify-center">
+                <span
+                  [class]="badgeClass.danger + ' self-start'"
+                  [attr.title]="reason"
+                >
+                  {{ statusKey[account.status] | transloco }}
+                </span>
+                <span class="truncate text-11 leading-16 text-text-muted" [title]="reason">
+                  {{ reason }}
+                </span>
+              </span>
+            } @else {
+              <span [class]="account.status === 'ACTIVE' ? badgeClass.success : badgeClass.danger">
+                {{ statusKey[account.status] | transloco }}
+              </span>
+            }
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <bdi class="truncate text-12 text-text-muted">{{ formatDate(account.updatedAt, language()) }}</bdi>
+          </span>
+
+          @if (canManage()) {
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border"
+              (click)="$event.stopPropagation()"
+              (keydown.enter)="$event.stopPropagation()"
+            >
+              <ui-actions-menu
+                [items]="actionsFor(account)"
+                [label]="'tradeAccounts.table.actions' | transloco"
+                (selected)="onAction(account, $event)"
+              />
+            </span>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>

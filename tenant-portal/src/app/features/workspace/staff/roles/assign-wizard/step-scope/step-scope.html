@@ -1,0 +1,237 @@
+<ui-field
+  size="bare"
+  [label]="'perm.s1.companies' | transloco"
+  [for]="uid + '-companies'"
+  [required]="true"
+  [hint]="'perm.s1.companiesHint' | transloco"
+>
+  <div
+    #companyTrigger
+    [id]="uid + '-companies'"
+    role="combobox"
+    [attr.tabindex]="readonly() ? -1 : 0"
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="companyMenuOpen()"
+    [attr.aria-label]="'perm.s1.companies' | transloco"
+    [attr.aria-describedby]="uid + '-companies-hint'"
+    [attr.aria-disabled]="readonly() ? 'true' : null"
+    class="flex min-h-field flex-wrap items-center gap-4 rounded-8 border bg-surface-field px-8 py-2 text-12 outline-none transition-colors duration-fast"
+    [class]="
+      readonly()
+        ? 'cursor-default border-border-field text-text'
+        : companyMenuOpen()
+          ? 'cursor-pointer border-focus-ring text-text ring-3 ring-focus-halo'
+          : 'cursor-pointer border-border-field text-text hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+    "
+    (click)="toggleCompanyMenu()"
+    (keydown.enter)="$event.preventDefault(); toggleCompanyMenu()"
+    (keydown.space)="$event.preventDefault(); toggleCompanyMenu()"
+  >
+    @if (selectedCompanies().length === 0) {
+      <span class="min-w-0 flex-1 truncate text-text-placeholder">
+        {{ 'perm.s1.companiesPlaceholder' | transloco }}
+      </span>
+    } @else {
+      @for (company of selectedCompanies(); track company.id) {
+        <span class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft">
+          <span class="truncate">{{ company.name }}</span>
+          @if (!readonly()) {
+            <button
+              type="button"
+              class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'perm.s1.removeCompany' | transloco: { name: company.name }"
+              [title]="'perm.s1.removeCompany' | transloco: { name: company.name }"
+              (click)="$event.stopPropagation(); onCompanyChipRemove(company.id)"
+            >
+              <ng-icon name="tablerX" size="12" aria-hidden="true" />
+            </button>
+          }
+        </span>
+      }
+      <span class="flex-1"></span>
+    }
+
+    <span class="ms-auto inline-flex shrink-0 text-text-muted">
+      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+    </span>
+  </div>
+</ui-field>
+
+@if (companyMenuOpen() && !readonly()) {
+  <ul
+    #companyList
+    role="listbox"
+    aria-multiselectable="true"
+    class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!menuPlaced()"
+    [style.top.px]="menuPlace().top"
+    [style.inset-inline-start.px]="menuPlace().start"
+    [style.min-width.px]="menuPlace().width"
+    [style.max-height.px]="menuPlace().maxHeight"
+    [attr.aria-label]="'perm.s1.companies' | transloco"
+  >
+    @if (companies().length === 0) {
+      <li role="presentation" class="flex h-menu-item items-center px-8 text-12 text-text-muted">
+        {{ 'perm.s1.noCompanies' | transloco }}
+      </li>
+    } @else {
+      @for (company of companies(); track company.id) {
+        @let selected = isCompanySelected(company.id);
+        @let disabledOpt = isCompanyOptionDisabled(company);
+        <li
+          role="option"
+          [attr.aria-selected]="selected"
+          [attr.aria-disabled]="disabledOpt ? 'true' : null"
+        >
+          <button
+            type="button"
+            class="flex h-menu-item w-full items-center justify-between gap-8 rounded-6 px-8 text-12 whitespace-nowrap outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              disabledOpt
+                ? 'cursor-not-allowed text-text-placeholder opacity-drag-source'
+                : selected
+                  ? 'cursor-pointer bg-brand-soft text-on-brand-soft'
+                  : 'cursor-pointer text-text hover:bg-row-hover'
+            "
+            [disabled]="disabledOpt"
+            (click)="onCompanyOptionClick(company)"
+          >
+            <span class="flex min-w-0 items-center gap-6">
+              <span class="truncate">{{ company.name }}</span>
+              <span class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft" dir="ltr">
+                {{ company.code }}
+              </span>
+              @if (company.status !== 'ACTIVE') {
+                <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+                  {{ 'perm.s1.inactive' | transloco }}
+                </span>
+              }
+            </span>
+            @if (selected) {
+              <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+            }
+          </button>
+        </li>
+      }
+    }
+  </ul>
+}
+
+<ui-field
+  size="bare"
+  [for]="uid + '-branches'"
+  [label]="'perm.s1.branches' | transloco"
+  [required]="true"
+  [hint]="'perm.s1.branchesHint' | transloco"
+  [error]="branchError()"
+>
+  @if (companyGroups().length === 0) {
+    <div
+      [id]="uid + '-branches'"
+      role="group"
+      [attr.aria-label]="'perm.s1.branches' | transloco"
+      [attr.aria-describedby]="uid + '-branches-hint' + (branchError() ? ' ' + uid + '-branches-error' : '')"
+      class="rounded-10 border border-border bg-surface-muted p-12 text-center text-12 text-text-muted"
+    >
+      {{ 'perm.s1.chooseCompanyFirst' | transloco }}
+    </div>
+  } @else {
+    <div
+      [id]="uid + '-branches'"
+      role="group"
+      [attr.aria-label]="'perm.s1.branches' | transloco"
+      [attr.aria-describedby]="uid + '-branches-hint' + (branchError() ? ' ' + uid + '-branches-error' : '')"
+      class="flex flex-col gap-10 rounded-10 border bg-surface p-8"
+      [class]="branchError() ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border'"
+    >
+      @for (group of companyGroups(); track group.company.id) {
+        <section class="flex flex-col gap-4">
+          <header class="flex items-center justify-between gap-8 border-b border-border pb-4">
+            <span class="min-w-0 truncate text-12 leading-18 font-medium text-text">
+              {{ group.company.name }}
+            </span>
+            @if (!readonly() && group.activeBranches.length > 0) {
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                (click)="selectAllCompanyBranches.emit(group.company.id)"
+              >
+                {{ (group.allActiveSelected ? 'perm.s1.deselectAll' : 'perm.s1.selectAll') | transloco }}
+              </button>
+            }
+          </header>
+
+          @if (autoSelectedCompanyIds().has(group.company.id)) {
+            <p class="text-11 leading-16 text-text-muted">
+              {{ 'perm.s1.onlyEligible' | transloco }}
+            </p>
+          }
+
+          @if (group.branches.length === 0) {
+            <p class="px-6 py-4 text-12 text-text-muted">
+              {{ 'perm.s1.noBranchesInCompany' | transloco }}
+            </p>
+          } @else {
+            <div class="flex flex-col">
+              @for (branch of group.branches; track branch.id) {
+                @let selected = isBranchSelected(branch.id);
+                @let inactive = isBranchInactive(branch);
+                @let disabled = isBranchDisabled(branch);
+
+                <div
+                  class="flex h-menu-item items-center gap-8 rounded-6 px-6 transition-colors duration-fast"
+                  [class]="disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-row-hover'"
+                  [attr.title]="!selected && atBranchLimit() && !readonly() ? ('perm.s1.maxBranches' | transloco: { max: maxBranches() }) : null"
+                  (click)="!disabled ? toggleBranch.emit(branch.id) : null"
+                >
+                  <span
+                    class="relative inline-flex min-w-0 flex-1 items-center"
+                    [class.opacity-drag-source]="disabled"
+                    [attr.inert]="disabled ? '' : null"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <ui-checkbox
+                      class="flex min-w-0 flex-1"
+                      [checked]="selected"
+                      (checkedChange)="toggleBranch.emit(branch.id)"
+                    >
+                      <span
+                        class="truncate text-12 leading-18"
+                        [class]="inactive ? 'text-text-muted' : 'text-text'"
+                        [title]="branch.name"
+                      >
+                        {{ branch.name }}
+                      </span>
+                    </ui-checkbox>
+                  </span>
+
+                  <span
+                    class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft"
+                    dir="ltr"
+                  >
+                    {{ branch.code }}
+                  </span>
+
+                  @if (inactive) {
+                    <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+                      {{ 'perm.s1.inactive' | transloco }}
+                    </span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </section>
+      }
+    </div>
+  }
+
+  <div class="mt-2 flex items-center justify-between gap-8 text-11 leading-16 text-text-muted">
+    <span>{{ branchCountText() }}</span>
+    @if (atBranchLimit() && !readonly()) {
+      <span class="text-warning-text">{{ 'perm.s1.maxBranches' | transloco: { max: maxBranches() } }}</span>
+    }
+  </div>
+</ui-field>

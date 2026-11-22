@@ -1,0 +1,96 @@
+{
+  "toolbar": {
+    "label": "Items toolbar",
+    "new": "New item",
+    "searchPlaceholder": "Search by code, barcode or name",
+    "scopeLabel": "List scope",
+    "scopeHint": "Catalogue: every item. This company: items enabled for the top-bar company, with prices.",
+    "scope": {
+      "catalogue": "Catalogue",
+      "company": "This company"
+    }
+  },
+  "views": {
+    "label": "Change view",
+    "board": "Board",
+    "cards": "Cards",
+    "table": "Table"
+  },
+  "sort": {
+    "label": "Sort by",
+    "created": "Newest first",
+    "updated": "Recently updated",
+    "code": "Code A–Z",
+    "name": "Name A–Z"
+  },
+  "facets": {
+    "text": "Code, barcode or name",
+    "kind": "Kind",
+    "purpose": "Use",
+    "purposeSales": "Can sell",
+    "purposePurchase": "Can purchase",
+    "category": "Category",
+    "image": "Image",
+    "imageYes": "Has image",
+    "imageNo": "No image"
+  },
+  "steps": {
+    "label": "Filter by status",
+    "hint": "Filter the items by status",
+    "all": "All"
+  },
+  "board": {
+    "loadMore": "Load more ({{shown}} of {{total}})",
+    "allShown": "All {{total}} shown",
+    "empty": "No items in this status",
+    "add": "Add item",
+    "collapse": "Collapse {{status}}",
+    "expand": "Expand {{status}}",
+    "illegal": "{{from}} items cannot move to {{to}}"
+  },
+  "table": {
+    "label": "Items",
+    "image": "Image",
+    "name": "Name",
+    "kind": "Kind",
+    "category": "Category",
+    "baseUnit": "Base unit",
+    "price": "Price",
+    "selectPage": "Select all items on this page",
+    "selectRow": "Select {{name}}"
+  },
+  "card": {
+    "sell": "Sell",
+    "buy": "Buy",
+    "pos": "POS"
+  },
+  "actions": {
+    "label": "Actions for {{name}}",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "discontinue": "Discontinue",
+    "copyCode": "Copy code",
+    "copied": "Code copied"
+  },
+  "discontinue": {
+    "title": "Discontinue {{name}}?",
+    "text": "A discontinued item cannot be sold or bought again. This cannot be undone."
+  },
+  "conflict": {
+    "title": "This item changed",
+    "text": "Someone else changed it.",
+    "keep": "Keep my changes"
+  },
+  "empty": {
+    "title": "No items yet",
+    "company": "No items are enabled for {{company}} yet.",
+    "filtered": "No items match your search",
+    "clear": "Clear search"
+  },
+  "error": {
+    "load": "The items could not be loaded."
+  },
+  "pagination": {
+    "label": "Items pages"
+  }
+}

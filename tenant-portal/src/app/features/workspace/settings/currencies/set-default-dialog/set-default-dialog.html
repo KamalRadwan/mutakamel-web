@@ -1,0 +1,60 @@
+<ui-modal
+  size="confirm"
+  icon="tablerStar"
+  tile="bg-icon-orange"
+  [title]="'wsCurrencies.setDefault.title' | transloco: { code: target()?.code ?? '' }"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onClosed()"
+>
+  @if (target(); as row) {
+    <div class="flex flex-col gap-8">
+      <p class="text-12 leading-18 text-text">
+        {{ 'wsCurrencies.setDefault.text' | transloco: { old: current()?.code ?? '—', code: row.code } }}
+      </p>
+
+      <div class="flex flex-col gap-2 rounded-8 border border-border bg-surface-muted px-10 py-8">
+        <span class="text-11 leading-16 text-text-muted">
+          {{ 'wsCurrencies.setDefault.storedRate' | transloco }}
+        </span>
+        <span dir="ltr" class="text-13 leading-18 font-medium tabular-nums text-text">
+          @if (row.exchangeRate !== null) {
+            1 {{ current()?.code ?? '—' }} = {{ row.exchangeRate }} {{ row.code }}
+          } @else {
+            —
+          }
+        </span>
+      </div>
+
+      <app-settings-notice tone="warning">
+        {{ 'wsCurrencies.setDefault.rebase' | transloco: { code: row.code } }}
+      </app-settings-notice>
+
+      <p class="text-11 leading-16 text-text-muted">
+        {{ 'wsCurrencies.setDefault.noPreview' | transloco }}
+      </p>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="saving()"
+      [disabled]="saving()"
+      (click)="confirm()"
+    >
+      {{ 'wsCurrencies.setDefault.confirm' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="saving()"
+      (click)="close()"
+    >
+      {{ 'settings.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

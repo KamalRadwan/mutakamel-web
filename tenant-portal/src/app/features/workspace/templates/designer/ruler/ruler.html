@@ -1,0 +1,44 @@
+<svg
+  #svgEl
+  class="block h-full w-full text-text-muted"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  @if (orientation() === 'H') {
+    @for (t of ticks(); track t.pos) {
+      <line
+        [attr.x1]="t.pos"
+        [attr.x2]="t.pos"
+        [attr.y1]="t.major ? 2 : t.minor5 ? 9 : 12"
+        y2="16"
+        class="stroke-border-field"
+        stroke-width="1"
+      />
+      @if (t.label !== null) {
+        <text
+          [attr.x]="t.pos + 3"
+          y="11"
+          class="fill-text-muted text-11 tabular-nums"
+        >{{ t.label }}</text>
+      }
+    }
+  } @else {
+    @for (t of ticks(); track t.pos) {
+      <line
+        x2="16"
+        [attr.x1]="t.major ? 2 : t.minor5 ? 9 : 12"
+        [attr.y1]="t.pos"
+        [attr.y2]="t.pos"
+        class="stroke-border-field"
+        stroke-width="1"
+      />
+      @if (t.label !== null) {
+        <text
+          x="11"
+          [attr.y]="t.pos - 3"
+          [attr.transform]="'rotate(-90, 11, ' + (t.pos - 3) + ')'"
+          class="fill-text-muted text-11 tabular-nums"
+        >{{ t.label }}</text>
+      }
+    }
+  }
+</svg>

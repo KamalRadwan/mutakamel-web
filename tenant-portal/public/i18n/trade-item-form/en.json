@@ -1,0 +1,293 @@
+{
+  "fields": {
+    "kind": {
+      "label": "Kind",
+      "hint": "Fixed after creation."
+    },
+    "status": {
+      "label": "Status",
+      "hint": "Draft is not sold; Discontinued is final."
+    },
+    "category": {
+      "label": "Category",
+      "hint": "Active categories only."
+    },
+    "owner": {
+      "label": "Owner",
+      "hint": "Keeps this item's data current."
+    },
+    "baseUnit": {
+      "label": "Base unit",
+      "hint": "Stock and prices use it; fixed."
+    },
+    "code": {
+      "label": "Code",
+      "hint": "Latin letters, digits, . - _ up to 80; capitals; fixed."
+    },
+    "nameEn": {
+      "label": "Name (English)",
+      "hint": "Up to 200 characters."
+    },
+    "nameAr": {
+      "label": "Name (Arabic)",
+      "hint": "Up to 200 characters."
+    },
+    "barcode": {
+      "label": "Barcode",
+      "hint": "Unique, up to 128."
+    },
+    "image": {
+      "label": "Image",
+      "hint": "PNG, JPEG or WebP, ≤10 MB, ≥32 px."
+    },
+    "component": {
+      "label": "Component",
+      "hint": "An active product."
+    },
+    "quantity": {
+      "label": "Quantity",
+      "hint": "Base units per combo."
+    },
+    "order": {
+      "label": "Order",
+      "hint": "Different per row."
+    },
+    "optionalProduct": {
+      "label": "Optional product",
+      "hint": "Suggested with this item."
+    },
+    "weightKg": {
+      "label": "Weight (kg)",
+      "hint": "Per base unit, above zero."
+    },
+    "volumeM3": {
+      "label": "Volume (m³)",
+      "hint": "Per base unit, above zero."
+    },
+    "quotationText": {
+      "label": "Quotation text",
+      "hint": "Printed on that document."
+    },
+    "salesOrderText": {
+      "label": "Sales order text",
+      "hint": "Printed on that document."
+    },
+    "receiptText": {
+      "label": "Receipt text",
+      "hint": "Printed on that document."
+    },
+    "deliveryText": {
+      "label": "Delivery order text",
+      "hint": "Printed on that document."
+    },
+    "notes": {
+      "label": "Notes",
+      "hint": "Internal."
+    },
+    "canSell": {
+      "label": "Can sell",
+      "hint": "This company sells it."
+    },
+    "canPurchase": {
+      "label": "Can purchase",
+      "hint": "This company buys it."
+    },
+    "canPos": {
+      "label": "Sell at POS",
+      "hint": "Needs Can sell."
+    },
+    "trackInventory": {
+      "label": "Track inventory",
+      "hint": "Not for services or combos."
+    },
+    "trackingMode": {
+      "label": "Tracking mode",
+      "hint": "Locked after the first stock movement."
+    },
+    "defaultSalesUnit": {
+      "label": "Default sales unit",
+      "hint": "Empty means the base unit."
+    },
+    "defaultPurchaseUnit": {
+      "label": "Default purchase unit",
+      "hint": "Empty means the base unit."
+    },
+    "salesPrice": {
+      "label": "Sales price",
+      "hint": "Per base unit, before tax."
+    },
+    "currency": {
+      "label": "Currency",
+      "hint": "The company currency."
+    },
+    "salesTax": {
+      "label": "Sales tax",
+      "hint": "Company or global taxes."
+    },
+    "purchaseTax": {
+      "label": "Purchase tax",
+      "hint": "Company or global taxes."
+    },
+    "taxClassificationKey": {
+      "label": "Tax classification key",
+      "hint": "For tax reports."
+    },
+    "accountingMappingKey": {
+      "label": "Accounting mapping key",
+      "hint": "For accounting posting."
+    },
+    "profileStatus": {
+      "label": "Profile status",
+      "hint": "Active after the first save."
+    },
+    "standardCost": {
+      "label": "Standard cost",
+      "hint": "Per base unit; cost viewers only."
+    },
+    "isAssorted": {
+      "label": "Sold in this branch",
+      "hint": "Shown in its lists."
+    },
+    "fulfilmentNode": {
+      "label": "Default fulfilment node",
+      "hint": "Fulfils this branch's orders."
+    },
+    "replenishmentKey": {
+      "label": "Replenishment policy key",
+      "hint": "Refill policy code."
+    },
+    "listingScope": {
+      "label": "Listing scope",
+      "hint": "Company or top-bar branch."
+    },
+    "channel": {
+      "label": "Channel",
+      "hint": "An active channel."
+    },
+    "publicationStatus": {
+      "label": "Publication status",
+      "hint": "Only Published sells."
+    }
+  },
+  "sections": {
+    "classification": "Item classification",
+    "identity": "Identity",
+    "image": "Image",
+    "combo": "Combo components",
+    "optional": "Optional products",
+    "more": "More details",
+    "standardCost": "Standard cost",
+    "addListing": "Add listing"
+  },
+  "modal": {
+    "title": "Item",
+    "newTitle": "New item",
+    "position": "{{n}} of {{total}}"
+  },
+  "nav": {
+    "back": "Back to items",
+    "prev": "Previous item",
+    "next": "Next item"
+  },
+  "actions": {
+    "create": "Create item",
+    "createAnother": "Save and add another",
+    "full": "Continue in full page",
+    "addComponent": "Add component",
+    "addOptional": "Add optional product",
+    "remove": "Remove",
+    "enable": "Enable for this company",
+    "addBranch": "Add to this branch",
+    "addListing": "Add listing",
+    "publish": "Publish",
+    "toDraft": "Move to draft",
+    "retire": "Retire",
+    "confirmKindChange": "Change kind"
+  },
+  "tabs": {
+    "label": "Item sections",
+    "overview": "Overview",
+    "company": "Company profile",
+    "branch": "Branch",
+    "channels": "Channels",
+    "hasErrors": "This tab has errors"
+  },
+  "codePreview": "Saved as {{code}}",
+  "profile": {
+    "heading": "Profile for {{company}}",
+    "none": "Not enabled for {{company}}."
+  },
+  "branch": {
+    "heading": "{{branch}} · {{company}}",
+    "none": "Not added to {{branch}}."
+  },
+  "listing": {
+    "company": "Company-wide"
+  },
+  "reasons": {
+    "needProfile": "Enable the item for this company first.",
+    "activateFirst": "Activate the item first.",
+    "needSell": "Turn on Can sell first.",
+    "needPos": "Turn on Sell at POS first.",
+    "notLinked": "Not linked to this branch.",
+    "listed": "Already listed.",
+    "inactive": "Inactive channel.",
+    "noTracking": "Services and combos have no stock.",
+    "locked": "Locked: stock already moved.",
+    "noCurrency": "Set a company currency first."
+  },
+  "validation": {
+    "required": "Required.",
+    "codePattern": "Latin letters, digits, . - _ only.",
+    "nameOne": "Enter an English or Arabic name.",
+    "decimal": "Up to 8 decimals.",
+    "positive": "Above zero.",
+    "noNegative": "Zero or above.",
+    "maxLength": "Up to {{max}} characters.",
+    "comboMin": "Add a component.",
+    "duplicate": "Already used.",
+    "orderInvalid": "Whole number from 0 to 10000.",
+    "comboInactive": "Components must be active products.",
+    "imageSmall": "At least 32 px.",
+    "imageType": "PNG, JPEG or WebP.",
+    "imageSize": "Over 10 MB."
+  },
+  "toast": {
+    "saved": "Item saved",
+    "created": "Item created",
+    "imageFailed": "Item created; the image was not uploaded.",
+    "scopeChanged": "Scope changed; unsaved profile changes were discarded.",
+    "listingSaved": "Listing saved",
+    "imageSaved": "Image updated",
+    "imageRemoved": "Image removed",
+    "statusChanged": "Status updated"
+  },
+  "removeImage": "Remove the image?",
+  "removeImageText": "The item image will be removed.",
+  "kindChange": "Change the kind? Combo rows will be cleared.",
+  "kindChangeText": "Changing the kind will clear the combo rows.",
+  "unsaved": {
+    "title": "Save changes?",
+    "text": "You have unsaved changes. Save them before leaving?",
+    "discard": "Discard"
+  },
+  "states": {
+    "notFound": "Item not found.",
+    "loadFailed": "The item could not be loaded.",
+    "noListings": "No listings here.",
+    "noOwner": "No owner",
+    "noTax": "No tax",
+    "none": "None",
+    "noImage": "No image",
+    "dropTitle": "Drop an image here",
+    "dropHint": "PNG, JPEG or WebP, up to 10 MB, at least 32 px.",
+    "noComponents": "No components added yet.",
+    "noOptionals": "No optional products added."
+  },
+  "table": {
+    "label": "Channel listings",
+    "channel": "Channel",
+    "type": "Type",
+    "listingActions": "Actions for {{name}}"
+  }
+}

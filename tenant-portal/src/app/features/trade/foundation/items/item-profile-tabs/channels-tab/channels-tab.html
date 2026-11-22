@@ -1,0 +1,225 @@
+<div class="flex flex-col gap-10">
+  <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+    <div class="flex flex-wrap items-center justify-between gap-8">
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope'"
+        [label]="'itemForm.fields.listingScope.label' | transloco"
+        [hint]="'itemForm.fields.listingScope.hint' | transloco"
+      >
+        <ui-segmented
+          [id]="uid + '-scope'"
+          [label]="'itemForm.fields.listingScope.label' | transloco"
+          [describedBy]="uid + '-scope-hint'"
+          [options]="scopeOptions()"
+          [value]="listingScope()"
+          (valueChange)="setListingScope($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (loadFailed()) {
+      <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-13 leading-18 text-text-muted">{{ 'tradeShared.common.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="primary" (click)="reload()">
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="min-w-doc-table-min"
+          [attr.aria-label]="'itemForm.table.label' | transloco"
+          [attr.aria-busy]="loading()"
+        >
+          <div
+            role="row"
+            class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+            [class]="tableCols"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'itemForm.table.channel' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'itemForm.table.type' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tradeShared.common.status' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'tradeShared.common.updated' | transloco }}
+            </span>
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'tradeShared.common.actions' | transloco }}</span>
+            </span>
+          </div>
+
+          @if (loading()) {
+            @for (row of skeletonRows; track row) {
+              <div
+                role="row"
+                aria-hidden="true"
+                class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+                [class]="tableCols"
+              >
+                <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                  <span class="size-icon-tile-sm shrink-0 motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+                  <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="h-badge w-1/2 motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+                </span>
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-btn-h-sm motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+                </span>
+              </div>
+            }
+          } @else if (listings().length === 0) {
+            <div class="mt-6 flex flex-col items-center justify-center gap-6 rounded-10 border border-dashed border-border-field p-16 text-center">
+              <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+                <ng-icon name="tablerBroadcast" size="18" aria-hidden="true" />
+              </span>
+              <p class="text-12 leading-18 text-text-muted">{{ 'itemForm.states.noListings' | transloco }}</p>
+            </div>
+          } @else {
+            @for (listing of listings(); track listing.id) {
+              @let tile = tileFor(listing);
+              <div
+                role="row"
+                class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+                [class]="tableCols"
+              >
+                <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+                  <span
+                    class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                    [class]="tile.tile"
+                    aria-hidden="true"
+                  >
+                    <ng-icon [name]="tile.icon" size="14" />
+                  </span>
+                  <span class="flex min-w-0 flex-col">
+                    <span dir="auto" class="truncate text-13 leading-18 font-medium text-text">
+                      {{ channelName(listing) }}
+                    </span>
+                    <bdi dir="ltr" class="truncate text-11 leading-16 text-text-muted tabular-nums">
+                      {{ channelCode(listing) }}
+                    </bdi>
+                  </span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="truncate text-13 text-text">{{ channelTypeLabel(listing) }}</span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span [class]="statusBadgeClass(listing.publicationStatus)">
+                    {{ statusKey[listing.publicationStatus] | transloco }}
+                  </span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <bdi class="truncate text-13 text-text-muted tabular-nums">{{ updatedText(listing) }}</bdi>
+                </span>
+
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  @if (!readonly()) {
+                    <ui-actions-menu
+                      [items]="actionsFor(listing)"
+                      [label]="menuLabel(listing)"
+                      (selected)="onListingAction(listing, $event)"
+                    />
+                  }
+                </span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  </section>
+
+  @if (!readonly()) {
+    <section
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+      [attr.title]="globalAddReason()"
+    >
+      <ui-section-bar tone="blue" icon="tablerPlus" [title]="'itemForm.sections.addListing' | transloco" />
+
+      <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 desktop:grid-cols-3">
+        <ui-field
+          size="bare"
+          [for]="uid + '-channel'"
+          [label]="'itemForm.fields.channel.label' | transloco"
+          [hint]="'itemForm.fields.channel.hint' | transloco"
+          [hintText]="globalAddReason()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-channel'"
+            [label]="'itemForm.fields.channel.label' | transloco"
+            [describedBy]="uid + '-channel-hint'"
+            [options]="channelOptions()"
+            [disabled]="addRowDisabled() || channelOptions().length === 0"
+            [value]="selectedChannelId()"
+            (valueChange)="selectedChannelId.set($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          size="bare"
+          [for]="uid + '-pub-status'"
+          [label]="'itemForm.fields.publicationStatus.label' | transloco"
+          [hint]="'itemForm.fields.publicationStatus.hint' | transloco"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-pub-status'"
+            [label]="'itemForm.fields.publicationStatus.label' | transloco"
+            [describedBy]="uid + '-pub-status-hint'"
+            [options]="publicationOptions()"
+            [disabled]="addRowDisabled()"
+            [value]="selectedPublicationStatus()"
+            (valueChange)="selectedPublicationStatus.set($event)"
+          />
+        </ui-field>
+
+        <div class="flex items-center desktop:mt-label desktop:pt-2">
+          <button
+            type="button"
+            uiButton
+            variant="primary"
+            [loading]="busy()"
+            [disabled]="!canSubmitAdd()"
+            [attr.title]="globalAddReason()"
+            (click)="addListing()"
+          >
+            <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+            {{ 'itemForm.actions.addListing' | transloco }}
+          </button>
+        </div>
+      </div>
+    </section>
+  }
+</div>
+
+<ui-unsaved-dialog
+  #conflictDialog
+  [title]="'tradeItems.conflict.title' | transloco"
+  [text]="'tradeItems.conflict.text' | transloco"
+  [saveLabel]="'tradeShared.common.reload' | transloco"
+  [discardLabel]="'tradeItems.conflict.keep' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

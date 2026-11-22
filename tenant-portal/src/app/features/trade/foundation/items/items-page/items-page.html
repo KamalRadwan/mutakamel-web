@@ -1,0 +1,321 @@
+<div
+  data-bulk-focus-return
+  tabindex="-1"
+  role="group"
+  class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  [attr.aria-label]="'tradeItems.toolbar.label' | transloco"
+>
+  @if (canManage) {
+    <button type="button" uiButton class="shrink-0" (click)="openCreate()">
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      {{ 'tradeItems.toolbar.new' | transloco }}
+    </button>
+  }
+
+  @if (canManage && currentView() === 'table' && selection.count() > 0) {
+    <app-item-bulk-menu
+      class="shrink-0"
+      [selection]="selection"
+      [context]="context()"
+      [filter]="bulkFilter()"
+      [total]="totalItems()"
+      (jobFinished)="reload()"
+    />
+  }
+
+  <div class="min-w-0 flex-1">
+    <ui-facet-search
+      [fields]="searchFields()"
+      [placeholder]="'tradeItems.toolbar.searchPlaceholder' | transloco"
+      [facets]="facets()"
+      (facetsChange)="setFacets($event)"
+    />
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-field
+    class="shrink-0"
+    size="bare"
+    for="items-scope"
+    [label]="'tradeItems.toolbar.scopeLabel' | transloco"
+    [hint]="'tradeItems.toolbar.scopeHint' | transloco"
+  >
+    <ui-segmented
+      [id]="'items-scope'"
+      [label]="'tradeItems.toolbar.scopeLabel' | transloco"
+      describedBy="items-scope-hint"
+      [options]="scopeOptions()"
+      [value]="currentScope()"
+      (valueChange)="setScope($event)"
+    />
+  </ui-field>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-dropdown
+    class="shrink-0"
+    icon="tablerArrowsSort"
+    [label]="'tradeItems.sort.label' | transloco"
+    [attr.title]="'tradeItems.sort.label' | transloco"
+    [options]="sortOptions()"
+    [value]="currentSort()"
+    (valueChange)="setSort($event)"
+  />
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <ui-view-switcher
+    [options]="viewOptions()"
+    [label]="'tradeItems.views.label' | transloco"
+    [value]="currentView()"
+    (valueChange)="setView($event)"
+  />
+</div>
+
+@if (canManage && currentView() === 'table' && selection.count() > 0) {
+  <app-item-selection-bar
+    [selection]="selection"
+    [total]="totalItems()"
+    [filter]="bulkFilter()"
+  />
+}
+
+@if (currentView() !== 'board') {
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="stepOptions()"
+    [label]="'tradeItems.steps.label' | transloco"
+    [hint]="'tradeItems.steps.hint' | transloco"
+    [value]="currentStatus()"
+    (valueChange)="setStatus($event)"
+  />
+}
+
+@switch (currentView()) {
+  @case ('board') {
+    <app-item-board
+      [context]="context()"
+      [filter]="filter()"
+      [companyView]="currentScope() === 'company'"
+      [canManage]="canManage"
+      [showThumbs]="showThumbs"
+      [companyName]="companyName()"
+      [hasFilters]="hasFilters()"
+      [refreshToken]="refreshTick()"
+      (create)="openCreate()"
+      (open)="openItem($event)"
+      (clearSearch)="clearSearch()"
+      (countsChanged)="reloadCounts()"
+    />
+  }
+
+  @case ('cards') {
+    @if (listFailed()) {
+      <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-13 leading-18 text-text-muted">{{ 'tradeItems.error.load' | transloco }}</p>
+        <button type="button" uiButton variant="primary" (click)="retryList()">
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (listLoading()) {
+      <div class="grid grid-cols-1 gap-12 desktop:grid-cols-2 wide:grid-cols-3" aria-busy="true">
+        @for (card of skeletonCards; track card) {
+          <div class="flex items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-popover">
+            <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft"></span>
+            <div class="flex min-w-0 flex-1 flex-col gap-4">
+              <span class="h-skeleton-line w-2/3 rounded-6 bg-neutral-soft"></span>
+              <span class="h-skeleton-line w-1/2 rounded-6 bg-neutral-soft"></span>
+            </div>
+            <span class="h-badge w-1/3 rounded-8 bg-neutral-soft"></span>
+          </div>
+        }
+      </div>
+    } @else if (visibleItems().length === 0) {
+      <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+          <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+        </span>
+        @if (hasFilters()) {
+          <p class="text-13 leading-18 font-medium text-text">{{ 'tradeItems.empty.filtered' | transloco }}</p>
+          <button type="button" uiButton variant="secondary" (click)="clearSearch()">
+            {{ 'tradeItems.empty.clear' | transloco }}
+          </button>
+        } @else if (currentScope() === 'company' && (totalCompanyAll() === 0 || currentStatus() === 'all')) {
+          <p class="text-13 leading-18 font-medium text-text">
+            {{ 'tradeItems.empty.company' | transloco: { company: companyName() } }}
+          </p>
+        } @else if (currentStatus() !== 'all') {
+          <p class="text-13 leading-18 font-medium text-text">{{ 'tradeItems.board.empty' | transloco }}</p>
+        } @else {
+          <p class="text-13 leading-18 font-medium text-text">{{ 'tradeItems.empty.title' | transloco }}</p>
+          @if (canManage) {
+            <button type="button" uiButton variant="primary" (click)="openCreate()">
+              <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+              {{ 'tradeItems.toolbar.new' | transloco }}
+            </button>
+          }
+        }
+      </div>
+    } @else {
+      <div class="grid auto-rows-fr grid-cols-1 gap-12 desktop:grid-cols-2 wide:grid-cols-3">
+        @for (item of visibleItems(); track item.id) {
+          <app-item-card
+            class="h-full"
+            [item]="item"
+            [companyView]="currentScope() === 'company'"
+            [canManage]="canManage"
+            [showThumb]="showThumbs"
+            [elevated]="true"
+            (open)="openItem(item)"
+            (action)="onRowAction(item, $event)"
+          />
+        }
+      </div>
+    }
+
+    @if (!listFailed() && totalItems() > 0) {
+      <footer class="mt-auto border-t border-border pt-8">
+        <ui-pagination
+          [total]="totalItems()"
+          [pageSizes]="pageSizes"
+          [label]="'tradeItems.pagination.label' | transloco"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          (pageChange)="setPage($event)"
+          (pageSizeChange)="setPageSize($event)"
+        />
+      </footer>
+    }
+  }
+
+  @case ('table') {
+    @if (listFailed()) {
+      <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-13 leading-18 text-text-muted">{{ 'tradeItems.error.load' | transloco }}</p>
+        <button type="button" uiButton variant="primary" (click)="retryList()">
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tradeShared.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (!listLoading() && visibleItems().length === 0) {
+      <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+          <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+        </span>
+        @if (hasFilters()) {
+          <p class="text-13 leading-18 font-medium text-text">{{ 'tradeItems.empty.filtered' | transloco }}</p>
+          <button type="button" uiButton variant="secondary" (click)="clearSearch()">
+            {{ 'tradeItems.empty.clear' | transloco }}
+          </button>
+        } @else if (currentScope() === 'company' && (totalCompanyAll() === 0 || currentStatus() === 'all')) {
+          <p class="text-13 leading-18 font-medium text-text">
+            {{ 'tradeItems.empty.company' | transloco: { company: companyName() } }}
+          </p>
+        } @else if (currentStatus() !== 'all') {
+          <p class="text-13 leading-18 font-medium text-text">{{ 'tradeItems.board.empty' | transloco }}</p>
+        } @else {
+          <p class="text-13 leading-18 font-medium text-text">{{ 'tradeItems.empty.title' | transloco }}</p>
+          @if (canManage) {
+            <button type="button" uiButton variant="primary" (click)="openCreate()">
+              <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+              {{ 'tradeItems.toolbar.new' | transloco }}
+            </button>
+          }
+        }
+      </div>
+    } @else {
+      <app-item-table
+        [items]="visibleItems()"
+        [loading]="listLoading()"
+        [companyView]="currentScope() === 'company'"
+        [canManage]="canManage"
+        [showThumbs]="showThumbs"
+        [uoms]="uomsMap()"
+        (open)="openItem($event)"
+        (action)="onRowAction($event.item, $event.action)"
+      />
+    }
+
+    @if (!listFailed() && totalItems() > 0) {
+      <footer class="mt-auto border-t border-border pt-8">
+        <ui-pagination
+          [total]="totalItems()"
+          [pageSizes]="pageSizes"
+          [label]="'tradeItems.pagination.label' | transloco"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          (pageChange)="setPage($event)"
+          (pageSizeChange)="setPageSize($event)"
+        />
+      </footer>
+    }
+  }
+}
+
+@if (modalOpen()) {
+  <app-item-modal
+    [itemId]="modalItemId()"
+    [listIds]="visibleListIds()"
+    (closed)="closeModal()"
+    (saved)="onItemSaved($event)"
+    (openFull)="openFullPage($event)"
+  />
+}
+
+<ui-modal
+  #discontinueModal
+  class="absolute"
+  size="confirm"
+  icon="tablerBan"
+  tile="bg-icon-red"
+  [title]="'tradeItems.discontinue.title' | transloco: { name: discontinueTargetName() }"
+  [closeLabel]="'tradeShared.common.cancel' | transloco"
+  [dismissable]="false"
+  (closed)="onDiscontinueClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text-muted">{{ 'tradeItems.discontinue.text' | transloco }}</p>
+    @if (discontinueOpen()) {
+      <app-trade-reason-picker
+        #discontinueReasonPicker
+        kind="ITEM_DISCONTINUE"
+        idPrefix="items-discontinue"
+        [showErrors]="discontinueSubmitted()"
+        [(value)]="discontinueReason"
+      />
+    }
+  </div>
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      variant="danger"
+      [disabled]="!(discontinueReasonPicker()?.valid() ?? false)"
+      (click)="confirmDiscontinue()"
+    >
+      {{ 'tradeItems.actions.discontinue' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="cancelDiscontinue()">
+      {{ 'tradeShared.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-unsaved-dialog
+  #conflictDialog
+  class="absolute"
+  [title]="'tradeItems.conflict.title' | transloco"
+  [text]="'tradeItems.conflict.text' | transloco"
+  [saveLabel]="'tradeShared.common.reload' | transloco"
+  [discardLabel]="'tradeItems.conflict.keep' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

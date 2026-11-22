@@ -1,0 +1,9 @@
+.transfer-segmented {
+  display: flex;
+  width: 100%;
+}
+
+.transfer-segmented > button {
+  flex: 1;
+  justify-content: center;
+}

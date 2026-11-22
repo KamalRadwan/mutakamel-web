@@ -1,0 +1,170 @@
+<div class="flex flex-col gap-8">
+  @if (fields().length === 0) {
+    <div class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+        <ng-icon name="tablerInbox" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-13 leading-18 text-text-muted">{{ 'extensions.fields.empty' | transloco }}</p>
+      @if (!readonly() && showAddButton()) {
+        <button
+          type="button"
+          uiButton
+          size="small"
+          variant="secondary"
+          [disabled]="atMax()"
+          [attr.title]="atMax() ? ('extensions.fields.maxReached' | transloco: { max: maxFields() }) : null"
+          (click)="addField.emit()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'extensions.fields.addField' | transloco }}
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div role="table" class="min-w-doc-table-min" [attr.aria-label]="'extensions.fields.tableLabel' | transloco">
+        <div
+          role="row"
+          class="bg-nav-gradient grid h-table-head rounded-10 text-13 leading-18 font-medium text-on-nav"
+          [class]="gridCols()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'extensions.fields.key' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'extensions.fields.type' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-center truncate border-s border-on-nav-line px-10">
+            {{ 'extensions.fields.required' | transloco }}
+            <span [id]="uid + '-required-hint'" class="sr-only">{{ 'extensions.field.required.hint' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-center truncate border-s border-on-nav-line px-10">
+            {{ 'extensions.fields.searchable' | transloco }}
+            <span [id]="uid + '-searchable-hint'" class="sr-only">{{ 'extensions.field.searchable.hint' | transloco }}</span>
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'extensions.fields.visibility' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'extensions.fields.default' | transloco }}
+          </span>
+          @if (!readonly()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'extensions.fields.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @for (field of fields(); track field.fieldKey + '-' + $index; let idx = $index) {
+          @let rowErrs = rowDiagnostics(field);
+          @let defDisplay = defaultDisplay(field);
+          <div
+            role="row"
+            class="mt-6 grid min-h-table-row rounded-10 border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+            [class]="gridCols() + (rowErrs.length > 0 ? ' border-danger-border ring-2 ring-danger-halo' : ' border-border')"
+          >
+            <span role="cell" class="flex min-w-0 flex-col justify-center gap-2 px-10 py-6">
+              <bdi dir="ltr" class="truncate text-13 leading-18 font-medium text-text tabular-nums">
+                {{ field.fieldKey }}
+              </bdi>
+              @for (code of rowErrs; track code) {
+                <span class="flex items-start gap-3 text-11 leading-16 text-danger-text" role="alert">
+                  <ng-icon name="tablerCircleX" size="11" class="mt-2 shrink-0" aria-hidden="true" />
+                  <span>{{ diagnosticText(code) }}</span>
+                </span>
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                {{ typeLabel(field) }}
+              </span>
+            </span>
+
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border px-10"
+              (click)="$event.stopPropagation()"
+            >
+              <ui-switch
+                [checked]="field.isRequired"
+                [disabled]="readonly()"
+                [label]="requiredLabel(field)"
+                [describedBy]="uid + '-required-hint'"
+                (checkedChange)="onRequiredChange(idx, $event)"
+              />
+            </span>
+
+            <span
+              role="cell"
+              class="flex items-center justify-center border-s border-border px-10"
+              [attr.title]="!isItemTarget() ? ('extensions.fields.searchableItemsOnly' | transloco) : null"
+              (click)="$event.stopPropagation()"
+            >
+              <ui-switch
+                [checked]="field.isSearchable"
+                [disabled]="readonly() || !isItemTarget()"
+                [label]="searchableLabel(field)"
+                [describedBy]="uid + '-searchable-hint'"
+                (checkedChange)="onSearchableChange(idx, $event)"
+              />
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-13 leading-18 text-text">
+                {{ 'extensions.visibility.' + field.visibilityCode | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (defDisplay.ltr) {
+                <bdi dir="ltr" class="truncate text-13 leading-18 text-text tabular-nums" [title]="defDisplay.text">
+                  {{ defDisplay.text }}
+                </bdi>
+              } @else {
+                <span class="truncate text-13 leading-18 text-text-muted" [title]="defDisplay.text">
+                  {{ defDisplay.text }}
+                </span>
+              }
+            </span>
+
+            @if (!readonly()) {
+              <span
+                role="cell"
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="actionsFor(field)"
+                  [label]="menuLabelFor(field)"
+                  (selected)="onActionSelected(idx, $event)"
+                />
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (!readonly() && showAddButton()) {
+      <div class="flex items-center justify-between gap-8">
+        <button
+          type="button"
+          uiButton
+          size="small"
+          variant="secondary"
+          [disabled]="atMax()"
+          [attr.title]="atMax() ? ('extensions.fields.maxReached' | transloco: { max: maxFields() }) : null"
+          (click)="addField.emit()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          {{ 'extensions.fields.addField' | transloco }}
+        </button>
+
+        <span class="text-11 leading-16 text-text-muted tabular-nums">
+          <bdi dir="ltr">{{ fields().length }} / {{ maxFields() }}</bdi>
+        </span>
+      </div>
+    }
+  }
+</div>

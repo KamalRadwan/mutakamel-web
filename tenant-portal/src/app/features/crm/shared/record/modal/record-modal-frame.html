@@ -1,0 +1,140 @@
+<ui-modal
+  size="record"
+  [ariaLabel]="effectiveAriaLabel()"
+  [hasFooter]="true"
+  bodyClass="flex flex-col p-0 overflow-hidden"
+  [dismissable]="effectiveDismissable()"
+  [preventDismiss]="true"
+  (dismiss)="onDismiss()"
+  (closed)="onUiModalClosed()"
+>
+  <app-record-modal-header
+    [typeIcon]="typeIcon()"
+    [typeTile]="typeTile()"
+    [typeTitle]="typeTitle()"
+    [subtitle]="subtitle()"
+    [position]="isCreate() ? null : position()"
+    [updating]="updating() || saving() || deleting()"
+    [showClose]="showClose()"
+    [prevLabel]="prevLabel()"
+    [nextLabel]="nextLabel()"
+    [closeLabel]="closeLabel()"
+    (prev)="prev.emit()"
+    (next)="next.emit()"
+    (close)="requestClose.emit()"
+  >
+    <ng-container ngProjectAs="[headerRelated]">@if (!isCreate()) {<ng-content select="[headerRelated]" />}</ng-container>
+  </app-record-modal-header>
+
+  <div class="flex h-full min-h-0 flex-1 overflow-hidden" [attr.aria-busy]="loading()">
+    <div
+      class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
+      [class]="hasAside() ? 'gap-y-10 px-16 py-10' : ''"
+    >
+      <ng-content select="[modalMain]" />
+    </div>
+
+    <aside
+      #asideSlot
+      class="flex h-full min-h-0 w-record-side shrink-0 flex-col gap-y-8 overflow-y-auto border-s border-border bg-surface-muted px-16 py-10 empty:hidden"
+    ><ng-content select="[modalAside]" /></aside>
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canSave()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="saveDisabled()"
+        (click)="save.emit()"
+      >
+        {{ isCreate() ? (createLabel() || ('recordModal.footer.create' | transloco)) : ('recordModal.footer.save' | transloco) }}
+      </button>
+    }
+
+    @if (isCreate() && canSave() && showSaveAndNew()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="footerBusy()"
+        (click)="saveAndNew.emit()"
+      >
+        {{ 'recordModal.footer.saveAndNew' | transloco }}
+      </button>
+    }
+
+    @if (showFullPage()) {
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="footerBusy()"
+        (click)="fullPage.emit()"
+      >
+        <ng-icon name="tablerArrowsMaximize" size="15" aria-hidden="true" />
+        {{ 'recordModal.footer.fullPage' | transloco }}
+      </button>
+    }
+
+    @if (dirty()) {
+      <button type="button" uiButton variant="ghost" [disabled]="saving() || deleting()" (click)="undo.emit()">
+        {{ 'recordModal.footer.undo' | transloco }}
+      </button>
+      <span class="text-12 leading-18 text-text-muted">{{ 'recordModal.footer.unsaved' | transloco }}</span>
+    } @else {
+      <button type="button" uiButton variant="ghost" [disabled]="saving() || deleting()" (click)="requestClose.emit()">
+        {{ (isCreate() ? 'recordModal.footer.cancel' : 'recordModal.footer.close') | transloco }}
+      </button>
+    }
+
+    @if (!isCreate()) {
+      @for (action of extraActions(); track action.id) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="footerBusy() || !!action.disabled"
+          (click)="extraAction.emit(action.id)"
+        >
+          @if (action.icon) {
+            <ng-icon
+              [name]="action.icon"
+              size="15"
+              [class]="
+                action.tone === 'success'
+                  ? 'text-success-text'
+                  : action.tone === 'danger'
+                    ? 'text-danger-text'
+                    : ''
+              "
+              aria-hidden="true"
+            />
+          }
+          {{ action.label }}
+        </button>
+      }
+    }
+
+    @if (showDelete()) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [loading]="deleting()"
+        [disabled]="deleteDisabled()"
+        [attr.title]="deleteDisabledReason() || null"
+        [attr.aria-describedby]="deleteDisabledReason() ? uid + '-delete-reason' : null"
+        (click)="delete.emit()"
+      >
+        {{ 'recordModal.footer.delete' | transloco }}
+      </button>
+      @if (deleteDisabledReason(); as reason) {
+        <span [id]="uid + '-delete-reason'" class="sr-only">{{ reason }}</span>
+      }
+    }
+  </div>
+</ui-modal>

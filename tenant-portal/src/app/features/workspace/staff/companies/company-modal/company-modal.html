@@ -1,0 +1,209 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerBuildingSkyscraper"
+  tile="bg-icon-navy"
+  [title]="(mode() === 'create' ? 'companies.modal.new' : 'companies.modal.title') | transloco"
+  [closeLabel]="'companies.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-code'"
+        [label]="'companies.fields.code' | transloco"
+        [hint]="(mode() === 'create' ? 'companies.fields.codeHint' : 'companies.fields.codeLocked') | transloco"
+        [required]="mode() === 'create'"
+        [error]="codeError()"
+      >
+        <input
+          [id]="uid + '-code'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [maxLength]="limits.code"
+          [value]="code()"
+          [readOnly]="mode() === 'edit' || !canManage() || saving()"
+          [attr.aria-invalid]="codeError() ? 'true' : null"
+          (input)="onCodeInput($event)"
+          (blur)="markTouched('code')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-name'"
+        [label]="'companies.fields.name' | transloco"
+        [hint]="'companies.fields.nameHint' | transloco"
+        [required]="true"
+        [count]="nameCount()"
+        [max]="limits.name"
+        [error]="nameError()"
+      >
+        <input
+          [id]="uid + '-name'"
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="name()"
+          [readOnly]="!canManage() || saving()"
+          [attr.aria-invalid]="nameError() ? 'true' : null"
+          (input)="onNameInput($event)"
+          (blur)="markTouched('name')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-legal-name'"
+        [label]="'companies.fields.legalName' | transloco"
+        [hint]="'companies.fields.legalNameHint' | transloco"
+        [count]="legalNameCount()"
+        [max]="limits.legalName"
+        [error]="legalNameError()"
+      >
+        <input
+          [id]="uid + '-legal-name'"
+          type="text"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [value]="legalName()"
+          [readOnly]="!canManage() || saving()"
+          [attr.aria-invalid]="legalNameError() ? 'true' : null"
+          (input)="onLegalNameInput($event)"
+          (blur)="markTouched('legalName')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        [for]="uid + '-tax'"
+        [label]="'companies.fields.tax' | transloco"
+        [hint]="'companies.fields.taxHint' | transloco"
+        [error]="taxError()"
+      >
+        <input
+          [id]="uid + '-tax'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [value]="taxNumber()"
+          [readOnly]="!canManage() || saving()"
+          [attr.aria-invalid]="taxError() ? 'true' : null"
+          (input)="onTaxInput($event)"
+          (blur)="markTouched('taxNumber')"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [for]="uid + '-currency'"
+        [label]="'companies.fields.currency' | transloco"
+        [hint]="'companies.fields.currencyHint' | transloco"
+        [error]="currencyError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-currency'"
+          [options]="currencyOptions()"
+          [value]="currencyCode()"
+          [label]="'companies.fields.currency' | transloco"
+          [disabled]="!canManage() || saving()"
+          [describedBy]="uid + '-currency-hint' + (currencyError() ? ' ' + uid + '-currency-error' : '')"
+          (valueChange)="onCurrencyChange($event)"
+        />
+      </ui-field>
+    </div>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-active'"
+          [label]="'companies.fields.active' | transloco"
+          [hint]="'companies.fields.activeHelp' | transloco"
+        >
+          <div
+            class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+          >
+            <app-staff-status-badge [status]="isActive() ? 'ACTIVE' : 'INACTIVE'" />
+            <ui-switch
+              [id]="uid + '-active'"
+              [(checked)]="isActive"
+              [disabled]="!canManage() || saving()"
+              [label]="'companies.fields.active' | transloco"
+              [describedBy]="uid + '-active-hint'"
+            />
+          </div>
+        </ui-field>
+        <app-seat-impact
+          class="mt-8"
+          [changes]="statusSeatChanges()"
+          [compact]="true"
+          [canBuySeats]="isOwner()"
+          (blocking)="seatBlocked.set($event)"
+        />
+        @if (statusBlocked()) {
+          <p class="mt-4 text-12 leading-18 text-warning-text">{{ 'staff.errors.SEAT_LIMIT_REACHED' | transloco }}</p>
+        }
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (canManage()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        [loading]="saving()"
+        [disabled]="saving() || statusBlocked() || (mode() === 'edit' && !dirty())"
+      >
+        {{ 'companies.save' | transloco }}
+      </button>
+
+      @if (mode() === 'edit' && dirty()) {
+        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
+          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
+          {{ 'companies.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'companies.unsaved' | transloco }}</span>
+      }
+
+      <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+        {{ (mode() === 'create' ? 'companies.cancel' : 'companies.close') | transloco }}
+      </button>
+
+      @if (mode() === 'edit') {
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          class="ms-auto"
+          [disabled]="saving()"
+          (click)="requestDelete()"
+        >
+          {{ 'companies.delete' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
+        {{ 'companies.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'companies.confirm.discardTitle' | transloco"
+  [text]="'companies.confirm.discardText' | transloco"
+  [confirmLabel]="'companies.confirm.discardConfirm' | transloco"
+  [cancelLabel]="'companies.cancel' | transloco"
+/>

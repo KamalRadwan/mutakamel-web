@@ -1,0 +1,382 @@
+<div class="grid grid-cols-1 items-start gap-12 desktop:grid-cols-12">
+  <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card desktop:col-span-5">
+    <header class="flex items-center gap-8">
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCalculator" size="14" />
+      </span>
+      <h2 class="truncate text-13 leading-18 font-medium text-text">
+        {{ 'priceEval.question.title' | transloco }}
+      </h2>
+    </header>
+
+    <div class="flex flex-col gap-10">
+      <ui-field
+        for="pe-purpose"
+        [label]="'priceEval.question.purpose.label' | transloco"
+        [hint]="'priceEval.question.purpose.hint' | transloco"
+        [required]="true"
+      >
+        <ui-segmented
+          id="pe-purpose"
+          describedBy="pe-purpose-hint"
+          [label]="'priceEval.question.purpose.label' | transloco"
+          [options]="purposeOptions()"
+          [value]="questionModel().purpose"
+          (valueChange)="onPurposeChange($event)"
+        />
+      </ui-field>
+
+      <div #itemPickerWrap>
+        <ui-field
+          for="pe-item"
+          [label]="'priceEval.question.item.label' | transloco"
+          [hint]="'priceEval.question.item.hint' | transloco"
+          [required]="true"
+          [error]="itemError()"
+        >
+          <app-trade-item-picker
+            id="pe-item"
+            [describedBy]="itemError() ? 'pe-item-hint pe-item-error' : 'pe-item-hint'"
+            [purpose]="questionModel().purpose"
+            [context]="branchContext()"
+            [invalid]="!!itemError()"
+            [value]="questionModel().itemId || null"
+            (valueChange)="onItemChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <div class="grid grid-cols-1 gap-10 desktop:grid-cols-2">
+        <ui-field
+          for="pe-uom"
+          [label]="'priceEval.question.unit.label' | transloco"
+          [hint]="'priceEval.question.unit.hint' | transloco"
+          [required]="true"
+          [error]="uomError()"
+        >
+          <ui-dropdown
+            id="pe-uom"
+            size="field"
+            class="w-full"
+            [describedBy]="uomError() ? 'pe-uom-hint pe-uom-error' : 'pe-uom-hint'"
+            [label]="'priceEval.question.unit.label' | transloco"
+            [options]="unitOptions()"
+            [disabled]="!questionModel().itemId"
+            [value]="questionModel().uomId"
+            (valueChange)="onUomChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          for="pe-quantity"
+          [label]="'priceEval.question.quantity.label' | transloco"
+          [hint]="'priceEval.question.quantity.hint' | transloco"
+          [required]="true"
+          [error]="quantityError()"
+        >
+          <input
+            id="pe-quantity"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            [formField]="questionForm.quantity"
+            [placeholder]="'priceEval.question.quantity.placeholder' | transloco"
+            [attr.aria-describedby]="quantityError() ? 'pe-quantity-hint pe-quantity-error' : 'pe-quantity-hint'"
+            [attr.aria-invalid]="quantityError() ? 'true' : null"
+            (keydown.enter)="onQuantityEnter($event)"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text placeholder:text-text-placeholder outline-none"
+          />
+        </ui-field>
+      </div>
+
+      <div class="grid grid-cols-1 gap-10 desktop:grid-cols-2">
+        <ui-field
+          for="pe-currency"
+          [label]="'priceEval.question.currency.label' | transloco"
+          [hint]="'priceEval.question.currency.hint' | transloco"
+          [required]="true"
+          [error]="currencyError()"
+        >
+          <ui-dropdown
+            id="pe-currency"
+            size="field"
+            class="w-full"
+            [describedBy]="currencyError() ? 'pe-currency-hint pe-currency-error' : 'pe-currency-hint'"
+            [label]="'priceEval.question.currency.label' | transloco"
+            [options]="currencyOptions()"
+            [value]="questionModel().currencyCode"
+            (valueChange)="onCurrencyChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          for="pe-at-date"
+          [label]="'priceEval.question.priceAsOf.label' | transloco"
+          [hint]="'priceEval.question.priceAsOf.hint' | transloco"
+        >
+          <div class="flex items-center gap-4">
+            <ui-date-field
+              id="pe-at-date"
+              class="min-w-0 flex-1"
+              describedBy="pe-at-date-hint"
+              [ariaLabel]="'priceEval.question.priceAsOf.dateAria' | transloco"
+              [placeholder]="'priceEval.question.priceAsOf.now' | transloco"
+              [todayLabel]="'priceEval.question.priceAsOf.today' | transloco"
+              [prevMonthLabel]="'priceEval.question.priceAsOf.prevMonth' | transloco"
+              [nextMonthLabel]="'priceEval.question.priceAsOf.nextMonth' | transloco"
+              [value]="questionModel().atDate || null"
+              (valueChange)="onDateChange($event)"
+            />
+            @if (questionModel().atDate) {
+              <ui-time-field
+                id="pe-at-time"
+                describedBy="pe-at-date-hint"
+                [placeholder]="'priceEval.question.priceAsOf.timePlaceholder' | transloco"
+                [hourLabel]="'priceEval.question.priceAsOf.hour' | transloco"
+                [minuteLabel]="'priceEval.question.priceAsOf.minute' | transloco"
+                [value]="questionModel().atTime || null"
+                (valueChange)="onTimeChange($event)"
+              />
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'priceEval.question.priceAsOf.clear' | transloco"
+                [title]="'priceEval.question.priceAsOf.clear' | transloco"
+                (click)="clearDateTime()"
+              >
+                <ng-icon name="tablerX" size="13" aria-hidden="true" />
+              </button>
+            }
+          </div>
+        </ui-field>
+      </div>
+
+      <div #accountAnchor class="relative">
+        <ui-field
+          for="pe-account"
+          [label]="accountLabel()"
+          [hint]="'priceEval.question.account.hint' | transloco"
+        >
+          <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            #accountInput
+            id="pe-account"
+            type="text"
+            role="combobox"
+            autocomplete="off"
+            aria-autocomplete="list"
+            aria-controls="pe-account-list"
+            aria-describedby="pe-account-hint"
+            [attr.aria-expanded]="accountOpen()"
+            [attr.aria-label]="accountLabel()"
+            [placeholder]="'priceEval.question.account.placeholder' | transloco"
+            [value]="accountInputValue()"
+            (focus)="onAccountFocus()"
+            (input)="onAccountInput($event)"
+            (keydown)="onAccountKeydown($event)"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text placeholder:text-text-placeholder outline-none"
+          />
+          @if (questionModel().partyId || accountFilterText()) {
+            <button
+              type="button"
+              class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'priceEval.question.account.clear' | transloco"
+              [title]="'priceEval.question.account.clear' | transloco"
+              (click)="clearAccount()"
+            >
+              <ng-icon name="tablerX" size="13" aria-hidden="true" />
+            </button>
+          }
+        </ui-field>
+
+        @if (accountOpen()) {
+          <ul
+            #accountList
+            id="pe-account-list"
+            role="listbox"
+            class="fixed z-dropdown flex max-h-notif-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4 shadow-popover"
+            [class.invisible]="!accountPlaced()"
+            [style.top.px]="accountPlace().top"
+            [style.inset-inline-start.px]="accountPlace().start"
+            [style.width.px]="accountPlace().width"
+            [attr.aria-label]="accountLabel()"
+          >
+            @if (accountsLoading()) {
+              <li class="px-8 py-6 text-12 text-text-muted">
+                {{ 'priceEval.question.account.loading' | transloco }}
+              </li>
+            } @else {
+              @let accountRows = accounts();
+              @if (accountRows.length === 0) {
+                <li class="px-8 py-6 text-12 text-text-muted">
+                  {{ 'priceEval.question.account.empty' | transloco }}
+                </li>
+              } @else {
+                @for (acc of accountRows; track acc.id; let idx = $index) {
+                  <li role="option" [attr.aria-selected]="acc.partyId === questionModel().partyId">
+                    <button
+                      type="button"
+                      class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      [class]="
+                        acc.partyId === questionModel().partyId
+                          ? 'bg-brand-soft text-on-brand-soft'
+                          : idx === accountHighlightIndex()
+                            ? 'bg-row-hover text-text'
+                            : 'text-text hover:bg-row-hover'
+                      "
+                      (mousedown)="$event.preventDefault()"
+                      (mouseenter)="accountHighlightIndex.set(idx)"
+                      (click)="selectAccount(acc)"
+                    >
+                      <span class="truncate">{{ acc.partyName }}</span>
+                      @if (acc.party.code) {
+                        <bdi dir="ltr" class="shrink-0 text-11 text-text-muted">{{ acc.party.code }}</bdi>
+                      }
+                    </button>
+                  </li>
+                }
+              }
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="grid grid-cols-1 gap-10 desktop:grid-cols-2">
+        <ui-field
+          for="pe-branch"
+          [label]="'priceEval.question.branch.label' | transloco"
+          [hint]="'priceEval.question.branch.hint' | transloco"
+        >
+          <ui-dropdown
+            id="pe-branch"
+            size="field"
+            class="w-full"
+            describedBy="pe-branch-hint"
+            [label]="'priceEval.question.branch.label' | transloco"
+            [options]="branchOptions()"
+            [value]="questionModel().branchId"
+            (valueChange)="onBranchChange($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          for="pe-channel"
+          [label]="'priceEval.question.channel.label' | transloco"
+          [hint]="'priceEval.question.channel.hint' | transloco"
+        >
+          <ui-dropdown
+            id="pe-channel"
+            size="field"
+            class="w-full"
+            describedBy="pe-channel-hint"
+            [label]="'priceEval.question.channel.label' | transloco"
+            [options]="channelOptions()"
+            [value]="questionModel().channelId"
+            (valueChange)="onChannelChange($event)"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        for="pe-price-book"
+        [label]="'priceEval.question.priceBook.label' | transloco"
+        [hint]="'priceEval.question.priceBook.hint' | transloco"
+      >
+        <ui-dropdown
+          id="pe-price-book"
+          size="field"
+          class="w-full"
+          describedBy="pe-price-book-hint"
+          [label]="'priceEval.question.priceBook.label' | transloco"
+          [options]="priceBookOptions()"
+          [value]="questionModel().priceBookId"
+          (valueChange)="onPriceBookChange($event)"
+        />
+      </ui-field>
+
+      @if (questionModel().priceBookId) {
+        <ui-field
+          for="pe-version"
+          [label]="'priceEval.question.version.label' | transloco"
+          [hint]="'priceEval.question.version.hint' | transloco"
+        >
+          <ui-dropdown
+            id="pe-version"
+            size="field"
+            class="w-full"
+            describedBy="pe-version-hint"
+            [label]="'priceEval.question.version.label' | transloco"
+            [options]="versionOptions()"
+            [value]="questionModel().priceBookVersionId"
+            (valueChange)="onVersionChange($event)"
+          />
+        </ui-field>
+      }
+
+      <div class="pt-2">
+        <button
+          type="button"
+          uiButton
+          variant="primary"
+          [loading]="evaluating()"
+          [disabled]="!canCalculate()"
+          (click)="calculate()"
+        >
+          @if (!evaluating()) {
+            <ng-icon name="tablerCalculator" size="14" aria-hidden="true" />
+          }
+          <span>{{ (evaluating() ? 'priceEval.question.calculating' : 'priceEval.question.calculate') | transloco }}</span>
+        </button>
+      </div>
+    </div>
+
+    @if (recentQuestions().length > 0) {
+      <div class="flex flex-col gap-6 border-t border-border pt-10">
+        <div class="flex items-center gap-6 text-12 leading-18 font-medium text-text">
+          <ng-icon name="tablerHistory" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <span>{{ 'priceEval.question.recentTitle' | transloco }}</span>
+        </div>
+
+        <ul class="flex flex-col gap-2">
+          @for (entry of recentQuestions(); track entry.id) {
+            <li>
+              <button
+                type="button"
+                class="flex min-h-btn w-full cursor-pointer items-center justify-between gap-10 rounded-6 px-6 py-4 text-start text-12 leading-18 outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [title]="recentSummary(entry)"
+                (click)="applyRecentQuestion(entry)"
+              >
+                <span class="flex min-w-0 items-center gap-6">
+                  <ng-icon
+                    name="tablerCornerDownRight"
+                    size="14"
+                    class="shrink-0 text-text-muted rtl:-scale-x-100"
+                    aria-hidden="true"
+                  />
+                  <span class="truncate text-text">{{ recentSummary(entry) }}</span>
+                </span>
+                <bdi dir="ltr" class="shrink-0 font-medium tabular-nums text-text">
+                  {{ formatRecentPrice(entry.currencyCode, entry.unitPrice) }}
+                </bdi>
+              </button>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </section>
+
+  <div class="desktop:col-span-7">
+    <app-price-answer
+      [decision]="answerDecision()"
+      [context]="answerContext()"
+      [error]="answerError()"
+      [loading]="evaluating()"
+      [unitLabel]="evaluatedUnitLabel()"
+      (focusQuestion)="focusItemPicker()"
+    />
+  </div>
+</div>

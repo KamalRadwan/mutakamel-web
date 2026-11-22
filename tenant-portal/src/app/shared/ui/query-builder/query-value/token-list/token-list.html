@@ -1,0 +1,35 @@
+<div [class]="containerClasses()" (click)="focusInput()">
+  @for (token of tokens(); track token) {
+    <span class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text">
+      <span class="truncate">{{ token }}</span>
+      @if (!disabled()) {
+        <button
+          type="button"
+          class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'qv.remove' | transloco: { label: token }"
+          (click)="$event.stopPropagation(); removeToken(token)"
+        >
+          <ng-icon name="tablerX" size="11" aria-hidden="true" />
+        </button>
+      }
+    </span>
+  }
+
+  <input
+    #inputEl
+    type="text"
+    autocomplete="off"
+    class="h-chip min-w-16 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed"
+    [dir]="dir()"
+    [attr.inputmode]="inputMode()"
+    [attr.maxlength]="maxLength()"
+    [placeholder]="tokens().length ? '' : ('qv.addTerm' | transloco)"
+    [attr.aria-label]="field().label"
+    [attr.aria-invalid]="invalid() ? 'true' : null"
+    [attr.aria-describedby]="describedBy() || null"
+    [disabled]="disabled()"
+    [value]="draft()"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  />
+</div>

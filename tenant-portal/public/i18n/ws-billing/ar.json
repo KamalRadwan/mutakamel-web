@@ -1,0 +1,192 @@
+{
+  "pages": {
+    "overview": "نظرة عامة على الفوترة",
+    "invoices": "الفواتير",
+    "invoice": "الفاتورة",
+    "subscription": "الاشتراك",
+    "change": "تغيير الباقة",
+    "catalogue": "دليل التطبيقات والإضافات"
+  },
+  "status": {
+    "invoice": {
+      "DRAFT": "مسودة",
+      "ISSUED": "صادرة",
+      "PARTIALLY_PAID": "مدفوعة جزئيًا",
+      "PAID": "مدفوعة",
+      "OVERDUE": "متأخرة السداد",
+      "VOID": "ملغاة"
+    },
+    "payment": {
+      "CREATED": "مُنشأة",
+      "PENDING": "قيد الانتظار",
+      "SUCCEEDED": "ناجحة",
+      "FAILED": "فاشلة",
+      "EXPIRED": "منتهية الصلاحية",
+      "REQUIRES_REVIEW": "قيد المراجعة",
+      "REFUND_PENDING": "استرداد قيد الانتظار",
+      "REFUNDED": "مستردة"
+    },
+    "subscription": {
+      "PENDING_ACTIVATION": "بانتظار التفعيل",
+      "TRIAL": "تجريبي",
+      "ACTIVE": "نشط",
+      "PAST_DUE": "متأخر السداد",
+      "CANCELLED": "ملغى"
+    },
+    "wallet": {
+      "ACTIVE": "نشطة",
+      "FROZEN": "مجمّدة",
+      "CLOSED": "مغلقة"
+    }
+  },
+  "access": {
+    "FULL": "وصول كامل",
+    "DUNNING": "مستحق السداد",
+    "READ_ONLY": "للقراءة فقط",
+    "BLOCKED": "محظور"
+  },
+  "purpose": {
+    "TRIAL_ACTIVATION": "تفعيل الفترة التجريبية",
+    "RENEWAL": "تجديد",
+    "PRORATION": "تسوية نسبية",
+    "MANUAL": "يدوية",
+    "WALLET_TOP_UP": "شحن المحفظة",
+    "INVOICE_SETTLEMENT": "سداد فاتورة"
+  },
+  "ledgerReason": {
+    "TOP_UP": "شحن الرصيد",
+    "SUBSCRIPTION_CHARGE": "رسوم اشتراك",
+    "PRORATION_CREDIT": "رصيد تسوية نسبية",
+    "REFUND": "استرداد",
+    "PROMO": "رصيد ترويجي",
+    "ADJUSTMENT": "تعديل"
+  },
+  "offerStatus": {
+    "PREPARATION_REQUIRED": "متاح",
+    "PARENT_REQUIRED": "يتطلب {{app}}",
+    "INCOMPATIBLE": "غير متاح على باقتك",
+    "UNAVAILABLE": "السعر غير متاح"
+  },
+  "provider": {
+    "PAYMOB": "باي موب",
+    "INTERNAL": "المحفظة",
+    "OFFLINE": "دفع يدوي"
+  },
+  "cycle": {
+    "MONTHLY": "شهري",
+    "ANNUAL": "سنوي"
+  },
+  "common": {
+    "pay": "دفع",
+    "topUp": "شحن المحفظة",
+    "retry": "إعادة المحاولة",
+    "close": "إغلاق",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "open": "فتح",
+    "details": "التفاصيل",
+    "seats": "المقاعد",
+    "perMonth": "/ شهر",
+    "perYear": "/ سنة",
+    "none": "—",
+    "supportRef": "مرجع الدعم"
+  },
+  "forbidden": {
+    "title": "الفوترة مخصصة لمالك مساحة العمل",
+    "text": "اطلب من مالك مساحة العمل إدارة الاشتراك والفواتير."
+  },
+  "failed": {
+    "title": "تعذّر تحميل هذه الصفحة",
+    "supportRef": "مرجع الدعم: {{id}}"
+  },
+  "errors": {
+    "generic": "حدث خطأ. يُرجى المحاولة مرة أخرى.",
+    "network": "تعذّر الوصول إلى خدمة الفوترة. تحقّق من اتصالك وحاول مرة أخرى.",
+    "TENANT_OWNER_REQUIRED": "يمكن لمالك مساحة العمل فقط عرض الفوترة أو إدارتها.",
+    "SUBSCRIPTION_NOT_FOUND": "لم يُعثر على اشتراك لمساحة العمل هذه.",
+    "WALLET_NOT_FOUND": "لم يُعثر على محفظة فوترة لمساحة العمل هذه.",
+    "WALLET_NOT_ACTIVE": "محفظتك غير نشطة حاليًا.",
+    "WALLET_FROZEN": "محفظتك مجمّدة. تواصل مع الدعم للمتابعة.",
+    "WALLET_INSUFFICIENT": "الرصيد المتاح في محفظتك غير كافٍ لإتمام هذه العملية.",
+    "INVOICE_NOT_FOUND": "تعذّر العثور على هذه الفاتورة.",
+    "INVOICE_ALREADY_PAID": "تم سداد هذه الفاتورة بالفعل.",
+    "INVOICE_NOT_PAYABLE": "لا يمكن دفع هذه الفاتورة في حالتها الحالية.",
+    "INVOICE_NOT_CANONICAL_USD": "لا يمكن دفع الفواتير القديمة عبر الدفع الإلكتروني.",
+    "INVOICE_ACCOUNTING_INCONSISTENT": "تعذّر تحميل هذه الفاتورة بسبب عدم تطابق محاسبي.",
+    "INVOICE_ACCEPTED_HISTORY_UNAVAILABLE": "سجل التسعير لهذه الفاتورة غير متاح مؤقتًا.",
+    "INVOICE_ACCEPTED_SOURCE_UNAVAILABLE": "تفاصيل مصدر التسعير لهذه الفاتورة غير متاحة مؤقتًا.",
+    "PAYMENT_QUOTE_STALE": "تغيّر مبلغ الدفع. اطلب عرض سعر جديدًا وحاول مرة أخرى.",
+    "PAYMENT_QUOTE_INVOICE_MISMATCH": "عرض السعر هذا لا يخص الفاتورة المحددة.",
+    "PAYMENT_INTENT_ALREADY_ACTIVE": "توجد عملية دفع جارية لهذه الفاتورة.",
+    "PAYMENT_INTENT_UNAVAILABLE": "يتعذّر بدء الدفع لهذه الفاتورة حاليًا.",
+    "PAYMENT_NOT_FOUND": "تعذّر العثور على سجل الدفع.",
+    "FX_QUOTE_NOT_FOUND": "لم يُعثر على عرض سعر الصرف هذا. اطلب مبلغًا جديدًا.",
+    "FX_QUOTE_EXPIRED": "انتهت صلاحية عرض الدفع هذا. اطلب مبلغًا جديدًا.",
+    "FX_QUOTE_ALREADY_CONSUMED": "استُخدم عرض الدفع هذا بالفعل. اطلب مبلغًا جديدًا.",
+    "FX_RATE_NOT_FOUND": "لا يتوفر سعر صرف للعملة المحددة.",
+    "FX_AMOUNT_ROUNDS_TO_ZERO": "المبلغ المُدخل صغير جدًا بعد تحويل العملة.",
+    "TOPUP_AMOUNT_OUT_OF_RANGE": "أدخل مبلغًا تعادل قيمته ما بين 1 و100,000 دولار أمريكي.",
+    "TOPUP_LIMITS_INVALID": "تعذّر التحقق من حدود الشحن حاليًا. حاول لاحقًا.",
+    "PAYMENT_PROVIDER_UNCONFIGURED": "الدفع الإلكتروني غير مُعدّ حاليًا.",
+    "PAYMENT_PROVIDER_ERROR": "تعذّر على مزوّد الدفع معالجة الطلب. حاول مرة أخرى.",
+    "PAYMENT_PROVIDER_CURRENCY_UNSUPPORTED": "العملة المحددة غير مدعومة للدفع الإلكتروني.",
+    "IDEMPOTENCY_KEY_REUSED": "استُخدم مفتاح الطلب هذا مسبقًا ببيانات مختلفة. حاول مرة أخرى.",
+    "IDEMPOTENCY_BODY_MISMATCH": "أُرسل هذا الطلب مسبقًا ببيانات مختلفة. حاول مرة أخرى.",
+    "CORE_VALIDATION_FAILED": "بعض القيم المدخلة غير صالحة.",
+    "DOWNGRADE_NOT_ALLOWED": "لا يُسمح هنا بخفض الباقات أو تقليل مقاعد الإضافات.",
+    "SEAT_DOWNGRADE_FREE_UP_REQUIRED": "حرّر مقاعد كافية قبل خفض عدد المقاعد.",
+    "SEAT_DOWNGRADE_FREE_UP_REQUIRED_COUNTS": "المقاعد المستخدمة {{used}}. حرّر {{excess}} منها قبل خفض العدد إلى {{target}}.",
+    "SEAT_MODULE_HOLDERS_EXCEED_PURCHASE": "عدد المستخدمين المعيّنين يتجاوز المقاعد المطلوبة. حرّر المقاعد قبل الخفض.",
+    "ADDON_PREPARATION_REQUIRED": "ما زال تجهيز تغيير الباقة قيد التنفيذ. انتظر لحظة ثم حاول مجددًا.",
+    "ADDON_PREPARATION_STALE": "أصبح تجهيز هذا التغيير قديمًا. أعد المراجعة من البداية.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_STALE": "تغيّر اشتراكك منذ أن بدأت. أعد التحميل وراجع التغييرات مجددًا.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_NOT_FOUND": "تعذّر العثور على معاينة السعر هذه. ابدأ المراجعة من جديد.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_EXPIRED": "انتهت صلاحية معاينة السعر هذه. حدّث السعر للمتابعة.",
+    "SUBSCRIPTION_PLAN_CHANGE_PREVIEW_ALREADY_APPLIED": "طُبّق تغيير الباقة هذا بالفعل.",
+    "SUBSCRIPTION_PLAN_CHANGE_IDEMPOTENCY_REUSED": "أُرسل هذا التغيير مسبقًا ببيانات مختلفة. ابدأ المراجعة من جديد.",
+    "SUBSCRIPTION_PLAN_CHANGE_PAST_DUE": "سدّد الفاتورة المتأخرة قبل تعديل اشتراكك.",
+    "SUBSCRIPTION_PLAN_CHANGE_PROVISIONING": "ما زال اشتراكك قيد التجهيز. حاول بعد قليل.",
+    "SUBSCRIPTION_PLAN_CHANGE_CANCELLED": "لا يمكن تعديل الاشتراكات الملغاة.",
+    "SUBSCRIPTION_PLAN_CHANGE_COLLECTION_IN_PROGRESS": "توجد عملية تحصيل جارية. سدّد الفاتورة المفتوحة أولًا.",
+    "COMMERCIAL_PREPARATION_IN_PROGRESS": "يُجهَّز تغيير آخر للباقة حاليًا.",
+    "COMMERCIAL_CAPACITY_OCCUPIED": "خدمة تعديل الفوترة مشغولة الآن. حاول بعد لحظات.",
+    "COMMERCIAL_PRICE_UNAVAILABLE": "التسعير غير متاح لأحد العناصر المحددة.",
+    "COMMERCIAL_CONTRACT_INVALID": "التغيير المطلوب غير صالح. راجعه وحاول مرة أخرى.",
+    "APPLICATION_SELECTION_NOT_ALLOWED": "يتعذّر تغيير أحد التطبيقات أو الباقات المحددة.",
+    "ADDON_DEFINITION_UNAVAILABLE": "هذه الإضافة غير متاحة حاليًا.",
+    "COMMERCIAL_RECOVERY_REVISION_STALE": "تم تحديث هذا التغيير من مكان آخر. أعد التحميل لعرض أحدث حالة.",
+    "COMMERCIAL_COMMAND_UNAVAILABLE": "خدمة الفوترة غير متاحة مؤقتًا. حاول بعد قليل.",
+    "TENANT_OPERATION_NOT_FOUND": "تعذّر العثور على عملية تغيير الباقة المعلّقة."
+  },
+  "names": {
+    "apps": {
+      "hr": "الموارد البشرية"
+    },
+    "tiers": {
+      "starter": "المبتدئة",
+      "growth": "النمو",
+      "enterprise": "المؤسسات",
+      "standard": "القياسية",
+      "pro": "الاحترافية"
+    },
+    "addons": {
+      "crm": {
+        "homes": "العقارات السكنية",
+        "whatsapp": "واتساب للأعمال",
+        "ai_assistant": "مساعد المبيعات الذكي",
+        "power_dialer": "الاتصال الآلي المتتابع",
+        "outbound_email": "البريد الإلكتروني الصادر"
+      },
+      "hr": {
+        "payroll": "الرواتب"
+      }
+    },
+    "currencies": {
+      "USD": "دولار أمريكي",
+      "EGP": "جنيه مصري",
+      "SAR": "ريال سعودي",
+      "AED": "درهم إماراتي",
+      "EUR": "يورو"
+    }
+  }
+}

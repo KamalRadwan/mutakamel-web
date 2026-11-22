@@ -1,0 +1,163 @@
+@if (loadFailed() && !loading()) {
+  <div
+    class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    role="alert"
+  >
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-danger-text">{{ 'bov.payments.loadFailed' | transloco }}</p>
+    @if (correlationId(); as id) {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'bill.common.supportRef' | transloco }}: <span dir="ltr">{{ id }}</span>
+      </p>
+    }
+    <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+      {{ 'bill.common.retry' | transloco }}
+    </button>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'bov.tabs.payments' | transloco"
+      [attr.aria-busy]="loading()"
+    >
+      <div
+        role="row"
+        class="grid grid-cols-billing-payment-row h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'bov.payments.cols.date' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'bov.payments.cols.purpose' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'bov.payments.cols.provider' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+          {{ 'bov.payments.cols.amount' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+          {{ 'bov.payments.cols.appliedUsd' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'bov.payments.cols.status' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'bov.payments.cols.invoice' | transloco }}
+        </span>
+      </div>
+
+      @if (loading()) {
+        @for (row of skeletonRows; track row) {
+          <div
+            role="row"
+            aria-hidden="true"
+            class="mt-6 grid grid-cols-billing-payment-row h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+          >
+            <span role="cell" class="flex items-center px-10">
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 animate-pulse rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+              <span class="h-skeleton-line w-2/3 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-badge w-2/3 animate-pulse rounded-8 bg-neutral-soft"></span>
+            </span>
+            <span role="cell" class="flex items-center border-s border-border px-10">
+              <span class="h-skeleton-line w-1/2 animate-pulse rounded-4 bg-neutral-soft"></span>
+            </span>
+          </div>
+        }
+      } @else {
+        @for (item of items(); track item.paymentId) {
+          <div
+            role="row"
+            class="mt-6 grid grid-cols-billing-payment-row h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+          >
+            <span role="cell" class="flex min-w-0 items-center px-10">
+              <span class="truncate text-12 tabular-nums text-text-muted">
+                {{ formatDateTime(item.createdAt) }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span [class]="purposeBadgeClasses">
+                {{ 'bill.purpose.' + item.purpose | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <span class="truncate text-13 text-text">
+                {{ 'bill.provider.' + item.provider | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+              <span dir="ltr" class="truncate text-13 tabular-nums text-text">
+                {{ formatAmount(item.providerAmount, item.providerCurrencyCode) }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10">
+              <span dir="ltr" class="truncate text-13 font-medium tabular-nums text-text">
+                {{ formatUsd(item.totalAppliedUsd) }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @let badge = statusBadge(item.status);
+              <span [class]="badge.classes">
+                {{ badge.labelKey | transloco }}
+              </span>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (item.invoiceId; as invId) {
+                <a
+                  [routerLink]="['/workspace/billing/invoices', invId]"
+                  class="truncate rounded-4 text-12 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                >
+                  {{ 'bov.payments.openInvoice' | transloco }}
+                </a>
+              } @else {
+                <span class="text-12 text-text-muted">{{ 'bill.common.none' | transloco }}</span>
+              }
+            </span>
+          </div>
+        } @empty {
+          <div role="row" class="mt-6 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+            <span role="cell" class="block text-12 text-text-muted">
+              {{ 'bov.payments.empty' | transloco }}
+            </span>
+          </div>
+        }
+      }
+    </div>
+  </div>
+}
+
+@if (!loadFailed() && total() > 0) {
+  <footer class="mt-auto border-t border-border pt-8">
+    <ui-pagination
+      [total]="total()"
+      [pageSizes]="pageSizes"
+      [label]="'bov.payments.pagination' | transloco"
+      [(page)]="page"
+      [pageSize]="pageSize()"
+      (pageSizeChange)="onPageSizeChange($event)"
+    />
+  </footer>
+}

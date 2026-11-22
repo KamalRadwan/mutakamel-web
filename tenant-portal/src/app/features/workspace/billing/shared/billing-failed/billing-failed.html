@@ -1,0 +1,15 @@
+<span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+  <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+</span>
+
+<h1 class="text-16 leading-24 font-medium text-text">{{ 'bill.failed.title' | transloco }}</h1>
+
+@if (correlationId(); as id) {
+  <p class="text-12 leading-18 text-text-muted">
+    {{ 'bill.common.supportRef' | transloco }}: <span dir="ltr">{{ id }}</span>
+  </p>
+}
+
+<button uiButton type="button" (click)="retry.emit()">
+  {{ 'bill.common.retry' | transloco }}
+</button>

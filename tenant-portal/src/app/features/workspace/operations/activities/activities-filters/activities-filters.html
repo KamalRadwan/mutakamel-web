@@ -1,0 +1,178 @@
+<section
+  [id]="panelId()"
+  role="region"
+  [attr.aria-label]="'wsActivities.filters.region' | transloco"
+  class="rounded-10 border border-border bg-surface p-10 shadow-card"
+>
+  <div class="grid grid-cols-1 gap-x-10 gap-y-8 desktop:grid-cols-3 wide:grid-cols-4">
+    <ui-field
+      [label]="'wsActivities.filters.show' | transloco"
+      [hint]="'wsActivities.filters.showHint' | transloco"
+      [for]="uid + '-show'"
+      [bare]="true"
+    >
+      <ui-segmented
+        class="w-fit"
+        [id]="uid + '-show'"
+        [describedBy]="uid + '-show-hint'"
+        [label]="'wsActivities.filters.show' | transloco"
+        [options]="showOptions()"
+        [value]="state().show"
+        (valueChange)="onShowChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'wsActivities.filters.types' | transloco"
+      [hint]="'wsActivities.filters.typesHint' | transloco"
+      [for]="uid + '-types'"
+      [bare]="true"
+    >
+      <app-activities-multi-select
+        [id]="uid + '-types'"
+        [describedBy]="uid + '-types-hint'"
+        [label]="'wsActivities.filters.types' | transloco"
+        [placeholder]="'wsActivities.filters.allTypes' | transloco"
+        [selectAllLabel]="'wsActivities.filters.selectAll' | transloco"
+        [clearAllLabel]="'wsActivities.filters.clearAll' | transloco"
+        [removeItemLabel]="'wsActivities.filters.removeFilter' | transloco: { name: '' }"
+        [options]="typeOptions()"
+        [values]="state().types"
+        (valuesChange)="onTypesChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'wsActivities.filters.priorities' | transloco"
+      [hint]="'wsActivities.filters.prioritiesHint' | transloco"
+      [for]="uid + '-priorities'"
+      [bare]="true"
+    >
+      <app-activities-multi-select
+        [id]="uid + '-priorities'"
+        [describedBy]="uid + '-priorities-hint'"
+        [label]="'wsActivities.filters.priorities' | transloco"
+        [placeholder]="'wsActivities.filters.allPriorities' | transloco"
+        [selectAllLabel]="'wsActivities.filters.selectAll' | transloco"
+        [clearAllLabel]="'wsActivities.filters.clearAll' | transloco"
+        [removeItemLabel]="'wsActivities.filters.removeFilter' | transloco: { name: '' }"
+        [options]="priorityOptions()"
+        [values]="state().priorities"
+        (valuesChange)="onPrioritiesChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'wsActivities.filters.statuses' | transloco"
+      [hint]="(view() === 'board' ? 'wsActivities.filters.statusesBoardHint' : 'wsActivities.filters.statusesHint') | transloco"
+      [for]="uid + '-statuses'"
+      [bare]="true"
+    >
+      <app-activities-multi-select
+        [id]="uid + '-statuses'"
+        [describedBy]="uid + '-statuses-hint'"
+        [label]="'wsActivities.filters.statuses' | transloco"
+        [placeholder]="'wsActivities.filters.allStatuses' | transloco"
+        [selectAllLabel]="'wsActivities.filters.selectAll' | transloco"
+        [clearAllLabel]="'wsActivities.filters.clearAll' | transloco"
+        [removeItemLabel]="'wsActivities.filters.removeFilter' | transloco: { name: '' }"
+        [options]="statusOptions()"
+        [disabled]="view() === 'board'"
+        [values]="selectedStatuses()"
+        (valuesChange)="onStatusesChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'wsActivities.filters.branch' | transloco"
+      [hint]="'wsActivities.filters.branchHint' | transloco"
+      [for]="uid + '-branch'"
+      [bare]="true"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-branch'"
+        [describedBy]="uid + '-branch-hint'"
+        [label]="'wsActivities.filters.branch' | transloco"
+        [options]="branchOptions()"
+        [value]="state().branchId ?? ''"
+        (valueChange)="onBranchChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'wsActivities.filters.recordType' | transloco"
+      [hint]="'wsActivities.filters.recordTypeHint' | transloco"
+      [for]="uid + '-record-type'"
+      [bare]="true"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-record-type'"
+        [describedBy]="uid + '-record-type-hint'"
+        [label]="'wsActivities.filters.recordType' | transloco"
+        [options]="recordTypeOptions()"
+        [value]="state().recordType ?? ''"
+        (valueChange)="onRecordTypeChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [label]="'wsActivities.filters.dueRange' | transloco"
+      [hint]="'wsActivities.filters.dueRangeHint' | transloco"
+      [for]="uid + '-due-range'"
+      [bare]="true"
+    >
+      <div class="flex items-center gap-4">
+        <ui-date-range
+          class="min-w-0 flex-1"
+          [months]="1"
+          [withTime]="false"
+          [id]="uid + '-due-range'"
+          [describedBy]="uid + '-due-range-hint'"
+          [ariaLabel]="'wsActivities.filters.dueRange' | transloco"
+          [placeholder]="'wsActivities.filters.dueRangePlaceholder' | transloco"
+          [value]="state().dueRange"
+          (valueChange)="onDueRangeChange($event)"
+        />
+        @if (state().dueRange) {
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'wsActivities.filters.clearDueRange' | transloco"
+            [title]="'wsActivities.filters.clearDueRange' | transloco"
+            (click)="onDueRangeChange(null)"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        }
+      </div>
+    </ui-field>
+  </div>
+
+  @if (hasActiveFilters()) {
+    <div class="mt-8 flex flex-wrap items-center justify-between gap-8 border-t border-border pt-8">
+      <div class="flex flex-wrap items-center gap-6">
+        @if (state().overdue) {
+          <span class="inline-flex h-filter-chip items-center gap-4 rounded-8 bg-danger px-8 text-12 font-medium text-on-danger">
+            <span>{{ 'wsActivities.filters.overdueActive' | transloco }}</span>
+            <button
+              type="button"
+              class="inline-flex size-checkbox-size shrink-0 cursor-pointer items-center justify-center rounded-4 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'wsActivities.filters.removeFilter' | transloco: { name: ('wsActivities.filters.overdueActive' | transloco) }"
+              (click)="clearOverdue()"
+            >
+              <ng-icon name="tablerX" size="11" aria-hidden="true" />
+            </button>
+          </span>
+        }
+      </div>
+
+      <button type="button" uiButton variant="ghost" size="small" (click)="clearAll.emit()">
+        {{ 'wsActivities.clearFilters' | transloco }}
+      </button>
+    </div>
+  }
+</section>

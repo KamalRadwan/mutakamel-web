@@ -1,0 +1,124 @@
+<ui-modal
+  size="form"
+  icon="tablerAdjustmentsHorizontal"
+  tile="bg-icon-navy"
+  [title]="title()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="pendingOp() === null"
+>
+  @if (field(); as current) {
+    <div class="flex flex-col gap-8">
+      @if (isArchived()) {
+        <app-settings-notice tone="warning">
+          {{ 'customFields.requirements.archivedNotice' | transloco }}
+        </app-settings-notice>
+      }
+
+      <div class="flex flex-col gap-8">
+        <ui-field
+          [bare]="true"
+          [label]="'customFields.requirements.create' | transloco"
+          [for]="'req-create'"
+          [hint]="'customFields.requirements.createHint' | transloco"
+        >
+          <div
+            class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+          >
+            <span
+              class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+              [class]="createRequired() ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+            >
+              {{ (createRequired() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+            </span>
+            <ui-switch
+              [checked]="createRequired()"
+              [disabled]="!canManage() || isArchived() || pendingOp() !== null"
+              [label]="'customFields.requirements.create' | transloco"
+              (checkedChange)="toggleRequirement('CREATE', $event)"
+            />
+          </div>
+        </ui-field>
+
+        <ui-field
+          [bare]="true"
+          [label]="'customFields.requirements.update' | transloco"
+          [for]="'req-update'"
+          [hint]="'customFields.requirements.updateHint' | transloco"
+        >
+          <div
+            class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+          >
+            <span
+              class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+              [class]="updateRequired() ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+            >
+              {{ (updateRequired() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+            </span>
+            <ui-switch
+              [checked]="updateRequired()"
+              [disabled]="!canManage() || isArchived() || pendingOp() !== null"
+              [label]="'customFields.requirements.update' | transloco"
+              (checkedChange)="toggleRequirement('UPDATE', $event)"
+            />
+          </div>
+        </ui-field>
+
+        @if (showConvert()) {
+          <ui-field
+            [bare]="true"
+            [label]="'customFields.requirements.convert' | transloco"
+            [for]="'req-convert'"
+            [hint]="'customFields.requirements.convertHint' | transloco"
+          >
+            <div
+              class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
+            >
+              <span
+                class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+                [class]="convertRequired() ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+              >
+                {{ (convertRequired() ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+              </span>
+              <ui-switch
+                [checked]="convertRequired()"
+                [disabled]="!canManage() || isArchived() || pendingOp() !== null"
+                [label]="'customFields.requirements.convert' | transloco"
+                (checkedChange)="toggleRequirement('CONVERT', $event)"
+              />
+            </div>
+          </ui-field>
+        }
+      </div>
+
+      @if (scopedRules().length) {
+        <div class="flex flex-col gap-6 border-t border-border pt-8">
+          <h3 class="text-12 font-medium text-text-muted">{{ 'customFields.requirements.scopedTitle' | transloco }}</h3>
+          <div class="flex flex-col gap-4">
+            @for (rule of scopedRules(); track rule.operation + '-' + rule.entityScope) {
+              <div class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted px-10 py-6 text-12">
+                <div class="flex items-center gap-6">
+                  <span class="font-medium text-text">{{ ('customFields.operations.' + rule.operation) | transloco }}</span>
+                  <span class="inline-flex h-badge items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                    {{ scopeLabel(rule.entityScope) }}
+                  </span>
+                </div>
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium"
+                  [class]="rule.isRequired ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+                >
+                  {{ (rule.isRequired ? 'settings.common.yes' : 'settings.common.no') | transloco }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 items-center justify-end gap-8">
+    <button type="button" uiButton variant="ghost" [disabled]="pendingOp() !== null" (click)="close()">
+      {{ 'settings.common.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

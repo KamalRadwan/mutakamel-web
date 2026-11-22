@@ -1,0 +1,255 @@
+<ui-modal
+  size="form"
+  icon="tablerKey"
+  tile="bg-icon-teal"
+  [title]="'access.request.title' | transloco"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onModalClosed()"
+>
+  <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+    <ui-field
+      size="bare"
+      class="col-span-2"
+      [label]="'access.request.resourceType' | transloco"
+      [for]="uid + '-type'"
+      [hint]="'access.request.resourceTypeHint' | transloco"
+      [required]="true"
+    >
+      <div>
+        <ui-segmented
+          [id]="uid + '-type'"
+          [options]="typeOptions()"
+          [label]="'access.request.resourceType' | transloco"
+          [describedBy]="uid + '-type-hint'"
+          [value]="resourceType()"
+          (valueChange)="onTypeChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      class="col-span-2"
+      [label]="'access.request.resource' | transloco"
+      [for]="uid + '-resource'"
+      [hint]="'access.request.resourceHint' | transloco"
+      [required]="true"
+      [error]="resourceError()"
+    >
+      <div class="relative inline-flex w-full">
+        <button
+          #resourceTrigger
+          type="button"
+          [id]="uid + '-resource'"
+          class="inline-flex h-field w-full cursor-pointer items-center justify-between gap-6 rounded-8 border bg-surface-field px-8 text-12 text-text outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+          [class]="
+            resourceError()
+              ? 'border-danger-border ring-2 ring-danger-halo'
+              : menuOpen()
+                ? 'border-focus-ring ring-3 ring-focus-halo'
+                : 'border-border-field hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
+          "
+          aria-haspopup="listbox"
+          [attr.aria-expanded]="menuOpen()"
+          [attr.aria-label]="'access.request.resource' | transloco"
+          [attr.aria-describedby]="
+            resourceError() ? uid + '-resource-hint ' + uid + '-resource-error' : uid + '-resource-hint'
+          "
+          [attr.aria-invalid]="resourceError() ? 'true' : null"
+          [disabled]="resourcesLoading() || resources().length === 0"
+          (click)="toggleMenu()"
+        >
+          <span class="flex min-w-0 items-center gap-6">
+            @if (selectedResource(); as chosen) {
+              <span
+                class="inline-flex size-badge shrink-0 items-center justify-center rounded-6 text-on-icon"
+                [class]="chosen.type === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+                aria-hidden="true"
+              >
+                <ng-icon
+                  [name]="chosen.type === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                  size="12"
+                />
+              </span>
+              <span class="truncate">{{ resourceDisplayName(chosen) }}</span>
+            } @else {
+              <span class="truncate text-text-placeholder">
+                {{ 'access.request.resourcePlaceholder' | transloco }}
+              </span>
+            }
+          </span>
+          <span class="inline-flex shrink-0 text-text-muted">
+            <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+          </span>
+        </button>
+
+        @if (menuOpen()) {
+          <div
+            #resourcePanel
+            class="fixed z-dropdown flex flex-col gap-4 rounded-10 border border-border bg-surface p-4 shadow-popover"
+            [class.invisible]="!menuPlaced()"
+            [style.top.px]="menuPlace().top"
+            [style.inset-inline-start.px]="menuPlace().start"
+            [style.width.px]="menuPlace().width"
+            [style.max-height.px]="menuPlace().maxHeight"
+            (keydown)="onPanelKeydown($event)"
+          >
+            <div
+              class="flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+            >
+              <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+              <input
+                #resourceSearchInput
+                type="text"
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                [value]="resourceSearch()"
+                [placeholder]="'access.request.searchResource' | transloco"
+                [attr.aria-label]="'access.request.searchResource' | transloco"
+                (input)="onSearchInput($event)"
+              />
+            </div>
+
+            <ul
+              role="listbox"
+              class="flex max-h-notif-list-max flex-col gap-2 overflow-y-auto"
+              [attr.aria-label]="'access.request.resource' | transloco"
+            >
+              @for (item of filteredResources(); track item.id) {
+                <li role="option" [attr.aria-selected]="resourceId() === item.id">
+                  <button
+                    type="button"
+                    class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [class]="
+                      resourceId() === item.id
+                        ? 'bg-brand-soft text-on-brand-soft'
+                        : 'text-text hover:bg-row-hover'
+                    "
+                    (click)="selectResource(item)"
+                  >
+                    <span class="flex min-w-0 items-center gap-6">
+                      <span
+                        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                        [class]="item.type === 'DASHBOARD' ? 'bg-icon-navy' : 'bg-icon-violet'"
+                        aria-hidden="true"
+                      >
+                        <ng-icon
+                          [name]="item.type === 'DASHBOARD' ? 'tablerLayoutDashboard' : 'tablerPuzzle'"
+                          size="14"
+                        />
+                      </span>
+                      <span class="truncate">{{ resourceDisplayName(item) }}</span>
+                      @if (item.heldLevel === 'VIEW') {
+                        <ui-badge tone="tag">{{ 'analytics.access.VIEW' | transloco }}</ui-badge>
+                      }
+                    </span>
+                    @if (resourceId() === item.id) {
+                      <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+                    }
+                  </button>
+                </li>
+              } @empty {
+                <li class="px-8 py-6 text-center text-12 text-text-muted">
+                  {{ 'analytics.common.noResults' | transloco }}
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'access.request.level' | transloco"
+      [for]="uid + '-level'"
+      [hint]="'access.request.levelHint' | transloco"
+      [required]="true"
+      [error]="levelError()"
+    >
+      <div>
+        <ui-segmented
+          [id]="uid + '-level'"
+          [options]="levelOptions()"
+          [label]="'access.request.level' | transloco"
+          [describedBy]="
+            levelError() ? uid + '-level-hint ' + uid + '-level-error' : uid + '-level-hint'
+          "
+          [value]="requestedLevel()"
+          (valueChange)="onLevelChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'access.request.expires' | transloco"
+      [for]="uid + '-expires'"
+      [hint]="'access.request.expiresHint' | transloco"
+      [error]="expiresError()"
+    >
+      <div class="flex items-center gap-4">
+        <ui-date-field
+          class="min-w-0 flex-1"
+          [id]="uid + '-expires'"
+          [ariaLabel]="'access.request.expires' | transloco"
+          [describedBy]="
+            expiresError()
+              ? uid + '-expires-hint ' + uid + '-expires-error'
+              : uid + '-expires-hint'
+          "
+          [min]="minExpiryDate"
+          [placeholder]="'access.fields.noExpiry' | transloco"
+          [todayLabel]="'access.date.today' | transloco"
+          [prevMonthLabel]="'access.date.prevMonth' | transloco"
+          [nextMonthLabel]="'access.date.nextMonth' | transloco"
+          [invalid]="!!expiresError()"
+          [value]="requestedExpiresAt()"
+          (valueChange)="onExpiresChange($event)"
+        />
+        @if (requestedExpiresAt()) {
+          <button
+            type="button"
+            class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-label]="'access.actions.clearDate' | transloco"
+            [title]="'access.actions.clearDate' | transloco"
+            (click)="clearExpires()"
+          >
+            <ng-icon name="tablerX" size="14" aria-hidden="true" />
+          </button>
+        }
+      </div>
+    </ui-field>
+
+    <ui-field
+      size="multiline"
+      class="col-span-2"
+      [label]="'access.request.purpose' | transloco"
+      [for]="uid + '-purpose'"
+      [hint]="'access.request.purposeHint' | transloco"
+      [required]="true"
+      [count]="purpose().length"
+      [max]="250"
+      [error]="purposeError()"
+    >
+      <textarea
+        [id]="uid + '-purpose'"
+        rows="3"
+        class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [value]="purpose()"
+        [placeholder]="'access.request.purposePlaceholder' | transloco"
+        [attr.aria-invalid]="purposeError() ? 'true' : null"
+        (input)="onPurposeInput($event)"
+      ></textarea>
+    </ui-field>
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton variant="primary" [loading]="submitting()" (click)="submit()">
+      {{ 'access.request.send' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+      {{ 'analytics.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

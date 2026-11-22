@@ -1,0 +1,41 @@
+@if (rows().length === 0) {
+  <div class="rounded-10 border border-border bg-surface p-16 text-center text-12 text-text-muted shadow-card">
+    {{ 'tdpg.revisions.empty' | transloco }}
+  </div>
+} @else {
+  <div class="flex flex-col gap-6">
+    @for (row of rows(); track row.id) {
+      <div
+        class="flex min-h-table-row flex-wrap items-center gap-8 rounded-10 border px-10 py-6"
+        [class]="row.isCurrent ? 'border-brand bg-brand-soft' : 'border-border bg-surface shadow-card'"
+      >
+        <span class="text-13 leading-18 font-medium text-text tabular-nums">
+          #<bdi dir="ltr">{{ row.revisionNumber }}</bdi>
+        </span>
+
+        <span
+          class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+          [class]="row.badgeClass"
+        >
+          {{ row.badgeLabelKey | transloco }}
+        </span>
+
+        @if (row.isCurrent) {
+          <ui-badge tone="brand">{{ 'tdpg.revisions.current' | transloco }}</ui-badge>
+        }
+
+        <span class="text-12 leading-18 text-text-muted">
+          {{ 'tdpg.revisions.validUntil' | transloco: { date: row.validUntilDmy } }}
+        </span>
+
+        <span class="text-12 leading-18 text-text-muted">
+          {{ row.timestampKey | transloco: { date: row.timestampFormatted } }}
+        </span>
+
+        <bdi dir="ltr" class="ms-auto text-13 leading-18 font-medium text-text tabular-nums">
+          {{ row.totalFormatted }}
+        </bdi>
+      </div>
+    }
+  </div>
+}

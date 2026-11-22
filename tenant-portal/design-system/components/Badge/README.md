@@ -1,0 +1,1 @@
+Shows status. Status badges are filled with dark text (`success`, `warning`, `danger`) and mean the same in both themes. Stage and category chips are quiet (`brand-soft`, `neutral-soft`). You provide one or two words. Due status: overdue red, today orange, upcoming green.

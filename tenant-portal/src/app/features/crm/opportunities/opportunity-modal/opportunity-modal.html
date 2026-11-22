@@ -1,0 +1,190 @@
+<app-record-modal-frame
+  [open]="isOpen()"
+  (openChange)="onOpenChange($event)"
+  [mode]="mode()"
+  typeIcon="tablerTarget"
+  typeTile="bg-icon-red"
+  [typeTitle]="(mode() === 'create' ? 'oppModal.newTitle' : 'oppModal.typeTitle') | transloco"
+  [subtitle]="subtitle()"
+  [position]="navPos()"
+  [dirty]="dirty()"
+  [saving]="saving()"
+  [deleting]="deleting()"
+  [loading]="loading()"
+  [updating]="instantUpdating() || loading()"
+  [actionsDisabled]="loading() || loadFailed() || (mode() === 'create' && !!saveBlockedReason())"
+  [canSave]="canEdit()"
+  [saveEnabled]="dirty() && !saveBlockedReason()"
+  [canDelete]="canDelete()"
+  [showSaveAndNew]="true"
+  [createLabel]="'oppModal.createLabel' | transloco"
+  [extraActions]="extraActions()"
+  [ariaLabel]="
+    mode() === 'create' ? ('oppModal.newTitle' | transloco) : subtitle() || ('oppModal.typeTitle' | transloco)
+  "
+  [dismissable]="!anyGuardBusy()"
+  [prevLabel]="'oppModal.nav.prev' | transloco"
+  [nextLabel]="'oppModal.nav.next' | transloco"
+  (prev)="goPrev()"
+  (next)="goNext()"
+  (requestClose)="requestClose()"
+  (save)="save(false)"
+  (saveAndNew)="save(true)"
+  (fullPage)="continueInFullPage()"
+  (undo)="undoChanges()"
+  (delete)="confirmDelete()"
+  (extraAction)="onExtraAction($event)"
+>
+  @if (mode() === 'edit' && !loading() && !loadFailed() && row(); as currentOpp) {
+    @if (currentOpp.id === opportunityId()) {
+      <app-record-related-badges
+        headerRelated
+        layout="modal"
+        recordType="OPPORTUNITY"
+        [recordId]="currentOpp.id"
+        [branchId]="currentOpp.branchId"
+        [partyLabel]="subtitle()"
+        [kinds]="relatedKinds"
+        [loadCounts]="loadRelatedCounts()"
+        [links]="relatedLinks"
+        (badgeClick)="onRelatedBadgeClick($event)"
+      />
+    }
+  }
+
+  @if (loading() || !scopesReady()) {
+    <div modalMain class="flex flex-col gap-y-10">
+      <div class="flex flex-col gap-8">
+        <div class="h-field w-1/3 animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+        <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+        <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+        <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      </div>
+      <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+        <div class="h-skeleton-line w-1/4 animate-pulse rounded-6 bg-neutral-soft motion-reduce:animate-none"></div>
+        <div class="grid grid-cols-2 gap-x-10 gap-y-8">
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+          <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+        </div>
+      </div>
+    </div>
+  } @else if (loadFailed()) {
+    <div modalMain class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-text-muted">{{ 'oppModal.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="primary" (click)="retryLoad()">
+        {{ 'recordModal.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <app-opportunity-form
+      modalMain
+      class="h-full min-h-0 flex-1"
+      layout="modal"
+      [mode]="mode()"
+      [readonly]="isReadonly()"
+      [errors]="errors()"
+      [row]="row()"
+      [updating]="updatingState()"
+      [draft]="draft()"
+      (draftChange)="onFormDraftChange($event)"
+      (seeded)="onFormSeeded($event)"
+      (rate)="onRate($event)"
+      (recolor)="onRecolor($event)"
+      (moveStage)="onMoveStage($event)"
+      (submitRequest)="save(false)"
+    />
+  }
+
+  @if (loading() || !scopesReady()) {
+    <div modalAside class="flex flex-col gap-y-8">
+      <div class="h-skeleton-line w-1/2 animate-pulse rounded-6 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      <div class="grid grid-cols-2 gap-x-10">
+        <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+        <div class="h-field animate-pulse rounded-8 bg-neutral-soft motion-reduce:animate-none"></div>
+      </div>
+    </div>
+  }
+</app-record-modal-frame>
+
+<span
+  #saveBlockedEl
+  [id]="saveBlockedId"
+  role="status"
+  class="text-12 leading-18 text-text-muted"
+  [class.hidden]="!showSaveBlocked()"
+>
+  @if (saveBlockedReason(); as reason) {
+    {{ reason | transloco }}
+  }
+</span>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'recordModal.unsaved.title' | transloco"
+  [text]="'recordModal.unsaved.text' | transloco"
+  [saveLabel]="'recordModal.unsaved.save' | transloco"
+  [discardLabel]="'recordModal.unsaved.discard' | transloco"
+  [cancelLabel]="'recordModal.unsaved.cancel' | transloco"
+/>
+
+<div #conflictDialogWrap>
+  <ui-confirm-dialog
+    #conflictDialog
+    tone="warning"
+    [title]="'oppModal.conflict.title' | transloco"
+    [text]="'oppModal.conflict.text' | transloco"
+    [confirmLabel]="'oppModal.conflict.reload' | transloco"
+    [cancelLabel]="'oppModal.conflict.keepEditing' | transloco"
+  />
+</div>
+
+<div #deleteDialogWrap>
+  <ui-confirm-dialog
+    #deleteDialog
+    tone="danger"
+    [title]="'oppModal.delete.title' | transloco"
+    [text]="'oppModal.delete.text' | transloco"
+    [confirmLabel]="'oppModal.delete.confirm' | transloco"
+    [cancelLabel]="'oppModal.delete.cancel' | transloco"
+  />
+</div>
+
+<app-opportunity-close-dialog
+  class="absolute"
+  [request]="moves.closeRequest()"
+  (done)="moves.resolveClose($event)"
+/>
+
+<app-opportunity-pipeline-move-dialog
+  class="absolute"
+  [request]="moves.transferRequest()"
+  (done)="moves.resolveTransfer($event)"
+/>
+
+<div #reopenDialogWrap>
+  <ui-confirm-dialog
+    #reopenDialog
+    class="absolute"
+    tone="warning"
+    [title]="'oppMoves.reopen.title' | transloco"
+    [text]="reopenText()"
+    [confirmLabel]="'oppMoves.reopen.confirm' | transloco"
+    [cancelLabel]="'oppMoves.common.cancel' | transloco"
+  />
+</div>

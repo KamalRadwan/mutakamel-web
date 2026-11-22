@@ -1,0 +1,145 @@
+<div class="flex h-app-screen flex-col bg-bg text-text">
+  <header class="shrink-0">
+    <div class="bg-nav-gradient flex h-nav items-center gap-4 px-12 text-13 leading-18 text-on-nav">
+      <div class="flex w-nav-logo shrink-0 items-center">
+        <img src="assets/brand/logo-horizontal-light.png" [alt]="'brand' | transloco" class="h-nav-item w-auto" />
+      </div>
+
+      <ui-menu
+        [items]="appItems()"
+        [label]="('nav.appSwitcher' | transloco) + ': ' + (('nav.apps.' + navApp()) | transloco)"
+        [glass]="true"
+        (selected)="selectApp($event)"
+      >
+        <ng-icon name="tablerLayoutGrid" size="17" aria-hidden="true" />
+        <span>{{ ('nav.apps.' + navApp()) | transloco }}</span>
+      </ui-menu>
+
+      <span class="h-counter w-border shrink-0 bg-on-nav-line" aria-hidden="true"></span>
+
+      <nav #mainNav class="flex min-w-0 flex-1 items-center gap-4" [attr.aria-label]="'nav.mainNavigation' | transloco">
+        @for (feature of features(); track feature; let index = $index) {
+          @if (index < visibleFeatures()) {
+              <a
+                data-fit-item
+                [routerLink]="featureLink(feature)"
+                class="inline-flex h-nav-item items-center gap-6 rounded-8 ps-2 pe-10 text-13 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [class]="
+                  isActiveFeature(feature)
+                    ? 'bg-nav-glass font-medium text-on-nav inset-ring inset-ring-nav-glass-ring'
+                    : 'text-on-nav-muted hover:text-on-nav'
+                "
+                [attr.aria-current]="featureCurrent(feature)"
+              >
+                @if (iconOf(feature); as look) {
+                  <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon" [class]="look.tile">
+                    <ng-icon [name]="look.icon" size="14" aria-hidden="true" />
+                  </span>
+                }
+                {{ ('nav.features.' + feature) | transloco }}
+              </a>
+          }
+        }
+        @if (moreItems().length) {
+          <ui-menu [items]="moreItems()" [label]="'nav.more' | transloco" [glass]="moreHasActive()" (selected)="selectFeature($event)">
+            <ng-icon name="tablerDots" size="17" aria-hidden="true" />
+            <span class="hidden desktop:inline">{{ 'nav.more' | transloco }}</span>
+          </ui-menu>
+        }
+      </nav>
+
+      <app-scope-switcher class="shrink-0" />
+
+      <ui-preferences tone="nav" class="shrink-0" />
+
+      <app-bulk-jobs-indicator />
+
+      <app-notification-bell />
+
+      @if (identityReady()) {
+        <ui-menu
+          [items]="userItems()"
+          [label]="'nav.userMenu' | transloco"
+          align="end"
+          (selected)="selectUserAction($event)"
+        >
+          <span class="inline-flex size-avatar-nav shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon">
+            {{ currentUser.initials() }}
+          </span>
+          <span class="hidden desktop:inline">{{ currentUser.user().displayName }}</span>
+        </ui-menu>
+      }
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+      @if (pages().length) {
+        <nav
+          #subNav
+          class="flex h-subnav shrink-0 items-stretch gap-2 overflow-hidden border-b border-border bg-surface px-12 text-13 leading-18"
+          [attr.aria-label]="'nav.subNavigation' | transloco"
+        >
+          @for (page of pages(); track page.id; let index = $index) {
+            @if (index < visibleSubPages()) {
+            <a
+              data-fit-item
+              [routerLink]="['/', currentApp(), currentFeature(), page.id]"
+              [queryParams]="staffPageQuery()"
+              class="my-4 inline-flex shrink-0 items-center gap-6 rounded-8 px-10 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="page.id === currentPage() ? 'bg-brand font-medium text-on-brand' : 'text-text-muted hover:bg-row-hover hover:text-text'"
+              [attr.aria-current]="page.id === currentPage() ? 'page' : null"
+              (click)="navApp.set(currentApp())"
+            >
+              <span class="inline-flex shrink-0" [class]="page.id === currentPage() ? 'text-on-brand' : page.color">
+                <ng-icon [name]="page.icon" size="16" aria-hidden="true" />
+              </span>
+              {{ ('nav.pages.' + currentApp() + '.' + currentFeature() + '.' + page.id) | transloco }}
+            </a>
+            }
+          }
+          @if (subMoreItems().length) {
+            <span
+              class="my-4 inline-flex shrink-0 items-center rounded-8"
+              [class]="subMoreHasActive() ? 'bg-brand-soft text-on-brand-soft' : ''"
+            >
+              <ui-menu
+                variant="icon"
+                [items]="subMoreItems()"
+                [label]="'nav.more' | transloco"
+                (selected)="selectSubPage($event)"
+              >
+                <ng-icon name="tablerDots" size="17" aria-hidden="true" />
+              </ui-menu>
+            </span>
+          }
+        </nav>
+      }
+
+      <main
+        class="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        [class.pb-phone-reserve]="phone.visible()"
+        [class]="phone.visible() && phone.panelOpen() ? 'lg:pe-phone-panel-reserve' : ''"
+      >
+        @if (identityReady()) {
+          @if (staffOutlet() === 'denied') {
+            <app-staff-access-page />
+          } @else if (staffOutlet() === 'open') {
+            <router-outlet />
+          }
+        } @else if (authSession.status() === 'failed' || authSession.status() === 'loading') {
+          <ui-full-state
+            kind="load-failure"
+            [title]="'session.loadFailed.title' | transloco"
+            [text]="'session.loadFailed.text' | transloco"
+            [actionLabel]="'session.loadFailed.retry' | transloco"
+            (action)="retrySession()"
+          />
+        }
+      </main>
+    </div>
+  </div>
+</div>
+
+<app-seat-notice-host />
+<app-phone-host />

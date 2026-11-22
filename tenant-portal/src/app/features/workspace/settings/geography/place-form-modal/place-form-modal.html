@@ -1,0 +1,175 @@
+<ui-modal
+  size="form"
+  [icon]="modalIcon()"
+  tile="bg-icon-teal"
+  [title]="modalTitle()"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+    <div class="col-span-2">
+      <ui-field
+        [for]="uid + '-location'"
+        [label]="'geoPlaces.modal.location' | transloco"
+        [hint]="'geoPlaces.modal.locationHint' | transloco"
+      >
+        <input
+          [id]="uid + '-location'"
+          type="text"
+          readonly
+          class="w-full cursor-default bg-transparent text-12 text-text outline-none"
+          [value]="resolvedLocationPath()"
+          [attr.aria-describedby]="uid + '-location-hint'"
+        />
+      </ui-field>
+    </div>
+
+    @if (entityType() === 'district') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-kind'"
+          [label]="'geoPlaces.modal.kind' | transloco"
+          [required]="true"
+          [hint]="'geoPlaces.modal.kindHint' | transloco"
+        >
+          <ui-segmented
+            class="w-fit"
+            [id]="uid + '-kind'"
+            [describedBy]="uid + '-kind-hint'"
+            [label]="'geoPlaces.modal.kind' | transloco"
+            [options]="kindOptions()"
+            [value]="kind()"
+            (valueChange)="onKindChange($event)"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <ui-field
+      [for]="uid + '-name-en'"
+      [label]="'geoPlaces.modal.nameEn' | transloco"
+      [required]="true"
+      [hint]="'geoPlaces.modal.nameEnHint' | transloco"
+      [count]="nameEn().length"
+      [max]="maxNameLength"
+      [error]="nameEnError()"
+    >
+      <input
+        #nameEnInput
+        [id]="uid + '-name-en'"
+        type="text"
+        dir="ltr"
+        [attr.maxlength]="maxNameLength"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameEn()"
+        [readonly]="isReadOnly() || saving()"
+        [attr.aria-invalid]="nameEnError() ? 'true' : null"
+        [attr.aria-describedby]="uid + '-name-en-hint' + (nameEnError() ? ' ' + uid + '-name-en-error' : '')"
+        (input)="onNameInput('en', $event)"
+        (blur)="markTouched('en')"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="uid + '-name-ar'"
+      [label]="'geoPlaces.modal.nameAr' | transloco"
+      [required]="true"
+      [hint]="'geoPlaces.modal.nameArHint' | transloco"
+      [count]="nameAr().length"
+      [max]="maxNameLength"
+      [error]="nameArError()"
+    >
+      <input
+        [id]="uid + '-name-ar'"
+        type="text"
+        dir="rtl"
+        [attr.maxlength]="maxNameLength"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="nameAr()"
+        [readonly]="isReadOnly() || saving()"
+        [attr.aria-invalid]="nameArError() ? 'true' : null"
+        [attr.aria-describedby]="uid + '-name-ar-hint' + (nameArError() ? ' ' + uid + '-name-ar-error' : '')"
+        (input)="onNameInput('ar', $event)"
+        (blur)="markTouched('ar')"
+      />
+    </ui-field>
+
+    @if (mode() === 'edit') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-active'"
+          [label]="'geoPlaces.modal.active' | transloco"
+          [hint]="'geoPlaces.modal.activeHint' | transloco"
+        >
+          <div class="flex items-start gap-8 pt-2">
+            <ui-switch
+              [id]="uid + '-active'"
+              [describedBy]="uid + '-active-hint'"
+              [(checked)]="isActive"
+              [disabled]="isReadOnly() || saving()"
+              [label]="'geoPlaces.modal.active' | transloco"
+            />
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <span class="text-12 leading-18 font-medium text-text">
+                {{ (isActive() ? 'geoPlaces.active' : 'geoPlaces.inactive') | transloco }}
+              </span>
+              <span class="text-11 leading-16 text-text-muted">
+                {{ 'geoPlaces.modal.activeHelp' | transloco }}
+              </span>
+            </div>
+          </div>
+        </ui-field>
+      </div>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center justify-between gap-8">
+    @if (isReadOnly()) {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    } @else {
+      <div class="flex flex-wrap items-center gap-8">
+        <button
+          type="submit"
+          [attr.form]="uid + '-form'"
+          uiButton
+          variant="primary"
+          [loading]="saving()"
+          [disabled]="saving() || !isValid() || !dirty()"
+        >
+          {{ 'geoPlaces.modal.save' | transloco }}
+        </button>
+
+        @if (dirty()) {
+          <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
+            {{ 'geoPlaces.modal.undo' | transloco }}
+          </button>
+          <span class="text-12 leading-18 text-text-muted">{{ 'geoPlaces.modal.unsaved' | transloco }}</span>
+        } @else {
+          <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+            {{ 'geoPlaces.modal.cancel' | transloco }}
+          </button>
+        }
+      </div>
+
+      @if (mode() === 'edit') {
+        <button type="button" uiButton variant="danger" [disabled]="saving()" (click)="requestDelete()">
+          {{ 'geoPlaces.modal.delete' | transloco }}
+        </button>
+      }
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #discardDialog
+  tone="warning"
+  [title]="'geoPlaces.discard.title' | transloco"
+  [text]="'geoPlaces.discard.text' | transloco"
+  [confirmLabel]="'geoPlaces.discard.confirm' | transloco"
+  [cancelLabel]="'geoPlaces.discard.keep' | transloco"
+/>

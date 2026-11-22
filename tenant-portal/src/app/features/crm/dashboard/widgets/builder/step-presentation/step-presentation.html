@@ -1,0 +1,266 @@
+<div class="flex flex-col gap-8">
+  <ui-field
+    for="presentation-chart"
+    [bare]="true"
+    [required]="true"
+    [label]="'builder2.presentation.chart' | transloco"
+    [hint]="'builder2.presentation.chartHint' | transloco"
+    [error]="errorFor('visualizationType')"
+  >
+    <app-chart-gallery
+      describedBy="presentation-chart-hint"
+      [label]="'builder2.presentation.chart' | transloco"
+      [catalog]="state.catalog()"
+      [metrics]="chosenMetrics()"
+      [seriesCount]="state.draft().querySpec.series.length"
+      [hasTarget]="hasTarget()"
+      [value]="state.draft().visualizationType"
+      (valueChange)="onChartChange($event)"
+    />
+  </ui-field>
+
+  <ui-field
+    for="presentation-title"
+    [required]="true"
+    [label]="'builder2.presentation.title' | transloco"
+    [hint]="'builder2.presentation.titleHint' | transloco"
+    [max]="120"
+    [count]="state.draft().name.length"
+    [error]="errorFor('name')"
+  >
+    <input
+      #titleInput
+      id="presentation-title"
+      type="text"
+      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'builder2.presentation.titlePlaceholder' | transloco"
+      [value]="state.draft().name"
+      (input)="onTitleInput(titleInput.value)"
+    />
+  </ui-field>
+
+  <ui-field
+    for="presentation-description"
+    size="multiline"
+    [label]="'builder2.presentation.description' | transloco"
+    [hint]="'builder2.presentation.descriptionHint' | transloco"
+    [max]="500"
+    [count]="state.draft().description.length"
+    [error]="errorFor('description')"
+  >
+    <textarea
+      #descInput
+      id="presentation-description"
+      rows="3"
+      class="min-h-textarea w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+      [placeholder]="'builder2.presentation.descriptionPlaceholder' | transloco"
+      [value]="state.draft().description"
+      (input)="onDescriptionInput(descInput.value)"
+    ></textarea>
+  </ui-field>
+
+  <div class="grid grid-cols-1 gap-8">
+    <ui-field
+      for="presentation-legend"
+      [bare]="true"
+      [label]="'builder2.presentation.legend' | transloco"
+      [hint]="'builder2.presentation.legendHint' | transloco"
+      [error]="errorFor('displaySpec.legendPosition') ?? errorFor('legendPosition')"
+    >
+      <ui-dropdown
+        id="presentation-legend"
+        size="field"
+        [label]="'builder2.presentation.legend' | transloco"
+        describedBy="presentation-legend-hint"
+        [options]="legendOptions()"
+        [value]="state.draft().displaySpec.legendPosition ?? 'top'"
+        (valueChange)="onLegendChange($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      for="presentation-number-format"
+      [bare]="true"
+      [label]="'builder2.presentation.numberFormat' | transloco"
+      [hint]="'builder2.presentation.numberFormatHint' | transloco"
+      [error]="errorFor('displaySpec.numberFormat') ?? errorFor('numberFormat')"
+    >
+      <ui-dropdown
+        id="presentation-number-format"
+        size="field"
+        [label]="'builder2.presentation.numberFormat' | transloco"
+        describedBy="presentation-number-format-hint"
+        [options]="numberFormatOptions()"
+        [value]="currentNumberFormat()"
+        (valueChange)="onNumberFormatChange($event)"
+      />
+    </ui-field>
+  </div>
+
+  <ui-field
+    for="presentation-series-colours"
+    [bare]="true"
+    [label]="'builder2.presentation.seriesColours' | transloco"
+    [hint]="(seriesColorRows().length === 0 ? 'builder2.presentation.noSeriesYet' : 'builder2.presentation.seriesColoursHint') | transloco"
+  >
+    <div id="presentation-series-colours" class="flex flex-wrap items-center gap-8">
+      @if (seriesColorRows().length === 0) {
+        <span class="text-12 leading-18 text-text-muted">
+          {{ 'builder2.presentation.noSeriesShort' | transloco }}
+        </span>
+      } @else {
+        @for (item of seriesColorRows(); track item.key) {
+          <span class="inline-flex h-field items-center gap-6 rounded-8 border border-border bg-surface px-8 text-12 text-text">
+            <span
+              class="size-checkbox-size shrink-0 rounded-4 border border-border"
+              [class]="item.swatchClass"
+              aria-hidden="true"
+            ></span>
+            <span class="truncate">{{ item.label }}</span>
+          </span>
+        }
+      }
+    </div>
+  </ui-field>
+
+  @if (selectedViz()?.supportsReferences) {
+    <div data-field="displaySpec.references">
+      <ui-field
+        for="presentation-references"
+        [bare]="true"
+        [label]="'builder2.presentation.references' | transloco"
+        [hint]="'builder2.presentation.referencesHint' | transloco"
+        [count]="references().length"
+        [max]="4"
+        [error]="errorFor('displaySpec.references')"
+      >
+        <div id="presentation-references" class="flex flex-col gap-6">
+          @for (ref of references(); track $index) {
+            <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+              <div class="flex items-center justify-between gap-6">
+                <span class="text-12 leading-18 font-medium text-text">
+                  {{ 'builder2.presentation.referenceItem' | transloco: { n: $index + 1 } }}
+                </span>
+                <button
+                  uiButton
+                  type="button"
+                  variant="ghost"
+                  size="small"
+                  [attr.aria-label]="'builder2.presentation.removeReference' | transloco"
+                  [title]="'builder2.presentation.removeReference' | transloco"
+                  (click)="removeReference($index)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 gap-8">
+                <div [attr.data-field]="'displaySpec.references.' + $index + '.seriesIndex'">
+                  <ui-field
+                    [for]="'presentation-ref-series-' + $index"
+                    [bare]="true"
+                    [label]="'builder2.presentation.refSeries' | transloco"
+                    [hint]="'builder2.presentation.refSeriesHint' | transloco"
+                    [error]="errorFor('displaySpec.references.' + $index + '.seriesIndex')"
+                  >
+                    <ui-dropdown
+                      [id]="'presentation-ref-series-' + $index"
+                      size="field"
+                      [label]="'builder2.presentation.refSeries' | transloco"
+                      [describedBy]="errorFor('displaySpec.references.' + $index + '.seriesIndex') ? ('presentation-ref-series-' + $index + '-hint presentation-ref-series-' + $index + '-error') : ('presentation-ref-series-' + $index + '-hint')"
+                      [options]="seriesOptionsForRow($index)"
+                      [value]="ref.seriesIndex + ''"
+                      (valueChange)="onReferenceSeriesChange($index, $event)"
+                    />
+                  </ui-field>
+                </div>
+
+                <div [attr.data-field]="'displaySpec.references.' + $index + '.value'">
+                  <ui-field
+                    [for]="'presentation-ref-value-' + $index"
+                    [label]="'builder2.presentation.refValue' | transloco"
+                    [hint]="refValueHint(ref.unit)"
+                    [error]="errorFor('displaySpec.references.' + $index + '.value')"
+                  >
+                    @if (ref.unit === 'MONEY') {
+                      @if (activeCurrency(); as currency) {
+                        <bdi dir="ltr" class="shrink-0 text-12 font-medium text-text-muted">{{ currency }}</bdi>
+                      }
+                    }
+                    <input
+                      #refValInput
+                      [id]="'presentation-ref-value-' + $index"
+                      type="number"
+                      min="0"
+                      dir="ltr"
+                      step="any"
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'builder2.presentation.referencePlaceholder' | transloco"
+                      [value]="refValueText(ref)"
+                      (input)="onReferenceValueInput($index, refValInput.value)"
+                    />
+                  </ui-field>
+                </div>
+
+                <div [attr.data-field]="'displaySpec.references.' + $index + '.label'">
+                  <ui-field
+                    [for]="'presentation-ref-label-' + $index"
+                    [label]="'builder2.presentation.refLabel' | transloco"
+                    [hint]="'builder2.presentation.refLabelHint' | transloco"
+                    [error]="errorFor('displaySpec.references.' + $index + '.label')"
+                  >
+                    <input
+                      #refLblInput
+                      [id]="'presentation-ref-label-' + $index"
+                      type="text"
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+                      [placeholder]="'builder2.presentation.referenceLabelPlaceholder' | transloco"
+                      [value]="ref.label"
+                      (input)="onReferenceLabelInput($index, refLblInput.value)"
+                    />
+                  </ui-field>
+                </div>
+              </div>
+            </div>
+          }
+
+          @if (canAddReference()) {
+            <div>
+              <button uiButton type="button" variant="secondary" size="small" (click)="addReference()">
+                <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                <span>{{ 'builder2.presentation.addReference' | transloco }}</span>
+              </button>
+            </div>
+          }
+        </div>
+      </ui-field>
+    </div>
+  }
+
+  <ui-field
+    for="presentation-size"
+    [bare]="true"
+    [label]="'builder2.presentation.size' | transloco"
+    [hint]="(activeSize() ? 'builder2.presentation.sizeHint' : 'builder2.presentation.noChartSelected') | transloco"
+  >
+    <div class="flex flex-wrap items-center gap-8">
+      <ui-segmented
+        id="presentation-size"
+        [label]="'builder2.presentation.size' | transloco"
+        describedBy="presentation-size-hint"
+        [options]="sizeOptions()"
+        [value]="sizePreset()"
+        (valueChange)="onSizePresetChange($event)"
+      />
+      @if (activeSize(); as sz) {
+        <ui-badge tone="tag">
+          <bdi dir="ltr" class="tabular-nums">W {{ sz.w }} × H {{ sz.h }}</bdi>
+        </ui-badge>
+      } @else {
+        <span class="text-12 text-text-muted">
+          {{ 'builder2.presentation.noChartShort' | transloco }}
+        </span>
+      }
+    </div>
+  </ui-field>
+</div>

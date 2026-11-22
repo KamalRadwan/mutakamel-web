@@ -1,0 +1,43 @@
+<ui-field
+  [label]="'builder.definitionLabel' | transloco"
+  [hint]="(definitionEmpty() ? 'builder.definition.empty' : 'builder.definitionHint') | transloco"
+  for="builder-definition-text"
+>
+  <input
+    id="builder-definition-text"
+    type="text"
+    readonly
+    [value]="definitionText()"
+    [title]="definitionText()"
+    class="w-full min-w-0 truncate bg-transparent text-12 text-text outline-none"
+  />
+</ui-field>
+
+<div class="min-w-0" [style.height]="'calc(' + previewRows() + ' * var(--dash-row-h))'">
+  <ui-widget-frame
+    [title]="previewTitle()"
+    [hint]="frameHint()"
+    [tag]="periodTag()"
+  >
+    @if (serverErrorReasonText(); as errText) {
+      <ui-widget-state kind="empty" [text]="errText" />
+    } @else {
+      <app-widget-body
+        [kind]="effectiveKind()"
+        [view]="state.preview()"
+        [title]="previewTitle()"
+        (retry)="state.refreshPreview()"
+        (openReadiness)="openReadiness($event)"
+      />
+    }
+  </ui-widget-frame>
+</div>
+
+@if (exactTable(); as table) {
+  <div class="min-w-0">
+    <app-widget-table
+      [table]="table"
+      [label]="'builder.preview.tableLabel' | transloco"
+    />
+  </div>
+}

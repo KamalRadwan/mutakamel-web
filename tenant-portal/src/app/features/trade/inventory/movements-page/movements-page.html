@@ -1,0 +1,388 @@
+<app-settings-frame
+  [addLabel]="'invMoves.actions.openingBalance' | transloco"
+  [searchPlaceholder]="'invMoves.searchPlaceholder' | transloco"
+  [loading]="loading()"
+  [showAdd]="canOpening"
+  [(search)]="searchInput"
+  (add)="openOpeningBalance()"
+  (reload)="reload()"
+>
+  <div notices class="flex flex-col gap-8">
+    @if (!canOpening && !canAdjust) {
+      <app-settings-notice tone="info">
+        {{ 'tradeInventory.common.canManageOff' | transloco }}
+      </app-settings-notice>
+    }
+
+    <div class="flex flex-wrap items-start gap-10 rounded-10 border border-border bg-surface p-8 shadow-card">
+      <ui-field
+        class="min-w-0 max-w-notif flex-1"
+        size="bare"
+        [for]="uid + '-node-filter'"
+        [label]="'invMoves.filters.node' | transloco"
+        [hint]="'invMoves.filters.nodeHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-node-filter'"
+          [describedBy]="uid + '-node-filter-hint'"
+          [options]="nodeOptions()"
+          [value]="nodeFilter()"
+          [label]="'invMoves.filters.node' | transloco"
+          (valueChange)="onNodeFilterChange($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 max-w-modal-alert flex-1"
+        size="bare"
+        [for]="uid + '-from-filter'"
+        [label]="'invMoves.filters.from' | transloco"
+        [hint]="'invMoves.filters.fromHint' | transloco"
+      >
+        <div class="flex items-center gap-4">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            [id]="uid + '-from-filter'"
+            [ariaLabel]="'invMoves.filters.from' | transloco"
+            [describedBy]="uid + '-from-filter-hint'"
+            [placeholder]="'invMoves.filters.fromPlaceholder' | transloco"
+            [todayLabel]="'invMoves.date.today' | transloco"
+            [prevMonthLabel]="'invMoves.date.prevMonth' | transloco"
+            [nextMonthLabel]="'invMoves.date.nextMonth' | transloco"
+            [value]="fromFilter() || null"
+            (valueChange)="onFromFilterChange($event)"
+          />
+          @if (fromFilter()) {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'invMoves.filters.clearDate' | transloco"
+              [title]="'invMoves.filters.clearDate' | transloco"
+              (click)="onFromFilterChange(null)"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+        </div>
+      </ui-field>
+
+      <ui-field
+        class="min-w-0 max-w-modal-alert flex-1"
+        size="bare"
+        [for]="uid + '-to-filter'"
+        [label]="'invMoves.filters.to' | transloco"
+        [hint]="'invMoves.filters.toHint' | transloco"
+        [error]="dateRangeInvalid() ? ('invMoves.filters.toBeforeFrom' | transloco) : null"
+      >
+        <div class="flex items-center gap-4">
+          <ui-date-field
+            class="min-w-0 flex-1"
+            [id]="uid + '-to-filter'"
+            [ariaLabel]="'invMoves.filters.to' | transloco"
+            [describedBy]="
+              dateRangeInvalid()
+                ? uid + '-to-filter-hint ' + uid + '-to-filter-error'
+                : uid + '-to-filter-hint'
+            "
+            [placeholder]="'invMoves.filters.toPlaceholder' | transloco"
+            [todayLabel]="'invMoves.date.today' | transloco"
+            [prevMonthLabel]="'invMoves.date.prevMonth' | transloco"
+            [nextMonthLabel]="'invMoves.date.nextMonth' | transloco"
+            [min]="fromFilter() || null"
+            [invalid]="dateRangeInvalid()"
+            [value]="toFilter() || null"
+            (valueChange)="onToFilterChange($event)"
+          />
+          @if (toFilter()) {
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'invMoves.filters.clearDate' | transloco"
+              [title]="'invMoves.filters.clearDate' | transloco"
+              (click)="onToFilterChange(null)"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          }
+        </div>
+      </ui-field>
+
+      @if (sourceFilter(); as srcId) {
+        <div class="flex shrink-0 flex-col">
+          <span class="mb-2 h-label" aria-hidden="true"></span>
+          <div class="flex h-field items-center">
+            <span
+              class="inline-flex h-filter-chip items-center gap-6 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft"
+              [title]="srcId"
+            >
+              <bdi dir="auto">{{ 'invMoves.filters.sourceChip' | transloco: { number: sourceDisplayLabel(srcId) } }}</bdi>
+              <button
+                type="button"
+                class="inline-flex size-counter cursor-pointer items-center justify-center rounded-4 text-on-brand-soft outline-none transition-colors duration-fast hover:bg-brand hover:text-on-brand focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                [attr.aria-label]="'invMoves.filters.clearSource' | transloco"
+                [title]="'invMoves.filters.clearSource' | transloco"
+                (click)="clearSourceFilter()"
+              >
+                <ng-icon name="tablerX" size="11" aria-hidden="true" />
+              </button>
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <ui-step-filter
+    class="shrink-0"
+    [steps]="steps()"
+    [label]="'invMoves.steps.label' | transloco"
+    [hint]="'invMoves.steps.hint' | transloco"
+    [value]="groupFilter()"
+    (valueChange)="onGroupChange($event)"
+  />
+
+  @if (loadFailed() && !loading()) {
+    <div
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+      role="alert"
+    >
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+      </span>
+      <p class="text-12 leading-18 text-danger-text">{{ loadErrorKey() | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+        {{ 'invMoves.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (!loading() && rows().length === 0) {
+    <div
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    >
+      @if (hasActiveFilters()) {
+        <p class="text-12 leading-18 text-text-muted">{{ 'invMoves.empty.filtered' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="clearFilters()">
+          {{ 'invMoves.actions.clearFilters' | transloco }}
+        </button>
+      } @else {
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+          <ng-icon name="tablerTruck" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text-muted">{{ 'invMoves.empty.text' | transloco }}</p>
+        @if (canOpening) {
+          <button type="button" uiButton variant="primary" (click)="openOpeningBalance()">
+            <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+            {{ 'invMoves.actions.openingBalance' | transloco }}
+          </button>
+        }
+      }
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'invMoves.tableLabel' | transloco"
+        [attr.aria-busy]="loading()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="gridColumns"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'invMoves.cols.date' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invMoves.cols.type' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invMoves.cols.item' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invMoves.cols.node' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10 text-end">
+            {{ 'invMoves.cols.quantity' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10 text-end">
+            {{ 'invMoves.cols.original' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invMoves.cols.tracking' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'invMoves.cols.source' | transloco }}
+          </span>
+          <span role="columnheader" class="border-s border-on-nav-line">
+            <span class="sr-only">{{ 'invMoves.cols.actions' | transloco }}</span>
+          </span>
+        </div>
+
+        @if (loading()) {
+          @for (skeleton of skeletonRows; track skeleton) {
+            <div
+              role="row"
+              aria-hidden="true"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface shadow-card"
+              [class]="gridColumns"
+            >
+              <span role="cell" class="flex items-center px-10">
+                <span class="h-skeleton-line w-3/4 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-badge w-2/3 motion-safe:animate-pulse rounded-8 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 flex-col justify-center gap-3 border-s border-border px-10">
+                <span class="h-skeleton-line w-1/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+                <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-end border-s border-border px-10">
+                <span class="h-skeleton-line w-1/2 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-2/3 motion-safe:animate-pulse rounded-4 bg-neutral-soft"></span>
+              </span>
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <span class="size-btn-h-sm motion-safe:animate-pulse rounded-6 bg-neutral-soft"></span>
+              </span>
+            </div>
+          }
+        } @else {
+          @for (row of rows(); track row.id) {
+            <div
+              role="row"
+              tabindex="0"
+              [attr.aria-label]="localizedItemName(row) + ' ' + row.itemCode + ' ' + formatDateTime(row.occurredAt)"
+              class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [class]="gridColumns"
+              (click)="openMovement(row)"
+              (keydown)="onRowKeydown($event, row)"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <bdi dir="ltr" class="truncate text-12 tabular-nums text-text-muted">
+                  {{ formatDateTime(row.occurredAt) }}
+                </bdi>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <app-inventory-badge kind="movement" [value]="row.movementType" />
+              </span>
+
+              <span role="cell" class="flex min-w-0 flex-col justify-center border-s border-border px-10">
+                <bdi dir="ltr" class="truncate text-13 leading-18 font-medium tabular-nums text-text">
+                  {{ row.itemCode }}
+                </bdi>
+                <span dir="auto" class="truncate text-11 leading-16 text-text-muted" [title]="localizedItemName(row)">
+                  {{ localizedItemName(row) }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span dir="auto" class="truncate text-13 text-text" [title]="row.nodeName">
+                  {{ row.nodeName }}
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-end">
+                <span class="text-13 font-medium">
+                  <app-inventory-quantity
+                    [value]="row.normalizedSignedQuantity"
+                    [uom]="row.normalizedUomCode"
+                    [signed]="true"
+                  />
+                </span>
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-end">
+                @if (hasOriginalColumnValue(row)) {
+                  <span class="text-12">
+                    <app-inventory-quantity
+                      [value]="row.signedQuantity"
+                      [uom]="row.uomCode"
+                      [signed]="true"
+                    />
+                  </span>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'tradeInventory.common.none' | transloco }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (row.tracking.lotKey; as lot) {
+                  <bdi dir="ltr" class="truncate text-12 tabular-nums text-text" [title]="lot">{{ lot }}</bdi>
+                } @else if (row.tracking.serialKeys?.length; as serialLen) {
+                  <span class="truncate text-12 text-text">{{ serialCountLabel(serialLen) }}</span>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'tradeInventory.common.none' | transloco }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                @if (row.sourceNumber; as srcNum) {
+                  <bdi dir="ltr" class="truncate text-12 tabular-nums text-text" [title]="srcNum">{{ srcNum }}</bdi>
+                } @else {
+                  <span class="text-12 text-text-muted">{{ 'tradeInventory.common.none' | transloco }}</span>
+                }
+              </span>
+
+              <span
+                role="cell"
+                class="flex items-center justify-center border-s border-border"
+                (click)="$event.stopPropagation()"
+              >
+                <ui-actions-menu
+                  [items]="rowActions(row)"
+                  [label]="'invMoves.actions.rowActions' | transloco"
+                  (selected)="onRowAction(row, $event)"
+                />
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    @if (!loadFailed() && (loading() ? total() > 0 : rows().length > 0)) {
+      <footer class="mt-auto border-t border-border pt-8">
+        <ui-pagination
+          [total]="total()"
+          [pageSizes]="pageSizes"
+          [label]="'invMoves.pagination' | transloco"
+          [page]="page()"
+          [pageSize]="pageSize()"
+          (pageChange)="onPageChange($event)"
+          (pageSizeChange)="onPageSizeChange($event)"
+        />
+      </footer>
+    }
+  }
+</app-settings-frame>
+
+<app-opening-balance-modal
+  [presetNodeId]="nodeFilter() || null"
+  (saved)="onOpeningBalanceSaved()"
+/>
+
+<app-movement-modal
+  [canAdjust]="canAdjust"
+  (closed)="onMovementModalClosed()"
+  (openMovement)="onOpenMovementById($event)"
+  (openDecision)="onOpenDecision($event)"
+  (reverseRequested)="onReverseFromDetail($event)"
+/>
+
+<app-reverse-modal
+  (reversed)="onReversed()"
+  (openDecision)="onOpenDecision($event)"
+/>

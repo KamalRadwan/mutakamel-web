@@ -1,0 +1,197 @@
+<ui-modal
+  size="form"
+  icon="tablerUpload"
+  tile="bg-icon-teal"
+  [title]="'templatesAssets.uploadModal.title' | transloco"
+  [closeLabel]="'templates.actions.close' | transloco"
+  [dismissable]="!uploading()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="submit($event)">
+    <div [class]="draft().scope === 'DEFINITION' ? 'col-span-1' : 'col-span-2'">
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope'"
+        [label]="'templatesAssets.uploadModal.scopeLabel' | transloco"
+        [hint]="'templatesAssets.uploadModal.scopeHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scope'"
+          [describedBy]="uid + '-scope-hint'"
+          [options]="scopeOptions()"
+          [formField]="uploadForm.scope"
+          [label]="'templatesAssets.uploadModal.scopeLabel' | transloco"
+        />
+      </ui-field>
+    </div>
+
+    @if (draft().scope === 'DEFINITION') {
+      <div class="col-span-1">
+        <ui-field
+          size="bare"
+          [for]="uid + '-template'"
+          [label]="'templatesAssets.uploadModal.templateLabel' | transloco"
+          [hint]="'templatesAssets.uploadModal.templateHint' | transloco"
+          [required]="true"
+          [error]="templateError()"
+        >
+          <ui-dropdown
+            class="w-full"
+            size="field"
+            [id]="uid + '-template'"
+            [describedBy]="uid + '-template-hint' + (templateError() ? ' ' + uid + '-template-error' : '')"
+            [options]="templateOptions()"
+            [formField]="uploadForm.definitionId"
+            [label]="'templatesAssets.uploadModal.templateLabel' | transloco"
+          />
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [for]="uid + '-type'"
+        [label]="'templatesAssets.uploadModal.typeLabel' | transloco"
+        [hint]="'templatesAssets.uploadModal.typeHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-type'"
+          [describedBy]="uid + '-type-hint'"
+          [options]="typeOptions()"
+          [formField]="uploadForm.assetType"
+          [label]="'templatesAssets.uploadModal.typeLabel' | transloco"
+        />
+      </ui-field>
+    </div>
+
+    <div class="col-span-1">
+      <ui-field
+        size="bare"
+        [for]="uid + '-delivery'"
+        [label]="'templatesAssets.uploadModal.deliveryLabel' | transloco"
+        [hint]="'templatesAssets.uploadModal.deliveryHint' | transloco"
+        [required]="true"
+        [error]="deliveryError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-delivery'"
+          [describedBy]="uid + '-delivery-hint' + (deliveryError() ? ' ' + uid + '-delivery-error' : '')"
+          [options]="deliveryOptions()"
+          [formField]="uploadForm.deliveryClass"
+          [label]="'templatesAssets.uploadModal.deliveryLabel' | transloco"
+        />
+      </ui-field>
+    </div>
+
+    @if (draft().deliveryClass === 'EMAIL_PUBLIC') {
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [label]="'templatesAssets.uploadModal.confirmPublicLabel' | transloco"
+          [hint]="'templatesAssets.uploadModal.confirmPublicHint' | transloco"
+          [required]="true"
+          [error]="confirmError()"
+        >
+          <ui-checkbox [formField]="uploadForm.confirmPublicEmailDelivery">
+            <span>{{ 'templatesAssets.uploadModal.confirmPublicText' | transloco }}</span>
+          </ui-checkbox>
+        </ui-field>
+      </div>
+    }
+
+    <div class="col-span-2">
+      <ui-field
+        size="bare"
+        [for]="uid + '-file'"
+        [label]="'templatesAssets.uploadModal.fileLabel' | transloco"
+        [hint]="'templatesAssets.uploadModal.fileHint' | transloco"
+        [required]="true"
+        [error]="fileError()"
+      >
+        @if (file(); as picked) {
+          <div class="flex items-center gap-8 rounded-10 border border-border bg-surface-muted p-8">
+            <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+              @if (hashing()) {
+                <ng-icon name="tablerLoader2" size="15" class="animate-spin" aria-hidden="true" />
+              } @else {
+                <ng-icon name="tablerPhoto" size="15" aria-hidden="true" />
+              }
+            </span>
+            <div class="min-w-0 flex-1">
+              <p dir="ltr" class="truncate text-12 leading-18 font-medium text-text text-start">{{ picked.name }}</p>
+              <p class="truncate text-11 leading-16 text-text-muted">
+                <bdi dir="ltr">{{ formatSize(picked.size) }}</bdi>
+                @if (hashing()) {
+                  · {{ 'templatesAssets.uploadModal.hashing' | transloco }}
+                } @else if (fileSha256()) {
+                  · <bdi dir="ltr">{{ 'templatesAssets.uploadModal.sha256Label' | transloco }}: {{ fileSha256().slice(0, 12) }}…</bdi>
+                }
+              </p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'templatesAssets.uploadModal.removeFile' | transloco"
+              [title]="'templatesAssets.uploadModal.removeFile' | transloco"
+              [disabled]="uploading()"
+              (click)="clearFile()"
+            >
+              <ng-icon name="tablerX" size="14" aria-hidden="true" />
+            </button>
+          </div>
+        } @else {
+          <ui-file-drop
+            [id]="uid + '-file'"
+            [describedBy]="uid + '-file-hint' + (fileError() ? ' ' + uid + '-file-error' : '')"
+            [accept]="accept"
+            [maxBytes]="maxBytes"
+            [title]="'templatesAssets.uploadModal.dropTitle' | transloco"
+            [hint]="'templatesAssets.uploadModal.dropHint' | transloco"
+            [browseLabel]="'templatesAssets.uploadModal.browse' | transloco"
+            [disabled]="uploading()"
+            (picked)="onFilePicked($event)"
+            (rejected)="onFileRejected($event)"
+          />
+        }
+      </ui-field>
+    </div>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="submit"
+      [attr.form]="uid + '-form'"
+      uiButton
+      [loading]="uploading()"
+      [disabled]="uploading() || hashing()"
+    >
+      {{ 'templates.actions.upload' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="uploading()"
+      (click)="requestClose()"
+    >
+      {{ 'templates.actions.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="warning"
+  [title]="'templatesAssets.discardConfirm.title' | transloco"
+  [text]="'templatesAssets.discardConfirm.text' | transloco"
+  [confirmLabel]="'templatesAssets.discardConfirm.confirm' | transloco"
+  [cancelLabel]="'templates.actions.cancel' | transloco"
+/>

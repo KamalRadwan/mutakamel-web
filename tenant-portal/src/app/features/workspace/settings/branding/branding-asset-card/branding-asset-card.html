@@ -1,0 +1,53 @@
+<div
+  role="group"
+  [attr.aria-labelledby]="uid + '-title'"
+  class="flex items-center gap-10 rounded-10 border border-border bg-surface-muted p-8"
+>
+  <div [class]="tileClass()">
+    @if (url(); as imageUrl) {
+      <img
+        [src]="imageUrl"
+        alt=""
+        [class]="kind() === 'logo' ? 'max-h-full max-w-full object-contain' : 'size-full object-contain'"
+      />
+    } @else {
+      <ng-icon name="tablerPhoto" size="16" class="text-text-muted" aria-hidden="true" />
+    }
+  </div>
+
+  <div class="flex min-w-0 flex-1 flex-col gap-2">
+    <h3 [id]="uid + '-title'" class="truncate text-13 leading-18 font-medium text-text">
+      {{ (kind() === 'logo' ? 'wsBranding.asset.logo.title' : 'wsBranding.asset.icon.title') | transloco }}
+    </h3>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ (kind() === 'logo' ? 'wsBranding.asset.logo.hint' : 'wsBranding.asset.icon.hint') | transloco }}
+    </p>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ (kind() === 'logo' ? 'wsBranding.asset.logo.limits' : 'wsBranding.asset.icon.limits') | transloco }}
+    </p>
+
+    @if (!url()) {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ 'wsBranding.asset.empty' | transloco }}
+      </p>
+    }
+
+    @if (canManage()) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        class="mt-4 self-start"
+        [loading]="busy()"
+        [disabled]="busy() || disabled()"
+        (click)="upload.emit()"
+      >
+        @if (!busy()) {
+          <ng-icon name="tablerUpload" size="14" aria-hidden="true" />
+        }
+        <span>{{ (url() ? 'wsBranding.asset.replace' : 'wsBranding.asset.upload') | transloco }}</span>
+      </button>
+    }
+  </div>
+</div>

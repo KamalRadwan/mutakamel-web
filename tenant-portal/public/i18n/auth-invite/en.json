@@ -1,0 +1,19 @@
+{
+  "title": "Accept your invitation",
+  "subtitle": "Choose a password to activate your account and open the workspace.",
+  "submit": "Activate account",
+  "invalid": {
+    "title": "Invitation not valid",
+    "text": "This invitation has expired or was already used. If you already set your password, sign in.",
+    "askAdmin": "Otherwise, ask your administrator to send a new invitation.",
+    "signIn": "Go to sign in"
+  },
+  "toast": {
+    "welcome": "Welcome to your workspace"
+  },
+  "errors": {
+    "sessionLimit": "Your account is active, but you have too many open sessions. Sign out on another device, then sign in.",
+    "AUTH_MFA_UNAVAILABLE": "Your account is active, but two-step verification is not available right now. Sign in again shortly.",
+    "ambiguous": "The connection was lost. Your account may already be active; if the next try says the invitation is not valid, sign in."
+  }
+}

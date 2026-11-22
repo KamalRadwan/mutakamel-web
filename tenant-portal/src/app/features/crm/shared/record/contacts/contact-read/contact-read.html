@@ -1,0 +1,108 @@
+<article class="flex flex-col gap-4 rounded-10 border border-border bg-surface px-8 py-6">
+  <div class="flex items-center justify-between gap-8">
+    <div class="min-w-0 flex-1 truncate text-13 leading-18">
+      @if (fullName(); as name) {
+        <span class="font-medium text-text">{{ name }}</span>
+      }
+      @if (fullName() && jobTitle()) {
+        <span class="text-text-muted"> — </span>
+      }
+      @if (jobTitle(); as job) {
+        <span class="text-text-muted">{{ job }}</span>
+      }
+    </div>
+
+    <div class="flex shrink-0 items-center gap-6">
+      <button
+        [id]="uid() + '-primary-' + index()"
+        type="button"
+        role="radio"
+        class="inline-flex h-btn-h-sm cursor-pointer items-center gap-4 rounded-6 px-8 text-11 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+        [class]="
+          contact().isPrimary
+            ? 'bg-brand-soft text-on-brand-soft'
+            : 'text-text-muted hover:bg-neutral-soft hover:text-text'
+        "
+        [attr.tabindex]="radioTabStop() ? 0 : -1"
+        [attr.aria-checked]="contact().isPrimary"
+        [attr.aria-label]="
+          (contact().isPrimary ? 'recordForm.contacts.primary' : 'recordForm.contacts.makePrimaryFor')
+            | transloco: { name: fullName() || ('recordForm.contacts.n' | transloco: { n: index() + 1 }) }
+        "
+        [title]="(contact().isPrimary ? 'recordForm.contacts.primary' : 'recordForm.contacts.makePrimary') | transloco"
+        [disabled]="readonly() || disabled()"
+        (keydown)="primaryKeydown.emit($event)"
+        (click)="makePrimary.emit()"
+      >
+        <ng-icon
+          [name]="contact().isPrimary ? 'tablerStarFill' : 'tablerStar'"
+          size="14"
+          [class]="contact().isPrimary ? 'text-warning-text' : ''"
+          aria-hidden="true"
+        />
+        <span>{{ (contact().isPrimary ? 'recordForm.contacts.primary' : 'recordForm.contacts.makePrimary') | transloco }}</span>
+      </button>
+
+      @if (!readonly()) {
+        <button
+          [id]="uid() + '-edit-' + index()"
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+          [attr.aria-label]="'recordForm.contacts.edit' | transloco"
+          [title]="'recordForm.contacts.edit' | transloco"
+          [disabled]="disabled()"
+          (click)="edit.emit()"
+        >
+          <ng-icon name="tablerPencil" size="14" aria-hidden="true" />
+        </button>
+      }
+
+      @if (canDelete() && !readonly()) {
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+          [attr.aria-label]="'recordForm.contacts.remove' | transloco: { n: index() + 1 }"
+          [title]="'recordForm.contacts.remove' | transloco: { n: index() + 1 }"
+          [disabled]="disabled()"
+          (click)="remove.emit()"
+        >
+          <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (primaryPhone() || email()) {
+    <div class="flex flex-wrap items-center gap-6 text-12 leading-18 text-text">
+      @if (primaryPhone(); as phone) {
+        <div class="inline-flex items-center gap-4">
+          <span dir="ltr" class="text-text">{{ phone }}</span>
+          @if (extraPhoneCount() > 0) {
+            <span
+              dir="ltr"
+              class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted"
+              [title]="allPhonesTitle()"
+            >
+              +{{ extraPhoneCount() }}
+            </span>
+          }
+          <app-phone-actions [phone]="phone" [showNumber]="false" [crm]="crm()" [source]="source()" />
+        </div>
+      }
+
+      @if (primaryPhone() && email()) {
+        <span class="text-text-muted" aria-hidden="true">|</span>
+      }
+
+      @if (email(); as mail) {
+        <a
+          dir="ltr"
+          [href]="'mailto:' + mail"
+          class="truncate text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        >
+          {{ mail }}
+        </a>
+      }
+    </div>
+  }
+</article>

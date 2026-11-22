@@ -1,0 +1,87 @@
+<ui-modal
+  #modal
+  size="form"
+  icon="tablerServer"
+  tile="bg-icon-teal"
+  [title]="'wsEmail.fields.providerDriver.label' | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!saving()"
+  (closed)="onModalClosed()"
+>
+  <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
+    @if (topError(); as err) {
+      <div role="alert">
+        <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
+      </div>
+    }
+
+    @if (showResetNotice()) {
+      <app-settings-notice tone="warning">
+        {{ 'wsEmail.notice.resetsVerification' | transloco }}
+      </app-settings-notice>
+    }
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-driver'"
+      [label]="'wsEmail.fields.providerDriver.label' | transloco"
+      [hint]="'wsEmail.fields.providerDriver.hint' | transloco"
+      [required]="!isReadonly()"
+      [error]="fieldError()"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-driver'"
+        [describedBy]="uid + '-driver-hint'"
+        [label]="'wsEmail.fields.providerDriver.label' | transloco"
+        [options]="driverOptions()"
+        [value]="driverDraft()"
+        [disabled]="isReadonly() || saving()"
+        (valueChange)="onDriverChange($event)"
+      />
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!isReadonly()) {
+      <button
+        type="submit"
+        [attr.form]="uid + '-form'"
+        uiButton
+        variant="primary"
+        [loading]="saving()"
+        [disabled]="!canSubmit()"
+      >
+        {{ (isNextToSmtp() ? 'wsEmail.provider.next' : 'settings.common.save') | transloco }}
+      </button>
+
+      @if (dirty()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="saving()"
+          (click)="undo()"
+        >
+          {{ 'settings.common.undo' | transloco }}
+        </button>
+        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+      } @else {
+        <button
+          type="button"
+          uiButton
+          variant="ghost"
+          [disabled]="saving()"
+          (click)="close()"
+        >
+          {{ 'settings.common.cancel' | transloco }}
+        </button>
+      }
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="close()">
+        {{ 'settings.common.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

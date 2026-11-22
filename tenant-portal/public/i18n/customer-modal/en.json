@@ -1,0 +1,38 @@
+{
+  "typeTitle": "Customer",
+  "newTitle": "New customer",
+  "newSubtitle": "New customer",
+  "createLabel": "Create customer",
+  "created": "Customer created.",
+  "createdPartial": "Customer created, but some extra details could not be saved.",
+  "saved": "Customer saved.",
+  "contactSaved": "Contact saved.",
+  "deleted": "Customer deleted.",
+  "loadFailed": "Could not load this customer.",
+  "customerGone": "That customer no longer exists. Moved to the next one.",
+  "customerGonePrev": "That customer no longer exists. Moved to the previous one.",
+  "nav": {
+    "prev": "Previous customer",
+    "next": "Next customer"
+  },
+  "conflict": {
+    "title": "Customer changed",
+    "text": "This customer was changed by someone else. Reload to see the latest version.",
+    "reload": "Reload",
+    "keepEditing": "Keep editing"
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "bodyReopensLead": "The lead this customer came from will be reopened.",
+    "bodyPermanent": "This can't be undone.",
+    "reasonLabel": "Reason",
+    "reasonHint": "Optional note explaining why this customer is being deleted, up to 500 characters.",
+    "confirm": "Delete",
+    "blacklistedReason": "A blacklisted customer can't be deleted."
+  },
+  "blacklistConfirm": {
+    "title": "Blacklist {{name}}?",
+    "body": "No new work can be added to a blacklisted customer, and it cannot be deleted.",
+    "confirm": "Blacklist"
+  }
+}

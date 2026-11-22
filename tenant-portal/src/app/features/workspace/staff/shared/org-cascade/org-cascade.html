@@ -1,0 +1,36 @@
+@for (level of levels(); track level) {
+  <ui-field
+    class="min-w-0"
+    [size]="readonly() ? 'default' : 'bare'"
+    [for]="uid + '-' + level"
+    [label]="'staff.cascade.' + level | transloco"
+    [required]="isRequired(level)"
+    [hint]="hintFor(level)"
+    [hintText]="isAutoSelected(level) ? ('staff.cascade.autoSelected' | transloco) : null"
+    [error]="errors()[level] ?? null"
+  >
+    @if (readonly()) {
+      <input
+        [id]="uid + '-' + level"
+        type="text"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+        [value]="displayValueFor(level)"
+        readonly
+      />
+    } @else {
+      <div class="min-w-0" [attr.title]="missingParentTitle(level)">
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-' + level"
+          [describedBy]="describedByFor(level)"
+          [label]="'staff.cascade.' + level | transloco"
+          [options]="optionsFor(level)"
+          [value]="valueFor(level)"
+          [disabled]="isDisabled(level)"
+          (valueChange)="onLevelChange(level, $event)"
+        />
+      </div>
+    }
+  </ui-field>
+}

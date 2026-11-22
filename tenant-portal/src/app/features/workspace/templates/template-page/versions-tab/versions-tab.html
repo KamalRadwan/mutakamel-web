@@ -1,0 +1,412 @@
+@if (service.versions().length === 0) {
+  <section class="flex flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
+      <ng-icon name="tablerStack2" size="18" aria-hidden="true" />
+    </span>
+    <h2 class="text-14 leading-20 font-medium text-text">
+      {{ 'templates.states.emptyVersions.title' | transloco }}
+    </h2>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'templates.states.emptyVersions.description' | transloco }}
+    </p>
+  </section>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-tpl-table"
+      [attr.aria-label]="'templatesPage.versions.table.ariaLabel' | transloco"
+      [attr.aria-busy]="paging()"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav grid-cols-tpl-version-row-actions"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'templatesPage.versions.table.version' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.versions.table.publishedAt' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.versions.table.changeNote' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'templatesPage.versions.table.status' | transloco }}
+        </span>
+        <span role="columnheader" class="border-s border-on-nav-line">
+          <span class="sr-only">{{ 'templatesPage.versions.table.actions' | transloco }}</span>
+        </span>
+      </div>
+
+      @for (row of service.versions(); track row.templateVersionId) {
+        @let isCurrent = row.templateVersionId === currentPublishedVersionId();
+        <div
+          role="row"
+          class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover grid-cols-tpl-version-row-actions"
+          (click)="openViewModal(row)"
+        >
+          <span role="cell" class="flex min-w-0 items-center gap-6 px-10">
+            <button
+              type="button"
+              class="cursor-pointer truncate rounded-4 font-medium text-text outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="openViewModal(row); $event.stopPropagation()"
+            >
+              <bdi dir="ltr">v{{ row.versionNumber }}</bdi>
+            </button>
+            @if (isCurrent) {
+              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                {{ 'templatesPage.versions.table.currentBadge' | transloco }}
+              </span>
+            }
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text-muted tabular-nums">
+            <span class="truncate">{{ service.formatDateTime(row.publishedAt, language()) }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 text-12 text-text">
+            <span class="truncate">{{ row.changeNote || ('templatesPage.versions.table.noNote' | transloco) }}</span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <span
+              class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+              [class]="row.lifecycleStatus === 'PUBLISHED' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+            >
+              {{ ('templates.lifecycle.' + row.lifecycleStatus) | transloco }}
+            </span>
+          </span>
+
+          <span
+            role="cell"
+            class="flex items-center justify-center border-s border-border"
+            (click)="$event.stopPropagation()"
+          >
+            <ui-actions-menu
+              [items]="actionsFor(row)"
+              [label]="'templatesPage.versions.table.actions' | transloco"
+              (selected)="onAction(row, $event)"
+            />
+          </span>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (canPrevPage() || canNextPage()) {
+    <div class="mt-8 flex items-center justify-end gap-8">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [disabled]="!canPrevPage() || paging()"
+        (click)="prevPage()"
+      >
+        <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+        {{ 'templates.actions.previous' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [disabled]="!canNextPage() || paging()"
+        (click)="nextPage()"
+      >
+        {{ 'templates.actions.next' | transloco }}
+        <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+      </button>
+    </div>
+  }
+}
+
+<!-- Read-only Version detail modal (580) -->
+<ui-modal
+  #viewModal
+  size="wide"
+  icon="tablerStack2"
+  tile="bg-icon-blue"
+  [title]="viewingVersionNumber() !== null ? ('templatesPage.versions.viewModal.title' | transloco: { version: viewingVersionNumber()! }) : ''"
+  [subtitle]="viewingVersionNumber() !== null ? ('templatesPage.versions.viewModal.subtitle' | transloco) : ''"
+  [closeLabel]="'templates.actions.close' | transloco"
+>
+  @if (loadingView()) {
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8" aria-busy="true">
+      @for (item of [1, 2, 3, 4, 5, 6, 7, 8, 9]; track item) {
+        <span class="h-field animate-pulse rounded-8 bg-neutral-soft"></span>
+      }
+    </div>
+  } @else if (viewingVersion(); as ver) {
+    <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+      <ui-field
+        [for]="uid + '-view-ver'"
+        [label]="'templatesPage.versions.viewModal.versionLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.versionHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-ver'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="'v' + ver.versionNumber"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-status'"
+        [label]="'templatesPage.versions.viewModal.statusLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.statusHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-status'"
+          type="text"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="('templates.lifecycle.' + ver.lifecycleStatus) | transloco"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-published-at'"
+        [label]="'templatesPage.versions.viewModal.publishedAtLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.publishedAtHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-published-at'"
+          type="text"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="service.formatDateTime(ver.publishedAt, language())"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-doctype'"
+        [label]="'templatesPage.versions.viewModal.documentTypeLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.documentTypeHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-doctype'"
+          type="text"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="('templates.families.' + ver.documentType) | transloco"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-layout'"
+        [label]="'templatesPage.versions.viewModal.layoutLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.layoutHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-layout'"
+          type="text"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="('templates.layouts.' + ver.layoutMode) | transloco"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-locale'"
+        [label]="'templatesPage.versions.viewModal.languageLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.languageHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-locale'"
+          type="text"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="('templates.locales.' + ver.locale) | transloco"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-direction'"
+        [label]="'templatesPage.versions.viewModal.directionLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.directionHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-direction'"
+          type="text"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="('templates.directions.' + ver.direction) | transloco"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [for]="uid + '-view-datasource'"
+          [label]="'templatesPage.versions.viewModal.dataSourceLabel' | transloco"
+          [hint]="'templatesPage.versions.viewModal.dataSourceHint' | transloco"
+        >
+          <input
+            [id]="uid + '-view-datasource'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+            [value]="ver.dataSourceKey + ' (v' + ver.dataSourceSchemaVersion + ')'"
+          />
+        </ui-field>
+      </div>
+
+      <ui-field
+        [for]="uid + '-view-compiler'"
+        [label]="'templatesPage.versions.viewModal.compilerLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.compilerHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-compiler'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="ver.compilerVersion"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-targets'"
+        [label]="'templatesPage.versions.viewModal.targetsLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.targetsHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-targets'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+          [value]="ver.rendererTargets.join(', ')"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-view-bindings'"
+        [label]="'templatesPage.versions.viewModal.bindingsCountLabel' | transloco"
+        [hint]="'templatesPage.versions.viewModal.bindingsCountHint' | transloco"
+      >
+        <input
+          [id]="uid + '-view-bindings'"
+          type="text"
+          dir="ltr"
+          readonly
+          class="w-full min-w-0 bg-transparent text-12 text-text outline-none tabular-nums"
+          [value]="'' + ver.bindingManifest.length"
+        />
+      </ui-field>
+
+      <div class="col-span-3">
+        <ui-field
+          [for]="uid + '-view-assets'"
+          [label]="'templatesPage.versions.viewModal.assetsCountLabel' | transloco"
+          [hint]="'templatesPage.versions.viewModal.assetsCountHint' | transloco"
+        >
+          <input
+            [id]="uid + '-view-assets'"
+            type="text"
+            dir="ltr"
+            readonly
+            class="w-full min-w-0 bg-transparent text-12 text-text outline-none tabular-nums"
+            [value]="'' + ver.assetManifest.length"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-3">
+        <ui-field
+          size="multiline"
+          [for]="uid + '-view-note'"
+          [label]="'templatesPage.versions.viewModal.changeNoteLabel' | transloco"
+          [hint]="'templatesPage.versions.viewModal.changeNoteHint' | transloco"
+        >
+          <textarea
+            [id]="uid + '-view-note'"
+            rows="2"
+            readonly
+            class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none"
+            [value]="ver.changeNote || ('templatesPage.versions.table.noNote' | transloco)"
+          ></textarea>
+        </ui-field>
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="viewModal.close()">
+      {{ 'templates.actions.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<!-- Restore version modal (520) -->
+<ui-modal
+  #restoreModal
+  size="form"
+  icon="tablerArrowBackUp"
+  tile="bg-icon-teal"
+  [title]="restoringTarget() ? ('templatesPage.versions.restoreModal.title' | transloco: { version: restoringTarget()!.versionNumber }) : ''"
+  [subtitle]="restoringTarget() ? ('templatesPage.versions.restoreModal.subtitle' | transloco: { version: restoringTarget()!.versionNumber }) : ''"
+  [closeLabel]="'templates.actions.close' | transloco"
+  [dismissable]="!restoring()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      size="multiline"
+      [for]="uid + '-restore-reason'"
+      [label]="'templatesPage.versions.restoreModal.reasonLabel' | transloco"
+      [hint]="'templatesPage.versions.restoreModal.reasonHint' | transloco"
+      [required]="true"
+      [count]="restoreReason().length"
+      [max]="500"
+      [error]="restoreReasonError()"
+    >
+      <textarea
+        [id]="uid + '-restore-reason'"
+        rows="3"
+        maxlength="500"
+        class="w-full min-w-0 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'templatesPage.versions.restoreModal.reasonPlaceholder' | transloco"
+        [value]="restoreReason()"
+        (input)="onRestoreReasonInput($event)"
+      ></textarea>
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-restore-discard'"
+      [label]="'templatesPage.versions.restoreModal.discardLabel' | transloco"
+      [hint]="'templatesPage.versions.restoreModal.discardHint' | transloco"
+      [required]="true"
+      [error]="restoreDiscardError()"
+    >
+      <ui-checkbox [checked]="restoreDiscardDraft()" (checkedChange)="onDiscardCheckedChange($event)">
+        {{ 'templatesPage.versions.restoreModal.discardCheckbox' | transloco }}
+      </ui-checkbox>
+    </ui-field>
+  </div>
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton [loading]="restoring()" (click)="submitRestore()">
+      {{ 'templatesPage.versions.restoreModal.confirm' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" [disabled]="restoring()" (click)="restoreModal.close()">
+      {{ 'templates.actions.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<!-- Retire version confirmation (360) -->
+<ui-confirm-dialog
+  #retireConfirm
+  tone="warning"
+  [title]="retiringTarget() ? ('templatesPage.versions.retireConfirm.title' | transloco: { version: retiringTarget()!.versionNumber }) : ''"
+  [text]="'templatesPage.versions.retireConfirm.text' | transloco"
+  [confirmLabel]="'templatesPage.versions.retireConfirm.confirm' | transloco"
+  [cancelLabel]="'templates.actions.cancel' | transloco"
+/>

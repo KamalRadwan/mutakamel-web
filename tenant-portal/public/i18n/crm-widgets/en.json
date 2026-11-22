@@ -1,0 +1,127 @@
+{
+  "newWidget": "New widget",
+  "search": "Search widgets",
+  "source": "Source",
+  "sourceHint": "Filter widgets by underlying CRM data source.",
+  "allSources": "All sources",
+  "owner": "Owner",
+  "ownerHint": "Filter widgets by their current owner.",
+  "allOwners": "All owners",
+  "status": "Status",
+  "statusHint": "Filter by lifecycle status (Draft, Published, or Archived).",
+  "allStatuses": "All statuses",
+  "name": "Name",
+  "kind": "Kind",
+  "usedOn": "Used on",
+  "usedOnCount": "Used on {{count}} dashboards",
+  "updated": "Updated",
+  "tableLabel": "Widgets list",
+  "tabsLabel": "Widget scope tabs",
+  "viewSwitcher": "View layout",
+  "draftChanges": "Draft changes",
+  "loadMore": "Load more",
+  "clearFilters": "Clear filters",
+  "loadFailedTitle": "Could not load widgets",
+  "views": {
+    "table": "Table",
+    "cards": "Cards"
+  },
+  "tabs": {
+    "mine": "Mine",
+    "shared": "Shared with me",
+    "published": "Published"
+  },
+  "statusValue": {
+    "DRAFT": "Draft",
+    "PUBLISHED": "Published",
+    "ARCHIVED": "Archived"
+  },
+  "sources": {
+    "leads": "Leads",
+    "opportunities": "Opportunities",
+    "activities": "Activities",
+    "customer_profiles": "Customer profiles",
+    "targets": "Targets"
+  },
+  "actions": {
+    "menu": "Widget actions",
+    "open": "Open",
+    "clone": "Clone",
+    "share": "Share",
+    "transfer": "Transfer owner",
+    "archive": "Archive",
+    "restore": "Restore",
+    "delete": "Delete"
+  },
+  "empty": {
+    "filtered": "No widgets match the current filters.",
+    "mine": "You do not own any widgets yet.",
+    "shared": "No widgets have been shared with you yet.",
+    "published": "No published widgets are available."
+  },
+  "deleteConfirm": {
+    "title": "Delete widget",
+    "text": "Are you sure you want to permanently delete \"{{name}}\"?",
+    "deletedToast": "Widget deleted"
+  },
+  "modal": {
+    "reason": "Reason"
+  },
+  "archiveModal": {
+    "archiveTitle": "Archive widget",
+    "restoreTitle": "Restore widget",
+    "archiveAction": "Archive",
+    "restoreAction": "Restore",
+    "dashboardsAffected": "Dashboards affected",
+    "dashboardsAffectedHint": "Dashboards that currently place this widget.",
+    "placementsHidden": "Placements hidden",
+    "placementsHiddenHint": "Dashboard placements that will be hidden while the widget is archived.",
+    "placementsToResume": "Placements to resume",
+    "placementsToResumeHint": "Hidden placements eligible to become visible again after restoring.",
+    "alertRules": "Alert rules",
+    "alertRulesHint": "Active alert rules linked to this widget and how this action affects them.",
+    "willSuspend": "Will pause temporarily",
+    "ownerMustResume": "Owner must resume",
+    "none": "None",
+    "reasonHint": "Optional note recording why this lifecycle change was made (up to 500 characters).",
+    "reasonPlaceholder": "Optional reason for this change...",
+    "reasonTooLong": "Reason must be 500 characters or fewer.",
+    "archivedToast": "Widget archived",
+    "restoredToast": "Widget restored"
+  },
+  "transferModal": {
+    "title": "Transfer widget ownership",
+    "action": "Transfer",
+    "newOwner": "New owner",
+    "newOwnerHint": "Select the active team member who will take ownership of this widget.",
+    "newOwnerPlaceholder": "Select new owner",
+    "searchOwners": "Search team members",
+    "noOwners": "No matching team members.",
+    "placementsAffected": "Placements affected",
+    "placementsAffectedHint": "Dashboard placements currently displaying this widget.",
+    "sharesKept": "Shares kept",
+    "sharesKeptHint": "Existing user and team share grants preserved after transfer.",
+    "ownersLosingAccess": "Dashboard owners losing access",
+    "ownersLosingAccessHint": "Dashboard owners who will lose automatic access to this widget.",
+    "readersMayNeedShare": "Readers who may need a share",
+    "readersMayNeedShareHint": "Dashboard viewers who may require an explicit share grant after transfer.",
+    "reasonHint": "Required explanation for transferring ownership (1 to 500 characters).",
+    "reasonPlaceholder": "Explain why ownership is being transferred...",
+    "reasonRequired": "Enter a reason for transferring ownership.",
+    "reasonTooLong": "Reason must be 500 characters or fewer.",
+    "acknowledgeLabel": "Confirmation",
+    "acknowledge": "I understand the effects",
+    "acknowledgeHint": "Confirm that you reviewed the placement and access impact before transferring ownership.",
+    "transferredToast": "Widget ownership transferred"
+  },
+  "cloneModal": {
+    "title": "Clone widget",
+    "action": "Clone",
+    "name": "Name",
+    "nameHint": "Name for the new private draft copy (1 to 120 characters).",
+    "nameRequired": "Widget name is required.",
+    "nameTooLong": "Name must be 120 characters or fewer.",
+    "copyName": "{{name}} (copy)",
+    "clonedToast": "Widget cloned as draft"
+  }
+}

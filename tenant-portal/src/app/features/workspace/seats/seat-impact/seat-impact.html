@@ -1,0 +1,148 @@
+@if (visible()) {
+  <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8" [attr.aria-busy]="loading()">
+    @if (loading() && !effectivePreview()) {
+      <div class="flex flex-col gap-6">
+        @for (item of skeletonItems; track item) {
+          <div class="flex min-h-btn items-center gap-8 rounded-8 border border-border bg-surface-muted px-8 py-4" aria-hidden="true">
+            <span class="size-icon-tile-sm shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+            <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+          </div>
+        }
+      </div>
+    } @else if (failed()) {
+      <div class="flex items-center justify-between gap-8 px-4 py-2" role="status">
+        <p class="text-12 leading-18 text-text-muted">{{ 'seats.impact.failed' | transloco }}</p>
+        <button type="button" uiButton variant="ghost" size="small" (click)="retry()">
+          {{ 'seats.impact.retry' | transloco }}
+        </button>
+      </div>
+    } @else if (effectivePreview(); as data) {
+      @if (data.mode === 'MANUAL') {
+        <p class="px-4 py-2 text-12 leading-18 text-text-muted">{{ 'seats.impact.manual' | transloco }}</p>
+      } @else if (!data.modules.length) {
+        <p class="px-4 py-2 text-12 leading-18 text-text-muted">{{ 'seats.impact.none' | transloco }}</p>
+      } @else {
+        @for (mod of data.modules; track mod.moduleKey) {
+          @let short = mod.usedAfter > mod.capacity;
+          @let delta = deltaOf(mod);
+          @let tile = tileOf(mod.moduleKey);
+          @let totalUsers = userCount(mod);
+          <div
+            class="flex flex-col gap-4 rounded-8 border px-8 py-4"
+            [class]="short ? 'border-warning bg-surface-muted' : 'border-border bg-surface-muted'"
+          >
+            <div class="flex min-h-btn flex-wrap items-center gap-8">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+                [class]="tile.tile"
+              >
+                <ng-icon [name]="tile.icon" size="14" aria-hidden="true" />
+              </span>
+
+              <span class="min-w-0 text-12 leading-18 font-medium text-text tabular-nums">
+                {{ 'seats.impact.row' | transloco: { module: moduleLabel(mod), usedAfter: mod.usedAfter, capacity: mod.capacity } }}
+              </span>
+
+              <span
+                dir="ltr"
+                class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium tabular-nums"
+                [class]="
+                  short
+                    ? 'bg-warning text-on-warning'
+                    : delta > 0
+                      ? 'bg-brand-soft text-on-brand-soft'
+                      : delta < 0
+                        ? 'bg-success-soft text-on-success-soft'
+                        : 'bg-neutral-soft text-on-neutral-soft'
+                "
+              >
+                {{ formatDelta(delta) }}
+              </span>
+
+              @if (totalUsers > 0 && !compact()) {
+                <button
+                  type="button"
+                  class="ms-auto inline-flex h-btn-h-sm shrink-0 cursor-pointer items-center gap-4 rounded-6 px-8 text-11 font-medium text-accent outline-none transition-colors duration-fast hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-expanded]="isExpanded(mod.moduleKey)"
+                  (click)="toggleModule(mod.moduleKey)"
+                >
+                  <span>
+                    {{ (isExpanded(mod.moduleKey) ? 'seats.impact.hide' : 'seats.impact.show') | transloco: { n: totalUsers } }}
+                  </span>
+                  <span class="inline-flex transition-transform duration-fast" [class.rotate-180]="isExpanded(mod.moduleKey)">
+                    <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+                  </span>
+                </button>
+              }
+            </div>
+
+            @if (!compact() && (mod.gaining.length > 0 || mod.losing.length > 0 || mod.addonsRemoved.length > 0)) {
+              <div class="flex flex-wrap items-center gap-8 text-11 leading-16 text-text-muted">
+                @if (mod.gaining.length > 0) {
+                  <span>{{ 'seats.impact.gaining' | transloco: { n: mod.gaining.length } }}</span>
+                }
+                @if (mod.losing.length > 0) {
+                  <span>{{ 'seats.impact.losing' | transloco: { n: mod.losing.length } }}</span>
+                }
+                @if (mod.addonsRemoved.length > 0) {
+                  <span class="font-medium text-warning-text">{{ 'seats.impact.addons' | transloco: { n: mod.addonsRemoved.length } }}</span>
+                }
+              </div>
+            }
+
+            @if (short) {
+              <div class="flex flex-wrap items-center gap-8 pt-2">
+                <span class="inline-flex items-center gap-4 text-12 leading-18 font-medium text-warning-text">
+                  <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+                  <span>{{ 'seats.impact.short' | transloco: { needed: mod.needed, free: mod.free } }}</span>
+                </span>
+                @if (canBuySeats()) {
+                  <a uiButton variant="secondary" size="small" routerLink="/workspace/billing/subscription/seats">
+                    {{ 'seats.impact.addSeats' | transloco }}
+                  </a>
+                } @else {
+                  <span class="text-12 leading-18 text-warning-text">{{ 'seats.impact.askOwner' | transloco }}</span>
+                }
+              </div>
+            }
+
+            @if (isExpanded(mod.moduleKey) && totalUsers > 0 && !compact()) {
+              <div class="mt-2 flex flex-col gap-4 border-t border-border pt-6">
+                @for (user of mod.gaining; track user.userId) {
+                  <div class="flex min-h-btn items-center gap-8">
+                    <span
+                      class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                      aria-hidden="true"
+                    >
+                      {{ initials(user.name) }}
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-12 leading-18 text-text">{{ user.name }}</span>
+                    <span dir="ltr" class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft tabular-nums">+1</span>
+                  </div>
+                }
+                @for (user of mod.losing; track user.userId) {
+                  <div class="flex min-h-btn items-center gap-8">
+                    <span
+                      class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-gray text-11 font-medium text-on-icon"
+                      aria-hidden="true"
+                    >
+                      {{ initials(user.name) }}
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-12 leading-18 text-text">{{ user.name }}</span>
+                    <span dir="ltr" class="inline-flex h-badge shrink-0 items-center rounded-8 bg-danger-soft px-8 text-12 font-medium text-on-danger-soft tabular-nums">&minus;1</span>
+                  </div>
+                }
+                @for (addon of mod.addonsRemoved; track addon.userId + ':' + addon.addonKey) {
+                  <div class="flex min-h-btn items-center gap-8 text-12 leading-18 text-warning-text">
+                    <ng-icon name="tablerAlertTriangle" size="14" class="shrink-0" aria-hidden="true" />
+                    <span class="min-w-0 truncate">{{ addon.name }}: <span dir="ltr" class="font-medium">{{ addon.addonKey }}</span></span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+}

@@ -1,0 +1,35 @@
+{
+  "request": {
+    "title": "Reset your password",
+    "subtitle": "Enter your email and we will send you a link to set a new password.",
+    "email": "Email",
+    "emailHint": "The email you use to sign in.",
+    "submit": "Send link"
+  },
+  "sent": {
+    "title": "Check your email",
+    "text": "If an account exists for {{email}}, we sent it a link to reset the password.",
+    "spam": "The link works once. Check your spam folder if it does not arrive.",
+    "again": "Send again",
+    "againIn": "Send again in {{s}} s"
+  },
+  "set": {
+    "title": "Set a new password",
+    "subtitle": "After the change, every device is signed out.",
+    "submit": "Change password"
+  },
+  "invalid": {
+    "title": "Link not valid",
+    "text": "This link has expired or was already used. Request a new link. If you already changed your password, sign in.",
+    "request": "Request a new link"
+  },
+  "done": {
+    "title": "Password changed",
+    "text": "Your password was changed and every device was signed out. Sign in with the new password.",
+    "signIn": "Sign in"
+  },
+  "errors": {
+    "email": "Enter a valid email.",
+    "required": "This field is required."
+  }
+}

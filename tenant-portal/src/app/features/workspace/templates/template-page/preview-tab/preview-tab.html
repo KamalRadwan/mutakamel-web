@@ -1,0 +1,448 @@
+<!-- Preview toolbar -->
+<div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 border border-border bg-surface p-4 shadow-card">
+  <div class="group relative shrink-0">
+    <ui-segmented
+      [options]="formatOptions()"
+      [label]="'tplPreview.format.label' | transloco"
+      [describedBy]="pdfDisabledReason() ? uid + '-pdf-reason' : null"
+      [value]="format()"
+      (valueChange)="onFormatChange($event)"
+    />
+    @if (pdfDisabledReason(); as reason) {
+      <span
+        [id]="uid + '-pdf-reason'"
+        role="tooltip"
+        class="pointer-events-none invisible absolute start-0 top-full z-tooltip mt-4 flex min-h-tooltip w-max max-w-tpl-tooltip items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip group-hover:visible group-focus-within:visible"
+      >
+        {{ reason }}
+      </span>
+    }
+  </div>
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <div class="shrink-0" [title]="sourceTooltip() || ''">
+    <ui-field
+      size="bare"
+      class="min-w-0 shrink-0 items-center gap-6"
+      [style.display]="'flex'"
+      [for]="uid + '-source'"
+      [label]="'tplPreview.source.label' | transloco"
+      [hint]="'tplPreview.source.hint' | transloco"
+    >
+      <ui-dropdown
+        class="shrink-0"
+        size="field"
+        [id]="uid + '-source'"
+        [options]="sourceOptions()"
+        [value]="selectedSource()"
+        [label]="'tplPreview.source.label' | transloco"
+        [describedBy]="uid + '-source-hint'"
+        [disabled]="loadingInit() || sourceOptions().length === 0"
+        (valueChange)="onSourceChange($event)"
+      />
+    </ui-field>
+  </div>
+
+  <div class="shrink-0">
+    <ui-field
+      size="bare"
+      class="min-w-0 shrink-0 items-center gap-6"
+      [style.display]="'flex'"
+      [for]="uid + '-fixture'"
+      [label]="'tplPreview.fixture.label' | transloco"
+      [hint]="'tplPreview.fixture.hint' | transloco"
+    >
+      <ui-dropdown
+        class="shrink-0"
+        size="field"
+        [id]="uid + '-fixture'"
+        [options]="fixtureOptions()"
+        [value]="selectedFixtureKey()"
+        [label]="'tplPreview.fixture.label' | transloco"
+        [describedBy]="uid + '-fixture-hint'"
+        [disabled]="loadingInit() || fixtures().length === 0"
+        (valueChange)="onFixtureChange($event)"
+      />
+    </ui-field>
+  </div>
+
+  @if (isEmail() && format() !== 'PDF') {
+    <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+    <ui-field
+      size="bare"
+      class="min-w-0 shrink-0 items-center gap-6"
+      [style.display]="'flex'"
+      [for]="uid + '-width'"
+      [label]="'tplPreview.width.label' | transloco"
+      [hint]="'tplPreview.width.hint' | transloco"
+    >
+      <ui-segmented
+        class="shrink-0"
+        [id]="uid + '-width'"
+        [options]="emailWidthOptions()"
+        [label]="'tplPreview.width.label' | transloco"
+        [describedBy]="uid + '-width-hint'"
+        [value]="emailWidthValue()"
+        (valueChange)="onEmailWidthChange($event)"
+      />
+    </ui-field>
+  }
+
+  <span class="flex-1"></span>
+
+  <ui-dropdown
+    class="shrink-0"
+    size="button"
+    icon="tablerSearch"
+    [options]="zoomOptions()"
+    [value]="zoomSetting()"
+    [label]="'tplPreview.zoom.label' | transloco"
+    [disabled]="loadingInit()"
+    (valueChange)="onZoomChange($event)"
+  />
+
+  <span class="h-counter w-border shrink-0 bg-border" aria-hidden="true"></span>
+
+  <button
+    type="button"
+    uiButton
+    variant="secondary"
+    class="shrink-0"
+    [disabled]="generateAgainDisabled()"
+    [title]="generateAgainTooltip()"
+    (click)="generateAgain()"
+  >
+    <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+    <span>{{ 'tplPreview.again' | transloco }}</span>
+  </button>
+
+  @if (format() === 'PDF') {
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      class="shrink-0"
+      [disabled]="!canDownloadPdf()"
+      (click)="downloadPdf()"
+    >
+      <ng-icon name="tablerDownload" size="15" aria-hidden="true" />
+      <span>{{ 'tplPreview.download' | transloco }}</span>
+    </button>
+  }
+</div>
+
+<!-- Preview stage -->
+<div
+  #stageEl
+  class="flex min-h-0 flex-1 flex-col rounded-10 border border-border bg-surface-muted"
+  [class]="activePdfResult() ? 'overflow-hidden p-8' : 'overflow-auto p-16'"
+>
+  @if (loadingInit() || loadingPreview()) {
+    <div class="flex min-h-0 flex-1 items-center justify-center" aria-busy="true">
+      <div
+        class="h-full w-full animate-pulse rounded-4 bg-paper shadow-card"
+        [class]="isEmail() && emailWidth() === 320 ? 'max-w-email-col-sm' : 'max-w-email-col'"
+      ></div>
+    </div>
+  } @else if (stageError(); as err) {
+    <div class="flex flex-1 items-center justify-center">
+      <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        @switch (err.kind) {
+          @case ('forbidden') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+              <ng-icon name="tablerLock" size="18" aria-hidden="true" />
+            </span>
+            <h2 class="text-16 leading-24 font-medium text-text">
+              {{ 'templates.states.forbidden.title' | transloco }}
+            </h2>
+            <p class="text-12 leading-18 text-text-muted">
+              {{ 'templates.states.forbidden.description' | transloco }}
+            </p>
+          }
+          @case ('notFound') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+              <ng-icon name="tablerFileSearch" size="18" aria-hidden="true" />
+            </span>
+            <h2 class="text-16 leading-24 font-medium text-text">
+              {{ 'templates.states.notFound.title' | transloco }}
+            </h2>
+            <p class="text-12 leading-18 text-text-muted">
+              {{ 'templates.states.notFound.description' | transloco }}
+            </p>
+          }
+          @case ('previewDisabled') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+              <ng-icon name="tablerEye" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-12 leading-18 text-text-muted">{{ err.reasonText }}</p>
+            <button type="button" uiButton variant="secondary" (click)="openOverview()">
+              {{ 'tplPreview.state.openOverview' | transloco }}
+            </button>
+          }
+          @case ('saveFirst') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+              <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-12 leading-18 text-text-muted">
+              {{ 'tplPreview.state.saveFirstHint' | transloco }}
+            </p>
+            @if (publishedVersions().length > 0) {
+              <button type="button" uiButton variant="secondary" (click)="previewLatestVersion()">
+                {{ 'tplPreview.state.previewLatestVersion' | transloco }}
+              </button>
+            } @else if (pageService.overviewDirty() && !pageService.hasDesignChanges()) {
+              <button type="button" uiButton variant="secondary" (click)="openOverview()">
+                {{ 'tplPreview.state.openOverview' | transloco }}
+              </button>
+            } @else {
+              <button type="button" uiButton variant="secondary" (click)="openDesign()">
+                {{ 'tplPreview.state.openDesign' | transloco }}
+              </button>
+            }
+          }
+          @case ('validation') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+              <ng-icon name="tablerShieldCheck" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-12 leading-18 text-text">
+              {{ 'tplPreview.state.invalid' | transloco }}
+            </p>
+            <button type="button" uiButton variant="secondary" (click)="openValidation()">
+              {{ 'tplPreview.state.openValidation' | transloco }}
+            </button>
+          }
+          @case ('compiler') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+              <ng-icon name="tablerCircleX" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-12 leading-18 text-text">
+              {{ 'tplPreview.state.compiler' | transloco }}
+            </p>
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [disabled]="generateAgainDisabled()"
+              (click)="generateAgain()"
+            >
+              <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+              {{ 'tplPreview.again' | transloco }}
+            </button>
+          }
+          @case ('unavailable') {
+            <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+              <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
+            </span>
+            <p class="text-12 leading-18 text-text">
+              {{ 'tplPreview.state.unavailable' | transloco }}
+            </p>
+            @if (err.correlationId; as corrId) {
+              <p class="text-11 leading-16 text-text-muted">
+                <bdi dir="ltr">{{ 'tplPreview.state.reference' | transloco: { id: corrId } }}</bdi>
+              </p>
+            }
+            <button type="button" uiButton variant="secondary" (click)="retryUnavailable()">
+              {{ 'templates.actions.retry' | transloco }}
+            </button>
+          }
+        }
+      </div>
+    </div>
+  } @else if (isPdfInProgress()) {
+    <div class="flex flex-1 items-center justify-center">
+      <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text">
+          <ng-icon name="tablerLoader2" size="16" class="animate-spin" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text">
+          {{ 'tplPreview.state.generating' | transloco }}
+        </p>
+        @if (poller.attemptCount() > 1) {
+          <p class="text-11 leading-16 text-text-muted">
+            {{ 'tplPreview.state.attempt' | transloco: { n: poller.attemptCount() } }}
+          </p>
+        }
+      </div>
+    </div>
+  } @else if (isPdfSlow()) {
+    <div class="flex flex-1 items-center justify-center">
+      <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+          <ng-icon name="tablerClock" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text">
+          {{ 'tplPreview.state.slow' | transloco }}
+        </p>
+        <button type="button" uiButton variant="secondary" (click)="checkAgain()">
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tplPreview.state.checkAgain' | transloco }}
+        </button>
+      </div>
+    </div>
+  } @else if (isPdfFailed()) {
+    <div class="flex flex-1 items-center justify-center">
+      <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+          <ng-icon name="tablerCircleX" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text">
+          {{ 'tplPreview.state.failed' | transloco }}
+        </p>
+        @if (poller.failure()?.code; as failureCode) {
+          <p class="text-11 leading-16 text-text-muted">
+            <bdi dir="ltr">{{ 'tplPreview.state.reference' | transloco: { id: failureCode } }}</bdi>
+          </p>
+        }
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="generateAgainDisabled()"
+          (click)="generateAgain()"
+        >
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tplPreview.again' | transloco }}
+        </button>
+      </div>
+    </div>
+  } @else if (isPdfExpired()) {
+    <div class="flex flex-1 items-center justify-center">
+      <div class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+        <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+          <ng-icon name="tablerClock" size="18" aria-hidden="true" />
+        </span>
+        <p class="text-12 leading-18 text-text">
+          {{ 'tplPreview.state.expired' | transloco }}
+        </p>
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="generateAgainDisabled()"
+          (click)="generateAgain()"
+        >
+          <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+          {{ 'tplPreview.again' | transloco }}
+        </button>
+      </div>
+    </div>
+  } @else if (activePdfResult(); as pdfRes) {
+    <app-tpl-pdf-frame
+      [url]="pdfRes.objectUrl"
+      [page]="pdfPage()"
+      [zoom]="effectivePdfZoom()"
+      [title]="'tplPreview.frame.pdfTitle' | transloco"
+    />
+  } @else if (activeHtmlResult(); as htmlRes) {
+    <app-tpl-html-frame
+      [html]="htmlRes.response.html"
+      [widthPx]="printWidthPx()"
+      [zoom]="effectiveHtmlZoom()"
+      [title]="'tplPreview.frame.htmlTitle' | transloco"
+    />
+  } @else if (activeEmailResult(); as emailRes) {
+    @if (format() === 'TEXT') {
+      <pre
+        data-theme="light"
+        [attr.dir]="templateDir()"
+        [attr.aria-label]="'tplPreview.frame.textLabel' | transloco"
+        class="mx-auto whitespace-pre-wrap rounded-4 bg-paper p-16 font-sans text-12 leading-18 text-text shadow-card"
+        [class]="emailWidth() === 320 ? 'w-email-col-sm' : 'w-email-col'"
+      >{{ emailRes.response.text }}</pre>
+    } @else {
+      <div
+        class="mx-auto flex flex-col gap-10"
+        [class]="effectiveHtmlZoom() === 1 ? (emailWidth() === 320 ? 'w-email-col-sm' : 'w-email-col') : ''"
+        [style.width.px]="effectiveHtmlZoom() === 1 ? null : emailScaledWidthPx()"
+      >
+        <section class="flex flex-col gap-4 rounded-10 border border-border bg-surface p-10 shadow-card">
+          <div class="flex min-w-0 items-baseline gap-8">
+            <span class="shrink-0 text-11 leading-16 text-text-muted">
+              {{ 'tplPreview.email.subject' | transloco }}
+            </span>
+            <p
+              class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text"
+              [dir]="templateDir()"
+              [title]="emailRes.response.subject"
+            >
+              {{ emailRes.response.subject }}
+            </p>
+          </div>
+          <div class="flex min-w-0 items-baseline gap-8">
+            <span class="shrink-0 text-11 leading-16 text-text-muted">
+              {{ 'tplPreview.email.preheader' | transloco }}
+            </span>
+            <p
+              class="min-w-0 flex-1 truncate text-12 leading-18 text-text-muted"
+              [dir]="templateDir()"
+              [title]="emailRes.response.preheader || '—'"
+            >
+              {{ emailRes.response.preheader || '—' }}
+            </p>
+          </div>
+        </section>
+
+        <app-tpl-html-frame
+          [html]="emailRes.response.html"
+          [widthPx]="emailWidth()"
+          [zoom]="effectiveHtmlZoom()"
+          [title]="'tplPreview.frame.emailTitle' | transloco"
+        />
+      </div>
+    }
+  }
+</div>
+
+<!-- Preview status bar -->
+<footer class="flex h-btn shrink-0 items-center justify-between gap-8 rounded-10 border border-border bg-surface px-8 text-12 leading-18 text-text-muted shadow-card">
+  <div class="flex min-w-0 items-center gap-8">
+    @if (statusBadge(); as badge) {
+      <span
+        class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+        [class]="badge.classes"
+      >
+        {{ badge.labelKey | transloco }}
+      </span>
+    }
+
+    @if (statusTimestampText(); as stamp) {
+      <span class="truncate tabular-nums">{{ stamp }}</span>
+    }
+
+    @if (layoutFactsText(); as facts) {
+      <span class="inline-flex h-btn-h-sm shrink-0 items-center rounded-6 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft whitespace-nowrap">
+        {{ facts }}
+      </span>
+    }
+  </div>
+
+  <div class="flex shrink-0 items-center gap-4">
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+      [disabled]="!canPrevPage()"
+      [attr.aria-label]="'tplPreview.status.prevPage' | transloco"
+      [title]="'tplPreview.status.prevPage' | transloco"
+      (click)="prevPdfPage()"
+    >
+      <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+
+    <span class="px-4 text-12 whitespace-nowrap text-text-muted tabular-nums">
+      {{ 'tplPreview.status.page' | transloco: { i: activePdfResult() ? pdfPage() : 1, n: pdfPageCount() } }}
+    </span>
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+      [disabled]="!canNextPage()"
+      [attr.aria-label]="'tplPreview.status.nextPage' | transloco"
+      [title]="'tplPreview.status.nextPage' | transloco"
+      (click)="nextPdfPage()"
+    >
+      <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+  </div>
+</footer>

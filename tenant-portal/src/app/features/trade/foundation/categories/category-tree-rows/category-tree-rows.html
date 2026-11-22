@@ -1,0 +1,143 @@
+<div
+  role="tree"
+  class="flex flex-col gap-6"
+  [attr.aria-label]="'tradeCategories.view.rows' | transloco"
+  (keydown)="onTreeKeydown($event)"
+>
+  @for (entry of flatRows(); track entry.node.id) {
+    @let row = entry.node;
+    @let muted = isMuted(row);
+    @let rowLoading = isLoading(row.id);
+    @let expanded = isExpanded(row.id);
+
+    <div
+      #rowEl
+      #dropTarget="categoryRowDrop"
+      role="treeitem"
+      [categoryRowDrag]="row.id"
+      [parentId]="row.parentId"
+      [dragDisabled]="!canManage()"
+      [categoryRowDrop]="row.id"
+      [targetParentId]="row.parentId"
+      [dropDisabled]="!canManage()"
+      (dragState)="draggingNode.set($event)"
+      (dropped)="onRowDropped($event, row)"
+      [attr.data-node-id]="row.id"
+      [attr.aria-level]="row.depth"
+      [attr.aria-expanded]="row.hasChildren ? expanded : null"
+      [attr.aria-selected]="activeRowId() === row.id"
+      [attr.aria-describedby]="muted ? uid + '-muted-' + row.id : null"
+      [attr.title]="muted ? ('tradeCategories.inactiveBecause' | transloco: { parent: ancestorName(row) }) : null"
+      [tabIndex]="activeRowId() === row.id ? 0 : -1"
+      [style.margin-inline-start]="indentStyle(row.depth)"
+      class="flex h-table-row cursor-pointer items-center gap-8 rounded-10 border px-8 shadow-card outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="dropTarget.over() ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover'"
+      (focus)="focusedId.set(row.id)"
+      (click)="onRowClick(row, $event)"
+    >
+      @if (canManage()) {
+        <span
+          data-drag-handle
+          class="inline-flex shrink-0 cursor-grab items-center text-text-muted"
+          [title]="'tradeCategories.dragHandle' | transloco"
+          aria-hidden="true"
+        >
+          <ng-icon name="tablerGripVertical" size="14" />
+        </span>
+      }
+
+      @if (row.hasChildren) {
+        <button
+          type="button"
+          tabindex="-1"
+          data-chevron
+          class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text"
+          [attr.aria-label]="(expanded ? 'tradeCategories.collapse' : 'tradeCategories.expand') | transloco"
+          [disabled]="rowLoading"
+          (click)="onToggle(row.id, $event)"
+        >
+          @if (rowLoading) {
+            <ng-icon name="tablerLoader2" size="14" class="animate-spin" aria-hidden="true" />
+          } @else {
+            <ng-icon
+              [name]="expanded ? 'tablerChevronDown' : 'tablerChevronRight'"
+              size="14"
+              [class.rtl:-scale-x-100]="!expanded"
+              aria-hidden="true"
+            />
+          }
+        </button>
+      } @else {
+        <span class="size-icon-tile-sm shrink-0" aria-hidden="true"></span>
+      }
+
+      <span
+        class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+        [class]="tileClass(row)"
+      >
+        <ng-icon name="tablerCategory" size="14" aria-hidden="true" />
+      </span>
+
+      <span
+        class="min-w-0 truncate text-13 leading-18 font-medium"
+        [class]="muted ? 'text-text-muted' : 'text-text'"
+        [title]="row.name"
+      >
+        {{ row.name }}
+      </span>
+
+      <span dir="ltr" class="shrink-0 text-12 leading-18 text-text-muted tabular-nums">
+        {{ row.code }}
+      </span>
+
+      <span class="shrink-0 text-11 leading-16 text-text-muted">
+        {{ 'tradeCategories.type' | transloco }}
+      </span>
+
+      @if (row.childCount > 0) {
+        <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+          {{ 'tradeCategories.children' | transloco: { count: row.childCount } }}
+        </span>
+      }
+
+      <span
+        class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+        [class]="row.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+      >
+        {{ (row.status === 'ACTIVE' ? 'tradeCategories.active' : 'tradeCategories.inactive') | transloco }}
+      </span>
+
+      @if (muted) {
+        <span [id]="uid + '-muted-' + row.id" class="sr-only">
+          {{ 'tradeCategories.inactiveBecause' | transloco: { parent: ancestorName(row) } }}
+        </span>
+      }
+
+      <span class="flex-1"></span>
+
+      <div data-row-action class="shrink-0" (click)="$event.stopPropagation()">
+        <ui-actions-menu
+          [items]="actionsFor()(row)"
+          [label]="row.name"
+          (selected)="onActionSelected(row, $event)"
+        />
+      </div>
+    </div>
+
+    @for (tail of entry.tailDrops; track tail.parentId ?? '__root__') {
+      @if (draggingNode(); as dragging) {
+        @if (dragging.parentId === tail.parentId && dragging.categoryId !== tail.lastSiblingId) {
+          <div
+            #tailDrop="categoryTailDrop"
+            [categoryTailDrop]="tail.parentId"
+            [dropDisabled]="!canManage()"
+            [style.margin-inline-start]="indentStyle(tail.depth)"
+            (dropped)="onTailDropped($event, tail.parentId)"
+            class="h-badge rounded-6 border-2 border-dashed transition-colors duration-fast"
+            [class]="tailDrop.over() ? 'border-brand bg-brand-soft' : 'border-border bg-surface-muted'"
+          ></div>
+        }
+      }
+    }
+  }
+</div>

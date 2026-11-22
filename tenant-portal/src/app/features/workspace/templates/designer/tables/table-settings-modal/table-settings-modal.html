@@ -1,0 +1,1168 @@
+<ui-modal
+  #tableModal
+  size="wide"
+  icon="tablerTable"
+  tile="teal"
+  [title]="(tableKind() === 'DYNAMIC' ? 'tplTables.settings.dynamicTitle' : 'tplTables.settings.title') | transloco"
+  [closeLabel]="'tplTables.actions.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <!-- Underline tabs (32) -->
+    <div
+      role="tablist"
+      class="flex items-center gap-4 border-b border-border"
+      [attr.aria-label]="'tplTables.settings.tabsLabel' | transloco"
+    >
+      @for (tab of tabs(); track tab.id) {
+        @let active = activeTab() === tab.id;
+        <button
+          type="button"
+          role="tab"
+          class="inline-flex h-tab shrink-0 cursor-pointer items-center gap-6 px-10 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="active ? 'subnav-active text-accent' : 'text-text-muted hover:text-text'"
+          [attr.aria-selected]="active"
+          (click)="activeTab.set(tab.id)"
+        >
+          {{ tab.label }}
+        </button>
+      }
+    </div>
+
+    @switch (activeTab()) {
+      @case ('columns') {
+        <div class="flex flex-col gap-8">
+          <div class="flex flex-wrap items-center justify-between gap-8">
+            <div class="flex items-center gap-8">
+              <span class="text-12 text-text-muted">
+                {{ 'tplTables.columns.count' | transloco: { count: columns().length, max: 30 } }}
+              </span>
+              @if (!isFixedCanvas()) {
+                <ui-dropdown
+                  size="button"
+                  [options]="unitOptions()"
+                  [value]="widthUnit()"
+                  [label]="'tplTables.columns.unitLabel' | transloco"
+                  [disabled]="readOnly()"
+                  (valueChange)="onWidthUnitChange($event)"
+                />
+              }
+            </div>
+
+            @if (!readOnly()) {
+              <div class="flex items-center gap-6">
+                @if (tableKind() === 'DYNAMIC') {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    [disabled]="!!productImageDisabledReason()"
+                    [title]="productImageDisabledReason() ?? ''"
+                    (click)="addProductImageColumn()"
+                  >
+                    <ng-icon name="tablerPhoto" size="14" aria-hidden="true" />
+                    {{ 'tplTables.actions.addProductImage' | transloco }}
+                  </button>
+                }
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  [disabled]="columns().length >= 30"
+                  (click)="addColumn()"
+                >
+                  <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                  {{ 'tplTables.actions.addColumn' | transloco }}
+                </button>
+              </div>
+            }
+          </div>
+
+          <!-- Columns list -->
+          <div class="flex max-h-tpl-list flex-col overflow-y-auto scrollbar-thin">
+            @for (col of columns(); track col.id; let idx = $index) {
+              <div class="relative mt-6 flex min-h-table-row flex-col justify-center gap-6 rounded-10 border border-border bg-surface px-10 py-6 text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover">
+                <div class="flex items-end gap-6">
+                  <!-- Reorder & Header -->
+                  <div class="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                      [attr.aria-label]="'tplTables.actions.moveUp' | transloco"
+                      [title]="(isColumnMoveBlockedByMerge(idx, -1) ? 'tplTables.columns.moveBlockedByMerge' : 'tplTables.actions.moveUp') | transloco"
+                      [disabled]="!canMoveColumn(idx, -1)"
+                      (click)="moveColumn(idx, -1)"
+                    >
+                      <ng-icon name="tablerArrowUp" size="14" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                      [attr.aria-label]="'tplTables.actions.moveDown' | transloco"
+                      [title]="(isColumnMoveBlockedByMerge(idx, 1) ? 'tplTables.columns.moveBlockedByMerge' : 'tplTables.actions.moveDown') | transloco"
+                      [disabled]="!canMoveColumn(idx, 1)"
+                      (click)="moveColumn(idx, 1)"
+                    >
+                      <ng-icon name="tablerArrowDown" size="14" aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <!-- Header input -->
+                  <div class="min-w-0 flex-1">
+                    @if (tableKind() === 'STATIC') {
+                      @if (staticHeaderIsText(col.id)) {
+                        <ui-field
+                          [for]="uid + '-col-h-' + idx"
+                          [label]="'tplTables.columns.headerLabel' | transloco"
+                          [hint]="'tplTables.columns.headerHint' | transloco"
+                        >
+                          <input
+                            [id]="uid + '-col-h-' + idx"
+                            type="text"
+                            [readonly]="readOnly()"
+                            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                            [value]="staticHeaderText(col.id)"
+                            (input)="onStaticHeaderInput(col.id, $event)"
+                          />
+                        </ui-field>
+                      } @else {
+                        <ui-field
+                          size="bare"
+                          [for]="uid + '-col-h-' + idx"
+                          [label]="'tplTables.columns.headerLabel' | transloco"
+                          [hint]="'tplTables.columns.headerHint' | transloco"
+                        >
+                          <button
+                            [id]="uid + '-col-h-' + idx"
+                            type="button"
+                            uiButton
+                            variant="secondary"
+                            size="small"
+                            class="w-full justify-start"
+                            aria-haspopup="dialog"
+                            [attr.aria-describedby]="uid + '-col-h-' + idx + '-hint'"
+                            [disabled]="readOnly() || isCellCovered(0, idx)"
+                            (click)="editStaticGridCell(0, idx)"
+                          >
+                            <span class="truncate">{{ staticHeaderText(col.id) }}</span>
+                          </button>
+                        </ui-field>
+                      }
+                    } @else {
+                      @if (col.header.kind === 'TEXT') {
+                        <ui-field
+                          [for]="uid + '-col-dh-' + idx"
+                          [label]="'tplTables.columns.headerLabel' | transloco"
+                          [hint]="'tplTables.columns.headerHint' | transloco"
+                        >
+                          <input
+                            [id]="uid + '-col-dh-' + idx"
+                            type="text"
+                            [readonly]="readOnly()"
+                            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                            [value]="col.header.value"
+                            (input)="onDynamicHeaderInput(idx, $event)"
+                          />
+                          @if (!readOnly()) {
+                            <button
+                              type="button"
+                              aria-haspopup="dialog"
+                              class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                              [attr.aria-label]="'tplTables.actions.useField' | transloco"
+                              [title]="'tplTables.actions.useField' | transloco"
+                              (click)="pickDynamicHeaderField(idx)"
+                            >
+                              <ng-icon name="tablerBraces" size="14" aria-hidden="true" />
+                            </button>
+                          }
+                        </ui-field>
+                      } @else {
+                        <ui-field
+                          size="bare"
+                          [for]="uid + '-col-dhb-' + idx"
+                          [label]="'tplTables.columns.headerLabel' | transloco"
+                          [hint]="'tplTables.columns.headerHint' | transloco"
+                        >
+                          <div class="flex items-center gap-4">
+                            <button
+                              [id]="uid + '-col-dhb-' + idx"
+                              type="button"
+                              uiButton
+                              variant="secondary"
+                              size="small"
+                              class="min-w-0 flex-1"
+                              aria-haspopup="dialog"
+                              [attr.aria-describedby]="uid + '-col-dhb-' + idx + '-hint'"
+                              [disabled]="readOnly()"
+                              (click)="pickDynamicHeaderField(idx)"
+                            >
+                              <ng-icon name="tablerBraces" size="14" aria-hidden="true" />
+                              <span class="truncate">{{ cellSummary(col.header) }}</span>
+                            </button>
+                            @if (!readOnly()) {
+                              <button
+                                type="button"
+                                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                                [attr.aria-label]="'tplTables.actions.useText' | transloco"
+                                [title]="'tplTables.actions.useText' | transloco"
+                                (click)="resetDynamicHeaderToText(idx)"
+                              >
+                                <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                              </button>
+                            }
+                          </div>
+                        </ui-field>
+                      }
+                    }
+                  </div>
+
+                  <!-- Width -->
+                  <div class="w-tpl-label shrink-0">
+                    <ui-field
+                      [for]="uid + '-col-w-' + idx"
+                      [label]="'tplTables.columns.widthLabel' | transloco"
+                      [hint]="'tplTables.columns.widthHint' | transloco"
+                      [error]="colWidthError(col)"
+                    >
+                      <input
+                        [id]="uid + '-col-w-' + idx"
+                        type="number"
+                        min="0.001"
+                        max="500"
+                        step="0.5"
+                        dir="ltr"
+                        [readonly]="readOnly()"
+                        class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                        [value]="col.widthValue"
+                        (input)="onColumnWidthInput(idx, $event)"
+                      />
+                      <span class="shrink-0 text-11 text-text-muted">
+                        {{ (isFixedCanvas() || widthUnit() === 'MM') ? 'mm' : '%' }}
+                      </span>
+                    </ui-field>
+                  </div>
+
+                  <!-- Align -->
+                  <div class="w-tpl-label shrink-0">
+                    <ui-field
+                      size="bare"
+                      [for]="uid + '-col-al-' + idx"
+                      [label]="'tplTables.columns.alignLabel' | transloco"
+                      [hint]="'tplTables.columns.alignHint' | transloco"
+                    >
+                      <ui-dropdown
+                        class="w-full"
+                        size="field"
+                        [id]="uid + '-col-al-' + idx"
+                        [options]="alignOptions()"
+                        [value]="col.align"
+                        [label]="'tplTables.columns.alignLabel' | transloco"
+                        [describedBy]="uid + '-col-al-' + idx + '-hint'"
+                        [disabled]="readOnly()"
+                        (valueChange)="updateColumn(idx, { align: $event })"
+                      />
+                    </ui-field>
+                  </div>
+
+                  <!-- Visible -->
+                  <div class="shrink-0">
+                    <ui-field
+                      size="bare"
+                      [for]="uid + '-col-vis-' + idx"
+                      [label]="'tplTables.columns.visibleLabel' | transloco"
+                      [hint]="'tplTables.columns.visibleHint' | transloco"
+                    >
+                      <div class="flex h-field items-center">
+                        @if (readOnly()) {
+                          <span class="relative inline-flex size-checkbox-size shrink-0">
+                            <input
+                              [id]="uid + '-col-vis-' + idx"
+                              type="checkbox"
+                              disabled
+                              [checked]="col.visible"
+                              class="peer size-checkbox-size cursor-default appearance-none rounded-4 border-check border-border-field bg-surface-field checked:border-brand checked:bg-brand"
+                            />
+                            <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+                              <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                            </span>
+                          </span>
+                        } @else {
+                          <ui-checkbox
+                            [checked]="col.visible"
+                            (checkedChange)="updateColumn(idx, { visible: $event })"
+                          />
+                        }
+                      </div>
+                    </ui-field>
+                  </div>
+
+                  <!-- Remove -->
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                    [attr.aria-label]="'tplTables.actions.remove' | transloco"
+                    [title]="'tplTables.actions.remove' | transloco"
+                    [disabled]="readOnly() || columns().length <= 1"
+                    (click)="removeColumn(idx)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                </div>
+
+                <!-- Dynamic column value or product image settings -->
+                @if (tableKind() === 'DYNAMIC') {
+                  @if (col.dynamicKind === 'PRODUCT_IMAGE') {
+                    <div class="grid grid-cols-3 items-end gap-10 border-t border-border pt-6">
+                      <div class="flex h-field items-center">
+                        <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft">
+                          <ng-icon name="tablerPhoto" size="12" aria-hidden="true" />
+                          {{ 'tplTables.columns.productImageBadge' | transloco }}
+                        </span>
+                      </div>
+                      <ui-field
+                        [for]="uid + '-img-h-' + idx"
+                        [label]="'tplTables.columns.imageHeightLabel' | transloco"
+                        [hint]="'tplTables.columns.imageHeightHint' | transloco"
+                        [error]="productImageHeightError(col)"
+                      >
+                        <input
+                          [id]="uid + '-img-h-' + idx"
+                          type="number"
+                          min="4"
+                          max="40"
+                          step="1"
+                          dir="ltr"
+                          [readonly]="readOnly()"
+                          class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                          [value]="col.productImage.props.heightMm"
+                          (input)="onProductImageHeightInput(idx, $event)"
+                        />
+                      </ui-field>
+                      <ui-field
+                        size="bare"
+                        [for]="uid + '-img-fit-' + idx"
+                        [label]="'tplTables.columns.imageFitLabel' | transloco"
+                        [hint]="'tplTables.columns.imageFitHint' | transloco"
+                      >
+                        <ui-dropdown
+                          class="w-full"
+                          size="field"
+                          [id]="uid + '-img-fit-' + idx"
+                          [options]="fitOptions()"
+                          [value]="col.productImage.props.objectFit ?? 'CONTAIN'"
+                          [label]="'tplTables.columns.imageFitLabel' | transloco"
+                          [describedBy]="uid + '-img-fit-' + idx + '-hint'"
+                          [disabled]="readOnly()"
+                          (valueChange)="onProductImageFitChange(idx, $event)"
+                        />
+                      </ui-field>
+                    </div>
+                  } @else {
+                    <div class="border-t border-border pt-6">
+                      <ui-field
+                        size="bare"
+                        [for]="uid + '-col-val-' + idx"
+                        [label]="'tplTables.columns.valueLabel' | transloco"
+                        [hint]="'tplTables.columns.valueHint' | transloco"
+                      >
+                        <button
+                          [id]="uid + '-col-val-' + idx"
+                          type="button"
+                          uiButton
+                          variant="secondary"
+                          size="small"
+                          aria-haspopup="dialog"
+                          [attr.aria-describedby]="uid + '-col-val-' + idx + '-hint'"
+                          [disabled]="readOnly()"
+                          (click)="editDynamicColumnValue(idx)"
+                        >
+                          <span class="truncate">
+                            {{ cellSummary(col.value) || ('tplTables.actions.edit' | transloco) }}
+                          </span>
+                        </button>
+                      </ui-field>
+                    </div>
+                  }
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Live check line under the list -->
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-wrap items-center justify-between gap-8 text-11 leading-16">
+              @if (isFixedCanvas()) {
+                <span [class]="widthTargetMatches() ? 'text-success-text font-medium' : 'text-danger-text font-medium'">
+                  {{ 'tplTables.check.mm' | transloco: { sum: visibleWidthSum(), frame: frameWidthMm() } }}
+                </span>
+                @if (!widthTargetMatches() && !readOnly() && visibleColumnCount() > 0) {
+                  <button type="button" uiButton variant="secondary" size="small" (click)="fitColumns()">
+                    {{ 'tplTables.fit.frame' | transloco }}
+                  </button>
+                }
+              } @else if (widthUnit() === 'PERCENT') {
+                <span [class]="widthTargetMatches() ? 'text-success-text font-medium' : 'text-danger-text font-medium'">
+                  {{ 'tplTables.check.percent' | transloco: { sum: visibleWidthSum() } }}
+                </span>
+                @if (!widthTargetMatches() && !readOnly() && visibleColumnCount() > 0) {
+                  <button type="button" uiButton variant="secondary" size="small" (click)="fitColumns()">
+                    {{ 'tplTables.fit.percent' | transloco }}
+                  </button>
+                }
+              } @else {
+                <span class="text-text-muted">
+                  {{ 'tplTables.check.flowMm' | transloco: { sum: visibleWidthSum() } }}
+                </span>
+              }
+            </div>
+            @if (visibleColumnCount() === 0) {
+              <p class="text-11 leading-16 text-danger-text">{{ 'tplTables.oneVisible' | transloco }}</p>
+            }
+          </div>
+        </div>
+      }
+
+      @case ('rows') {
+        <div class="flex flex-col gap-10">
+          <!-- Row count stepper -->
+          <div class="grid grid-cols-3 gap-x-10">
+            <ui-field
+              size="bare"
+              [for]="uid + '-row-count'"
+              [label]="'tplTables.rows.countLabel' | transloco"
+              [hint]="'tplTables.rows.countHint' | transloco"
+            >
+              <div class="flex items-center gap-6">
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  [attr.aria-label]="'tplTables.actions.decreaseRows' | transloco"
+                  [disabled]="readOnly() || rows().length <= 1"
+                  (click)="changeRowCount(-1)"
+                >
+                  <ng-icon name="tablerMinus" size="14" aria-hidden="true" />
+                </button>
+                <input
+                  [id]="uid + '-row-count'"
+                  type="number"
+                  readonly
+                  dir="ltr"
+                  [value]="rows().length"
+                  class="h-field min-w-0 flex-1 rounded-8 border border-border-field bg-surface-field px-6 text-center text-12 font-medium tabular-nums text-text outline-none focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo"
+                />
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-50"
+                  [attr.aria-label]="'tplTables.actions.increaseRows' | transloco"
+                  [disabled]="readOnly() || rows().length >= 100"
+                  (click)="changeRowCount(1)"
+                >
+                  <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+                </button>
+              </div>
+            </ui-field>
+          </div>
+
+          <!-- Cell grid editor -->
+          <ui-field
+            size="bare"
+            [label]="'tplTables.rows.gridLabel' | transloco"
+            [hint]="'tplTables.rows.gridHint' | transloco"
+          >
+            <div class="max-h-tpl-list overflow-auto rounded-8 border border-border bg-surface p-4 scrollbar-thin">
+              <table class="w-full border-collapse table-fixed" [attr.role]="gridHasHeader() ? null : 'presentation'">
+                <tbody>
+                  @for (row of rows(); track row.id; let rIdx = $index) {
+                    <tr>
+                      @for (col of columns(); track col.id; let cIdx = $index) {
+                        @let covered = isCellCovered(rIdx, cIdx);
+                        @if (covered) {
+                          <td class="h-btn border border-border bg-neutral-soft px-6 text-center text-11 text-text-placeholder">
+                            {{ 'tplTables.rows.covered' | transloco }}
+                          </td>
+                        } @else {
+                          @let cell = getStaticCell(rIdx, col.id);
+                          <ng-template #gridCellButton>
+                            <button
+                              type="button"
+                              class="flex h-btn w-full cursor-pointer items-center truncate px-6 text-start text-11 text-text outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo"
+                              (click)="editStaticGridCell(rIdx, cIdx)"
+                            >
+                              <span class="truncate">
+                                {{ cell ? (cellSummary(cell.value) || '—') : '—' }}
+                              </span>
+                            </button>
+                          </ng-template>
+                          @if (gridHasHeader() && rIdx === 0) {
+                            <th scope="col" class="h-btn border border-border p-0 font-normal">
+                              <ng-container [ngTemplateOutlet]="gridCellButton" />
+                            </th>
+                          } @else {
+                            <td class="h-btn border border-border p-0">
+                              <ng-container [ngTemplateOutlet]="gridCellButton" />
+                            </td>
+                          }
+                        }
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </ui-field>
+
+          <!-- Fixed canvas row heights -->
+          @if (isFixedCanvas()) {
+            <div class="flex flex-col gap-6 border-t border-border pt-8">
+              <ui-field
+                size="bare"
+                [label]="'tplTables.rows.heightsLabel' | transloco"
+                [hint]="'tplTables.rows.heightsHint' | transloco"
+              >
+                <div class="grid max-h-tpl-list-short grid-cols-3 gap-x-10 gap-y-6 overflow-y-auto scrollbar-thin">
+                  @for (h of rowHeightsMm(); track $index; let idx = $index) {
+                    <ui-field
+                      [for]="uid + '-rh-' + idx"
+                      [label]="'tplTables.rows.rowLabel' | transloco: { n: idx + 1 }"
+                      [hint]="'tplTables.rows.heightsHint' | transloco"
+                      [error]="rowHeightError(h)"
+                    >
+                      <input
+                        [id]="uid + '-rh-' + idx"
+                        type="number"
+                        min="0.1"
+                        max="1000"
+                        step="0.5"
+                        dir="ltr"
+                        [readonly]="readOnly()"
+                        class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                        [value]="h"
+                        (input)="onRowHeightInput(idx, $event)"
+                      />
+                      <span class="shrink-0 text-11 text-text-muted">mm</span>
+                    </ui-field>
+                  }
+                </div>
+              </ui-field>
+
+              <div class="flex flex-wrap items-center justify-between gap-8 text-11 leading-16">
+                <span [class]="rowHeightsFitFrame() ? 'text-success-text font-medium' : 'text-danger-text font-medium'">
+                  {{ 'tplTables.check.rowHeightsMm' | transloco: { sum: rowHeightsSum(), frame: frameHeightMm() } }}
+                </span>
+                @if (!rowHeightsFitFrame() && !readOnly()) {
+                  <button type="button" uiButton variant="secondary" size="small" (click)="fitRowHeights()">
+                    {{ 'tplTables.fit.frame' | transloco }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      @case ('source') {
+        <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+          <div class="col-span-2 min-w-0">
+            <ui-field
+              size="bare"
+              [for]="uid + '-src-list'"
+              [label]="'tplTables.source.listLabel' | transloco"
+              [hint]="'tplTables.source.listHint' | transloco"
+              [required]="true"
+            >
+              @if (!readOnly()) {
+                <div class="flex items-center gap-6">
+                  <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text">
+                    <span class="truncate">{{ state.fieldLabel(sourcePath()) }}</span>
+                  </div>
+                  <button
+                    [id]="uid + '-src-list'"
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    aria-haspopup="dialog"
+                    [attr.aria-describedby]="uid + '-src-list-hint'"
+                    (click)="changeSourceList()"
+                  >
+                    {{ 'tplTables.actions.change' | transloco }}
+                  </button>
+                </div>
+              } @else {
+                <input
+                  [id]="uid + '-src-list'"
+                  type="text"
+                  readonly
+                  class="h-field min-w-0 w-full rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text outline-none"
+                  [value]="state.fieldLabel(sourcePath())"
+                />
+              }
+              <p class="mt-2 truncate text-11 leading-16 text-text-muted" dir="ltr">{{ sourcePath() }}</p>
+            </ui-field>
+          </div>
+
+          <div class="col-span-1 min-w-0">
+            <ui-field
+              size="bare"
+              [for]="uid + '-row-key'"
+              [label]="'tplTables.source.rowKeyLabel' | transloco"
+              [hint]="'tplTables.source.rowKeyHint' | transloco"
+            >
+              <div class="flex items-center gap-4">
+                <button
+                  [id]="uid + '-row-key'"
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  class="min-w-0 flex-1"
+                  aria-haspopup="dialog"
+                  [attr.aria-describedby]="uid + '-row-key-hint'"
+                  [disabled]="readOnly()"
+                  (click)="pickRowKey()"
+                >
+                  <span class="truncate">
+                    {{ rowKeyPath() ? state.fieldLabel(rowKeyPath()) : ('tplTables.source.noRowKey' | transloco) }}
+                  </span>
+                </button>
+                @if (rowKeyPath() && !readOnly()) {
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border-field bg-surface text-text-muted outline-none hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                    [attr.aria-label]="'tplTables.actions.clear' | transloco"
+                    [title]="'tplTables.actions.clear' | transloco"
+                    (click)="clearRowKey()"
+                  >
+                    <ng-icon name="tablerX" size="14" aria-hidden="true" />
+                  </button>
+                }
+              </div>
+            </ui-field>
+          </div>
+
+          <div class="col-span-1 min-w-0">
+            <ui-field
+              size="bare"
+              [for]="uid + '-empty-beh'"
+              [label]="'tplTables.empty.label' | transloco"
+              [hint]="'tplTables.empty.hint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-empty-beh'"
+                [options]="emptyBehaviorOptions()"
+                [value]="emptyBehavior()"
+                [label]="'tplTables.empty.label' | transloco"
+                [describedBy]="uid + '-empty-beh-hint'"
+                [disabled]="readOnly()"
+                (valueChange)="emptyBehavior.set($event)"
+              />
+            </ui-field>
+          </div>
+
+          @if (emptyBehavior() === 'MESSAGE') {
+            <div class="col-span-2 min-w-0">
+              <ui-field
+                [for]="uid + '-empty-msg'"
+                [label]="'tplTables.empty.messageLabel' | transloco"
+                [hint]="'tplTables.empty.messageHint' | transloco"
+                [required]="true"
+                [count]="emptyMessage().length"
+                [max]="500"
+                [error]="emptyMessageError()"
+              >
+                <input
+                  [id]="uid + '-empty-msg'"
+                  type="text"
+                  [readonly]="readOnly()"
+                  class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                  [value]="emptyMessage()"
+                  (input)="onEmptyMessageInput($event)"
+                />
+              </ui-field>
+            </div>
+          } @else if (emptyBehavior() === 'MIN_ROWS') {
+            <div class="col-span-2 min-w-0">
+              <ui-field
+                [for]="uid + '-min-rows'"
+                [label]="'tplTables.empty.minRowsLabel' | transloco"
+                [hint]="'tplTables.empty.minRowsHint' | transloco"
+                [error]="minEmptyRowsError()"
+              >
+                <input
+                  [id]="uid + '-min-rows'"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  dir="ltr"
+                  [readonly]="readOnly()"
+                  class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                  [value]="minimumEmptyRows()"
+                  (input)="onMinEmptyRowsInput($event)"
+                />
+              </ui-field>
+            </div>
+          }
+
+          @if (isFixedCanvas()) {
+            <div class="col-span-3 border-t border-border pt-8">
+              <p class="mb-6 text-12 font-medium text-text">{{ 'tplTables.source.fixedSection' | transloco }}</p>
+              <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+                <div class="col-span-2 min-w-0">
+                  <ui-field
+                    [for]="uid + '-budget'"
+                    [label]="'tplTables.budget.label' | transloco"
+                    [hint]="'tplTables.budget.hint' | transloco"
+                    [required]="true"
+                    [error]="rowBudgetError()"
+                  >
+                    <input
+                      [id]="uid + '-budget'"
+                      type="number"
+                      min="1"
+                      max="2000"
+                      step="1"
+                      dir="ltr"
+                      [readonly]="readOnly()"
+                      class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+                      [value]="maxRenderedRows()"
+                      (input)="onRowBudgetInput($event)"
+                    />
+                  </ui-field>
+                </div>
+
+                <div class="col-span-1 min-w-0">
+                  <ui-field
+                    [for]="uid + '-overflow'"
+                    [label]="'tplTables.overflow.label' | transloco"
+                    [hint]="'tplTables.overflow.hint' | transloco"
+                  >
+                    <input
+                      [id]="uid + '-overflow'"
+                      type="text"
+                      readonly
+                      class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                      [value]="'tplTables.overflow.REJECT' | transloco"
+                    />
+                    <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+                  </ui-field>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Read-only header and footer bands summary -->
+          <div class="col-span-3 border-t border-border pt-8">
+            <ui-field
+              [for]="uid + '-bands'"
+              [label]="'tplTables.source.bandsLabel' | transloco"
+              [hint]="'tplTables.source.bandsNote' | transloco"
+            >
+              <input
+                [id]="uid + '-bands'"
+                type="text"
+                readonly
+                class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+                [value]="'tplTables.source.bandsSummary' | transloco: { headers: headerBandsCount(), footers: footerBandsCount() }"
+              />
+              <ng-icon name="tablerLock" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+            </ui-field>
+          </div>
+        </div>
+      }
+
+      @case ('options') {
+        <div class="flex max-h-tpl-list flex-col gap-10 overflow-y-auto pe-2 scrollbar-thin">
+          <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+            <ui-field
+              size="bare"
+              [for]="uid + '-rep-h'"
+              [label]="'tplTables.options.repeatHeaderLabel' | transloco"
+              [hint]="'tplTables.options.repeatHeaderHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-rep-h'"
+                [options]="repeatHeaderOptions()"
+                [value]="repeatHeader()"
+                [label]="'tplTables.options.repeatHeaderLabel' | transloco"
+                [describedBy]="uid + '-rep-h-hint'"
+                [disabled]="readOnly()"
+                (valueChange)="repeatHeader.set($event)"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [for]="uid + '-row-split'"
+              [label]="'tplTables.options.rowSplitLabel' | transloco"
+              [hint]="'tplTables.options.rowSplitHint' | transloco"
+            >
+              <ui-dropdown
+                class="w-full"
+                size="field"
+                [id]="uid + '-row-split'"
+                [options]="rowSplitOptions()"
+                [value]="rowSplit()"
+                [label]="'tplTables.options.rowSplitLabel' | transloco"
+                [describedBy]="uid + '-row-split-hint'"
+                [disabled]="readOnly()"
+                (valueChange)="rowSplit.set($event)"
+              />
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [for]="uid + '-keep-together'"
+              [label]="'tplTables.options.keepRowsTogether' | transloco"
+              [hint]="'tplTables.options.keepRowsTogetherHint' | transloco"
+            >
+              <div class="flex h-field items-center">
+                @if (readOnly()) {
+                  <span class="relative inline-flex size-checkbox-size shrink-0">
+                    <input
+                      [id]="uid + '-keep-together'"
+                      type="checkbox"
+                      disabled
+                      [checked]="keepRowsTogether()"
+                      class="peer size-checkbox-size cursor-default appearance-none rounded-4 border-check border-border-field bg-surface-field checked:border-brand checked:bg-brand"
+                    />
+                    <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+                      <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                    </span>
+                  </span>
+                } @else {
+                  <ui-checkbox
+                    [checked]="keepRowsTogether()"
+                    (checkedChange)="onOptionFlagChange('keepRowsTogether', $event)"
+                  />
+                }
+              </div>
+            </ui-field>
+
+            <ui-field
+              size="bare"
+              [for]="uid + '-striped'"
+              [label]="'tplTables.options.stripedRows' | transloco"
+              [hint]="'tplTables.options.stripedRowsHint' | transloco"
+            >
+              <div class="flex h-field items-center">
+                @if (readOnly()) {
+                  <span class="relative inline-flex size-checkbox-size shrink-0">
+                    <input
+                      [id]="uid + '-striped'"
+                      type="checkbox"
+                      disabled
+                      [checked]="stripedRows()"
+                      class="peer size-checkbox-size cursor-default appearance-none rounded-4 border-check border-border-field bg-surface-field checked:border-brand checked:bg-brand"
+                    />
+                    <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+                      <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                    </span>
+                  </span>
+                } @else {
+                  <ui-checkbox
+                    [checked]="stripedRows()"
+                    (checkedChange)="onOptionFlagChange('stripedRows', $event)"
+                  />
+                }
+              </div>
+            </ui-field>
+
+            @if (tableKind() === 'STATIC' && isFixedCanvas()) {
+              <ui-field
+                size="bare"
+                [for]="uid + '-wrap-cells'"
+                [label]="'tplTables.options.wrapCells' | transloco"
+                [hint]="'tplTables.options.wrapCellsHint' | transloco"
+              >
+                <div class="flex h-field items-center">
+                  @if (readOnly()) {
+                    <span class="relative inline-flex size-checkbox-size shrink-0">
+                      <input
+                        [id]="uid + '-wrap-cells'"
+                        type="checkbox"
+                        disabled
+                        [checked]="wrapCells()"
+                        class="peer size-checkbox-size cursor-default appearance-none rounded-4 border-check border-border-field bg-surface-field checked:border-brand checked:bg-brand"
+                      />
+                      <span class="pointer-events-none absolute inset-0 hidden items-center justify-center text-on-brand peer-checked:flex">
+                        <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+                      </span>
+                    </span>
+                  } @else {
+                    <ui-checkbox
+                      [checked]="wrapCells()"
+                      (checkedChange)="onOptionFlagChange('wrapCells', $event)"
+                    />
+                  }
+                </div>
+              </ui-field>
+            }
+          </div>
+
+          <!-- Header style -->
+          <div class="border-t border-border pt-8">
+            <p class="mb-6 text-12 font-medium text-text">{{ 'tplTables.options.headerStyle' | transloco }}</p>
+            <ng-container
+              [ngTemplateOutlet]="styleSectionTpl"
+              [ngTemplateOutletContext]="{ target: 'header', draft: headerStyleDraft(), prefix: uid + '-hs' }"
+            />
+          </div>
+
+          <!-- Cell style -->
+          <div class="border-t border-border pt-8">
+            <p class="mb-6 text-12 font-medium text-text">{{ 'tplTables.options.cellStyle' | transloco }}</p>
+            <ng-container
+              [ngTemplateOutlet]="styleSectionTpl"
+              [ngTemplateOutletContext]="{ target: 'cell', draft: cellStyleDraft(), prefix: uid + '-cs' }"
+            />
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!readOnly()) {
+      <button type="button" uiButton variant="primary" [disabled]="!canApply()" (click)="apply()">
+        {{ 'tplTables.actions.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplTables.actions.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="cancel()">
+        {{ 'tplTables.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ng-template #styleSectionTpl let-target="target" let-draft="draft" let-prefix="prefix">
+  <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+    <ui-field
+      [for]="prefix + '-fsize'"
+      [label]="'tplTables.options.fontSizeLabel' | transloco"
+      [hint]="'tplTables.options.fontSizeHint' | transloco"
+      [error]="fontSizeError(draft.fontSizePx)"
+    >
+      <input
+        [id]="prefix + '-fsize'"
+        type="number"
+        min="8"
+        max="48"
+        step="1"
+        dir="ltr"
+        [readonly]="readOnly()"
+        class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+        [value]="draft.fontSizePx"
+        (input)="onStyleInput(target, 'fontSizePx', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="prefix + '-fweight'"
+      [label]="'tplTables.options.fontWeightLabel' | transloco"
+      [hint]="'tplTables.options.fontWeightHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="prefix + '-fweight'"
+        [options]="fontWeightOptions()"
+        [value]="draft.fontWeight"
+        [label]="'tplTables.options.fontWeightLabel' | transloco"
+        [describedBy]="prefix + '-fweight-hint'"
+        [disabled]="readOnly()"
+        (valueChange)="onStyleDropdown(target, 'fontWeight', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="prefix + '-color'"
+      [label]="'tplTables.options.colorLabel' | transloco"
+      [hint]="'tplTables.options.colorHint' | transloco"
+      [error]="colorError(draft.color)"
+    >
+      <span
+        class="size-badge shrink-0 rounded-4 border border-border"
+        [style.background-color]="swatchBackground(draft.color)"
+        aria-hidden="true"
+      ></span>
+      <input
+        [id]="prefix + '-color'"
+        type="text"
+        dir="ltr"
+        placeholder="#12141C"
+        [readonly]="readOnly()"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="draft.color"
+        (input)="onStyleInput(target, 'color', $event)"
+        (blur)="normalizeColorField(target, 'color')"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="prefix + '-bg'"
+      [label]="'tplTables.options.backgroundLabel' | transloco"
+      [hint]="'tplTables.options.backgroundHint' | transloco"
+      [error]="colorError(draft.backgroundColor)"
+    >
+      <span
+        class="size-badge shrink-0 rounded-4 border border-border"
+        [style.background-color]="swatchBackground(draft.backgroundColor)"
+        aria-hidden="true"
+      ></span>
+      <input
+        [id]="prefix + '-bg'"
+        type="text"
+        dir="ltr"
+        placeholder="#FFFFFF"
+        [readonly]="readOnly()"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="draft.backgroundColor"
+        (input)="onStyleInput(target, 'backgroundColor', $event)"
+        (blur)="normalizeColorField(target, 'backgroundColor')"
+      />
+    </ui-field>
+
+    <div class="col-span-2 min-w-0">
+      <ui-field
+        size="bare"
+        [label]="'tplTables.options.paddingLabel' | transloco"
+        [hint]="'tplTables.options.paddingHint' | transloco"
+        [error]="paddingError(draft)"
+      >
+        <div class="grid grid-cols-4 gap-4">
+          <input
+            type="number"
+            min="0"
+            max="50"
+            dir="ltr"
+            [placeholder]="'tplTables.options.paddingTop' | transloco"
+            [attr.aria-label]="'tplTables.options.paddingTop' | transloco"
+            [readonly]="readOnly()"
+            class="h-field min-w-0 rounded-8 border border-border-field bg-surface-field px-6 text-12 tabular-nums text-text outline-none focus:border-focus-ring"
+            [value]="draft.padTop"
+            (input)="onStyleInput(target, 'padTop', $event)"
+          />
+          <input
+            type="number"
+            min="0"
+            max="50"
+            dir="ltr"
+            [placeholder]="'tplTables.options.paddingEnd' | transloco"
+            [attr.aria-label]="'tplTables.options.paddingEnd' | transloco"
+            [readonly]="readOnly()"
+            class="h-field min-w-0 rounded-8 border border-border-field bg-surface-field px-6 text-12 tabular-nums text-text outline-none focus:border-focus-ring"
+            [value]="draft.padEnd"
+            (input)="onStyleInput(target, 'padEnd', $event)"
+          />
+          <input
+            type="number"
+            min="0"
+            max="50"
+            dir="ltr"
+            [placeholder]="'tplTables.options.paddingBottom' | transloco"
+            [attr.aria-label]="'tplTables.options.paddingBottom' | transloco"
+            [readonly]="readOnly()"
+            class="h-field min-w-0 rounded-8 border border-border-field bg-surface-field px-6 text-12 tabular-nums text-text outline-none focus:border-focus-ring"
+            [value]="draft.padBottom"
+            (input)="onStyleInput(target, 'padBottom', $event)"
+          />
+          <input
+            type="number"
+            min="0"
+            max="50"
+            dir="ltr"
+            [placeholder]="'tplTables.options.paddingStart' | transloco"
+            [attr.aria-label]="'tplTables.options.paddingStart' | transloco"
+            [readonly]="readOnly()"
+            class="h-field min-w-0 rounded-8 border border-border-field bg-surface-field px-6 text-12 tabular-nums text-text outline-none focus:border-focus-ring"
+            [value]="draft.padStart"
+            (input)="onStyleInput(target, 'padStart', $event)"
+          />
+        </div>
+      </ui-field>
+    </div>
+
+    <ui-field
+      [for]="prefix + '-bw'"
+      [label]="'tplTables.options.borderWidthLabel' | transloco"
+      [hint]="'tplTables.options.borderWidthHint' | transloco"
+      [error]="borderWidthError(draft.borderWidthPx)"
+    >
+      <input
+        [id]="prefix + '-bw'"
+        type="number"
+        min="0"
+        max="12"
+        step="0.5"
+        dir="ltr"
+        [readonly]="readOnly()"
+        class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+        [value]="draft.borderWidthPx"
+        (input)="onStyleInput(target, 'borderWidthPx', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="prefix + '-bs'"
+      [label]="'tplTables.options.borderStyleLabel' | transloco"
+      [hint]="'tplTables.options.borderStyleHint' | transloco"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="prefix + '-bs'"
+        [options]="borderStyleOptions()"
+        [value]="draft.borderStyle"
+        [label]="'tplTables.options.borderStyleLabel' | transloco"
+        [describedBy]="prefix + '-bs-hint'"
+        [disabled]="readOnly()"
+        (valueChange)="onStyleDropdown(target, 'borderStyle', $event)"
+      />
+    </ui-field>
+
+    <ui-field
+      [for]="prefix + '-bc'"
+      [label]="'tplTables.options.borderColorLabel' | transloco"
+      [hint]="'tplTables.options.borderColorHint' | transloco"
+      [error]="borderColorError(draft)"
+    >
+      <span
+        class="size-badge shrink-0 rounded-4 border border-border"
+        [style.background-color]="swatchBackground(draft.borderColor)"
+        aria-hidden="true"
+      ></span>
+      <input
+        [id]="prefix + '-bc'"
+        type="text"
+        dir="ltr"
+        placeholder="#E4E7EC"
+        [readonly]="readOnly()"
+        class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [value]="draft.borderColor"
+        (input)="onStyleInput(target, 'borderColor', $event)"
+        (blur)="normalizeColorField(target, 'borderColor')"
+      />
+    </ui-field>
+  </div>
+</ng-template>
+
+<ui-confirm-dialog
+  #listChangeConfirm
+  tone="warning"
+  [title]="'tplTables.source.confirmListTitle' | transloco"
+  [text]="'tplTables.source.confirmListText' | transloco"
+  [confirmLabel]="'tplTables.source.confirmListAction' | transloco"
+  [cancelLabel]="'tplTables.actions.cancel' | transloco"
+/>

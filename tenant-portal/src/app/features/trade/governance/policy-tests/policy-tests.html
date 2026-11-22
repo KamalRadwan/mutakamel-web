@@ -1,0 +1,162 @@
+<div class="flex flex-wrap items-center justify-between gap-8">
+  @if (summary(); as s) {
+    <div class="flex items-center gap-8">
+      <span
+        class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium tabular-nums"
+        [class]="
+          s.total > 0 && s.passed === s.total
+            ? 'bg-success-soft text-on-success-soft'
+            : 'bg-danger-soft text-on-danger-soft'
+        "
+      >
+        {{ 'policy.tests.summary' | transloco: { passed: s.passed, total: s.total } }}
+      </span>
+    </div>
+  }
+
+  @if (!readonly()) {
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      size="small"
+      class="ms-auto"
+      [disabled]="testCases().length >= maxTests"
+      (click)="openCreate()"
+    >
+      <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+      <span>{{ 'policy.tests.addTest' | transloco }}</span>
+    </button>
+  }
+</div>
+
+@if (testCases().length === 0) {
+  <div class="flex flex-col items-center justify-center gap-8 rounded-12 border border-border bg-surface px-12 py-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-10 bg-icon-violet text-on-icon">
+      <ng-icon name="tablerFlask" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'policy.tests.empty' | transloco }}</p>
+  </div>
+} @else {
+  <div class="overflow-x-auto pb-4">
+    <div class="flex flex-col gap-6" [style.min-width.px]="hasResults() ? 940 : 680">
+      <div
+        class="grid h-table-head items-center gap-8 rounded-10 bg-linear-to-b from-nav-start to-nav-end px-10 text-12 leading-18 font-medium text-on-nav shadow-card"
+        [class]="gridColumns()"
+        role="row"
+      >
+        <span class="truncate">{{ 'policy.tests.columns.code' | transloco }}</span>
+        <span class="truncate">{{ 'policy.tests.columns.facts' | transloco }}</span>
+        <span class="truncate">{{ 'policy.tests.columns.expectedOutcome' | transloco }}</span>
+        <span class="truncate">{{ 'policy.tests.columns.expectedRule' | transloco }}</span>
+        @if (hasResults()) {
+          <span class="truncate">{{ 'policy.tests.columns.actualOutcome' | transloco }}</span>
+          <span class="truncate">{{ 'policy.tests.columns.actualRule' | transloco }}</span>
+          <span class="truncate">{{ 'policy.tests.columns.result' | transloco }}</span>
+        }
+        @if (!readonly()) {
+          <span class="sr-only">{{ 'policy.tests.columns.actions' | transloco }}</span>
+        }
+      </div>
+
+      @for (tc of testCases(); track $index; let idx = $index) {
+        @let res = resultMap().get(tc.code);
+        @let chips = factChipsFor(tc);
+        <div
+          class="grid min-h-table-row items-center gap-8 rounded-10 border border-border bg-surface px-10 py-6 text-12 leading-18 text-text shadow-card transition-colors duration-fast"
+          [class]="gridColumns() + ' ' + (!readonly() ? 'cursor-pointer hover:bg-neutral-soft' : '')"
+          role="row"
+          (click)="openEdit(idx, tc)"
+        >
+          <span class="truncate font-medium" dir="ltr">{{ tc.code }}</span>
+
+          <div class="flex min-w-0 flex-wrap items-center gap-4">
+            @for (chip of chips.visible; track chip.key) {
+              <span class="inline-flex h-chip max-w-full items-center gap-4 rounded-6 bg-neutral-soft px-6 text-11 text-on-neutral-soft">
+                <span class="truncate">{{ chip.label }}</span>
+                <span aria-hidden="true">=</span>
+                <span class="truncate font-medium tabular-nums" dir="auto">{{ chip.value }}</span>
+              </span>
+            }
+            @if (chips.extra > 0) {
+              <span class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text-muted">
+                {{ 'policy.tests.moreFacts' | transloco: { count: chips.extra } }}
+              </span>
+            }
+          </div>
+
+          <div class="flex min-w-0 items-center">
+            <span
+              class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+              [class]="outcomeClass(tc.expectedOutcome)"
+              [title]="tc.expectedSelectedValue || ''"
+            >
+              {{ 'policy.outcomes.' + tc.expectedOutcome | transloco }}
+            </span>
+          </div>
+
+          <span class="truncate text-text-muted" [dir]="tc.expectedRuleCode ? 'ltr' : 'auto'">
+            {{ tc.expectedRuleCode || ('policy.tests.defaultRule' | transloco) }}
+          </span>
+
+          @if (hasResults()) {
+            <div class="flex min-w-0 items-center">
+              @if (res) {
+                <span
+                  class="inline-flex h-chip max-w-full items-center truncate rounded-6 px-6 text-11 font-medium"
+                  [class]="outcomeClass(res.actualOutcome)"
+                  [title]="res.actualSelectedValue || ''"
+                >
+                  {{ 'policy.outcomes.' + res.actualOutcome | transloco }}
+                </span>
+              } @else {
+                <span class="text-text-muted">—</span>
+              }
+            </div>
+
+            <span class="truncate text-text-muted" [dir]="res?.actualRuleCode ? 'ltr' : 'auto'">
+              @if (res) {
+                {{ res.actualRuleCode || ('policy.tests.defaultRule' | transloco) }}
+              } @else {
+                —
+              }
+            </span>
+
+            <div class="flex min-w-0 items-center">
+              @if (res) {
+                <span
+                  class="inline-flex h-badge items-center rounded-8 px-8 text-11 font-medium"
+                  [class]="res.passed ? 'bg-success text-on-success' : 'bg-danger text-on-danger'"
+                >
+                  {{ (res.passed ? 'policy.tests.pass' : 'policy.tests.fail') | transloco }}
+                </span>
+              } @else {
+                <span class="text-text-muted">—</span>
+              }
+            </div>
+          }
+
+          @if (!readonly()) {
+            <div class="flex items-center justify-end" (click)="$event.stopPropagation()">
+              <ui-actions-menu
+                size="small"
+                [items]="rowActions()"
+                [label]="'policy.tests.actionsLabel' | transloco"
+                (selected)="onRowAction(idx, tc, $event)"
+              />
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<app-policy-test-modal
+  [kind]="kind()"
+  [rules]="rules()"
+  [facts]="facts()"
+  [factsByKind]="factsByKind()"
+  [existingCodes]="existingCodes()"
+  (saved)="onTestSaved($event)"
+/>

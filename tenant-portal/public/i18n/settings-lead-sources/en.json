@@ -1,0 +1,77 @@
+{
+  "title": "Lead sources",
+  "new": "New source",
+  "search": "Search lead sources",
+  "limitReached": "Maximum of {{max}} lead sources reached.",
+  "empty": "No lead sources yet.",
+  "dragHandle": "Drag to reorder",
+  "table": {
+    "order": "#"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "changeIcon": "Change icon",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "moveReorderingReason": "Wait for the current reorder to finish.",
+    "moveSingleReason": "Add another lead source to reorder."
+  },
+  "modal": {
+    "createTitle": "New lead source",
+    "editTitle": "Lead source",
+    "nameArHint": "Arabic name of the lead source (1 to 120 characters), shown on leads and customers in Arabic.",
+    "nameEnHint": "English name of the lead source (1 to 120 characters), shown on leads and customers in English.",
+    "activeHint": "Inactive sources stay on existing leads but cannot be chosen for new ones."
+  },
+  "icon": {
+    "label": "Source icon",
+    "hint": "Upload a PNG, JPEG or ICO image up to 2 MB to display beside this source name.",
+    "createHint": "You can add an icon after saving.",
+    "dropTitle": "Drop an icon here",
+    "dropHint": "PNG, JPEG or ICO, up to 2 MB"
+  },
+  "moveModal": {
+    "title": "Move to position",
+    "positionHint": "Choose the new order number in the list; controls the order shown when selecting a lead source."
+  },
+  "delete": {
+    "title": "Delete lead source?",
+    "text": "{{name}} will be deleted. This cannot be undone."
+  },
+  "discard": {
+    "title": "Discard unsaved changes?",
+    "text": "Your changes to this lead source have not been saved.",
+    "confirm": "Discard"
+  },
+  "inUse": {
+    "title": "Cannot delete lead source",
+    "text": "This source is used by leads or customers, so it cannot be deleted. You can make it inactive instead.",
+    "textInactive": "This source is used by leads or customers, so it cannot be deleted. It is already inactive, so it cannot be chosen for new leads.",
+    "makeInactive": "Make inactive"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters."
+  },
+  "toasts": {
+    "created": "Lead source created",
+    "saved": "Changes saved",
+    "activated": "Lead source activated",
+    "deactivated": "Lead source made inactive",
+    "reordered": "Order updated",
+    "deleted": "Lead source deleted",
+    "iconUploaded": "Icon updated"
+  },
+  "errors": {
+    "CRM_ACQUISITION_SOURCE_NAME_TAKEN": "A lead source with this name already exists.",
+    "CRM_ACQUISITION_SOURCE_LIMIT_EXCEEDED": "You have reached the maximum of 500 lead sources.",
+    "CRM_ACQUISITION_SOURCE_NOT_FOUND": "This lead source no longer exists.",
+    "CRM_ACQUISITION_SOURCE_REORDER_INVALID": "The source list changed. Reload and try again.",
+    "CRM_ACQUISITION_SOURCE_IN_USE": "This source is used by leads or customers and cannot be deleted.",
+    "CRM_ACQUISITION_SOURCE_ICON_TYPE_UNSUPPORTED": "Only PNG, JPEG and ICO icon files are supported.",
+    "CRM_ACQUISITION_SOURCE_ICON_EXTENSION_UNSUPPORTED": "The file extension does not match the icon format (PNG, JPEG or ICO).",
+    "CRM_ACQUISITION_SOURCE_ICON_EMPTY": "The selected icon file is empty.",
+    "CRM_ACQUISITION_SOURCE_ICON_TOO_LARGE": "The icon file must not exceed 2 MB."
+  }
+}

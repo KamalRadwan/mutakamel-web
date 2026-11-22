@@ -1,0 +1,123 @@
+<div class="flex shrink-0 items-center justify-end gap-8 rounded-10 bg-surface p-8 shadow-card">
+  <button
+    type="button"
+    class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+    [disabled]="loading()"
+    [attr.aria-label]="'repExports.reload' | transloco"
+    [title]="'repExports.reload' | transloco"
+    (click)="load()"
+  >
+    <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+  </button>
+</div>
+
+@if (loadError(); as errKind) {
+  <ui-full-state
+    [kind]="errKind"
+    [title]="(errKind === 'forbidden' ? 'repExports.forbiddenTitle' : 'analytics.common.loadFailed') | transloco"
+    [text]="errKind === 'forbidden' ? ('repExports.forbiddenText' | transloco) : ''"
+    [actionLabel]="errKind === 'load-failure' ? ('analytics.common.retry' | transloco) : ''"
+    (action)="load()"
+  />
+} @else if (!loading() && exports().length === 0) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon" aria-hidden="true">
+      <ng-icon name="tablerFileExport" size="var(--icon-empty)" class="size-icon-empty" aria-hidden="true" />
+    </span>
+    <p class="text-12 leading-18 text-text-muted">{{ 'repExports.empty' | transloco }}</p>
+  </div>
+} @else {
+  <ui-data-table
+    [columns]="columns()"
+    [rows]="exports()"
+    [rowKey]="rowKey"
+    [loading]="loading()"
+    [label]="'repExports.title' | transloco"
+  >
+    <ng-template uiCell="queuedAt" let-row>
+      <span class="truncate text-12 text-text-muted">{{ formatRequestedAt(row.queuedAt) }}</span>
+    </ng-template>
+
+    <ng-template uiCell="source" let-row>
+      @let label = sourceLabel(row);
+      <span class="truncate text-13 font-medium text-text" dir="auto" [attr.title]="label">{{ label }}</span>
+    </ng-template>
+
+    <ng-template uiCell="format" let-row>
+      <ui-badge tone="tag">{{ row.format }}</ui-badge>
+    </ng-template>
+
+    <ng-template uiCell="status" let-row>
+      <ui-badge [tone]="statusTone(row.status)" [attr.title]="failureTooltip(row)">
+        {{ 'repExports.status.' + row.status | transloco }}
+      </ui-badge>
+    </ng-template>
+
+    <ng-template uiCell="byteSize" let-row>
+      {{ formatSize(row.byteSize) }}
+    </ng-template>
+
+    <ng-template uiCell="rowCount" let-row>
+      {{ formatRows(row.rowCount) }}
+    </ng-template>
+
+    <ng-template uiCell="expiresAt" let-row>
+      <span class="truncate text-12 text-text-muted">{{ formatExpires(row.expiresAt) }}</span>
+    </ng-template>
+
+    <ng-template uiCell="actions" let-row>
+      <div class="flex items-center justify-end gap-4">
+        @if (row.status === 'SUCCEEDED') {
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [loading]="downloadingId() === row.id"
+            (click)="download(row)"
+          >
+            @if (downloadingId() !== row.id) {
+              <ng-icon name="tablerDownload" size="14" class="text-icon-teal" aria-hidden="true" />
+            }
+            <span>{{ 'repExports.download' | transloco }}</span>
+          </button>
+        } @else if (row.status === 'QUEUED' || row.status === 'RUNNING') {
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            size="small"
+            [loading]="cancellingId() === row.id"
+            (click)="requestCancel(row)"
+          >
+            {{ 'repExports.cancel' | transloco }}
+          </button>
+        }
+      </div>
+    </ng-template>
+  </ui-data-table>
+
+  @if (hasMore()) {
+    <div class="flex justify-center pt-4">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [loading]="loadingMore()"
+        (click)="loadMore()"
+      >
+        {{ 'repExports.loadMore' | transloco }}
+      </button>
+    </div>
+  }
+}
+
+<ui-confirm-dialog
+  #cancelDialog
+  tone="warning"
+  [title]="'repExports.cancelTitle' | transloco"
+  [text]="'repExports.cancelText' | transloco"
+  [confirmLabel]="'repExports.cancelConfirm' | transloco"
+  [cancelLabel]="'analytics.common.cancel' | transloco"
+/>

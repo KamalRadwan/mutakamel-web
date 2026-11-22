@@ -1,0 +1,211 @@
+<button
+  #trigger
+  type="button"
+  class="flex h-field w-full cursor-pointer items-center gap-6 rounded-8 border bg-surface-field px-8 text-12 outline-none transition-colors duration-fast disabled:cursor-not-allowed disabled:border-transparent disabled:bg-neutral-soft disabled:text-text-placeholder"
+  [class]="boxClasses()"
+  [attr.id]="id() || null"
+  [attr.aria-label]="ariaLabel() || null"
+  [attr.aria-describedby]="describedBy() || null"
+  [attr.aria-invalid]="invalid() ? 'true' : null"
+  aria-haspopup="dialog"
+  [attr.aria-expanded]="open()"
+  [disabled]="disabled()"
+  (click)="toggle()"
+  (keydown)="onTriggerKeydown($event)"
+>
+  <span
+    class="min-w-0 flex-1 truncate text-start"
+    [class]="!disabled() && displayText() ? 'text-text' : 'text-text-placeholder'"
+  >
+    @if (displayText()) {
+      <bdi class="tabular-nums">{{ displayText() }}</bdi>
+    } @else {
+      {{ placeholderText() }}
+    }
+  </span>
+  <span class="inline-flex shrink-0 text-text-muted">
+    <ng-icon name="tablerCalendar" size="14" aria-hidden="true" />
+  </span>
+</button>
+
+@if (open()) {
+  <div
+    #popover
+    role="dialog"
+    aria-modal="false"
+    class="fixed z-dropdown flex rounded-12 border border-border bg-surface shadow-popover"
+    [class]="(months() === 1 ? 'w-picker-w-single' : 'w-picker') + (placed() ? '' : ' invisible')"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [attr.aria-label]="ariaLabel() || placeholderText()"
+    (keydown)="onPopoverKeydown($event)"
+  >
+    <div class="flex w-preset shrink-0 flex-col gap-2 border-e border-border p-6">
+      @for (preset of presets; track preset) {
+        <button
+          type="button"
+          class="h-btn-h-sm w-full cursor-pointer truncate rounded-6 px-6 text-start text-12 leading-18 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="
+            draftPreset() === preset
+              ? 'bg-brand-soft font-medium text-on-brand-soft'
+              : 'text-text hover:bg-row-hover'
+          "
+          [attr.aria-pressed]="draftPreset() === preset"
+          (click)="choosePreset(preset)"
+        >
+          {{ 'dateRange.presets.' + preset | transloco }}
+        </button>
+      }
+    </div>
+
+    <div class="flex min-w-0 flex-1 flex-col gap-8 p-8">
+      <div class="grid gap-12" [class]="months() === 2 ? 'grid-cols-2' : 'grid-cols-1'">
+        @for (pane of panes(); track pane.monthIndex; let first = $first; let last = $last) {
+          <div class="flex min-w-0 flex-col gap-4">
+            <div class="flex h-btn items-center justify-between gap-4">
+              @if (first) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'dateRange.prevMonth' | transloco"
+                  (click)="shiftMonth(-1)"
+                >
+                  <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                </button>
+              } @else {
+                <span class="size-btn-h-sm shrink-0" aria-hidden="true"></span>
+              }
+
+              <span class="truncate text-13 leading-18 font-medium text-text">{{ pane.title }}</span>
+
+              @if (last) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'dateRange.nextMonth' | transloco"
+                  (click)="shiftMonth(1)"
+                >
+                  <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+                </button>
+              } @else {
+                <span class="size-btn-h-sm shrink-0" aria-hidden="true"></span>
+              }
+            </div>
+
+            <div
+              class="grid h-badge grid-cols-7 items-center text-center text-11 leading-16 text-text-muted"
+              aria-hidden="true"
+            >
+              @for (weekday of weekdays(); track $index) {
+                <span>{{ weekday }}</span>
+              }
+            </div>
+
+            <div
+              role="grid"
+              class="grid grid-cols-7 gap-y-2"
+              (mouseleave)="hoveredIso.set(null)"
+            >
+              @for (day of pane.days; track day.iso) {
+                <button
+                  type="button"
+                  class="relative flex h-cal-cell w-full cursor-pointer items-center justify-center rounded-6 outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.data-iso]="day.iso"
+                  [attr.data-in-month]="day.inMonth ? 'true' : null"
+                  [attr.tabindex]="day.inMonth && day.iso === tabbableIso() ? 0 : -1"
+                  [attr.aria-label]="day.ariaLabel"
+                  [attr.aria-selected]="day.inMonth && (day.isRangeStart || day.isRangeEnd || day.isInRange)"
+                  [attr.aria-current]="day.isToday ? 'date' : null"
+                  (mouseenter)="hoverDay(day)"
+                  (click)="selectDay(day)"
+                >
+                  @if (day.bandStart || day.bandEnd) {
+                    <span class="pointer-events-none absolute inset-x-0 inset-y-0 my-auto flex h-cal-mark" aria-hidden="true">
+                      <span class="flex-1" [class]="day.bandStart ? 'bg-brand-soft' : ''"></span>
+                      <span class="flex-1" [class]="day.bandEnd ? 'bg-brand-soft' : ''"></span>
+                    </span>
+                  }
+                  <span
+                    class="relative inline-flex size-cal-mark items-center justify-center rounded-full text-12 leading-18 tabular-nums transition-colors duration-fast"
+                    [class]="dayMarkClasses(day)"
+                  >
+                    {{ day.label }}
+                  </span>
+                </button>
+              }
+            </div>
+
+            @if (withTime()) {
+              @if (months() === 2) {
+                <div class="flex items-center justify-center pt-2">
+                  @if (first) {
+                    <ui-field size="bare" [label]="'dateRange.startTime' | transloco" [hint]="'dateRange.startTimeHint' | transloco">
+                      <ui-time-field
+                        [value]="draftFromTimeValue()"
+                        [ariaLabel]="'dateRange.startTime' | transloco"
+                        [hourLabel]="'dateRange.hour' | transloco"
+                        [minuteLabel]="'dateRange.minute' | transloco"
+                        (valueChange)="onTimeChange('from', $event)"
+                      />
+                    </ui-field>
+                  } @else {
+                    <ui-field size="bare" [label]="'dateRange.endTime' | transloco" [hint]="'dateRange.endTimeHint' | transloco">
+                      <ui-time-field
+                        [value]="draftToTimeValue()"
+                        [ariaLabel]="'dateRange.endTime' | transloco"
+                        [hourLabel]="'dateRange.hour' | transloco"
+                        [minuteLabel]="'dateRange.minute' | transloco"
+                        (valueChange)="onTimeChange('to', $event)"
+                      />
+                    </ui-field>
+                  }
+                </div>
+              } @else {
+                <div class="flex items-end justify-center gap-6 pt-2">
+                  <ui-field size="bare" [label]="'dateRange.startTime' | transloco" [hint]="'dateRange.startTimeHint' | transloco">
+                    <ui-time-field
+                      [value]="draftFromTimeValue()"
+                      [ariaLabel]="'dateRange.startTime' | transloco"
+                      [hourLabel]="'dateRange.hour' | transloco"
+                      [minuteLabel]="'dateRange.minute' | transloco"
+                      (valueChange)="onTimeChange('from', $event)"
+                    />
+                  </ui-field>
+                  <span class="flex h-field items-center text-12 text-text-muted" aria-hidden="true">&#8211;</span>
+                  <ui-field size="bare" [label]="'dateRange.endTime' | transloco" [hint]="'dateRange.endTimeHint' | transloco">
+                    <ui-time-field
+                      [value]="draftToTimeValue()"
+                      [ariaLabel]="'dateRange.endTime' | transloco"
+                      [hourLabel]="'dateRange.hour' | transloco"
+                      [minuteLabel]="'dateRange.minute' | transloco"
+                      (valueChange)="onTimeChange('to', $event)"
+                    />
+                  </ui-field>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+
+      <div class="mt-auto flex items-center justify-between gap-8 border-t border-border pt-8">
+        <span class="text-12 leading-18 text-text-muted tabular-nums">{{ dayCountText() }}</span>
+        <div class="flex items-center gap-6">
+          <button uiButton type="button" variant="secondary" size="small" (click)="cancel()">
+            {{ 'dateRange.cancel' | transloco }}
+          </button>
+          <button
+            uiButton
+            type="button"
+            variant="primary"
+            size="small"
+            [disabled]="!canApply()"
+            (click)="apply()"
+          >
+            {{ 'dateRange.apply' | transloco }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

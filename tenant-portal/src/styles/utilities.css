@@ -1,0 +1,283 @@
+/* Design-system patterns Tailwind cannot express with one class. */
+@utility subnav-active {
+  box-shadow: inset 0 calc(-1 * var(--border-w-strong)) 0 var(--accent);
+}
+
+/* One-time-code input: wide letter spacing so each digit reads on its own. */
+@utility tracking-otp {
+  letter-spacing: 0.3em;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+}
+
+@utility bg-nav-gradient {
+  background: linear-gradient(120deg, var(--nav-start), var(--nav-end));
+}
+
+@utility opacity-drag-source {
+  opacity: var(--opacity-drag-source);
+}
+
+/* Kanban drag preview: tilted copy of the card with the drag shadow, padded so the native snapshot keeps the corners. */
+@utility drag-preview-frame {
+  padding: var(--space-16);
+}
+
+@utility drag-preview {
+  transform: rotate(var(--drag-tilt));
+  box-shadow: var(--shadow-drag);
+  border-radius: var(--radius-10);
+}
+
+@utility step-first { clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%); }
+@utility step-next { clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%); }
+
+@utility grid-app-cards {
+  grid-template-columns: repeat(auto-fill, var(--app-card-w));
+  @media (width < 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Full window height under the View scale zoom (html zoom scales 100dvh too). */
+@utility h-app-screen { height: calc(100dvh / var(--view-zoom, 1)); }
+
+@utility scrollbar-thin {
+  /* Chromium ignores ::-webkit-scrollbar* when scrollbar-width is set, so the two are split (web phone review F6). */
+  @supports selector(::-webkit-scrollbar) {
+    &::-webkit-scrollbar {
+      width: var(--scrollbar-w);
+      height: var(--scrollbar-w);
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--border-field);
+      border-radius: var(--radius-3);
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-button {
+      display: none;
+    }
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-field) transparent;
+  }
+}
+
+@utility press-scale {
+  &:active {
+    transform: scale(var(--phone-key-press));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active {
+      transform: none;
+    }
+  }
+}
+
+@utility auto-rows-phone-key {
+  grid-auto-rows: minmax(var(--table-row-h), 1fr);
+}
+
+@utility writing-vertical-rl {
+  writing-mode: vertical-rl;
+}
+
+/* Trade foundation tables: named column tracks (tokens in exceptions.css). */
+@utility grid-cols-definition-row { grid-template-columns: var(--definition-row-cols); }
+@utility grid-cols-definition-row-actions { grid-template-columns: var(--definition-row-cols) var(--table-head-h); }
+@utility grid-cols-version-row { grid-template-columns: var(--version-row-cols); }
+@utility grid-cols-version-row-actions { grid-template-columns: var(--version-row-actions-cols); }
+@utility grid-cols-channel-row-actions { grid-template-columns: var(--channel-row-cols) var(--table-head-h); }
+@utility grid-cols-account-row { grid-template-columns: var(--account-row-cols); }
+@utility grid-cols-account-row-actions { grid-template-columns: var(--account-row-cols) var(--table-head-h); }
+@utility grid-cols-account-row-select { grid-template-columns: var(--select-col-w) var(--account-row-cols); }
+@utility grid-cols-account-row-select-actions { grid-template-columns: var(--select-col-w) var(--account-row-cols) var(--table-head-h); }
+
+/* Trade automation tables: named column tracks (tokens in exceptions.css). */
+@utility grid-cols-delivery-row { grid-template-columns: var(--delivery-row-cols); }
+@utility grid-cols-subscription-row-actions { grid-template-columns: var(--subscription-row-cols) var(--table-head-h); }
+@utility grid-cols-auto-tower-row { grid-template-columns: var(--auto-tower-row-cols); }
+@utility grid-cols-auto-tower-row-select { grid-template-columns: var(--select-col-w) var(--auto-tower-row-cols); }
+@utility grid-cols-auto-tower-attempt-row { grid-template-columns: var(--auto-tower-attempt-row-cols); }
+@utility grid-cols-auto-evidence-row { grid-template-columns: var(--auto-evidence-row-cols); }
+@utility grid-cols-auto-ext-field-row { grid-template-columns: var(--auto-ext-field-row-cols); }
+@utility grid-cols-auto-ext-field-row-actions { grid-template-columns: var(--auto-ext-field-row-cols) var(--table-head-h); }
+@utility grid-cols-auto-ext-profile-row-actions { grid-template-columns: var(--auto-ext-profile-row-cols) var(--table-head-h); }
+@utility grid-cols-auto-ext-version-row-actions { grid-template-columns: var(--auto-ext-version-row-cols) var(--table-head-h); }
+@utility grid-cols-auto-import-mapping-row-actions { grid-template-columns: var(--auto-import-mapping-row-cols) var(--table-head-h); }
+@utility grid-cols-auto-import-mapping-version-row { grid-template-columns: var(--auto-import-mapping-version-row-cols); }
+@utility grid-cols-auto-import-mapping-field-row { grid-template-columns: var(--auto-import-mapping-field-row-cols); }
+@utility grid-cols-auto-import-run-row-actions { grid-template-columns: var(--auto-import-run-row-cols) var(--table-head-h); }
+@utility grid-cols-auto-import-invalid-row { grid-template-columns: var(--auto-import-invalid-row-cols); }
+@utility grid-cols-auto-import-result-row { grid-template-columns: var(--auto-import-result-row-cols); }
+
+/* Workspace billing and operations tables: named column tracks (tokens in exceptions.css). */
+@utility grid-cols-billing-invoice-row-actions { grid-template-columns: var(--billing-invoice-row-cols) var(--table-head-h); }
+@utility grid-cols-billing-invoice-line { grid-template-columns: var(--billing-invoice-line-cols); }
+@utility grid-cols-billing-ledger-row { grid-template-columns: var(--billing-ledger-row-cols); }
+@utility grid-cols-billing-payment-row { grid-template-columns: var(--billing-payment-row-cols); }
+@utility grid-cols-ops-activity-row-actions { grid-template-columns: var(--ops-activity-row-cols) var(--table-head-h); }
+
+/* Reduced motion: honour the OS setting app-wide (animations and transitions off). */
+@layer base {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Workspace remaining tables: named column tracks (tokens in exceptions.css). */
+@utility grid-cols-billing-item-row { grid-template-columns: var(--table-head-h) var(--billing-item-row-cols) var(--table-head-h); }
+@utility grid-cols-billing-quote-row { grid-template-columns: var(--billing-quote-row-cols); }
+@utility grid-cols-ops-activation-row { grid-template-columns: var(--ops-activation-row-cols); }
+@utility grid-cols-ops-audit-row { grid-template-columns: var(--ops-audit-row-cols); }
+@utility grid-cols-ops-audit-diff { grid-template-columns: var(--ops-audit-diff-cols); }
+@utility grid-cols-ops-party-row-actions { grid-template-columns: var(--ops-party-row-cols) var(--table-head-h); }
+@utility grid-cols-ops-party-person-row { grid-template-columns: var(--ops-party-person-row-cols); }
+@utility grid-cols-ops-party-person-row-actions { grid-template-columns: var(--ops-party-person-row-cols) var(--table-head-h); }
+@utility grid-cols-geo-country-row-actions { grid-template-columns: var(--geo-country-row-cols) var(--table-head-h); }
+@utility grid-cols-geo-state-row-actions { grid-template-columns: var(--geo-state-row-cols) var(--table-head-h); }
+@utility grid-cols-geo-city-row { grid-template-columns: var(--geo-city-row-cols); }
+@utility grid-cols-geo-city-row-actions { grid-template-columns: var(--geo-city-row-cols) var(--table-head-h); }
+@utility grid-cols-geo-district-row { grid-template-columns: var(--geo-district-row-cols); }
+@utility grid-cols-geo-district-row-actions { grid-template-columns: var(--geo-district-row-cols) var(--table-head-h); }
+@utility grid-cols-geo-zone-row { grid-template-columns: var(--geo-zone-row-cols); }
+@utility grid-cols-geo-zone-row-actions { grid-template-columns: var(--geo-zone-row-cols) var(--table-head-h); }
+@utility grid-cols-phone-server-row { grid-template-columns: var(--phone-server-row-cols); }
+@utility grid-cols-phone-server-row-manage { grid-template-columns: var(--table-head-h) var(--phone-server-row-cols) var(--table-head-h); }
+
+/* Workspace staff/settings tables: named column tracks (tokens in exceptions.css). */
+@utility grid-cols-ws-holder-row { grid-template-columns: var(--ws-holder-row-cols); }
+@utility grid-cols-ws-migration-row { grid-template-columns: var(--ws-migration-row-cols); }
+@utility grid-cols-ws-migration-row-owner { grid-template-columns: var(--ws-migration-row-cols) minmax(0, 2fr); }
+@utility grid-cols-ws-addon-option-row { grid-template-columns: var(--ws-addon-option-row-cols); }
+@utility grid-cols-ws-addon-option-row-manage { grid-template-columns: var(--ws-addon-option-row-manage-cols); }
+@utility grid-cols-ws-addon-assignment-row { grid-template-columns: var(--ws-addon-assignment-row-cols); }
+@utility grid-cols-ws-addon-assignment-row-manage { grid-template-columns: var(--ws-addon-assignment-row-manage-cols); }
+@utility grid-cols-ws-currency-row { grid-template-columns: var(--ws-currency-row-cols); }
+@utility grid-cols-ws-currency-row-actions { grid-template-columns: var(--ws-currency-row-cols) var(--table-head-h); }
+@utility grid-cols-ws-numbering-row-actions { grid-template-columns: var(--ws-numbering-row-cols) var(--table-head-h); }
+@utility grid-cols-ws-tax-row { grid-template-columns: var(--ws-tax-row-cols); }
+@utility grid-cols-ws-tax-row-actions { grid-template-columns: var(--ws-tax-row-cols) var(--table-head-h); }
+@utility grid-cols-ws-update-row-actions { grid-template-columns: var(--ws-update-row-cols) var(--table-head-h); }
+@utility grid-cols-ws-update-row-select-actions { grid-template-columns: var(--select-col-w) var(--ws-update-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-branch-row-actions { grid-template-columns: var(--staff-branch-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-company-row-actions { grid-template-columns: var(--staff-company-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-department-row-actions { grid-template-columns: var(--staff-department-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-role-row-actions { grid-template-columns: var(--staff-role-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-team-row-actions { grid-template-columns: var(--staff-team-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-user-row-select-actions { grid-template-columns: var(--select-col-w) var(--staff-user-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-user-app-row { grid-template-columns: var(--staff-user-app-row-cols); }
+@utility grid-cols-staff-user-app-row-actions { grid-template-columns: var(--staff-user-app-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-user-app-derived-row { grid-template-columns: var(--staff-user-app-derived-row-cols); }
+@utility grid-cols-staff-user-branch-row { grid-template-columns: var(--staff-user-branch-row-cols); }
+@utility grid-cols-staff-user-branch-row-actions { grid-template-columns: var(--staff-user-branch-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-user-scope-row { grid-template-columns: var(--staff-user-scope-row-cols); }
+@utility grid-cols-staff-user-scope-row-actions { grid-template-columns: var(--staff-user-scope-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-user-team-row { grid-template-columns: var(--staff-user-team-row-cols); }
+@utility grid-cols-staff-user-team-row-actions { grid-template-columns: var(--staff-user-team-row-cols) var(--table-head-h); }
+
+/* Template Design UI tables and grids (AGENTS "Template Design UI sizes"). */
+@utility grid-cols-tpl-cards { grid-template-columns: var(--tpl-card-grid-cols); }
+@utility grid-cols-tpl-asset-row { grid-template-columns: var(--tpl-asset-row-cols); }
+@utility grid-cols-tpl-asset-row-actions { grid-template-columns: var(--tpl-asset-row-cols) var(--table-head-h); }
+@utility grid-cols-tpl-assignment-row-actions { grid-template-columns: var(--tpl-assignment-row-cols) var(--table-head-h); }
+@utility grid-cols-tpl-function-row-actions { grid-template-columns: var(--tpl-function-row-cols) var(--table-head-h); }
+@utility grid-cols-tpl-function-version-row { grid-template-columns: var(--tpl-function-version-row-cols); }
+@utility grid-cols-tpl-function-usage-row { grid-template-columns: var(--tpl-function-usage-row-cols); }
+@utility grid-cols-tpl-function-impact-row { grid-template-columns: var(--tpl-function-impact-row-cols); }
+@utility grid-cols-tpl-library-row-actions { grid-template-columns: var(--tpl-library-row-cols) var(--table-head-h); }
+@utility grid-cols-tpl-publish-summary { grid-template-columns: var(--tpl-publish-summary-cols); }
+@utility grid-cols-tpl-recovery-row { grid-template-columns: var(--tpl-recovery-row-cols); }
+@utility grid-cols-tpl-validation-row { grid-template-columns: var(--tpl-validation-row-cols); }
+@utility grid-cols-tpl-validation-row-validate { grid-template-columns: var(--tpl-validation-row-validate-cols); }
+@utility grid-cols-tpl-version-row-actions { grid-template-columns: var(--tpl-version-row-cols) var(--table-head-h); }
+
+/* Trade tables, remaining (AGENTS "Trade tables, remaining"). */
+@utility grid-cols-trade-doc-quotation-row { grid-template-columns: var(--trade-doc-quotation-row-cols); }
+@utility grid-cols-trade-doc-sales-order-row { grid-template-columns: var(--trade-doc-sales-order-row-cols); }
+@utility grid-cols-trade-doc-purchase-order-row { grid-template-columns: var(--trade-doc-purchase-order-row-cols); }
+@utility grid-cols-trade-doc-purchase-quotation-row { grid-template-columns: var(--trade-doc-purchase-quotation-row-cols); }
+@utility grid-cols-trade-item-channel-row-actions { grid-template-columns: var(--trade-item-channel-row-actions-cols); }
+@utility grid-cols-trade-unit-row-actions { grid-template-columns: var(--trade-unit-row-actions-cols); }
+@utility grid-cols-trade-unit-row { grid-template-columns: var(--trade-unit-row-cols); }
+@utility grid-cols-trade-company-default-row { grid-template-columns: var(--trade-company-default-row-cols); }
+@utility grid-cols-trade-doc-profile-row-actions { grid-template-columns: var(--trade-doc-profile-row-actions-cols); }
+@utility grid-cols-trade-governance-skeleton-row { grid-template-columns: var(--trade-governance-skeleton-row-cols); }
+@utility grid-cols-trade-policy-row { grid-template-columns: var(--trade-policy-row-cols); }
+@utility grid-cols-trade-policy-test-input-row { grid-template-columns: var(--trade-policy-test-input-row-cols); }
+@utility grid-cols-trade-policy-test-split { grid-template-columns: var(--trade-policy-test-split-cols); }
+@utility grid-cols-trade-policy-test-result-row-actions { grid-template-columns: var(--trade-policy-test-result-row-actions-cols); }
+@utility grid-cols-trade-policy-test-result-row { grid-template-columns: var(--trade-policy-test-result-row-cols); }
+@utility grid-cols-trade-policy-test-row-actions { grid-template-columns: var(--trade-policy-test-row-actions-cols); }
+@utility grid-cols-trade-policy-test-row { grid-template-columns: var(--trade-policy-test-row-cols); }
+@utility grid-cols-trade-price-book-detail-row { grid-template-columns: var(--trade-price-book-detail-row-cols); }
+@utility grid-cols-trade-price-book-row-actions { grid-template-columns: var(--trade-price-book-row-actions-cols); }
+@utility grid-cols-trade-price-diff-entry-row { grid-template-columns: var(--trade-price-diff-entry-row-cols); }
+@utility grid-cols-trade-price-diff-promo-row { grid-template-columns: var(--trade-price-diff-promo-row-cols); }
+@utility grid-cols-trade-price-promo-row-actions { grid-template-columns: var(--trade-price-promo-row-actions-cols); }
+@utility grid-cols-trade-profile-system-case-row { grid-template-columns: var(--trade-profile-system-case-row-cols); }
+@utility grid-cols-trade-profile-case-row { grid-template-columns: var(--trade-profile-case-row-cols); }
+@utility grid-cols-trade-profile-case-row-actions { grid-template-columns: var(--trade-profile-case-row-actions-cols); }
+@utility grid-cols-trade-profile-field-row { grid-template-columns: var(--trade-profile-field-row-cols); }
+@utility grid-cols-trade-profile-evidence-row { grid-template-columns: var(--trade-profile-evidence-row-cols); }
+@utility grid-cols-trade-profile-layout-row { grid-template-columns: var(--trade-profile-layout-row-cols); }
+@utility grid-cols-trade-profile-layout-row-actions { grid-template-columns: var(--trade-profile-layout-row-actions-cols); }
+@utility grid-cols-trade-rule-condition-row { grid-template-columns: var(--trade-rule-condition-row-cols); }
+@utility grid-cols-trade-workflow-transition-row { grid-template-columns: var(--trade-workflow-transition-row-cols); }
+@utility grid-cols-trade-workflow-transition-row-actions { grid-template-columns: var(--trade-workflow-transition-row-actions-cols); }
+@utility grid-cols-trade-workflow-test-result-row-actions { grid-template-columns: var(--trade-workflow-test-result-row-actions-cols); }
+@utility grid-cols-trade-workflow-test-result-row { grid-template-columns: var(--trade-workflow-test-result-row-cols); }
+@utility grid-cols-trade-workflow-test-row-actions { grid-template-columns: var(--trade-workflow-test-row-actions-cols); }
+@utility grid-cols-trade-workflow-test-row { grid-template-columns: var(--trade-workflow-test-row-cols); }
+@utility grid-cols-trade-workflow-row-actions { grid-template-columns: var(--trade-workflow-row-actions-cols); }
+@utility grid-cols-trade-inv-availability-row { grid-template-columns: var(--trade-inv-availability-row-cols); }
+@utility grid-cols-trade-inv-decision-row-actions { grid-template-columns: var(--trade-inv-decision-row-actions-cols); }
+@utility grid-cols-trade-inv-movement-row-actions { grid-template-columns: var(--trade-inv-movement-row-actions-cols); }
+@utility grid-cols-trade-inv-node-row-actions { grid-template-columns: var(--trade-inv-node-row-actions-cols); }
+@utility grid-cols-trade-inv-period-row-actions { grid-template-columns: var(--trade-inv-period-row-actions-cols); }
+@utility grid-cols-trade-inv-serial-row-actions { grid-template-columns: var(--trade-inv-serial-row-actions-cols); }
+@utility grid-cols-trade-inv-uom-conversion-row-actions { grid-template-columns: var(--trade-inv-uom-conversion-row-actions-cols); }
+@utility grid-cols-trade-reason-row-actions { grid-template-columns: var(--trade-reason-row-actions-cols); }
+@utility grid-cols-trade-reason-row { grid-template-columns: var(--trade-reason-row-cols); }
+@utility grid-cols-trade-term-extended-row-actions { grid-template-columns: var(--trade-term-extended-row-actions-cols); }
+@utility grid-cols-trade-term-row-actions { grid-template-columns: var(--trade-term-row-actions-cols); }
+@utility grid-cols-trade-item-row { grid-template-columns: var(--trade-item-row-cols); }
+@utility grid-cols-trade-item-row-select { grid-template-columns: var(--select-col-w) var(--trade-item-row-cols); }
+@utility grid-cols-trade-item-company-row { grid-template-columns: var(--trade-item-company-row-cols); }
+@utility grid-cols-trade-item-company-row-select { grid-template-columns: var(--select-col-w) var(--trade-item-company-row-cols); }
+@utility grid-cols-trade-price-line-row { grid-template-columns: var(--trade-price-line-row-cols); }
+@utility grid-cols-trade-price-line-row-cost { grid-template-columns: var(--trade-price-line-row-cols) var(--trade-price-line-cost-col); }
+@utility grid-cols-trade-price-line-row-edit { grid-template-columns: var(--select-col-w) var(--trade-price-line-row-cols) var(--trade-price-line-actions-col); }
+@utility grid-cols-trade-price-line-row-edit-cost { grid-template-columns: var(--select-col-w) var(--trade-price-line-row-cols) var(--trade-price-line-cost-col) var(--trade-price-line-actions-col); }
+/* CRM settings tables: named column tracks (tokens in exceptions.css). */
+@utility grid-cols-crm-custom-field-row-actions { grid-template-columns: var(--crm-custom-field-row-cols) var(--table-head-h); }
+@utility grid-cols-crm-duplicate-row { grid-template-columns: var(--crm-duplicate-row-cols); }
+@utility grid-cols-crm-lead-source-row { grid-template-columns: var(--crm-lead-source-row-cols); }
+@utility grid-cols-crm-lead-source-row-manage { grid-template-columns: var(--table-head-h) var(--crm-lead-source-row-cols) var(--table-head-h); }
+@utility grid-cols-crm-outbound-email-row { grid-template-columns: var(--crm-outbound-email-row-cols); }
+@utility grid-cols-crm-outbound-email-row-actions { grid-template-columns: var(--crm-outbound-email-row-cols) var(--table-head-h); }
+@utility grid-cols-crm-reason-row { grid-template-columns: var(--crm-reason-row-cols); }
+@utility grid-cols-crm-reason-row-actions { grid-template-columns: var(--crm-reason-row-cols) var(--table-head-h); }
+@utility grid-cols-crm-reason-outcome-row { grid-template-columns: var(--crm-reason-outcome-row-cols); }
+@utility grid-cols-crm-reason-outcome-row-actions { grid-template-columns: var(--crm-reason-outcome-row-cols) var(--table-head-h); }
+@utility grid-cols-crm-static-data-row-actions { grid-template-columns: var(--crm-static-data-row-cols) var(--table-head-h); }
+@utility grid-cols-kanban-cards { grid-template-columns: var(--kanban-cards-cols); }
+@utility grid-cols-qb-condition-row { grid-template-columns: var(--qb-condition-row-cols); }
+@utility grid-cols-call-log-party-row { grid-template-columns: var(--call-log-party-row-cols); }
+@utility grid-cols-call-log-party-row-actions { grid-template-columns: var(--call-log-party-row-cols) var(--table-head-h); }
+@utility grid-cols-call-log-owner-row { grid-template-columns: var(--call-log-owner-row-cols); }
+@utility grid-cols-call-log-owner-row-actions { grid-template-columns: var(--call-log-owner-row-cols) var(--table-head-h); }
+@utility grid-cols-record-attachment-row { grid-template-columns: var(--record-attachment-row-cols); }
+@utility grid-cols-swatches { grid-template-columns: var(--swatch-grid-cols); }

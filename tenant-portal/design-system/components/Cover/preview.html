@@ -1,0 +1,56 @@
+<!-- @dsCard height=300 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ERP Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin:0; height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font-en); overflow:hidden; }
+  .cover { position:relative; height:300px; overflow:hidden; }
+  .art { position:absolute; top:0; left:480px; width:480px; height:300px; }
+  .art svg { display:block; }
+  .navy { fill:var(--nav-end); }
+  .brand { fill:var(--brand); }
+  .accent { fill:var(--accent); }
+  .ok { fill:var(--success); }
+  .warn { fill:var(--warning); }
+  .bad { fill:var(--danger); }
+  .slab { rx:var(--radius-14); }
+  .row { rx:var(--radius-10); }
+  .chip { rx:var(--radius-8); }
+  .words { position:absolute; left:var(--space-16); bottom:var(--space-16); max-width:440px; }
+  .name { margin:0; font-size:64px; line-height:.95; font-weight:500; letter-spacing:-.02em; color:var(--text); }
+  .tag { margin:var(--space-8) 0 0 4px; font-size:14px; line-height:20px; color:var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 300" width="480" height="300">
+<!--
+  blocks      nav-end 128x268 slab (the navy the nav and table header are known by) · brand 296x40 and 216x40 rows · accent 256x40 row · success/warning/danger 56x24 chips (status only, kept small)
+  arrangement one tall navy slab at the left of the box with staggered table rows running to the right edge, like the system's rows-as-cards table
+  pattern     row bars, from "rows are separate cards, 6px apart": 40px rows at a 46px pitch (table-row-h + space-6), widths staggered, three status chips riding on rows
+  scales      row height 40 = table-row-h, gap 6 = space-6, inset 16 = space-16; corners radius-14 (slab), radius-10 (rows), radius-8 (chips)
+-->
+<rect class="navy slab" x="16" y="16" width="128" height="268" rx="14"/>
+<rect class="brand row" x="160" y="16" width="296" height="40" rx="10"/>
+<rect class="accent row" x="160" y="62" width="256" height="40" rx="10"/>
+<rect class="brand row" x="160" y="108" width="216" height="40" rx="10"/>
+<rect class="navy row" x="160" y="154" width="304" height="40" rx="10"/>
+<rect class="accent row" x="160" y="200" width="176" height="40" rx="10"/>
+<rect class="brand row" x="160" y="246" width="264" height="38" rx="10"/>
+<rect class="ok chip" x="392" y="116" width="56" height="24" rx="8"/>
+<rect class="warn chip" x="352" y="208" width="56" height="24" rx="8"/>
+<rect class="bad chip" x="416" y="208" width="48" height="24" rx="8"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">ERP Design System</h1>
+<p class="tag">Bold, bilingual and built for dense work.</p>
+</div>
+</div>
+</body>
+</html>

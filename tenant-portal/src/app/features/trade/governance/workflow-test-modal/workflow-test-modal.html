@@ -1,0 +1,184 @@
+<ui-modal
+  size="wide"
+  icon="tablerFlask"
+  tile="bg-icon-teal"
+  [title]="modalTitle()"
+  [closeLabel]="'governance.common.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-12">
+    <ui-field
+      [label]="'workflows.tests.modal.codeLabel' | transloco"
+      [required]="true"
+      [for]="'wf-test-code'"
+      [hint]="'workflows.tests.modal.codeHint' | transloco"
+      [error]="codeError()"
+    >
+      <input
+        id="wf-test-code"
+        type="text"
+        dir="ltr"
+        maxlength="64"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'workflows.tests.modal.codePlaceholder' | transloco"
+        [value]="code()"
+        [attr.aria-invalid]="codeError() ? 'true' : null"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <div class="grid grid-cols-2 gap-10">
+      <ui-field
+        size="bare"
+        [label]="'workflows.tests.modal.startStateLabel' | transloco"
+        [required]="true"
+        [for]="'wf-test-start-state'"
+        [hint]="'workflows.tests.modal.startStateHint' | transloco"
+        [error]="startStateError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          id="wf-test-start-state"
+          [label]="'workflows.tests.modal.startStateLabel' | transloco"
+          [options]="startStateOptions()"
+          [value]="startState()"
+          (valueChange)="startState.set($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'workflows.tests.modal.expectedStateLabel' | transloco"
+        [required]="true"
+        [for]="'wf-test-expected-state'"
+        [hint]="'workflows.tests.modal.expectedStateHint' | transloco"
+        [error]="expectedStateError()"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          id="wf-test-expected-state"
+          [label]="'workflows.tests.modal.expectedStateLabel' | transloco"
+          [options]="expectedStateOptions()"
+          [value]="expectedState()"
+          (valueChange)="expectedState.set($event)"
+        />
+      </ui-field>
+    </div>
+
+    <ui-field
+      size="bare"
+      [label]="'workflows.tests.modal.actionsLabel' | transloco"
+      [for]="'wf-test-action-add'"
+      [hint]="'workflows.tests.modal.actionsHint' | transloco"
+      [count]="actions().length"
+      [max]="maxActions"
+      [error]="actionsError()"
+    >
+      <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface-muted p-10">
+        @if (actions().length === 0) {
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'workflows.tests.modal.actionsEmpty' | transloco }}
+          </p>
+        } @else {
+          <div class="flex flex-wrap items-center gap-6">
+            @for (act of actions(); track $index; let idx = $index; let first = $first; let last = $last) {
+              @let actLabel = 'workflows.actions.' + act | transloco;
+              @if (!first) {
+                <ng-icon
+                  name="tablerArrowRight"
+                  size="12"
+                  class="shrink-0 text-text-muted rtl:-scale-x-100"
+                  aria-hidden="true"
+                />
+              }
+              <div
+                class="inline-flex h-btn items-center gap-4 rounded-8 px-6 text-12 font-medium"
+                [class]="actionChipClasses(act)"
+              >
+                <span class="tabular-nums text-11 opacity-drag-source" aria-hidden="true">
+                  <bdi dir="ltr">{{ idx + 1 }}.</bdi>
+                </span>
+                <span>{{ actLabel }}</span>
+                <button
+                  type="button"
+                  class="inline-flex size-counter cursor-pointer items-center justify-center rounded-4 outline-none hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                  [disabled]="first"
+                  [attr.aria-label]="'workflows.tests.modal.moveEarlier' | transloco: { action: actLabel }"
+                  [title]="'workflows.tests.modal.moveEarlier' | transloco: { action: actLabel }"
+                  (click)="moveAction(idx, -1)"
+                >
+                  <ng-icon name="tablerChevronLeft" size="12" class="rtl:-scale-x-100" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-counter cursor-pointer items-center justify-center rounded-4 outline-none hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                  [disabled]="last"
+                  [attr.aria-label]="'workflows.tests.modal.moveLater' | transloco: { action: actLabel }"
+                  [title]="'workflows.tests.modal.moveLater' | transloco: { action: actLabel }"
+                  (click)="moveAction(idx, 1)"
+                >
+                  <ng-icon name="tablerChevronRight" size="12" class="rtl:-scale-x-100" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex size-counter cursor-pointer items-center justify-center rounded-4 outline-none hover:bg-surface focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  [attr.aria-label]="'workflows.tests.modal.removeAction' | transloco: { action: actLabel }"
+                  [title]="'workflows.tests.modal.removeAction' | transloco: { action: actLabel }"
+                  (click)="removeAction(idx)"
+                >
+                  <ng-icon name="tablerX" size="12" aria-hidden="true" />
+                </button>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="flex flex-wrap items-center gap-8">
+          <div class="min-w-0 flex-1 max-w-toast">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              id="wf-test-action-add"
+              [label]="'workflows.tests.modal.addActionSelect' | transloco"
+              [options]="actionOptions()"
+              [disabled]="actions().length >= maxActions"
+              [value]="actionToAdd()"
+              (valueChange)="actionToAdd.set($event)"
+            />
+          </div>
+          <button
+            type="button"
+            uiButton
+            variant="secondary"
+            size="small"
+            [disabled]="actions().length >= maxActions"
+            (click)="addAction()"
+          >
+            <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+            <span>{{ 'workflows.tests.modal.addAction' | transloco }}</span>
+          </button>
+        </div>
+      </div>
+    </ui-field>
+  </div>
+
+  <ng-container modal-footer>
+    <button type="button" uiButton variant="primary" (click)="save()">
+      {{ 'workflows.tests.modal.save' | transloco }}
+    </button>
+    <button type="button" uiButton variant="ghost" (click)="requestClose()">
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>
+
+<ui-confirm-dialog
+  class="contents"
+  tone="warning"
+  [title]="'workflows.tests.modal.discardTitle' | transloco"
+  [text]="'workflows.tests.modal.discardText' | transloco"
+  [confirmLabel]="'workflows.tests.modal.discardConfirm' | transloco"
+  [cancelLabel]="'governance.common.cancel' | transloco"
+/>

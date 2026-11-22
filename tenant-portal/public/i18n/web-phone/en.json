@@ -1,0 +1,228 @@
+{
+  "title": "Phone",
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "retry": "Retry"
+  },
+  "tabs": {
+    "phone": "Phone",
+    "calls": "Calls",
+    "settings": "Settings"
+  },
+  "launcher": {
+    "label": "Phone, {{status}}",
+    "registered": "Registered",
+    "connecting": "Connecting",
+    "error": "Error",
+    "offline": "Offline",
+    "paused": "Paused",
+    "incomingFrom": "Incoming call from {{name}}",
+    "answerShortcutHint": "Press Alt+Shift+A to answer."
+  },
+  "header": {
+    "extPrefix": "Ext",
+    "extStatus": "Ext {{ext}} · {{status}}",
+    "devices": "Devices",
+    "retry": "Retry connection",
+    "collapse": "Collapse phone"
+  },
+  "bar": {
+    "openLabel": "Open phone, {{status}}",
+    "openInCall": "Open phone, in a call with {{name}}, {{time}}",
+    "openConference": "Open phone, conference with {{n}} people, {{time}}",
+    "missed": "{{n}} missed"
+  },
+  "pill": {
+    "calling": "Calling…",
+    "consult": "2 calls · {{time}}",
+    "conference": "Conference · {{n}} · {{time}}",
+    "mute": "Mute microphone",
+    "unmute": "Unmute microphone",
+    "hangupWith": "Hang up call with {{name}}"
+  },
+  "dialer": {
+    "number": "Number",
+    "numberHint": "Type or paste a number. Spaces and dashes are removed.",
+    "phoneNumber": "Phone number",
+    "enterNumber": "Enter number",
+    "deleteDigit": "Delete last digit",
+    "copyNumber": "Copy number",
+    "clearSource": "Clear record",
+    "call": "Call",
+    "autoAnswer": "Auto answer",
+    "autoAnswerHint": "Answers incoming calls automatically after a short delay.",
+    "dnd": "Do not disturb",
+    "dndHint": "Incoming calls get a busy signal while this is on."
+  },
+  "inCall": {
+    "calling": "Calling…",
+    "ringing": "Ringing…",
+    "onHold": "On hold",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "hold": "Hold",
+    "resume": "Resume",
+    "keypad": "Keypad",
+    "hideKeypad": "Hide keypad",
+    "transfer": "Transfer",
+    "add": "Add",
+    "addPerson": "Add person",
+    "addPersonHint": "The person joins this call when they answer.",
+    "speaker": "Speaker",
+    "unmuteSpeaker": "Unmute speaker",
+    "hangup": "Hang up"
+  },
+  "audio": {
+    "muteSpeaker": "Mute speaker",
+    "unmuteSpeaker": "Unmute speaker",
+    "muteMic": "Mute microphone",
+    "unmuteMic": "Unmute microphone",
+    "speakerVolume": "Speaker volume",
+    "micVolume": "Microphone volume"
+  },
+  "statusLine": {
+    "buttonLabel": "Phone status and call quality",
+    "connecting": "Connecting…",
+    "server": "Server {{index}} of {{count}} · {{name}}"
+  },
+  "mediaNotice": {
+    "requiresHttps": "HTTPS is required for audio",
+    "unavailable": "Audio device unavailable",
+    "permissionDenied": "Microphone blocked: allow it from the lock icon",
+    "noMicrophone": "No microphone found",
+    "stopped": "Microphone disconnected",
+    "muted": "Microphone is muted",
+    "clickToAllow": "Click to allow audio playback",
+    "speakerUnavailable": "Speaker device unavailable",
+    "fix": "Fix"
+  },
+  "quality": {
+    "title": "Call quality",
+    "measuring": "Measuring",
+    "good": "Good",
+    "fair": "Fair",
+    "poor": "Poor",
+    "packetLoss": "Packet loss",
+    "jitterBuffer": "Jitter buffer",
+    "roundTrip": "Round trip",
+    "mos": "MOS (estimated)",
+    "estimatedNote": "Estimated from loss and delay, not measured."
+  },
+  "transfer": {
+    "type": "Transfer type",
+    "typeHint": "Direct moves the call at once. Talk first lets you speak to the other person before you hand the call over.",
+    "talkFirst": "Talk first",
+    "direct": "Direct",
+    "target": "Transfer to",
+    "targetHint": "The number or extension that will take the call.",
+    "callTarget": "Call {{target}}",
+    "transferNow": "Transfer",
+    "transferring": "Transferring…"
+  },
+  "callRows": {
+    "onHold": "On hold",
+    "talking": "Talking",
+    "ringing": "Ringing",
+    "left": "Left",
+    "removeFromCall": "Remove {{name}} from the call",
+    "cancel": "Cancel",
+    "talkTo": "Talk to {{name}}"
+  },
+  "consult": {
+    "swap": "Swap",
+    "completeTransfer": "Complete transfer",
+    "transferWaitHint": "You can transfer once they answer.",
+    "cancelConsult": "Cancel consult",
+    "merge": "Merge",
+    "hangupWith": "Hang up {{name}}"
+  },
+  "conference": {
+    "header": "Conference · {{n}} people",
+    "holdAll": "Hold all",
+    "resumeAll": "Resume all",
+    "sendTonesTo": "Send tones to",
+    "sendTonesToHint": "Tones go to one person, for example an automated menu.",
+    "addPerson": "Add person",
+    "maxPartiesHint": "Up to 4 people in a call",
+    "endForAll": "End for everyone",
+    "confirmEndTitle": "End the call for everyone?",
+    "confirmEndText": "This will disconnect all participants in the conference call."
+  },
+  "ended": {
+    "reasons": {
+      "ended": "Call ended",
+      "declined": "Declined",
+      "busy": "Busy",
+      "noAnswer": "No answer",
+      "failed": "Call failed",
+      "transferred": "Transferred",
+      "transferredTo": "Transferred to {{name}}",
+      "dropped": "Call dropped",
+      "conferenceEnded": "Conference ended",
+      "tabClosed": "Call lost"
+    },
+    "loggedTo": "Logged to {{type}} {{name}}",
+    "redial": "Redial"
+  },
+  "incoming": {
+    "title": "Incoming call",
+    "answer": "Answer",
+    "decline": "Decline",
+    "silence": "Silence",
+    "answerAndTransfer": "Answer and transfer",
+    "answerInPhoneTab": "Answer in the phone tab",
+    "answerInPhoneTabHint": "Use the system notification or switch to the active phone tab to answer."
+  },
+  "status": {
+    "idle": "Idle",
+    "loadingPhone": "Loading phone",
+    "disabled": "Disabled",
+    "ready": "Ready",
+    "notConfigured": "Not configured",
+    "unavailable": "Unavailable",
+    "connecting": "Connecting",
+    "socketConnected": "Socket connected",
+    "registering": "Registering",
+    "registered": "Registered",
+    "registrationFailed": "Registration failed",
+    "failingOver": "Switching server",
+    "disconnected": "Disconnected",
+    "connectFailed": "Connect failed",
+    "incomingCall": "Incoming call",
+    "calling": "Calling",
+    "ringing": "Ringing",
+    "startingCall": "Starting call",
+    "callEnded": "Call ended",
+    "declined": "Declined",
+    "callFailed": "Call failed",
+    "transferring": "Transferring",
+    "transferFailed": "Transfer failed",
+    "inCall": "In call"
+  },
+  "toast": {
+    "notConnected": "Phone is not connected",
+    "transferFailed": "Transfer failed",
+    "consultFailed": "Could not call {{name}}",
+    "partyFailed": "{{name}} could not join",
+    "conferenceFailed": "Could not start the conference",
+    "headsetGone": "Headset disconnected. Using the default device.",
+    "allowNotifications": "Allow notifications so you never miss a call.",
+    "callLostTitle": "Call lost",
+    "callLost": "The call with {{name}} ({{duration}}) ended because its tab was closed.",
+    "callLostNoTime": "The call with {{name}} ended because its tab was closed.",
+    "copied": "Number copied",
+    "callFailed": "Call failed"
+  },
+  "notify": {
+    "title": "Incoming call",
+    "body": "{{name}} · {{number}}"
+  },
+  "source": {
+    "LEAD": "Lead",
+    "CUSTOMER_PROFILE": "Customer",
+    "OPPORTUNITY": "Opportunity",
+    "PARTY": "Contact"
+  }
+}

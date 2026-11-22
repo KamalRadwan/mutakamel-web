@@ -1,0 +1,221 @@
+@if (canEditKind()) {
+  <ui-field
+    size="bare"
+    [for]="uid + '-kind'"
+    [label]="'itemForm.fields.kind.label' | transloco"
+    [hint]="'itemForm.fields.kind.hint' | transloco"
+  >
+    <div
+      [id]="uid + '-kind'"
+      role="radiogroup"
+      [class]="
+        layout() === 'page'
+          ? 'inline-flex items-center gap-2 self-start rounded-10 bg-neutral-soft p-3'
+          : 'flex w-full items-center gap-2 rounded-10 bg-neutral-soft p-3'
+      "
+      [attr.aria-label]="'itemForm.fields.kind.label' | transloco"
+    >
+      @for (option of kindOptions; track option.value; let idx = $index) {
+        @let selected = draft().itemKind === option.value;
+        <button
+          #kindBtn
+          type="button"
+          role="radio"
+          class="flex h-field flex-1 cursor-pointer items-center justify-center gap-6 rounded-8 px-10 text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="selected ? option.tileClass + ' font-medium shadow-card' : 'text-text-muted hover:text-text'"
+          [attr.aria-checked]="selected"
+          [tabIndex]="idx === activeKindTabIndex() ? 0 : -1"
+          (click)="selectKind(option.value)"
+          (keydown)="onKindKeydown($event, idx)"
+        >
+          <ng-icon [name]="option.icon" size="14" aria-hidden="true" />
+          <span class="truncate">{{ option.labelKey | transloco }}</span>
+        </button>
+      }
+    </div>
+  </ui-field>
+} @else {
+  <ui-field
+    [for]="uid + '-kind'"
+    [label]="'itemForm.fields.kind.label' | transloco"
+    [hint]="'itemForm.fields.kind.hint' | transloco"
+  >
+    <span
+      class="inline-flex size-16 shrink-0 items-center justify-center rounded-4 text-on-icon"
+      [class]="currentKindTile().tile"
+      aria-hidden="true"
+    >
+      <ng-icon [name]="currentKindTile().icon" size="11" />
+    </span>
+    <input
+      [id]="uid + '-kind'"
+      type="text"
+      readonly
+      class="w-full bg-transparent text-12 text-text outline-none"
+      [value]="kindKey[draft().itemKind] | transloco"
+    />
+  </ui-field>
+}
+
+@let statusErr = errorText('status');
+@if (legalStatusMoves().length > 0) {
+  <ui-field
+    size="bare"
+    [for]="uid + '-status'"
+    [label]="'itemForm.fields.status.label' | transloco"
+    [hint]="'itemForm.fields.status.hint' | transloco"
+    [error]="statusErr"
+  >
+    <div [attr.aria-invalid]="statusErr ? 'true' : null">
+      <ui-dropdown
+        #statusDropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-status'"
+        [label]="'itemForm.fields.status.label' | transloco"
+        [describedBy]="describedBy('status', uid + '-status')"
+        [options]="statusOptions()"
+        [disabled]="updatingStatus()"
+        [value]="draft().status"
+        (valueChange)="onStatusSelected($event)"
+      />
+    </div>
+  </ui-field>
+} @else {
+  <ui-field
+    [for]="uid + '-status'"
+    [label]="'itemForm.fields.status.label' | transloco"
+    [hint]="'itemForm.fields.status.hint' | transloco"
+    [error]="statusErr"
+  >
+    <input
+      [id]="uid + '-status'"
+      type="text"
+      readonly
+      class="w-full bg-transparent text-12 text-text outline-none"
+      [value]="statusKey[draft().status] | transloco"
+      [attr.aria-invalid]="statusErr ? 'true' : null"
+    />
+  </ui-field>
+}
+
+@let catErr = errorText('categoryId');
+@if (!readonly()) {
+  <ui-field
+    size="bare"
+    [for]="uid + '-category'"
+    [label]="'itemForm.fields.category.label' | transloco"
+    [hint]="'itemForm.fields.category.hint' | transloco"
+    [error]="catErr"
+  >
+    <app-trade-category-picker
+      [id]="uid + '-category'"
+      [describedBy]="describedBy('categoryId', uid + '-category')"
+      [invalid]="!!catErr"
+      [value]="draft().categoryId"
+      (valueChange)="onCategoryChange($event)"
+    />
+  </ui-field>
+} @else {
+  <ui-field
+    [for]="uid + '-category'"
+    [label]="'itemForm.fields.category.label' | transloco"
+    [hint]="'itemForm.fields.category.hint' | transloco"
+    [error]="catErr"
+  >
+    <input
+      [id]="uid + '-category'"
+      type="text"
+      readonly
+      class="w-full bg-transparent text-12 text-text outline-none"
+      [value]="categoryLabel() || ('tradeShared.picker.noCategory' | transloco)"
+      [attr.aria-invalid]="catErr ? 'true' : null"
+    />
+  </ui-field>
+}
+
+@let ownerErr = errorText('ownerUserId');
+@if (!readonly()) {
+  <ui-field
+    size="bare"
+    [for]="uid + '-owner'"
+    [label]="'itemForm.fields.owner.label' | transloco"
+    [hint]="'itemForm.fields.owner.hint' | transloco"
+    [error]="ownerErr"
+  >
+    <div [attr.aria-invalid]="ownerErr ? 'true' : null">
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-owner'"
+        [label]="'itemForm.fields.owner.label' | transloco"
+        [describedBy]="describedBy('ownerUserId', uid + '-owner')"
+        [options]="ownerOptions()"
+        [value]="draft().ownerUserId ?? ''"
+        (valueChange)="onOwnerChange($event)"
+      />
+    </div>
+  </ui-field>
+} @else {
+  <ui-field
+    [for]="uid + '-owner'"
+    [label]="'itemForm.fields.owner.label' | transloco"
+    [hint]="'itemForm.fields.owner.hint' | transloco"
+    [error]="ownerErr"
+  >
+    <input
+      [id]="uid + '-owner'"
+      type="text"
+      readonly
+      class="w-full bg-transparent text-12 text-text outline-none"
+      [value]="ownerLabel()"
+      [attr.aria-invalid]="ownerErr ? 'true' : null"
+    />
+  </ui-field>
+}
+
+@let uomErr = errorText('baseUomId');
+@if (canEditBaseUom()) {
+  <ui-field
+    size="bare"
+    [for]="uid + '-base-unit'"
+    [label]="'itemForm.fields.baseUnit.label' | transloco"
+    [hint]="'itemForm.fields.baseUnit.hint' | transloco"
+    [required]="true"
+    [error]="uomErr"
+  >
+    <app-trade-uom-picker
+      [id]="uid + '-base-unit'"
+      [describedBy]="describedBy('baseUomId', uid + '-base-unit')"
+      [includeRetired]="false"
+      [invalid]="!!uomErr"
+      [value]="draft().baseUomId"
+      (valueChange)="onBaseUomChange($event)"
+    />
+  </ui-field>
+} @else {
+  <ui-field
+    [for]="uid + '-base-unit'"
+    [label]="'itemForm.fields.baseUnit.label' | transloco"
+    [hint]="'itemForm.fields.baseUnit.hint' | transloco"
+    [error]="uomErr"
+  >
+    <input
+      [id]="uid + '-base-unit'"
+      type="text"
+      readonly
+      class="w-full bg-transparent text-12 text-text outline-none"
+      [value]="baseUnitLabel()"
+      [attr.aria-invalid]="uomErr ? 'true' : null"
+    />
+  </ui-field>
+}
+
+<ui-confirm-dialog
+  #kindChangeDialog
+  tone="warning"
+  [title]="'itemForm.kindChange' | transloco"
+  [text]="'itemForm.kindChangeText' | transloco"
+  [confirmLabel]="'itemForm.actions.confirmKindChange' | transloco"
+  [cancelLabel]="'tradeShared.common.cancel' | transloco"
+/>

@@ -1,0 +1,202 @@
+{
+  "newEmail": "New email",
+  "searchPlaceholder": "Search by subject or recipient",
+  "loadMore": "Load more",
+  "retentionFooter": "Message content is kept for {{days}} days",
+  "changeRetention": "Change",
+  "empty": "No outbound emails match the current filters.",
+  "loadingDetail": "Loading email details...",
+  "sender": {
+    "sendingFrom": "Sending from {{name}}",
+    "active": "Active",
+    "suspended": "Suspended",
+    "domainVerified": "Domain verified",
+    "domainUnverified": "Domain not verified",
+    "notReadyWarning": "CRM emails cannot be sent until the sender is active, the domain is verified and a delivery provider other than SMTP is set.",
+    "notReadyHint": "Complete the sender setup before sending CRM emails.",
+    "openSettings": "Open email settings"
+  },
+  "filters": {
+    "status": "Status",
+    "statusHint": "Filter outbound emails by their current delivery status.",
+    "allStatuses": "All statuses",
+    "sourceType": "Record type",
+    "sourceTypeHint": "Filter outbound emails by CRM record type (lead, customer or opportunity).",
+    "allTypes": "All record types",
+    "record": "Record",
+    "recordHint": "Show emails sent for a specific CRM record of the selected type.",
+    "allRecords": "All records",
+    "fromDate": "From date",
+    "fromDateHint": "Start date for filtering by request date (date range up to 366 days).",
+    "toDate": "To date",
+    "toDateHint": "End date for filtering by request date (on or after From date, up to 366 days).",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "clear": "Clear filters",
+    "invalidRange": "From date must be on or before To date.",
+    "rangeTooLong": "Date range cannot exceed 366 days."
+  },
+  "table": {
+    "label": "Outbound emails",
+    "subject": "Subject",
+    "recipient": "Recipient",
+    "record": "Record",
+    "template": "Template",
+    "status": "Status",
+    "requested": "Requested",
+    "actions": "Actions",
+    "version": "v{{version}}",
+    "recordRef": "{{type}} · {{ref}}",
+    "noSubject": "Subject not available"
+  },
+  "statuses": {
+    "QUEUED": "Queued",
+    "DISPATCHING": "Sending",
+    "SENT": "Sent",
+    "FAILED": "Failed"
+  },
+  "sourceTypes": {
+    "LEAD": "Lead",
+    "CUSTOMER_PROFILE": "Customer",
+    "OPPORTUNITY": "Opportunity"
+  },
+  "providers": {
+    "SES": "Amazon SES",
+    "SENDGRID": "SendGrid",
+    "PLATFORM-SHARED": "Platform shared",
+    "SMTP": "SMTP"
+  },
+  "badges": {
+    "retry": "Retry",
+    "primaryContact": "Primary contact",
+    "BOUNCE": "Bounce",
+    "COMPLAINT": "Complaint"
+  },
+  "actions": {
+    "open": "Open",
+    "retry": "Retry",
+    "openRecord": "Open record",
+    "openRecordDisabled": "Record pages are not ready yet"
+  },
+  "detail": {
+    "title": "Outbound email",
+    "tabs": {
+      "message": "Message",
+      "details": "Details",
+      "timeline": "Timeline"
+    },
+    "format": {
+      "label": "Message view",
+      "hint": "Switch between the rendered HTML email and its plain-text version.",
+      "html": "HTML",
+      "text": "Plain text"
+    },
+    "htmlPreview": "Email HTML preview",
+    "redactedNotice": "The message text was removed after {{days}} days. The sending record is kept.",
+    "noTextBody": "No plain text version was saved for this message.",
+    "fields": {
+      "recipient": "Recipient",
+      "sender": "Sender",
+      "replyTo": "Reply to",
+      "record": "Record",
+      "template": "Template",
+      "provider": "Provider",
+      "providerReference": "Provider reference",
+      "requestedAt": "Requested at",
+      "sentAt": "Sent at",
+      "failedAt": "Failed at",
+      "failure": "Failure",
+      "retriesExhausted": "Automatic retries were used up.",
+      "feedback": "Delivery feedback",
+      "retryOf": "Retry of",
+      "retriedAs": "Retried as",
+      "retention": "Content retention",
+      "retentionUntil": "Kept until {{date}} ({{days}} days)",
+      "notAvailable": "—"
+    },
+    "direction": {
+      "LTR": "Left to right",
+      "RTL": "Right to left"
+    },
+    "feedbackReasons": {
+      "HARD_BOUNCE": "Permanent bounce: the address cannot receive email.",
+      "SOFT_BOUNCE": "Temporary bounce: the recipient server deferred the message.",
+      "COMPLAINT": "The recipient reported this message as spam.",
+      "UNSPECIFIED": "No reason was given."
+    },
+    "feedbackSuppressed": "The address was added to the suppression list.",
+    "openEmailLink": "Open email",
+    "timeline": {
+      "QUEUED": "Queued for delivery",
+      "RETRY_REQUESTED": "Retry requested",
+      "DISPATCHING": "Handed over to delivery provider",
+      "SENT": "Sent to mail server",
+      "FAILED": "Delivery failed",
+      "BOUNCED": "Bounced by recipient server",
+      "COMPLAINED": "Marked as spam by recipient"
+    }
+  },
+  "retry": {
+    "title": "Retry failed email",
+    "reasonLabel": "Reason",
+    "reasonHint": "Explain why this failed email is being retried (1 to 500 characters); queues a new email with the same content.",
+    "reasonPlaceholder": "Explain why this email is being retried",
+    "send": "Send retry",
+    "openExisting": "Open the retry",
+    "validationRequired": "Enter a reason for the retry.",
+    "validationMax": "Reason must be at most 500 characters.",
+    "validationControl": "Reason cannot contain control characters."
+  },
+  "compose": {
+    "title": "New email",
+    "steps": {
+      "record": "Record",
+      "recipientTemplate": "Recipient and template",
+      "previewSend": "Preview and send"
+    },
+    "recordTypeLabel": "Record type",
+    "recordTypeHint": "Choose whether this email is sent for a lead, customer or opportunity.",
+    "recordLabel": "Record",
+    "recordHint": "Select the CRM record whose contacts and data will populate the email.",
+    "recordPlaceholder": "Select a record",
+    "recordSearchLabel": "Search records",
+    "recordSearchHint": "Type part of a record name to filter the list below.",
+    "recordSearchPlaceholder": "Search records",
+    "noMatchingRecords": "No matching records",
+    "recipientLabel": "Recipient",
+    "recipientHint": "Choose which approved contact email address on this record receives the message.",
+    "templateLabel": "Template",
+    "templateHint": "Choose the published email template version to render for this record.",
+    "noApprovedRecipient": "No approved or unsuppressed recipient email address is available for this record.",
+    "noCompatibleTemplate": "No compatible email template is available for this record type.",
+    "next": "Next",
+    "back": "Back",
+    "send": "Send"
+  },
+  "toasts": {
+    "queued": "Email queued",
+    "retryQueued": "Retry email queued"
+  },
+  "errors": {
+    "CRM_FEATURE_DISABLED": "CRM outbound email is not enabled for your subscription.",
+    "CRM_VALIDATION_FAILED": "Check the entered values and try again.",
+    "CRM": {
+      "EMAIL": {
+        "SOURCE_NOT_FOUND": "The requested email or record could not be found.",
+        "RETRY_NOT_ALLOWED": "Only failed emails with retained message content can be retried.",
+        "RETRY_ALREADY_CREATED": "A retry has already been created for this email.",
+        "SENDER_UNVERIFIED": "The sender configuration is not ready for CRM emails yet.",
+        "RECIPIENT_SUPPRESSED": "This recipient is on the suppression list and cannot receive emails.",
+        "RECIPIENT_INVALID": "The selected recipient email address is invalid.",
+        "TEMPLATE_NOT_SENDABLE": "This template version is not published or cannot be sent.",
+        "TEMPLATE_RENDER_FAILED": "Could not render the template for this record.",
+        "CONTENT_LIMIT_EXCEEDED": "The rendered email exceeds the maximum allowed content size.",
+        "SOURCE_INELIGIBLE": "Emails cannot be sent for this record in its current state.",
+        "SEND_RATE_LIMITED": "Sending limit reached. Try again in {{minutes}} min.",
+        "DEPENDENCY_UNAVAILABLE": "The email delivery service is temporarily unavailable. Try again shortly.",
+        "IDEMPOTENCY_MISMATCH": "This request was already sent with different details. Reload the page and try again."
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+<div #labelRow class="mb-2 flex h-label min-w-0 items-center gap-4 text-12 text-text-muted">
+  <label [attr.for]="for() || (hasControl() ? controlId() : null)" [title]="label()" class="min-w-0 truncate">{{ label() }}</label>
+  @if (required()) {
+    <span class="shrink-0 text-danger-text" aria-hidden="true">*</span>
+  }
+  @if (hint().trim()) {
+    <span #hintTrigger class="relative inline-flex shrink-0 items-center text-accent" (mouseenter)="onHover(hintTrigger, true)" (mouseleave)="onHover(hintTrigger, false)">
+      <button
+        type="button"
+        data-ui-hint
+        class="inline-flex cursor-help items-center rounded-full text-accent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+        [attr.aria-label]="label()"
+        [attr.aria-describedby]="controlId() + '-hint'"
+        (focus)="onFocus(hintTrigger, true)"
+        (blur)="onFocus(hintTrigger, false)"
+        (keydown.escape)="onEscape($event)"
+      >
+        <ng-icon name="tablerExclamationCircle" size="14" aria-hidden="true" />
+      </button>
+      <span
+        #tooltip
+        [id]="controlId() + '-hint'"
+        role="tooltip"
+        class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip before:absolute before:-inset-x-8 before:inset-y-0 before:-z-10"
+        [class]="tipPlaced() ? 'visible' : 'invisible'"
+        [style.top.px]="tooltipPlace().top"
+        [style.inset-inline-start.px]="tooltipPlace().start"
+        (keydown.escape)="onEscape($event)"
+      >
+        {{ hint() }}
+      </span>
+    </span>
+  }
+  @if (max() !== null) {
+    <span
+      class="ms-auto shrink-0 whitespace-nowrap text-11"
+      [class]="(count() ?? 0) > max()! ? 'text-danger-text' : 'text-text-muted'"
+      aria-live="polite"
+    >
+      <bdi dir="ltr" aria-hidden="true">{{ count() ?? 0 }} / {{ max() }}</bdi>
+      <span class="sr-only">{{ countLabel() }}</span>
+    </span>
+  }
+</div>
+
+<div #box [class]="boxClasses()">
+  <ng-content />
+</div>
+
+@if (error()) {
+  <p [id]="controlId() + '-error'" role="alert" class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text">
+    <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+    {{ error() }}
+  </p>
+} @else if (hintText()) {
+  <p class="mt-2 text-11 leading-16 text-text-muted">{{ hintText() }}</p>
+}

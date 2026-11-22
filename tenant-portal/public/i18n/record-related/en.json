@@ -1,0 +1,12 @@
+{
+  "label": "Related records",
+  "kinds": {
+    "leads": "Similar leads",
+    "opportunities": "Opportunities",
+    "quotations": "Quotations",
+    "salesOrders": "Sales orders",
+    "invoices": "Invoices"
+  },
+  "badgeAria": "{{label}}: {{count}}",
+  "unavailable": "This list is not available yet."
+}

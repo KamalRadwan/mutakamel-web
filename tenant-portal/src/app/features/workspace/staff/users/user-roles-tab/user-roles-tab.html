@@ -1,0 +1,558 @@
+@if (effectiveReadonly()) {
+  <p class="flex items-center gap-6 text-12 leading-18 text-text-muted">
+    <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+    <span>{{ effectiveReadonlyReason() || ('access.common.readonly' | transloco) }}</span>
+  </p>
+}
+
+<section class="flex flex-col gap-8">
+  <div class="flex flex-wrap items-center justify-between gap-8">
+    <div class="min-w-0">
+      <h3 class="text-14 leading-20 font-medium text-text">{{ 'access.roles.branchTitle' | transloco }}</h3>
+      <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.branchDesc' | transloco }}</p>
+    </div>
+
+    @if (!effectiveReadonly() && canViewBranchRoles()) {
+      <button type="button" uiButton variant="secondary" size="small" (click)="openAddBranchModal()">
+        <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+        <span>{{ 'access.roles.add' | transloco }}</span>
+      </button>
+    }
+  </div>
+
+  @if (!canViewBranchRoles()) {
+    @if (!effectiveReadonlyReason()) {
+      <p class="text-12 leading-18 text-text-muted">
+        {{ isSelf() ? ('access.roles.selfReadonly' | transloco) : ('staff.protected.scope' | transloco) }}
+      </p>
+    }
+  } @else if (branchLoadFailed()) {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerCloudOff" size="20" />
+      </span>
+      <p class="text-12 text-danger-text">{{ 'access.common.loadFailed' | transloco }}</p>
+      <button type="button" uiButton variant="secondary" size="small" (click)="reloadBranch()">
+        {{ 'access.common.retry' | transloco }}
+      </button>
+    </div>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-modal-form"
+        [attr.aria-label]="'access.roles.branchTitle' | transloco"
+        [attr.aria-busy]="loadingBranch()"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="branchGridColumns()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'access.roles.cols.branch' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'access.roles.cols.role' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'access.roles.cols.added' | transloco }}
+          </span>
+          @if (!effectiveReadonly()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'access.common.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @if (loadingBranch()) {
+          @for (row of skeletonRows; track row) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+              [class]="branchGridColumns()"
+              aria-hidden="true"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10">
+                <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="h-skeleton-line w-stat-chart-w max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+              </span>
+              @if (!effectiveReadonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+              }
+            </div>
+          }
+        } @else {
+          @for (row of branchRoles(); track row.id) {
+            <div
+              role="row"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+              [class]="branchGridColumns()"
+            >
+              <span role="cell" class="flex min-w-0 items-baseline gap-6 px-10">
+                <span class="truncate font-medium">{{ branchName(row.branchId) }}</span>
+                @if (companyOfBranch(row.branchId); as comp) {
+                  <span class="truncate text-12 text-text-muted">{{ comp }}</span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                <span class="truncate">{{ roleLabel(row.roleId) }}</span>
+                @if (roleRecord(row.roleId)?.permissionMode === 'BRANCH') {
+                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text whitespace-nowrap">
+                    {{ 'access.roles.perBranch' | transloco }}
+                  </span>
+                }
+              </span>
+
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                <span class="truncate text-12 text-text-muted">{{ formatDate(row.createdAt) }}</span>
+              </span>
+
+              @if (!effectiveReadonly()) {
+                <span role="cell" class="flex items-center justify-center border-s border-border">
+                  <button
+                    type="button"
+                    class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                    [disabled]="removingBranchId() === row.id"
+                    [attr.aria-label]="'access.common.remove' | transloco"
+                    [title]="'access.common.remove' | transloco"
+                    (click)="requestRemoveBranch(row)"
+                  >
+                    <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                  </button>
+                </span>
+              }
+            </div>
+          } @empty {
+            <div role="row">
+              <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+                {{ 'access.roles.emptyBranch' | transloco }}
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+</section>
+
+<section class="flex flex-col gap-8 border-t border-border pt-12">
+  @if (!isOwnerActor()) {
+    <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.scopeOwnerOnly' | transloco }}</p>
+  } @else {
+    <div class="flex flex-wrap items-center justify-between gap-8">
+      <div class="min-w-0">
+        <h3 class="text-14 leading-20 font-medium text-text">{{ 'access.roles.scopeTitle' | transloco }}</h3>
+        <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.scopeDesc' | transloco }}</p>
+      </div>
+
+      @if (!effectiveReadonly() && user().status === 'ACTIVE') {
+        <button type="button" uiButton variant="secondary" size="small" (click)="openAddScopeModal()">
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          <span>{{ 'access.roles.addScope' | transloco }}</span>
+        </button>
+      }
+    </div>
+
+    @if (user().status !== 'ACTIVE') {
+      <p class="text-12 leading-18 text-text-muted">{{ 'access.roles.needsActive' | transloco }}</p>
+    }
+
+    @if (scopeLoadFailed()) {
+      <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+        <span
+          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+          aria-hidden="true"
+        >
+          <ng-icon name="tablerCloudOff" size="20" />
+        </span>
+        <p class="text-12 text-danger-text">{{ 'access.common.loadFailed' | transloco }}</p>
+        <button type="button" uiButton variant="secondary" size="small" (click)="reloadScope()">
+          {{ 'access.common.retry' | transloco }}
+        </button>
+      </div>
+    } @else {
+      <div class="overflow-x-auto pb-4">
+        <div
+          role="table"
+          class="min-w-modal-form"
+          [attr.aria-label]="'access.roles.scopeTitle' | transloco"
+          [attr.aria-busy]="loadingScope()"
+        >
+          <div
+            role="row"
+            class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+            [class]="scopeGridColumns()"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'access.roles.scopeField' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'access.roles.cols.role' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'access.roles.cols.state' | transloco }}
+            </span>
+            @if (!effectiveReadonly()) {
+              <span role="columnheader" class="border-s border-on-nav-line">
+                <span class="sr-only">{{ 'access.common.actions' | transloco }}</span>
+              </span>
+            }
+          </div>
+
+          @if (loadingScope()) {
+            @for (row of skeletonRows; track row) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
+                [class]="scopeGridColumns()"
+                aria-hidden="true"
+              >
+                <span role="cell" class="flex min-w-0 items-center px-10">
+                  <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="h-skeleton-line w-preset max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="h-badge w-time-dd rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+                </span>
+                @if (!effectiveReadonly()) {
+                  <span role="cell" class="flex items-center justify-center border-s border-border">
+                    <span class="size-icon-tile-sm rounded-6 bg-neutral-soft motion-safe:animate-pulse"></span>
+                  </span>
+                }
+              </div>
+            }
+          } @else {
+            @for (row of scopeRoles(); track row.id; let idx = $index) {
+              <div
+                role="row"
+                class="mt-6 grid h-table-row rounded-10 border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+                [class]="scopeGridColumns() + ' ' + (isInvalidScopeRow(idx) ? 'border-danger-border ring-2 ring-danger-halo' : 'border-border')"
+              >
+                <span role="cell" class="flex min-w-0 items-center px-10">
+                  <span class="truncate font-medium">{{ scopeDescription(row) }}</span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  <span class="truncate">{{ roleLabel(row.roleId) }}</span>
+                </span>
+
+                <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                  @if (row.scopeActive) {
+                    <span class="inline-flex h-badge items-center rounded-8 bg-success px-8 text-12 font-medium text-on-success whitespace-nowrap">
+                      {{ 'access.common.active' | transloco }}
+                    </span>
+                  } @else {
+                    <span
+                      class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted whitespace-nowrap"
+                      [title]="'access.roles.inactiveScopeHint' | transloco"
+                    >
+                      {{ 'access.roles.inactiveScope' | transloco }}
+                    </span>
+                  }
+                </span>
+
+                @if (!effectiveReadonly()) {
+                  <span role="cell" class="flex items-center justify-center border-s border-border">
+                    <button
+                      type="button"
+                      class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source"
+                      [disabled]="savingScope()"
+                      [attr.aria-label]="'access.common.remove' | transloco"
+                      [title]="'access.common.remove' | transloco"
+                      (click)="removeScopeAssignment(idx)"
+                    >
+                      <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                    </button>
+                  </span>
+                }
+              </div>
+            } @empty {
+              <div role="row">
+                <span role="cell" class="block p-16 text-center text-12 text-text-muted">
+                  {{ 'access.roles.emptyScope' | transloco }}
+                </span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    }
+  }
+</section>
+
+<ui-modal
+  #addBranchModal
+  size="form"
+  icon="tablerPlus"
+  tile="bg-icon-blue"
+  [title]="'access.roles.addTitle' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+  [dismissable]="!savingBranchAdd()"
+  (closed)="onAddBranchModalClosed()"
+>
+  <div class="flex flex-col gap-8">
+    <ui-field
+      [for]="uid + '-choice-search'"
+      [label]="'access.roles.search' | transloco"
+      [hint]="'access.roles.searchHint' | transloco"
+    >
+      <input
+        [id]="uid + '-choice-search'"
+        type="text"
+        dir="auto"
+        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'access.roles.search' | transloco"
+        [value]="choiceSearch()"
+        (input)="onChoiceSearchInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-choices'"
+      [label]="'access.roles.choicesLabel' | transloco"
+      [hint]="'access.roles.choicesHint' | transloco"
+      [required]="true"
+    >
+      <div
+        [id]="uid + '-choices'"
+        role="group"
+        [attr.aria-label]="'access.roles.choicesLabel' | transloco"
+        [attr.aria-describedby]="uid + '-choices-hint'"
+        class="flex max-h-notif-list-max flex-col gap-4 overflow-y-auto rounded-10 border border-border bg-surface p-6"
+      >
+        @if (loadingChoices()) {
+          @for (row of skeletonRows; track row) {
+            <span class="h-skeleton-line w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+          }
+        } @else {
+          @for (choice of choices(); track choiceId(choice)) {
+            <div class="flex items-center justify-between gap-8 rounded-6 px-4 py-2 hover:bg-row-hover">
+              <ui-checkbox
+                [checked]="isChoiceSelected(choice)"
+                (checkedChange)="toggleChoice(choice, $event)"
+              >
+                <span class="font-medium">{{ choiceRoleLabel(choice) }}</span>
+                <span class="text-text-muted">· {{ choice.branchName }}</span>
+              </ui-checkbox>
+            </div>
+          } @empty {
+            <p class="p-8 text-center text-12 text-text-muted">{{ 'access.roles.emptyChoices' | transloco }}</p>
+          }
+
+          @if (choicesHasMore()) {
+            <div class="pt-4 text-center">
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [loading]="loadingMoreChoices()"
+                (click)="loadMoreChoices()"
+              >
+                {{ 'access.roles.loadMore' | transloco }}
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </ui-field>
+
+    <app-seat-impact
+      [changes]="addBranchSeatChanges()"
+      [canBuySeats]="isOwnerActor()"
+      (blocking)="addBranchSeatBlocked.set($event)"
+    />
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    [loading]="savingBranchAdd()"
+    [disabled]="savingBranchAdd() || !selectedChoices().length || addBranchSeatBlocked()"
+    (click)="saveBranchChoices()"
+  >
+    {{ 'access.common.save' | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="savingBranchAdd()"
+    (click)="addBranchModal.close()"
+  >
+    {{ 'access.common.cancel' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-modal
+  #removeBranchConfirm
+  size="confirm"
+  icon="tablerTrash"
+  tile="bg-icon-red"
+  [title]="'access.roles.removeTitle' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+  (closed)="onRemoveBranchConfirmClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'access.roles.removeText' | transloco: { role: removeBranchRoleName(), branch: removeBranchName() } }}
+    </p>
+    <app-seat-impact [changes]="removeBranchSeatChanges()" [compact]="true" />
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="danger"
+    (click)="settleRemoveBranchConfirm(true)"
+  >
+    {{ 'access.common.remove' | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    (click)="settleRemoveBranchConfirm(false)"
+  >
+    {{ 'access.common.cancel' | transloco }}
+  </button>
+</ui-modal>
+
+<ui-modal
+  #addScopeModal
+  size="form"
+  icon="tablerPlus"
+  tile="bg-icon-violet"
+  [title]="'access.roles.addScope' | transloco"
+  [closeLabel]="'access.common.close' | transloco"
+  [dismissable]="!savingScope()"
+  (closed)="onScopeModalClosed()"
+>
+  <div class="flex flex-col gap-8">
+    <ui-field
+      size="bare"
+      [for]="uid + '-scope-target'"
+      [label]="'access.roles.scopeField' | transloco"
+      [hint]="'access.roles.scopeFieldHint' | transloco"
+      [required]="true"
+    >
+      <div>
+        <ui-segmented
+          [id]="uid + '-scope-target'"
+          [describedBy]="uid + '-scope-target-hint'"
+          [options]="scopeTargetOptions()"
+          [label]="'access.roles.scopeField' | transloco"
+          [value]="scopeTarget()"
+          (valueChange)="onScopeTargetChange($event)"
+        />
+      </div>
+    </ui-field>
+
+    @if (scopeTarget() === 'COMPANY' || scopeTarget() === 'BRANCH') {
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope-company'"
+        [label]="'access.roles.companyField' | transloco"
+        [hint]="'access.roles.companyFieldHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scope-company'"
+          [describedBy]="uid + '-scope-company-hint'"
+          [options]="companyOptions()"
+          [value]="scopeCompanyId()"
+          [label]="'access.roles.companyField' | transloco"
+          (valueChange)="onScopeCompanyChange($event)"
+        />
+      </ui-field>
+    }
+
+    @if (scopeTarget() === 'BRANCH') {
+      <ui-field
+        size="bare"
+        [for]="uid + '-scope-branch'"
+        [label]="'access.roles.branchField' | transloco"
+        [hint]="'access.roles.branchFieldHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-scope-branch'"
+          [describedBy]="uid + '-scope-branch-hint'"
+          [options]="scopeBranchOptions()"
+          [value]="scopeBranchId()"
+          [label]="'access.roles.branchField' | transloco"
+          (valueChange)="scopeBranchId.set($event)"
+        />
+      </ui-field>
+    }
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-scope-role'"
+      [label]="'access.roles.roleField' | transloco"
+      [hint]="'access.roles.roleFieldHint' | transloco"
+      [required]="true"
+    >
+      <ui-dropdown
+        class="w-full"
+        size="field"
+        [id]="uid + '-scope-role'"
+        [describedBy]="uid + '-scope-role-hint'"
+        [options]="scopeRoleOptions()"
+        [value]="scopeRoleId()"
+        [label]="'access.roles.roleField' | transloco"
+        (valueChange)="scopeRoleId.set($event)"
+      />
+    </ui-field>
+
+    <app-seat-impact
+      [changes]="scopeSeatChanges()"
+      [canBuySeats]="isOwnerActor()"
+      (blocking)="scopeSeatBlocked.set($event)"
+    />
+  </div>
+
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    [loading]="savingScope()"
+    [disabled]="!canSaveScopeModal()"
+    (click)="saveScopeModal()"
+  >
+    {{ 'access.common.save' | transloco }}
+  </button>
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="savingScope()"
+    (click)="addScopeModal.close()"
+  >
+    {{ 'access.common.cancel' | transloco }}
+  </button>
+</ui-modal>

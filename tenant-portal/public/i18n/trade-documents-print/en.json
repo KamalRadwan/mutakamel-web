@@ -1,0 +1,26 @@
+{
+  "title": "Print {{kind}}",
+  "template": "Template",
+  "templateHint": "The default template assignment is used unless you pick a template.",
+  "language": "Language",
+  "languageHint": "Language used in the generated PDF. Locked when decided by the template.",
+  "default": "Default template",
+  "defaultSub": "The template your company assigned",
+  "builtIn": "Built-in template",
+  "builtInSub": "The standard Mutakamel layout",
+  "version": "version {{n}}",
+  "preparing": "Preparing the PDF (attempt {{n}} of 3)…",
+  "renderUnavailable": "The PDF rendering service is temporarily unavailable. Try again shortly.",
+  "stillPreparing": "Still preparing. You can close this window; try again later.",
+  "ready": "The PDF is ready",
+  "failed": "The PDF could not be prepared.",
+  "notEligible": "This document cannot be printed in its current state.",
+  "chooseTemplate": "Choose a template.",
+  "printing": "Printing",
+  "print": "Print",
+  "tryAgain": "Try again",
+  "lang": {
+    "en-US": "English",
+    "ar-EG": "العربية"
+  }
+}

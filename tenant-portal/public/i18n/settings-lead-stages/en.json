@@ -1,0 +1,102 @@
+{
+  "new": "New stage",
+  "search": "Search stages",
+  "limitHint": "Maximum of 500 stages reached.",
+  "footerHint": "New stays first. Disqualified and Converted stay last.",
+  "notices": {
+    "noActiveQualified": "Leads can only be converted from a qualified stage, and no active stage means Qualified."
+  },
+  "table": {
+    "ariaLabel": "Lead stages",
+    "dragHandle": "Reorder stage",
+    "systemLocked": "System stage",
+    "meaning": "Meaning",
+    "category": "Category",
+    "default": "Default",
+    "setAsDefault": "Set as default"
+  },
+  "flags": {
+    "NEW": "New",
+    "CONTACTED": "Contacted",
+    "QUALIFYING": "Qualifying",
+    "QUALIFIED": "Qualified",
+    "DISQUALIFIED": "Disqualified",
+    "CONVERTED": "Converted",
+    "NURTURING": "Nurturing",
+    "ON_HOLD": "On hold"
+  },
+  "categories": {
+    "IN_PROGRESS": "In progress",
+    "POSITIVE": "Positive",
+    "NEGATIVE": "Negative"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "setDefault": "Set as default",
+    "setDefaultInactiveReason": "Activate this stage first",
+    "setDefaultTerminalReason": "Disqualified and Converted stages cannot be default",
+    "movePosition": "Move to position",
+    "moveProtectedReason": "System stages stay in their fixed position",
+    "moveSearchingReason": "Clear the search to reorder stages",
+    "moveOnlyCustomReason": "Add another custom stage to reorder",
+    "deleteProtectedReason": "System stages cannot be deleted",
+    "deleteDefaultReason": "Choose another default stage first"
+  },
+  "modal": {
+    "createTitle": "New lead stage",
+    "nameArHint": "Enter the Arabic stage name shown on lead boards and lists (up to 80 characters).",
+    "nameEnHint": "Enter the English stage name shown on lead boards and lists (up to 80 characters).",
+    "meaning": "Meaning",
+    "meaningHint": "The meaning can only change while no lead, even a deleted one, uses this stage.",
+    "category": "Category",
+    "categoryHint": "Choose how this stage counts in lead progress and conversion reports.",
+    "defaultCheckbox": "Default stage for new leads",
+    "defaultHint": "When checked, new leads start in this stage instead of the current default stage.",
+    "activeHint": "Inactive stages are hidden when creating or moving leads.",
+    "activeDefaultHint": "Choose another default stage first.",
+    "systemNotice": "System stages cannot be changed.",
+    "discardTitle": "Discard changes?",
+    "discardText": "Your changes to this stage are not saved.",
+    "discardConfirm": "Discard",
+    "discardKeep": "Keep editing"
+  },
+  "moveModal": {
+    "title": "Move stage",
+    "position": "New position",
+    "positionHint": "Choose the new order position between New and the terminal stages."
+  },
+  "delete": {
+    "title": "Delete stage?",
+    "text": "Delete “{{name}}”? Only unused custom stages can be deleted.",
+    "inUseTitle": "Stage is in use",
+    "inUseText": "This stage is in use. Move its leads to another stage first, or make the stage inactive.",
+    "makeInactive": "Make inactive"
+  },
+  "toasts": {
+    "created": "Stage added",
+    "updated": "Stage saved",
+    "defaultSet": "Default stage updated",
+    "reordered": "Stage order updated",
+    "deleted": "Stage deleted",
+    "deactivated": "Stage marked inactive"
+  },
+  "validation": {
+    "required": "This field is required.",
+    "maxLength": "At most {{max}} characters."
+  },
+  "errors": {
+    "LEAD_STAGE_PROTECTED": "System stages cannot be changed or deleted",
+    "LEAD_STAGE_CATEGORY_INVALID": "Choose In progress, Positive or Negative",
+    "LEAD_STAGE_LIMIT_EXCEEDED": "You can have at most 500 lead stages",
+    "LEAD_STAGE_IN_USE": "Leads use this stage, even deleted ones, so its meaning cannot change.",
+    "LEAD_STAGE_DEFAULT_DEACTIVATE": "Choose another default stage before making this one inactive",
+    "LEAD_STAGE_NOT_FOUND": "This stage no longer exists",
+    "LEAD_STAGE_DEFAULT_INACTIVE": "An inactive stage cannot be the default",
+    "LEAD_STAGE_DEFAULT_TERMINAL": "Disqualified and Converted stages cannot be the default",
+    "LEAD_STAGE_REORDER_INVALID": "New must stay first, with Disqualified and Converted last",
+    "LEAD_STAGE_DEFAULT_DELETE": "Choose another default stage before deleting this one",
+    "VALIDATION_ERROR": "Check the stage fields and try again",
+    "CRM_VALIDATION_FAILED": "Some values are not valid. Check them and try again."
+  }
+}

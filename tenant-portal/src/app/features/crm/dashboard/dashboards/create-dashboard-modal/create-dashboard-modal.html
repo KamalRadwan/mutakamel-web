@@ -1,0 +1,180 @@
+<ui-modal
+  #createModal
+  size="form"
+  [title]="'dashLibrary.createModal.createTitle' | transloco"
+  icon="tablerPlus"
+  tile="bg-icon-green"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!submitting()"
+  (closed)="onCreateModalClosed()"
+>
+  <form class="flex flex-col gap-10" (submit)="$event.preventDefault(); submit()">
+    <ui-field
+      for="create-dash-name"
+      [required]="true"
+      [label]="'dashLibrary.createModal.nameLabel' | transloco"
+      [hint]="'dashLibrary.createModal.nameHint' | transloco"
+      [count]="name().length"
+      [max]="nameMax"
+      [error]="nameError()"
+    >
+      <input
+        #nameInput
+        id="create-dash-name"
+        type="text"
+        [maxLength]="nameMax"
+        class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'dashLibrary.createModal.namePlaceholder' | transloco"
+        [value]="name()"
+        (input)="onNameInput(nameInput.value)"
+      />
+    </ui-field>
+
+    <ui-field
+      for="create-dash-desc"
+      size="multiline"
+      [label]="'dashLibrary.createModal.descriptionLabel' | transloco"
+      [hint]="'dashLibrary.createModal.descriptionHint' | transloco"
+      [count]="description().length"
+      [max]="descriptionMax"
+      [error]="descriptionError()"
+    >
+      <textarea
+        #descInput
+        id="create-dash-desc"
+        rows="3"
+        [maxLength]="descriptionMax"
+        class="min-h-0 w-full flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+        [placeholder]="'dashLibrary.createModal.descriptionPlaceholder' | transloco"
+        [value]="description()"
+        (input)="onDescriptionInput(descInput.value)"
+      ></textarea>
+    </ui-field>
+
+    <ui-field
+      for="create-dash-source"
+      [bare]="true"
+      [label]="'dashLibrary.createModal.startFrom' | transloco"
+      [hint]="'dashLibrary.createModal.startFromHint' | transloco"
+      [error]="sourceError()"
+    >
+      <div
+        id="create-dash-source"
+        role="radiogroup"
+        class="grid grid-cols-2 gap-8"
+        [attr.aria-label]="'dashLibrary.createModal.startFrom' | transloco"
+        [attr.aria-describedby]="sourceDescribedBy()"
+      >
+        @for (option of startOptions(); track option.key ?? '__blank__'; let idx = $index) {
+          @let isSelected = selectedSource() === option.key;
+          <button
+            #sourceTile
+            type="button"
+            role="radio"
+            class="flex cursor-pointer items-center gap-8 rounded-10 border p-8 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              isSelected
+                ? 'border-brand bg-brand-soft'
+                : 'border-border bg-surface hover:border-border-field-hover hover:bg-row-hover'
+            "
+            [attr.aria-checked]="isSelected"
+            [tabIndex]="isSelected ? 0 : -1"
+            (click)="selectSource(option.key)"
+            (keydown)="onSourceKeydown($event, idx)"
+          >
+            <span
+              class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="option.key === null ? 'bg-icon-blue' : 'bg-icon-teal'"
+              aria-hidden="true"
+            >
+              <ng-icon [name]="option.key === null ? 'tablerLayoutDashboard' : 'tablerTemplate'" size="15" />
+            </span>
+            <span class="min-w-0 flex-1 leading-16">
+              <span class="block truncate text-12 font-medium text-text">{{ option.name }}</span>
+              <span class="block truncate text-11 text-text-muted">
+                {{ 'dashLibrary.widgets' | transloco: { count: option.widgetCount } }}
+              </span>
+            </span>
+          </button>
+        }
+      </div>
+    </ui-field>
+
+    @if (selectedBlueprint()?.branchSelectionRequired) {
+      <ui-field
+        for="create-dash-branch"
+        [bare]="true"
+        [label]="'dashLibrary.branchLabel' | transloco"
+        [hint]="'dashLibrary.branchHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          id="create-dash-branch"
+          describedBy="create-dash-branch-hint"
+          size="field"
+          [label]="'dashLibrary.branchLabel' | transloco"
+          [options]="branchOptions()"
+          [value]="selectedBranchId()"
+          (valueChange)="selectedBranchId.set($event)"
+        />
+      </ui-field>
+    }
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="submitting()"
+      [disabled]="!canSubmit() || submitting()"
+      (click)="submit()"
+    >
+      {{ 'dashLibrary.createModal.create' | transloco }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="cancel()"
+    >
+      {{ 'dashLibrary.createModal.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>
+
+<ui-modal
+  #targetsModal
+  size="form"
+  [title]="'dashLibrary.confirmTargetsTitle' | transloco"
+  icon="tablerTarget"
+  tile="bg-icon-orange"
+  [closeLabel]="'analytics.common.close' | transloco"
+  (closed)="onTargetsModalClosed()"
+>
+  @if (pendingTargetsBlueprint(); as bp) {
+    <ul
+      class="m-0 flex list-none flex-col divide-y divide-border rounded-10 border border-border bg-surface p-0"
+      [attr.aria-label]="'dashLibrary.targetsListLabel' | transloco"
+    >
+      @for (item of bp.targets; track item.widgetName) {
+        <li class="flex items-center justify-between gap-8 px-10 py-8 text-12 leading-18">
+          <span class="min-w-0 flex-1 truncate text-text-muted">{{ item.widgetName }}</span>
+          <bdi dir="ltr" class="shrink-0 font-medium text-text tabular-nums">
+            {{ formatTargetValue(item.target) }}
+          </bdi>
+        </li>
+      }
+    </ul>
+  }
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="confirmTargetsAction()">
+      {{ 'dashLibrary.confirmTargetsAction' | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="cancelTargetsAction()">
+      {{ 'dashLibrary.createModal.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

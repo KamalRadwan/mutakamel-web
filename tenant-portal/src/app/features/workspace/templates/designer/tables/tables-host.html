@@ -1,0 +1,5 @@
+<app-tpl-field-picker #picker />
+<app-tpl-table-settings-modal #tableSettings [pickField]="openPicker" [editCellFn]="openCellEditor" />
+<app-tpl-cell-editor-modal #cellEditor [pickField]="openPicker" [openFormula]="openFormulaBuilder" />
+<app-tpl-formula-builder #formula [pickField]="openPicker" />
+<app-tpl-totals-modal #totals [pickField]="openPicker" />

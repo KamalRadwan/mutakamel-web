@@ -1,0 +1,3 @@
+.audio-row-grid {
+  grid-template-columns: var(--btn-h) 1fr var(--table-head-h);
+}

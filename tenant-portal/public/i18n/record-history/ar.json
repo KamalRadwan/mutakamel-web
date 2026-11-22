@@ -1,0 +1,219 @@
+{
+  "filter": {
+    "label": "عرض التغييرات الخاصة بـ",
+    "hint": "اقصر السجل على نوع واحد من التغييرات",
+    "all": "الكل",
+    "details": "التفاصيل",
+    "contact": "جهات الاتصال",
+    "activity": "الأنشطة"
+  },
+  "list": "سجل التغييرات",
+  "system": "النظام",
+  "day": {
+    "today": "اليوم",
+    "yesterday": "أمس"
+  },
+  "s": {
+    "created": {
+      "ok": "{{actor}} أنشأ السجل",
+      "failed": "حاول {{actor}} إنشاء السجل"
+    },
+    "updated": {
+      "ok": "{{actor}} حدّث السجل",
+      "failed": "حاول {{actor}} تحديث السجل"
+    },
+    "deleted": {
+      "ok": "{{actor}} حذف السجل",
+      "failed": "حاول {{actor}} حذف السجل"
+    },
+    "leadCreated": {
+      "ok": "{{actor}} أنشأ العميل المحتمل",
+      "failed": "حاول {{actor}} إنشاء العميل المحتمل"
+    },
+    "leadStage": {
+      "ok": "{{actor}} نقل العميل المحتمل إلى مرحلة أخرى",
+      "failed": "حاول {{actor}} نقل العميل المحتمل إلى مرحلة أخرى"
+    },
+    "leadConverted": {
+      "ok": "{{actor}} حوّل العميل المحتمل",
+      "failed": "حاول {{actor}} تحويل العميل المحتمل"
+    },
+    "leadDeleted": {
+      "ok": "{{actor}} حذف العميل المحتمل",
+      "failed": "حاول {{actor}} حذف العميل المحتمل"
+    },
+    "leadUpdated": {
+      "ok": "{{actor}} حدّث العميل المحتمل",
+      "failed": "حاول {{actor}} تحديث العميل المحتمل"
+    },
+    "customerCreated": {
+      "ok": "{{actor}} أنشأ العميل",
+      "failed": "حاول {{actor}} إنشاء العميل"
+    },
+    "customerStatus": {
+      "ok": "{{actor}} غيّر حالة العميل",
+      "failed": "حاول {{actor}} تغيير حالة العميل"
+    },
+    "customerUpdated": {
+      "ok": "{{actor}} حدّث العميل",
+      "failed": "حاول {{actor}} تحديث العميل"
+    },
+    "customerDeleted": {
+      "ok": "{{actor}} حذف العميل",
+      "failed": "حاول {{actor}} حذف العميل"
+    },
+    "opportunityCreated": {
+      "ok": "{{actor}} أنشأ الفرصة",
+      "failed": "حاول {{actor}} إنشاء الفرصة"
+    },
+    "opportunityStage": {
+      "ok": "{{actor}} نقل الفرصة إلى مرحلة أخرى",
+      "failed": "حاول {{actor}} نقل الفرصة إلى مرحلة أخرى"
+    },
+    "opportunityWon": {
+      "ok": "{{actor}} أتمّ الفرصة بنجاح",
+      "failed": "حاول {{actor}} إتمام الفرصة بنجاح"
+    },
+    "opportunityLost": {
+      "ok": "{{actor}} سجّل الفرصة كخسارة",
+      "failed": "حاول {{actor}} تسجيل الفرصة كخسارة"
+    },
+    "opportunityUpdated": {
+      "ok": "{{actor}} حدّث الفرصة",
+      "failed": "حاول {{actor}} تحديث الفرصة"
+    },
+    "opportunityDeleted": {
+      "ok": "{{actor}} حذف الفرصة",
+      "failed": "حاول {{actor}} حذف الفرصة"
+    },
+    "contactAdded": {
+      "ok": "{{actor}} أضاف جهة الاتصال {{name}}",
+      "failed": "حاول {{actor}} إضافة جهة الاتصال {{name}}"
+    },
+    "contactRemoved": {
+      "ok": "{{actor}} أزال جهة الاتصال {{name}}",
+      "failed": "حاول {{actor}} إزالة جهة الاتصال {{name}}"
+    },
+    "contactUpdated": {
+      "ok": "{{actor}} حدّث جهة الاتصال {{name}}",
+      "failed": "حاول {{actor}} تحديث جهة الاتصال {{name}}"
+    },
+    "noteAdded": {
+      "ok": "{{actor}} أضاف ملاحظة",
+      "failed": "حاول {{actor}} إضافة ملاحظة"
+    },
+    "noteEdited": {
+      "ok": "{{actor}} عدّل ملاحظة",
+      "failed": "حاول {{actor}} تعديل ملاحظة"
+    },
+    "noteDeleted": {
+      "ok": "{{actor}} حذف ملاحظة",
+      "failed": "حاول {{actor}} حذف ملاحظة"
+    },
+    "fileAdded": {
+      "ok": "{{actor}} رفع {{name}}",
+      "failed": "حاول {{actor}} رفع {{name}}"
+    },
+    "fileDeleted": {
+      "ok": "{{actor}} حذف الملف {{name}}",
+      "failed": "حاول {{actor}} حذف الملف {{name}}"
+    },
+    "activityPlanned": {
+      "ok": "{{actor}} خطّط للنشاط {{name}}",
+      "failed": "حاول {{actor}} التخطيط للنشاط {{name}}"
+    },
+    "activityCompleted": {
+      "ok": "{{actor}} أكمل النشاط {{name}}",
+      "failed": "حاول {{actor}} إكمال النشاط {{name}}"
+    },
+    "activityCancelled": {
+      "ok": "{{actor}} ألغى النشاط {{name}}",
+      "failed": "حاول {{actor}} إلغاء النشاط {{name}}"
+    },
+    "activityUpdated": {
+      "ok": "{{actor}} حدّث النشاط {{name}}",
+      "failed": "حاول {{actor}} تحديث النشاط {{name}}"
+    },
+    "quotation": {
+      "ok": "{{actor}} حدّث عرض السعر {{name}}",
+      "failed": "حاول {{actor}} تحديث عرض السعر {{name}}"
+    },
+    "salesOrder": {
+      "ok": "{{actor}} حدّث أمر البيع {{name}}",
+      "failed": "حاول {{actor}} تحديث أمر البيع {{name}}"
+    },
+    "invoice": {
+      "ok": "{{actor}} حدّث الفاتورة {{name}}",
+      "failed": "حاول {{actor}} تحديث الفاتورة {{name}}"
+    },
+    "other": {
+      "ok": "{{actor}} أجرى تغييرًا",
+      "failed": "حاول {{actor}} إجراء تغيير"
+    }
+  },
+  "failed": "فشل: {{reason}}",
+  "showAll": "عرض كل التغييرات ({{n}})",
+  "showLess": "عرض أقل",
+  "older": "عرض الأقدم",
+  "none": "—",
+  "ratingOf": "{{n}} من 3",
+  "yes": "نعم",
+  "no": "لا",
+  "from": "من",
+  "to": "إلى",
+  "status": {
+    "OPEN": "مفتوح",
+    "ON_HOLD": "معلّق",
+    "DISQUALIFIED": "غير مؤهل",
+    "CONVERTED": "محوَّل",
+    "PROSPECT": "عميل محتمل",
+    "ACTIVE_CUSTOMER": "عميل نشط",
+    "INACTIVE": "غير نشط",
+    "BLACKLISTED": "محظور"
+  },
+  "field": {
+    "stageId": "المرحلة",
+    "ownerUserId": "المسؤول",
+    "status": "الحالة",
+    "rating": "التقييم",
+    "cardColor": "لون البطاقة",
+    "profileType": "النوع",
+    "sourceLeadId": "العميل المحتمل المصدر",
+    "expectedValue": "القيمة المتوقعة",
+    "currencyCode": "العملة",
+    "acquisitionSourceId": "المصدر",
+    "tagIds": "الوسوم",
+    "description": "الملاحظات",
+    "interestSummary": "ملخص الاهتمام",
+    "expectedNeed": "الاحتياج المتوقع",
+    "displayName": "الاسم",
+    "companyName": "اسم الشركة",
+    "companyEmail": "بريد الشركة الإلكتروني",
+    "companyWebsite": "الموقع الإلكتروني للشركة",
+    "firstName": "الاسم الأول",
+    "lastName": "اسم العائلة",
+    "honorificTitle": "اللقب",
+    "jobTitle": "المسمى الوظيفي",
+    "phone": "الهاتف",
+    "email": "البريد الإلكتروني",
+    "website": "الموقع الإلكتروني",
+    "legalName": "الاسم القانوني",
+    "taxNumber": "الرقم الضريبي",
+    "commercialRegistrationNumber": "رقم السجل التجاري",
+    "address": "العنوان",
+    "isPrimary": "جهة الاتصال الرئيسية",
+    "branchId": "الفرع",
+    "subject": "الموضوع",
+    "dueAt": "موعد الاستحقاق",
+    "type": "نوع النشاط",
+    "priority": "الأولوية",
+    "direction": "الاتجاه"
+  },
+  "empty": "لا توجد تغييرات مسجلة بعد.",
+  "denied": {
+    "title": "السجل غير متاح",
+    "text": "لا يسمح دورك بعرض سجل التغييرات. اطلب من المسؤول صلاحية الاطلاع على سجل التدقيق."
+  },
+  "loadFailed": "تعذّر تحميل السجل.",
+  "retry": "إعادة المحاولة"
+}

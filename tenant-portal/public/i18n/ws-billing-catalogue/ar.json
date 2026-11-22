@@ -1,0 +1,44 @@
+{
+  "toolbar": {
+    "appFilterLabel": "تصفية حسب التطبيق",
+    "allApplications": "جميع التطبيقات",
+    "reload": "إعادة التحميل"
+  },
+  "badges": {
+    "subscribed": "مشترك",
+    "current": "الحالية"
+  },
+  "tier": {
+    "rank": "الفئة {{rank}}",
+    "lowerTier": "فئة أدنى"
+  },
+  "addons": {
+    "title": "الإضافات"
+  },
+  "price": {
+    "fromPrefix": "ابتداءً من",
+    "perUserMonth": "/ مستخدم / شهر",
+    "perUserYear": "/ مستخدم / سنة",
+    "unavailable": "السعر غير متاح"
+  },
+  "actions": {
+    "upgrade": "ترقية",
+    "upgradeTier": "ترقية الفئة",
+    "addToPlan": "إضافة إلى الباقة",
+    "prices": "الأسعار"
+  },
+  "empty": {
+    "title": "لا تتوفر تطبيقات بعد"
+  },
+  "modal": {
+    "title": "أسعار {{app}} · {{item}}",
+    "cycleLabel": "دورة الفوترة",
+    "cycleHint": "اعرض أسعار المستخدم للفوترة الشهرية أو السنوية",
+    "tableLabel": "شرائح الأسعار",
+    "colUsers": "المستخدمون",
+    "colPricePerUser": "السعر لكل مستخدم",
+    "rangeOpen": "{{min}} فأكثر",
+    "notConfigured": "لم تُحدَّد الأسعار لهذه الدورة.",
+    "bracketNote": "يُحتسب كل مستخدم بسعر الشريحة التي يقع ضمنها."
+  }
+}

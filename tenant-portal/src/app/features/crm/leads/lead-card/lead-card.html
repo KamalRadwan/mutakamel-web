@@ -1,0 +1,95 @@
+<app-record-card
+  [title]="cardTitle()"
+  [subtitle]="cardSubtitle()"
+  [typeIcon]="cardTypeIcon()"
+  [typeTile]="cardTypeTile()"
+  [typeLabel]="'leads.profile.' + lead().leadProfileType | transloco"
+  [color]="lead().cardColor"
+  [rating]="lead().rating"
+  [ratingEditable]="true"
+  [dueBucket]="lead().nextActivity?.bucket ?? null"
+  [owner]="cardOwner()"
+  [actions]="actions()"
+  [actionsLabel]="'leads.card.actions' | transloco"
+  [viewLabel]="'leads.card.view' | transloco"
+  [detailed]="detailed()"
+  [(expanded)]="expanded"
+  (open)="view.emit()"
+  (rate)="rate.emit($event)"
+  (recolor)="recolor.emit($event)"
+  (action)="act($event)"
+  (due)="activities.emit()"
+>
+  <ng-container cardBadges>
+    @if (detailed() && stageName()) {
+      <span class="inline-flex h-badge w-fit items-center rounded-8 bg-brand-soft px-8 font-medium text-on-brand-soft">{{ stageName() }}</span>
+    }
+  </ng-container>
+
+  <ng-container cardBody>
+    @if (showDetails()) {
+      @if (isCorporate()) {
+        @if (lead().companyPhone; as phone) {
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.companyPhone' | transloco">
+              <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+            </span>
+            <app-phone-actions [phone]="phone" [crm]="true" [source]="phoneSource()" />
+          </div>
+        }
+        @if (lead().companyEmail; as email) {
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.companyEmail' | transloco">
+              <ng-icon name="tablerMail" size="14" aria-hidden="true" />
+            </span>
+            <span class="truncate">{{ email }}</span>
+          </div>
+        }
+        @if (lead().primaryContact?.phones?.[0]; as phone) {
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.contactPhone' | transloco">
+              <ng-icon name="tablerDeviceMobile" size="14" aria-hidden="true" />
+            </span>
+            <app-phone-actions [phone]="phone" [crm]="true" [source]="phoneSource()" />
+          </div>
+        }
+        @if (lead().primaryContact?.email; as email) {
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.contactEmail' | transloco">
+              <ng-icon name="tablerAt" size="14" aria-hidden="true" />
+            </span>
+            <span class="truncate">{{ email }}</span>
+          </div>
+        }
+      } @else {
+        @if (lead().primaryMobile; as phone) {
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.phone' | transloco">
+              <ng-icon name="tablerDeviceMobile" size="14" aria-hidden="true" />
+            </span>
+            <app-phone-actions [phone]="phone" [crm]="true" [source]="phoneSource()" />
+          </div>
+        }
+        @if (lead().email; as email) {
+          <div class="flex min-w-0 items-center gap-6">
+            <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.email' | transloco">
+              <ng-icon name="tablerMail" size="14" aria-hidden="true" />
+            </span>
+            <span class="truncate">{{ email }}</span>
+          </div>
+        }
+      }
+      @if (location(); as place) {
+        <div class="flex min-w-0 items-center gap-6">
+          <span class="inline-flex shrink-0 text-text-muted" [title]="'leads.details.location' | transloco">
+            <ng-icon name="tablerMapPin" size="14" aria-hidden="true" />
+          </span>
+          @if (place.flag; as code) {
+            <img [src]="'assets/flags/' + code.toLowerCase() + '.svg'" alt="" class="h-12 w-16 shrink-0 rounded-2 object-cover" />
+          }
+          <span class="truncate">{{ place.label }}</span>
+        </div>
+      }
+    }
+  </ng-container>
+</app-record-card>

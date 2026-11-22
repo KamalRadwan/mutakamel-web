@@ -1,0 +1,128 @@
+{
+  "actions": {
+    "open": "فتح"
+  },
+  "common": {
+    "rowActions": "إجراءات الصف",
+    "noResults": "لا توجد نتائج.",
+    "clearFilters": "مسح التصفية",
+    "retry": "إعادة المحاولة",
+    "pagination": "ترقيم الصفحات"
+  },
+  "outcomes": {
+    "SELECT": "اختيار"
+  },
+  "aggregateTypes": {
+    "INVENTORY_RESERVATION": "حجز",
+    "INVENTORY_RECEIPT": "إيصال استلام",
+    "INVENTORY_RECEIPT_LINE": "بند استلام",
+    "INVENTORY_DELIVERY": "إذن تسليم",
+    "INVENTORY_DELIVERY_LINE": "بند تسليم"
+  },
+  "explanations": {
+    "WITHIN_TOLERANCE": "الكمية المستلمة ضمن سماحية الاستلام الزائد المضبوطة.",
+    "PARTIAL_STOCK_AVAILABLE": "غطّى الرصيد المتاح جزءًا من الطلب، فاختير الحجز الجزئي.",
+    "INSUFFICIENT_AVAILABLE": "الرصيد المتاح غير كافٍ، فوُضعت الوحدات المتبقية كطلب مؤجل.",
+    "NEGATIVE_ALLOWED_FOR_STORE": "سمحت سياسة الرصيد السالب للمتجر بالترحيل دون الصفر.",
+    "SERIAL_COUNT_MATCHED": "طابق عدد الوحدات التسلسلية سماحية بند أمر الشراء.",
+    "SERIALIZED_NEGATIVE_FORBIDDEN": "لا يُسمح بدخول المنتجات ذات الأرقام التسلسلية في رصيد سالب.",
+    "FULL_RESERVATION_OK": "حُجزت الكمية المطلوبة كاملة من الرصيد المتاح.",
+    "OVER_RECEIPT_LIMIT_EXCEEDED": "تجاوزت كمية الاستلام الحد الأقصى لسماحية الاستلام الزائد فحُجبت.",
+    "RESERVATION_PARTIAL_ALLOWED": "يُسمح بالحجز الجزئي عند نقص الرصيد المتاح.",
+    "RESERVATION_BACKORDER_ALLOWED": "يُسمح بالطلب المؤجل عند نقص الرصيد المتاح.",
+    "NEGATIVE_STOCK_ALLOWED": "تسمح السياسة بالرصيد السالب.",
+    "OVER_RECEIPT_EXCEEDS_TOLERANCE": "تتجاوز الكمية المستلمة سماحية الاستلام الزائد المضبوطة."
+  },
+  "serials": {
+    "tableLabel": "الوحدات التسلسلية",
+    "searchPlaceholder": "امسح الرقم التسلسلي أو اكتبه",
+    "itemLabel": "الصنف",
+    "itemHint": "اعرض الأرقام التسلسلية لمنتج واحد.",
+    "steps": {
+      "label": "التصفية حسب الحالة",
+      "hint": "صفِّ الأرقام التسلسلية حسب الحالة",
+      "all": "الكل"
+    },
+    "cols": {
+      "serial": "الرقم التسلسلي",
+      "item": "الصنف",
+      "state": "الحالة",
+      "node": "الموقع",
+      "lastChange": "آخر تغيير",
+      "actions": "الإجراءات"
+    },
+    "actions": {
+      "copySerial": "نسخ الرقم التسلسلي"
+    },
+    "empty": {
+      "all": "لا توجد وحدات تسلسلية مسجلة بعد.",
+      "serial": "لا توجد وحدة بهذا الرقم التسلسلي."
+    }
+  },
+  "serialModal": {
+    "title": "وحدة تسلسلية",
+    "itemHint": "المنتج الذي ينتمي إليه هذا الرقم.",
+    "currentNode": "الموقع الحالي",
+    "currentNodeHint": "يكون فارغًا بعد خروج الوحدة من المخزون.",
+    "currentReservation": "الحجز الحالي",
+    "currentReservationHint": "الحجز الذي يحتجز هذه الوحدة، إن وُجد.",
+    "copyReservation": "نسخ معرّف الحجز",
+    "lastChange": "آخر تغيير",
+    "lastChangeHint": "وقت آخر تغيير في حالة هذه الوحدة التسلسلية.",
+    "lifecycle": "دورة الحياة",
+    "emptyLifecycle": "لا توجد أحداث مسجلة لدورة الحياة.",
+    "openMovement": "فتح الحركة",
+    "copyOperationKey": "نسخ مفتاح العملية",
+    "limitNote": "تُعرض أول 500 حدث."
+  },
+  "decisions": {
+    "tableLabel": "قرارات السياسات",
+    "searchPlaceholder": "ابحث بمعرّف السجل",
+    "invalidRecordId": "أدخل معرّف السجل كاملًا.",
+    "companyScope": "الشركة",
+    "steps": {
+      "label": "التصفية حسب السياسة",
+      "hint": "صفِّ القرارات حسب السياسة",
+      "all": "الكل",
+      "reservation": "نقص عند الحجز",
+      "negative": "رصيد سالب",
+      "overReceipt": "الاستلام الزائد"
+    },
+    "cols": {
+      "evaluated": "وقت التقييم",
+      "decision": "القرار",
+      "outcome": "النتيجة",
+      "explanation": "التفسير",
+      "record": "السجل",
+      "branch": "الفرع",
+      "actions": "الإجراءات"
+    },
+    "actions": {
+      "copyCorrelation": "نسخ معرّف الارتباط"
+    },
+    "empty": {
+      "all": "لا توجد قرارات سياسات مسجلة بعد."
+    }
+  },
+  "decisionModal": {
+    "title": "قرار السياسة",
+    "outcome": "النتيجة",
+    "outcomeHint": "ما قررته السياسة.",
+    "evaluatedAt": "وقت التقييم",
+    "evaluatedAtHint": "وقت تقييم السياسة.",
+    "explanation": "التفسير",
+    "explanationHint": "مترجَم من رمز التفسير، ويظهر النص الأصلي أسفله.",
+    "originalExplanation": "التفسير الأصلي من الخادم",
+    "matchedRules": "القواعد المطابقة",
+    "matchedRulesHint": "قواعد السياسة التي أنتجت هذه النتيجة.",
+    "policyVersions": "إصدارات السياسة",
+    "policyVersionsHint": "إصدار السياسة المنشور المستخدم بالضبط.",
+    "record": "السجل",
+    "recordHint": "سجل المخزون الذي يخصه هذا القرار.",
+    "copyRecord": "نسخ معرّف السجل",
+    "correlationId": "معرّف الارتباط",
+    "correlationIdHint": "قدّمه للدعم لتتبّع الطلب.",
+    "copyCorrelation": "نسخ معرّف الارتباط",
+    "noRecordPage": "لا توجد صفحة لهذا النوع من السجلات بعد."
+  }
+}

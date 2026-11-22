@@ -1,0 +1,12 @@
+{
+  "label": "السجلات المرتبطة",
+  "kinds": {
+    "leads": "عملاء محتملون مشابهون",
+    "opportunities": "الفرص",
+    "quotations": "عروض الأسعار",
+    "salesOrders": "أوامر البيع",
+    "invoices": "الفواتير"
+  },
+  "badgeAria": "{{label}}: {{count}}",
+  "unavailable": "هذه القائمة غير متاحة بعد."
+}

@@ -1,0 +1,9 @@
+@if (view(); as current) {
+  <div
+    role="status"
+    class="flex min-h-btn items-center gap-6 rounded-10 bg-brand-soft px-10 py-4 text-12 leading-18 text-on-brand-soft"
+  >
+    <ng-icon [name]="current.icon" size="14" class="shrink-0" aria-hidden="true" />
+    <span class="min-w-0">{{ current.key | transloco: current.params }}</span>
+  </div>
+}

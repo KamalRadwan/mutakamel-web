@@ -1,0 +1,266 @@
+<div class="flex flex-col gap-8">
+  @if (part() !== 'details') {
+    <ui-field
+      size="bare"
+      [label]="'customerForm.type.label' | transloco"
+      [for]="uid + '-type'"
+      [hint]="(mode() === 'create' ? 'customerForm.type.hint' : 'customerForm.type.lockedHint') | transloco"
+    >
+      <div
+        class="inline-flex self-start"
+        [attr.title]="mode() !== 'create' ? ('customerForm.type.lockedHint' | transloco) : null"
+      >
+        <ui-segmented
+          #typeSegmented
+          [id]="uid + '-type'"
+          [describedBy]="uid + '-type-hint'"
+          [label]="'customerForm.type.label' | transloco"
+          [options]="typeOptions()"
+          [value]="draft().profileType"
+          (valueChange)="onTypeChange($event)"
+        />
+      </div>
+    </ui-field>
+  }
+
+  @if (part() !== 'type' && draft().profileType === 'INDIVIDUAL') {
+    @if (layout() === 'page') {
+      <div [class]="pageGrid">
+        @let titleErr = errorText('honorificTitle', limits.honorificTitle);
+        <ui-field
+          size="bare"
+          [label]="'customerForm.identity.title' | transloco"
+          [for]="uid + '-title'"
+          [hint]="'customerForm.identity.titleHint' | transloco"
+          [count]="draft().honorificTitle.length"
+          [max]="limits.honorificTitle"
+          [error]="titleErr"
+        >
+          <ui-suggest-input
+            [value]="draft().honorificTitle"
+            (valueChange)="setHonorificTitle($event)"
+            [options]="allTitles()"
+            [maxLength]="limits.honorificTitle"
+            [inputId]="uid + '-title'"
+            [describedBy]="uid + '-title-hint'"
+            [label]="'customerForm.identity.title' | transloco"
+            [invalid]="!!titleErr"
+            [readonly]="readonly()"
+          />
+        </ui-field>
+
+        @let firstErr = errorText('firstName', limits.contactFirstName);
+        <ui-field
+          [label]="'customerForm.identity.firstName' | transloco"
+          [for]="uid + '-first-name'"
+          [hint]="'customerForm.identity.firstNameHint' | transloco"
+          [required]="true"
+          [count]="draft().firstName.length"
+          [max]="limits.contactFirstName"
+          [error]="firstErr"
+        >
+          <input
+            #firstNameInput
+            [id]="uid + '-first-name'"
+            type="text"
+            autocomplete="given-name"
+            aria-required="true"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [readonly]="readonly()"
+            [value]="draft().firstName"
+            [attr.aria-invalid]="firstErr ? 'true' : null"
+            (input)="setField('firstName', $event)"
+          />
+        </ui-field>
+
+        @let lastErr = errorText('lastName', limits.contactLastName);
+        <ui-field
+          [label]="'customerForm.identity.lastName' | transloco"
+          [for]="uid + '-last-name'"
+          [hint]="'customerForm.identity.lastNameHint' | transloco"
+          [count]="draft().lastName.length"
+          [max]="limits.contactLastName"
+          [error]="lastErr"
+        >
+          <input
+            #lastNameInput
+            [id]="uid + '-last-name'"
+            type="text"
+            autocomplete="family-name"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [readonly]="readonly()"
+            [value]="draft().lastName"
+            [attr.aria-invalid]="lastErr ? 'true' : null"
+            (input)="setField('lastName', $event)"
+          />
+        </ui-field>
+
+        <div class="col-span-2 desktop:col-span-1">
+          <app-phone-list
+            [phones]="phones()"
+            (phonesChange)="onPhonesChange($event)"
+            [countries]="countries()"
+            [max]="limits.phonesMax"
+            [maxLength]="limits.phoneMax"
+            [readonly]="readonly()"
+            [label]="'customerForm.reach.mobile' | transloco"
+            [hint]="'customerForm.reach.mobileHint' | transloco"
+            [addLabel]="'customerForm.reach.addPhone' | transloco"
+            [removeLabel]="'customerForm.reach.removePhone' | transloco"
+            [idPrefix]="uid + '-phone'"
+            [errors]="phoneErrors()"
+            [crm]="crm()"
+            [source]="source()"
+          />
+        </div>
+
+        @let mailErr = emailError();
+        <ui-field
+          [label]="'customerForm.reach.email' | transloco"
+          [for]="uid + '-email'"
+          [hint]="'customerForm.reach.emailHint' | transloco"
+          [count]="draft().email.length"
+          [max]="limits.email"
+          [error]="mailErr"
+        >
+          <input
+            [id]="uid + '-email'"
+            type="email"
+            dir="ltr"
+            autocomplete="email"
+            class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+            [readonly]="readonly()"
+            [value]="draft().email"
+            [attr.aria-invalid]="mailErr ? 'true' : null"
+            (input)="setField('email', $event)"
+          />
+        </ui-field>
+      </div>
+    } @else {
+      <div class="flex flex-col gap-8">
+        <div class="grid grid-cols-3 items-start gap-x-10 gap-y-8">
+          @let titleErr = errorText('honorificTitle', limits.honorificTitle);
+          <ui-field
+            size="bare"
+            [label]="'customerForm.identity.title' | transloco"
+            [for]="uid + '-title'"
+            [hint]="'customerForm.identity.titleHint' | transloco"
+            [count]="draft().honorificTitle.length"
+            [max]="limits.honorificTitle"
+            [error]="titleErr"
+          >
+            <ui-suggest-input
+              [value]="draft().honorificTitle"
+              (valueChange)="setHonorificTitle($event)"
+              [options]="allTitles()"
+              [maxLength]="limits.honorificTitle"
+              [inputId]="uid + '-title'"
+              [describedBy]="uid + '-title-hint'"
+              [label]="'customerForm.identity.title' | transloco"
+              [invalid]="!!titleErr"
+              [readonly]="readonly()"
+            />
+          </ui-field>
+
+          @let firstErr = errorText('firstName', limits.contactFirstName);
+          <ui-field
+            [label]="'customerForm.identity.firstName' | transloco"
+            [for]="uid + '-first-name'"
+            [hint]="'customerForm.identity.firstNameHint' | transloco"
+            [required]="true"
+            [count]="draft().firstName.length"
+            [max]="limits.contactFirstName"
+            [error]="firstErr"
+          >
+            <input
+              #firstNameInput
+              [id]="uid + '-first-name'"
+              type="text"
+              autocomplete="given-name"
+              aria-required="true"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().firstName"
+              [attr.aria-invalid]="firstErr ? 'true' : null"
+              (input)="setField('firstName', $event)"
+            />
+          </ui-field>
+
+          @let lastErr = errorText('lastName', limits.contactLastName);
+          <ui-field
+            [label]="'customerForm.identity.lastName' | transloco"
+            [for]="uid + '-last-name'"
+            [hint]="'customerForm.identity.lastNameHint' | transloco"
+            [count]="draft().lastName.length"
+            [max]="limits.contactLastName"
+            [error]="lastErr"
+          >
+            <input
+              #lastNameInput
+              [id]="uid + '-last-name'"
+              type="text"
+              autocomplete="family-name"
+              class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().lastName"
+              [attr.aria-invalid]="lastErr ? 'true' : null"
+              (input)="setField('lastName', $event)"
+            />
+          </ui-field>
+        </div>
+
+        <div class="grid grid-cols-2 items-start gap-x-10 gap-y-8">
+          <app-phone-list
+            [phones]="phones()"
+            (phonesChange)="onPhonesChange($event)"
+            [countries]="countries()"
+            [max]="limits.phonesMax"
+            [maxLength]="limits.phoneMax"
+            [readonly]="readonly()"
+            [label]="'customerForm.reach.mobile' | transloco"
+            [hint]="'customerForm.reach.mobileHint' | transloco"
+            [addLabel]="'customerForm.reach.addPhone' | transloco"
+            [removeLabel]="'customerForm.reach.removePhone' | transloco"
+            [idPrefix]="uid + '-phone'"
+            [errors]="phoneErrors()"
+            [crm]="crm()"
+            [source]="source()"
+          />
+
+          @let mailErr = emailError();
+          <ui-field
+            [label]="'customerForm.reach.email' | transloco"
+            [for]="uid + '-email'"
+            [hint]="'customerForm.reach.emailHint' | transloco"
+            [count]="draft().email.length"
+            [max]="limits.email"
+            [error]="mailErr"
+          >
+            <input
+              [id]="uid + '-email'"
+              type="email"
+              dir="ltr"
+              autocomplete="email"
+              class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+              [readonly]="readonly()"
+              [value]="draft().email"
+              [attr.aria-invalid]="mailErr ? 'true' : null"
+              (input)="setField('email', $event)"
+            />
+          </ui-field>
+        </div>
+      </div>
+    }
+  }
+</div>
+
+<div #switchTypeWrap (keydown.escape)="onSwitchTypeEscape($event)" (cancel)="onSwitchTypeEscape($event)">
+  <ui-confirm-dialog
+    #switchTypeDialog
+    tone="warning"
+    [title]="'customerForm.type.switchTitle' | transloco"
+    [text]="'customerForm.type.switchText' | transloco"
+    [confirmLabel]="'customerForm.type.switchConfirm' | transloco"
+    [cancelLabel]="'customerForm.type.switchCancel' | transloco"
+  />
+</div>

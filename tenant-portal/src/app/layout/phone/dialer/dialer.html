@@ -1,0 +1,175 @@
+@if (!addingParty()) {
+  <app-keypad (pressed)="phone.pressKey($event)" />
+
+  @if (inCall()) {
+    @if (isActive()) {
+      @if (leg(); as current) {
+        <div class="grid shrink-0 grid-cols-3 gap-6">
+          <button
+            type="button"
+            data-call-control
+            class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 px-6 text-12 leading-18 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class]="
+              current.held
+                ? 'bg-warning text-on-warning'
+                : 'border border-border bg-surface-muted text-text hover:bg-row-hover'
+            "
+            [attr.aria-pressed]="current.held"
+            (click)="phone.toggleHold()"
+          >
+            <ng-icon [name]="current.held ? 'tablerPlayerPlay' : 'tablerPlayerPause'" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ (current.held ? 'webPhone.inCall.resume' : 'webPhone.inCall.hold') | transloco }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 bg-icon-violet px-6 text-12 leading-18 font-medium text-on-icon outline-none transition-colors duration-fast hover:bg-icon-violet-hover active:bg-icon-violet-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="openTransfer.emit()"
+          >
+            <ng-icon name="tablerArrowsExchange" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'webPhone.inCall.transfer' | transloco }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            (click)="openAddParty()"
+          >
+            <ng-icon name="tablerUsersPlus" size="15" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ 'webPhone.inCall.add' | transloco }}</span>
+          </button>
+        </div>
+      }
+    }
+
+    <button
+      type="button"
+      data-call-control
+      class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 bg-danger px-10 text-12 leading-18 font-medium text-on-danger outline-none transition-colors duration-fast hover:bg-danger-hover active:bg-danger-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="phone.hangup()"
+    >
+      <ng-icon name="tablerPhoneEnd" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.inCall.hangup' | transloco }}</span>
+    </button>
+  } @else {
+    <button
+      type="button"
+      class="inline-flex h-table-head w-full shrink-0 cursor-pointer items-center justify-center gap-6 rounded-10 px-10 text-12 leading-18 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+      [class]="
+        !callDisabled()
+          ? 'bg-success text-on-success hover:bg-success-hover active:bg-success-pressed'
+          : 'bg-neutral-soft text-text-muted'
+      "
+      [disabled]="callDisabled()"
+      [attr.title]="micBlockReasonKey() ? (micBlockReasonKey()! | transloco) : null"
+      (click)="phone.call()"
+    >
+      <ng-icon name="tablerPhone" size="15" aria-hidden="true" />
+      <span>{{ 'webPhone.dialer.call' | transloco }}</span>
+    </button>
+  }
+} @else {
+  <ui-field
+    class="shrink-0"
+    for="phone-add-party-input"
+    [label]="'webPhone.inCall.addPerson' | transloco"
+    [hint]="'webPhone.inCall.addPersonHint' | transloco"
+    [bare]="true"
+  >
+    <div
+      class="flex h-table-head items-center gap-2 rounded-10 border border-border bg-surface-muted ps-10 pe-4 transition-colors duration-fast focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
+    >
+      <input
+        id="phone-add-party-input"
+        type="text"
+        inputmode="tel"
+        dir="ltr"
+        class="min-w-0 flex-1 bg-transparent text-start text-16 leading-22 font-medium text-text tabular-nums outline-none placeholder:text-12 placeholder:font-normal placeholder:text-text-placeholder"
+        [placeholder]="'webPhone.dialer.enterNumber' | transloco"
+        [value]="partyNumber()"
+        (input)="onPartyInput($event)"
+        (keydown.enter)="submitAddParty()"
+      />
+      <button
+        type="button"
+        class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+        [disabled]="!partyNumber()"
+        [attr.aria-label]="'webPhone.dialer.deleteDigit' | transloco"
+        [title]="'webPhone.dialer.deleteDigit' | transloco"
+        (click)="deletePartyKey()"
+      >
+        <ng-icon name="tablerBackspace" size="15" aria-hidden="true" />
+      </button>
+    </div>
+  </ui-field>
+
+  <app-keypad (pressed)="pressPartyKey($event)" />
+
+  <div class="grid shrink-0 grid-cols-2 gap-6">
+    <button
+      type="button"
+      class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 border border-border bg-surface-muted px-6 text-12 leading-18 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="addingParty.set(false)"
+    >
+      <span class="truncate">{{ 'webPhone.common.cancel' | transloco }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex h-table-head min-w-0 cursor-pointer items-center justify-center gap-6 rounded-10 px-6 text-12 leading-18 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+      [class]="
+        partyNumber().trim()
+          ? 'bg-success text-on-success hover:bg-success-hover active:bg-success-pressed'
+          : 'bg-neutral-soft text-text-muted'
+      "
+      [disabled]="!partyNumber().trim()"
+      (click)="submitAddParty()"
+    >
+      <ng-icon name="tablerPhone" size="15" class="shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ 'webPhone.dialer.call' | transloco }}</span>
+    </button>
+  </div>
+}
+
+<div class="flex shrink-0 flex-col gap-6">
+  <app-audio-row kind="speaker" />
+  <app-audio-row kind="mic" />
+</div>
+
+@if (!inCall()) {
+  <div class="grid shrink-0 grid-cols-2 gap-6">
+    <button
+      type="button"
+      class="inline-flex h-btn min-w-0 cursor-pointer items-center justify-center gap-4 rounded-8 border px-8 text-11 leading-16 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        phone.prefs().autoAnswer
+          ? 'border-brand bg-brand text-on-brand'
+          : 'border-border bg-surface-muted text-text-muted hover:bg-row-hover hover:text-text'
+      "
+      [attr.aria-pressed]="phone.prefs().autoAnswer"
+      [title]="'webPhone.dialer.autoAnswerHint' | transloco"
+      (click)="phone.setPref('autoAnswer', !phone.prefs().autoAnswer)"
+    >
+      <span class="shrink-0">AA</span>
+      <span class="truncate">· {{ 'webPhone.dialer.autoAnswer' | transloco }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex h-btn min-w-0 cursor-pointer items-center justify-center gap-4 rounded-8 border px-8 text-11 leading-16 font-medium outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [class]="
+        phone.prefs().dnd
+          ? 'border-brand bg-brand text-on-brand'
+          : 'border-border bg-surface-muted text-text-muted hover:bg-row-hover hover:text-text'
+      "
+      [attr.aria-pressed]="phone.prefs().dnd"
+      [title]="'webPhone.dialer.dndHint' | transloco"
+      (click)="phone.setPref('dnd', !phone.prefs().dnd)"
+    >
+      <span class="shrink-0">DND</span>
+      <span class="truncate">· {{ 'webPhone.dialer.dnd' | transloco }}</span>
+    </button>
+  </div>
+}
+
+<app-status-line />

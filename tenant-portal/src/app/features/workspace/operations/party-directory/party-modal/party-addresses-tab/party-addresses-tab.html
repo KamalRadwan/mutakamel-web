@@ -1,0 +1,421 @@
+<div class="min-h-0 flex-1 overflow-y-auto p-10">
+  <div class="mb-8 flex items-center justify-between gap-8">
+    <p class="text-11 leading-16 text-text-muted">
+      <bdi dir="ltr">{{ addresses().length }}</bdi> / <bdi dir="ltr">{{ maxAddresses() }}</bdi>
+      <span class="sr-only">
+        {{ 'wsPartyModal.counter' | transloco: { count: addresses().length, max: maxAddresses() } }}
+      </span>
+    </p>
+
+    @if (!readonly() && editingKey() !== 'new' && addresses().length > 0) {
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [disabled]="saving() || atLimit()"
+        [attr.title]="atLimit() ? ('wsPartyModal.addresses.limitReached' | transloco) : null"
+        (click)="startAdd()"
+      >
+        <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+        <span>{{ 'wsPartyModal.addresses.add' | transloco }}</span>
+      </button>
+    }
+  </div>
+
+  @if (addresses().length === 0 && editingKey() !== 'new') {
+    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+        aria-hidden="true"
+      >
+        <ng-icon name="tablerMapPin" size="18" />
+      </span>
+      <p class="text-12 text-text-muted">{{ 'wsPartyModal.addresses.empty' | transloco }}</p>
+      @if (!readonly()) {
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          size="small"
+          [disabled]="saving() || atLimit()"
+          [attr.title]="atLimit() ? ('wsPartyModal.addresses.limitReached' | transloco) : null"
+          (click)="startAdd()"
+        >
+          <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
+          <span>{{ 'wsPartyModal.addresses.add' | transloco }}</span>
+        </button>
+      }
+    </div>
+  } @else {
+    <div class="flex flex-col gap-8">
+      @for (item of addresses(); track item.id) {
+        @if (editingKey() === item.id) {
+          <ng-container
+            *ngTemplateOutlet="addressFormCard; context: { titleKey: 'wsPartyModal.addresses.editTitle', prefix: 'edit' }"
+          />
+        } @else {
+          <article class="flex items-center justify-between gap-8 rounded-10 border border-border bg-surface px-8 py-6 shadow-card">
+            <div class="flex min-w-0 flex-1 items-center gap-8">
+              <span
+                class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon"
+                aria-hidden="true"
+              >
+                <ng-icon name="tablerMapPin" size="14" />
+              </span>
+
+              <div class="min-w-0 flex-1">
+                <p dir="auto" class="truncate text-13 leading-18 font-medium text-text">
+                  {{ formatOneLine(item) }}
+                </p>
+                <p class="truncate text-12 leading-18 text-text-muted">
+                  <span>{{ 'wsParty.addressTypes.' + item.addressType | transloco }}</span>
+                  @if (item.label) {
+                    <span> · {{ item.label }}</span>
+                  }
+                </p>
+              </div>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-6">
+              @if (item.isPrimary) {
+                <span class="inline-flex h-badge items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft whitespace-nowrap">
+                  <ng-icon name="tablerStarFill" size="12" class="text-warning-text" aria-hidden="true" />
+                  <span>{{ 'wsPartyModal.common.primary' | transloco }}</span>
+                </span>
+              } @else if (!readonly()) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="ghost"
+                  size="small"
+                  [loading]="busyRowId() === item.id"
+                  [disabled]="saving()"
+                  (click)="makePrimary(item)"
+                >
+                  <ng-icon name="tablerStar" size="14" aria-hidden="true" />
+                  <span>{{ 'wsPartyModal.common.makePrimary' | transloco }}</span>
+                </button>
+              }
+
+              @if (!readonly()) {
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                  [disabled]="saving()"
+                  [attr.aria-label]="'wsPartyModal.common.edit' | transloco"
+                  [title]="'wsPartyModal.common.edit' | transloco"
+                  (click)="startEdit(item)"
+                >
+                  <ng-icon name="tablerPencil" size="14" aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-danger-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+                  [disabled]="saving()"
+                  [attr.aria-label]="'wsPartyModal.common.delete' | transloco"
+                  [title]="'wsPartyModal.common.delete' | transloco"
+                  (click)="remove(item)"
+                >
+                  <ng-icon name="tablerTrash" size="14" aria-hidden="true" />
+                </button>
+              }
+            </div>
+          </article>
+        }
+      }
+
+      @if (editingKey() === 'new') {
+        <ng-container
+          *ngTemplateOutlet="addressFormCard; context: { titleKey: 'wsPartyModal.addresses.newTitle', prefix: 'new' }"
+        />
+      }
+    </div>
+  }
+</div>
+
+<ng-template #addressFormCard let-titleKey="titleKey" let-prefix="prefix">
+  <article class="flex flex-col gap-8 rounded-10 border border-brand bg-surface p-8 shadow-card">
+    <div class="flex items-center justify-between gap-8">
+      <span class="text-12 leading-18 font-medium text-text">
+        {{ titleKey | transloco }}
+      </span>
+      <div class="flex items-center gap-6">
+        <button
+          type="submit"
+          [attr.form]="uid + '-form'"
+          uiButton
+          variant="primary"
+          size="small"
+          [loading]="addressForm().submitting()"
+          [disabled]="saving()"
+        >
+          <ng-icon name="tablerCheck" size="14" aria-hidden="true" />
+          <span>{{ 'wsPartyModal.common.save' | transloco }}</span>
+        </button>
+        <button
+          type="button"
+          class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed"
+          [disabled]="saving()"
+          [attr.aria-label]="'wsPartyModal.common.cancel' | transloco"
+          [title]="'wsPartyModal.common.cancel' | transloco"
+          (click)="cancelEdit()"
+        >
+          <ng-icon name="tablerX" size="14" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <form [id]="uid + '-form'" class="grid grid-cols-2 items-start gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+      <ui-field
+        size="bare"
+        [for]="uid + '-' + prefix + '-addr-type'"
+        [label]="'wsPartyModal.addresses.type' | transloco"
+        [hint]="'wsPartyModal.addresses.typeHint' | transloco"
+        [required]="true"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-' + prefix + '-addr-type'"
+          [describedBy]="uid + '-' + prefix + '-addr-type-hint'"
+          [options]="typeOptions()"
+          [value]="addressType()"
+          [label]="'wsPartyModal.addresses.type' | transloco"
+          [disabled]="saving()"
+          (valueChange)="addressType.set($event)"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-' + prefix + '-addr-label'"
+        [label]="'wsPartyModal.addresses.label' | transloco"
+        [hint]="'wsPartyModal.addresses.labelHint' | transloco"
+        [count]="addressForm.label().value().length"
+        [max]="limits.addressLabel"
+        [error]="maxErr(addressForm.label(), limits.addressLabel)"
+      >
+        <input
+          [id]="uid + '-' + prefix + '-addr-label'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="addressForm.label"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="maxErr(addressForm.label(), limits.addressLabel) ? 'true' : null"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-' + prefix + '-addr-country'"
+        [label]="'wsPartyModal.addresses.country' | transloco"
+        [hint]="'wsPartyModal.addresses.countryHint' | transloco"
+        [count]="addressForm.country().value().length"
+        [max]="limits.country"
+        [error]="maxErr(addressForm.country(), limits.country)"
+      >
+        <input
+          [id]="uid + '-' + prefix + '-addr-country'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="addressForm.country"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="maxErr(addressForm.country(), limits.country) ? 'true' : null"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-' + prefix + '-addr-city'"
+        [label]="'wsPartyModal.addresses.city' | transloco"
+        [hint]="'wsPartyModal.addresses.cityHint' | transloco"
+        [count]="addressForm.city().value().length"
+        [max]="limits.city"
+        [error]="maxErr(addressForm.city(), limits.city)"
+      >
+        <input
+          [id]="uid + '-' + prefix + '-addr-city'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="addressForm.city"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="maxErr(addressForm.city(), limits.city) ? 'true' : null"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-' + prefix + '-addr-area'"
+        [label]="'wsPartyModal.addresses.area' | transloco"
+        [hint]="'wsPartyModal.addresses.areaHint' | transloco"
+        [count]="addressForm.area().value().length"
+        [max]="limits.area"
+        [error]="maxErr(addressForm.area(), limits.area)"
+      >
+        <input
+          [id]="uid + '-' + prefix + '-addr-area'"
+          type="text"
+          dir="auto"
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+          [formField]="addressForm.area"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="maxErr(addressForm.area(), limits.area) ? 'true' : null"
+        />
+      </ui-field>
+
+      <ui-field
+        [for]="uid + '-' + prefix + '-addr-postal'"
+        [label]="'wsPartyModal.addresses.postalCode' | transloco"
+        [hint]="'wsPartyModal.addresses.postalCodeHint' | transloco"
+        [count]="addressForm.postalCode().value().length"
+        [max]="limits.postalCode"
+        [error]="maxErr(addressForm.postalCode(), limits.postalCode)"
+      >
+        <input
+          [id]="uid + '-' + prefix + '-addr-postal'"
+          type="text"
+          dir="ltr"
+          class="min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+          [formField]="addressForm.postalCode"
+          [readOnly]="saving()"
+          [attr.aria-invalid]="maxErr(addressForm.postalCode(), limits.postalCode) ? 'true' : null"
+        />
+      </ui-field>
+
+      <div class="col-span-2">
+        <ui-field
+          [for]="uid + '-' + prefix + '-addr-street'"
+          [label]="'wsPartyModal.addresses.street' | transloco"
+          [hint]="'wsPartyModal.addresses.streetHint' | transloco"
+          [count]="addressForm.street().value().length"
+          [max]="limits.street"
+          [error]="maxErr(addressForm.street(), limits.street)"
+        >
+          <input
+            [id]="uid + '-' + prefix + '-addr-street'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [formField]="addressForm.street"
+            [readOnly]="saving()"
+            [attr.aria-invalid]="maxErr(addressForm.street(), limits.street) ? 'true' : null"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2 grid grid-cols-3 gap-x-10 gap-y-8">
+        <ui-field
+          [for]="uid + '-' + prefix + '-addr-building'"
+          [label]="'wsPartyModal.addresses.buildingNo' | transloco"
+          [hint]="'wsPartyModal.addresses.buildingNoHint' | transloco"
+          [count]="addressForm.buildingNo().value().length"
+          [max]="limits.buildingNo"
+          [error]="maxErr(addressForm.buildingNo(), limits.buildingNo)"
+        >
+          <input
+            [id]="uid + '-' + prefix + '-addr-building'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [formField]="addressForm.buildingNo"
+            [readOnly]="saving()"
+            [attr.aria-invalid]="maxErr(addressForm.buildingNo(), limits.buildingNo) ? 'true' : null"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-' + prefix + '-addr-floor'"
+          [label]="'wsPartyModal.addresses.floor' | transloco"
+          [hint]="'wsPartyModal.addresses.floorHint' | transloco"
+          [count]="addressForm.floor().value().length"
+          [max]="limits.floor"
+          [error]="maxErr(addressForm.floor(), limits.floor)"
+        >
+          <input
+            [id]="uid + '-' + prefix + '-addr-floor'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [formField]="addressForm.floor"
+            [readOnly]="saving()"
+            [attr.aria-invalid]="maxErr(addressForm.floor(), limits.floor) ? 'true' : null"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-' + prefix + '-addr-apt'"
+          [label]="'wsPartyModal.addresses.apartment' | transloco"
+          [hint]="'wsPartyModal.addresses.apartmentHint' | transloco"
+          [count]="addressForm.apartment().value().length"
+          [max]="limits.apartment"
+          [error]="maxErr(addressForm.apartment(), limits.apartment)"
+        >
+          <input
+            [id]="uid + '-' + prefix + '-addr-apt'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [formField]="addressForm.apartment"
+            [readOnly]="saving()"
+            [attr.aria-invalid]="maxErr(addressForm.apartment(), limits.apartment) ? 'true' : null"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          [for]="uid + '-' + prefix + '-addr-landmark'"
+          [label]="'wsPartyModal.addresses.landmark' | transloco"
+          [hint]="'wsPartyModal.addresses.landmarkHint' | transloco"
+          [count]="addressForm.landmark().value().length"
+          [max]="limits.landmark"
+          [error]="maxErr(addressForm.landmark(), limits.landmark)"
+        >
+          <input
+            [id]="uid + '-' + prefix + '-addr-landmark'"
+            type="text"
+            dir="auto"
+            class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [formField]="addressForm.landmark"
+            [readOnly]="saving()"
+            [attr.aria-invalid]="maxErr(addressForm.landmark(), limits.landmark) ? 'true' : null"
+          />
+        </ui-field>
+      </div>
+
+      <div class="col-span-2">
+        <ui-field
+          size="bare"
+          [for]="uid + '-' + prefix + '-addr-primary'"
+          [label]="'wsPartyModal.addresses.isPrimary' | transloco"
+          [hint]="'wsPartyModal.addresses.isPrimaryHint' | transloco"
+        >
+          <div class="flex h-field items-center">
+            <ui-checkbox [(checked)]="isPrimary">
+              <span>{{ 'wsPartyModal.addresses.isPrimary' | transloco }}</span>
+            </ui-checkbox>
+          </div>
+        </ui-field>
+      </div>
+    </form>
+  </article>
+</ng-template>
+
+<ui-confirm-dialog
+  #deleteConfirm
+  tone="danger"
+  [title]="'wsPartyModal.addresses.deleteTitle' | transloco"
+  [text]="'wsPartyModal.addresses.deleteText' | transloco"
+  [confirmLabel]="'wsPartyModal.common.delete' | transloco"
+  [cancelLabel]="'wsPartyModal.common.cancel' | transloco"
+/>
+
+<ui-unsaved-dialog
+  #unsavedDialog
+  [title]="'wsPartyModal.unsaved.title' | transloco"
+  [text]="'wsPartyModal.unsaved.text' | transloco"
+  [saveLabel]="'wsPartyModal.common.save' | transloco"
+  [discardLabel]="'wsPartyModal.common.discard' | transloco"
+  [cancelLabel]="'wsPartyModal.common.cancel' | transloco"
+/>

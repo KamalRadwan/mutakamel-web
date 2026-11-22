@@ -1,0 +1,364 @@
+{
+  "types": {
+    "ALL": "الكل",
+    "QUOTATION": "عرض السعر",
+    "SALES_ORDER": "أمر البيع",
+    "PURCHASE_ORDER": "أمر الشراء"
+  },
+  "list": {
+    "title": "ملفات تعريف المستندات",
+    "newProfile": "ملف تعريف جديد",
+    "searchPlaceholder": "ابحث برمز ملف التعريف…",
+    "clearSearch": "مسح البحث",
+    "reload": "إعادة التحميل",
+    "stepFilterLabel": "تصفية حسب نوع المستند",
+    "stepFilterHint": "اعرض ملفات التعريف الخاصة بنوع المستند المختار فقط",
+    "tableLabel": "ملفات تعريف المستندات",
+    "paginationLabel": "ترقيم صفحات ملفات تعريف المستندات",
+    "columns": {
+      "code": "الرمز",
+      "documentType": "نوع المستند",
+      "liveVersion": "النسخة السارية",
+      "nextVersion": "النسخة التالية",
+      "versions": "النسخ",
+      "actions": "الإجراءات"
+    },
+    "liveVersion": "النسخة {{n}} · من {{date}}",
+    "startsOn": "يبدأ في {{date}}",
+    "versionShort": "v{{n}}",
+    "empty": "لا توجد ملفات تعريف مستندات بعد.",
+    "noMatches": "لا توجد ملفات تعريف تطابق عوامل التصفية.",
+    "clearFilters": "مسح التصفية",
+    "loadFailed": "تعذّر تحميل ملفات تعريف المستندات.",
+    "versionNotInScope": "هذه النسخة ليست ضمن النطاق الحالي.",
+    "actionsLabel": "إجراءات ملف التعريف",
+    "actions": {
+      "open": "فتح",
+      "newVersion": "نسخة جديدة"
+    }
+  },
+  "modal": {
+    "title": "ملف تعريف مستند جديد",
+    "create": "إنشاء",
+    "codeLabel": "الرمز",
+    "codePlaceholder": "DEFAULT",
+    "codeHint": "استخدم DEFAULT لملف التعريف الذي تستخدمه المستندات الجديدة.",
+    "codeRequired": "أدخل رمز ملف التعريف.",
+    "codeInvalid": "ابدأ بحرف إنجليزي كبير متبوعًا بأحرف إنجليزية كبيرة أو أرقام أو شرطات سفلية أو نقاط أو شرطات.",
+    "documentTypeLabel": "نوع المستند",
+    "documentTypeHint": "اختر عائلة المستندات التي يحكمها ملف التعريف هذا.",
+    "scopeLabel": "النطاق",
+    "scopeHint": "تُعرَّف ملفات التعريف على مستوى الشركة أو المستأجر وفق سياق العمل الحالي.",
+    "scopePair": "{{company}} · {{branch}}",
+    "branchScopeError": "تُضبط ملفات تعريف المستندات على مستوى الشركة أو المستأجر. بدّل النطاق إلى شركتك.",
+    "discardTitle": "تجاهل التغييرات؟",
+    "discardText": "ستُفقد بيانات ملف التعريف المُدخلة.",
+    "discardConfirm": "تجاهل"
+  },
+  "detail": {
+    "back": "العودة إلى ملفات تعريف المستندات",
+    "liveVersion": "السارية: النسخة {{n}}",
+    "noLiveVersion": "لا توجد نسخة سارية",
+    "newVersion": "نسخة جديدة",
+    "reload": "إعادة التحميل",
+    "loadFailed": "تعذّر تحميل ملف تعريف المستند.",
+    "versionsEmpty": "لا توجد نسخ بعد.",
+    "newVersionModal": {
+      "title": "نسخة ملف تعريف جديدة",
+      "continue": "متابعة",
+      "effectiveFrom": "يسري من",
+      "effectiveFromHint": "التاريخ والوقت بنظام 24 ساعة لبدء سريان هذه النسخة.",
+      "effectiveTo": "يسري حتى",
+      "effectiveToHint": "تاريخ ووقت انتهاء اختياريان؛ اتركه فارغًا لنسخة مفتوحة المدة.",
+      "clearEnd": "مسح تاريخ الانتهاء",
+      "startFrom": "البدء من",
+      "startFromHint": "انسخ إعدادات النسخة السارية الحالية أو ابدأ من الإعدادات الافتراضية للعائلة.",
+      "startFromLive": "النسخة السارية",
+      "startFromEmpty": "ملف تعريف فارغ",
+      "noLiveHint": "لا توجد نسخة سارية منشورة بعد، لذا سيبدأ الإنشاء من الملف الافتراضي للعائلة.",
+      "dateRequired": "اختر تاريخ البدء ووقته.",
+      "invalidDate": "أدخل تاريخًا ووقتًا صالحين.",
+      "endAfterStart": "يجب أن يكون تاريخ الانتهاء ووقته بعد البدء.",
+      "today": "اليوم",
+      "prevMonth": "الشهر السابق",
+      "nextMonth": "الشهر التالي",
+      "hour": "الساعة",
+      "minute": "الدقائق"
+    },
+    "deleteDraft": {
+      "title": "حذف نسخة المسودة {{n}}؟",
+      "text": "ستُحذف نسخة المسودة وقواعدها نهائيًا.",
+      "confirm": "حذف المسودة"
+    }
+  },
+  "version": {
+    "back": "العودة إلى ملف التعريف",
+    "versionLabel": "النسخة {{n}}",
+    "newVersionTitle": "نسخة جديدة",
+    "createVersion": "إنشاء النسخة",
+    "validate": "تحقق",
+    "publish": "نشر",
+    "schedule": "جدولة",
+    "loadFailed": "تعذّر تحميل نسخة ملف التعريف.",
+    "lifecycleLabel": "دورة حياة النسخة",
+    "tabsLabel": "أقسام نسخة ملف التعريف",
+    "goesLive": "يسري من {{date}}",
+    "liveSince": "سارٍ منذ {{date}}",
+    "replacedRange": "مستبدلة · {{range}}",
+    "datesCardLabel": "جدول السريان",
+    "discardTitle": "تجاهل النسخة الجديدة؟",
+    "discardText": "ستُفقد تعديلاتك على نسخة ملف التعريف الجديدة.",
+    "discardConfirm": "تجاهل",
+    "effectiveFrom": "يسري من",
+    "effectiveFromHint": "التاريخ والوقت بنظام 24 ساعة لتفعيل هذه النسخة.",
+    "effectiveTo": "يسري حتى",
+    "effectiveToHint": "تاريخ ووقت انتهاء اختياريان؛ اتركه فارغًا لنسخة مفتوحة المدة.",
+    "clearEnd": "مسح تاريخ الانتهاء",
+    "dateRequired": "اختر تاريخ البدء ووقته.",
+    "invalidDate": "أدخل تاريخًا ووقتًا صالحين.",
+    "endAfterStart": "يجب أن يكون تاريخ الانتهاء ووقته بعد البدء.",
+    "today": "اليوم",
+    "prevMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "hour": "الساعة",
+    "minute": "الدقائق"
+  },
+  "stepper": {
+    "draft": "مسودة",
+    "tested": "مختبرة",
+    "publishedOrScheduled": "منشورة أو مجدولة",
+    "replaced": "مستبدلة"
+  },
+  "tabs": {
+    "fields": "الحقول",
+    "layout": "التخطيط",
+    "behaviour": "السلوك",
+    "evidence": "الأدلة",
+    "cases": "الحالات"
+  },
+  "fields": {
+    "tableLabel": "حقول المستند",
+    "columns": {
+      "field": "الحقل",
+      "kind": "النوع",
+      "visible": "ظاهر",
+      "required": "مطلوب",
+      "note": "ملاحظة",
+      "visibleHint": "أظهر هذا الحقل أو أخفِه في المستندات التي تستخدم هذا الملف.",
+      "requiredHint": "اشترط إدخال قيمة لهذا الحقل قبل حفظ المستند."
+    },
+    "kind": {
+      "editable": "قابل للتعديل",
+      "serverOwned": "يحدده النظام"
+    },
+    "alwaysRequired": {
+      "QUOTATION": "مطلوب دائمًا في عروض الأسعار",
+      "SALES_ORDER": "مطلوب دائمًا في أوامر البيع",
+      "PURCHASE_ORDER": "مطلوب دائمًا في أوامر الشراء"
+    },
+    "serverOwnedNote": "للعرض فقط؛ يملؤه النظام",
+    "visibleAria": "إظهار {{field}}",
+    "requiredAria": "إلزامية {{field}}"
+  },
+  "layout": {
+    "tableLabel": "مكونات تخطيط المستند",
+    "dragHandle": "إعادة ترتيب المكون",
+    "alwaysVisible": "ظاهر دائمًا",
+    "columns": {
+      "drag": "ترتيب",
+      "order": "الترتيب",
+      "component": "المكون",
+      "visible": "ظاهر",
+      "note": "ملاحظة",
+      "actions": "الإجراءات",
+      "visibleHint": "أظهر هذا المكوّن أو أخفِه في تخطيط المستند."
+    },
+    "actions": {
+      "menuLabel": "إجراءات ترتيب المكون",
+      "moveUp": "تحريك لأعلى",
+      "moveDown": "تحريك لأسفل"
+    },
+    "visibleAria": "إظهار {{component}}"
+  },
+  "behaviour": {
+    "sectionLabel": "أوضاع سلوك المستند",
+    "lockedNote": "مثبّت من النظام لعائلة المستندات هذه."
+  },
+  "evidence": {
+    "tableLabel": "سجلات الأدلة المطلوبة",
+    "columns": {
+      "evidence": "الدليل",
+      "include": "تضمين",
+      "required": "مطلوب",
+      "includeHint": "ضمّن نوع الإثبات هذا في المستندات التي تستخدم هذا الملف.",
+      "requiredHint": "اشترط هذا الإثبات قبل أن يتقدم المستند. يتاح فقط عند تضمين الإثبات."
+    },
+    "includeAria": "تضمين {{evidence}}",
+    "requiredAria": "إلزامية {{evidence}}"
+  },
+  "cases": {
+    "systemTitle": "حالات التحقق النظامية",
+    "systemTableLabel": "حالات التحقق النظامية",
+    "systemBadge": "نظام",
+    "customTitle": "حالات التحقق المخصصة",
+    "customTableLabel": "حالات التحقق المخصصة",
+    "addCase": "إضافة حالة",
+    "limitReached": "تم بلوغ الحد الأقصى البالغ 20 حالة مخصصة.",
+    "emptyCustom": "لا توجد حالات تحقق مخصصة بعد.",
+    "pass": "ناجح",
+    "fail": "فاشل",
+    "moreFields": "+{{count}}",
+    "columns": {
+      "case": "الحالة",
+      "kind": "النوع",
+      "result": "النتيجة",
+      "code": "الرمز",
+      "inputFields": "الحقول المدخلة",
+      "shouldBeValid": "ينبغي أن يكون صالحًا",
+      "actions": "الإجراءات"
+    },
+    "actions": {
+      "menuLabel": "إجراءات الحالة",
+      "edit": "تعديل",
+      "delete": "حذف"
+    },
+    "modal": {
+      "addTitle": "إضافة حالة تحقق",
+      "editTitle": "تعديل حالة التحقق",
+      "add": "إضافة",
+      "save": "حفظ",
+      "codeLabel": "الرمز",
+      "codeHint": "معرّف فريد بأحرف إنجليزية كبيرة مثل QUOTATION_MINIMUM_INPUTS.",
+      "codePlaceholder": "MINIMUM_INPUTS",
+      "codeRequired": "أدخل رمز الحالة.",
+      "codeInvalid": "ابدأ بحرف إنجليزي كبير متبوعًا بأحرف إنجليزية كبيرة أو أرقام أو شرطات سفلية أو نقاط أو شرطات.",
+      "codeDuplicate": "توجد حالة بهذا الرمز بالفعل.",
+      "inputFieldsLabel": "الحقول المدخلة",
+      "inputFieldsHint": "اختر الحقول المقدمة في سيناريو التحقق هذا.",
+      "shouldBeValidLabel": "ينبغي أن يكون صالحًا",
+      "shouldBeValidHint": "حدّد ما إذا كان المستند بهذه الحقول المدخلة ينبغي أن يجتاز التحقق."
+    }
+  },
+  "publishModal": {
+    "title": "نشر النسخة {{n}}؟",
+    "scheduledWithLive": "يبدأ في {{date}}، لذا ستُجدوَل. تبقى النسخة {{live}} سارية حتى ذلك الحين.",
+    "scheduledNoLive": "يبدأ في {{date}}، لذا ستُجدوَل.",
+    "liveWithLive": "يسري الآن ويحل محل النسخة {{live}}.",
+    "liveNoLive": "يسري فورًا.",
+    "makerCheckerAuthor": "يجب أن ينشرها شخص آخر: أنشأت {{author}} هذه النسخة.",
+    "schedule": "جدولة",
+    "publish": "نشر"
+  },
+  "actions": {
+    "validate": "تحقق"
+  },
+  "toasts": {
+    "profileCreated": "تم إنشاء ملف التعريف {{code}}.",
+    "versionCreated": "تم إنشاء النسخة {{n}} كمسودة.",
+    "draftDeleted": "تم حذف نسخة المسودة {{n}}.",
+    "validated": "نجح التحقق. أصبحت النسخة مختبرة الآن.",
+    "validationFailedOne": "فشلت حالة واحدة.",
+    "validationFailed": "فشلت {{count}} حالات.",
+    "published": "تم نشر النسخة {{n}}.",
+    "scheduled": "تمت جدولة النسخة {{n}}."
+  },
+  "errors": {
+    "generic": "حدث خطأ ما، فحاول مرة أخرى."
+  },
+  "registry": {
+    "fields": {
+      "customerAccountId": "العميل",
+      "supplierAccountId": "المورد",
+      "contactPartyId": "جهة الاتصال",
+      "currencyCode": "العملة",
+      "validUntil": "صالح حتى",
+      "orderDate": "تاريخ الأمر",
+      "requestedDeliveryDate": "تاريخ التسليم المطلوب",
+      "expectedReceiptDate": "تاريخ الاستلام المتوقع",
+      "paymentTermsId": "الشروط",
+      "branchId": "الفرع",
+      "channelId": "القناة",
+      "externalReference": "المرجع الخارجي",
+      "notes": "الملاحظات",
+      "documentNumber": "رقم المستند",
+      "grandTotal": "الإجمالي",
+      "approvalStatus": "حالة الاعتماد",
+      "confirmationStatus": "حالة التأكيد"
+    },
+    "components": {
+      "HEADER": "الرأس",
+      "PARTIES": "الأطراف",
+      "LINE_ITEMS": "البنود",
+      "TOTALS": "الإجماليات",
+      "TERMS": "الشروط",
+      "DELIVERY": "التسليم",
+      "ATTACHMENTS": "المرفقات",
+      "AUDIT_HISTORY": "سجل التدقيق"
+    },
+    "modes": {
+      "acceptanceMode": {
+        "label": "القبول",
+        "hint": "يحدّد المخوّلين بتسجيل قبول عرض السعر.",
+        "note": "يقتصر القبول على المستخدمين المخوّلين داخليًا فقط.",
+        "values": {
+          "INTERNAL_AUTHORIZED_ONLY": "المخوّلون داخليًا فقط"
+        }
+      },
+      "priceLockRequired": {
+        "label": "تثبيت السعر مطلوب",
+        "hint": "يتطلب تثبيت التسعير قبل إرسال عرض السعر.",
+        "values": {
+          "true": "نعم",
+          "false": "لا"
+        }
+      },
+      "confirmationMode": {
+        "label": "التأكيد",
+        "hint": "يحدّد آلية تأكيد أوامر البيع عند الإرسال.",
+        "note": "انتظار التأكيد غير مدعوم بعد.",
+        "values": {
+          "SYNC": "فوري"
+        }
+      },
+      "reservationRequired": {
+        "label": "الحجز مطلوب",
+        "hint": "يتطلب حجز المخزون قبل تأكيد أمر البيع.",
+        "values": {
+          "true": "نعم",
+          "false": "لا"
+        }
+      },
+      "approvalMode": {
+        "label": "الاعتماد",
+        "hint": "اختر ما إذا كانت أوامر الشراء تتطلب مسار عمل للاعتماد.",
+        "values": {
+          "NONE": "بدون",
+          "WORKFLOW": "مسار عمل"
+        }
+      },
+      "dispatchMode": {
+        "label": "الإرسال",
+        "hint": "يتحكم في إرسال أوامر الشراء المعتمدة فورًا أو عبر قائمة الانتظار.",
+        "values": {
+          "IMMEDIATE": "فوري",
+          "QUEUED": "في قائمة الانتظار"
+        }
+      }
+    },
+    "evidence": {
+      "CUSTOMER_ACCEPTANCE": "قبول العميل",
+      "APPROVAL_DECISION": "قرار الاعتماد",
+      "PRICE_DECISION": "قرار السعر",
+      "CREDIT_DECISION": "قرار الائتمان",
+      "SUPPLIER_ACKNOWLEDGEMENT": "إقرار المورد"
+    },
+    "systemCases": {
+      "MINIMAL_VALID": "قبول مستند يحتوي على الحقول المطلوبة فقط",
+      "MISSING_REQUIRED_REJECTED": "رفض مستند ينقصه حقل مطلوب",
+      "SERVER_OWNED_REJECTED": "رفض مستند يعيّن حقلًا يملؤه النظام",
+      "QUOTATION_REGISTRY_COMPATIBLE": "توافق الملف مع سجل عروض الأسعار",
+      "SALES_ORDER_REGISTRY_COMPATIBLE": "توافق الملف مع سجل أوامر البيع",
+      "PURCHASE_ORDER_REGISTRY_COMPATIBLE": "توافق الملف مع سجل أوامر الشراء"
+    }
+  }
+}

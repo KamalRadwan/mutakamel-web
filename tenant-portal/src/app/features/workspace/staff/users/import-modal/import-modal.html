@@ -1,0 +1,108 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerUpload"
+  tile="bg-icon-blue"
+  [title]="'users.import.title' | transloco"
+  [closeLabel]="'users.common.close' | transloco"
+  [dismissable]="!busy()"
+  (closed)="onClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <div class="flex items-center justify-end">
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        size="small"
+        [disabled]="busy()"
+        (click)="downloadTemplate()"
+      >
+        <ng-icon name="tablerDownload" size="14" aria-hidden="true" />
+        <span>{{ 'users.import.template' | transloco }}</span>
+      </button>
+    </div>
+
+    <ui-field
+      size="bare"
+      [for]="uid + '-file'"
+      [label]="'users.import.file' | transloco"
+      [hint]="'users.import.fileHint' | transloco"
+      [required]="true"
+      [error]="fileError()"
+    >
+      <ui-file-drop
+        [id]="uid + '-file'"
+        accept=".csv,text/csv"
+        [maxBytes]="maxBytes"
+        [title]="fileName() || ('users.import.file' | transloco)"
+        [hint]="'users.import.fileHint' | transloco"
+        [disabled]="busy()"
+        (picked)="onFilePicked($event)"
+        (rejected)="onFileRejected($event)"
+      />
+    </ui-field>
+
+    @if (parseErrors().length > 0) {
+      <div
+        role="alert"
+        class="flex max-h-notif-list-max flex-col gap-4 overflow-y-auto rounded-10 border border-danger-border bg-danger-soft px-10 py-8 text-12 leading-18 text-on-danger-soft"
+      >
+        @for (err of parseErrors(); track $index) {
+          <p>{{ err }}</p>
+        }
+      </div>
+    }
+
+    <div class="flex flex-wrap items-end justify-between gap-8">
+      <ui-field
+        size="bare"
+        [for]="uid + '-mode'"
+        [label]="'users.import.mode' | transloco"
+        [hint]="'users.import.modeHint' | transloco"
+      >
+        <div>
+          <ui-segmented
+            [id]="uid + '-mode'"
+            [describedBy]="uid + '-mode-hint'"
+            [options]="modeOptions()"
+            [label]="'users.import.mode' | transloco"
+            [value]="mode()"
+            (valueChange)="onModeChange($event)"
+          />
+        </div>
+      </ui-field>
+
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [loading]="checking()"
+        [disabled]="!canCheck()"
+        (click)="checkImport()"
+      >
+        {{ 'users.import.check' | transloco }}
+      </button>
+    </div>
+
+    @if (activeReport(); as report) {
+      <app-dry-run-report [result]="report" kind="import" [roleLabels]="roleLabels()" />
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      [loading]="importing()"
+      [disabled]="!canImport()"
+      (click)="runImport()"
+    >
+      {{ ('users.import.goPlural' | pluralKey: parsedRows().length) | transloco: { n: parsedRows().length } }}
+    </button>
+
+    <button type="button" uiButton variant="secondary" [disabled]="busy()" (click)="close()">
+      {{ (finalResult() ? 'users.common.close' : 'users.common.cancel') | transloco }}
+    </button>
+  </div>
+</ui-modal>

@@ -1,0 +1,142 @@
+<span class="sr-only" aria-live="polite">
+  {{ !disabled() && !hidden() && matches().length ? ('recordDup.title' | transloco: { count: matches().length }) : '' }}
+</span>
+
+@if (!disabled() && !hidden() && matches().length > 0) {
+  <section class="flex flex-col gap-6 rounded-10 border border-warning bg-surface p-8 shadow-card">
+    <div class="flex items-center gap-8">
+      <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+        <ng-icon name="tablerCopy" size="14" aria-hidden="true" />
+      </span>
+
+      <span class="min-w-0 flex-1 truncate text-12 leading-18 font-medium text-text">
+        {{ 'recordDup.title' | transloco: { count: matches().length } }}
+      </span>
+
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="(expanded() ? 'recordDup.collapse' : 'recordDup.expand') | transloco"
+        [attr.aria-expanded]="expanded()"
+        [title]="(expanded() ? 'recordDup.collapse' : 'recordDup.expand') | transloco"
+        (click)="expanded.update((value) => !value)"
+      >
+        <span class="inline-flex transition-transform duration-fast" [class.rotate-180]="expanded()">
+          <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+        </span>
+      </button>
+    </div>
+
+    @if (blocking()) {
+      <p role="alert" class="flex items-start gap-6 text-12 leading-18 text-warning-text">
+        <ng-icon name="tablerAlertTriangle" size="14" class="mt-2 shrink-0" aria-hidden="true" />
+        <span>{{ 'recordDup.wouldBlock' | transloco }}</span>
+      </p>
+    }
+
+    @if (expanded()) {
+      <div class="flex flex-col gap-6">
+        @for (match of visibleMatches(); track match.partyId) {
+          @let leadCount = match.leads.length;
+          <div class="flex min-h-table-row flex-wrap items-center gap-x-8 gap-y-6 rounded-8 px-8 py-6 transition-colors duration-fast hover:bg-row-hover">
+            <div class="flex min-w-org-card-w flex-1 items-center gap-8">
+              <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+                <ng-icon
+                  [name]="match.partyType === 'ORGANIZATION' ? 'tablerBuilding' : 'tablerUser'"
+                  size="14"
+                  aria-hidden="true"
+                />
+              </span>
+
+              <div class="flex min-w-0 flex-1 items-center gap-6">
+                @if (match.displayName; as name) {
+                  <span dir="auto" class="truncate text-12 leading-18 font-medium text-text">{{ name }}</span>
+                } @else {
+                  <span class="truncate text-12 leading-18 font-medium text-text-muted">
+                    {{ 'recordDup.otherBranch' | transloco }}
+                  </span>
+                }
+
+                @if (match.restricted) {
+                  <span
+                    role="img"
+                    class="inline-flex shrink-0 items-center text-text-muted"
+                    [title]="'recordDup.restrictedHint' | transloco"
+                    [attr.aria-label]="'recordDup.restrictedHint' | transloco"
+                  >
+                    <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="flex min-w-0 flex-wrap items-center gap-4">
+              @if (match.matchTypes.length > 0) {
+                @let matchLabel = matchLabels()[match.partyId] ?? '';
+                <span
+                  class="inline-flex h-badge max-w-full items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-warning-text"
+                  [title]="matchLabel"
+                >
+                  <span class="truncate">{{ matchLabel }}</span>
+                </span>
+              }
+              @if (leadCount > 0) {
+                <span class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
+                  {{ 'recordDup.leads' | transloco: { count: leadCount } }}
+                </span>
+              }
+            </div>
+
+            @if (canOpenMatch(match) || canUseCompany(match)) {
+              <div class="flex shrink-0 items-center gap-6">
+                @if (canOpenMatch(match)) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="secondary"
+                    size="small"
+                    (click)="onOpenMatch(match)"
+                  >
+                    {{ openLabel() }}
+                  </button>
+                  @if (leadCount > 1) {
+                    <ui-actions-menu
+                      [items]="leadMenuItems()[match.partyId] ?? []"
+                      [label]="'recordDup.allLeads' | transloco: { count: leadCount }"
+                      (selected)="onOpenMatch(match, $event.id)"
+                    />
+                  }
+                }
+                @if (canUseCompany(match)) {
+                  <button
+                    type="button"
+                    uiButton
+                    variant="primary"
+                    size="small"
+                    (click)="onUseCompany(match)"
+                  >
+                    {{ 'recordDup.useCompany' | transloco }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      @if (hasMore()) {
+        <div class="flex justify-start">
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            size="small"
+            (click)="showAll.update((value) => !value)"
+          >
+            {{ (showAll() ? 'recordDup.showLess' : 'recordDup.showAll') | transloco: { count: matches().length } }}
+          </button>
+        </div>
+      }
+    }
+  </section>
+}

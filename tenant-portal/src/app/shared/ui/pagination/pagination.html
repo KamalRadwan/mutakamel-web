@@ -1,0 +1,79 @@
+<nav class="flex flex-wrap items-center justify-between gap-8" [attr.aria-label]="ariaLabel()">
+  <span class="text-12 leading-18 text-text-muted tabular-nums">
+    {{ 'pagination.showing' | transloco: { from: rangeStart(), to: rangeEnd(), total: total() } }}
+  </span>
+
+  <div class="flex flex-wrap items-center gap-4">
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-12 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-row-hover hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="currentPage() <= 1"
+      [attr.aria-label]="'pagination.first' | transloco"
+      [title]="'pagination.first' | transloco"
+      (click)="goTo(1)"
+    >
+      <ng-icon name="tablerChevronsLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-12 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-row-hover hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="currentPage() <= 1"
+      [attr.aria-label]="'pagination.prev' | transloco"
+      [title]="'pagination.prev' | transloco"
+      (click)="goTo(currentPage() - 1)"
+    >
+      <ng-icon name="tablerChevronLeft" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+
+    @for (item of items(); track item.key) {
+      @if (item.kind === 'ellipsis') {
+        <span class="inline-flex size-btn-h-sm items-center justify-center text-12 leading-16 text-text-muted select-none" aria-hidden="true">
+          …
+        </span>
+      } @else {
+        <button
+          type="button"
+          class="inline-flex h-btn-h-sm min-w-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 px-4 text-12 leading-16 font-medium tabular-nums outline-none transition-colors duration-fast ease-enter focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [class]="item.page === currentPage() ? 'bg-brand text-on-brand' : 'text-text hover:bg-row-hover'"
+          [attr.aria-current]="item.page === currentPage() ? 'page' : null"
+          [attr.aria-label]="'pagination.page' | transloco: { page: item.page }"
+          (click)="goTo(item.page)"
+        >
+          {{ item.page }}
+        </button>
+      }
+    }
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-12 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-row-hover hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="currentPage() >= totalPages()"
+      [attr.aria-label]="'pagination.next' | transloco"
+      [title]="'pagination.next' | transloco"
+      (click)="goTo(currentPage() + 1)"
+    >
+      <ng-icon name="tablerChevronRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+
+    <button
+      type="button"
+      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-12 text-text-muted outline-none transition-colors duration-fast ease-enter hover:bg-row-hover hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
+      [disabled]="currentPage() >= totalPages()"
+      [attr.aria-label]="'pagination.last' | transloco"
+      [title]="'pagination.last' | transloco"
+      (click)="goTo(totalPages())"
+    >
+      <ng-icon name="tablerChevronsRight" size="14" class="rtl:-scale-x-100" aria-hidden="true" />
+    </button>
+  </div>
+
+  <ui-dropdown
+    class="shrink-0"
+    size="field"
+    [options]="sizeOptions()"
+    [label]="'pagination.pageSize' | transloco"
+    [value]="pageSize()"
+    (valueChange)="changePageSize($event)"
+  />
+</nav>

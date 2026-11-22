@@ -1,0 +1,83 @@
+{
+  "hero": {
+    "welcomeName": "Welcome back, {{name}}",
+    "welcome": "Welcome back",
+    "subtitle": "{{n}} apps in your workspace",
+    "subtitlePlural": {
+      "one": "{{n}} app in your workspace",
+      "other": "{{n}} apps in your workspace"
+    },
+    "subscribedPill": "Your apps {{n}}",
+    "availablePill": "To add {{n}}",
+    "comingSoonPill": "Coming soon {{n}}"
+  },
+  "sections": {
+    "subscribed": {
+      "title": "Your apps",
+      "description": "The apps your workspace subscribes to.",
+      "empty": "Your workspace has no subscribed apps yet."
+    },
+    "available": {
+      "title": "Add to your workspace",
+      "description": "Apps available to add to your workspace.",
+      "empty": "No additional apps are available to add."
+    },
+    "future": {
+      "title": "Coming soon",
+      "description": "New apps coming to your workspace.",
+      "collapse": "Collapse coming soon",
+      "expand": "Expand coming soon"
+    }
+  },
+  "badges": {
+    "active": "Active",
+    "available": "Available",
+    "comingSoon": "Coming soon",
+    "addon": "Add-on",
+    "overCapacity": "Read only",
+    "overCapacityHint": "Your seat is over the plan limit, so this app is read only for you.",
+    "noAccess": "No access",
+    "noAccessHint": "You need a seat in this app to open it. Ask the workspace owner to assign one."
+  },
+  "card": {
+    "seats": "{{used}} / {{total}} users",
+    "open": "Open"
+  },
+  "error": {
+    "text": "Could not load workspace apps.",
+    "retry": "Retry"
+  },
+  "apps": {
+    "crm": "Customer relationship management",
+    "trade": "Sales, purchasing and inventory",
+    "accounting": "Financial accounting",
+    "pos": "Retail checkout",
+    "projects": "Project management",
+    "helpdesk": "Customer support",
+    "hr": "People and payroll",
+    "manufacturing": "Production management",
+    "fleet": "Vehicles and drivers",
+    "recruitment": "Hiring and applicants",
+    "procurement": "Suppliers and purchasing",
+    "warehouse": "Storage and fulfillment",
+    "quality": "Inspections and standards",
+    "maintenance": "Equipment upkeep and repairs",
+    "assets": "Fixed assets and lifecycle",
+    "documents": "Files and digital archive",
+    "ecommerce": "Online storefront and orders",
+    "marketing": "Campaigns and outreach",
+    "field-service": "On-site visits and dispatch",
+    "subscriptions": "Recurring billing and plans",
+    "budgeting": "Financial planning and budgets",
+    "bi": "Dashboards and analytics",
+    "real-estate": "Property sales and leasing",
+    "clinics": "Patients and appointments",
+    "schools": "Students and academics",
+    "restaurants": "Dining and kitchen orders",
+    "hotels": "Rooms, bookings and guests",
+    "pharmacies": "Medicines and dispensing",
+    "construction": "Sites, contractors and progress",
+    "gyms": "Memberships and classes",
+    "car-rental": "Bookings and rental contracts"
+  }
+}

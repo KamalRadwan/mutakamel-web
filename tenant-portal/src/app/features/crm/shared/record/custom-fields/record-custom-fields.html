@@ -1,0 +1,304 @@
+@if (visibleFields().length > 0) {
+  @if (layout() === 'page') {
+    @if (scope() === 'required') {
+      <ng-container *ngTemplateOutlet="fieldsList" />
+    } @else {
+      <div [class]="pageGrid">
+        <ng-container *ngTemplateOutlet="fieldsList" />
+      </div>
+    }
+  } @else {
+    <div class="grid items-start gap-x-10 gap-y-8" [class.grid-cols-2]="!stacked()">
+      <ng-container *ngTemplateOutlet="fieldsList" />
+    </div>
+  }
+}
+
+<ng-template #fieldsList>
+  @for (field of visibleFields(); track field.id) {
+    @let err = fieldError(field);
+    @let label = fieldLabel(field);
+    @let hint = fieldHint(field);
+    @let required = isRequired(field);
+    @let controlId = uid + '-' + field.fieldKey;
+
+    @switch (field.type) {
+      @case ('TEXTAREA') {
+        <div class="col-span-2">
+          <ui-field
+            size="multiline"
+            [label]="label"
+            [for]="controlId"
+            [hint]="hint"
+            [required]="required"
+            [count]="stringValue(field.fieldKey).length"
+            [max]="textareaMax"
+            [error]="err"
+          >
+            <textarea
+              [id]="controlId"
+              rows="3"
+              class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+              [placeholder]="fieldPlaceholder(field)"
+              [readonly]="readonly()"
+              [value]="stringValue(field.fieldKey)"
+              [attr.aria-invalid]="err ? 'true' : null"
+              (input)="onTextInput(field.fieldKey, $event)"
+            ></textarea>
+          </ui-field>
+        </div>
+      }
+
+      @case ('TEXT') {
+        <ui-field
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [count]="stringValue(field.fieldKey).length"
+          [max]="textMax"
+          [error]="err"
+        >
+          <input
+            [id]="controlId"
+            type="text"
+            class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="fieldPlaceholder(field)"
+            [readonly]="readonly()"
+            [value]="stringValue(field.fieldKey)"
+            [attr.aria-invalid]="err ? 'true' : null"
+            (input)="onTextInput(field.fieldKey, $event)"
+          />
+        </ui-field>
+      }
+
+      @case ('NUMBER') {
+        <ui-field
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <input
+            [id]="controlId"
+            type="text"
+            inputmode="decimal"
+            dir="ltr"
+            class="w-full bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="fieldPlaceholder(field)"
+            [readonly]="readonly()"
+            [value]="stringValue(field.fieldKey)"
+            [attr.aria-invalid]="err ? 'true' : null"
+            (input)="onTextInput(field.fieldKey, $event)"
+          />
+        </ui-field>
+      }
+
+      @case ('URL') {
+        <ui-field
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <input
+            [id]="controlId"
+            type="url"
+            dir="ltr"
+            class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="fieldPlaceholder(field)"
+            [readonly]="readonly()"
+            [value]="stringValue(field.fieldKey)"
+            [attr.aria-invalid]="err ? 'true' : null"
+            (input)="onTextInput(field.fieldKey, $event)"
+          />
+        </ui-field>
+      }
+
+      @case ('EMAIL') {
+        <ui-field
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <input
+            [id]="controlId"
+            type="email"
+            dir="ltr"
+            class="w-full bg-transparent text-start text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="fieldPlaceholder(field)"
+            [readonly]="readonly()"
+            [value]="stringValue(field.fieldKey)"
+            [attr.aria-invalid]="err ? 'true' : null"
+            (input)="onTextInput(field.fieldKey, $event)"
+          />
+        </ui-field>
+      }
+
+      @case ('DATE') {
+        <ui-field
+          size="bare"
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <ui-date-field
+            [id]="controlId"
+            [ariaLabel]="label"
+            [placeholder]="fieldPlaceholder(field)"
+            [todayLabel]="'recordFields.custom.today' | transloco"
+            [prevMonthLabel]="'recordFields.custom.prevMonth' | transloco"
+            [nextMonthLabel]="'recordFields.custom.nextMonth' | transloco"
+            [invalid]="!!err"
+            [disabled]="readonly()"
+            [value]="datePart(field.fieldKey)"
+            (valueChange)="setFieldValue(field.fieldKey, $event)"
+          />
+        </ui-field>
+      }
+
+      @case ('DATETIME') {
+        <ui-field
+          size="bare"
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <div class="flex items-center gap-6">
+            <ui-date-field
+              class="min-w-0 flex-1"
+              [id]="controlId"
+              [ariaLabel]="label"
+              [placeholder]="fieldPlaceholder(field)"
+              [todayLabel]="'recordFields.custom.today' | transloco"
+              [prevMonthLabel]="'recordFields.custom.prevMonth' | transloco"
+              [nextMonthLabel]="'recordFields.custom.nextMonth' | transloco"
+              [invalid]="!!err"
+              [disabled]="readonly()"
+              [value]="datePart(field.fieldKey)"
+              (valueChange)="onDateTimeDateChange(field.fieldKey, $event)"
+            />
+            <ui-time-field
+              class="shrink-0"
+              [id]="controlId + '-time'"
+              [ariaLabel]="label"
+              [hourLabel]="'recordFields.custom.hour' | transloco"
+              [minuteLabel]="'recordFields.custom.minute' | transloco"
+              [invalid]="!!err"
+              [disabled]="readonly()"
+              [value]="timePart(field.fieldKey)"
+              (valueChange)="onDateTimeTimeChange(field.fieldKey, $event)"
+            />
+          </div>
+        </ui-field>
+      }
+
+      @case ('BOOLEAN') {
+        <ui-field
+          size="bare"
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <div class="flex h-field items-center" [attr.aria-invalid]="err ? 'true' : null">
+            <ui-switch
+              [id]="controlId"
+              [label]="label"
+              [checked]="boolValue(field.fieldKey)"
+              [disabled]="readonly()"
+              (checkedChange)="setFieldValue(field.fieldKey, $event)"
+            />
+          </div>
+        </ui-field>
+      }
+
+      @case ('SELECT') {
+        <ui-field
+          size="bare"
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <div [attr.aria-invalid]="err ? 'true' : null">
+            <ui-dropdown
+              class="w-full"
+              size="field"
+              [id]="controlId"
+              [label]="label"
+              [options]="selectOptions(field)"
+              [disabled]="readonly()"
+              [value]="stringValue(field.fieldKey)"
+              (valueChange)="setFieldValue(field.fieldKey, $event || null)"
+            />
+          </div>
+        </ui-field>
+      }
+
+      @case ('MULTI_SELECT') {
+        <ui-field
+          size="bare"
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <div
+            role="group"
+            class="flex min-h-field flex-wrap items-center gap-6"
+            [attr.aria-label]="label"
+            [attr.aria-invalid]="err ? 'true' : null"
+          >
+            @for (opt of field.options; track opt.key) {
+              <span
+                class="inline-flex h-chip items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-text"
+                [class.pointer-events-none]="readonly()"
+                [attr.inert]="readonly() ? '' : null"
+              >
+                <ui-checkbox
+                  [checked]="hasMultiValue(field.fieldKey, opt.key)"
+                  (checkedChange)="toggleMultiValue(field.fieldKey, opt.key, $event)"
+                >
+                  {{ optionLabel(opt) }}
+                </ui-checkbox>
+              </span>
+            }
+          </div>
+        </ui-field>
+      }
+
+      @case ('PHONE') {
+        <ui-field
+          size="bare"
+          [label]="label"
+          [for]="controlId"
+          [hint]="hint"
+          [required]="required"
+          [error]="err"
+        >
+          <ui-phone-input
+            [countries]="countries()"
+            [inputId]="controlId"
+            [label]="label"
+            [readonly]="readonly()"
+            [invalid]="!!err"
+            [value]="stringValue(field.fieldKey)"
+            (valueChange)="setFieldValue(field.fieldKey, $event)"
+          />
+        </ui-field>
+      }
+    }
+  }
+</ng-template>

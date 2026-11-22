@@ -1,0 +1,195 @@
+<ui-modal
+  #cellModal
+  size="form"
+  icon="tablerTable"
+  tile="teal"
+  [title]="'tplTables.cell.title' | transloco"
+  [closeLabel]="'tplTables.actions.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    <ui-field
+      size="bare"
+      [for]="uid + '-mode'"
+      [label]="'tplTables.cell.modeLabel' | transloco"
+      [hint]="'tplTables.cell.modeHint' | transloco"
+    >
+      <ui-segmented
+        [id]="uid + '-mode'"
+        [options]="modeOptions()"
+        [label]="'tplTables.cell.modeLabel' | transloco"
+        [describedBy]="uid + '-mode-hint'"
+        [value]="mode()"
+        (valueChange)="onModeChange($event)"
+      />
+    </ui-field>
+
+    @switch (mode()) {
+      @case ('TEXT') {
+        <ui-field
+          size="multiline"
+          [for]="uid + '-text'"
+          [label]="'tplTables.cell.textLabel' | transloco"
+          [hint]="'tplTables.cell.textHint' | transloco"
+          [count]="textValue().length"
+          [max]="2000"
+        >
+          <textarea
+            [id]="uid + '-text'"
+            rows="3"
+            [readonly]="readOnly()"
+            class="min-w-0 flex-1 resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
+            [value]="textValue()"
+            (input)="onTextInput($event)"
+          ></textarea>
+        </ui-field>
+      }
+
+      @case ('BINDING') {
+        <ui-field
+          size="bare"
+          [for]="uid + '-field'"
+          [label]="'tplTables.cell.fieldLabel' | transloco"
+          [hint]="'tplTables.cell.fieldHint' | transloco"
+          [required]="true"
+        >
+          <div class="flex flex-wrap items-center gap-6">
+            <button
+              [id]="uid + '-field'"
+              type="button"
+              uiButton
+              variant="secondary"
+              aria-haspopup="dialog"
+              [attr.aria-describedby]="uid + '-field-hint'"
+              [disabled]="readOnly()"
+              (click)="pickCellField(false)"
+            >
+              <ng-icon name="tablerBraces" size="15" aria-hidden="true" />
+              <span class="truncate">
+                {{ binding().path ? '«' + state.fieldLabel(binding().path) + '»' : ('tplTables.cell.chooseField' | transloco) }}
+              </span>
+            </button>
+            @if (isDynamic() && !readOnly()) {
+              <button
+                type="button"
+                uiButton
+                variant="ghost"
+                size="small"
+                aria-haspopup="dialog"
+                (click)="pickCellField(true)"
+              >
+                {{ 'tplTables.actions.useDocumentField' | transloco }}
+              </button>
+            }
+          </div>
+          @if (binding().path) {
+            <div class="mt-4 flex flex-wrap items-center gap-8 text-11 leading-16 text-text-muted">
+              <bdi dir="ltr">{{ binding().path }}</bdi>
+              <span>
+                {{
+                  'tplTables.cell.bindingEmpty'
+                    | transloco: { behavior: ('tplTables.cell.nullBehavior.' + binding().nullBehavior | transloco) }
+                }}
+              </span>
+            </div>
+          }
+        </ui-field>
+      }
+
+      @case ('FORMULA') {
+        <ui-field
+          size="bare"
+          [for]="uid + '-formula'"
+          [label]="'tplTables.cell.formulaLabel' | transloco"
+          [hint]="'tplTables.cell.formulaHint' | transloco"
+          [required]="true"
+        >
+          <div class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface-muted p-8">
+            <p class="min-w-0 flex-1 text-12 leading-18 text-text" dir="auto">{{ formulaSummary() }}</p>
+            <button
+              [id]="uid + '-formula'"
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              aria-haspopup="dialog"
+              [attr.aria-describedby]="uid + '-formula-hint'"
+              [disabled]="readOnly()"
+              (click)="editCellFormula()"
+            >
+              <ng-icon name="tablerMathFunction" size="14" aria-hidden="true" />
+              {{ 'tplTables.actions.editFormula' | transloco }}
+            </button>
+          </div>
+        </ui-field>
+      }
+    }
+
+    @if (isStaticWithGrid()) {
+      <div class="grid grid-cols-2 gap-x-10 gap-y-8 border-t border-border pt-8">
+        <ui-field
+          [for]="uid + '-rspan'"
+          [label]="'tplTables.cell.rowSpanLabel' | transloco"
+          [hint]="'tplTables.cell.rowSpanHint' | transloco"
+          [error]="spanError()"
+        >
+          <input
+            [id]="uid + '-rspan'"
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            dir="ltr"
+            [readonly]="readOnly()"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="rowSpanInput()"
+            (input)="onRowSpanInput($event)"
+          />
+        </ui-field>
+
+        <ui-field
+          [for]="uid + '-cspan'"
+          [label]="'tplTables.cell.colSpanLabel' | transloco"
+          [hint]="'tplTables.cell.colSpanHint' | transloco"
+        >
+          <input
+            [id]="uid + '-cspan'"
+            type="number"
+            min="1"
+            max="30"
+            step="1"
+            dir="ltr"
+            [readonly]="readOnly()"
+            class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
+            [value]="colSpanInput()"
+            (input)="onColSpanInput($event)"
+          />
+        </ui-field>
+      </div>
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (!readOnly()) {
+      <button type="button" uiButton variant="primary" [disabled]="!canApply()" (click)="apply()">
+        {{ 'tplTables.actions.apply' | transloco }}
+      </button>
+      <button type="button" uiButton variant="secondary" (click)="cancel()">
+        {{ 'tplTables.actions.cancel' | transloco }}
+      </button>
+    } @else {
+      <button type="button" uiButton variant="ghost" (click)="cancel()">
+        {{ 'tplTables.actions.close' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  #mergeConfirm
+  tone="warning"
+  [title]="'tplTables.cell.confirmMergeTitle' | transloco"
+  [text]="'tplTables.cell.confirmMergeText' | transloco: { count: confirmCoveredCount() }"
+  [confirmLabel]="'tplTables.cell.confirmMergeAction' | transloco"
+  [cancelLabel]="'tplTables.actions.cancel' | transloco"
+/>

@@ -1,0 +1,67 @@
+<nav [attr.aria-label]="label() || null">
+  <ol class="no-scrollbar -mx-3 -my-3 flex items-center gap-6 overflow-x-auto px-3 py-3">
+    @for (step of steps(); track step.id; let index = $index; let last = $last) {
+      <li class="flex items-center gap-6" [class]="last ? 'flex-none' : 'flex-auto'">
+        @if (clickable()) {
+          <button
+            type="button"
+            class="group inline-flex shrink-0 cursor-pointer items-center gap-4 rounded-8 text-12 leading-18 whitespace-nowrap outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [attr.aria-current]="step.state === 'current' ? 'step' : null"
+            (click)="select(step)"
+          >
+            <span
+              class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 leading-16 font-medium tabular-nums"
+              [class]="circleClass(step.state)"
+              aria-hidden="true"
+            >
+              @if (step.state === 'done') {
+                <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+              } @else if (step.state === 'error') {
+                <ng-icon name="tablerExclamationMark" size="12" aria-hidden="true" />
+              } @else {
+                <bdi dir="ltr">{{ index + 1 }}</bdi>
+              }
+            </span>
+            <span class="transition-colors duration-fast" [class]="labelClass(step.state, true)">
+              {{ step.label }}
+            </span>
+            @if (stateText(step.state); as status) {
+              <span class="sr-only"> ({{ status }})</span>
+            }
+          </button>
+        } @else {
+          <span
+            class="inline-flex shrink-0 items-center gap-4 text-12 leading-18 whitespace-nowrap"
+            [attr.aria-current]="step.state === 'current' ? 'step' : null"
+          >
+            <span
+              class="inline-flex size-badge shrink-0 items-center justify-center rounded-full text-11 leading-16 font-medium tabular-nums"
+              [class]="circleClass(step.state)"
+              aria-hidden="true"
+            >
+              @if (step.state === 'done') {
+                <ng-icon name="tablerCheck" size="12" aria-hidden="true" />
+              } @else if (step.state === 'error') {
+                <ng-icon name="tablerExclamationMark" size="12" aria-hidden="true" />
+              } @else {
+                <bdi dir="ltr">{{ index + 1 }}</bdi>
+              }
+            </span>
+            <span [class]="labelClass(step.state, false)">{{ step.label }}</span>
+            @if (stateText(step.state); as status) {
+              <span class="sr-only"> ({{ status }})</span>
+            }
+          </span>
+        }
+
+        @if (!last) {
+          <span
+            class="h-border-w-strong min-w-12 flex-1 rounded-full transition-colors duration-fast"
+            [class]="connectorActive(index) ? 'bg-accent' : 'bg-border'"
+            aria-hidden="true"
+          ></span>
+        }
+      </li>
+    }
+  </ol>
+</nav>

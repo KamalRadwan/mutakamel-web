@@ -1,0 +1,265 @@
+<ui-modal
+  #modal
+  size="wide"
+  [icon]="group()?.icon ?? ''"
+  [tile]="group()?.tile ?? 'bg-icon-blue'"
+  [title]="group() ? (group()!.titleKey | transloco) : ''"
+  [closeLabel]="'staticData.details.close' | transloco"
+  (closed)="onClosed()"
+>
+  @if (group(); as g) {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text whitespace-nowrap"
+    >
+      {{ 'staticData.kinds.' + g.kind | transloco }}
+    </span>
+  }
+
+  @if (group(); as g) {
+    <div class="flex flex-col gap-10">
+      <div class="flex flex-wrap items-center gap-6">
+        <span
+          class="inline-flex h-badge items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted whitespace-nowrap"
+        >
+          <ng-icon name="tablerLock" size="11" aria-hidden="true" />
+          {{ 'staticData.readOnly' | transloco }}
+        </span>
+
+        <span
+          class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text tabular-nums whitespace-nowrap"
+        >
+          {{ 'staticData.entriesBadge' | transloco: { n: g.entryCount } }}
+        </span>
+
+        @if (g.maxSizeText; as sizeText) {
+          <span
+            class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text tabular-nums whitespace-nowrap"
+          >
+            {{ 'staticData.maximumSize' | transloco: { size: sizeText } }}
+          </span>
+        }
+      </div>
+
+      @if (showEntrySearch()) {
+        <ui-field
+          [label]="'staticData.details.search' | transloco"
+          [for]="uid + '-search'"
+          [hint]="'staticData.details.searchHint' | transloco"
+        >
+          <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
+          <input
+            [id]="uid + '-search'"
+            type="text"
+            autocomplete="off"
+            class="h-full min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
+            [placeholder]="'staticData.details.search' | transloco"
+            [value]="entrySearch()"
+            (input)="onSearchInput($event)"
+            (keydown.escape)="clearSearch(); $event.stopPropagation()"
+          />
+          @if (entrySearch()) {
+            <button
+              type="button"
+              class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              [attr.aria-label]="'staticData.clearSearch' | transloco"
+              (click)="clearSearch()"
+            >
+              <ng-icon name="tablerX" size="12" aria-hidden="true" />
+            </button>
+          }
+        </ui-field>
+      }
+
+      @switch (g.detailVariant) {
+        @case ('options') {
+          <div class="overflow-x-auto pb-2">
+            <div role="table" [attr.aria-label]="g.titleKey | transloco">
+              <div
+                role="row"
+                class="grid h-table-head grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.3fr)] rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+              >
+                <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                  {{ 'staticData.details.labelAr' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'staticData.details.labelEn' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'staticData.details.value' | transloco }}
+                </span>
+              </div>
+
+              @for (opt of filteredOptions(); track opt.value) {
+                <div
+                  role="row"
+                  class="mt-6 grid h-table-row grid-cols-[minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.3fr)] rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+                >
+                  <span role="cell" class="flex min-w-0 items-center justify-between gap-6 px-10">
+                    <span dir="rtl" class="min-w-0 truncate text-12 font-medium text-text" [title]="opt.label.ar">
+                      {{ opt.label.ar }}
+                    </span>
+                    @if (opt.label.ar === opt.label.en) {
+                      <span
+                        class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-warning-text whitespace-nowrap"
+                        [title]="'staticData.untranslatedHint' | transloco"
+                      >
+                        {{ 'staticData.englishOnly' | transloco }}
+                      </span>
+                    }
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <span dir="ltr" class="truncate text-12 text-text" [title]="opt.label.en">
+                      {{ opt.label.en }}
+                    </span>
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <span
+                      dir="ltr"
+                      class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft tabular-nums"
+                      [title]="opt.value"
+                    >
+                      {{ opt.value }}
+                    </span>
+                  </span>
+                </div>
+              } @empty {
+                <div role="row" class="mt-6 flex flex-col items-center gap-6 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+                  <span role="cell" class="text-12 text-text-muted">{{ 'staticData.noMatches' | transloco }}</span>
+                  @if (entrySearch()) {
+                    <button type="button" uiButton variant="ghost" size="small" (click)="clearSearch()">
+                      {{ 'staticData.clearSearch' | transloco }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @case ('attachmentPolicy') {
+          <div class="overflow-x-auto pb-2">
+            <div role="table" [attr.aria-label]="g.titleKey | transloco">
+              <div
+                role="row"
+                class="grid h-table-head grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.5fr)] rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+              >
+                <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                  {{ 'staticData.cols.group' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'staticData.details.extensions' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'staticData.details.mime' | transloco }}
+                </span>
+              </div>
+
+              @for (fam of g.attachmentFamilies; track fam.key) {
+                <div
+                  role="row"
+                  class="mt-6 grid h-table-row grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.5fr)] rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+                >
+                  <span role="cell" class="flex min-w-0 items-center px-10">
+                    <span class="truncate text-12 font-medium text-text">{{ labelText(fam.label) }}</span>
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center gap-4 overflow-hidden border-s border-border px-10">
+                    @for (ext of fam.extensions; track ext) {
+                      <span
+                        dir="ltr"
+                        class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft tabular-nums"
+                      >
+                        {{ ext }}
+                      </span>
+                    }
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+                    <span
+                      dir="ltr"
+                      class="truncate text-11 leading-16 text-text-muted tabular-nums"
+                      [title]="fam.mimeTypes.join(', ')"
+                    >
+                      {{ fam.mimeTypes.join(', ') }}
+                    </span>
+                  </span>
+                </div>
+              } @empty {
+                <div role="row" class="mt-6 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+                  <span role="cell" class="text-12 text-text-muted">{{ 'staticData.emptyCatalogue' | transloco }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @case ('stageStatusRule') {
+          <div class="overflow-x-auto pb-2">
+            <div role="table" [attr.aria-label]="g.titleKey | transloco">
+              <div
+                role="row"
+                class="grid h-table-head grid-cols-[minmax(0,1fr)_minmax(0,1fr)] rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+              >
+                <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+                  {{ 'staticData.details.stage' | transloco }}
+                </span>
+                <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+                  {{ 'staticData.details.resultingStatus' | transloco }}
+                </span>
+              </div>
+
+              @for (row of g.stageStatusRows; track row.stageKey) {
+                <div
+                  role="row"
+                  class="mt-6 grid h-table-row grid-cols-[minmax(0,1fr)_minmax(0,1fr)] rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+                >
+                  <span role="cell" class="flex min-w-0 items-center gap-6 px-10">
+                    @if (row.stageLabel) {
+                      <span class="truncate text-12 font-medium text-text">{{ labelText(row.stageLabel) }}</span>
+                      <span
+                        dir="ltr"
+                        class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-on-neutral-soft tabular-nums"
+                      >
+                        {{ row.stageKey }}
+                      </span>
+                    } @else {
+                      <span class="truncate text-12 font-medium text-text">
+                        {{ 'staticData.details.otherStages' | transloco }}
+                      </span>
+                    }
+                  </span>
+
+                  <span role="cell" class="flex min-w-0 items-center gap-6 border-s border-border px-10">
+                    <span
+                      class="inline-flex h-badge items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                      [class]="stageStatusBadgeClass(row.statusValue)"
+                    >
+                      {{ labelText(row.statusLabel) }}
+                    </span>
+                  </span>
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        @case ('leadConversionRule') {
+          <div class="rounded-10 border border-border bg-surface p-10 shadow-card">
+            <p class="text-12 leading-18 text-text">
+              {{ 'staticData.details.copiedRule' | transloco: { label: copiedLabel(g) } }}
+            </p>
+          </div>
+        }
+      }
+    </div>
+  }
+
+  <div modal-footer class="flex items-center gap-8">
+    <button type="button" uiButton variant="secondary" (click)="close()">
+      {{ 'staticData.details.close' | transloco }}
+    </button>
+  </div>
+</ui-modal>

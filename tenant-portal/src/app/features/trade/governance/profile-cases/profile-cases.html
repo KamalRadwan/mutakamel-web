@@ -1,0 +1,269 @@
+<section class="flex flex-col gap-6">
+  <div class="flex items-center gap-8">
+    <h2 class="text-13 leading-18 font-medium text-text">{{ 'profiles.cases.systemTitle' | transloco }}</h2>
+    <ui-badge tone="count">{{ family().systemCases.length }}</ui-badge>
+  </div>
+
+  <div class="overflow-x-auto pb-4">
+    <div
+      role="table"
+      class="min-w-doc-table-min"
+      [attr.aria-label]="'profiles.cases.systemTableLabel' | transloco"
+    >
+      <div
+        role="row"
+        class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+        [class]="systemTableTrack"
+      >
+        <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+          {{ 'profiles.cases.columns.case' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'profiles.cases.columns.kind' | transloco }}
+        </span>
+        <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          {{ 'profiles.cases.columns.result' | transloco }}
+        </span>
+      </div>
+
+      @for (item of family().systemCases; track item.code) {
+        @let res = resultFor(item.code);
+        <div
+          role="row"
+          class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+          [class]="systemTableTrack"
+        >
+          <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
+            <span class="truncate font-medium">
+              {{ 'profiles.registry.systemCases.' + item.code | transloco }}
+            </span>
+            <span class="shrink-0 text-11 text-text-muted">
+              <bdi dir="ltr">{{ item.code }}</bdi>
+            </span>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            <ui-badge tone="brand">{{ 'profiles.cases.systemBadge' | transloco }}</ui-badge>
+          </span>
+
+          <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+            @if (res) {
+              <ui-badge
+                [tone]="res.passed ? 'success' : 'danger'"
+                [icon]="res.passed ? 'tablerCircleCheck' : 'tablerCircleX'"
+              >
+                {{ (res.passed ? 'profiles.cases.pass' : 'profiles.cases.fail') | transloco }}
+              </ui-badge>
+            } @else {
+              <span class="text-12 text-text-muted">—</span>
+            }
+          </span>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<section class="flex flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-8">
+    <div class="flex items-center gap-8">
+      <h2 class="text-13 leading-18 font-medium text-text">{{ 'profiles.cases.customTitle' | transloco }}</h2>
+      <ui-badge tone="count">{{ cases().length }} / {{ maxCases }}</ui-badge>
+    </div>
+
+    @if (!readonly()) {
+      <span [attr.title]="cases().length >= maxCases ? ('profiles.cases.limitReached' | transloco) : null">
+        <button
+          type="button"
+          uiButton
+          variant="secondary"
+          [disabled]="cases().length >= maxCases"
+          (click)="openAddModal()"
+        >
+          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+          {{ 'profiles.cases.addCase' | transloco }}
+        </button>
+      </span>
+    }
+  </div>
+
+  @if (cases().length === 0) {
+    <p class="rounded-10 border border-border bg-surface p-16 text-center text-12 text-text-muted shadow-card">
+      {{ 'profiles.cases.emptyCustom' | transloco }}
+    </p>
+  } @else {
+    <div class="overflow-x-auto pb-4">
+      <div
+        role="table"
+        class="min-w-doc-table-min"
+        [attr.aria-label]="'profiles.cases.customTableLabel' | transloco"
+      >
+        <div
+          role="row"
+          class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          [class]="customTableTrack()"
+        >
+          <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+            {{ 'profiles.cases.columns.code' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.cases.columns.inputFields' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.cases.columns.shouldBeValid' | transloco }}
+          </span>
+          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            {{ 'profiles.cases.columns.result' | transloco }}
+          </span>
+          @if (!readonly()) {
+            <span role="columnheader" class="border-s border-on-nav-line">
+              <span class="sr-only">{{ 'profiles.cases.columns.actions' | transloco }}</span>
+            </span>
+          }
+        </div>
+
+        @for (item of cases(); track item.code + ':' + index; let index = $index) {
+          @let res = resultFor(item.code);
+          <div
+            role="row"
+            class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+            [class]="customTableTrack()"
+          >
+            <span role="cell" class="flex min-w-0 items-center px-10">
+              <span class="truncate text-13 font-medium">
+                <bdi dir="ltr">{{ item.code }}</bdi>
+              </span>
+            </span>
+
+            <span
+              role="cell"
+              class="flex min-w-0 items-center gap-4 overflow-hidden border-s border-border px-10"
+              [title]="allFieldLabelsTitle(fieldsOf(item))"
+            >
+              @if (fieldsOf(item).length === 0) {
+                <span class="text-12 text-text-muted">—</span>
+              } @else {
+                @for (fieldCode of visibleFieldChips(fieldsOf(item)); track fieldCode) {
+                  <span
+                    class="inline-flex h-chip shrink-0 items-center rounded-6 bg-neutral-soft px-6 text-11 font-medium text-on-neutral-soft"
+                  >
+                    {{ 'profiles.registry.fields.' + fieldCode | transloco }}
+                  </span>
+                }
+                @if (hiddenFieldsCount(fieldsOf(item)); as extra) {
+                  <span
+                    class="inline-flex h-chip shrink-0 items-center rounded-6 bg-brand-soft px-6 text-11 font-medium text-on-brand-soft"
+                  >
+                    <bdi dir="ltr">{{ 'profiles.cases.moreFields' | transloco: { count: extra } }}</bdi>
+                  </span>
+                }
+              }
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              <ui-badge [tone]="item.expectedValid ? 'success' : 'tag'">
+                {{ (item.expectedValid ? 'tradeShared.common.yes' : 'tradeShared.common.no') | transloco }}
+              </ui-badge>
+            </span>
+
+            <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
+              @if (res) {
+                <ui-badge
+                  [tone]="res.passed ? 'success' : 'danger'"
+                  [icon]="res.passed ? 'tablerCircleCheck' : 'tablerCircleX'"
+                >
+                  {{ (res.passed ? 'profiles.cases.pass' : 'profiles.cases.fail') | transloco }}
+                </ui-badge>
+              } @else {
+                <span class="text-12 text-text-muted">—</span>
+              }
+            </span>
+
+            @if (!readonly()) {
+              <span role="cell" class="flex items-center justify-center border-s border-border">
+                <ui-actions-menu
+                  [items]="caseMenuItems()"
+                  [label]="'profiles.cases.actions.menuLabel' | transloco"
+                  (selected)="onCaseAction(index, $event)"
+                />
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</section>
+
+<ui-modal
+  #caseModal
+  size="form"
+  icon="tablerChecklist"
+  tile="bg-icon-blue"
+  [title]="(editingIndex() === null ? 'profiles.cases.modal.addTitle' : 'profiles.cases.modal.editTitle') | transloco"
+  [closeLabel]="'governance.common.close' | transloco"
+  (closed)="modalSubmitted.set(false)"
+>
+  <form class="flex flex-col gap-10" (submit)="$event.preventDefault(); saveCase()">
+    <ui-field
+      [label]="'profiles.cases.modal.codeLabel' | transloco"
+      [for]="uid + '-code'"
+      [required]="true"
+      [hint]="'profiles.cases.modal.codeHint' | transloco"
+      [error]="codeError()"
+    >
+      <input
+        [id]="uid + '-code'"
+        type="text"
+        dir="ltr"
+        autocomplete="off"
+        class="h-full w-full bg-transparent text-12 text-text uppercase outline-none placeholder:normal-case placeholder:text-text-placeholder"
+        [placeholder]="'profiles.cases.modal.codePlaceholder' | transloco"
+        [value]="draftCode()"
+        [attr.aria-invalid]="codeError() ? 'true' : null"
+        (input)="onCodeInput($event)"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'profiles.cases.modal.inputFieldsLabel' | transloco"
+      [for]="uid + '-fields'"
+      [hint]="'profiles.cases.modal.inputFieldsHint' | transloco"
+    >
+      <ui-tag-picker
+        [inputId]="uid + '-fields'"
+        [label]="'profiles.cases.modal.inputFieldsLabel' | transloco"
+        [options]="fieldTagOptions()"
+        [canCreate]="false"
+        [max]="family().fields.length"
+        [(value)]="draftInputFields"
+      />
+    </ui-field>
+
+    <ui-field
+      size="bare"
+      [label]="'profiles.cases.modal.shouldBeValidLabel' | transloco"
+      [for]="uid + '-valid'"
+      [hint]="'profiles.cases.modal.shouldBeValidHint' | transloco"
+    >
+      <ui-segmented
+        [id]="uid + '-valid'"
+        [describedBy]="uid + '-valid-hint'"
+        [label]="'profiles.cases.modal.shouldBeValidLabel' | transloco"
+        [options]="shouldBeValidOptions()"
+        [value]="draftShouldBeValid() ? 'yes' : 'no'"
+        (valueChange)="onShouldBeValidChange($event)"
+      />
+    </ui-field>
+  </form>
+
+  <div modal-footer class="flex flex-1 items-center gap-8">
+    <button type="button" uiButton variant="primary" (click)="saveCase()">
+      {{ (editingIndex() === null ? 'profiles.cases.modal.add' : 'profiles.cases.modal.save') | transloco }}
+    </button>
+    <button type="button" uiButton variant="secondary" (click)="closeModal()">
+      {{ 'governance.common.cancel' | transloco }}
+    </button>
+  </div>
+</ui-modal>

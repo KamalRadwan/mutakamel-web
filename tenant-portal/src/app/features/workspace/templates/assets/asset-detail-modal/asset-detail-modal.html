@@ -1,0 +1,217 @@
+<ui-modal
+  size="wide"
+  icon="tablerPhoto"
+  [tile]="tileClass()"
+  [title]="asset()?.originalFileName ?? ('templatesAssets.detailModal.title' | transloco)"
+  [closeLabel]="'templates.actions.close' | transloco"
+  [dismissable]="!retiring()"
+  (closed)="onModalClosed()"
+>
+  @if (asset(); as current) {
+    <ng-container ngProjectAs="[modal-header-end]">
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+      [class]="current.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+    >
+      {{ ('templates.lifecycle.' + current.status) | transloco }}
+    </span>
+    </ng-container>
+
+    <div class="flex flex-col gap-10">
+      <div class="flex h-tpl-preview items-center justify-center overflow-hidden rounded-10 border border-border bg-surface-muted p-10">
+        @if (previewUrl(); as url) {
+          <img [src]="url" [alt]="current.originalFileName" class="max-h-full max-w-full object-contain" />
+        } @else if (loadingDetail()) {
+          <ng-icon name="tablerLoader2" size="20" class="animate-spin text-text-muted" aria-hidden="true" />
+        } @else {
+          <div class="flex flex-col items-center gap-4 text-center text-text-muted">
+            <ng-icon name="tablerPhoto" size="20" aria-hidden="true" />
+            <span class="text-12 leading-18">{{ 'templatesAssets.detailModal.previewUnavailable' | transloco }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="grid grid-cols-3 gap-x-10 gap-y-8">
+        <div class="col-span-2">
+          <ui-field
+            [label]="'templatesAssets.detailModal.fileNameLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.fileNameHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              dir="ltr"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="current.originalFileName"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.scopeLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.scopeHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="scopeLabel()"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.typeLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.typeHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="('templatesAssets.types.' + current.assetType) | transloco"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.deliveryLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.deliveryHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="('templatesAssets.delivery.' + current.deliveryClass) | transloco"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.emailRenditionLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.emailRenditionHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="('templatesAssets.emailRendition.' + current.emailRendition.kind) | transloco"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.formatLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.formatHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              dir="ltr"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="storedFormatText()"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.dimensionsLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.dimensionsHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              dir="ltr"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="dimensionsText()"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.sizeLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.sizeHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              dir="ltr"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="fileSizeText()"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-1">
+          <ui-field
+            [label]="'templatesAssets.detailModal.updatedLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.updatedHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="updatedText()"
+            />
+          </ui-field>
+        </div>
+
+        <div class="col-span-2">
+          <ui-field
+            [label]="'templatesAssets.detailModal.checksumLabel' | transloco"
+            [hint]="'templatesAssets.detailModal.checksumHint' | transloco"
+          >
+            <input
+              type="text"
+              readonly
+              dir="ltr"
+              class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+              [value]="current.checksum"
+            />
+          </ui-field>
+        </div>
+      </div>
+    </div>
+  }
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="retiring()"
+      (click)="closeModal()"
+    >
+      {{ 'templates.actions.close' | transloco }}
+    </button>
+
+    @if (canManage() && asset(); as current) {
+      <button
+        type="button"
+        uiButton
+        variant="danger"
+        class="ms-auto"
+        [loading]="retiring()"
+        [disabled]="retiring() || current.status === 'RETIRED'"
+        (click)="requestRetire()"
+      >
+        {{ 'templates.actions.retire' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>
+
+<ui-confirm-dialog
+  tone="danger"
+  [title]="'templatesAssets.retireConfirm.title' | transloco"
+  [text]="'templatesAssets.retireConfirm.text' | transloco: { name: asset()?.originalFileName ?? '' }"
+  [confirmLabel]="'templates.actions.retire' | transloco"
+  [cancelLabel]="'templates.actions.cancel' | transloco"
+/>

@@ -1,0 +1,113 @@
+<div class="flex flex-col gap-6 rounded-10 border border-border bg-surface-muted p-8">
+  <div class="flex items-center justify-center rounded-8 border border-border bg-surface p-6">
+    <svg
+      viewBox="0 0 220 180"
+      class="block w-full max-h-tpl-preview"
+      role="img"
+      [attr.aria-label]="ariaLabel() || paperLabel()"
+    >
+      <!-- Paper sheet stays white in both light and dark themes -->
+      <rect
+        [attr.x]="paperRect().x"
+        [attr.y]="paperRect().y"
+        [attr.width]="paperRect().width"
+        [attr.height]="paperRect().height"
+        rx="2"
+        fill="var(--template-paper)"
+        stroke="var(--border-field)"
+        stroke-width="1"
+      />
+
+      <!-- Printable body area inside logical margins -->
+      @if (printableValid()) {
+        <rect
+          [attr.x]="printableRect().x"
+          [attr.y]="printableRect().y"
+          [attr.width]="printableRect().width"
+          [attr.height]="printableRect().height"
+          fill="var(--brand-soft)"
+          stroke="var(--brand)"
+          stroke-width="1"
+          stroke-dasharray="3 2"
+        />
+      } @else {
+        <line
+          [attr.x1]="paperRect().x"
+          [attr.y1]="paperRect().y"
+          [attr.x2]="paperRect().x + paperRect().width"
+          [attr.y2]="paperRect().y + paperRect().height"
+          stroke="var(--danger-border)"
+          stroke-width="1.5"
+        />
+        <line
+          [attr.x1]="paperRect().x + paperRect().width"
+          [attr.y1]="paperRect().y"
+          [attr.x2]="paperRect().x"
+          [attr.y2]="paperRect().y + paperRect().height"
+          stroke="var(--danger-border)"
+          stroke-width="1.5"
+        />
+      }
+
+      @if (topLabel()) {
+        <text
+          [attr.x]="topEdgeCenter().x"
+          [attr.y]="topEdgeCenter().y"
+          text-anchor="middle"
+          font-size="8"
+          fill="var(--text-muted)"
+        >
+          {{ topLabel() }} ({{ safeTopMm() }})
+        </text>
+      }
+      @if (bottomLabel()) {
+        <text
+          [attr.x]="bottomEdgeCenter().x"
+          [attr.y]="bottomEdgeCenter().y"
+          text-anchor="middle"
+          font-size="8"
+          fill="var(--text-muted)"
+        >
+          {{ bottomLabel() }} ({{ safeBottomMm() }})
+        </text>
+      }
+      @if (leftEdgeLabel()) {
+        <text
+          [attr.x]="leftEdgeCenter().x"
+          [attr.y]="leftEdgeCenter().y"
+          text-anchor="end"
+          font-size="8"
+          fill="var(--text-muted)"
+        >
+          {{ leftEdgeLabel() }} ({{ leftMarginMm() }})
+        </text>
+      }
+      @if (rightEdgeLabel()) {
+        <text
+          [attr.x]="rightEdgeCenter().x"
+          [attr.y]="rightEdgeCenter().y"
+          text-anchor="start"
+          font-size="8"
+          fill="var(--text-muted)"
+        >
+          {{ rightEdgeLabel() }} ({{ rightMarginMm() }})
+        </text>
+      }
+    </svg>
+  </div>
+
+  <div class="flex flex-col gap-2 text-11 leading-16">
+    <div class="flex items-center justify-between gap-8">
+      <span class="text-text-muted">{{ paperLabel() }}</span>
+      <span class="font-medium text-text">
+        <bdi dir="ltr">{{ safeWidthMm() }} × {{ safeHeightMm() }} mm</bdi>
+      </span>
+    </div>
+    <div class="flex items-center justify-between gap-8">
+      <span class="text-text-muted">{{ printableLabel() }}</span>
+      <span class="font-medium" [class]="printableValid() ? 'text-text' : 'text-danger-text'">
+        <bdi dir="ltr">{{ printableWidthMm() }} × {{ printableHeightMm() }} mm</bdi>
+      </span>
+    </div>
+  </div>
+</div>

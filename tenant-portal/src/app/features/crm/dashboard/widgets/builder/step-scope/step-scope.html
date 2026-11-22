@@ -1,0 +1,235 @@
+<div data-field="filters.datePreset">
+  <ui-field
+    [label]="'builder.scope.period' | transloco"
+    [hint]="'builder.scope.periodHint' | transloco"
+    [required]="true"
+    [bare]="true"
+    for="builder-period"
+    [error]="datePreset() !== 'CUSTOM' ? periodError() : null"
+  >
+    <ui-dropdown
+      [id]="'builder-period'"
+      class="w-full"
+      size="field"
+      [label]="'builder.scope.period' | transloco"
+      describedBy="builder-period-hint"
+      [options]="presetOptions()"
+      [value]="datePreset()"
+      (valueChange)="onPresetChange($event)"
+    />
+  </ui-field>
+</div>
+
+@if (datePreset() === 'CUSTOM') {
+  <ui-field
+    [label]="'builder.scope.customRange' | transloco"
+    [hint]="'builder.scope.customRangeHint' | transloco"
+    [required]="true"
+    [bare]="true"
+    for="builder-custom-range"
+    [error]="periodError()"
+  >
+    <ui-date-range
+      [id]="'builder-custom-range'"
+      [months]="1"
+      [withTime]="false"
+      [today]="fakeNow"
+      describedBy="builder-custom-range-hint"
+      [ariaLabel]="'builder.scope.customRange' | transloco"
+      [invalid]="!!periodError()"
+      [value]="customRangeValue()"
+      (valueChange)="onCustomRangeChange($event)"
+    />
+  </ui-field>
+}
+
+<ui-field
+  [label]="'builder.scope.basis' | transloco"
+  [hint]="'builder.scope.basisHint' | transloco"
+  for="builder-basis"
+>
+  <input
+    id="builder-basis"
+    type="text"
+    readonly
+    [value]="basisLabel()"
+    class="w-full min-w-0 bg-transparent text-12 text-text outline-none"
+  />
+</ui-field>
+
+<div data-field="scopeBinding" class="flex flex-col gap-8">
+  <ui-field
+    [label]="'builder.scope.dataScope' | transloco"
+    [hint]="'builder.scope.dataScopeHint' | transloco"
+    [bare]="true"
+    for="builder-data-scope"
+    [error]="scopeMode() !== 'FIXED_REQUESTED' ? (errors()['scopeBinding'] ?? null) : null"
+  >
+    <ui-segmented
+      [id]="'builder-data-scope'"
+      [label]="'builder.scope.dataScope' | transloco"
+      describedBy="builder-data-scope-hint"
+      [options]="scopeModeOptions()"
+      [value]="scopeMode()"
+      (valueChange)="onScopeModeChange($event)"
+    />
+  </ui-field>
+
+  @if (scopeMode() === 'FIXED_REQUESTED') {
+    <ui-field
+      [label]="'builder.scope.scopeBranches' | transloco"
+      [hint]="'builder.scope.scopeBranchesHint' | transloco"
+      [required]="true"
+      [bare]="true"
+      for="builder-scope-branches"
+      [error]="errors()['scopeBinding'] ?? null"
+    >
+      <div
+        aria-describedby="builder-scope-branches-hint"
+        class="flex flex-col gap-6 rounded-10 border border-border-field bg-surface-field p-8"
+      >
+        @for (branch of branches(); track branch.id) {
+          <ui-checkbox
+            [checked]="fixedBranchIds().includes(branch.id)"
+            (checkedChange)="toggleScopeBranch(branch.id, $event)"
+          >
+            {{ branchName(branch) }}
+          </ui-checkbox>
+        }
+      </div>
+    </ui-field>
+  }
+</div>
+
+<div data-field="filters.branchId">
+  <ui-field
+    [label]="'builder.scope.branch' | transloco"
+    [hint]="'builder.scope.branchHint' | transloco"
+    [bare]="true"
+    for="builder-branch"
+    [error]="errors()['filters.branchId'] ?? null"
+  >
+    <ui-dropdown
+      [id]="'builder-branch'"
+      class="w-full"
+      size="field"
+      [label]="'builder.scope.branch' | transloco"
+      describedBy="builder-branch-hint"
+      [options]="branchOptions()"
+      [value]="branchId()"
+      (valueChange)="onBranchChange($event)"
+    />
+  </ui-field>
+</div>
+
+@if (supportedFilters().has('pipelineId')) {
+  <div data-field="filters.pipelineId">
+    <ui-field
+      [label]="'builder.scope.pipeline' | transloco"
+      [hint]="'builder.scope.pipelineHint' | transloco"
+      [bare]="true"
+      for="builder-pipeline"
+    >
+      <ui-dropdown
+        [id]="'builder-pipeline'"
+        class="w-full"
+        size="field"
+        [label]="'builder.scope.pipeline' | transloco"
+        describedBy="builder-pipeline-hint"
+        [options]="pipelineOptions()"
+        [value]="filters().pipelineId ?? ''"
+        (valueChange)="onPipelineChange($event)"
+      />
+    </ui-field>
+  </div>
+}
+
+@if (supportedFilters().has('currencyCode')) {
+  <div data-field="filters.currencyCode">
+    <ui-field
+      [label]="'builder.scope.currency' | transloco"
+      [hint]="'builder.scope.currencyHint' | transloco"
+      [bare]="true"
+      for="builder-currency"
+    >
+      <ui-dropdown
+        [id]="'builder-currency'"
+        class="w-full"
+        size="field"
+        [label]="'builder.scope.currency' | transloco"
+        describedBy="builder-currency-hint"
+        [options]="currencyOptions()"
+        [value]="filters().currencyCode ?? ''"
+        (valueChange)="onCurrencyChange($event)"
+      />
+    </ui-field>
+  </div>
+}
+
+@if (supportedFilters().has('staleDays')) {
+  <div data-field="filters.staleDays">
+    <ui-field
+      [label]="'builder.scope.staleDays' | transloco"
+      [hint]="'builder.scope.staleDaysHint' | transloco"
+      for="builder-stale-days"
+      [error]="errors()['filters.staleDays'] ?? null"
+    >
+      <input
+        id="builder-stale-days"
+        type="number"
+        min="1"
+        max="365"
+        dir="ltr"
+        [value]="filters().staleDays ?? ''"
+        class="w-full min-w-0 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+        (input)="onNumberFilterChange('staleDays', $event)"
+      />
+    </ui-field>
+  </div>
+}
+
+@if (supportedFilters().has('closingWindowDays')) {
+  <div data-field="filters.closingWindowDays">
+    <ui-field
+      [label]="'builder.scope.closingWindowDays' | transloco"
+      [hint]="'builder.scope.closingWindowDaysHint' | transloco"
+      for="builder-closing-window-days"
+      [error]="errors()['filters.closingWindowDays'] ?? null"
+    >
+      <input
+        id="builder-closing-window-days"
+        type="number"
+        min="1"
+        max="365"
+        dir="ltr"
+        [value]="filters().closingWindowDays ?? ''"
+        class="w-full min-w-0 bg-transparent text-start text-12 text-text tabular-nums outline-none"
+        (input)="onNumberFilterChange('closingWindowDays', $event)"
+      />
+    </ui-field>
+  </div>
+}
+
+@if (filterRecordType()) {
+  <div data-field="filterTree">
+    <ui-field
+      [label]="'builder.scope.filterRules' | transloco"
+      [hint]="'builder.scope.filterRulesHint' | transloco"
+      [bare]="true"
+      for="builder-filter-tree"
+      [error]="filterTreeError()"
+    >
+      <ui-query-builder
+        id="builder-filter-tree"
+        [fields]="filterFields()"
+        [applied]="appliedFilterQuery()"
+        [title]="'builder.scope.filterRules' | transloco"
+        [attr.aria-describedby]="filterTreeError() ? 'builder-filter-tree-hint builder-filter-tree-error' : 'builder-filter-tree-hint'"
+        [operatorLabel]="filterOperatorLabel()"
+        [(expanded)]="filterExpanded"
+        (apply)="onFilterTreeApply($event)"
+        (clear)="onFilterTreeClear()"
+      />
+    </ui-field>
+  </div>
+}

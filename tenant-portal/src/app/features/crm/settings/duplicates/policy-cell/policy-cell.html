@@ -1,0 +1,100 @@
+<button
+  #trigger
+  type="button"
+  class="flex h-full w-full min-w-0 items-center gap-6 rounded-6 px-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+  [class]="
+    canManage() && !saving()
+      ? 'cursor-pointer hover:bg-neutral-soft' + (open() ? ' bg-neutral-soft' : '')
+      : 'cursor-default'
+  "
+  [attr.tabindex]="triggerTabIndex()"
+  [attr.aria-haspopup]="canManage() ? 'menu' : null"
+  [attr.aria-expanded]="canManage() ? open() : null"
+  [attr.aria-label]="ariaLabel()"
+  [attr.title]="ariaLabel()"
+  (click)="toggle()"
+>
+  <div class="flex min-w-0 flex-1 flex-col justify-center">
+    <div class="flex min-w-0 items-center gap-6">
+      <span
+        class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+        [class]="effectiveValue() ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text-muted'"
+      >
+        {{ stateText() }}
+      </span>
+
+      @if (mode() === 'node') {
+        @if (isLimited()) {
+          <span class="inline-flex min-w-0 items-center gap-3 text-11 leading-16 text-warning-text">
+            <ng-icon name="tablerLock" size="11" class="shrink-0" aria-hidden="true" />
+            <span class="truncate">{{ sourceText() }}</span>
+          </span>
+        } @else if (isExplicit()) {
+          <span class="inline-flex min-w-0 items-center gap-4 text-11 leading-16 text-text-muted">
+            <span class="size-radio-dot shrink-0 rounded-full bg-brand" aria-hidden="true"></span>
+            <span class="truncate">{{ sourceText() }}</span>
+          </span>
+        } @else {
+          <span class="min-w-0 truncate text-11 leading-16 text-text-muted">{{ sourceText() }}</span>
+        }
+      }
+    </div>
+
+    @if (subnote()) {
+      <span class="truncate text-11 leading-16 text-text-muted">{{ subnote() }}</span>
+    }
+  </div>
+
+  @if (saving()) {
+    <ng-icon name="tablerLoader2" size="12" class="ms-auto shrink-0 animate-spin text-text-muted" aria-hidden="true" />
+  } @else if (canManage()) {
+    <ng-icon name="tablerChevronDown" size="14" class="ms-auto shrink-0 text-text-muted" aria-hidden="true" />
+  }
+</button>
+
+@if (open()) {
+  <div
+    #menu
+    role="menu"
+    class="fixed z-dropdown flex flex-col gap-2 overflow-y-auto whitespace-nowrap rounded-10 border border-border bg-surface p-4 shadow-popover"
+    [class.invisible]="!placed()"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    [style.min-width.px]="place().minWidth"
+    [style.max-height.px]="place().maxHeight"
+    [attr.aria-label]="ariaLabel()"
+  >
+    @for (option of options(); track option.id) {
+      <button
+        #optionRow
+        type="button"
+        role="menuitemradio"
+        class="flex w-full items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-start text-12 outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [class]="
+          option.disabledReason
+            ? 'min-h-menu-item cursor-not-allowed py-4 text-text-placeholder'
+            : option.selected
+              ? 'h-menu-item cursor-pointer bg-brand-soft text-on-brand-soft'
+              : 'h-menu-item cursor-pointer text-text hover:bg-row-hover'
+        "
+        [attr.aria-checked]="option.selected"
+        [attr.aria-disabled]="option.disabledReason ? 'true' : null"
+        [attr.aria-describedby]="option.disabledReason ? uid + '-opt-' + option.id + '-reason' : null"
+        [attr.title]="option.disabledReason"
+        (click)="choose(option)"
+      >
+        <span class="flex min-w-0 flex-col">
+          <span>{{ option.label }}</span>
+          @if (option.disabledReason) {
+            <span [id]="uid + '-opt-' + option.id + '-reason'" class="text-11 leading-16 text-text-muted">
+              {{ option.disabledReason }}
+            </span>
+          }
+        </span>
+        @if (option.selected) {
+          <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
+        }
+      </button>
+    }
+  </div>
+}

@@ -1,0 +1,34 @@
+<section class="flex flex-col items-start gap-12 rounded-10 bg-surface p-16 shadow-card">
+  <div class="flex items-center gap-12">
+    <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <ng-icon name="tablerTarget" size="18" aria-hidden="true" />
+    </span>
+    <div class="flex flex-col gap-2">
+      @if (id(); as oppId) {
+        <h1 class="text-16 leading-24 font-medium text-text">
+          @if (opportunity(); as opp) {
+            <span dir="auto">{{ opp.title }}</span>
+          } @else {
+            {{ 'opportunities.record' | transloco }}
+          }
+        </h1>
+        @if (loading()) {
+          <p class="text-12 leading-18 text-text-muted">{{ 'opportunities.loading' | transloco }}</p>
+        } @else if (errorKey(); as key) {
+          <p class="text-12 leading-18 text-danger-text">{{ key | transloco }}</p>
+        } @else if (reference(); as ref) {
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'opportunities.ref' | transloco }}: <span dir="ltr">{{ ref }}</span>
+          </p>
+        } @else {
+          <p class="text-12 leading-18 text-text-muted" dir="ltr">{{ oppId }}</p>
+        }
+      } @else if (isCreate) {
+        <h1 class="text-16 leading-24 font-medium text-text">{{ 'opportunities.new' | transloco }}</h1>
+      } @else {
+        <h1 class="text-16 leading-24 font-medium text-text">{{ 'opportunities.title' | transloco }}</h1>
+      }
+      <p class="text-12 leading-18 text-text-muted">{{ 'opportunities.placeholder' | transloco }}</p>
+    </div>
+  </div>
+</section>

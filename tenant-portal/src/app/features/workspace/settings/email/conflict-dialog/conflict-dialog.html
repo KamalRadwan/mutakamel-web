@@ -1,0 +1,144 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerAlertTriangle"
+  tile="bg-icon-orange"
+  [title]="titleKey() | transloco"
+  [closeLabel]="'settings.common.close' | transloco"
+  [dismissable]="!busy()"
+  (closed)="onModalClosed()"
+>
+  <div class="flex flex-col gap-10">
+    @if (errorMessage(); as err) {
+      <div role="alert">
+        <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
+      </div>
+    }
+
+    @if (!isLoadOnly() && phase() === 'reviewed') {
+      @if (diffRows().length === 0) {
+        <app-settings-notice tone="info">
+          {{ 'wsEmail.conflict.same' | transloco }}
+        </app-settings-notice>
+      } @else {
+        <div role="table" class="flex flex-col" [attr.aria-label]="titleKey() | transloco">
+          <div
+            role="row"
+            class="grid h-table-head grid-cols-3 rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
+          >
+            <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
+              {{ 'wsEmail.conflict.field' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'wsEmail.conflict.mine' | transloco }}
+            </span>
+            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+              {{ 'wsEmail.conflict.latest' | transloco }}
+            </span>
+          </div>
+
+          @for (row of diffRows(); track row.key) {
+            <div
+              role="row"
+              class="mt-6 grid min-h-table-row grid-cols-3 rounded-10 border border-border bg-surface text-12 leading-18 text-text shadow-card"
+            >
+              <span role="cell" class="flex min-w-0 items-center px-10 py-6 font-medium">
+                <span class="truncate">{{ row.label }}</span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-6">
+                <span
+                  [attr.dir]="row.mineLtr ? 'ltr' : 'auto'"
+                  class="min-w-0 break-words"
+                >
+                  {{ row.mineText }}
+                </span>
+              </span>
+              <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-6">
+                <span
+                  [attr.dir]="row.latestLtr ? 'ltr' : 'auto'"
+                  class="min-w-0 break-words"
+                >
+                  {{ row.latestText }}
+                </span>
+              </span>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+
+  <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
+    @if (isLoadOnly()) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="busy()"
+        [disabled]="busy()"
+        (click)="loadLatest()"
+      >
+        {{ 'wsEmail.conflict.load' | transloco }}
+      </button>
+    } @else if (phase() === 'initial') {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="busy()"
+        [disabled]="busy()"
+        (click)="reviewLatest()"
+      >
+        {{ 'wsEmail.conflict.review' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="busy()"
+        (click)="close()"
+      >
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    } @else if (diffRows().length === 0) {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [disabled]="busy()"
+        (click)="useLatestSaved()"
+      >
+        {{ 'wsEmail.conflict.useLatest' | transloco }}
+      </button>
+    } @else {
+      <button
+        type="button"
+        uiButton
+        variant="primary"
+        [loading]="busy()"
+        [disabled]="busy()"
+        (click)="keepMyChanges()"
+      >
+        {{ 'wsEmail.conflict.keep' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="secondary"
+        [disabled]="busy()"
+        (click)="useLatestSaved()"
+      >
+        {{ 'wsEmail.conflict.useLatest' | transloco }}
+      </button>
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        [disabled]="busy()"
+        (click)="close()"
+      >
+        {{ 'settings.common.cancel' | transloco }}
+      </button>
+    }
+  </div>
+</ui-modal>

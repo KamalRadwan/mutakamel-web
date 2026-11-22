@@ -1,0 +1,59 @@
+@let current = item();
+@let currentLook = look();
+<div
+  class="flex items-start gap-8 px-10 py-8 transition-colors duration-fast"
+  [class]="current.readAt !== null ? 'hover:bg-row-hover' : 'bg-brand-soft'"
+>
+  <span
+    class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 text-on-icon"
+    [class]="currentLook.tile"
+  >
+    <ng-icon [name]="currentLook.icon" size="15" aria-hidden="true" />
+  </span>
+
+  <div class="flex min-w-0 flex-1 flex-col items-start gap-6">
+    <button
+      type="button"
+      class="flex w-full min-w-0 cursor-pointer flex-col gap-2 rounded-6 text-start outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      (click)="onOpen($event)"
+    >
+      <span class="text-11 leading-16 text-text-muted">{{ currentLook.labelKey | transloco }}</span>
+      <span class="text-12 leading-18 font-medium text-text">{{ current.title }}</span>
+      @if (current.body) {
+        <span class="text-12 leading-18 text-text-muted">{{ current.body }}</span>
+      }
+      <span class="text-11 leading-16 text-text-muted">{{ timeLabel() }}</span>
+    </button>
+
+    @if (showAcknowledge()) {
+      @if (current.acknowledgedAt === null) {
+        <button type="button" uiButton variant="secondary" size="small" (click)="onAcknowledge($event)">
+          {{ 'wsNotif.actions.acknowledge' | transloco }}
+        </button>
+      } @else {
+        <span class="text-11 leading-16 text-text-muted">
+          @if (acknowledgedTimeLabel(); as time) {
+            {{ 'wsNotif.acknowledgedAt' | transloco: { time: time } }}
+          } @else {
+            {{ 'wsNotif.acknowledgedJustNow' | transloco }}
+          }
+        </span>
+      }
+    }
+  </div>
+
+  <div class="flex shrink-0 flex-col items-center gap-6">
+    <button
+      type="button"
+      class="inline-flex cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+      [attr.aria-label]="'notifications.actions.dismiss' | transloco"
+      [attr.title]="'notifications.actions.dismiss' | transloco"
+      (click)="onDismiss($event)"
+    >
+      <ng-icon name="tablerX" size="14" aria-hidden="true" />
+    </button>
+    @if (current.readAt === null) {
+      <span class="size-unread-dot rounded-full bg-brand" aria-hidden="true"></span>
+    }
+  </div>
+</div>

@@ -1,0 +1,265 @@
+<ui-modal
+  #modal
+  size="wide"
+  icon="tablerSend"
+  tile="bg-icon-green"
+  [title]="modalTitle()"
+  [closeLabel]="'analytics.common.close' | transloco"
+  [dismissable]="!publishing()"
+  (closed)="onModalClosed()"
+>
+  @if (loadingImpact()) {
+    <div class="flex flex-col gap-8 py-6" aria-busy="true">
+      <div class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+      <div class="h-skeleton-line w-full rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+      <div class="h-skeleton-line w-4/5 rounded-4 bg-neutral-soft" aria-hidden="true"></div>
+      <span class="sr-only" role="status">{{ 'builder2.publish.loadingImpact' | transloco }}</span>
+    </div>
+  } @else if (impactError(); as errMsg) {
+    <ui-full-state
+      kind="load-failure"
+      [title]="'analytics.common.loadFailed' | transloco"
+      [text]="errMsg"
+      [actionLabel]="'builder2.publish.retry' | transloco"
+      (action)="loadImpact()"
+    />
+  } @else if (impact(); as imp) {
+    <div class="flex flex-col gap-12">
+      <dl class="grid grid-cols-1 gap-8 rounded-10 border border-border bg-surface-muted p-8 desktop:grid-cols-2">
+        <div class="flex flex-col gap-2">
+          <dt class="flex h-label items-center gap-4 text-12 text-text-muted">
+            <span>{{ 'builder2.publish.nextVersion' | transloco }}</span>
+            <span
+              #verHintTrigger
+              class="relative inline-flex shrink-0 items-center text-accent"
+              tabindex="0"
+              (mouseenter)="showHint('nextVersion', verHintTrigger, verHintTip)"
+              (focus)="showHint('nextVersion', verHintTrigger, verHintTip)"
+              (blur)="hideHint()"
+              (keydown.escape)="hideHint()"
+              aria-describedby="publish-next-version-hint"
+              (mouseleave)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #verHintTip
+                id="publish-next-version-hint"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class.invisible]="!(tipPlaced() && activeHint() === 'nextVersion')"
+                [style.top.px]="tooltipPlace().top"
+                [style.inset-inline-start.px]="tooltipPlace().start"
+              >
+                {{ 'builder2.publish.nextVersionHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd aria-describedby="publish-next-version-hint" class="text-13 leading-20 font-medium text-text">
+            <bdi dir="ltr" class="tabular-nums">v{{ imp.nextVersionNumber }}</bdi>
+          </dd>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <dt class="flex h-label items-center gap-4 text-12 text-text-muted">
+            <span>{{ 'builder2.publish.validUntil' | transloco }}</span>
+            <span
+              #expHintTrigger
+              class="relative inline-flex shrink-0 items-center text-accent"
+              tabindex="0"
+              (mouseenter)="showHint('validUntil', expHintTrigger, expHintTip)"
+              (focus)="showHint('validUntil', expHintTrigger, expHintTip)"
+              (blur)="hideHint()"
+              (keydown.escape)="hideHint()"
+              aria-describedby="publish-valid-until-hint"
+              (mouseleave)="hideHint()"
+            >
+              <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+              <span
+                #expHintTip
+                id="publish-valid-until-hint"
+                role="tooltip"
+                class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                [class.invisible]="!(tipPlaced() && activeHint() === 'validUntil')"
+                [style.top.px]="tooltipPlace().top"
+                [style.inset-inline-start.px]="tooltipPlace().start"
+              >
+                {{ 'builder2.publish.validUntilHint' | transloco }}
+              </span>
+            </span>
+          </dt>
+          <dd aria-describedby="publish-valid-until-hint" class="text-12 leading-20 text-text">
+            {{ validUntilText() }}
+          </dd>
+        </div>
+      </dl>
+
+      <div class="flex flex-col gap-4" aria-describedby="publish-dashboards-hint">
+        <div class="flex h-label items-center gap-4 text-12 font-medium text-text-muted">
+          <span>{{ 'builder2.publish.dashboardsAffected' | transloco }}</span>
+          <span
+            #dashHintTrigger
+            class="relative inline-flex shrink-0 items-center text-accent"
+            tabindex="0"
+            (mouseenter)="showHint('dashboards', dashHintTrigger, dashHintTip)"
+            (focus)="showHint('dashboards', dashHintTrigger, dashHintTip)"
+            (blur)="hideHint()"
+            (keydown.escape)="hideHint()"
+            aria-describedby="publish-dashboards-hint"
+            (mouseleave)="hideHint()"
+          >
+            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+            <span
+              #dashHintTip
+              id="publish-dashboards-hint"
+              role="tooltip"
+              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+              [class.invisible]="!(tipPlaced() && activeHint() === 'dashboards')"
+              [style.top.px]="tooltipPlace().top"
+              [style.inset-inline-start.px]="tooltipPlace().start"
+            >
+              {{ 'builder2.publish.dashboardsAffectedHint' | transloco }}
+            </span>
+          </span>
+        </div>
+
+        <ui-data-table
+          [columns]="dashboardColumns()"
+          [rows]="imp.dashboards"
+          [rowKey]="dashboardRowKey"
+          [emptyText]="'builder2.publish.noDashboards' | transloco"
+          [label]="'builder2.publish.dashboardsAffected' | transloco"
+        >
+          <ng-template uiCell="affected" let-row>
+            <ui-badge [tone]="isDashboardAffected(row) ? 'warning' : 'none'">
+              {{ (isDashboardAffected(row) ? 'builder2.publish.affected' : 'builder2.publish.notAffected') | transloco }}
+            </ui-badge>
+          </ng-template>
+        </ui-data-table>
+      </div>
+
+      <div class="flex flex-col gap-4" aria-describedby="publish-layout-hint">
+        <div class="flex h-label items-center gap-4 text-12 font-medium text-text-muted">
+          <span>{{ 'builder2.publish.layoutChanges' | transloco }}</span>
+          <span
+            #layoutHintTrigger
+            class="relative inline-flex shrink-0 items-center text-accent"
+            tabindex="0"
+            (mouseenter)="showHint('layout', layoutHintTrigger, layoutHintTip)"
+            (focus)="showHint('layout', layoutHintTrigger, layoutHintTip)"
+            (blur)="hideHint()"
+            (keydown.escape)="hideHint()"
+            aria-describedby="publish-layout-hint"
+            (mouseleave)="hideHint()"
+          >
+            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+            <span
+              #layoutHintTip
+              id="publish-layout-hint"
+              role="tooltip"
+              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+              [class.invisible]="!(tipPlaced() && activeHint() === 'layout')"
+              [style.top.px]="tooltipPlace().top"
+              [style.inset-inline-start.px]="tooltipPlace().start"
+            >
+              {{ (imp.layoutAdjustments.length === 0 ? 'builder2.publish.noLayoutChanges' : 'builder2.publish.layoutChangesHint') | transloco }}
+            </span>
+          </span>
+        </div>
+
+        @if (imp.layoutAdjustments.length === 0) {
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'builder2.publish.none' | transloco }}
+          </p>
+        } @else {
+          <ul class="flex flex-col gap-4">
+            @for (adj of imp.layoutAdjustments; track adj.placementId) {
+              <li class="flex items-center justify-between gap-8 rounded-8 border border-border bg-surface px-8 py-6 text-12 text-text">
+                <span class="min-w-0 truncate">{{ dashboardNameFor(adj.dashboardId) }}</span>
+                <ui-badge tone="tag">
+                  <bdi dir="ltr" class="tabular-nums">W {{ adj.w }} × H {{ adj.h }}</bdi>
+                </ui-badge>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="flex flex-col gap-4" aria-describedby="publish-dependents-hint">
+        <div class="flex h-label items-center gap-4 text-12 font-medium text-text-muted">
+          <span>{{ 'builder2.publish.dependents' | transloco }}</span>
+          <span
+            #depsHintTrigger
+            class="relative inline-flex shrink-0 items-center text-accent"
+            tabindex="0"
+            (mouseenter)="showHint('dependents', depsHintTrigger, depsHintTip)"
+            (focus)="showHint('dependents', depsHintTrigger, depsHintTip)"
+            (blur)="hideHint()"
+            (keydown.escape)="hideHint()"
+            aria-describedby="publish-dependents-hint"
+            (mouseleave)="hideHint()"
+          >
+            <ng-icon name="tablerExclamationCircle" size="14" class="cursor-help" tabindex="-1" aria-hidden="true" />
+            <span
+              #depsHintTip
+              id="publish-dependents-hint"
+              role="tooltip"
+              class="pointer-events-none fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+              [class.invisible]="!(tipPlaced() && activeHint() === 'dependents')"
+              [style.top.px]="tooltipPlace().top"
+              [style.inset-inline-start.px]="tooltipPlace().start"
+            >
+              {{ (dependentGroups().length === 0 ? 'builder2.publish.noDependents' : 'builder2.publish.dependentsHint') | transloco }}
+            </span>
+          </span>
+        </div>
+
+        @if (dependentGroups().length === 0) {
+          <p class="text-12 leading-18 text-text-muted">
+            {{ 'builder2.publish.none' | transloco }}
+          </p>
+        } @else {
+          <div class="flex flex-col gap-6 rounded-10 border border-border bg-surface p-8">
+            @for (group of dependentGroups(); track group.key) {
+              <div class="flex flex-col gap-4">
+                <div class="flex items-center gap-6 text-12 text-text">
+                  <span class="font-medium">{{ group.label }}</span>
+                  <ui-badge tone="count">{{ group.count }}</ui-badge>
+                </div>
+                @if (group.items.length > 0) {
+                  <div class="flex flex-wrap gap-4">
+                    @for (dep of group.items; track dep.id) {
+                      <ui-badge tone="tag">{{ dep.name || dep.id }}</ui-badge>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <ng-container modal-footer>
+    <button
+      uiButton
+      type="button"
+      variant="primary"
+      [loading]="publishing()"
+      [disabled]="loadingImpact() || !impact() || publishing()"
+      (click)="confirmPublish()"
+    >
+      <ng-icon name="tablerSend" size="15" aria-hidden="true" />
+      <span>{{ 'builder2.review.publish' | transloco }}</span>
+    </button>
+    <button
+      uiButton
+      type="button"
+      variant="secondary"
+      [disabled]="publishing()"
+      (click)="cancel()"
+    >
+      {{ 'builder2.publish.cancel' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

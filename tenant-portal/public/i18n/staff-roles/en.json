@@ -1,0 +1,136 @@
+{
+  "title": "Roles",
+  "add": "Add role",
+  "search": "Search roles",
+  "empty": "No roles yet.",
+  "noResults": "No matching results.",
+  "loadFailed": "Could not load roles.",
+  "retry": "Try again",
+  "filters": {
+    "type": "Type"
+  },
+  "type": {
+    "custom": "Custom",
+    "system": "Built-in"
+  },
+  "sort": {
+    "name": "Name",
+    "newest": "Newest"
+  },
+  "cols": {
+    "role": "Role",
+    "mode": "Scope",
+    "branches": "Branches",
+    "count": "Permissions",
+    "users": "Users",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "mode": {
+    "GLOBAL": "Workspace-wide",
+    "BRANCH": "Per branch"
+  },
+  "system": "Built-in",
+  "adminSeatChip": "Takes a seat in every application",
+  "adminSeatHint": "Each user with this role takes one seat of every subscribed application.",
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "assign": "Assign permissions",
+    "workspace": "Workspace permissions",
+    "view": "View permissions",
+    "duplicate": "Duplicate",
+    "delete": "Delete"
+  },
+  "reason": {
+    "ownerOnly": "Only the workspace owner can set per-branch permissions.",
+    "branchPermissions": "Editing per-branch permissions requires role update and permissions catalogue access.",
+    "rolePermissions": "You don't have the permissions required for this action.",
+    "tenantWide": "This needs workspace-wide role permissions.",
+    "system": "Built-in roles can't be changed.",
+    "noDuplicateBranch": "Per-branch roles can't be duplicated yet."
+  },
+  "convert": {
+    "title": "Switch to per-branch permissions?",
+    "text": "Switch {{name}} to per-branch permissions? This can't be undone. Its {{n}} workspace-wide permissions will be removed, and you will choose permissions for each branch.",
+    "confirm": "Switch"
+  },
+  "create": {
+    "choiceTitle": "How should this role's permissions work?",
+    "perBranch": "Per branch: choose permissions for each branch",
+    "workspace": "Workspace-wide: the same permissions everywhere"
+  },
+  "modal": {
+    "new": "New role",
+    "title": "Role",
+    "create": "Create role",
+    "permissions": "Permissions…",
+    "systemNote": "Built-in roles can't be changed."
+  },
+  "fields": {
+    "name": "Name",
+    "nameHint": "Up to 120 characters, unique. \"admin\" is reserved.",
+    "namePlaceholder": "Enter role name",
+    "description": "Description",
+    "descriptionHint": "Optional. What this role is for, up to 2000 characters.",
+    "descriptionPlaceholder": "Describe what this role is for"
+  },
+  "validation": {
+    "nameRequired": "Role name is required.",
+    "nameMaxLength": "Role name must be at most {{max}} characters.",
+    "descriptionMaxLength": "Description must be at most {{max}} characters."
+  },
+  "global": {
+    "title": "Workspace permissions",
+    "count": "{{n}} of 200",
+    "saved": "Saved. Users with this role get the change on their next action.",
+    "listChanged": "The permission list changed. Reload.",
+    "grantDenied": "You can only give permissions you hold workspace-wide.",
+    "reload": "Reload",
+    "loadFailed": "Could not load permissions.",
+    "branchOwnerOnly": "Permissions are set per branch; only the workspace owner can view them."
+  },
+  "seat": {
+    "gives": "Gives {{module}} access to {{holders}} users",
+    "short": "Not enough {{module}} seats for everyone."
+  },
+  "delete": {
+    "title": "Delete {{name}}?",
+    "text": "This can't be undone.",
+    "inUse": "Remove this role from its {{n}} users first.",
+    "viewUsers": "View users"
+  },
+  "toast": {
+    "created": "Role created.",
+    "duplicated": "Role duplicated.",
+    "deleted": "Role deleted.",
+    "saved": "Changes saved."
+  },
+  "copySuffix": "(copy)",
+  "common": {
+    "save": "Save",
+    "undo": "Undo changes",
+    "unsaved": "Unsaved changes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete"
+  },
+  "discard": {
+    "title": "Discard your changes?",
+    "text": "Your unsaved changes will be lost.",
+    "confirm": "Discard",
+    "keep": "Keep editing"
+  },
+  "errors": {
+    "ROLE_NAME_TAKEN": "A role with this name already exists.",
+    "ROLE_NAME_RESERVED": "This role name is reserved.",
+    "ROLE_IS_SYSTEM": "Built-in roles can't be changed.",
+    "TENANT_WIDE_PERMISSION_REQUIRED": "This needs workspace-wide role permissions.",
+    "TENANT_ROLE_PERMISSION_LIMIT_EXCEEDED": "A role can have at most 200 permissions.",
+    "PERMISSION_UNKNOWN": "The permission list changed. Reload.",
+    "ROLE_BRANCH_MODE_REQUIRED": "This role uses per-branch permissions.",
+    "ROLE_PERMISSION_GRANT_DENIED": "You can only give permissions you hold workspace-wide.",
+    "ROLE_IN_USE": "Remove this role from its users first.",
+    "generic": "Something went wrong. Try again."
+  }
+}

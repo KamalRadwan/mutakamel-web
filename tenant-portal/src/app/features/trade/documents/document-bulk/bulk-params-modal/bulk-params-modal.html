@@ -1,0 +1,114 @@
+<ui-modal
+  [size]="modalSize()"
+  [icon]="modalIcon()"
+  [tile]="modalTile()"
+  [title]="modalTitle()"
+  [closeLabel]="'td.common.close' | transloco"
+  [dismissable]="!isDanger() && !submitting()"
+  (closed)="onModalClosed()"
+>
+  @if (action() === 'PRINT') {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 bg-brand-soft px-8 text-12 font-medium whitespace-nowrap text-on-brand-soft"
+    >
+      {{ 'tdb.bar.selected' | transloco: { n: selectedCount() } }}
+    </span>
+  }
+
+  @if (action() === 'PRINT') {
+    <div class="flex flex-col gap-10">
+      <ui-field
+        size="bare"
+        [label]="'tdb.print.template' | transloco"
+        [for]="uid + '-template'"
+        [hint]="'tdb.print.templateHint' | transloco"
+        [error]="templateError()"
+      >
+        <div class="flex items-center gap-6">
+          <ui-dropdown
+            class="min-w-0 flex-1"
+            size="field"
+            [id]="uid + '-template'"
+            [label]="'tdb.print.template' | transloco"
+            [describedBy]="templateDescribedBy()"
+            [options]="templateOptions()"
+            [value]="selectedTemplate()"
+            [disabled]="submitting() || templatesLoading() || templatesError()"
+            (valueChange)="onTemplateChange($event)"
+          />
+          @if (templatesError()) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              size="small"
+              [disabled]="submitting()"
+              (click)="retryTemplates()"
+            >
+              <ng-icon name="tablerRefresh" size="14" aria-hidden="true" />
+              <span>{{ 'td.common.retry' | transloco }}</span>
+            </button>
+          }
+        </div>
+      </ui-field>
+
+      <ui-field
+        size="bare"
+        [label]="'tdb.print.language' | transloco"
+        [for]="uid + '-locale'"
+        [hint]="'tdb.print.languageHint' | transloco"
+      >
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-locale'"
+          [label]="'tdb.print.language' | transloco"
+          [describedBy]="uid + '-locale-hint'"
+          [options]="localeOptions()"
+          [value]="effectiveLocale()"
+          [disabled]="submitting() || !usesDefaultTemplate()"
+          (valueChange)="onLocaleChange($event)"
+        />
+      </ui-field>
+
+      <p class="text-12 leading-18 text-text-muted">{{ 'tdb.print.zipNote' | transloco }}</p>
+    </div>
+  } @else if (action()) {
+    <div class="flex flex-col gap-10">
+      <p class="text-12 leading-18 text-text">{{ confirmLine() }}</p>
+
+      @if (reasonKind(); as rk) {
+        <app-trade-reason-picker
+          [kind]="rk"
+          [(value)]="reasonValue"
+          [idPrefix]="uid + '-reason'"
+          [disabled]="submitting()"
+          [showErrors]="showReasonErrors()"
+        />
+      }
+    </div>
+  }
+
+  <ng-container modal-footer>
+    <button
+      type="button"
+      uiButton
+      [variant]="isDanger() ? 'danger' : 'primary'"
+      [loading]="submitting()"
+      [disabled]="!canSubmit()"
+      (click)="submit()"
+    >
+      {{ confirmButtonLabel() }}
+    </button>
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="submitting()"
+      (click)="close()"
+    >
+      {{ (isDanger() ? 'td.common.close' : 'td.common.cancel') | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

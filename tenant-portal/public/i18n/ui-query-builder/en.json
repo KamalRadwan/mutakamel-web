@@ -1,0 +1,131 @@
+{
+  "title": "Advanced search",
+  "none": "No conditions",
+  "count": "Conditions: {{n}} · Groups: {{g}}",
+  "edit": "Edit",
+  "clear": "Clear",
+  "apply": "Apply",
+  "discard": "Discard changes",
+  "clearAll": "Clear all",
+  "unsaved": "Unsaved changes",
+  "collapse": "Collapse advanced search",
+  "expand": "Expand advanced search",
+  "attention": "{{n}} conditions need attention",
+  "fixed": {
+    "title": "Always applied",
+    "desc": "These filters apply to every result.",
+    "add": "Add filter"
+  },
+  "group": {
+    "all": "Match ALL",
+    "any": "Match ANY",
+    "combine": "How conditions in this group combine",
+    "combineLabel": "Match",
+    "combineHint": "All: every condition must be true. Any: one condition is enough",
+    "label": "Group {{n}}",
+    "remove": "Remove group {{n}}"
+  },
+  "and": "AND",
+  "or": "OR",
+  "add": {
+    "condition": "Condition",
+    "group": "Group"
+  },
+  "field": "Field",
+  "operator": "Operator",
+  "value": "Value",
+  "chooseField": "Choose a field",
+  "remove": "Remove condition {{field}}",
+  "reason": {
+    "ROOT_ONLY": "Applies to all results, so it lives in \"Always applied\".",
+    "SINGLETON": "Already used. Edit the existing condition.",
+    "EXCLUSIVE": "Only one text search at a time. Edit the existing one."
+  },
+  "limits": {
+    "depth": "Groups can be nested up to 3 levels.",
+    "conditions": "Up to 50 conditions.",
+    "children": "Up to 20 items in one group."
+  },
+  "op": {
+    "contains": "contains",
+    "ilike": "contains",
+    "ilikeAny": "contains any of",
+    "startsWith": "starts with",
+    "endsWith": "ends with",
+    "eq": "is",
+    "neq": "is not",
+    "in": "is one of",
+    "nin": "is none of",
+    "gte": "at least",
+    "lte": "at most",
+    "between": "between",
+    "isNull": "is empty",
+    "isNotNull": "is not empty",
+    "on": "on",
+    "before": "before",
+    "after": "after",
+    "relative": "in the period",
+    "is": "is",
+    "hasAny": "has any of"
+  },
+  "shortOp": {
+    "eq": "",
+    "is": "",
+    "neq": "not",
+    "in": "one of",
+    "nin": "none of",
+    "isNull": "empty",
+    "isNotNull": "not empty"
+  },
+  "date": {
+    "today": "today",
+    "yesterday": "yesterday",
+    "last7": "the last 7 days",
+    "last30": "the last 30 days",
+    "thisMonth": "this month",
+    "lastMonth": "last month",
+    "thisYear": "this year"
+  },
+  "bool": {
+    "true": "Yes",
+    "false": "No"
+  },
+  "summary": {
+    "cond": "{{field}} {{op}} {{value}}",
+    "and": ", and",
+    "or": "or"
+  },
+  "issue": {
+    "INCOMPLETE": "Complete this condition or remove it.",
+    "INVALID_VALUE": "This value is not valid.",
+    "RANGE_INVERTED": "\"From\" must not be after \"To\".",
+    "DUPLICATE": "This condition is already in this group.",
+    "CONTRADICTION": "{{field}} can't be both “{{a}}” and “{{b}}”.",
+    "CONTRADICTION_IN": "{{field}} can't be both “{{a}}” and “{{b}}”. Use \"Match ANY\" or \"is one of\".",
+    "REDUNDANT": "These {{field}} conditions overlap; one is enough.",
+    "OR_MERGE": "Combine into \"is one of\".",
+    "ALWAYS_TRUE": "This matches every result, so it has no effect.",
+    "MATCHES_NOTHING": "This can never match.",
+    "SINGLETON": "{{field}} can be used only once.",
+    "EXCLUSIVE": "Only one text search at a time.",
+    "ROOT_ONLY": "{{field}} applies to all results. Move it to \"Always applied\".",
+    "LIMIT": "Too many conditions or levels.",
+    "DUPLICATE_GROUP": "This group repeats another group."
+  },
+  "fix": {
+    "merge": "Merge",
+    "simplify": "Simplify",
+    "remove": "Remove",
+    "removeBoth": "Remove both"
+  },
+  "confirm": {
+    "clearTitle": "Clear all conditions?",
+    "clearText": "The list will show all leads you can see.",
+    "clear": "Clear",
+    "discardTitle": "Discard the advanced changes?",
+    "discardText": "Your unapplied changes will be lost.",
+    "discard": "Discard",
+    "keep": "Keep editing"
+  },
+  "hintLabel": "About {{field}}"
+}

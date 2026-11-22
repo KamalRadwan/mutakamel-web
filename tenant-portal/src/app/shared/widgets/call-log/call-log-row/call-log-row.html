@@ -1,0 +1,254 @@
+@let row = item();
+@let rowLook = look();
+
+@if (variant() === 'list') {
+  <div class="flex items-center gap-8 rounded-10 px-10 py-8 transition-colors duration-fast hover:bg-row-hover">
+    <span
+      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="rowLook.tile"
+    >
+      <ng-icon [name]="rowLook.icon" size="14" aria-hidden="true" />
+    </span>
+
+    <div class="flex min-w-0 flex-1 flex-col gap-2">
+      <div
+        class="flex min-w-0 items-center text-12 leading-18 font-medium"
+        [class]="rowLook.missed ? 'text-danger-text' : 'text-text'"
+      >
+        @if (row.record; as rec) {
+          @if (recordRoute(); as route) {
+            <a
+              [routerLink]="route"
+              class="truncate rounded-4 outline-none transition-colors duration-fast hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="onOpenRecord($event)"
+            >
+              {{ rec.label }}
+            </a>
+          } @else {
+            <button
+              type="button"
+              class="cursor-pointer truncate rounded-4 text-start outline-none transition-colors duration-fast hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="onOpenRecord($event)"
+            >
+              {{ rec.label }}
+            </button>
+          }
+        } @else if (row.name) {
+          <span class="truncate">{{ row.name }}</span>
+        } @else {
+          <span dir="ltr" class="truncate">{{ row.number }}</span>
+        }
+      </div>
+
+      <div class="flex min-w-0 items-center gap-4 text-11 leading-16 text-text-muted">
+        <span class="truncate">{{ rowLook.labelKey | transloco }}</span>
+        @if (timeText(); as time) {
+          <span aria-hidden="true">·</span>
+          <span dir="ltr" class="shrink-0 tabular-nums">{{ time }}</span>
+        }
+        @if (durationText(); as duration) {
+          <span aria-hidden="true">·</span>
+          <span dir="ltr" class="shrink-0 tabular-nums">{{ duration }}</span>
+        }
+      </div>
+    </div>
+
+    @if (canCallBack()) {
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source disabled:hover:bg-transparent"
+        [disabled]="isBusy()"
+        [attr.aria-label]="(isBusy() ? 'callLog.actions.inCall' : 'callLog.actions.callBack') | transloco"
+        [title]="(isBusy() ? 'callLog.actions.inCall' : 'callLog.actions.callBack') | transloco"
+        (click)="onCallBack($event)"
+      >
+        <ng-icon
+          name="tablerPhone"
+          size="14"
+          [class]="isBusy() ? 'text-text-placeholder' : 'text-icon-green'"
+          aria-hidden="true"
+        />
+      </button>
+    }
+  </div>
+} @else if (variant() === 'card') {
+  <div class="flex h-table-row shrink-0 items-center gap-8 rounded-10 border border-border bg-surface px-8 transition-colors duration-fast hover:bg-row-hover">
+    <span
+      class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+      [class]="rowLook.tile"
+    >
+      <ng-icon [name]="rowLook.icon" size="14" aria-hidden="true" />
+    </span>
+
+    <div class="flex min-w-0 flex-1 flex-col">
+      <div
+        class="flex min-w-0 items-center text-13 leading-16 font-medium"
+        [class]="rowLook.missed ? 'text-danger-text' : 'text-text'"
+      >
+        @if (row.record; as rec) {
+          @if (recordRoute(); as route) {
+            <a
+              [routerLink]="route"
+              class="truncate rounded-4 outline-none transition-colors duration-fast hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="onOpenRecord($event)"
+            >
+              {{ rec.label }}
+            </a>
+          } @else {
+            <button
+              type="button"
+              class="cursor-pointer truncate rounded-4 text-start outline-none transition-colors duration-fast hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+              (click)="onOpenRecord($event)"
+            >
+              {{ rec.label }}
+            </button>
+          }
+        } @else if (row.name) {
+          <span class="truncate">{{ row.name }}</span>
+        } @else {
+          <span dir="ltr" class="truncate">{{ row.number }}</span>
+        }
+      </div>
+
+      <div class="flex min-w-0 items-center gap-4 text-11 leading-16 text-text-muted">
+        @if (row.record || row.name) {
+          <span dir="ltr" class="shrink-0">{{ row.number }}</span>
+          <span aria-hidden="true">·</span>
+        }
+        <span class="truncate">{{ rowLook.labelKey | transloco }}</span>
+      </div>
+    </div>
+
+    @if (timeText(); as time) {
+      <span dir="ltr" class="shrink-0 text-11 leading-16 text-text-muted tabular-nums">{{ time }}</span>
+    }
+
+    @if (canCallBack()) {
+      @let callBackLabel =
+        isBusy()
+          ? ('callLog.actions.inCall' | transloco)
+          : (('callLog.actions.callBack' | transloco) + ' ' + partyDisplayName());
+      <button
+        type="button"
+        class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-full bg-success text-on-success outline-none transition-colors duration-fast hover:bg-success-hover active:bg-success-pressed focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:bg-neutral-soft disabled:text-text-placeholder"
+        [disabled]="isBusy()"
+        [attr.aria-label]="callBackLabel"
+        [title]="callBackLabel"
+        (click)="onCallBack($event)"
+      >
+        <ng-icon name="tablerPhone" size="14" aria-hidden="true" />
+      </button>
+    }
+  </div>
+} @else {
+  <div
+    role="row"
+    class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
+    [class]="tableColumnsClass()"
+  >
+    @for (col of columns(); track col; let first = $first) {
+      @switch (col) {
+        @case ('type') {
+          <span role="cell" class="flex min-w-0 items-center gap-8 px-10" [class.border-s]="!first" [class.border-border]="!first">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-on-icon"
+              [class]="rowLook.tile"
+            >
+              <ng-icon [name]="rowLook.icon" size="14" aria-hidden="true" />
+            </span>
+            <span
+              class="min-w-0 truncate text-12 leading-18 font-medium"
+              [class]="rowLook.missed ? 'text-danger-text' : 'text-text'"
+            >
+              {{ rowLook.labelKey | transloco }}
+            </span>
+            @if (row.linkKind === 'NUMBER_MATCH' && !hasPartyColumn()) {
+              <span
+                class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text"
+                [title]="'callLog.numberMatch.hint' | transloco"
+              >
+                {{ 'callLog.numberMatch.label' | transloco }}
+              </span>
+            }
+          </span>
+        }
+
+        @case ('party') {
+          <span role="cell" class="flex min-w-0 items-center gap-6 px-10 text-14 leading-20" [class.border-s]="!first" [class.border-border]="!first">
+            @if (row.record; as rec) {
+              @if (recordRoute(); as route) {
+                <a
+                  [routerLink]="route"
+                  class="min-w-0 truncate rounded-4 font-medium outline-none transition-colors duration-fast hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="onOpenRecord($event)"
+                >
+                  {{ rec.label }}
+                </a>
+              } @else {
+                <button
+                  type="button"
+                  class="min-w-0 cursor-pointer truncate rounded-4 text-start font-medium outline-none transition-colors duration-fast hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                  (click)="onOpenRecord($event)"
+                >
+                  {{ rec.label }}
+                </button>
+              }
+            } @else if (row.name) {
+              <span class="min-w-0 truncate">{{ row.name }}</span>
+            } @else {
+              <span dir="ltr" class="min-w-0 truncate">{{ row.number }}</span>
+            }
+            @if (row.linkKind === 'NUMBER_MATCH') {
+              <span
+                class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text"
+                [title]="'callLog.numberMatch.hint' | transloco"
+              >
+                {{ 'callLog.numberMatch.label' | transloco }}
+              </span>
+            }
+          </span>
+        }
+
+        @case ('owner') {
+          <span role="cell" class="flex min-w-0 items-center px-10 text-14 leading-20" [class.border-s]="!first" [class.border-border]="!first">
+            <span class="truncate" [class.text-text-muted]="!row.ownerName">{{ row.ownerName || '—' }}</span>
+          </span>
+        }
+
+        @case ('date') {
+          <span role="cell" class="flex min-w-0 items-center px-10 text-12 leading-18 text-text" [class.border-s]="!first" [class.border-border]="!first">
+            <span dir="ltr" class="truncate tabular-nums">{{ dateTimeText() || '—' }}</span>
+          </span>
+        }
+
+        @case ('duration') {
+          <span role="cell" class="flex min-w-0 items-center justify-end px-10 text-12 leading-18 text-text" [class.border-s]="!first" [class.border-border]="!first">
+            <span dir="ltr" class="truncate tabular-nums">{{ durationText() ?? '—' }}</span>
+          </span>
+        }
+
+        @case ('actions') {
+          <span role="cell" class="flex items-center justify-center" [class.border-s]="!first" [class.border-border]="!first">
+            @if (canCallBack()) {
+              <button
+                type="button"
+                class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 outline-none transition-colors duration-fast hover:bg-neutral-soft active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:opacity-drag-source disabled:hover:bg-transparent"
+                [disabled]="isBusy()"
+                [attr.aria-label]="(isBusy() ? 'callLog.actions.inCall' : 'callLog.actions.callBack') | transloco"
+                [title]="(isBusy() ? 'callLog.actions.inCall' : 'callLog.actions.callBack') | transloco"
+                (click)="onCallBack($event)"
+              >
+                <ng-icon
+                  name="tablerPhone"
+                  size="14"
+                  [class]="isBusy() ? 'text-text-placeholder' : 'text-icon-green'"
+                  aria-hidden="true"
+                />
+              </button>
+            }
+          </span>
+        }
+      }
+    }
+  </div>
+}

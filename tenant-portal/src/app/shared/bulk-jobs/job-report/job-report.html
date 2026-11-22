@@ -1,0 +1,252 @@
+<ui-modal
+  size="wide"
+  [icon]="modalIcon()"
+  [tile]="modalTile()"
+  [title]="modalTitle()"
+  [subtitle]="modalSubtitle()"
+  [closeLabel]="'bulkJobs.report.close' | transloco"
+  (closed)="onModalClosed()"
+>
+  @if (job(); as current) {
+    <span
+      modal-header-end
+      class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+      [class]="statusBadgeClass()"
+    >
+      {{ 'bulkJobs.status.' + current.status | transloco }}
+    </span>
+  }
+
+  @if (loadingJob() && !job()) {
+    <div class="flex items-center justify-center gap-8 py-16 text-12 text-text-muted">
+      <ng-icon name="tablerLoader2" size="16" class="animate-spin text-accent" aria-hidden="true" />
+    </div>
+  } @else if (job(); as current) {
+    <div class="flex flex-col gap-10">
+      @if (isActive()) {
+        <div class="flex flex-col gap-4">
+          <div
+            class="h-6 w-full overflow-hidden rounded-full bg-neutral-soft"
+            role="progressbar"
+            [attr.aria-valuenow]="current.processed"
+            [attr.aria-valuemin]="0"
+            [attr.aria-valuemax]="current.total"
+          >
+            <div
+              class="h-full rounded-full bg-brand transition-all duration-fast ease-enter"
+              [style.width.%]="progressPercent()"
+            ></div>
+          </div>
+          <span class="text-12 leading-18 text-text-muted tabular-nums">
+            {{ 'bulkJobs.progress' | transloco: { processed: current.processed, total: current.total } }}
+          </span>
+        </div>
+      }
+
+      @if (
+        current.counts.succeeded > 0 ||
+        current.counts.unchanged > 0 ||
+        current.counts.skipped > 0 ||
+        current.counts.failed > 0 ||
+        current.counts.cancelled > 0
+      ) {
+        <div class="flex flex-wrap items-center gap-6">
+          @if (current.counts.succeeded > 0) {
+            <span
+              class="inline-flex h-badge items-center rounded-8 bg-success-soft px-8 text-12 font-medium whitespace-nowrap text-on-success-soft"
+            >
+              {{ succeededText() }}
+            </span>
+          }
+          @if (current.counts.unchanged > 0) {
+            <span
+              class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
+            >
+              {{ ('bulkJobs.count.unchangedPlural' | pluralKey: current.counts.unchanged) | transloco: { n: current.counts.unchanged } }}
+            </span>
+          }
+          @if (current.counts.skipped > 0) {
+            <span
+              class="inline-flex h-badge items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
+            >
+              {{ ('bulkJobs.count.skippedPlural' | pluralKey: current.counts.skipped) | transloco: { n: current.counts.skipped } }}
+            </span>
+          }
+          @if (current.counts.failed > 0) {
+            <span
+              class="inline-flex h-badge items-center rounded-8 bg-danger-soft px-8 text-12 font-medium whitespace-nowrap text-on-danger-soft"
+            >
+              {{ ('bulkJobs.count.failedPlural' | pluralKey: current.counts.failed) | transloco: { n: current.counts.failed } }}
+            </span>
+          }
+          @if (current.counts.cancelled > 0) {
+            <span
+              class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning"
+            >
+              {{ ('bulkJobs.count.cancelledPlural' | pluralKey: current.counts.cancelled) | transloco: { n: current.counts.cancelled } }}
+            </span>
+          }
+        </div>
+      }
+
+      @if (summaryLines().length > 0) {
+        <div class="flex flex-col gap-2">
+          @for (line of summaryLines(); track $index) {
+            <p class="text-12 leading-18 text-text-muted">{{ line }}</p>
+          }
+        </div>
+      }
+
+      @if (failureReason(); as reason) {
+        <p class="flex items-center gap-3 text-11 leading-16 text-danger-text" role="alert">
+          <ng-icon name="tablerCircleX" size="11" class="shrink-0" aria-hidden="true" />
+          <span>{{ reason }}</span>
+        </p>
+      }
+
+      <div class="flex flex-col gap-6 border-t border-border pt-8">
+        <h3 class="text-13 leading-18 font-medium text-text">{{ 'bulkJobs.report.issues' | transloco }}</h3>
+
+        <ui-field
+          size="bare"
+          [label]="'bulkJobs.report.filter.label' | transloco"
+          [hint]="'bulkJobs.report.filter.hint' | transloco"
+        >
+          <div class="flex flex-wrap items-center">
+            <ui-segmented
+              [options]="issueFilterOptions()"
+              [label]="'bulkJobs.report.filter.label' | transloco"
+              [value]="selectedIssueStatus()"
+              (valueChange)="onIssueStatusChange($event)"
+            />
+          </div>
+        </ui-field>
+
+        @if (loadingItems()) {
+          <div class="flex flex-col gap-6">
+            @for (row of [1, 2, 3]; track row) {
+              <div class="flex h-table-row items-center justify-between gap-8 rounded-10 border border-border bg-surface px-10 shadow-card">
+                <div class="h-skeleton-line w-toast animate-pulse rounded-4 bg-neutral-soft"></div>
+                <div class="h-badge w-icon-tile-lg animate-pulse rounded-8 bg-neutral-soft"></div>
+              </div>
+            }
+          </div>
+        } @else if (issueRows().length === 0) {
+          <p class="py-8 text-center text-12 leading-18 text-text-muted">
+            {{ 'bulkJobs.report.noIssues' | transloco }}
+          </p>
+        } @else {
+          <div
+            class="flex flex-col gap-6 overflow-y-auto pb-2"
+            style="max-height: calc(8 * var(--table-row-h))"
+            role="list"
+          >
+            @for (row of issueRows(); track row.item.ordinal) {
+              <div
+                role="listitem"
+                class="flex min-h-table-row items-center justify-between gap-8 rounded-10 border border-border bg-surface px-10 py-6 text-12 shadow-card"
+              >
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  @if (row.link; as link) {
+                    <a
+                      [routerLink]="link.commands"
+                      [queryParams]="link.queryParams ?? null"
+                      class="truncate rounded-4 font-medium text-accent outline-none hover:underline focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+                      (click)="close()"
+                    >
+                      {{ row.item.label }}
+                    </a>
+                  } @else {
+                    <span class="truncate font-medium text-text">{{ row.item.label }}</span>
+                  }
+                  @if (row.reason) {
+                    <span class="truncate text-11 leading-16 text-text-muted">{{ row.reason }}</span>
+                  }
+                </div>
+                <span
+                  class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+                  [class]="row.statusClass"
+                >
+                  {{ 'bulkJobs.item.' + row.item.status | transloco }}
+                </span>
+              </div>
+            }
+          </div>
+
+          @if (hasMore()) {
+            <div class="flex justify-center pt-2">
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [loading]="loadingMore()"
+                (click)="loadMore()"
+              >
+                {{ 'bulkJobs.report.loadMore' | transloco }}
+              </button>
+            </div>
+          }
+        }
+      </div>
+
+      @if (showRetryStart()) {
+        <div class="border-t border-border pt-8">
+          <ui-field
+            size="bare"
+            [label]="'bulkJobs.report.retryStart' | transloco"
+            [for]="uid + '-retry-date'"
+            [hint]="'bulkJobs.report.retryStartHint' | transloco"
+            [required]="true"
+            [error]="retryStartError()"
+          >
+            <div class="flex items-center gap-6">
+              <ui-date-field
+                class="min-w-0 flex-1"
+                [id]="uid + '-retry-date'"
+                [ariaLabel]="'bulkJobs.report.retryStart' | transloco"
+                [todayLabel]="'bulkJobs.report.today' | transloco"
+                [min]="todayIso()"
+                [value]="retryDate()"
+                [invalid]="!!retryStartError()"
+                (valueChange)="onRetryDateChange($event)"
+              />
+              <ui-time-field
+                class="shrink-0"
+                [id]="uid + '-retry-time'"
+                [ariaLabel]="'bulkJobs.report.retryStart' | transloco"
+                [hourLabel]="'bulkJobs.report.hour' | transloco"
+                [minuteLabel]="'bulkJobs.report.minute' | transloco"
+                [value]="retryTime()"
+                [invalid]="!!retryStartError()"
+                (valueChange)="onRetryTimeChange($event)"
+              />
+            </div>
+          </ui-field>
+        </div>
+      }
+    </div>
+  }
+
+  <ng-container modal-footer>
+    @if (canRetry()) {
+      <button
+        type="button"
+        uiButton
+        [loading]="retrying()"
+        [disabled]="retrying() || !!retryStartError()"
+        (click)="onRetry()"
+      >
+        {{ 'bulkJobs.report.retry' | transloco }}
+      </button>
+    }
+    @if (selectFailedRouteValue()) {
+      <button type="button" uiButton variant="secondary" (click)="onSelectFailed()">
+        {{ 'bulkJobs.report.selectFailed' | transloco }}
+      </button>
+    }
+    <button type="button" uiButton [variant]="canRetry() ? 'secondary' : 'primary'" (click)="close()">
+      {{ 'bulkJobs.report.close' | transloco }}
+    </button>
+  </ng-container>
+</ui-modal>

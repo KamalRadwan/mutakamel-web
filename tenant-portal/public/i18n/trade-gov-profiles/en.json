@@ -1,0 +1,364 @@
+{
+  "types": {
+    "ALL": "All",
+    "QUOTATION": "Quotation",
+    "SALES_ORDER": "Sales order",
+    "PURCHASE_ORDER": "Purchase order"
+  },
+  "list": {
+    "title": "Document profiles",
+    "newProfile": "New profile",
+    "searchPlaceholder": "Search by profile code…",
+    "clearSearch": "Clear search",
+    "reload": "Reload",
+    "stepFilterLabel": "Filter by document type",
+    "stepFilterHint": "Show only the profiles for the chosen document type",
+    "tableLabel": "Document profiles",
+    "paginationLabel": "Document profiles pagination",
+    "columns": {
+      "code": "Code",
+      "documentType": "Document type",
+      "liveVersion": "Live version",
+      "nextVersion": "Next version",
+      "versions": "Versions",
+      "actions": "Actions"
+    },
+    "liveVersion": "Version {{n}} · from {{date}}",
+    "startsOn": "Starts {{date}}",
+    "versionShort": "v{{n}}",
+    "empty": "No document profiles yet.",
+    "noMatches": "No document profiles match your filters.",
+    "clearFilters": "Clear filters",
+    "loadFailed": "Could not load document profiles.",
+    "versionNotInScope": "This version is not in the current scope.",
+    "actionsLabel": "Profile actions",
+    "actions": {
+      "open": "Open",
+      "newVersion": "New version"
+    }
+  },
+  "modal": {
+    "title": "New document profile",
+    "create": "Create",
+    "codeLabel": "Code",
+    "codePlaceholder": "DEFAULT",
+    "codeHint": "Use DEFAULT for the profile new documents use.",
+    "codeRequired": "Enter a profile code.",
+    "codeInvalid": "Start with an uppercase letter followed by uppercase letters, digits, underscores, dots, or hyphens.",
+    "documentTypeLabel": "Document type",
+    "documentTypeHint": "Choose the document family governed by this profile.",
+    "scopeLabel": "Scope",
+    "scopeHint": "Profiles are defined at company or tenant level using your current working context.",
+    "scopePair": "{{company}} · {{branch}}",
+    "branchScopeError": "Document profiles are set at company or tenant level. Switch the scope to your company.",
+    "discardTitle": "Discard changes?",
+    "discardText": "Your entered profile details will be lost.",
+    "discardConfirm": "Discard"
+  },
+  "detail": {
+    "back": "Back to document profiles",
+    "liveVersion": "Live: Version {{n}}",
+    "noLiveVersion": "No live version",
+    "newVersion": "New version",
+    "reload": "Reload",
+    "loadFailed": "Could not load document profile.",
+    "versionsEmpty": "No versions yet.",
+    "newVersionModal": {
+      "title": "New profile version",
+      "continue": "Continue",
+      "effectiveFrom": "Effective from",
+      "effectiveFromHint": "Date and 24-hour time when this profile version starts applying.",
+      "effectiveTo": "Effective to",
+      "effectiveToHint": "Optional end date and time; leave blank for an open-ended version.",
+      "clearEnd": "Clear end date",
+      "startFrom": "Start from",
+      "startFromHint": "Seed this version from the current live version or start from default family settings.",
+      "startFromLive": "The live version",
+      "startFromEmpty": "An empty profile",
+      "noLiveHint": "No live version is published yet, so this starts from the default family profile.",
+      "dateRequired": "Choose a start date and time.",
+      "invalidDate": "Enter a valid date and time.",
+      "endAfterStart": "End date and time must be after the start.",
+      "today": "Today",
+      "prevMonth": "Previous month",
+      "nextMonth": "Next month",
+      "hour": "Hour",
+      "minute": "Minutes"
+    },
+    "deleteDraft": {
+      "title": "Delete draft version {{n}}?",
+      "text": "This draft version and its rules will be permanently removed.",
+      "confirm": "Delete draft"
+    }
+  },
+  "version": {
+    "back": "Back to profile",
+    "versionLabel": "Version {{n}}",
+    "newVersionTitle": "New version",
+    "createVersion": "Create version",
+    "validate": "Validate",
+    "publish": "Publish",
+    "schedule": "Schedule",
+    "loadFailed": "Could not load profile version.",
+    "lifecycleLabel": "Version lifecycle",
+    "tabsLabel": "Profile version sections",
+    "goesLive": "goes live {{date}}",
+    "liveSince": "live since {{date}}",
+    "replacedRange": "replaced · {{range}}",
+    "datesCardLabel": "Effective schedule",
+    "discardTitle": "Discard new version?",
+    "discardText": "Your edits to this new profile version will be lost.",
+    "discardConfirm": "Discard",
+    "effectiveFrom": "Effective from",
+    "effectiveFromHint": "Date and 24-hour time when this version becomes active.",
+    "effectiveTo": "Effective to",
+    "effectiveToHint": "Optional end date and time; leave blank for an open-ended version.",
+    "clearEnd": "Clear end date",
+    "dateRequired": "Choose a start date and time.",
+    "invalidDate": "Enter a valid date and time.",
+    "endAfterStart": "End date and time must be after the start.",
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "hour": "Hour",
+    "minute": "Minutes"
+  },
+  "stepper": {
+    "draft": "Draft",
+    "tested": "Tested",
+    "publishedOrScheduled": "Published or scheduled",
+    "replaced": "Replaced"
+  },
+  "tabs": {
+    "fields": "Fields",
+    "layout": "Layout",
+    "behaviour": "Behaviour",
+    "evidence": "Evidence",
+    "cases": "Cases"
+  },
+  "fields": {
+    "tableLabel": "Document fields",
+    "columns": {
+      "field": "Field",
+      "kind": "Kind",
+      "visible": "Visible",
+      "required": "Required",
+      "note": "Note",
+      "visibleHint": "Show or hide this field on documents that use this profile.",
+      "requiredHint": "Require a value for this field before the document can be saved."
+    },
+    "kind": {
+      "editable": "Editable",
+      "serverOwned": "Set by the system"
+    },
+    "alwaysRequired": {
+      "QUOTATION": "Always required for quotations",
+      "SALES_ORDER": "Always required for sales orders",
+      "PURCHASE_ORDER": "Always required for purchase orders"
+    },
+    "serverOwnedNote": "Shown only; the system fills it",
+    "visibleAria": "{{field}} visible",
+    "requiredAria": "{{field}} required"
+  },
+  "layout": {
+    "tableLabel": "Document layout components",
+    "dragHandle": "Reorder component",
+    "alwaysVisible": "Always visible",
+    "columns": {
+      "drag": "Reorder",
+      "order": "Order",
+      "component": "Component",
+      "visible": "Visible",
+      "note": "Note",
+      "actions": "Actions",
+      "visibleHint": "Show or hide this component in the document layout."
+    },
+    "actions": {
+      "menuLabel": "Component order actions",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
+    },
+    "visibleAria": "{{component}} visible"
+  },
+  "behaviour": {
+    "sectionLabel": "Document behaviour modes",
+    "lockedNote": "Fixed by the system for this document family."
+  },
+  "evidence": {
+    "tableLabel": "Required evidence records",
+    "columns": {
+      "evidence": "Evidence",
+      "include": "Include",
+      "required": "Required",
+      "includeHint": "Include this evidence type in documents that use this profile.",
+      "requiredHint": "Require this evidence before the document can move forward. Available only when the evidence is included."
+    },
+    "includeAria": "Include {{evidence}}",
+    "requiredAria": "Require {{evidence}}"
+  },
+  "cases": {
+    "systemTitle": "System validation cases",
+    "systemTableLabel": "System validation cases",
+    "systemBadge": "System",
+    "customTitle": "Custom validation cases",
+    "customTableLabel": "Custom validation cases",
+    "addCase": "Add case",
+    "limitReached": "Maximum of 20 custom cases reached.",
+    "emptyCustom": "No custom validation cases yet.",
+    "pass": "Pass",
+    "fail": "Fail",
+    "moreFields": "+{{count}}",
+    "columns": {
+      "case": "Case",
+      "kind": "Kind",
+      "result": "Result",
+      "code": "Code",
+      "inputFields": "Input fields",
+      "shouldBeValid": "Should be valid",
+      "actions": "Actions"
+    },
+    "actions": {
+      "menuLabel": "Case actions",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "modal": {
+      "addTitle": "Add validation case",
+      "editTitle": "Edit validation case",
+      "add": "Add",
+      "save": "Save",
+      "codeLabel": "Code",
+      "codeHint": "Unique uppercase identifier such as QUOTATION_MINIMUM_INPUTS.",
+      "codePlaceholder": "MINIMUM_INPUTS",
+      "codeRequired": "Enter a case code.",
+      "codeInvalid": "Start with an uppercase letter followed by uppercase letters, digits, underscores, dots, or hyphens.",
+      "codeDuplicate": "A case with this code already exists.",
+      "inputFieldsLabel": "Input fields",
+      "inputFieldsHint": "Select the fields provided in this validation scenario.",
+      "shouldBeValidLabel": "Should be valid",
+      "shouldBeValidHint": "Specify whether a document with these input fields should pass profile validation."
+    }
+  },
+  "publishModal": {
+    "title": "Publish version {{n}}?",
+    "scheduledWithLive": "It starts on {{date}}, so it will be scheduled. Version {{live}} stays live until then.",
+    "scheduledNoLive": "It starts on {{date}}, so it will be scheduled.",
+    "liveWithLive": "It goes live now and replaces version {{live}}.",
+    "liveNoLive": "It goes live immediately.",
+    "makerCheckerAuthor": "Another person must publish: {{author}} created this version.",
+    "schedule": "Schedule",
+    "publish": "Publish"
+  },
+  "actions": {
+    "validate": "Validate"
+  },
+  "toasts": {
+    "profileCreated": "Document profile {{code}} created.",
+    "versionCreated": "Version {{n}} created as a draft.",
+    "draftDeleted": "Draft version {{n}} deleted.",
+    "validated": "Validation passed. Version is now tested.",
+    "validationFailedOne": "1 case failed.",
+    "validationFailed": "{{count}} cases failed.",
+    "published": "Version {{n}} published.",
+    "scheduled": "Version {{n}} scheduled."
+  },
+  "errors": {
+    "generic": "Something went wrong. Try again."
+  },
+  "registry": {
+    "fields": {
+      "customerAccountId": "Customer",
+      "supplierAccountId": "Supplier",
+      "contactPartyId": "Contact",
+      "currencyCode": "Currency",
+      "validUntil": "Valid until",
+      "orderDate": "Order date",
+      "requestedDeliveryDate": "Requested delivery date",
+      "expectedReceiptDate": "Expected receipt date",
+      "paymentTermsId": "Terms",
+      "branchId": "Branch",
+      "channelId": "Channel",
+      "externalReference": "External reference",
+      "notes": "Notes",
+      "documentNumber": "Document number",
+      "grandTotal": "Grand total",
+      "approvalStatus": "Approval status",
+      "confirmationStatus": "Confirmation status"
+    },
+    "components": {
+      "HEADER": "Header",
+      "PARTIES": "Parties",
+      "LINE_ITEMS": "Line items",
+      "TOTALS": "Totals",
+      "TERMS": "Terms",
+      "DELIVERY": "Delivery",
+      "ATTACHMENTS": "Attachments",
+      "AUDIT_HISTORY": "Audit history"
+    },
+    "modes": {
+      "acceptanceMode": {
+        "label": "Acceptance",
+        "hint": "Determines who is permitted to record quotation acceptance.",
+        "note": "Only internal authorized users can accept quotations.",
+        "values": {
+          "INTERNAL_AUTHORIZED_ONLY": "Internal authorized only"
+        }
+      },
+      "priceLockRequired": {
+        "label": "Price lock required",
+        "hint": "Require pricing to be locked before sending the quotation.",
+        "values": {
+          "true": "Yes",
+          "false": "No"
+        }
+      },
+      "confirmationMode": {
+        "label": "Confirmation",
+        "hint": "Defines how sales orders are confirmed upon submission.",
+        "note": "Waiting confirmation is not supported yet.",
+        "values": {
+          "SYNC": "Immediate"
+        }
+      },
+      "reservationRequired": {
+        "label": "Reservation required",
+        "hint": "Require inventory reservation before confirming a sales order.",
+        "values": {
+          "true": "Yes",
+          "false": "No"
+        }
+      },
+      "approvalMode": {
+        "label": "Approval",
+        "hint": "Choose whether purchase orders require an approval workflow.",
+        "values": {
+          "NONE": "None",
+          "WORKFLOW": "Workflow"
+        }
+      },
+      "dispatchMode": {
+        "label": "Dispatch",
+        "hint": "Control whether approved purchase orders dispatch immediately or via queue.",
+        "values": {
+          "IMMEDIATE": "Immediate",
+          "QUEUED": "Queued"
+        }
+      }
+    },
+    "evidence": {
+      "CUSTOMER_ACCEPTANCE": "Customer acceptance",
+      "APPROVAL_DECISION": "Approval decision",
+      "PRICE_DECISION": "Price decision",
+      "CREDIT_DECISION": "Credit decision",
+      "SUPPLIER_ACKNOWLEDGEMENT": "Supplier acknowledgement"
+    },
+    "systemCases": {
+      "MINIMAL_VALID": "A document with only the required fields is accepted",
+      "MISSING_REQUIRED_REJECTED": "A document missing a required field is rejected",
+      "SERVER_OWNED_REJECTED": "A document that sets a system-filled field is rejected",
+      "QUOTATION_REGISTRY_COMPATIBLE": "The profile matches the quotation registry",
+      "SALES_ORDER_REGISTRY_COMPATIBLE": "The profile matches the sales order registry",
+      "PURCHASE_ORDER_REGISTRY_COMPATIBLE": "The profile matches the purchase order registry"
+    }
+  }
+}

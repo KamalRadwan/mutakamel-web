@@ -1,0 +1,32 @@
+@if (chips().length > 0) {
+  <div
+    role="group"
+    [attr.aria-label]="'dashFilters.selectedFilters' | transloco"
+    class="flex flex-wrap items-center gap-6"
+  >
+    @for (chip of chips(); track chip.index + ':' + chip.value) {
+      <span class="inline-flex h-filter-chip max-w-full items-center gap-4 rounded-8 bg-brand-soft ps-8 text-12 leading-16 font-medium text-on-brand-soft">
+        <span class="truncate">{{ chip.display }}</span>
+        <button
+          type="button"
+          class="inline-flex size-filter-chip shrink-0 cursor-pointer items-center justify-center rounded-8 text-on-brand-soft outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+          [attr.aria-label]="'dashFilters.removeItem' | transloco: { name: chip.display }"
+          [title]="'dashFilters.removeItem' | transloco: { name: chip.display }"
+          (click)="remove.emit({ index: chip.index, value: chip.value })"
+        >
+          <ng-icon name="tablerX" size="12" aria-hidden="true" />
+        </button>
+      </span>
+    }
+
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      size="small"
+      (click)="clear.emit()"
+    >
+      {{ 'dashFilters.clearAll' | transloco }}
+    </button>
+  </div>
+}

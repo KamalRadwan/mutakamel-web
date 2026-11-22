@@ -1,0 +1,9 @@
+<span
+  class="inline-flex h-badge shrink-0 items-center justify-center gap-4 rounded-8 px-8 text-12 font-medium whitespace-nowrap"
+  [class]="toneClass()"
+>
+  @if (iconName(); as icon) {
+    <ng-icon [name]="icon" size="12" class="shrink-0" aria-hidden="true" />
+  }
+  {{ labelKey() | transloco }}
+</span>

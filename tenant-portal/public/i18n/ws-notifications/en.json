@@ -1,0 +1,38 @@
+{
+  "refresh": "Refresh",
+  "retry": "Retry",
+  "allShown": "You have seen all notifications.",
+  "loadFailed": {
+    "title": "Could not load notifications",
+    "text": "Check your connection and try again."
+  },
+  "unavailable": {
+    "title": "Notifications are not available",
+    "text": "Your account cannot receive notifications right now. Contact your administrator."
+  },
+  "actions": {
+    "acknowledge": "Acknowledge",
+    "open": "Open",
+    "dismiss": "Dismiss"
+  },
+  "acknowledgedAt": "Acknowledged {{time}}",
+  "acknowledgedJustNow": "Acknowledged just now",
+  "detail": {
+    "entity": "Related record: {{type}}",
+    "gone": "This notification is no longer available."
+  },
+  "entityTypes": {
+    "lead": "Lead",
+    "opportunity": "Opportunity",
+    "customer": "Customer",
+    "activity": "Activity",
+    "party": "Party",
+    "quotation": "Quotation",
+    "invoice": "Invoice",
+    "record": "Record"
+  },
+  "errors": {
+    "NOTIFICATION_NOT_FOUND": "This notification is no longer available.",
+    "NOTIFICATION_USER_NOT_FOUND": "Your account cannot receive notifications right now."
+  }
+}

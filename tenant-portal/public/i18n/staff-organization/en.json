@@ -1,0 +1,54 @@
+{
+  "search": "Search by name or code",
+  "clearSearch": "Clear search",
+  "matches": "Matches: {{n}}",
+  "showInactive": "Show inactive",
+  "showInactiveHint": "Also list deactivated companies, branches, departments and teams in the tree.",
+  "expand": "Expand",
+  "collapse": "Collapse",
+  "expandAll": "Expand all",
+  "collapseAll": "Collapse all",
+  "reload": "Reload",
+  "views": {
+    "rows": "Card rows",
+    "columns": "Columns",
+    "chart": "Org chart",
+    "label": "View"
+  },
+  "summary": "Companies: {{c}} · Branches: {{b}} · Departments: {{d}} · Teams: {{t}}",
+  "type": {
+    "company": "Company",
+    "branch": "Branch",
+    "department": "Department",
+    "team": "Team"
+  },
+  "children": {
+    "branches": "Branches: {{n}}",
+    "departments": "Departments: {{n}}",
+    "teams": "Teams: {{n}}"
+  },
+  "columns": {
+    "companies": "Companies",
+    "branches": "Branches",
+    "departments": "Departments",
+    "teams": "Teams",
+    "chooseCompany": "Choose a company",
+    "chooseBranch": "Choose a branch",
+    "chooseDepartment": "Choose a department"
+  },
+  "actions": {
+    "open": "Open",
+    "edit": "Edit",
+    "addBranch": "Add branch",
+    "addDepartment": "Add department",
+    "addTeam": "Add team",
+    "viewUsers": "View users"
+  },
+  "addCompany": "Add company",
+  "hiddenByPermission": "Hidden by your permissions",
+  "empty": "No companies yet.",
+  "tooLarge": "The structure is too large to show here. Use the Companies and Branches pages.",
+  "openCompanies": "Open companies",
+  "loadFailed": "Could not load the structure.",
+  "retry": "Try again"
+}
