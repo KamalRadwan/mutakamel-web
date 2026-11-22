@@ -1,11 +1,11 @@
-@if (visible() && staffRoute()) {
-  <span class="inline-flex h-nav-item items-center rounded-8 ps-2 pe-6" [attr.title]="'scope.namesUnavailable' | transloco">
+@if (visible() && !canInteract()) {
+  <span class="inline-flex h-nav-item items-center rounded-8 ps-2 pe-6" aria-disabled="true" [attr.title]="'scope.namesUnavailable' | transloco">
     <span class="inline-flex size-icon-tile-sm items-center justify-center rounded-8 bg-icon-teal text-on-icon" aria-hidden="true">
       <ng-icon name="tablerBuilding" size="15" />
     </span>
     <span class="sr-only">{{ 'scope.namesUnavailable' | transloco }}</span>
   </span>
-} @else if (visible()) {
+} @else if (canInteract()) {
   @let triggerLabel = ('scope.label' | transloco) + ': ' + nameOf(scope.company()) + ' · ' + nameOf(scope.branch());
   <button
     #triggerBtn

@@ -123,9 +123,21 @@ describe('Company and branch switcher visibility', () => {
     expect(legacyScope).not.toHaveBeenCalled();
   });
 
-  it('hides the control when the server returns no accessible context', () => {
-    me.set(snapshot([], []));
-    expect(render().querySelector('button, ng-icon')).toBeNull();
+  it.each(['/workspace/home', '/workspace/staff/users'])('shows a noninteractive indicator on %s when the tenant has alternatives and the user has no scope', (url) => {
+    me.set({ ...snapshot([], [], { mode: 'EXPLICIT' }), hasMultipleOrganizationScopes: true });
+    const host = render(url);
+    expect(host.classList.contains('hidden')).toBe(false);
+    expect(host.querySelector('[aria-disabled="true"] ng-icon')).not.toBeNull();
+    expect(host.querySelector('button, [role="menu"]')).toBeNull();
+    expect(legacyScope).not.toHaveBeenCalled();
+    expect(TestBed.inject(TenantScopeState).selection()).toBeNull();
+  });
+
+  it.each([undefined, false])('hides the control with no accessible context and tenant-wide flag %s', (multiple) => {
+    me.set({ ...snapshot([], []), hasMultipleOrganizationScopes: multiple });
+    const host = render();
+    expect(host.classList.contains('hidden')).toBe(true);
+    expect(host.querySelector('button, ng-icon')).toBeNull();
     expect(legacyScope).not.toHaveBeenCalled();
   });
 });

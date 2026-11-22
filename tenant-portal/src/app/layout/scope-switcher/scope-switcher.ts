@@ -60,8 +60,11 @@ export class ScopeSwitcher {
     ),
     { initialValue: this.router.url },
   );
-  protected readonly staffRoute = computed(() => /^\/workspace\/staff(?:[/?#;]|$)/u.test(this.routeUrl()));
+  private readonly staffRoute = computed(() => /^\/workspace\/staff(?:[/?#;]|$)/u.test(this.routeUrl()));
   protected readonly visible = this.tenantScope.showScopeSwitcher;
+  protected readonly canInteract = computed(() =>
+    this.visible() && !this.staffRoute() && this.tenantScope.selectorCompanyIds().length > 0,
+  );
 
   private readonly triggerBtn = viewChild<ElementRef<HTMLButtonElement>>('triggerBtn');
   private readonly menuEl = viewChild<ElementRef<HTMLElement>>('menuEl');
@@ -73,7 +76,7 @@ export class ScopeSwitcher {
 
   constructor() {
     effect(() => {
-      if (!this.visible() || this.staffRoute()) this.open.set(false);
+      if (!this.canInteract()) this.open.set(false);
     });
     const close = () => this.open.set(false);
     document.addEventListener('scroll', close, { capture: true, passive: true });
@@ -85,7 +88,7 @@ export class ScopeSwitcher {
   }
 
   protected toggle() {
-    if (this.staffRoute()) return;
+    if (!this.canInteract()) return;
     if (this.open()) {
       this.open.set(false);
       return;
@@ -101,7 +104,7 @@ export class ScopeSwitcher {
   }
 
   protected chooseCompany(id: string) {
-    if (this.staffRoute()) return;
+    if (!this.canInteract()) return;
     this.scope.selectCompany(id);
     queueMicrotask(() => {
       this.branchRows()[0]?.nativeElement.focus();
@@ -116,7 +119,7 @@ export class ScopeSwitcher {
   }
 
   protected chooseBranch(id: string) {
-    if (this.staffRoute()) return;
+    if (!this.canInteract()) return;
     this.scope.selectBranch(id);
     this.open.set(false);
   }
