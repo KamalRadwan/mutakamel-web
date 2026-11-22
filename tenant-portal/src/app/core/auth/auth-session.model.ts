@@ -68,6 +68,7 @@ export interface TenantAccessScope {
 
 /** GET /auth/me data (TenantMe + featureEntitlements). */
 export interface TenantMe extends AuthMe {
+  hasMultipleOrganizationScopes?: boolean;
   accessibleBranches: string[];
   accessibleCompanies: string[];
   accessibleBranchCompanies: { branchId: string; companyId: string }[];

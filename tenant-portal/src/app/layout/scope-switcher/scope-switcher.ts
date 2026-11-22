@@ -35,7 +35,8 @@ const VIEWPORT_GAP = 4;
   providers: [provideIcons({ tablerBuilding, tablerMapPin, tablerCheck, tablerChevronDown })],
   templateUrl: './scope-switcher.html',
   host: {
-    class: 'relative me-8 inline-flex shrink-0',
+    class: 'relative me-8 shrink-0',
+    '[class.inline-flex]': 'visible()',
     '[class.hidden]': '!visible()',
     '(document:click)': 'closeIfOutside($event)',
     '(document:keydown.escape)': 'onEscape($event)',
@@ -60,9 +61,7 @@ export class ScopeSwitcher {
     { initialValue: this.router.url },
   );
   protected readonly staffRoute = computed(() => /^\/workspace\/staff(?:[/?#;]|$)/u.test(this.routeUrl()));
-  protected readonly visible = computed(() =>
-    this.staffRoute() ? this.tenantScope.selectorCompanyIds().length > 0 : this.scope.hasChoice(),
-  );
+  protected readonly visible = this.tenantScope.showScopeSwitcher;
 
   private readonly triggerBtn = viewChild<ElementRef<HTMLButtonElement>>('triggerBtn');
   private readonly menuEl = viewChild<ElementRef<HTMLElement>>('menuEl');
@@ -74,7 +73,7 @@ export class ScopeSwitcher {
 
   constructor() {
     effect(() => {
-      if (this.staffRoute()) this.open.set(false);
+      if (!this.visible() || this.staffRoute()) this.open.set(false);
     });
     const close = () => this.open.set(false);
     document.addEventListener('scroll', close, { capture: true, passive: true });

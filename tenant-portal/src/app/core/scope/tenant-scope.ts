@@ -45,6 +45,24 @@ export class TenantScopeState {
     [...new Set([...this.companies(), ...this.branchCompanies().values()])].filter(Boolean),
   );
 
+  readonly showScopeSwitcher = computed(() => {
+    const me = this.me();
+    if (!me || me.hasMultipleOrganizationScopes === false) return false;
+
+    const { accessScope, accessibleBranches } = me;
+    if (accessScope?.companiesTruncated || accessScope?.branchesTruncated) return true;
+    const companies = this.selectorCompanyIds();
+    if (!companies.length && !accessibleBranches.length) return false;
+
+    // Older Core versions can only prove a singleton through the complete FULL projection.
+    return me.hasMultipleOrganizationScopes === true ||
+      accessScope?.mode !== 'FULL' ||
+      companies.length !== 1 ||
+      !this.companies().has(companies[0]) ||
+      accessibleBranches.length !== 1 ||
+      this.branchCompanies().size !== 1;
+  });
+
   readonly selection = computed<TenantSelection | null>(() => {
     const account = this.me()?.id;
     if (!account) return null;
