@@ -35,6 +35,7 @@ export interface TenantFqdnView {
   id: string;
   fqdn: string;
   isPrimary: boolean;
+  isPlatformIssued?: boolean;
   validationStatus: TenantFqdnValidationStatus;
   verifiedAt: string | null;
   createdAt: string;

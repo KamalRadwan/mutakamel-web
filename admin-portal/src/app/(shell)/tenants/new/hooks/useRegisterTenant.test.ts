@@ -2,6 +2,7 @@
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
 import type { TenantCreateResult, TenantSubscriptionQuote } from "../types";
 
 const {
@@ -12,6 +13,7 @@ const {
   listCandidateApplicationsMock,
   listDatabasePlacementOptionsMock,
   persistPendingCreateMock,
+  previewPlatformFqdnMock,
   previewProvisioningPlanMock,
   pushMock,
   quoteMock,
@@ -26,6 +28,7 @@ const {
   listCandidateApplicationsMock: vi.fn(),
   listDatabasePlacementOptionsMock: vi.fn(),
   persistPendingCreateMock: vi.fn(),
+  previewPlatformFqdnMock: vi.fn(),
   previewProvisioningPlanMock: vi.fn(),
   pushMock: vi.fn(),
   quoteMock: vi.fn(),
@@ -84,6 +87,9 @@ vi.mock("@/i18n/I18nContext", () => ({
             "Choose a country from the canonical registry and one of its timezones.",
         },
         wizard: {
+          platformFqdnChanged: en.tenants.wizard.platformFqdnChanged,
+          platformFqdnTaken: en.tenants.wizard.platformFqdnTaken,
+          platformFqdnUnavailable: en.tenants.wizard.platformFqdnUnavailable,
           requiredField: (label: string) => `${label} is required.`,
           invalidEmail: "Enter a valid email address.",
           identityValidationRequired:
@@ -163,6 +169,7 @@ vi.mock("../api/tenant-registration.api", () => ({
     findCreateStatus: vi.fn(),
     listCandidateApplications: listCandidateApplicationsMock,
     listDatabasePlacementOptions: listDatabasePlacementOptionsMock,
+    previewPlatformFqdn: previewPlatformFqdnMock,
     previewProvisioningPlan: previewProvisioningPlanMock,
     quote: quoteMock,
     validateIdentity: validateIdentityMock,
@@ -353,6 +360,11 @@ describe("useRegisterTenant reviewed quote and create recovery", () => {
       },
       message: "Identity is available.",
     });
+    previewPlatformFqdnMock.mockResolvedValue({
+      platformDomain: "tenants.example.net",
+      primaryFqdn: "acme.tenants.example.net",
+      available: true,
+    });
   });
 
   it("blocks create while a quote is pending, then requires review before creating and redirecting once", async () => {
@@ -387,6 +399,10 @@ describe("useRegisterTenant reviewed quote and create recovery", () => {
     expect(createMock).not.toHaveBeenCalled();
     act(() => { submission = result.current.handleSubmit(submitEvent()); });
     await waitFor(() => expect(createMock).toHaveBeenCalledOnce());
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedPlatformDomain: "tenants.example.net" }),
+      expect.any(String),
+    );
     expect(result.current.isSubmitting).toBe(true);
     expect(toastMock.error).not.toHaveBeenCalled();
 
@@ -588,6 +604,31 @@ describe("useRegisterTenant reviewed quote and create recovery", () => {
       expect.stringContaining("Your session was kept; try again."),
     );
     expect(pushMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("requires a fresh preview and review after a platform domain change", async () => {
+    quoteMock.mockResolvedValueOnce(subscriptionQuote());
+    createMock.mockRejectedValueOnce({
+      isNormalized: true,
+      httpStatus: 409,
+      errorCode: "TENANT_PLATFORM_DOMAIN_CHANGED",
+      message: "Platform domain changed.",
+    });
+    const { result, unmount } = await renderReadyRegistration();
+    await act(async () => { await result.current.creationQuote.load(); });
+    await act(async () => { await result.current.handleSubmit(submitEvent()); });
+
+    expect(result.current.currentStep).toBe(1);
+    expect(result.current.platformPreview).toBeUndefined();
+    expect(result.current.pendingCreateRecovery).toBeNull();
+    expect(result.current.validationErrors).toContainEqual({
+      fieldId: "tenant-name",
+      message: en.tenants.wizard.platformFqdnChanged,
+      step: 1,
+    });
+    await act(async () => { await result.current.handleSubmit(submitEvent()); });
+    expect(createMock).toHaveBeenCalledOnce();
     unmount();
   });
 

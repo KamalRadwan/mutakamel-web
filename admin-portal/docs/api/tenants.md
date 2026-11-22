@@ -1,5 +1,10 @@
 # Admin Tenants Frontend Contract
 
+Tenant issuance domain amendment (2026-11-22): Core owns the proposed primary
+hostname, its availability, the default domain fence, and the persisted
+platform-issued marker. See [Validate identity and preview the primary domain](#1-validate-tenant-identity)
+and [System Settings](system-settings.md#tenant-issuance-domain-source-verified-2026-11-22).
+
 Storage-status verification (2026-10-17, CLXAPP-135): the tenant-workspace
 reader accepts `DRAFT`, `ACTIVE`, `DRAINING`, and `OFFLINE` in the nested
 Storage Server summary, matching Core's storage registry lifecycle. Tenant
@@ -103,6 +108,7 @@ generated for one mutation intent.
 | Method and browser path | Permission | Success | Idempotency key | Purpose |
 |:---|:---|:---:|:---:|:---|
 | `POST /api/admin/core/v1/tenants/validate-identity` | `admin.tenants.create` | `200` | No | Check name and company-name availability |
+| `POST /api/admin/core/v1/tenants/platform-fqdn-preview` | `admin.tenants.create` | `200` | No | Preview the complete primary hostname and its availability |
 | `GET /api/admin/core/v1/tenants/create-options` | `admin.tenants.create` | `200` | No | Load one consistent, bounded Application/readiness/active-tier projection |
 | `GET /api/admin/core/v1/tenants/database-placement-options?applicationKeys=crm,trade` | `admin.tenants.create` | `200` | No | List servers ready for the exact selected Applications |
 | `GET /api/admin/core/v1/tenants/storage-placement-options` | `admin.tenants.create` | `200` | No | List the safe, production-ready Storage Servers eligible for explicit placement |
@@ -278,6 +284,7 @@ interface TenantFqdnView {
   id: string;
   fqdn: string;
   isPrimary: boolean;
+  isPlatformIssued: boolean;
   validationStatus: TenantFqdnValidationStatus;
   verifiedAt: string | null;
   createdAt: string;
@@ -406,6 +413,21 @@ transactional plan from the subscription’s module selection.
 
 ### 1. Validate tenant identity
 
+After identity validation, the wizard calls
+`POST /api/admin/core/v1/tenants/platform-fqdn-preview` with `{ name }`. This
+read-like command returns `{ platformDomain, primaryFqdn, available }`.
+The wizard displays `primaryFqdn` and binds that evidence to the current
+identity. Create sends the preview's `platformDomain` as
+`expectedPlatformDomain`. A 409 `TENANT_PLATFORM_DOMAIN_CHANGED` returns
+the operator to identity and requires a fresh preview and review. Core
+returns `TENANT_PLATFORM_DOMAIN_UNAVAILABLE` (503) if no eligible default
+exists. The preview does not reserve a hostname.
+
+The create response and tenant workspace expose the saved primary with
+`fqdns[].isPrimary`. Core supplies `fqdns[].isPlatformIssued` in tenant
+views and the FQDN list. The panel uses that flag for the lock badge and
+requires explicit legacy evidence for promotion.
+
 `POST /api/admin/core/v1/tenants/validate-identity`
 
 Permission: `admin.tenants.create`.
@@ -454,8 +476,8 @@ and prevents leaving step 1 or creating the tenant until the real endpoint is
 called again. Late validation responses are generation/identity fenced and
 cannot validate changed input.
 
-The tenant name is immutable after creation and generates the platform-owned
-primary domain `<name>.mutakamel.ai`.
+The tenant name is immutable after creation. Core uses it as the first label
+of the primary hostname and supplies the complete value in the preview.
 
 ### 2. Validate secondary FQDNs
 
@@ -740,6 +762,7 @@ Canonical Admin Portal request shape:
 interface CreateTenantDto {
   quoteId: string; // required UUIDv7
   name: string;
+  expectedPlatformDomain?: string; // the Admin wizard always sends the reviewed value
   secondaryFqdns?: string[];
   companyName: string;
   countryName: string;
@@ -1401,15 +1424,15 @@ The same validation rules as the preflight DTO apply. Core additionally:
 ### Remove
 
 Removing a missing or foreign row returns `204` without revealing ownership.
-The generated `<name>.mutakamel.ai` primary domain cannot be removed, and no
-operation may leave a tenant without a primary.
+Core protects the primary domain and any row marked `isPlatformIssued` from
+removal.
 
 ### Promote to primary
 
-Primary promotion exists only for legacy tenants that do not already have the
-generated platform primary. The candidate must be `VALID` and have
-`verifiedAt`. For normal newly created tenants the platform primary is locked,
-so the UI should not show a “set primary” action.
+Primary promotion requires an existing primary and explicit
+`isPlatformIssued: false` values for every FQDN. The candidate must be
+`VALID` and have `verifiedAt`. The panel presents a lock on the row marked
+as platform-issued.
 
 ## Permission-gated UI
 

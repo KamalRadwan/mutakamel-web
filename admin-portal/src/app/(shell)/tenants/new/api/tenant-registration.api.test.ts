@@ -48,6 +48,17 @@ describe("tenant registration API", () => {
     postMock.mockReset();
   });
 
+  it("reads the server-generated primary hostname from a no-store preview", async () => {
+    const result = { platformDomain: "tenants.example.net", primaryFqdn: "acme.tenants.example.net", available: true };
+    postMock.mockResolvedValue(envelope(result));
+    await expect(tenantRegistrationApi.previewPlatformFqdn("acme")).resolves.toEqual(result);
+    expect(postMock).toHaveBeenCalledWith(
+      "/api/admin/core/v1/tenants/platform-fqdn-preview",
+      { name: "acme" },
+      expect.objectContaining({ cache: "no-store", skipAutoIdempotency: true }),
+    );
+  });
+
   it("validates identity through the idempotent read-like command", async () => {
     const controller = new AbortController();
     const result = {
@@ -223,6 +234,7 @@ describe("tenant registration API", () => {
     const command: TenantCreateCommand = {
       quoteId,
       name: "acme",
+      expectedPlatformDomain: "tenants.example.net",
       companyName: "Acme",
       countryName: "Egypt",
       countryIsoCode: "EG",

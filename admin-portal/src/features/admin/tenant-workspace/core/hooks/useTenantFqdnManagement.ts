@@ -308,8 +308,9 @@ export function useTenantFqdnManagement({
   const remove = useCallback(
     async (fqdnId: string) => {
       const current = assertManageableTenant();
-      const row = current.fqdns.find((item) => item.id === fqdnId);
-      if (!row || row.isPrimary) {
+      const row = fqdns.find((item) => item.id === fqdnId) ??
+        current.fqdns.find((item) => item.id === fqdnId);
+      if (!row || row.isPrimary || row.isPlatformIssued === true) {
         throw localError(
           "TENANT_FQDN_REMOVE_NOT_ALLOWED",
           "The primary domain cannot be removed.",
@@ -323,14 +324,14 @@ export function useTenantFqdnManagement({
       );
       await Promise.all([refreshTenant(), loadFqdns()]);
     },
-    [assertManageableTenant, loadFqdns, refreshTenant, runWrite, tenantId],
+    [assertManageableTenant, fqdns, loadFqdns, refreshTenant, runWrite, tenantId],
   );
 
   const promote = useCallback(
     async (fqdnId: string) => {
       const current = assertManageableTenant();
-      const row = current.fqdns.find((item) => item.id === fqdnId);
-      if (!row || !canPromoteLegacyPrimary(current, row)) {
+      const row = fqdns.find((item) => item.id === fqdnId);
+      if (isLoadingFqdns || listError || !row || !canPromoteLegacyPrimary(current, fqdns, row)) {
         throw localError(
           "TENANT_FQDN_PROMOTION_NOT_ALLOWED",
           "Only a verified domain on a legacy tenant can become primary.",
@@ -344,7 +345,7 @@ export function useTenantFqdnManagement({
       );
       await Promise.all([refreshTenant(), loadFqdns()]);
     },
-    [assertManageableTenant, loadFqdns, refreshTenant, runWrite, tenantId],
+    [assertManageableTenant, fqdns, isLoadingFqdns, listError, loadFqdns, refreshTenant, runWrite, tenantId],
   );
 
   return {

@@ -53,6 +53,13 @@ export interface TenantIdentityValidationResult {
 export interface TenantIdentityValidationEvidence {
   fingerprint: string;
   result: TenantIdentityValidationResult;
+  platformPreview?: TenantPlatformFqdnPreview;
+}
+
+export interface TenantPlatformFqdnPreview {
+  platformDomain: string;
+  primaryFqdn: string;
+  available: boolean;
 }
 
 export type TenantApplicationCandidate = InitialApplicationOption;
@@ -135,6 +142,7 @@ export type TenantSubscriptionQuote = InitialQuoteView;
 export interface TenantCreateCommand {
   quoteId: string;
   name: string;
+  expectedPlatformDomain: string;
   companyName: string;
   countryName: string;
   countryIsoCode: string;
@@ -177,4 +185,5 @@ export interface TenantCreateCommand {
 export interface TenantCreateResult {
   id: string;
   status: "PROVISIONING";
+  primaryFqdn?: string;
 }

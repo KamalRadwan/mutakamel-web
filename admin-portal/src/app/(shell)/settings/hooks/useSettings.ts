@@ -47,6 +47,7 @@ export interface SettingFieldData extends MergedSystemSetting {
 }
 
 const SETTINGS_SAVE_PERMISSIONS = ADMIN_RBAC_CRITICAL.SETTINGS_UPDATE;
+export const TENANT_PLATFORM_DOMAIN_KEY = "tenants.platform_domain";
 const MIN_TOP_UP_KEY = "billing.min_topup_usd";
 const MAX_TOP_UP_KEY = "billing.max_topup_usd";
 
@@ -559,10 +560,12 @@ function readSettingsListEnvelope(payload: unknown): MergedSystemSetting[] {
   ) {
     throw new Error("INVALID_SETTINGS_RESPONSE");
   }
-  return envelope.data.map((item) => readSetting(item));
+  return envelope.data
+    .filter((item) => plainRecord(item)?.key !== TENANT_PLATFORM_DOMAIN_KEY)
+    .map((item) => readSetting(item));
 }
 
-function readSettingEnvelope(payload: unknown, expectedKey: string): MergedSystemSetting {
+export function readSettingEnvelope(payload: unknown, expectedKey: string): MergedSystemSetting {
   const envelope = plainRecord(payload);
   if (
     envelope?.success !== true ||

@@ -162,7 +162,7 @@ export function splitPhoneNumber(raw: string): SplitPhoneNumber | null {
 /**
  * Turns a company name into a DNS-safe tenant code.
  *
- * The code becomes the label in `<code>.mutakamel.ai`, so it is bound by the
+ * The code becomes the first label of the platform hostname and follows the
  * hostname rules Core enforces: lowercase letters, digits and hyphens only,
  * no leading or trailing hyphen, 63 characters at most. Spaces become hyphens
  * rather than underscores because an underscore is not valid in a hostname.

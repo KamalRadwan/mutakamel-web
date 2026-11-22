@@ -17,9 +17,7 @@ import {
   canAttachAfterPreflight,
   canPromoteLegacyPrimary,
   createTenantProfileDraft,
-  hasPlatformPrimaryFqdn,
   isTenantDatabaseReady,
-  platformFqdnForTenant,
   readFqdnAvailability,
   readTenantDestroy,
   readTenantDestroyRequest,
@@ -392,18 +390,17 @@ describe("tenant profile and lifecycle model", () => {
     ).toThrow("INVALID_TENANT_COMMAND_RESPONSE");
   });
 
-  it("derives immutable platform-domain and legacy promotion rules", () => {
+  it("requires Core origin evidence for legacy primary promotion", () => {
     const normal = tenantFixture();
     const custom = customFqdnFixture();
-    expect(platformFqdnForTenant(normal)).toBe("acme.mutakamel.ai");
-    expect(hasPlatformPrimaryFqdn(normal)).toBe(true);
-    expect(canPromoteLegacyPrimary(normal, custom)).toBe(false);
+    expect(canPromoteLegacyPrimary(normal, normal.fqdns, custom)).toBe(false);
 
-    const legacy = tenantFixture("ACTIVE", { fqdns: [custom] });
-    expect(hasPlatformPrimaryFqdn(legacy)).toBe(false);
-    expect(canPromoteLegacyPrimary(legacy, custom)).toBe(true);
+    const primary = { ...normal.fqdns[0]!, isPlatformIssued: false };
+    const legacy = tenantFixture("ACTIVE", { fqdns: [primary, custom] });
+    expect(canPromoteLegacyPrimary(legacy, legacy.fqdns, custom)).toBe(true);
+    expect(canPromoteLegacyPrimary(legacy, [{ ...primary, isPlatformIssued: undefined }, custom], custom)).toBe(false);
     expect(
-      canPromoteLegacyPrimary(legacy, {
+      canPromoteLegacyPrimary(legacy, legacy.fqdns, {
         ...custom,
         validationStatus: "PENDING",
         verifiedAt: null,
@@ -411,7 +408,8 @@ describe("tenant profile and lifecycle model", () => {
     ).toBe(false);
     expect(
       canPromoteLegacyPrimary(
-        tenantFixture("SUSPENDED", { fqdns: [custom] }),
+        tenantFixture("SUSPENDED"),
+        legacy.fqdns,
         custom,
       ),
     ).toBe(false);

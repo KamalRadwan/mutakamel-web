@@ -115,6 +115,7 @@ export default function RegisterTenantWizardPage() {
     isValidatingIdentity,
     identityValidationEvidence,
     identityValidationError,
+    platformPreview,
     hasValidIdentityEvidence,
     recoverTenantCreateStatus,
     handleValidateIdentity,
@@ -475,12 +476,6 @@ export default function RegisterTenantWizardPage() {
                             .join(" ")}
                           aria-invalid={field["aria-invalid"]}
                         />
-                        <div
-                          className="flex items-center shrink-0 h-full border-s border-border bg-muted/30 px-2 text-xs font-mono text-muted-foreground select-none"
-                          dir="ltr"
-                        >
-                          .mutakamel.ai
-                        </div>
                         <Button
                           type="button"
                           variant="ghost"
@@ -516,14 +511,15 @@ export default function RegisterTenantWizardPage() {
                       ) : null}
                       <p
                         id="tenant-derived-fqdn"
-                        className="sr-only font-mono text-xs text-muted-foreground"
-                        dir="ltr"
+                        className="mt-1 text-xs text-muted-foreground"
+                        role="status"
                       >
-                        {t.tenants.wizard.workspaceAddress(
-                          formData.name
-                            ? `${formData.name}.mutakamel.ai`
-                            : "name.mutakamel.ai",
-                        )}
+                        {platformPreview ? (
+                          <>
+                            {t.tenants.primaryFqdn}{" "}
+                            <bdi className="break-all font-mono">{platformPreview.primaryFqdn}</bdi>
+                          </>
+                        ) : t.tenants.wizard.platformFqdnPending}
                       </p>
                     </>
                   )}
@@ -539,7 +535,9 @@ export default function RegisterTenantWizardPage() {
                       : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
                   }`}
                 >
-                  {identityValidationEvidence.result.message}
+                  {platformPreview?.available === false
+                    ? t.tenants.wizard.platformFqdnTaken
+                    : identityValidationEvidence.result.message}
                 </div>
               ) : identityValidationError ? (
                 <div
@@ -1116,7 +1114,7 @@ export default function RegisterTenantWizardPage() {
                 <ReviewRow
                   icon={<Globe className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                   label={t.tenants.primaryFqdn}
-                  value={`${formData.name}.mutakamel.ai`}
+                  value={platformPreview?.primaryFqdn ?? t.tenants.wizard.platformFqdnPending}
                   mono
                 />
                 <ReviewRow

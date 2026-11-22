@@ -8,6 +8,7 @@ import { SettingField } from "../components/SettingField";
 import { SettingSearch } from "../components/SettingSearch";
 import { SaveSettingsBanner } from "../components/SaveSettingsBanner";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
+import { matchesTenantPlatformDomainSearch, TenantPlatformDomainSettings } from "./TenantPlatformDomainSettings";
 import {
   combineSettingsLoadStates,
   useSettings,
@@ -32,6 +33,7 @@ export default function PlatformSettingsPage() {
   const hasUnsavedChanges =
     platform.hasUnsavedChanges || support.hasUnsavedChanges;
   const isSaving = platform.isSaving || support.isSaving;
+  const showDomain = matchesTenantPlatformDomainSearch(search);
   const filteredSettings = allSettings.filter((setting) => {
     if (!search.trim()) return true;
     const term = search.toLowerCase();
@@ -96,13 +98,14 @@ export default function PlatformSettingsPage() {
                 onRetryExact={saveAll}
               />
             ))
-          ) : (
+          ) : !showDomain ? (
             <div className="rounded-lg border border-border bg-card p-4 text-center text-xs text-muted-foreground">
               {allSettings.length ? copy.emptyFiltered : copy.emptyGroup}
             </div>
-          )}
+          ) : null}
         </div>
       </SettingsResourceBoundary>
+      <TenantPlatformDomainSettings lang={lang} visible={showDomain} />
     </div>
   );
 }

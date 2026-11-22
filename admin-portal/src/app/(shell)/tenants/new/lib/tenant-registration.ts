@@ -328,7 +328,14 @@ export function readTenantCreateResult(payload: unknown): TenantCreateResult {
   if (!tenant || !isUuidV7(tenant.id) || tenant.status !== "PROVISIONING") {
     throw new Error("INVALID_TENANT_CREATE_RESPONSE");
   }
-  return { id: tenant.id, status: "PROVISIONING" };
+  const primary = Array.isArray(tenant.fqdns)
+    ? tenant.fqdns.map(asRecord).find((row) => row?.isPrimary === true)
+    : undefined;
+  return {
+    id: tenant.id,
+    status: "PROVISIONING",
+    ...(isNonEmptyString(primary?.fqdn) ? { primaryFqdn: primary.fqdn } : {}),
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

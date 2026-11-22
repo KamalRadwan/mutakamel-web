@@ -265,6 +265,9 @@ export function readTenantFqdn(value: unknown): TenantFqdnView {
     id: uuidV7(fqdn.id, "INVALID_TENANT_FQDN_RESPONSE"),
     fqdn: normalizedFqdn(fqdn.fqdn, "INVALID_TENANT_FQDN_RESPONSE"),
     isPrimary: boolean(fqdn.isPrimary, "INVALID_TENANT_FQDN_RESPONSE"),
+    ...(fqdn.isPlatformIssued === undefined ? {} : {
+      isPlatformIssued: boolean(fqdn.isPlatformIssued, "INVALID_TENANT_FQDN_RESPONSE"),
+    }),
     validationStatus: oneOf(
       fqdn.validationStatus,
       TENANT_FQDN_VALIDATION_STATUSES,
@@ -406,26 +409,16 @@ export function isTenantDatabaseReady(tenant: Pick<TenantView, "status">) {
   return tenant.status === "ACTIVE" || tenant.status === "SUSPENDED";
 }
 
-export function platformFqdnForTenant(
-  tenant: Pick<TenantView, "name">,
-): string {
-  return `${tenant.name}.mutakamel.ai`;
-}
-
-export function hasPlatformPrimaryFqdn(
-  tenant: Pick<TenantView, "name" | "fqdns">,
-): boolean {
-  const platformFqdn = platformFqdnForTenant(tenant);
-  return tenant.fqdns.some((row) => row.fqdn === platformFqdn);
-}
-
 export function canPromoteLegacyPrimary(
-  tenant: Pick<TenantView, "name" | "status" | "fqdns">,
+  tenant: Pick<TenantView, "status">,
+  fqdns: readonly TenantFqdnView[],
   fqdn: TenantFqdnView,
 ): boolean {
   return (
     tenant.status === "ACTIVE" &&
-    !hasPlatformPrimaryFqdn(tenant) &&
+    fqdns.some((row) => row.isPrimary) &&
+    fqdns.every((row) => row.isPlatformIssued === false) &&
+    fqdn.isPlatformIssued === false &&
     !fqdn.isPrimary &&
     fqdn.validationStatus === "VALID" &&
     fqdn.verifiedAt !== null

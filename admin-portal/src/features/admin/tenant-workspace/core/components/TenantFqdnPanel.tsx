@@ -159,21 +159,22 @@ export function TenantFqdnPanel({
             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
           >
             <div className="min-w-0">
-              <p className="truncate font-mono text-xs font-semibold text-foreground">
-                {row.fqdn}
+              <p className="break-all font-mono text-xs font-semibold text-foreground">
+                <bdi>{row.fqdn}</bdi>
               </p>
               <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
                 <Badge tone={row.isPrimary ? "info" : "neutral"} className="normal-case tracking-normal">
                   {row.isPrimary ? text.primary : text.secondary}
                 </Badge>
+                {row.isPlatformIssued ? <Badge tone="info">{text.platformDomainLocked}</Badge> : null}
                 <Badge tone={fqdnValidationTone(row.validationStatus)} className="font-mono">
                   {row.validationStatus}
                 </Badge>
               </div>
             </div>
-            {canMutate && !row.isPrimary && (
+            {canMutate && !row.isPrimary && !row.isPlatformIssued && (
               <div className="flex gap-2">
-                {canPromoteLegacyPrimary(tenant, row) && (
+                {!fqdn.isLoadingFqdns && !fqdn.listError && canPromoteLegacyPrimary(tenant, fqdn.fqdns, row) && (
                   <Button
                     type="button"
                     variant="secondary"

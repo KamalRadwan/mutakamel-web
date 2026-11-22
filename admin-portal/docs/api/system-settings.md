@@ -4,6 +4,23 @@ Status: **[Verified]**
 
 Last source verification: **2026-10-29** (generic settings registry and consumers; Worker message verification remains 2026-09-29)
 
+### Tenant issuance domain (source verified 2026-11-22)
+
+**Settings → Platform & Support** reads
+`GET /api/admin/core/v1/system-settings/tenant-platform-domain` with
+`admin.settings.read`. The no-store Core envelope contains
+`{ defaultDomain: string | null, eligibleDomains: string[] }`. A stored default
+outside the eligible list is shown as ineligible. An empty list and a missing
+default have separate states.
+
+A confirmed save uses `PUT /api/admin/core/v1/system-settings/tenants.platform_domain`
+with exactly `{ value: string }`, one UUIDv7 idempotency key, and both
+`admin.settings.update` and `admin.settings.critical`. Core owns the setting
+change audit. The portal preserves the exact intent on an ambiguous response
+and prompts for a reload on `TENANT_PLATFORM_DOMAIN_NOT_ALLOWED` (422).
+The generic Billing settings view excludes this dedicated field, whose
+registry default can be null.
+
 ### Notification retention metadata (source reviewed 2026-10-29)
 
 `notifications.retention_days` has English and Arabic titles and descriptions.

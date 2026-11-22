@@ -232,17 +232,23 @@ describe("useTenantFqdnManagement", () => {
     const normal = tenantFixture("ACTIVE", {
       fqdns: [tenantFixture().fqdns[0]!, customFqdnFixture()],
     });
+    api.listFqdns.mockResolvedValue(normal.fqdns);
     const normalHook = renderFqdn(normal);
+    await waitFor(() => expect(normalHook.result.current.fqdns).toEqual(normal.fqdns));
     await expect(
       normalHook.result.current.promote(CUSTOM_FQDN_ID),
     ).rejects.toMatchObject({ errorCode: "TENANT_FQDN_PROMOTION_NOT_ALLOWED" });
     expect(api.promoteFqdn).not.toHaveBeenCalled();
     normalHook.unmount();
 
-    const legacy = tenantFixture("ACTIVE", { fqdns: [customFqdnFixture()] });
+    const legacy = tenantFixture("ACTIVE", {
+      fqdns: [{ ...normal.fqdns[0]!, isPlatformIssued: false }, customFqdnFixture()],
+    });
+    api.listFqdns.mockResolvedValue(legacy.fqdns);
     api.promoteFqdn.mockResolvedValue(undefined);
     const refreshTenant = vi.fn().mockResolvedValue(legacy);
     const legacyHook = renderFqdn(legacy, { refreshTenant });
+    await waitFor(() => expect(legacyHook.result.current.fqdns).toEqual(legacy.fqdns));
     await act(async () => {
       await legacyHook.result.current.promote(CUSTOM_FQDN_ID);
     });

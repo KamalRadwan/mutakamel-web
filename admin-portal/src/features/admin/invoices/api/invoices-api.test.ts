@@ -17,6 +17,7 @@ const INVOICE_ID = "019f0000-0000-7000-8000-000000000001";
 const TENANT_ID = "019f0000-0000-7000-8000-000000000002";
 const IDEMPOTENCY_KEY = "019f0000-0000-7000-8000-000000000003";
 const TIMESTAMP = "2026-08-12T08:00:00.000Z";
+const VOID_DTO = { reasonCode: "ISSUED_IN_ERROR" } as const;
 
 function envelope(data: unknown, meta?: Record<string, unknown>) {
   return {
@@ -147,7 +148,7 @@ describe("invoicesApi", () => {
     await invoicesApi.generate(generateDto, IDEMPOTENCY_KEY);
     await invoicesApi.update(INVOICE_ID, updateDto, IDEMPOTENCY_KEY);
     await invoicesApi.issue(INVOICE_ID, issueDto, IDEMPOTENCY_KEY);
-    await invoicesApi.void(INVOICE_ID, IDEMPOTENCY_KEY);
+    await invoicesApi.void(INVOICE_ID, VOID_DTO, IDEMPOTENCY_KEY);
 
     expect(patchMock).toHaveBeenCalledWith(
       `/api/admin/core/v1/invoices/${INVOICE_ID}`,
@@ -157,7 +158,7 @@ describe("invoicesApi", () => {
     expect(postMock.mock.calls).toEqual([
       ["/api/admin/core/v1/invoices/generate", generateDto, config],
       [`/api/admin/core/v1/invoices/${INVOICE_ID}/issue`, issueDto, config],
-      [`/api/admin/core/v1/invoices/${INVOICE_ID}/void`, undefined, config],
+      [`/api/admin/core/v1/invoices/${INVOICE_ID}/void`, VOID_DTO, config],
     ]);
   });
 
@@ -198,7 +199,7 @@ describe("invoicesApi", () => {
       "INVALID_ADMIN_INVOICE_ID",
     );
     await expect(
-      invoicesApi.void(INVOICE_ID, "not-a-command-id"),
+      invoicesApi.void(INVOICE_ID, VOID_DTO, "not-a-command-id"),
     ).rejects.toThrow("INVALID_ADMIN_INVOICE_IDEMPOTENCY_KEY");
     expect(getMock).not.toHaveBeenCalled();
     expect(postMock).not.toHaveBeenCalled();

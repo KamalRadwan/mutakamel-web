@@ -823,7 +823,9 @@ describe("TenantFqdnPanel", () => {
   });
 
   it("offers verified legacy-only promotion and confirms removal by identity", async () => {
-    const tenant = tenantFixture("ACTIVE", { fqdns: [customFqdnFixture()] });
+    const tenant = tenantFixture("ACTIVE", {
+      fqdns: [{ ...tenantFixture().fqdns[0]!, isPlatformIssued: false }, customFqdnFixture()],
+    });
     const promote = vi.fn().mockResolvedValue(null);
     const remove = vi.fn().mockResolvedValue(null);
     render(

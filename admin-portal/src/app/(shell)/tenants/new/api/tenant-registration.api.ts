@@ -16,6 +16,7 @@ import { readTenantCreateStatus } from "../lib/tenant-create-recovery";
 import type {
   TenantBillingCycle,
   TenantCreateCommand,
+  TenantPlatformFqdnPreview,
   TenantProvisioningPlanPreview,
   ReverseGeocodeTenantAddressDto,
   TenantSubscriptionLine,
@@ -40,6 +41,24 @@ export const tenantRegistrationApi = {
       },
     );
     return readTenantIdentityValidation(extractCoreData(response));
+  },
+
+  previewPlatformFqdn: async (name: string, signal?: AbortSignal): Promise<TenantPlatformFqdnPreview> => {
+    const response = await axiosClient.post<SuccessResponse<Partial<TenantPlatformFqdnPreview>>>(
+      `${TENANTS_BASE_URL}/platform-fqdn-preview`,
+      { name },
+      { skipAutoIdempotency: true, replayAfterRefresh: true, cache: "no-store", signal },
+    );
+    const preview = extractCoreData(response);
+    if (
+      !preview ||
+      typeof preview.platformDomain !== "string" || !preview.platformDomain.trim() ||
+      typeof preview.primaryFqdn !== "string" || !preview.primaryFqdn.trim() ||
+      typeof preview.available !== "boolean"
+    ) {
+      throw new Error("INVALID_TENANT_PLATFORM_FQDN_PREVIEW");
+    }
+    return { platformDomain: preview.platformDomain, primaryFqdn: preview.primaryFqdn, available: preview.available };
   },
 
   reverseGeocode: async (

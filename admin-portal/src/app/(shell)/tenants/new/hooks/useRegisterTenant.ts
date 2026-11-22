@@ -696,15 +696,16 @@ export function useRegisterTenant() {
     [formData.companyName, formData.name],
   );
   const identityFingerprintRef = useRef(identityFingerprint);
-  const hasValidIdentityEvidence = isTenantIdentityEvidenceCurrent(
-    identityValidationEvidence,
-    formData.name,
-    formData.companyName,
-  );
   const currentIdentityValidationEvidence =
     identityValidationEvidence?.fingerprint === identityFingerprint
       ? identityValidationEvidence
       : null;
+  const platformPreview = currentIdentityValidationEvidence?.platformPreview;
+  const hasValidIdentityEvidence = platformPreview?.available === true && isTenantIdentityEvidenceCurrent(
+    currentIdentityValidationEvidence,
+    formData.name,
+    formData.companyName,
+  );
 
   const showValidationErrors = useCallback(
     (errors: TenantWizardValidationError[], step: number) => {
@@ -826,6 +827,12 @@ export function useRegisterTenant() {
             step: 1,
           });
         }
+      } else if (platformPreview?.available === false) {
+        errors.push({
+          fieldId: "tenant-name",
+          message: t.tenants.wizard.platformFqdnTaken,
+          step: 1,
+        });
       } else {
         errors.push({
           fieldId: "tenant-name",
@@ -843,6 +850,7 @@ export function useRegisterTenant() {
     currentIdentityValidationEvidence,
     formData,
     hasValidIdentityEvidence,
+    platformPreview,
     requiredError,
     t.tenants.registerFlow.countryTimezoneRequiredDesc,
     t.tenants.wizard,
@@ -895,6 +903,7 @@ export function useRegisterTenant() {
 
   /** Resolves to whether the identity is confirmed available. */
   const handleValidateIdentity = async (): Promise<boolean> => {
+    if (!canCreateTenant) return false;
     const fingerprint = identityFingerprint;
     const generation = ++identityRequestGeneration.current;
     identityRequestAbort.current?.abort();
@@ -919,13 +928,20 @@ export function useRegisterTenant() {
       ) {
         return false;
       }
-      setIdentityValidationEvidence({ fingerprint, result });
       if (result.valid) {
+        const preview = await tenantRegistrationApi.previewPlatformFqdn(formData.name, controller.signal);
+        if (generation !== identityRequestGeneration.current || controller.signal.aborted) return false;
+        setIdentityValidationEvidence({ fingerprint, result, platformPreview: preview });
+        if (!preview.available) {
+          showValidationErrors([{ fieldId: "tenant-name", message: t.tenants.wizard.platformFqdnTaken, step: 1 }], 1);
+          return false;
+        }
         clearValidationError("tenant-name");
         clearValidationError("tenant-company-name");
         toast.success(t.tenants.registerFlow.identityAvailableTitle, result.message);
         return true;
       } else {
+        setIdentityValidationEvidence({ fingerprint, result });
         const errors: TenantWizardValidationError[] = [];
         if (!result.fields.name.valid || !result.fields.name.available) {
           errors.push({
@@ -956,12 +972,15 @@ export function useRegisterTenant() {
         return false;
       }
       const error = normalizeApiError(caught);
-      setIdentityValidationError(error);
+      const message = error.errorCode === "TENANT_PLATFORM_DOMAIN_UNAVAILABLE"
+        ? t.tenants.wizard.platformFqdnUnavailable
+        : error.message;
+      setIdentityValidationError({ ...error, message });
       showValidationErrors(
-        [{ fieldId: "tenant-name", message: error.message, step: 1 }],
+        [{ fieldId: "tenant-name", message, step: 1 }],
         1,
       );
-      toast.error(t.tenants.registerFlow.identityCheckFailedTitle, error.message);
+      toast.error(t.tenants.registerFlow.identityCheckFailedTitle, message);
       return false;
     } finally {
       if (generation === identityRequestGeneration.current) {
@@ -972,7 +991,7 @@ export function useRegisterTenant() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (submissionLockRef.current || isSubmitting || creationQuote.loading) return;
+    if (!canCreateTenant || submissionLockRef.current || isSubmitting || creationQuote.loading) return;
     if (pendingCreateRecovery) {
       toast.warning(
         t.tenants.registerFlow.resolvePreviousCreateTitle,
@@ -985,6 +1004,7 @@ export function useRegisterTenant() {
       showValidationErrors(identityErrors, 1);
       return;
     }
+    if (!platformPreview?.available) return;
     const ownerErrors = getOwnerValidationErrors();
     if (ownerErrors.length > 0) {
       showValidationErrors(ownerErrors, 2);
@@ -1055,6 +1075,7 @@ export function useRegisterTenant() {
       const command: TenantCreateCommand = {
         quoteId: quote.quoteId,
         name: formData.name,
+        expectedPlatformDomain: platformPreview.platformDomain,
         companyName: formData.companyName,
         countryName: formData.countryName,
         countryIsoCode: formData.countryIsoCode,
@@ -1136,7 +1157,10 @@ export function useRegisterTenant() {
       setPendingCreateRecovery(null);
       setCreateRecoveryError(null);
       resetKey();
-      toast.success(t.tenants.registerFlow.createdTitle, t.tenants.registerFlow.createdDesc);
+      const savedHostname = createdTenant.primaryFqdn
+        ? t.tenants.wizard.workspaceAddress(createdTenant.primaryFqdn)
+        : null;
+      toast.success(t.tenants.registerFlow.createdTitle, [t.tenants.registerFlow.createdDesc, savedHostname].filter(Boolean).join("\n"));
       router.push(`/tenants/${createdTenant.id}`);
     } catch (caught) {
       if (submissionController.signal.aborted) return;
@@ -1154,6 +1178,18 @@ export function useRegisterTenant() {
       const adminAuthHandling = getAdminAuthHandling(caught);
       const requestOutcome = getApiRequestOutcome(caught);
       const error = normalizeApiError(caught);
+      if (commandWasSent && requestOutcome !== "settled-before-session-change" &&
+          (error.errorCode === "TENANT_PLATFORM_DOMAIN_CHANGED" || error.errorCode === "TENANT_PLATFORM_DOMAIN_UNAVAILABLE")) {
+        clearPendingTenantCreateStatusAttempt();
+        setPendingCreateRecovery(null);
+        resetKey();
+        setIdentityValidationEvidence(null);
+        const message = error.errorCode === "TENANT_PLATFORM_DOMAIN_CHANGED"
+          ? t.tenants.wizard.platformFqdnChanged
+          : t.tenants.wizard.platformFqdnUnavailable;
+        showValidationErrors([{ fieldId: "tenant-name", message, step: 1 }], 1);
+        return;
+      }
       const retainStatusEvidence =
         commandWasSent &&
         (requestOutcome === "settled-before-session-change" ||
@@ -1417,6 +1453,7 @@ export function useRegisterTenant() {
     isValidatingIdentity,
     identityValidationEvidence: currentIdentityValidationEvidence,
     identityValidationError,
+    platformPreview,
     hasValidIdentityEvidence,
     createOutcomeUnknown: pendingCreateRecovery !== null,
     recoverTenantCreateStatus,
