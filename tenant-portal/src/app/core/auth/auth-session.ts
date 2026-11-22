@@ -221,6 +221,14 @@ export class AuthSession {
     return this.renew('manual');
   }
 
+  async reloadProfile(version: RequestVersion): Promise<void> {
+    await this.withSessionLock(async () => {
+      if (version.generation === this.generation && this._status() === 'signed-in') {
+        await this.loadMe(version.generation);
+      }
+    });
+  }
+
   logout(): Promise<void> {
     if (this.logoutInFlight) return this.logoutInFlight;
 

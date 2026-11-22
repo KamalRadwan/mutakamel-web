@@ -16,7 +16,6 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerArrowBackUp,
   tablerCheck,
   tablerChevronDown,
   tablerLoader2,
@@ -29,43 +28,24 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
-import { Switch } from '../../../../../shared/ui/switch/switch';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { OrganizationCreateApi, type CreateTeamBody } from '../../shared/organization-create.api';
+import { OrganizationReadApi } from '../../shared/organization-read.api';
+import { errorCodeOf, errorMessage } from '../../shared/staff.api';
+import { StaffSession } from '../../shared/staff-session';
+import { StaffUsersApi } from '../../users/users.api';
 import {
-  ApiError,
-  createTeam,
-  errorCodeOf,
-  errorMessage,
-  getBranch,
-  getDepartment,
-  getTeam,
-  getUser,
-  listMemberships,
-  listUsers,
-  newIdempotencyKey,
-  updateTeam,
-} from '../../shared/staff.api';
-import {
+  Branch,
   CODE_PATTERN,
-  MembershipRole,
+  Company,
+  Department,
   OrgCascadeValue,
-  OrgStatus,
   STAFF_LIMITS,
   Team,
   TenantUser,
 } from '../../shared/staff.model';
-
-interface TeamPatch {
-  name?: string;
-  leadUserId?: string | null;
-  status?: OrgStatus;
-}
-
-interface TeamMemberItem {
-  user: TenantUser;
-  role: MembershipRole | null;
-}
 
 interface MenuPlace {
   top: number;
@@ -85,8 +65,8 @@ const SEARCH_DEBOUNCE_MS = 200;
 
 @Component({
   selector: 'app-team-modal',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Field, Modal, OrgCascade, StatusBadge, Switch],
-  providers: [provideIcons({ tablerArrowBackUp, tablerUsersGroup, tablerChevronDown, tablerSearch, tablerLoader2, tablerCheck })],
+  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Field, Modal, OrgCascade, StatusBadge],
+  providers: [provideIcons({ tablerUsersGroup, tablerChevronDown, tablerSearch, tablerLoader2, tablerCheck })],
   templateUrl: './team-modal.html',
   host: {
     '(document:click)': 'closeLeadMenuIfOutside($event)',
@@ -103,6 +83,10 @@ export class TeamModal {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
+  private readonly organization = inject(OrganizationReadApi);
+  private readonly createApi = inject(OrganizationCreateApi);
+  private readonly session = inject(StaffSession);
+  private readonly usersApi = inject(StaffUsersApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -113,19 +97,44 @@ export class TeamModal {
   private readonly leadMenuPanel = viewChild<ElementRef<HTMLElement>>('leadMenuPanel');
   private readonly leadSearchInput = viewChild<ElementRef<HTMLInputElement>>('leadSearchInput');
 
-  readonly canManage = input(true);
+  readonly companies = input.required<readonly Company[]>();
+  readonly branches = input.required<readonly Branch[]>();
+  readonly departments = input.required<readonly Department[]>();
+  readonly createDepartments = input.required<readonly Department[]>();
   readonly knownUsers = input<TenantUser[]>([]);
-  readonly saved = output<{ team: Team; isNew: boolean }>();
-  readonly deleteRequested = output<Team>();
-  readonly deactivateBlocked = output<{ team: Team; blockers: string[] }>();
-  readonly deletedRemotely = output<void>();
+  readonly saved = output<Team>();
   readonly staleScopeDetected = output<void>();
 
   protected readonly limits = STAFF_LIMITS;
 
-  protected readonly mode = signal<'create' | 'edit'>('create');
+  protected readonly mode = signal<'create' | 'details'>('create');
   protected readonly baseTeam = signal<Team | null>(null);
   protected readonly saving = signal(false);
+  protected readonly canManage = computed(() => this.mode() === 'create' && this.createDepartments().length > 0);
+  protected readonly branchOptions = computed(() => {
+    if (this.mode() === 'details') return this.branches();
+    const ids = new Set(this.createDepartments().map((department) => department.branchId));
+    return this.branches().filter((branch) => ids.has(branch.id));
+  });
+  protected readonly companyOptions = computed(() => {
+    if (this.mode() === 'details') return this.companies();
+    const ids = new Set(this.branchOptions().map((branch) => branch.companyId));
+    return this.companies().filter((company) => ids.has(company.id));
+  });
+  protected readonly departmentOptions = computed(() =>
+    this.mode() === 'create' ? this.createDepartments() : this.departments(),
+  );
+  protected readonly canReadBranchUsers = computed(() => {
+    const branchId = this.cascadeValue().branchId;
+    return Boolean(branchId && this.session.can('users.user.read', { branchId }));
+  });
+  protected readonly canSelectLead = computed(() => {
+    const { branchId, departmentId } = this.cascadeValue();
+    return this.canManage() && this.canReadBranchUsers() && this.createDepartments().some((department) =>
+      department.id === departmentId && department.branchId === branchId,
+    );
+  });
+
 
   protected readonly cascadeValue = signal<OrgCascadeValue>({ ...EMPTY_CASCADE });
   protected readonly code = signal('');
@@ -142,8 +151,8 @@ export class TeamModal {
   protected readonly resolvedSelectedLead = signal<TenantUser | null>(null);
 
   protected readonly membersLoading = signal(false);
-  protected readonly membersTotal = signal(0);
-  protected readonly members = signal<TeamMemberItem[]>([]);
+  protected readonly membersTotal = signal<number | null>(null);
+  protected readonly members = signal<TenantUser[]>([]);
 
   protected readonly touched = signal<{ code?: boolean; name?: boolean }>({});
   protected readonly submitAttempted = signal(false);
@@ -166,7 +175,7 @@ export class TeamModal {
 
   protected readonly selectedLead = computed<TenantUser | null>(() => {
     const id = this.leadUserId();
-    if (!id) return null;
+    if (!id || !this.canReadBranchUsers()) return null;
     const resolved = this.resolvedSelectedLead();
     if (resolved?.id === id) return resolved;
     return (
@@ -179,7 +188,7 @@ export class TeamModal {
   protected readonly readonlyLeadText = computed(() => {
     this.i18n();
     const lead = this.selectedLead();
-    if (!lead) return this.transloco.translate('teams.fields.noLead');
+    if (!lead) return this.leadUserId() ? '—' : this.transloco.translate('teams.fields.noLead');
     const name = this.fullName(lead);
     return lead.jobTitle ? `${name} — ${lead.jobTitle}` : name;
   });
@@ -189,23 +198,11 @@ export class TeamModal {
     const trimmedCode = this.code().trim();
     const trimmedName = this.name().trim();
 
-    if (this.mode() === 'create') {
-      const current = this.cascadeValue();
-      const cascadeChanged =
-        this.cascadeEditedByUser &&
-        (current.companyId !== this.presetCascade.companyId ||
-          current.branchId !== this.presetCascade.branchId ||
-          current.departmentId !== this.presetCascade.departmentId);
-      return cascadeChanged || trimmedCode !== '' || trimmedName !== '' || this.leadUserId() !== null;
-    }
-
-    const base = this.baseTeam();
-    if (!base) return false;
-    return (
-      trimmedName !== base.name ||
-      this.leadUserId() !== base.leadUserId ||
-      (this.isActive() ? 'ACTIVE' : 'INACTIVE') !== base.status
-    );
+    const current = this.cascadeValue();
+    const cascadeChanged = this.cascadeEditedByUser &&
+      (current.companyId !== this.presetCascade.companyId || current.branchId !== this.presetCascade.branchId ||
+        current.departmentId !== this.presetCascade.departmentId);
+    return cascadeChanged || trimmedCode !== '' || trimmedName !== '' || this.leadUserId() !== null;
   });
 
   protected readonly cascadeErrors = computed<{ company?: string; branch?: string; department?: string }>(() => {
@@ -289,13 +286,12 @@ export class TeamModal {
     this.resolvedSelectedLead.set(null);
     this.isActive.set(true);
     this.members.set([]);
-    this.membersTotal.set(0);
+    this.membersTotal.set(null);
     this.membersLoading.set(false);
     this.resetValidation();
     this.resetIdempotency();
     this.modal().open();
     this.focusControl(initialCascade.departmentId ? `#${this.uid}-code` : undefined);
-    void this.loadLeadOptions('');
 
     if (initialCascade.departmentId && (!initialCascade.branchId || !initialCascade.companyId)) {
       void this.resolveChainFromDepartment(initialCascade.departmentId, seq);
@@ -304,52 +300,24 @@ export class TeamModal {
     }
   }
 
-  openEdit(team: Team, parents?: { companyId?: string | null; branchId?: string | null }): void {
+  openDetails(team: Team, parents?: { companyId?: string | null; branchId?: string | null }): void {
     const seq = ++this.openSeq;
     this.allowClose = false;
     this.closeLeadMenu();
-    this.mode.set('edit');
+    this.mode.set('details');
     this.cascadeEditedByUser = false;
     this.baseTeam.set(team);
     this.applyTeamToForm(team, parents?.companyId ?? null, parents?.branchId ?? null);
     this.resetValidation();
     this.resetIdempotency();
     this.modal().open();
-    if (this.canManage()) {
-      this.focusControl(`#${this.uid}-name`);
-    }
-    void this.loadLeadOptions('');
-    void this.loadMembers(team.id);
-
-    if (team.leadUserId) {
-      void this.resolveLeadUser(team.leadUserId, seq);
-    }
-    if (!parents?.branchId || !parents?.companyId) {
-      void this.resolveChainFromDepartment(team.departmentId, seq);
-    }
-  }
-
-  syncTeam(updated: Team, parents?: { companyId?: string | null; branchId?: string | null }): void {
-    if (this.baseTeam()?.id !== updated.id) return;
-    const companyId = parents?.companyId ?? this.cascadeValue().companyId;
-    const branchId = parents?.branchId ?? this.cascadeValue().branchId;
-    this.baseTeam.set(updated);
-    this.applyTeamToForm(updated, companyId, branchId);
-    this.resetValidation();
-    if (updated.leadUserId) {
-      void this.resolveLeadUser(updated.leadUserId, this.openSeq);
-    }
-    void this.loadMembers(updated.id);
+    void this.loadDetails(team, seq);
   }
 
   closeImmediate(): void {
     this.closeLeadMenu();
     this.allowClose = true;
     this.modal().close();
-  }
-
-  editingId(): string | null {
-    return this.baseTeam()?.id ?? null;
   }
 
   protected fullName(user: TenantUser): string {
@@ -364,6 +332,14 @@ export class TeamModal {
 
   protected onCascadeChange(next: OrgCascadeValue): void {
     const prev = this.cascadeValue();
+    if (prev.branchId !== next.branchId) {
+      this.closeLeadMenu();
+      this.leadSearchSeq++;
+      this.leadOptions.set([]);
+      this.leadSearching.set(false);
+      this.leadUserId.set(null);
+      this.resolvedSelectedLead.set(null);
+    }
     if (
       this.mode() === 'create' &&
       !this.cascadeEditedByUser &&
@@ -404,7 +380,7 @@ export class TeamModal {
   }
 
   protected toggleLeadMenu(): void {
-    if (!this.canManage() || this.saving()) return;
+    if (!this.canSelectLead() || this.saving()) return;
     if (this.leadMenuOpen()) {
       this.closeLeadMenu();
       return;
@@ -492,7 +468,7 @@ export class TeamModal {
   }
 
   protected selectLead(user: TenantUser | null): void {
-    if (!this.canManage()) return;
+    if (!this.canSelectLead() || (user && user.branchId !== this.cascadeValue().branchId)) return;
     this.leadUserId.set(user?.id ?? null);
     this.resolvedSelectedLead.set(user);
     this.leadServerError.set(null);
@@ -509,16 +485,6 @@ export class TeamModal {
     });
   }
 
-  protected undo(): void {
-    const base = this.baseTeam();
-    if (!base) return;
-    this.applyTeamToForm(base, this.cascadeValue().companyId, this.cascadeValue().branchId);
-    this.resetValidation();
-    if (base.leadUserId) {
-      void this.resolveLeadUser(base.leadUserId, this.openSeq);
-    }
-  }
-
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     if (!this.canManage() || this.saving()) return;
@@ -532,61 +498,33 @@ export class TeamModal {
       return;
     }
 
-    const trimmedName = this.name().trim();
-
-    if (this.mode() === 'create') {
-      const departmentId = this.cascadeValue().departmentId;
-      if (!departmentId) return;
-
-      const body: {
-        departmentId: string;
-        code: string;
-        name: string;
-        leadUserId?: string | null;
-      } = {
-        departmentId,
-        code: this.code().trim(),
-        name: trimmedName,
-      };
-      if (this.leadUserId() !== null) {
-        body.leadUserId = this.leadUserId();
-      }
-
-      this.saving.set(true);
-      try {
-        const created = await createTeam(body, this.idempotencyKeyFor('create', body));
-        this.saved.emit({ team: created, isNew: true });
-        this.notify.success(this.transloco.translate('teams.toast.created'));
-        this.closeImmediate();
-      } catch (error) {
-        await this.handleSaveError(error, false);
-      } finally {
-        this.saving.set(false);
-      }
+    const { companyId, branchId, departmentId } = this.cascadeValue();
+    const department = this.createDepartments().find((item) => item.id === departmentId && item.branchId === branchId);
+    const branch = this.branchOptions().find((item) => item.id === branchId && item.companyId === companyId);
+    if (!department || !branch) {
+      this.notify.error(this.transloco.translate('apiErrors.permission'));
       return;
     }
-
-    const base = this.baseTeam();
-    if (!base) return;
-
-    const patch: TeamPatch = {};
-    if (trimmedName !== base.name) patch.name = trimmedName;
-    if (this.leadUserId() !== base.leadUserId) patch.leadUserId = this.leadUserId();
-    const nextStatus: OrgStatus = this.isActive() ? 'ACTIVE' : 'INACTIVE';
-    const isDeactivating = base.status === 'ACTIVE' && nextStatus === 'INACTIVE';
-    const isActivating = base.status === 'INACTIVE' && nextStatus === 'ACTIVE';
-    if (nextStatus !== base.status) patch.status = nextStatus;
-
-    if (Object.keys(patch).length === 0) return;
+    const lead = this.leadUserId();
+    if (lead && (!this.canSelectLead() || this.selectedLead()?.branchId !== branch.id)) {
+      this.leadServerError.set(this.transloco.translate('staff.errors.ORG_LEAD_BRANCH_REQUIRED'));
+      return;
+    }
+    const body: CreateTeamBody = {
+      departmentId: department.id,
+      code: this.code().trim(),
+      name: this.name().trim(),
+      ...(lead ? { leadUserId: lead } : {}),
+    };
 
     this.saving.set(true);
     try {
-      const updated = await updateTeam(base.id, patch, this.idempotencyKeyFor(base.id, patch));
-      this.saved.emit({ team: updated, isNew: false });
-      this.notify.success(this.transloco.translate('teams.toast.saved'));
+      const created = await this.createApi.createTeam(body, this.idempotencyKeyFor(body), branch.id);
+      this.saved.emit(created);
+      this.notify.success(this.transloco.translate('teams.toast.created'));
       this.closeImmediate();
     } catch (error) {
-      await this.handleSaveError(error, isDeactivating, isActivating, base);
+      await this.handleSaveError(error);
     } finally {
       this.saving.set(false);
     }
@@ -597,12 +535,6 @@ export class TeamModal {
     this.closeLeadMenu();
     if (this.canManage() && this.dirty() && !(await this.confirmDiscard())) return;
     this.closeImmediate();
-  }
-
-  protected requestDelete(): void {
-    const base = this.baseTeam();
-    if (!base || !this.canManage() || this.saving()) return;
-    this.deleteRequested.emit(base);
   }
 
   protected onModalClosed(): void {
@@ -617,81 +549,55 @@ export class TeamModal {
       return;
     }
     this.allowClose = false;
+    this.openSeq++;
+    this.leadSearchSeq++;
+    this.membersSeq++;
     this.baseTeam.set(null);
     this.presetCascade = { ...EMPTY_CASCADE };
     this.cascadeEditedByUser = false;
     this.resolvedSelectedLead.set(null);
     this.members.set([]);
-    this.membersTotal.set(0);
+    this.membersTotal.set(null);
     this.resetValidation();
   }
 
-  private async handleSaveError(
-    error: unknown,
-    isDeactivating: boolean,
-    isActivating = false,
-    base?: Team,
-  ): Promise<void> {
+  private async handleSaveError(error: unknown): Promise<void> {
     const code = errorCodeOf(error);
     if (code === 'ORG_CODE_TAKEN') {
       this.codeServerError.set(this.resolveError(error));
       return;
     }
-    if (code === 'ORG_BRANCH_SCOPE_STALE' || code === 'ORG_NODE_SCOPE_STALE') {
-      if (await this.staleDialog().open()) {
-        this.staleScopeDetected.emit();
-        if (base) {
-          try {
-            const fresh = await getTeam(base.id);
-            this.syncTeam(fresh);
-          } catch (reloadError) {
-            this.notify.error(this.resolveError(reloadError));
-            this.closeImmediate();
-          }
-        }
-      }
-      return;
-    }
-    if (code === 'ORG_LEAD_BRANCH_REQUIRED' || code === 'ORG_LEAD_USER_NOT_FOUND') {
+    if (code === 'ORG_LEAD_USER_NOT_FOUND' || code === 'ORG_LEAD_BRANCH_REQUIRED') {
       this.leadServerError.set(this.resolveError(error));
       return;
     }
-    if (code === 'ORG_LEAD_CHANGE_CONFLICT') {
-      this.notify.error(this.transloco.translate('teams.retryLater'));
-      return;
-    }
-    if (code === 'ORG_PARENT_INACTIVE') {
-      if (isActivating) {
-        this.isActive.set(false);
-      }
-      this.notify.error(this.resolveError(error));
-      return;
-    }
-    if (code === 'ORG_NODE_NOT_EMPTY' && isDeactivating && base) {
-      this.isActive.set(true);
-      const rawBlockers = error instanceof ApiError ? error.details?.['blockers'] : undefined;
-      const blockers = Array.isArray(rawBlockers) ? rawBlockers.map(String) : [];
-      this.deactivateBlocked.emit({ team: base, blockers });
+    if (code === 'ORG_BRANCH_SCOPE_STALE' || code === 'ORG_NODE_SCOPE_STALE') {
+      if (await this.staleDialog().open()) this.staleScopeDetected.emit();
       return;
     }
     this.notify.error(this.resolveError(error));
-    if (code === 'ORG_NODE_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
-      this.deletedRemotely.emit();
-      this.closeImmediate();
-    }
   }
 
   private async loadLeadOptions(search: string): Promise<void> {
     const seq = ++this.leadSearchSeq;
+    const branchId = this.cascadeValue().branchId;
+    if (!branchId || !this.canSelectLead()) {
+      this.leadOptions.set([]);
+      this.leadSearching.set(false);
+      return;
+    }
+    const revision = this.session.scopeRevision();
     this.leadSearching.set(true);
     try {
-      const page = await listUsers({
+      const page = await this.usersApi.listUsers({
+        branchId,
         status: 'ACTIVE',
         ...(search.trim() ? { search: search.trim() } : {}),
         limit: 20,
       });
       if (seq !== this.leadSearchSeq) return;
-      this.leadOptions.set(page.data);
+      if (revision !== this.session.scopeRevision() || !this.canSelectLead()) return;
+      this.leadOptions.set(page.data.filter((user) => user.branchId === branchId && user.status === 'ACTIVE'));
       if (this.leadMenuOpen()) {
         queueMicrotask(() => this.placeLeadMenu(this.leadMenuSeq));
       }
@@ -705,6 +611,14 @@ export class TeamModal {
     }
   }
 
+  private async loadDetails(team: Team, seq: number): Promise<void> {
+    const parents = this.cascadeValue();
+    if (!parents.branchId || !parents.companyId) await this.resolveChainFromDepartment(team.departmentId, seq);
+    if (seq !== this.openSeq || !this.canReadBranchUsers()) return;
+    void this.loadMembers(team.id);
+    if (team.leadUserId) void this.resolveLeadUser(team.leadUserId, seq);
+  }
+
   private async resolveLeadUser(userId: string, seq: number): Promise<void> {
     const known =
       this.knownUsers().find((u) => u.id === userId) ??
@@ -714,7 +628,7 @@ export class TeamModal {
       return;
     }
     try {
-      const user = await getUser(userId);
+      const user = await this.usersApi.getUser(userId);
       if (seq !== this.openSeq) return;
       this.resolvedSelectedLead.set(user);
     } catch {
@@ -724,26 +638,19 @@ export class TeamModal {
 
   private async loadMembers(teamId: string): Promise<void> {
     const seq = ++this.membersSeq;
+    const revision = this.session.scopeRevision();
+    this.members.set([]);
+    this.membersTotal.set(null);
     this.membersLoading.set(true);
     try {
-      const page = await listUsers({ teamId, limit: 10 });
-      if (seq !== this.membersSeq) return;
+      const page = await this.usersApi.listUsers({ teamId, limit: 10 });
+      if (seq !== this.membersSeq || revision !== this.session.scopeRevision()) return;
       this.membersTotal.set(page.meta.total);
-      const membershipResults = await Promise.allSettled(page.data.map((user) => listMemberships(user.id)));
-      if (seq !== this.membersSeq) return;
-      const items: TeamMemberItem[] = page.data.map((user, index) => {
-        const res = membershipResults[index];
-        if (res.status === 'fulfilled') {
-          const match = res.value.find((m) => m.teamId === teamId);
-          return { user, role: match?.role ?? null };
-        }
-        return { user, role: null };
-      });
-      this.members.set(items);
+      this.members.set(page.data);
     } catch {
       if (seq !== this.membersSeq) return;
       this.members.set([]);
-      this.membersTotal.set(0);
+      this.membersTotal.set(null);
     } finally {
       if (seq === this.membersSeq) {
         this.membersLoading.set(false);
@@ -753,9 +660,9 @@ export class TeamModal {
 
   private async resolveChainFromDepartment(departmentId: string, seq: number): Promise<void> {
     try {
-      const dept = await getDepartment(departmentId);
+      const dept = await this.organization.getDepartment(departmentId);
       if (seq !== this.openSeq || this.cascadeEditedByUser) return;
-      const branch = await getBranch(dept.branchId);
+      const branch = await this.organization.getBranch(dept.branchId);
       if (seq !== this.openSeq || this.cascadeEditedByUser) return;
       const resolved: OrgCascadeValue = {
         companyId: branch.companyId,
@@ -772,7 +679,7 @@ export class TeamModal {
 
   private async resolveCompanyFromBranch(branchId: string, seq: number): Promise<void> {
     try {
-      const branch = await getBranch(branchId);
+      const branch = await this.organization.getBranch(branchId);
       if (seq !== this.openSeq || this.cascadeEditedByUser) return;
       const resolved: OrgCascadeValue = {
         companyId: branch.companyId,
@@ -863,8 +770,8 @@ export class TeamModal {
     this.lastIdempotencyKey = '';
   }
 
-  private idempotencyKeyFor(target: string, payload: unknown): string {
-    const signature = `${target}:${JSON.stringify(payload)}`;
+  private idempotencyKeyFor(payload: CreateTeamBody): string {
+    const signature = JSON.stringify(payload);
     if (signature !== this.lastPayloadSignature) {
       this.lastPayloadSignature = signature;
       this.lastIdempotencyKey = newIdempotencyKey();

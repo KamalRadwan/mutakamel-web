@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
@@ -19,6 +20,8 @@ class EmptyLoader {
 }
 
 const companiesPath = '/api/tenant/core/v1/organization/companies';
+const dialog = HTMLDialogElement.prototype;
+const { showModal, close } = dialog;
 const company: Company = {
   id: '019f0000-0000-7000-8000-000000000010',
   code: 'C',
@@ -40,6 +43,8 @@ describe('Companies with Gateway reads', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    dialog.showModal = function () { this.setAttribute('open', ''); };
+    dialog.close = function () { this.removeAttribute('open'); };
     me.set({
       ...FAKE_TENANT_ME,
       permissions: ['org.company.read', 'org.company.manage'],
@@ -57,7 +62,10 @@ describe('Companies with Gateway reads', () => {
         }),
         {
           provide: AuthSession,
-          useValue: { me, status: signal('signed-in'), ensureLoaded: async () => 'signed-in' },
+          useValue: {
+            me, status: signal('signed-in'), ensureLoaded: async () => 'signed-in',
+            requestVersion: () => ({ generation: 1, revision: 0 }), reloadProfile: async () => undefined,
+          },
         },
       ],
     });
@@ -66,6 +74,9 @@ describe('Companies with Gateway reads', () => {
 
   afterEach(() => {
     http.verify();
+    dialog.showModal = showModal;
+    dialog.close = close;
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -114,6 +125,38 @@ describe('Companies with Gateway reads', () => {
     await finish(fixture);
     expect(page['total']()).toBe(0);
     expect(page['loadForbidden']()).toBe(true);
+  });
+
+  it('opens Add Company and retries the unchanged form with the same real write key', async () => {
+    const doc = TestBed.inject(DOCUMENT);
+    const csrfName = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${csrfName}=test-csrf`);
+    const fixture = render();
+    const page = fixture.componentInstance;
+    http.expectOne((req) => req.method === 'GET' && req.url === companiesPath)
+      .flush({ success: true, data: [], meta: emptyMeta });
+    await finish(fixture);
+
+    expect(page['canCreate']()).toBe(true);
+    page['openCreate']();
+    const modal = page['companyModal']();
+    modal['code'].set(company.code);
+    modal['name'].set(company.name);
+    const first = modal['save']();
+    const write = http.expectOne({ method: 'POST', url: companiesPath });
+    expect(write.request.body).toEqual({ code: company.code, name: company.name });
+    write.flush({ code: 'GW.UPSTREAM.UNAVAILABLE' }, { status: 503, statusText: 'Unavailable' });
+    await first;
+
+    const retry = modal['save']();
+    const retriedWrite = http.expectOne({ method: 'POST', url: companiesPath });
+    expect(retriedWrite.request.headers.get('x-idempotency-key')).toBe(write.request.headers.get('x-idempotency-key'));
+    retriedWrite.flush({ success: true, data: company }, { status: 201, statusText: 'Created' });
+    await retry;
+    http.expectOne((req) => req.method === 'GET' && req.url === companiesPath)
+      .flush({ success: true, data: [company], meta: { ...emptyMeta, total: 1, totalPages: 1 } });
+    await finish(fixture);
+    expect(page['rows']()).toEqual([company]);
   });
 });
 

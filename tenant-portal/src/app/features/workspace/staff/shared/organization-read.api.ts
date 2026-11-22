@@ -4,13 +4,20 @@ import { QueryClient } from '@tanstack/angular-query';
 import { firstValueFrom } from 'rxjs';
 import { ApiError } from '../../../../core/api/api-errors';
 import type { CorePage, CorePageMeta } from '../../../../core/api/core-page';
-import type { Branch, Company, ListQuery } from './staff.model';
+import type { Branch, Company, Currency, Department, ListQuery, Team } from './staff.model';
 import { StaffSession } from './staff-session';
 
 const ORGANIZATION_PATH = '/api/tenant/core/v1/organization';
 type CompanyQuery = Pick<ListQuery, 'page' | 'limit' | 'search' | 'sortBy' | 'sortDir' | 'status'>;
 type BranchQuery = CompanyQuery & Pick<ListQuery, 'companyId'>;
-type ReadPermission = 'org.company.read' | 'org.branch.read';
+type DepartmentQuery = BranchQuery & Pick<ListQuery, 'branchId'>;
+type TeamQuery = DepartmentQuery & Pick<ListQuery, 'departmentId'>;
+type ReadPermission =
+  | 'org.company.read'
+  | 'org.branch.read'
+  | 'org.department.read'
+  | 'org.team.read'
+  | 'currencies.currency.read';
 
 interface ReadEnvelope<T> {
   success: true;
@@ -27,24 +34,52 @@ export class OrganizationReadApi {
   });
 
   listCompanies(query: CompanyQuery = {}): Promise<CorePage<Company>> {
-    return this.readPage('companies', 'org.company.read', query);
+    return this.readPage(`${ORGANIZATION_PATH}/companies`, 'org.company.read', query);
   }
 
   listBranches(query: BranchQuery = {}): Promise<CorePage<Branch>> {
-    return this.readPage('branches', 'org.branch.read', query);
+    return this.readPage(`${ORGANIZATION_PATH}/branches`, 'org.branch.read', query);
+  }
+
+  listDepartments(query: DepartmentQuery = {}): Promise<CorePage<Department>> {
+    return this.readPage(`${ORGANIZATION_PATH}/departments`, 'org.department.read', query);
+  }
+
+  listTeams(query: TeamQuery = {}): Promise<CorePage<Team>> {
+    return this.readPage(`${ORGANIZATION_PATH}/teams`, 'org.team.read', query);
+  }
+
+  listCurrencies(query: Pick<ListQuery, 'page' | 'limit' | 'status'> = {}): Promise<CorePage<Currency>> {
+    return this.readPage('/api/tenant/core/v1/currencies', 'currencies.currency.read', query);
   }
 
   async getCompany(id: string): Promise<Company> {
-    const result = await this.read<Company>(`companies/${encodeURIComponent(id)}`, 'org.company.read');
+    const result = await this.read<Company>(`${ORGANIZATION_PATH}/companies/${encodeURIComponent(id)}`, 'org.company.read');
     return result.data;
   }
 
   async getBranch(id: string): Promise<Branch> {
-    const result = await this.read<Branch>(`branches/${encodeURIComponent(id)}`, 'org.branch.read');
+    const result = await this.read<Branch>(`${ORGANIZATION_PATH}/branches/${encodeURIComponent(id)}`, 'org.branch.read');
     return result.data;
   }
 
-  private async readPage<T>(path: string, permission: ReadPermission, query: BranchQuery): Promise<CorePage<T>> {
+  async getDepartment(id: string): Promise<Department> {
+    const result = await this.read<Department>(`${ORGANIZATION_PATH}/departments/${encodeURIComponent(id)}`, 'org.department.read');
+    return result.data;
+  }
+
+  async getTeam(id: string): Promise<Team> {
+    const result = await this.read<Team>(`${ORGANIZATION_PATH}/teams/${encodeURIComponent(id)}`, 'org.team.read');
+    return result.data;
+  }
+
+  async invalidateScope(scope: string): Promise<void> {
+    const filters = { queryKey: ['staff-organization', scope] };
+    await this.queries.cancelQueries(filters);
+    await this.queries.invalidateQueries({ ...filters, refetchType: 'none' });
+  }
+
+  private async readPage<T>(path: string, permission: ReadPermission, query: TeamQuery): Promise<CorePage<T>> {
     const { data, meta } = await this.read<T[]>(path, permission, query);
     if (!Array.isArray(data) || !meta || !Number.isSafeInteger(meta.total) || meta.total < 0 ||
       !Number.isSafeInteger(meta.totalPages) || meta.totalPages < 0 ||
@@ -54,7 +89,7 @@ export class OrganizationReadApi {
     return { data, meta };
   }
 
-  private async read<T>(path: string, permission: ReadPermission, query: BranchQuery = {}): Promise<ReadEnvelope<T>> {
+  private async read<T>(path: string, permission: ReadPermission, query: TeamQuery = {}): Promise<ReadEnvelope<T>> {
     const scope = this.session.scopeRevision();
     if (!scope || !this.session.can(permission)) {
       throw new ApiError(403, 'COMMON.GENERIC.FORBIDDEN');
@@ -67,7 +102,7 @@ export class OrganizationReadApi {
       queryKey: ['staff-organization', scope, path, query],
       queryFn: async () => {
         try {
-          const envelope = await firstValueFrom(this.http.get<ReadEnvelope<T>>(`${ORGANIZATION_PATH}/${path}`, { params }));
+          const envelope = await firstValueFrom(this.http.get<ReadEnvelope<T>>(path, { params }));
           if (envelope?.success !== true || envelope.data == null) {
             throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
           }

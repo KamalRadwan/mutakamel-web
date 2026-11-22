@@ -5,46 +5,27 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerCheck,
-  tablerCircleOff,
   tablerCloudOff,
-  tablerEdit,
   tablerEye,
   tablerPlus,
   tablerSitemap,
-  tablerTrash,
   tablerUsers,
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
-import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
-import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StaffSession } from '../shared/staff-session';
 import { StatusBadge } from '../shared/status-badge/status-badge';
-import {
-  ApiError,
-  deleteDepartment,
-  errorCodeOf,
-  errorMessage,
-  getBranch,
-  getDepartment,
-  listAllPages,
-  listBranches,
-  listCompanies,
-  listDepartments,
-  listTeams,
-  newIdempotencyKey,
-  updateDepartment,
-} from '../shared/staff.api';
+import { ApiError } from '../../../../core/api/api-errors';
+import { OrganizationReadApi } from '../shared/organization-read.api';
+import { errorMessage, listAllPages } from '../shared/staff.api';
 import {
   Branch,
   Company,
   Department,
   ListQuery,
-  OrgStatus,
   StaffListFilter,
   StaffListSortOption,
 } from '../shared/staff.model';
@@ -61,9 +42,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-department-row-actions';
     NgIcon,
     TranslocoPipe,
     ActionsMenu,
-    BlockersDialog,
     Button,
-    ConfirmDialog,
     DepartmentModal,
     StaffList,
     StatusBadge,
@@ -78,12 +57,8 @@ const TABLE_COLUMNS = 'grid-cols-staff-department-row-actions';
       tablerSitemap,
       tablerCloudOff,
       tablerEye,
-      tablerEdit,
       tablerPlus,
       tablerUsers,
-      tablerCheck,
-      tablerCircleOff,
-      tablerTrash,
     }),
   ],
   templateUrl: './departments-page.html',
@@ -97,12 +72,10 @@ export class DepartmentsPage {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
+  private readonly organization = inject(OrganizationReadApi);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly departmentModal = viewChild.required(DepartmentModal);
-  private readonly deleteConfirm = viewChild.required<ConfirmDialog>('deleteConfirm');
-  private readonly blockersDialog = viewChild.required(BlockersDialog);
-
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly tableColumns = TABLE_COLUMNS;
 
@@ -112,43 +85,29 @@ export class DepartmentsPage {
   protected readonly sort = signal<string>('name');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  private readonly loadedRows = signal<Department[]>([]);
-  protected readonly rows = computed(() => this.loadedRows().filter((row) =>
-    this.session.can('org.department.read', { branchId: row.branchId }),
-  ));
-  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
-  protected readonly total = computed(() => {
-    const result = this.loadedTotal();
-    return result && result.revision === this.session.scopeRevision() &&
-      this.rows().length === this.loadedRows().length ? result.count : this.rows().length;
+  private readonly result = signal<{ revision: string; rows: Department[]; total: number } | null>(null);
+  private readonly currentResult = computed(() => {
+    const result = this.result();
+    return result?.revision === this.session.scopeRevision() ? result : null;
   });
+  protected readonly rows = computed(() => this.currentResult()?.rows ?? []);
+  protected readonly total = computed(() => this.currentResult()?.total ?? 0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly loadForbidden = signal(false);
+  private readonly lookupsReady = signal(false);
   protected readonly companies = signal<Company[]>([]);
   protected readonly branches = signal<Branch[]>([]);
   protected readonly teamCounts = signal<Record<string, number>>({});
-  protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
-
-  protected readonly modalDepartment = signal<Department | null>(null);
-  protected readonly pendingDeleteDepartment = signal<Department | null>(null);
 
   private readonly companyMap = computed(() => new Map(this.companies().map((c) => [c.id, c])));
   private readonly branchMap = computed(() => new Map(this.branches().map((b) => [b.id, b])));
 
-  protected readonly canAddDepartment = computed(
-    () =>
-      this.branches().some((b) =>
-        this.session.can('org.department.manage', { companyId: b.companyId, branchId: b.id }),
-      ),
-  );
-
-  protected readonly modalCanManage = computed(() => {
-    const editing = this.modalDepartment();
-    if (editing) {
-      return this.canManageDepartment(editing);
-    }
-    return this.canAddDepartment();
-  });
+  protected readonly createBranches = computed(() => this.branches().filter((branch) =>
+    branch.status === 'ACTIVE' && this.companyMap().has(branch.companyId) &&
+    this.session.can('org.department.manage', { companyId: branch.companyId, branchId: branch.id }),
+  ));
+  protected readonly canAddDepartment = computed(() => this.createBranches().length > 0);
 
   protected readonly hasActiveFiltersOrSearch = computed(
     () =>
@@ -201,6 +160,8 @@ export class DepartmentsPage {
   });
 
   private loadSeq = 0;
+  private lookupSeq = 0;
+  private detailSeq = 0;
   private countsSeq = 0;
   private prevCompanyFilter: string | null = null;
   private prevCriteriaSignature: string | null = null;
@@ -211,7 +172,15 @@ export class DepartmentsPage {
     if (!this.session.me()) {
       void this.session.load();
     }
-    void this.loadLookups();
+    effect(() => {
+      this.session.scopeRevision();
+      untracked(() => {
+        this.lookupsReady.set(false);
+        this.companies.set([]);
+        this.branches.set([]);
+        void this.loadLookups();
+      });
+    });
 
     const initialParams = this.route.snapshot.queryParamMap;
     const initialCompany = initialParams.get('companyId');
@@ -288,7 +257,7 @@ export class DepartmentsPage {
 
       const openId = params.get('open');
       const isNew = params.get('new') === '1';
-      if (!openId && !isNew) return;
+      if ((!openId && !isNew) || (isNew && !openId && !this.lookupsReady())) return;
 
       const key = `${openId ?? ''}|${isNew ? '1' : ''}|${companyId ?? ''}|${branchId ?? ''}`;
       if (key === this.handledDeepLinkKey) return;
@@ -328,14 +297,9 @@ export class DepartmentsPage {
     });
   }
 
-  protected canManageDepartment(department: Department): boolean {
-    const companyId = this.branchMap().get(department.branchId)?.companyId ?? null;
-    return this.session.can('org.department.manage', { companyId, branchId: department.branchId });
-  }
-
   protected canAddTeamTo(department: Department): boolean {
-    const companyId = this.branchMap().get(department.branchId)?.companyId ?? null;
-    return this.session.can('org.team.manage', { companyId, branchId: department.branchId });
+    const target = { branchId: department.branchId };
+    return this.session.can('org.team.read', target) && this.session.can('org.team.manage', target);
   }
 
   protected branchName(branchId: string): string {
@@ -348,7 +312,6 @@ export class DepartmentsPage {
   }
 
   protected teamCountText(departmentId: string): string {
-    if (this.loadedTotal()?.revision !== this.session.scopeRevision()) return '—';
     const department = this.rows().find(({ id }) => id === departmentId);
     if (!department || !this.session.can('org.team.read', { branchId: department.branchId })) return '—';
     const count = this.teamCounts()[departmentId];
@@ -367,102 +330,64 @@ export class DepartmentsPage {
 
   protected openCreate(preset?: { companyId?: string | null; branchId?: string | null }): void {
     if (!this.canAddDepartment()) return;
-    this.modalDepartment.set(null);
-    const branchId = preset?.branchId ?? this.filterValues()['branchId'] ?? null;
-    const companyId =
-      preset?.companyId ??
-      (branchId ? this.branchMap().get(branchId)?.companyId : undefined) ??
-      this.filterValues()['companyId'] ??
-      null;
-    this.departmentModal().openCreate({ companyId, branchId });
+    const filters = this.filterValues();
+    const companyId = preset?.companyId ?? filters['companyId'];
+    const branchId = preset?.branchId ?? filters['branchId'];
+    const matching = this.createBranches().filter((branch) =>
+      (!companyId || branch.companyId === companyId) && (!branchId || branch.id === branchId),
+    );
+    if (preset && matching.length === 0) return;
+
+    const branch = matching.length === 1 ? matching[0] : null;
+    this.detailSeq++;
+    this.departmentModal().openCreate({
+      companyId: branch?.companyId ?? (matching.length ? companyId : null),
+      branchId: branch?.id,
+    });
   }
 
-  protected openEdit(department: Department): void {
-    if (!this.session.can('org.department.read', { branchId: department.branchId })) return;
-    this.modalDepartment.set(department);
-    const companyId = this.branchMap().get(department.branchId)?.companyId ?? null;
-    this.departmentModal().openEdit(department, companyId);
+  protected openDetails(department: Department): void {
+    void this.openDepartmentById(department.id);
   }
 
-  protected onModalSaved(event: { department: Department; isNew: boolean }): void {
-    const companyId = this.branchMap().get(event.department.branchId)?.companyId ?? null;
-    if (this.departmentModal().editingId() === event.department.id) {
-      this.departmentModal().syncDepartment(event.department, companyId);
-    }
-    this.reload();
+  protected async onModalSaved(): Promise<void> {
+    const revision = this.session.scopeRevision();
+    if (!revision) return;
+    await this.organization.invalidateScope(revision);
+    if (revision === this.session.scopeRevision()) this.reload();
   }
 
   protected actionsFor(department: Department): ActionItem[] {
     this.i18n();
     const t = (key: string) => this.transloco.translate(key);
-    const manage = this.canManageDepartment(department);
-    const busy = this.busyIds().has(department.id);
-    const isActive = department.status === 'ACTIVE';
-
-    const items: ActionItem[] = [
-      {
-        id: 'open',
-        title: t('departments.actions.open'),
-        icon: 'tablerEye',
-        tile: 'bg-icon-blue',
-      },
-    ];
-
-    if (manage) {
-      items.push({
-        id: 'edit',
-        title: t('departments.actions.edit'),
-        icon: 'tablerEdit',
-        tile: 'bg-icon-orange',
-      });
-    }
+    const items: ActionItem[] = [{
+      id: 'open',
+      title: t('departments.actions.open'),
+      icon: 'tablerEye',
+      tile: 'bg-icon-blue',
+    }];
 
     if (this.canAddTeamTo(department)) {
+      const inactive = department.status !== 'ACTIVE';
       items.push({
         id: 'addTeam',
         title: t('departments.actions.addTeam'),
         icon: 'tablerPlus',
-        tile: isActive ? 'bg-icon-green' : 'bg-icon-gray',
-        disabled: !isActive,
-        reason: !isActive ? t('departments.actions.addTeamInactiveReason') : undefined,
+        tile: inactive ? 'bg-icon-gray' : 'bg-icon-green',
+        disabled: inactive,
+        reason: inactive ? t('departments.actions.addTeamInactiveReason') : undefined,
       });
     }
-
-    if (this.session.can('users.user.read', { branchId: department.branchId })) items.push({
-      id: 'viewUsers',
-      title: t('departments.actions.viewUsers'),
-      icon: 'tablerUsers',
-      tile: 'bg-icon-blue',
-    });
-
-    if (manage) {
-      items.push(
-        {
-          id: 'toggleStatus',
-          title: t(isActive ? 'departments.actions.deactivate' : 'departments.actions.activate'),
-          icon: isActive ? 'tablerCircleOff' : 'tablerCheck',
-          tile: busy ? 'bg-icon-gray' : isActive ? 'bg-icon-orange' : 'bg-icon-green',
-          disabled: busy,
-        },
-        {
-          id: 'delete',
-          title: t('departments.actions.delete'),
-          icon: 'tablerTrash',
-          tile: 'bg-icon-red',
-          danger: true,
-          disabled: busy,
-        },
-      );
+    if (this.session.can('users.user.read', { branchId: department.branchId })) {
+      items.push({ id: 'viewUsers', title: t('departments.actions.viewUsers'), icon: 'tablerUsers', tile: 'bg-icon-blue' });
     }
-
     return items;
   }
 
   protected onAction(department: Department, selection: ActionSelection): void {
     switch (selection.id) {
       case 'open':
-      case 'edit':
-        this.openEdit(department);
+        this.openDetails(department);
         break;
       case 'addTeam':
         if (this.canAddTeamTo(department) && department.status === 'ACTIVE') {
@@ -476,137 +401,31 @@ export class DepartmentsPage {
           void this.router.navigate(['/workspace/staff/users'], { queryParams: { departmentId: department.id } });
         }
         break;
-      case 'toggleStatus':
-        if (this.canManageDepartment(department)) {
-          void this.toggleStatus(department);
-        }
-        break;
-      case 'delete':
-        if (this.canManageDepartment(department)) {
-          void this.requestDelete(department);
-        }
-        break;
     }
-  }
-
-  protected async requestDelete(department: Department): Promise<void> {
-    if (!this.canManageDepartment(department) || this.busyIds().has(department.id)) return;
-    this.pendingDeleteDepartment.set(department);
-    if (!(await this.deleteConfirm().open())) {
-      this.pendingDeleteDepartment.set(null);
-      return;
-    }
-
-    this.setBusy(department.id, true);
-    try {
-      await deleteDepartment(department.id, newIdempotencyKey());
-      if (this.departmentModal().editingId() === department.id) {
-        this.departmentModal().closeImmediate();
-      }
-      this.notify.success(this.transloco.translate('departments.toast.deleted'));
-      this.reload();
-    } catch (error) {
-      if (errorCodeOf(error) === 'ORG_NODE_NOT_EMPTY') {
-        this.openDepartmentBlockers(department, this.extractBlockers(error));
-        return;
-      }
-      this.notify.error(this.resolveError(error));
-      if (errorCodeOf(error) === 'ORG_NODE_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
-        if (this.departmentModal().editingId() === department.id) {
-          this.departmentModal().closeImmediate();
-        }
-        this.reload();
-      }
-    } finally {
-      this.setBusy(department.id, false);
-      this.pendingDeleteDepartment.set(null);
-    }
-  }
-
-  protected onDeactivateBlocked(event: { department: Department; blockers: string[] }): void {
-    this.openDepartmentBlockers(event.department, event.blockers);
-  }
-
-  private async toggleStatus(department: Department): Promise<void> {
-    if (this.busyIds().has(department.id)) return;
-    const nextStatus: OrgStatus = department.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-
-    this.setBusy(department.id, true);
-    try {
-      const updated = await updateDepartment(department.id, { status: nextStatus }, newIdempotencyKey());
-      const companyId = this.branchMap().get(updated.branchId)?.companyId ?? null;
-      this.departmentModal().syncDepartment(updated, companyId);
-      this.notify.success(
-        this.transloco.translate(nextStatus === 'ACTIVE' ? 'departments.toast.activated' : 'departments.toast.deactivated'),
-      );
-      this.reload();
-    } catch (error) {
-      if (errorCodeOf(error) === 'ORG_NODE_NOT_EMPTY') {
-        this.openDepartmentBlockers(department, this.extractBlockers(error));
-        return;
-      }
-      this.notify.error(this.resolveError(error));
-    } finally {
-      this.setBusy(department.id, false);
-    }
-  }
-
-  private openDepartmentBlockers(department: Department, blockers: string[]): void {
-    const t = (key: string) => this.transloco.translate(key);
-    const teamsLink = {
-      label: t('departments.actions.viewTeams'),
-      route: ['/workspace/staff/teams'],
-      queryParams: { departmentId: department.id },
-    };
-    const usersLink = {
-      label: t('departments.actions.viewUsers'),
-      route: ['/workspace/staff/users'],
-      queryParams: { departmentId: department.id },
-    };
-
-    void this.blockersDialog().open({
-      title: department.name,
-      blockers,
-      links: {
-        'department has teams': teamsLink,
-        'department has active teams': teamsLink,
-        'active teams': teamsLink,
-        'department has placed users': usersLink,
-        'department has team memberships': usersLink,
-        users: usersLink,
-      },
-    });
   }
 
   private async openDepartmentById(id: string): Promise<void> {
-    const existing = this.rows().find((d) => d.id === id);
-    if (existing) {
-      this.openEdit(existing);
-      return;
-    }
+    const seq = ++this.detailSeq;
+    const revision = this.session.scopeRevision();
     try {
-      const department = await getDepartment(id);
-      let companyId = this.branchMap().get(department.branchId)?.companyId ?? null;
-      if (!companyId) {
-        try {
-          const branch = await getBranch(department.branchId);
-          companyId = branch.companyId;
-        } catch {
-          // DepartmentModal also resolves companyId as fallback.
-        }
-      }
-      this.modalDepartment.set(department);
-      this.departmentModal().openEdit(department, companyId);
+      const department = await this.organization.getDepartment(id);
+      if (seq !== this.detailSeq || revision !== this.session.scopeRevision()) return;
+      this.departmentModal().openDetails(department, this.branchMap().get(department.branchId)?.companyId);
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      if (seq === this.detailSeq && revision === this.session.scopeRevision()) this.notify.error(this.resolveError(error));
     }
   }
 
   private async loadLookups(): Promise<void> {
+    const seq = ++this.lookupSeq;
+    const revision = this.session.scopeRevision();
+    if (!revision) return;
     const [companiesRes, branchesRes] = await Promise.allSettled([
-      listAllPages(listCompanies, { limit: 100 }),
-      listAllPages(listBranches, { limit: 100 }),
+      listAllPages((query) => this.organization.listCompanies(query), { limit: 100 }),
+      listAllPages((query) => this.organization.listBranches(query), { limit: 100 }),
     ]);
+    if (seq !== this.lookupSeq || revision !== this.session.scopeRevision()) return;
+    this.lookupsReady.set(true);
     if (companiesRes.status === 'fulfilled') {
       this.companies.set(companiesRes.value);
     }
@@ -634,8 +453,10 @@ export class DepartmentsPage {
   }): Promise<void> {
     const seq = ++this.loadSeq;
     const revision = this.session.scopeRevision();
+    if (!revision) return;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadForbidden.set(false);
 
     const query: ListQuery = {
       page: params.page,
@@ -649,16 +470,15 @@ export class DepartmentsPage {
     if (params.status) query.status = params.status;
 
     try {
-      const result = await listDepartments(query, (scope) => this.session.can('org.department.read', scope));
+      const result = await this.organization.listDepartments(query);
       if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
-      this.loadedRows.set(result.data);
-      this.loadedTotal.set({ revision, count: result.meta.total });
+      this.result.set({ revision, rows: result.data, total: result.meta.total });
       void this.loadTeamCounts(result.data);
-    } catch {
-      if (seq !== this.loadSeq) return;
+    } catch (error) {
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
       this.loadFailed.set(true);
-      this.loadedRows.set([]);
-      this.loadedTotal.set(null);
+      this.loadForbidden.set(error instanceof ApiError && error.status === 403);
+      this.result.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -672,16 +492,15 @@ export class DepartmentsPage {
     this.teamCounts.set({});
     const results = await Promise.allSettled(
       items.map(async (dept) => {
-        const page = await listTeams({ departmentId: dept.id, limit: 1 }, (scope) =>
-          this.session.can('org.team.read', scope),
-        );
+        if (!this.session.can('org.team.read', { branchId: dept.branchId })) return null;
+        const page = await this.organization.listTeams({ departmentId: dept.id, limit: 1 });
         return [dept.id, page.meta.total] as const;
       }),
     );
     if (seq !== this.countsSeq || revision !== this.session.scopeRevision()) return;
     const next: Record<string, number> = {};
     for (const res of results) {
-      if (res.status === 'fulfilled') {
+      if (res.status === 'fulfilled' && res.value) {
         next[res.value[0]] = res.value[1];
       }
     }
@@ -696,20 +515,6 @@ export class DepartmentsPage {
       queryParams: clear,
       queryParamsHandling: 'merge',
       replaceUrl: true,
-    });
-  }
-
-  private extractBlockers(error: unknown): string[] {
-    const raw = error instanceof ApiError ? error.details?.['blockers'] : undefined;
-    return Array.isArray(raw) ? raw.map(String) : [];
-  }
-
-  private setBusy(id: string, busy: boolean): void {
-    this.busyIds.update((current) => {
-      const next = new Set(current);
-      if (busy) next.add(id);
-      else next.delete(id);
-      return next;
     });
   }
 

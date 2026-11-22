@@ -73,7 +73,7 @@ export class AuthTransport {
   }
 }
 
-function readCsrfCookie(document: Document): string | undefined {
+export function readCsrfCookie(document: Document): string | undefined {
   const protocol = document.location?.protocol;
   if (protocol !== 'http:' && protocol !== 'https:') return undefined;
 

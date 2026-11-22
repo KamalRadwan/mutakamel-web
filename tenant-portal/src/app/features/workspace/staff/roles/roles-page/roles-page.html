@@ -160,7 +160,7 @@
               </span>
 
               <span role="cell" dir="ltr" class="flex min-w-0 items-center border-s border-border px-10 text-12 tabular-nums text-text">
-                {{ holderCountText(role.id) }}
+                —
               </span>
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
@@ -169,9 +169,9 @@
 
               <span role="cell" class="flex items-center justify-center border-s border-border" (click)="$event.stopPropagation()">
                 <ui-actions-menu
-                  [items]="actionsFor(role)"
+                  [items]="rowActions()"
                   [label]="'roles.cols.actions' | transloco"
-                  (selected)="onRowAction(role, $event)"
+                  (selected)="openRole(role)"
                 />
               </span>
             </div>
@@ -188,117 +188,4 @@
   }
 </app-staff-list>
 
-<app-role-modal
-  [canCreate]="canCreate()"
-  [canUpdate]="canUpdate()"
-  [canDelete]="canDelete()"
-  [holderCount]="selectedRoleHolderCount()"
-  (created)="onRoleCreated($event)"
-  (saved)="onRoleSaved()"
-  (deletedRemotely)="onRoleDeletedRemotely()"
-  (deleteRequested)="requestDelete($event)"
-  (permissionsRequested)="onRolePermissionsRequested($event)"
-/>
-
-<app-global-permissions-modal
-  (saved)="onPermissionsSaved()"
-  (branchModeConflict)="load()"
-/>
-
-<app-assign-permissions-wizard (saved)="onPermissionsSaved()" />
-
-<app-blockers-dialog />
-
-<ui-modal
-  #deleteDialog
-  size="confirm"
-  icon="tablerTrash"
-  tile="bg-icon-red"
-  [title]="'roles.delete.title' | transloco: { name: pendingDeleteRole() ? roleName(pendingDeleteRole()!) : '' }"
-  [closeLabel]="'roles.common.close' | transloco"
-  [dismissable]="false"
-  (closed)="onDeleteDialogClosed()"
->
-  <div class="flex flex-col gap-10">
-    <p class="text-12 leading-18 text-text-muted">
-      {{ 'roles.delete.text' | transloco: { name: pendingDeleteRole() ? roleName(pendingDeleteRole()!) : '' } }}
-    </p>
-    <app-seat-impact [changes]="deleteSeatChanges()" [compact]="true" />
-  </div>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="danger"
-    (click)="settleDeleteConfirm(true)"
-  >
-    {{ 'roles.common.delete' | transloco }}
-  </button>
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="secondary"
-    (click)="settleDeleteConfirm(false)"
-  >
-    {{ 'roles.common.cancel' | transloco }}
-  </button>
-</ui-modal>
-
-<ui-confirm-dialog
-  #convertDialog
-  tone="warning"
-  [title]="'roles.convert.title' | transloco"
-  [text]="
-    'roles.convert.text'
-      | transloco
-        : {
-            name: pendingConvertRole() ? roleName(pendingConvertRole()!) : '',
-            n: pendingConvertRole()?.permissionCount ?? 0,
-          }
-  "
-  [confirmLabel]="'roles.convert.confirm' | transloco"
-  [cancelLabel]="'roles.common.cancel' | transloco"
-/>
-
-<ui-modal
-  #modeChoiceModal
-  size="confirm"
-  icon="tablerShieldLock"
-  tile="bg-icon-violet"
-  [title]="'roles.create.choiceTitle' | transloco"
-  [subtitle]="pendingModeRole() ? roleName(pendingModeRole()!) : ''"
-  [closeLabel]="'roles.common.close' | transloco"
-  (closed)="pendingModeRole.set(null)"
->
-  <div class="flex flex-col gap-8">
-    <button
-      type="button"
-      class="flex w-full cursor-pointer items-center gap-8 rounded-8 border border-border bg-surface p-8 text-start text-12 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-      (click)="chooseCreateMode('BRANCH')"
-    >
-      <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
-        <ng-icon name="tablerBuildingStore" size="14" aria-hidden="true" />
-      </span>
-      <span class="min-w-0 flex-1">{{ 'roles.create.perBranch' | transloco }}</span>
-    </button>
-
-    <button
-      type="button"
-      class="flex w-full cursor-pointer items-center gap-8 rounded-8 border border-border bg-surface p-8 text-start text-12 font-medium text-text outline-none transition-colors duration-fast hover:bg-row-hover focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-      (click)="chooseCreateMode('GLOBAL')"
-    >
-      <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
-        <ng-icon name="tablerWorld" size="14" aria-hidden="true" />
-      </span>
-      <span class="min-w-0 flex-1">{{ 'roles.create.workspace' | transloco }}</span>
-    </button>
-  </div>
-
-  <div modal-footer class="flex items-center gap-8">
-    <button type="button" uiButton variant="ghost" (click)="closeModeChoice()">
-      {{ 'roles.common.close' | transloco }}
-    </button>
-  </div>
-</ui-modal>
+<app-role-modal [canCreate]="canCreate()" (created)="onRoleCreated()" />

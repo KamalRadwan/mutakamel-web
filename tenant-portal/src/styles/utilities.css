@@ -178,6 +178,7 @@
 @utility grid-cols-staff-role-row-actions { grid-template-columns: var(--staff-role-row-cols) var(--table-head-h); }
 @utility grid-cols-staff-team-row-actions { grid-template-columns: var(--staff-team-row-cols) var(--table-head-h); }
 @utility grid-cols-staff-user-row-select-actions { grid-template-columns: var(--select-col-w) var(--staff-user-row-cols) var(--table-head-h); }
+@utility grid-cols-staff-user-row { grid-template-columns: var(--staff-user-row-cols); }
 @utility grid-cols-staff-user-app-row { grid-template-columns: var(--staff-user-app-row-cols); }
 @utility grid-cols-staff-user-app-row-actions { grid-template-columns: var(--staff-user-app-row-cols) var(--table-head-h); }
 @utility grid-cols-staff-user-app-derived-row { grid-template-columns: var(--staff-user-app-derived-row-cols); }

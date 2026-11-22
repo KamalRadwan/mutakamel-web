@@ -10,8 +10,9 @@ import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { ApiError, createRole, errorCodeOf, errorMessage, newIdempotencyKey, updateRole } from '../../shared/staff.api';
-import { Role, RoleDetail, STAFF_LIMITS } from '../../shared/staff.model';
+import { ApiError, errorCodeOf, errorMessage, newIdempotencyKey } from '../../shared/staff.api';
+import { Role, STAFF_LIMITS } from '../../shared/staff.model';
+import { RolesApi, type CreateRoleBody } from '../roles.api';
 
 interface RoleDraft {
   name: string;
@@ -78,6 +79,7 @@ export class RoleModal {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
+  private readonly api = inject(RolesApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -86,30 +88,18 @@ export class RoleModal {
   private readonly discardDialog = viewChild.required(ConfirmDialog);
 
   readonly canCreate = input(false);
-  readonly canUpdate = input(false);
-  readonly canDelete = input(false);
-  readonly holderCount = input<number | null>(null);
-
-  readonly created = output<RoleDetail>();
-  readonly saved = output<RoleDetail>();
-  readonly deletedRemotely = output<void>();
-  readonly deleteRequested = output<Role>();
-  readonly permissionsRequested = output<Role>();
+  readonly created = output<void>();
 
   protected readonly maxName = STAFF_LIMITS.roleName;
   protected readonly maxDescription = STAFF_LIMITS.roleDescription;
 
-  protected readonly mode = signal<'create' | 'edit'>('create');
+  protected readonly mode = signal<'create' | 'details'>('create');
   protected readonly editingRole = signal<Role | null>(null);
   protected readonly submitAttempted = signal(false);
   private readonly nameServerError = signal<{ code: string; value: string } | null>(null);
 
   private readonly draft = signal<RoleDraft>({ ...EMPTY_DRAFT });
-  protected readonly isReadonly = computed(() => {
-    if (this.mode() === 'create') return !this.canCreate();
-    const role = this.editingRole();
-    return !role || role.isSystem || !this.canUpdate();
-  });
+  protected readonly isReadonly = computed(() => this.mode() === 'details' || !this.canCreate());
 
   protected readonly roleForm = form(this.draft, (path) => {
     validate(path.name, ({ value }) => validateRoleName(value()));
@@ -132,15 +122,8 @@ export class RoleModal {
   });
 
   protected readonly dirty = computed(() => {
-    if (this.isReadonly()) return false;
     const current = this.draft();
-    if (this.mode() === 'create') {
-      return current.name.trim() !== '' || current.description.trim() !== '';
-    }
-    const base = this.editingRole();
-    if (!base) return false;
-    const baseDesc = (base.description ?? '').trim();
-    return current.name.trim() !== base.name || current.description.trim() !== baseDesc;
+    return !this.isReadonly() && (current.name.trim() !== '' || current.description.trim() !== '');
   });
 
   private allowClose = false;
@@ -163,9 +146,9 @@ export class RoleModal {
     );
   }
 
-  openEdit(role: Role): void {
+  openDetails(role: Role): void {
     this.allowClose = false;
-    this.mode.set('edit');
+    this.mode.set('details');
     this.editingRole.set(role);
     this.submitAttempted.set(false);
     this.nameServerError.set(null);
@@ -184,10 +167,6 @@ export class RoleModal {
   closeImmediate(): void {
     this.allowClose = true;
     this.modal().close();
-  }
-
-  editingId(): string | null {
-    return this.editingRole()?.id ?? null;
   }
 
   protected nameError(): string | null {
@@ -229,66 +208,23 @@ export class RoleModal {
       const trimmedName = value.name.trim();
       const trimmedDescription = value.description.trim();
 
+      const payload: CreateRoleBody = { name: trimmedName };
+      if (trimmedDescription) payload.description = trimmedDescription;
       try {
-        if (this.mode() === 'create') {
-          const payload: Parameters<typeof createRole>[0] = { name: trimmedName };
-          if (trimmedDescription) {
-            payload.description = trimmedDescription;
-          }
-          const key = this.idempotencyKeyFor('create', payload);
-          const created = await createRole(payload, key);
-          this.clearIdempotency();
-          this.notify.success(this.transloco.translate('roles.toast.created'));
-          this.closeImmediate();
-          this.created.emit(created);
-          return undefined;
-        }
-
-        const base = this.editingRole();
-        if (!base) return undefined;
-        const patch: Parameters<typeof updateRole>[1] = {};
-        if (trimmedName !== base.name) {
-          patch.name = trimmedName;
-        }
-        const baseDescription = (base.description ?? '').trim();
-        if (trimmedDescription !== baseDescription) {
-          patch.description = (trimmedDescription
-            ? trimmedDescription
-            : null) as Parameters<typeof updateRole>[1]['description'];
-        }
-        if (Object.keys(patch).length === 0) return undefined;
-
-        const key = this.idempotencyKeyFor(base.id, patch);
-        const updated = await updateRole(base.id, patch, key);
+        await this.api.create(payload, this.idempotencyKeyFor(payload));
         this.clearIdempotency();
-        this.notify.success(this.transloco.translate('roles.toast.saved'));
+        this.notify.success(this.transloco.translate('roles.toast.created'));
         this.closeImmediate();
-        this.saved.emit(updated);
+        this.created.emit();
       } catch (error) {
         const code = errorCodeOf(error);
         if (code === 'ROLE_NAME_TAKEN' || code === 'ROLE_NAME_RESERVED') {
           this.nameServerError.set({ code, value: trimmedName });
-          return undefined;
-        }
-        this.notify.error(translateError(error, this.transloco));
-        if (code === 'ROLE_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
-          this.deletedRemotely.emit();
-          this.closeImmediate();
+        } else {
+          this.notify.error(translateError(error, this.transloco));
         }
       }
       return undefined;
-    });
-  }
-
-  protected undo(): void {
-    const base = this.editingRole();
-    if (!base) return;
-    this.submitAttempted.set(false);
-    this.nameServerError.set(null);
-    this.clearIdempotency();
-    this.roleForm().reset({
-      name: base.name,
-      description: base.description ?? '',
     });
   }
 
@@ -296,20 +232,6 @@ export class RoleModal {
     if (this.saving()) return;
     if (this.dirty() && !(await this.confirmDiscard())) return;
     this.closeImmediate();
-  }
-
-  protected requestDelete(): void {
-    const role = this.editingRole();
-    if (!role || role.isSystem || !this.canDelete() || this.saving()) return;
-    this.deleteRequested.emit(role);
-  }
-
-  protected async openPermissions(): Promise<void> {
-    const role = this.editingRole();
-    if (!role || this.saving()) return;
-    if (this.dirty() && !(await this.confirmDiscard())) return;
-    this.closeImmediate();
-    this.permissionsRequested.emit(role);
   }
 
   protected onModalClosed(): void {
@@ -329,8 +251,8 @@ export class RoleModal {
     this.clearIdempotency();
   }
 
-  private idempotencyKeyFor(scope: string, body: unknown): string {
-    const fingerprint = `${scope}:${JSON.stringify(body)}`;
+  private idempotencyKeyFor(body: CreateRoleBody): string {
+    const fingerprint = JSON.stringify(body);
     if (fingerprint !== this.lastFingerprint || !this.lastIdempotencyKey) {
       this.lastFingerprint = fingerprint;
       this.lastIdempotencyKey = newIdempotencyKey();

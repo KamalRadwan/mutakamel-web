@@ -145,7 +145,6 @@ export class BranchesPage {
   protected readonly countries = signal<GeoCountry[]>([]);
   protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
 
-  protected readonly modalBranch = signal<Branch | null>(null);
   protected readonly pendingDeleteBranch = signal<Branch | null>(null);
   protected readonly pendingStatusChange = signal<{ branch: Branch; nextStatus: OrgStatus } | null>(null);
   protected readonly pendingHqBranch = signal<{ branch: Branch; companyName: string; oldHqName: string } | null>(null);
@@ -162,16 +161,10 @@ export class BranchesPage {
 
   private readonly companyMap = computed(() => new Map(this.companies().map((c) => [c.id, c])));
 
-  // Keep fixture mutations unavailable for records loaded from Core.
-  protected readonly canAddBranch = () => false;
-
-  protected readonly modalCanManage = computed(() => {
-    const editing = this.modalBranch();
-    if (editing) {
-      return this.canManageBranch(editing);
-    }
-    return this.canAddBranch();
-  });
+  private readonly creatableCompanies = computed(() =>
+    this.companies().filter((company) => company.status === 'ACTIVE' && this.session.canCreateBranch(company.id)),
+  );
+  protected readonly canAddBranch = computed(() => this.creatableCompanies().length > 0);
 
   protected readonly hasActiveFiltersOrSearch = computed(
     () =>
@@ -278,6 +271,7 @@ export class BranchesPage {
       const openId = params.get('open');
       const isNew = params.get('new') === '1';
       if (!openId && !isNew) return;
+      if (isNew && !openId && this.companyLookup()?.revision !== this.session.scopeRevision()) return;
 
       const key = `${openId ?? ''}|${isNew ? '1' : ''}|${companyId ?? ''}`;
       if (key === this.handledDeepLinkKey) return;
@@ -310,9 +304,8 @@ export class BranchesPage {
     });
   }
 
-  protected canManageBranch(branch: Branch): boolean {
-    return this.canAddBranch() &&
-      this.session.can('org.branch.manage', { companyId: branch.companyId, branchId: branch.id });
+  protected canManageBranch(_branch: Branch): boolean {
+    return false;
   }
 
   private canReadBranch(branch: Branch): boolean {
@@ -327,9 +320,8 @@ export class BranchesPage {
     return branch.isHeadquarters ? this.canChangeHeadquarters(branch) : this.canManageBranch(branch);
   }
 
-  protected canAddDepartmentTo(branch: Branch): boolean {
-    return this.canAddBranch() &&
-      this.session.can('org.department.manage', { companyId: branch.companyId, branchId: branch.id });
+  protected canAddDepartmentTo(_branch: Branch): boolean {
+    return false;
   }
 
   protected companyName(companyId: string): string {
@@ -352,10 +344,12 @@ export class BranchesPage {
 
   protected openCreate(presetCompanyId?: string | null): void {
     if (!this.canAddBranch()) return;
-    const companyId = presetCompanyId ?? this.filterValues()['companyId'] ?? null;
-    if (companyId && !this.session.canCreateBranch(companyId)) return;
-    this.modalBranch.set(null);
-    this.branchModal().openCreate(companyId);
+    const companies = this.creatableCompanies();
+    const companyId = presetCompanyId ?? this.filterValues()['companyId'];
+    const company = companies.find((item) => item.id === companyId);
+    if (presetCompanyId && !company) return;
+    this.detailRevision = null;
+    this.branchModal().openCreate(company?.id ?? (companies.length === 1 ? companies[0].id : null));
   }
 
   protected openEdit(branch: Branch): void {
@@ -752,7 +746,6 @@ export class BranchesPage {
       const branch = await this.organization.getBranch(id);
       if (!this.destroyRef.destroyed && seq === this.detailSeq && revision === this.session.scopeRevision()) {
         this.detailRevision = revision;
-        this.modalBranch.set(branch);
         this.branchModal().openEdit(branch);
       }
     } catch (error) {

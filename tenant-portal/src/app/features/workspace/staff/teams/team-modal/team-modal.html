@@ -12,9 +12,11 @@
     <app-org-cascade
       [levels]="['company', 'branch', 'department']"
       [required]="mode() === 'create' ? ['company', 'branch', 'department'] : []"
-      [readonly]="mode() === 'edit' || !canManage()"
+      [readonly]="mode() === 'details' || !canManage()"
       [disabledLevels]="saving() ? ['company', 'branch', 'department'] : []"
       [activeOnly]="mode() === 'create'"
+      [companySource]="companyOptions()"
+      [placementSource]="{ branches: branchOptions(), departments: departmentOptions(), teams: [] }"
       [errors]="cascadeErrors()"
       [value]="cascadeValue()"
       (valueChange)="onCascadeChange($event)"
@@ -36,8 +38,8 @@
           [placeholder]="mode() === 'create' ? ('teams.fields.codePlaceholder' | transloco) : ''"
           [maxLength]="limits.code"
           [value]="code()"
-          [readOnly]="mode() === 'edit' || !canManage() || saving()"
-          [attr.aria-readonly]="mode() === 'edit' || !canManage() ? 'true' : null"
+          [readOnly]="mode() === 'details' || !canManage() || saving()"
+          [attr.aria-readonly]="mode() === 'details' || !canManage() ? 'true' : null"
           [attr.aria-invalid]="codeError() ? 'true' : null"
           (input)="onCodeInput($event)"
           (blur)="markTouched('code')"
@@ -79,7 +81,7 @@
         [hint]="'teams.fields.leadHint' | transloco"
         [error]="leadError()"
       >
-        @if (!canManage()) {
+        @if (!canSelectLead()) {
           <input
             [id]="uid + '-lead'"
             type="text"
@@ -210,7 +212,7 @@
       }
     </div>
 
-    @if (mode() === 'edit') {
+    @if (mode() === 'details') {
       <div class="col-span-3">
         <ui-field
           size="bare"
@@ -222,66 +224,52 @@
             class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
           >
             <app-staff-status-badge [status]="isActive() ? 'ACTIVE' : 'INACTIVE'" />
-            <ui-switch
-              [id]="uid + '-active'"
-              [(checked)]="isActive"
-              [disabled]="!canManage() || saving()"
-              [label]="'teams.fields.active' | transloco"
-              [describedBy]="uid + '-active-hint'"
-            />
           </div>
         </ui-field>
       </div>
 
-      <div class="col-span-3 flex flex-col gap-8 border-t border-border pt-8">
-        <div class="flex items-center justify-between gap-8">
-          <h3 class="text-13 leading-18 font-medium text-text">
-            {{ 'teams.members.title' | transloco: { n: membersTotal() } }}
-          </h3>
-          <button type="button" uiButton variant="ghost" size="small" (click)="viewAllMembers()">
-            {{ 'teams.members.viewAll' | transloco }}
-          </button>
-        </div>
-
-        @if (membersLoading()) {
-          <div class="flex flex-col gap-6" aria-hidden="true">
-            @for (row of [1, 2, 3]; track row) {
-              <div class="flex items-center gap-8 py-2">
-                <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
-                <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></span>
-                <span class="ms-auto h-badge w-preset rounded-8 bg-neutral-soft"></span>
-              </div>
-            }
+      @if (canReadBranchUsers() && (membersLoading() || membersTotal() !== null)) {
+        <div class="col-span-3 flex flex-col gap-8 border-t border-border pt-8">
+          <div class="flex items-center justify-between gap-8">
+            <h3 class="text-13 leading-18 font-medium text-text">
+              {{ 'teams.members.title' | transloco: { n: membersTotal() ?? '—' } }}
+            </h3>
+            <button type="button" uiButton variant="ghost" size="small" (click)="viewAllMembers()">
+              {{ 'teams.members.viewAll' | transloco }}
+            </button>
           </div>
-        } @else {
-          @for (item of members(); track item.user.id) {
-            <div class="flex items-center gap-8 py-2">
-              <span
-                class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
-                aria-hidden="true"
-              >
-                {{ initials(item.user) }}
-              </span>
-              <span class="min-w-0 truncate text-12 font-medium text-text">{{ fullName(item.user) }}</span>
-              @if (item.user.jobTitle) {
-                <span class="min-w-0 truncate text-12 text-text-muted">{{ item.user.jobTitle }}</span>
-              }
-              @if (item.role; as role) {
-                <span
-                  class="ms-auto inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium"
-                  [class]="role === 'LEAD' ? 'bg-brand-soft text-on-brand-soft' : 'bg-neutral-soft text-text'"
-                >
-                  {{ 'teams.role.' + role | transloco }}
-                </span>
+
+          @if (membersLoading()) {
+            <div class="flex flex-col gap-6" aria-hidden="true">
+              @for (row of [1, 2, 3]; track row) {
+                <div class="flex items-center gap-8 py-2">
+                  <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
+                  <span class="h-skeleton-line w-1/3 rounded-4 bg-neutral-soft"></span>
+                </div>
               }
             </div>
-          } @empty {
-            <p class="text-12 text-text-muted">{{ 'teams.members.none' | transloco }}</p>
+          } @else {
+            @for (member of members(); track member.id) {
+              <div class="flex items-center gap-8 py-2">
+                <span
+                  class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full bg-icon-blue text-11 font-medium text-on-icon"
+                  aria-hidden="true"
+                >
+                  {{ initials(member) }}
+                </span>
+                <span class="min-w-0 truncate text-12 font-medium text-text">{{ fullName(member) }}</span>
+                @if (member.jobTitle) {
+                  <span class="min-w-0 truncate text-12 text-text-muted">{{ member.jobTitle }}</span>
+                }
+              </div>
+            } @empty {
+              <p class="text-12 text-text-muted">{{ 'teams.members.none' | transloco }}</p>
+            }
           }
-        }
 
-        <p class="text-11 leading-16 text-text-muted">{{ 'teams.members.hint' | transloco }}</p>
-      </div>
+          <p class="text-11 leading-16 text-text-muted">{{ 'teams.members.hint' | transloco }}</p>
+        </div>
+      }
     }
   </form>
 
@@ -292,35 +280,16 @@
         [attr.form]="uid + '-form'"
         uiButton
         [loading]="saving()"
-        [disabled]="saving() || (mode() === 'edit' && !dirty())"
+        [disabled]="saving()"
       >
         {{ 'teams.save' | transloco }}
       </button>
 
-      @if (mode() === 'edit' && dirty()) {
-        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
-          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
-          {{ 'teams.undo' | transloco }}
-        </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'teams.unsaved' | transloco }}</span>
-      }
 
       <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
         {{ (mode() === 'create' ? 'teams.cancel' : 'teams.close') | transloco }}
       </button>
 
-      @if (mode() === 'edit') {
-        <button
-          type="button"
-          uiButton
-          variant="danger"
-          class="ms-auto"
-          [disabled]="saving()"
-          (click)="requestDelete()"
-        >
-          {{ 'teams.delete' | transloco }}
-        </button>
-      }
     } @else {
       <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'teams.close' | transloco }}

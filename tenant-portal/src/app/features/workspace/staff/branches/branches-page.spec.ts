@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
@@ -19,6 +20,8 @@ class EmptyLoader {
 }
 
 const organization = '/api/tenant/core/v1/organization';
+const dialog = HTMLDialogElement.prototype;
+const { showModal, close } = dialog;
 const companyId = '019f0000-0000-7000-8000-000000000010';
 const firstBranch: Branch = {
   id: '019f0000-0000-7000-8000-000000000011',
@@ -53,6 +56,8 @@ describe('Branches with Gateway reads', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    dialog.showModal = function () { this.setAttribute('open', ''); };
+    dialog.close = function () { this.removeAttribute('open'); };
     me.set({
       ...FAKE_TENANT_ME,
       isTenantOwner: false,
@@ -74,7 +79,10 @@ describe('Branches with Gateway reads', () => {
         }),
         {
           provide: AuthSession,
-          useValue: { me, status: signal('signed-in'), ensureLoaded: async () => 'signed-in' },
+          useValue: {
+            me, status: signal('signed-in'), ensureLoaded: async () => 'signed-in',
+            requestVersion: () => ({ generation: 1, revision: 0 }), reloadProfile: async () => undefined,
+          },
         },
       ],
     });
@@ -83,6 +91,9 @@ describe('Branches with Gateway reads', () => {
 
   afterEach(() => {
     http.verify();
+    dialog.showModal = showModal;
+    dialog.close = close;
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
@@ -168,6 +179,52 @@ describe('Branches with Gateway reads', () => {
     await finish(fixture);
     expect(open).toHaveBeenCalledWith(detail);
     expect(modal.canManage()).toBe(false);
+  });
+
+  it('creates an ordinary branch under a real permitted company without enabling headquarters or other writes', async () => {
+    const doc = TestBed.inject(DOCUMENT);
+    const csrfName = doc.location.protocol === 'https:' ? '__Host-mutakamel-tenant-csrf' : 'mutakamel-http-tenant-csrf';
+    vi.spyOn(doc, 'cookie', 'get').mockReturnValue(`${csrfName}=test-csrf`);
+    me.update((actor) => ({
+      ...actor,
+      permissions: [...actor.permissions, 'org.company.read'],
+      permissionScopes: {
+        ...actor.permissionScopes,
+        'org.company.read': tenantGrant,
+        'org.branch.manage': { ...branchGrant, companyIds: [companyId] },
+      },
+    }));
+    const fixture = render();
+    const page = fixture.componentInstance;
+    const company = { id: companyId, name: 'Real company', status: 'ACTIVE' };
+    const directory = { ...branchPage([], 1), data: [company] };
+    const expectDirectory = () => http.expectOne((req) =>
+      req.method === 'GET' && req.url === organization + '/companies',
+    );
+    expectDirectory().flush(directory);
+    expectPage(1).flush(branchPage([firstBranch]));
+    await finish(fixture);
+
+    expect(page['canAddBranch']()).toBe(true);
+    expect(page['actionsFor'](firstBranch).map((action) => action.id)).toEqual(['open']);
+    page['openCreate']();
+    const modal = page['branchModal']();
+    expect(modal['selectedCompanyId']()).toBe(companyId);
+    expect(modal['hqSwitchDisabled']()).toBe(true);
+    modal['code'].set(secondBranch.code);
+    modal['name'].set(secondBranch.name);
+    const saved = modal['save']();
+    const write = http.expectOne({ method: 'POST', url: organization + '/branches' });
+    expect(write.request.body).toEqual({
+      companyId, code: secondBranch.code, name: secondBranch.name, isHeadquarters: false,
+    });
+    write.flush({ success: true, data: secondBranch }, { status: 201, statusText: 'Created' });
+    await saved;
+    expectDirectory().flush(directory);
+    expectPage(1).flush(branchPage([secondBranch], 2));
+    await finish(fixture);
+    expect(page['rows']()).toEqual([secondBranch]);
+    expect(page['total']()).toBe(2);
   });
 
   it.each([200, 403])('keeps the 200-empty and forbidden views distinct for HTTP %i', async (status) => {

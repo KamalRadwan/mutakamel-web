@@ -12,9 +12,11 @@
     <app-org-cascade
       [levels]="['company', 'branch']"
       [required]="mode() === 'create' ? ['company', 'branch'] : []"
-      [readonly]="mode() === 'edit' || !canManage()"
+      [readonly]="mode() === 'details' || !canManage()"
       [disabledLevels]="saving() ? ['company', 'branch'] : []"
       [activeOnly]="mode() === 'create'"
+      [companySource]="companyOptions()"
+      [placementSource]="{ branches: branchOptions(), departments: [], teams: [] }"
       [errors]="cascadeErrors()"
       [value]="cascadeValue()"
       (valueChange)="onCascadeChange($event)"
@@ -36,8 +38,8 @@
           [placeholder]="mode() === 'create' ? ('departments.fields.codePlaceholder' | transloco) : ''"
           [maxLength]="limits.code"
           [value]="code()"
-          [readOnly]="mode() === 'edit' || !canManage() || saving()"
-          [attr.aria-readonly]="mode() === 'edit' || !canManage() ? 'true' : null"
+          [readOnly]="mode() === 'details' || !canManage() || saving()"
+          [attr.aria-readonly]="mode() === 'details' || !canManage() ? 'true' : null"
           [attr.aria-invalid]="codeError() ? 'true' : null"
           (input)="onCodeInput($event)"
           (blur)="markTouched('code')"
@@ -71,7 +73,7 @@
       </ui-field>
     </div>
 
-    @if (mode() === 'edit') {
+    @if (mode() === 'details') {
       <div class="col-span-2">
         <ui-field
           size="bare"
@@ -83,13 +85,6 @@
             class="flex h-field items-center justify-between gap-8 rounded-8 border border-border-field bg-surface-field px-8"
           >
             <app-staff-status-badge [status]="isActive() ? 'ACTIVE' : 'INACTIVE'" />
-            <ui-switch
-              [id]="uid + '-active'"
-              [(checked)]="isActive"
-              [disabled]="!canManage() || saving()"
-              [label]="'departments.fields.active' | transloco"
-              [describedBy]="uid + '-active-hint'"
-            />
           </div>
         </ui-field>
       </div>
@@ -103,35 +98,16 @@
         [attr.form]="uid + '-form'"
         uiButton
         [loading]="saving()"
-        [disabled]="saving() || (mode() === 'edit' && !dirty())"
+        [disabled]="saving()"
       >
         {{ 'departments.save' | transloco }}
       </button>
 
-      @if (mode() === 'edit' && dirty()) {
-        <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="undo()">
-          <ng-icon name="tablerArrowBackUp" size="14" aria-hidden="true" />
-          {{ 'departments.undo' | transloco }}
-        </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'departments.unsaved' | transloco }}</span>
-      }
 
       <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
         {{ (mode() === 'create' ? 'departments.cancel' : 'departments.close') | transloco }}
       </button>
 
-      @if (mode() === 'edit') {
-        <button
-          type="button"
-          uiButton
-          variant="danger"
-          class="ms-auto"
-          [disabled]="saving()"
-          (click)="requestDelete()"
-        >
-          {{ 'departments.delete' | transloco }}
-        </button>
-      }
     } @else {
       <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'departments.close' | transloco }}

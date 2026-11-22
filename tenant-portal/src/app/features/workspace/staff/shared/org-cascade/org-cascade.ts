@@ -28,6 +28,12 @@ export class OrgCascade {
   readonly readonly = input(false);
   readonly disabledLevels = input<OrgCascadeLevel[]>([]);
   readonly activeOnly = input(true);
+  readonly companySource = input<readonly Company[] | null>(null);
+  readonly placementSource = input<{
+    branches: readonly Branch[];
+    departments: readonly Department[];
+    teams: readonly Team[];
+  } | null>(null);
   readonly allowCompany = input<((company: Company) => boolean) | null>(null);
   readonly errors = input<Partial<Record<OrgCascadeLevel, string>>>({});
   readonly hints = input<Partial<Record<OrgCascadeLevel, string>>>({});
@@ -57,7 +63,7 @@ export class OrgCascade {
     effect(() => {
       const levels = this.levels();
       const activeOnly = this.activeOnly();
-      if (!levels.includes('company')) {
+      if (!levels.includes('company') || this.companySource() !== null) {
         this.companiesSeq++;
         this.loadedCompanyFilter = null;
         this.companies.set([]);
@@ -74,7 +80,7 @@ export class OrgCascade {
       const levels = this.levels();
       const activeOnly = this.activeOnly();
       const companyId = this.value().companyId;
-      if (!levels.includes('branch') || !companyId) {
+      if (!levels.includes('branch') || !companyId || this.placementSource() !== null) {
         this.branchesSeq++;
         this.loadedBranchesKey = '';
         this.branches.set([]);
@@ -92,7 +98,7 @@ export class OrgCascade {
       const levels = this.levels();
       const activeOnly = this.activeOnly();
       const branchId = this.value().branchId;
-      if (!levels.includes('department') || !branchId) {
+      if (!levels.includes('department') || !branchId || this.placementSource() !== null) {
         this.departmentsSeq++;
         this.loadedDepartmentsKey = '';
         this.departments.set([]);
@@ -110,7 +116,7 @@ export class OrgCascade {
       const levels = this.levels();
       const activeOnly = this.activeOnly();
       const departmentId = this.value().departmentId;
-      if (!levels.includes('team') || !departmentId) {
+      if (!levels.includes('team') || !departmentId || this.placementSource() !== null) {
         this.teamsSeq++;
         this.loadedTeamsKey = '';
         this.teams.set([]);
@@ -126,17 +132,23 @@ export class OrgCascade {
   }
 
   protected readonly companyOptions = computed(() =>
-    this.buildOptions('company', this.companies().filter((company) => this.allowCompany()?.(company) ?? true),
+    this.buildOptions('company', (this.companySource() ?? this.companies()).filter((company) => this.allowCompany()?.(company) ?? true),
       this.value().companyId),
   );
   protected readonly branchOptions = computed(() =>
-    this.buildOptions('branch', this.branches(), this.value().branchId),
+    this.buildOptions('branch',
+      this.placementSource()?.branches.filter((branch) => branch.companyId === this.value().companyId) ?? this.branches(),
+      this.value().branchId),
   );
   protected readonly departmentOptions = computed(() =>
-    this.buildOptions('department', this.departments(), this.value().departmentId),
+    this.buildOptions('department',
+      this.placementSource()?.departments.filter((department) => department.branchId === this.value().branchId) ?? this.departments(),
+      this.value().departmentId),
   );
   protected readonly teamOptions = computed(() =>
-    this.buildOptions('team', this.teams(), this.value().teamId),
+    this.buildOptions('team',
+      this.placementSource()?.teams.filter((team) => team.departmentId === this.value().departmentId) ?? this.teams(),
+      this.value().teamId),
   );
 
   protected isRequired(level: OrgCascadeLevel): boolean {
@@ -239,14 +251,15 @@ export class OrgCascade {
     if (!id) {
       return this.isRequired(level) ? '—' : this.transloco.translate('staff.cascade.none');
     }
+    const placement = this.placementSource();
     const items: readonly { id: string; name: string }[] =
       level === 'company'
-        ? this.companies()
+        ? this.companySource() ?? this.companies()
         : level === 'branch'
-          ? this.branches()
+          ? placement?.branches ?? this.branches()
           : level === 'department'
-            ? this.departments()
-            : this.teams();
+            ? placement?.departments ?? this.departments()
+            : placement?.teams ?? this.teams();
     return items.find((item) => item.id === id)?.name ?? '—';
   }
 

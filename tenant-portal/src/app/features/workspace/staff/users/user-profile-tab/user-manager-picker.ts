@@ -15,8 +15,8 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerChevronDown, tablerLoader2, tablerSearch } from '@ng-icons/tabler-icons';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
-import { getUser, listUsers } from '../../shared/staff.api';
 import { TenantUser } from '../../shared/staff.model';
+import { StaffUsersApi } from '../users.api';
 import { userFullName } from '../users-page/users.model';
 
 interface MenuPlace {
@@ -44,6 +44,7 @@ export class UserManagerPicker {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly api = inject(StaffUsersApi);
 
   private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
   private readonly menuPanel = viewChild<ElementRef<HTMLElement>>('menuPanel');
@@ -214,7 +215,7 @@ export class UserManagerPicker {
     this.lastResolvedId = userId;
     const seq = ++this.resolveSeq;
     try {
-      const user = await getUser(userId);
+      const user = await this.api.getUser(userId);
       if (seq !== this.resolveSeq || this.value() !== userId) return;
       this.resolvedSelected.set(user);
     } catch {
@@ -226,7 +227,7 @@ export class UserManagerPicker {
     const seq = ++this.searchSeq;
     this.searching.set(true);
     try {
-      const page = await listUsers({
+      const page = await this.api.listUsers({
         status: 'ACTIVE',
         ...(search.trim() ? { search: search.trim() } : {}),
         limit: 20,

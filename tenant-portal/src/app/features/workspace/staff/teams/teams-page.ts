@@ -5,12 +5,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
-  tablerCheck,
-  tablerCircleOff,
   tablerCloudOff,
-  tablerEdit,
   tablerEye,
-  tablerTrash,
   tablerUsers,
   tablerUsersGroup,
 } from '@ng-icons/tabler-icons';
@@ -18,34 +14,18 @@ import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../shared/ui/button/button';
-import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
-import { BlockersDialog } from '../shared/blockers-dialog/blockers-dialog';
 import { StaffList } from '../shared/staff-list/staff-list';
 import { StaffSession } from '../shared/staff-session';
 import { StatusBadge } from '../shared/status-badge/status-badge';
-import {
-  ApiError,
-  deleteTeam,
-  errorCodeOf,
-  errorMessage,
-  getBranch,
-  getDepartment,
-  getTeam,
-  listAllPages,
-  listBranches,
-  listCompanies,
-  listDepartments,
-  listTeams,
-  listUsers,
-  newIdempotencyKey,
-  updateTeam,
-} from '../shared/staff.api';
+import { ApiError } from '../../../../core/api/api-errors';
+import { OrganizationReadApi } from '../shared/organization-read.api';
+import { errorMessage, listAllPages } from '../shared/staff.api';
+import { StaffUsersApi } from '../users/users.api';
 import {
   Branch,
   Company,
   Department,
   ListQuery,
-  OrgStatus,
   StaffListFilter,
   StaffListSortOption,
   Team,
@@ -64,9 +44,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-team-row-actions';
     NgIcon,
     TranslocoPipe,
     ActionsMenu,
-    BlockersDialog,
     Button,
-    ConfirmDialog,
     StaffList,
     StatusBadge,
     TeamModal,
@@ -81,11 +59,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-team-row-actions';
       tablerUsersGroup,
       tablerCloudOff,
       tablerEye,
-      tablerEdit,
       tablerUsers,
-      tablerCheck,
-      tablerCircleOff,
-      tablerTrash,
     }),
   ],
   templateUrl: './teams-page.html',
@@ -99,12 +73,11 @@ export class TeamsPage {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly session = inject(StaffSession);
+  private readonly organization = inject(OrganizationReadApi);
+  private readonly usersApi = inject(StaffUsersApi);
   private readonly queryParams = toSignal(this.route.queryParamMap);
 
   private readonly teamModal = viewChild.required(TeamModal);
-  private readonly deleteConfirm = viewChild.required<ConfirmDialog>('deleteConfirm');
-  private readonly blockersDialog = viewChild.required(BlockersDialog);
-
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly tableColumns = TABLE_COLUMNS;
 
@@ -114,46 +87,34 @@ export class TeamsPage {
   protected readonly sort = signal<string>('name');
   protected readonly filterValues = signal<Record<string, string | null>>({});
 
-  private readonly loadedRows = signal<Team[]>([]);
-  protected readonly rows = computed(() => this.loadedRows().filter((row) =>
-    this.canOnTeam('org.team.read', row),
-  ));
-  private readonly loadedTotal = signal<{ revision: string | null; count: number } | null>(null);
-  protected readonly total = computed(() => {
-    const result = this.loadedTotal();
-    return result && result.revision === this.session.scopeRevision() &&
-      this.rows().length === this.loadedRows().length ? result.count : this.rows().length;
+  private readonly result = signal<{ revision: string; rows: Team[]; total: number } | null>(null);
+  private readonly currentResult = computed(() => {
+    const result = this.result();
+    return result?.revision === this.session.scopeRevision() ? result : null;
   });
+  protected readonly rows = computed(() => this.currentResult()?.rows ?? []);
+  protected readonly total = computed(() => this.currentResult()?.total ?? 0);
   protected readonly loading = signal(false);
   protected readonly loadFailed = signal(false);
+  protected readonly loadForbidden = signal(false);
+  private readonly lookupsReady = signal(false);
   protected readonly companies = signal<Company[]>([]);
   protected readonly branches = signal<Branch[]>([]);
   protected readonly departments = signal<Department[]>([]);
   protected readonly users = signal<TenantUser[]>([]);
   protected readonly memberCounts = signal<Record<string, number>>({});
-  protected readonly busyIds = signal<ReadonlySet<string>>(new Set());
-
-  protected readonly modalTeam = signal<Team | null>(null);
-  protected readonly pendingDeleteTeam = signal<Team | null>(null);
 
   private readonly branchMap = computed(() => new Map(this.branches().map((b) => [b.id, b])));
   private readonly departmentMap = computed(() => new Map(this.departments().map((d) => [d.id, d])));
   private readonly userMap = computed(() => new Map(this.users().map((u) => [u.id, u])));
 
-  protected readonly canAddTeam = computed(
-    () =>
-      this.branches().some((b) =>
-        this.session.can('org.team.manage', { companyId: b.companyId, branchId: b.id }),
-      ),
-  );
-
-  protected readonly modalCanManage = computed(() => {
-    const editing = this.modalTeam();
-    if (editing) {
-      return this.canManageTeam(editing);
-    }
-    return this.canAddTeam();
-  });
+  protected readonly createDepartments = computed(() => this.departments().filter((department) => {
+    const branch = this.branchMap().get(department.branchId);
+    return department.status === 'ACTIVE' && branch &&
+      this.companies().some((company) => company.id === branch.companyId) &&
+      this.session.can('org.team.manage', { companyId: branch.companyId, branchId: branch.id });
+  }));
+  protected readonly canAddTeam = computed(() => this.createDepartments().length > 0);
 
   protected readonly hasActiveFiltersOrSearch = computed(
     () =>
@@ -224,6 +185,8 @@ export class TeamsPage {
   });
 
   private loadSeq = 0;
+  private lookupSeq = 0;
+  private detailSeq = 0;
   private countsSeq = 0;
   private prevCompanyFilter: string | null = null;
   private prevBranchFilter: string | null = null;
@@ -235,7 +198,22 @@ export class TeamsPage {
     if (!this.session.me()) {
       void this.session.load();
     }
-    void this.loadLookups();
+    effect(() => {
+      this.session.scopeRevision();
+      untracked(() => {
+        this.lookupsReady.set(false);
+        this.companies.set([]);
+        this.branches.set([]);
+        this.departments.set([]);
+        this.users.set([]);
+        void this.loadLookups();
+      });
+    });
+    effect(() => {
+      const result = this.currentResult();
+      if (!result || !this.lookupsReady()) return;
+      void untracked(() => this.loadMemberCounts(result.rows));
+    });
 
     const initialParams = this.route.snapshot.queryParamMap;
     const initialCompany = initialParams.get('companyId');
@@ -343,7 +321,7 @@ export class TeamsPage {
 
       const openId = params.get('open');
       const isNew = params.get('new') === '1';
-      if (!openId && !isNew) return;
+      if ((!openId && !isNew) || (isNew && !openId && !this.lookupsReady())) return;
 
       const key = `${openId ?? ''}|${isNew ? '1' : ''}|${urlFilterKey}`;
       if (key === this.handledDeepLinkKey) return;
@@ -389,10 +367,6 @@ export class TeamsPage {
     });
   }
 
-  protected canManageTeam(team: Team): boolean {
-    return this.canOnTeam('org.team.manage', team);
-  }
-
   private canOnTeam(permission: string, team: Team): boolean {
     const branchId = this.departmentMap().get(team.departmentId)?.branchId;
     if (!branchId) return false;
@@ -423,7 +397,6 @@ export class TeamsPage {
   }
 
   protected memberCountText(teamId: string): string {
-    if (this.loadedTotal()?.revision !== this.session.scopeRevision()) return '—';
     const team = this.rows().find(({ id }) => id === teamId);
     if (!team || !this.canOnTeam('users.user.read', team)) return '—';
     const count = this.memberCounts()[teamId];
@@ -442,217 +415,68 @@ export class TeamsPage {
 
   protected openCreate(preset?: { companyId?: string | null; branchId?: string | null; departmentId?: string | null }): void {
     if (!this.canAddTeam()) return;
-    this.modalTeam.set(null);
-    const vals = this.filterValues();
-    const departmentId = preset?.departmentId ?? vals['departmentId'] ?? null;
-    const resolved = this.resolveParentIds({
-      companyId: preset?.companyId ?? vals['companyId'] ?? null,
-      branchId: preset?.branchId ?? vals['branchId'] ?? null,
-      departmentId,
-    });
+    const filters = this.filterValues();
+    const companyId = preset?.companyId ?? filters['companyId'];
+    const branchId = preset?.branchId ?? filters['branchId'];
+    const departmentId = preset?.departmentId ?? filters['departmentId'];
+    const matching = this.createDepartments().filter((department) =>
+      (!companyId || this.branchMap().get(department.branchId)?.companyId === companyId) &&
+      (!branchId || department.branchId === branchId) && (!departmentId || department.id === departmentId),
+    );
+    if (preset && matching.length === 0) return;
+
+    const department = matching.length === 1 ? matching[0] : null;
+    this.detailSeq++;
     this.teamModal().openCreate({
-      companyId: resolved.companyId,
-      branchId: resolved.branchId,
-      departmentId,
+      companyId: department ? this.branchMap().get(department.branchId)?.companyId : matching.length ? companyId : null,
+      branchId: department?.branchId ?? (matching.length ? branchId : null),
+      departmentId: department?.id,
     });
   }
 
-  protected openEdit(team: Team): void {
-    if (!this.canOnTeam('org.team.read', team)) return;
-    this.modalTeam.set(team);
-    const resolved = this.resolveParentIds({ departmentId: team.departmentId });
-    this.teamModal().openEdit(team, resolved);
+  protected openDetails(team: Team): void {
+    void this.openTeamById(team.id);
   }
 
-  protected onModalSaved(event: { team: Team; isNew: boolean }): void {
-    const resolved = this.resolveParentIds({ departmentId: event.team.departmentId });
-    if (this.teamModal().editingId() === event.team.id) {
-      this.teamModal().syncTeam(event.team, resolved);
-    }
-    this.reload();
+  protected async onModalSaved(): Promise<void> {
+    const revision = this.session.scopeRevision();
+    if (!revision) return;
+    await this.organization.invalidateScope(revision);
+    if (revision === this.session.scopeRevision()) this.reload();
   }
 
   protected actionsFor(team: Team): ActionItem[] {
     this.i18n();
     const t = (key: string) => this.transloco.translate(key);
-    const manage = this.canManageTeam(team);
-    const busy = this.busyIds().has(team.id);
-    const isActive = team.status === 'ACTIVE';
-
-    const items: ActionItem[] = [
-      {
-        id: 'open',
-        title: t('teams.actions.open'),
-        icon: 'tablerEye',
-        tile: 'bg-icon-blue',
-      },
-    ];
-
-    if (manage) {
-      items.push({
-        id: 'edit',
-        title: t('teams.actions.edit'),
-        icon: 'tablerEdit',
-        tile: 'bg-icon-orange',
-      });
-    }
-
-    if (this.canOnTeam('users.user.read', team)) items.push({
-      id: 'viewMembers',
-      title: t('teams.actions.viewMembers'),
-      icon: 'tablerUsers',
+    const items: ActionItem[] = [{
+      id: 'open',
+      title: t('teams.actions.open'),
+      icon: 'tablerEye',
       tile: 'bg-icon-blue',
-    });
+    }];
 
-    if (manage) {
-      items.push(
-        {
-          id: 'toggleStatus',
-          title: t(isActive ? 'teams.actions.deactivate' : 'teams.actions.activate'),
-          icon: isActive ? 'tablerCircleOff' : 'tablerCheck',
-          tile: busy ? 'bg-icon-gray' : isActive ? 'bg-icon-orange' : 'bg-icon-green',
-          disabled: busy,
-        },
-        {
-          id: 'delete',
-          title: t('teams.actions.delete'),
-          icon: 'tablerTrash',
-          tile: 'bg-icon-red',
-          danger: true,
-          disabled: busy,
-        },
-      );
+    if (this.canOnTeam('users.user.read', team)) {
+      items.push({ id: 'viewMembers', title: t('teams.actions.viewMembers'), icon: 'tablerUsers', tile: 'bg-icon-blue' });
     }
-
     return items;
   }
 
   protected onAction(team: Team, selection: ActionSelection): void {
-    switch (selection.id) {
-      case 'open':
-      case 'edit':
-        this.openEdit(team);
-        break;
-      case 'viewMembers':
-        if (this.canOnTeam('users.user.read', team)) {
-          void this.router.navigate(['/workspace/staff/users'], { queryParams: { teamId: team.id } });
-        }
-        break;
-      case 'toggleStatus':
-        if (this.canManageTeam(team)) {
-          void this.toggleStatus(team);
-        }
-        break;
-      case 'delete':
-        if (this.canManageTeam(team)) {
-          void this.requestDelete(team);
-        }
-        break;
+    if (selection.id === 'open') this.openDetails(team);
+    if (selection.id === 'viewMembers' && this.canOnTeam('users.user.read', team)) {
+      void this.router.navigate(['/workspace/staff/users'], { queryParams: { teamId: team.id } });
     }
-  }
-
-  protected async requestDelete(team: Team): Promise<void> {
-    if (!this.canManageTeam(team) || this.busyIds().has(team.id)) return;
-    this.pendingDeleteTeam.set(team);
-    if (!(await this.deleteConfirm().open())) {
-      this.pendingDeleteTeam.set(null);
-      return;
-    }
-
-    this.setBusy(team.id, true);
-    try {
-      await deleteTeam(team.id, newIdempotencyKey());
-      if (this.teamModal().editingId() === team.id) {
-        this.teamModal().closeImmediate();
-      }
-      this.notify.success(this.transloco.translate('teams.toast.deleted'));
-      this.reload();
-    } catch (error) {
-      if (errorCodeOf(error) === 'ORG_NODE_NOT_EMPTY') {
-        this.openTeamBlockers(team, this.extractBlockers(error));
-        return;
-      }
-      this.notify.error(this.resolveError(error));
-      if (errorCodeOf(error) === 'ORG_NODE_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
-        if (this.teamModal().editingId() === team.id) {
-          this.teamModal().closeImmediate();
-        }
-        this.reload();
-      }
-    } finally {
-      this.setBusy(team.id, false);
-      this.pendingDeleteTeam.set(null);
-    }
-  }
-
-  protected onDeactivateBlocked(event: { team: Team; blockers: string[] }): void {
-    this.openTeamBlockers(event.team, event.blockers);
-  }
-
-  private async toggleStatus(team: Team): Promise<void> {
-    if (this.busyIds().has(team.id)) return;
-    const nextStatus: OrgStatus = team.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-
-    this.setBusy(team.id, true);
-    try {
-      const updated = await updateTeam(team.id, { status: nextStatus }, newIdempotencyKey());
-      const resolved = this.resolveParentIds({ departmentId: updated.departmentId });
-      this.teamModal().syncTeam(updated, resolved);
-      this.notify.success(
-        this.transloco.translate(nextStatus === 'ACTIVE' ? 'teams.toast.activated' : 'teams.toast.deactivated'),
-      );
-      this.reload();
-    } catch (error) {
-      if (errorCodeOf(error) === 'ORG_NODE_NOT_EMPTY') {
-        this.openTeamBlockers(team, this.extractBlockers(error));
-        return;
-      }
-      this.notify.error(this.resolveError(error));
-    } finally {
-      this.setBusy(team.id, false);
-    }
-  }
-
-  private openTeamBlockers(team: Team, blockers: string[]): void {
-    const t = (key: string) => this.transloco.translate(key);
-    const membersLink = {
-      label: t('teams.actions.viewMembers'),
-      route: ['/workspace/staff/users'],
-      queryParams: { teamId: team.id },
-    };
-
-    void this.blockersDialog().open({
-      title: team.name,
-      blockers,
-      links: {
-        'team has placed users': membersLink,
-        'team has memberships': membersLink,
-      },
-    });
   }
 
   private async openTeamById(id: string): Promise<void> {
-    const existing = this.rows().find((t) => t.id === id);
-    if (existing) {
-      this.openEdit(existing);
-      return;
-    }
+    const seq = ++this.detailSeq;
+    const revision = this.session.scopeRevision();
     try {
-      const team = await getTeam(id);
-      let resolved = this.resolveParentIds({ departmentId: team.departmentId });
-      if (!resolved.branchId || !resolved.companyId) {
-        try {
-          const dept = await getDepartment(team.departmentId);
-          const branch = await getBranch(dept.branchId);
-          resolved = { companyId: branch.companyId, branchId: dept.branchId };
-        } catch {
-          // TeamModal also resolves parent chain as fallback.
-        }
-      }
-      this.modalTeam.set(team);
-      this.teamModal().openEdit(team, resolved);
+      const team = await this.organization.getTeam(id);
+      if (seq !== this.detailSeq || revision !== this.session.scopeRevision()) return;
+      this.teamModal().openDetails(team, this.resolveParentIds({ departmentId: team.departmentId }));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      if (seq === this.detailSeq && revision === this.session.scopeRevision()) this.notify.error(this.resolveError(error));
     }
   }
 
@@ -673,12 +497,16 @@ export class TeamsPage {
   }
 
   private async loadLookups(): Promise<void> {
-    const [companiesRes, branchesRes, deptsRes, usersRes] = await Promise.allSettled([
-      listAllPages(listCompanies, { limit: 100 }),
-      listAllPages(listBranches, { limit: 100 }),
-      listAllPages(listDepartments, { limit: 100 }),
-      listAllPages(listUsers, { limit: 100 }),
+    const seq = ++this.lookupSeq;
+    const revision = this.session.scopeRevision();
+    if (!revision) return;
+    const [companiesRes, branchesRes, deptsRes] = await Promise.allSettled([
+      listAllPages((query) => this.organization.listCompanies(query), { limit: 100 }),
+      listAllPages((query) => this.organization.listBranches(query), { limit: 100 }),
+      listAllPages((query) => this.organization.listDepartments(query), { limit: 100 }),
     ]);
+    if (seq !== this.lookupSeq || revision !== this.session.scopeRevision()) return;
+    this.lookupsReady.set(true);
     if (companiesRes.status === 'fulfilled') {
       this.companies.set(companiesRes.value);
     }
@@ -688,10 +516,6 @@ export class TeamsPage {
     if (deptsRes.status === 'fulfilled') {
       this.departments.set(deptsRes.value);
     }
-    if (usersRes.status === 'fulfilled') {
-      this.users.set(usersRes.value);
-    }
-
     const vals = this.filterValues();
     const resolved = this.resolveParentIds({
       companyId: vals['companyId'] ?? null,
@@ -721,8 +545,10 @@ export class TeamsPage {
   }): Promise<void> {
     const seq = ++this.loadSeq;
     const revision = this.session.scopeRevision();
+    if (!revision) return;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.loadForbidden.set(false);
 
     const query: ListQuery = {
       page: params.page,
@@ -737,21 +563,29 @@ export class TeamsPage {
     if (params.status) query.status = params.status;
 
     try {
-      const result = await listTeams(query, (scope) => this.session.can('org.team.read', scope));
+      const result = await this.organization.listTeams(query);
       if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
-      this.loadedRows.set(result.data);
-      this.loadedTotal.set({ revision, count: result.meta.total });
-      void this.loadMemberCounts(result.data);
-    } catch {
-      if (seq !== this.loadSeq) return;
+      this.result.set({ revision, rows: result.data, total: result.meta.total });
+      void this.loadLeads(result.data, seq, revision);
+    } catch (error) {
+      if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
       this.loadFailed.set(true);
-      this.loadedRows.set([]);
-      this.loadedTotal.set(null);
+      this.loadForbidden.set(error instanceof ApiError && error.status === 403);
+      this.result.set(null);
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
+  }
+
+  private async loadLeads(teams: Team[], seq: number, revision: string): Promise<void> {
+    this.users.set([]);
+    if (!this.session.can('users.user.read')) return;
+    const ids = new Set(teams.flatMap((team) => team.leadUserId ? [team.leadUserId] : []));
+    const results = await Promise.allSettled([...ids].map((id) => this.usersApi.getUser(id)));
+    if (seq !== this.loadSeq || revision !== this.session.scopeRevision()) return;
+    this.users.set(results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []));
   }
 
   private async loadMemberCounts(items: Team[]): Promise<void> {
@@ -760,16 +594,15 @@ export class TeamsPage {
     this.memberCounts.set({});
     const results = await Promise.allSettled(
       items.map(async (team) => {
-        const page = await listUsers({ teamId: team.id, limit: 1 }, (scope) =>
-          this.session.can('users.user.read', scope),
-        );
+        if (!this.canOnTeam('users.user.read', team)) return null;
+        const page = await this.usersApi.listUsers({ teamId: team.id, limit: 1 });
         return [team.id, page.meta.total] as const;
       }),
     );
     if (seq !== this.countsSeq || revision !== this.session.scopeRevision()) return;
     const next: Record<string, number> = {};
     for (const res of results) {
-      if (res.status === 'fulfilled') {
+      if (res.status === 'fulfilled' && res.value) {
         next[res.value[0]] = res.value[1];
       }
     }
@@ -784,20 +617,6 @@ export class TeamsPage {
       queryParams: clear,
       queryParamsHandling: 'merge',
       replaceUrl: true,
-    });
-  }
-
-  private extractBlockers(error: unknown): string[] {
-    const raw = error instanceof ApiError ? error.details?.['blockers'] : undefined;
-    return Array.isArray(raw) ? raw.map(String) : [];
-  }
-
-  private setBusy(id: string, busy: boolean): void {
-    this.busyIds.update((current) => {
-      const next = new Set(current);
-      if (busy) next.add(id);
-      else next.delete(id);
-      return next;
     });
   }
 

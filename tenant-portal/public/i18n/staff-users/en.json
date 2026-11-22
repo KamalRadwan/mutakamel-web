@@ -8,7 +8,9 @@
   "retry": "Try again",
   "invite": {
     "title": "Invite user",
-    "send": "Send invitation"
+    "send": "Send invitation",
+    "loadingPlacement": "Loading available staff placement.",
+    "placementUnavailable": "No eligible company, branch, and department is available for invitations."
   },
   "filters": {
     "status": "Status",
@@ -70,7 +72,7 @@
     "unsavedText": "Save your changes to this user's profile before leaving?"
   },
   "toast": {
-    "invited": "Invitation sent to {{email}}.",
+    "invited": "Invitation queued for {{email}}.",
     "resent": "Invitation sent again.",
     "suspended": "User suspended.",
     "activated": "User activated.",

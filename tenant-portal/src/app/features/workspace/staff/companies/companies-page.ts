@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
+  tablerAdjustmentsHorizontal,
   tablerBuildingSkyscraper,
   tablerCheck,
   tablerCircleOff,
@@ -34,10 +35,11 @@ import {
   deleteCompany,
   errorCodeOf,
   errorMessage,
+  listAllPages,
   newIdempotencyKey,
   updateCompany,
 } from '../shared/staff.api';
-import { Company, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
+import { Company, Currency, ListQuery, OrgStatus, StaffListFilter, StaffListSortOption } from '../shared/staff.model';
 import { CompanyModal } from './company-modal/company-modal';
 
 type CompanySort = 'name' | 'code' | 'createdAt';
@@ -68,6 +70,7 @@ const TABLE_COLUMNS = 'grid-cols-staff-company-row-actions';
       { scope: 'seats', alias: 'seats' },
     ),
     provideIcons({
+      tablerAdjustmentsHorizontal,
       tablerBuildingSkyscraper,
       tablerCloudOff,
       tablerEye,
@@ -137,6 +140,8 @@ export class CompaniesPage {
 
   // Records are served by Core while organization mutations still use fixtures.
   protected readonly canManage = () => false;
+  protected readonly canCreate = computed(() => this.session.isTenantWide('org.company.manage'));
+  protected readonly currencies = signal<Currency[]>([]);
 
   protected readonly hasActiveFiltersOrSearch = computed(
     () => Boolean(this.search().trim()) || Boolean(this.filterValues()['status']),
@@ -220,7 +225,7 @@ export class CompaniesPage {
           void this.openCompanyById(openId);
           this.clearQueryParams(['open', 'new']);
         } else if (isNew) {
-          if (this.canManage()) {
+          if (this.canCreate()) {
             this.openCreate();
           }
           this.clearQueryParams(['new']);
@@ -240,8 +245,21 @@ export class CompaniesPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage()) return;
+    if (!this.canCreate()) return;
+    this.detailRevision = null;
     this.companyModal().openCreate();
+    void this.loadCurrencies();
+  }
+
+  private async loadCurrencies(): Promise<void> {
+    this.currencies.set([]);
+    if (!this.session.can('currencies.currency.read')) return;
+    const revision = this.session.scopeRevision();
+    const currencies = await listAllPages(
+      (query) => this.organization.listCurrencies(query),
+      { status: 'ACTIVE', limit: 100 },
+    ).catch(() => []);
+    if (revision === this.session.scopeRevision()) this.currencies.set(currencies);
   }
 
   protected openEdit(company: Company): void {

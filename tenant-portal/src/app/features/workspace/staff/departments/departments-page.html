@@ -22,10 +22,14 @@
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
         <ng-icon name="tablerCloudOff" size="18" aria-hidden="true" />
       </span>
-      <p class="text-12 text-danger-text">{{ 'departments.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'departments.retry' | transloco }}
-      </button>
+      <p class="text-12 text-danger-text">
+        {{ (loadForbidden() ? 'apiErrors.permission' : 'departments.loadFailed') | transloco }}
+      </p>
+      @if (!loadForbidden()) {
+        <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
+          {{ 'departments.retry' | transloco }}
+        </button>
+      }
     </div>
   } @else {
     <div class="overflow-x-auto pb-4">
@@ -101,7 +105,7 @@
               role="row"
               class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
               [class]="tableColumns"
-              (click)="openEdit(department)"
+              (click)="openDetails(department)"
             >
               <span role="cell" class="flex min-w-0 items-center px-10">
                 <span
@@ -119,7 +123,7 @@
                 <button
                   type="button"
                   class="min-w-0 cursor-pointer truncate rounded-4 text-start font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                  (click)="$event.stopPropagation(); openEdit(department)"
+                  (click)="$event.stopPropagation(); openDetails(department)"
                 >
                   {{ department.name }}
                 </button>
@@ -172,21 +176,9 @@
 </app-staff-list>
 
 <app-department-modal
-  [canManage]="modalCanManage()"
-  (saved)="onModalSaved($event)"
-  (deleteRequested)="requestDelete($event)"
-  (deactivateBlocked)="onDeactivateBlocked($event)"
-  (deletedRemotely)="reload()"
+  [companies]="companies()"
+  [branches]="branches()"
+  [createBranches]="createBranches()"
+  (saved)="onModalSaved()"
   (staleScopeDetected)="reload()"
 />
-
-<ui-confirm-dialog
-  #deleteConfirm
-  tone="danger"
-  [title]="'departments.confirm.deleteTitle' | transloco: { name: pendingDeleteDepartment()?.name ?? '' }"
-  [text]="'departments.confirm.deleteText' | transloco"
-  [confirmLabel]="'departments.delete' | transloco"
-  [cancelLabel]="'departments.cancel' | transloco"
-/>
-
-<app-blockers-dialog />

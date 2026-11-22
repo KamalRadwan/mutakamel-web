@@ -15,10 +15,10 @@ import { isCascadeRequired, seatErrorMessage } from '../../../seats/seat-errors'
 import { SeatImpact } from '../../../seats/seat-impact/seat-impact';
 import { SeatChange } from '../../../seats/seats.model';
 import { StaffSession } from '../../shared/staff-session';
+import { OrganizationCreateApi, type CreateCompanyBody } from '../../shared/organization-create.api';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import {
   ApiError,
-  createCompany,
   errorCodeOf,
   errorMessage,
   newIdempotencyKey,
@@ -50,12 +50,15 @@ export class CompanyModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly session = inject(StaffSession);
+  private readonly organizationCreate = inject(OrganizationCreateApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  readonly canManage = input(true);
+  readonly canEdit = input(true, { alias: 'canManage' });
+  readonly canCreate = input(false);
+  readonly canManage = computed(() => this.mode() === 'create' ? this.canCreate() : this.canEdit());
   readonly currencies = input<Currency[]>([]);
 
   readonly saved = output<{ company: Company; isNew: boolean }>();
@@ -310,13 +313,7 @@ export class CompanyModal {
 
     if (this.mode() === 'create') {
       const trimmedCode = this.code().trim();
-      const body: {
-        code: string;
-        name: string;
-        legalName?: string;
-        taxNumber?: string;
-        currencyCode?: string;
-      } = {
+      const body: CreateCompanyBody = {
         code: trimmedCode,
         name: trimmedName,
       };
@@ -326,7 +323,7 @@ export class CompanyModal {
 
       this.saving.set(true);
       try {
-        const created = await createCompany(body, this.idempotencyKeyFor('create', body));
+        const created = await this.organizationCreate.createCompany(body, this.idempotencyKeyFor('create', body));
         this.saved.emit({ company: created, isNew: true });
         this.notify.success(this.transloco.translate('companies.toast.created'));
         this.closeImmediate();

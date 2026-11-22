@@ -203,6 +203,21 @@ describe('AuthSession', () => {
     expect(identity.user().displayName).toBe('Retry Reviewer');
   });
 
+  it('rereads the organization scope for the originating login without renewing tokens', async () => {
+    const session = TestBed.inject(AuthSession);
+    expect(await settle(session.ensureLoaded())).toBe('signed-in');
+    const version = session.requestVersion();
+    api.getMe.mockResolvedValueOnce({ ...FAKE_TENANT_ME, hasMultipleOrganizationScopes: true });
+
+    await settle(session.reloadProfile(version));
+    expect(session.me()?.hasMultipleOrganizationScopes).toBe(true);
+    expect(api.refreshSession).not.toHaveBeenCalled();
+
+    session.clearLocal();
+    await settle(session.reloadProfile(version));
+    expect(api.getMe).toHaveBeenCalledTimes(2);
+  });
+
   it('coalesces concurrent ensureLoaded() and refresh() calls into single fake requests', async () => {
     const requestSpy = vi.fn(<T>(_name: string, fn: () => Promise<T>) => fn());
     Object.defineProperty(navigator, 'locks', {

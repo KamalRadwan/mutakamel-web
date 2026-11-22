@@ -43,6 +43,25 @@
     "manualHint": "Type the IANA name, up to 48 characters, for example Africa/Cairo.",
     "required": "Choose a time zone."
   },
+  "sessionPolicy": {
+    "title": "Session lifetimes",
+    "unitSeconds": "Seconds",
+    "accessTokenTtlSeconds": {
+      "label": "Access token limit",
+      "hint": "Maximum lifetime of a newly issued access token, in seconds. The session may end sooner. Allowed range: {{min}} to {{max}} seconds."
+    },
+    "idleTimeoutSeconds": {
+      "label": "Idle timeout",
+      "hint": "Time without activity before the session ends, in seconds. Allowed range: {{min}} to {{max}} seconds."
+    },
+    "absoluteTimeoutSeconds": {
+      "label": "Session limit",
+      "hint": "Maximum time from sign-in until the session ends, in seconds, even while active. Allowed range: {{min}} to {{max}} seconds."
+    },
+    "rememberMeNote": "Remember me lets your browser keep you signed in after it closes, within these session limits.",
+    "rangeError": "Enter a whole number from {{min}} to {{max}} seconds.",
+    "idleExceedsSession": "Idle timeout must not exceed the session limit."
+  },
   "support": {
     "title": "Support access",
     "line": "Let the support team help inside this workspace.",

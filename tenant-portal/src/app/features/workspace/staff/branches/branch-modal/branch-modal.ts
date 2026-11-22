@@ -17,10 +17,10 @@ import { SeatImpact } from '../../../seats/seat-impact/seat-impact';
 import { SeatChange } from '../../../seats/seats.model';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StaffSession } from '../../shared/staff-session';
+import { OrganizationCreateApi, type CreateBranchBody } from '../../shared/organization-create.api';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import {
   ApiError,
-  createBranch,
   errorCodeOf,
   errorMessage,
   getBranch,
@@ -59,13 +59,16 @@ export class BranchModal {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly session = inject(StaffSession);
+  private readonly organizationCreate = inject(OrganizationCreateApi);
   private readonly cascadeConfirm = inject(SeatCascadeConfirm);
 
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
   private readonly staleDialog = viewChild.required<ConfirmDialog>('staleDialog');
 
-  readonly canManage = input(true);
+  readonly canEdit = input(true, { alias: 'canManage' });
+  readonly canCreate = input(false);
+  readonly canManage = computed(() => this.mode() === 'create' ? this.canCreate() : this.canEdit());
   readonly companies = input<Company[]>([]);
   readonly branches = input<Branch[]>([]);
   readonly countries = input<GeoCountry[]>([]);
@@ -149,7 +152,8 @@ export class BranchModal {
       !this.session.can('org.branch.manage', { companyId: this.selectedCompanyId() }),
   );
 
-  protected readonly allowCompany = (company: Company): boolean => this.session.canCreateBranch(company.id);
+  protected readonly allowCompany = (company: Company): boolean =>
+    company.status === 'ACTIVE' && this.session.canCreateBranch(company.id);
 
   protected readonly canChangeLifecycle = computed(() => {
     const branch = this.baseBranch();
@@ -380,18 +384,12 @@ export class BranchModal {
     const trimmedAddress = this.address().trim();
 
     if (this.mode() === 'create') {
-      const companyId = this.cascadeValue().companyId;
-      if (!companyId || !this.session.canCreateBranch(companyId)) return;
+      const company = this.selectedCompany();
+      if (!company || !this.allowCompany(company)) return;
+      const companyId = company.id;
       if (this.isHeadquarters() && !this.session.can('org.branch.manage', { companyId })) return;
 
-      const body: {
-        companyId: string;
-        code: string;
-        name: string;
-        phone?: string;
-        address?: string;
-        isHeadquarters?: boolean;
-      } = {
+      const body: CreateBranchBody = {
         companyId,
         code: this.code().trim(),
         name: trimmedName,
@@ -402,7 +400,7 @@ export class BranchModal {
 
       this.saving.set(true);
       try {
-        const created = await createBranch(body, this.idempotencyKeyFor('create', body));
+        const created = await this.organizationCreate.createBranch(body, this.idempotencyKeyFor('create', body));
         this.saved.emit({ branch: created, isNew: true });
         this.notify.success(this.transloco.translate('branches.toast.created'));
         this.closeImmediate();

@@ -12,32 +12,20 @@ import {
 } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerArrowBackUp, tablerSitemap } from '@ng-icons/tabler-icons';
+import { provideIcons } from '@ng-icons/core';
+import { tablerSitemap } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { Switch } from '../../../../../shared/ui/switch/switch';
 import { OrgCascade } from '../../shared/org-cascade/org-cascade';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
-import {
-  ApiError,
-  createDepartment,
-  errorCodeOf,
-  errorMessage,
-  getBranch,
-  getDepartment,
-  newIdempotencyKey,
-  updateDepartment,
-} from '../../shared/staff.api';
-import { CODE_PATTERN, Department, OrgCascadeValue, OrgStatus, STAFF_LIMITS } from '../../shared/staff.model';
-
-interface DepartmentPatch {
-  name?: string;
-  status?: OrgStatus;
-}
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { OrganizationCreateApi, type CreateDepartmentBody } from '../../shared/organization-create.api';
+import { OrganizationReadApi } from '../../shared/organization-read.api';
+import { errorCodeOf, errorMessage } from '../../shared/staff.api';
+import { Branch, CODE_PATTERN, Company, Department, OrgCascadeValue, STAFF_LIMITS } from '../../shared/staff.model';
 
 const EMPTY_CASCADE: OrgCascadeValue = {
   companyId: null,
@@ -48,8 +36,8 @@ const EMPTY_CASCADE: OrgCascadeValue = {
 
 @Component({
   selector: 'app-department-modal',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Field, Modal, OrgCascade, StatusBadge, Switch],
-  providers: [provideIcons({ tablerArrowBackUp, tablerSitemap })],
+  imports: [TranslocoPipe, Button, ConfirmDialog, Field, Modal, OrgCascade, StatusBadge],
+  providers: [provideIcons({ tablerSitemap })],
   templateUrl: './department-modal.html',
 })
 export class DepartmentModal {
@@ -59,6 +47,8 @@ export class DepartmentModal {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
+  private readonly organization = inject(OrganizationReadApi);
+  private readonly createApi = inject(OrganizationCreateApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -66,18 +56,26 @@ export class DepartmentModal {
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
   private readonly staleDialog = viewChild.required<ConfirmDialog>('staleDialog');
 
-  readonly canManage = input(true);
-  readonly saved = output<{ department: Department; isNew: boolean }>();
-  readonly deleteRequested = output<Department>();
-  readonly deactivateBlocked = output<{ department: Department; blockers: string[] }>();
-  readonly deletedRemotely = output<void>();
+  readonly companies = input.required<readonly Company[]>();
+  readonly branches = input.required<readonly Branch[]>();
+  readonly createBranches = input.required<readonly Branch[]>();
+  readonly saved = output<Department>();
   readonly staleScopeDetected = output<void>();
 
   protected readonly limits = STAFF_LIMITS;
 
-  protected readonly mode = signal<'create' | 'edit'>('create');
-  protected readonly baseDepartment = signal<Department | null>(null);
+  protected readonly mode = signal<'create' | 'details'>('create');
   protected readonly saving = signal(false);
+  protected readonly canManage = computed(() => this.mode() === 'create' && this.createBranches().length > 0);
+  protected readonly branchOptions = computed(() => {
+    if (this.mode() === 'details') return this.branches();
+    return this.createBranches();
+  });
+  protected readonly companyOptions = computed(() => {
+    if (this.mode() === 'details') return this.companies();
+    const ids = new Set(this.branchOptions().map((branch) => branch.companyId));
+    return this.companies().filter((company) => ids.has(company.id));
+  });
 
   protected readonly cascadeValue = signal<OrgCascadeValue>({ ...EMPTY_CASCADE });
   protected readonly code = signal('');
@@ -103,17 +101,10 @@ export class DepartmentModal {
     const trimmedCode = this.code().trim();
     const trimmedName = this.name().trim();
 
-    if (this.mode() === 'create') {
-      const current = this.cascadeValue();
-      const cascadeChanged =
-        this.cascadeEditedByUser &&
-        (current.companyId !== this.presetCascade.companyId || current.branchId !== this.presetCascade.branchId);
-      return cascadeChanged || trimmedCode !== '' || trimmedName !== '';
-    }
-
-    const base = this.baseDepartment();
-    if (!base) return false;
-    return trimmedName !== base.name || (this.isActive() ? 'ACTIVE' : 'INACTIVE') !== base.status;
+    const current = this.cascadeValue();
+    const cascadeChanged = this.cascadeEditedByUser &&
+      (current.companyId !== this.presetCascade.companyId || current.branchId !== this.presetCascade.branchId);
+    return cascadeChanged || trimmedCode !== '' || trimmedName !== '';
   });
 
   protected readonly cascadeErrors = computed<{ company?: string; branch?: string }>(() => {
@@ -160,7 +151,6 @@ export class DepartmentModal {
     const seq = ++this.openSeq;
     this.allowClose = false;
     this.mode.set('create');
-    this.baseDepartment.set(null);
     this.cascadeEditedByUser = false;
 
     const initialCascade: OrgCascadeValue = {
@@ -183,39 +173,23 @@ export class DepartmentModal {
     }
   }
 
-  openEdit(department: Department, companyId?: string | null): void {
+  openDetails(department: Department, companyId?: string | null): void {
     const seq = ++this.openSeq;
     this.allowClose = false;
-    this.mode.set('edit');
+    this.mode.set('details');
     this.cascadeEditedByUser = false;
-    this.baseDepartment.set(department);
     this.applyDepartmentToForm(department, companyId ?? null);
     this.resetValidation();
     this.resetIdempotency();
     this.modal().open();
-    if (this.canManage()) {
-      this.focusControl(`#${this.uid}-name`);
-    }
     if (!companyId) {
       void this.resolveCompanyFromBranch(department.branchId, seq);
     }
   }
 
-  syncDepartment(updated: Department, companyId?: string | null): void {
-    if (this.baseDepartment()?.id !== updated.id) return;
-    const resolvedCompanyId = companyId ?? this.cascadeValue().companyId;
-    this.baseDepartment.set(updated);
-    this.applyDepartmentToForm(updated, resolvedCompanyId);
-    this.resetValidation();
-  }
-
   closeImmediate(): void {
     this.allowClose = true;
     this.modal().close();
-  }
-
-  editingId(): string | null {
-    return this.baseDepartment()?.id ?? null;
   }
 
   protected onCascadeChange(next: OrgCascadeValue): void {
@@ -256,13 +230,6 @@ export class DepartmentModal {
     this.touched.update((current) => (current[field] ? current : { ...current, [field]: true }));
   }
 
-  protected undo(): void {
-    const base = this.baseDepartment();
-    if (!base) return;
-    this.applyDepartmentToForm(base, this.cascadeValue().companyId);
-    this.resetValidation();
-  }
-
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     if (!this.canManage() || this.saving()) return;
@@ -275,52 +242,22 @@ export class DepartmentModal {
       return;
     }
 
-    const trimmedName = this.name().trim();
-
-    if (this.mode() === 'create') {
-      const branchId = this.cascadeValue().branchId;
-      if (!branchId) return;
-
-      const body = {
-        branchId,
-        code: this.code().trim(),
-        name: trimmedName,
-      };
-
-      this.saving.set(true);
-      try {
-        const created = await createDepartment(body, this.idempotencyKeyFor('create', body));
-        this.saved.emit({ department: created, isNew: true });
-        this.notify.success(this.transloco.translate('departments.toast.created'));
-        this.closeImmediate();
-      } catch (error) {
-        await this.handleSaveError(error, false);
-      } finally {
-        this.saving.set(false);
-      }
+    const { companyId, branchId } = this.cascadeValue();
+    const branch = this.createBranches().find((item) => item.id === branchId && item.companyId === companyId);
+    if (!branch) {
+      this.notify.error(this.transloco.translate('apiErrors.permission'));
       return;
     }
-
-    const base = this.baseDepartment();
-    if (!base) return;
-
-    const patch: DepartmentPatch = {};
-    if (trimmedName !== base.name) patch.name = trimmedName;
-    const nextStatus: OrgStatus = this.isActive() ? 'ACTIVE' : 'INACTIVE';
-    const isDeactivating = base.status === 'ACTIVE' && nextStatus === 'INACTIVE';
-    const isActivating = base.status === 'INACTIVE' && nextStatus === 'ACTIVE';
-    if (nextStatus !== base.status) patch.status = nextStatus;
-
-    if (Object.keys(patch).length === 0) return;
+    const body: CreateDepartmentBody = { branchId: branch.id, code: this.code().trim(), name: this.name().trim() };
 
     this.saving.set(true);
     try {
-      const updated = await updateDepartment(base.id, patch, this.idempotencyKeyFor(base.id, patch));
-      this.saved.emit({ department: updated, isNew: false });
-      this.notify.success(this.transloco.translate('departments.toast.saved'));
+      const created = await this.createApi.createDepartment(body, this.idempotencyKeyFor(body));
+      this.saved.emit(created);
+      this.notify.success(this.transloco.translate('departments.toast.created'));
       this.closeImmediate();
     } catch (error) {
-      await this.handleSaveError(error, isDeactivating, isActivating, base);
+      await this.handleSaveError(error);
     } finally {
       this.saving.set(false);
     }
@@ -330,12 +267,6 @@ export class DepartmentModal {
     if (this.saving()) return;
     if (this.canManage() && this.dirty() && !(await this.confirmDiscard())) return;
     this.closeImmediate();
-  }
-
-  protected requestDelete(): void {
-    const base = this.baseDepartment();
-    if (!base || !this.canManage() || this.saving()) return;
-    this.deleteRequested.emit(base);
   }
 
   protected onModalClosed(): void {
@@ -349,62 +280,28 @@ export class DepartmentModal {
       return;
     }
     this.allowClose = false;
-    this.baseDepartment.set(null);
+    this.openSeq++;
     this.presetCascade = { ...EMPTY_CASCADE };
     this.cascadeEditedByUser = false;
     this.resetValidation();
   }
 
-  private async handleSaveError(
-    error: unknown,
-    isDeactivating: boolean,
-    isActivating = false,
-    base?: Department,
-  ): Promise<void> {
+  private async handleSaveError(error: unknown): Promise<void> {
     const code = errorCodeOf(error);
     if (code === 'ORG_CODE_TAKEN') {
       this.codeServerError.set(this.resolveError(error));
       return;
     }
     if (code === 'ORG_BRANCH_SCOPE_STALE' || code === 'ORG_NODE_SCOPE_STALE') {
-      if (await this.staleDialog().open()) {
-        this.staleScopeDetected.emit();
-        if (base) {
-          try {
-            const fresh = await getDepartment(base.id);
-            this.syncDepartment(fresh);
-          } catch (reloadError) {
-            this.notify.error(this.resolveError(reloadError));
-            this.closeImmediate();
-          }
-        }
-      }
-      return;
-    }
-    if (code === 'ORG_PARENT_INACTIVE') {
-      if (isActivating) {
-        this.isActive.set(false);
-      }
-      this.notify.error(this.resolveError(error));
-      return;
-    }
-    if (code === 'ORG_NODE_NOT_EMPTY' && isDeactivating && base) {
-      this.isActive.set(true);
-      const rawBlockers = error instanceof ApiError ? error.details?.['blockers'] : undefined;
-      const blockers = Array.isArray(rawBlockers) ? rawBlockers.map(String) : [];
-      this.deactivateBlocked.emit({ department: base, blockers });
+      if (await this.staleDialog().open()) this.staleScopeDetected.emit();
       return;
     }
     this.notify.error(this.resolveError(error));
-    if (code === 'ORG_NODE_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
-      this.deletedRemotely.emit();
-      this.closeImmediate();
-    }
   }
 
   private async resolveCompanyFromBranch(branchId: string, seq: number): Promise<void> {
     try {
-      const branch = await getBranch(branchId);
+      const branch = await this.organization.getBranch(branchId);
       if (seq !== this.openSeq || this.cascadeEditedByUser) return;
       const resolved: OrgCascadeValue = {
         companyId: branch.companyId,
@@ -442,8 +339,8 @@ export class DepartmentModal {
     this.lastIdempotencyKey = '';
   }
 
-  private idempotencyKeyFor(target: string, payload: unknown): string {
-    const signature = `${target}:${JSON.stringify(payload)}`;
+  private idempotencyKeyFor(payload: CreateDepartmentBody): string {
+    const signature = JSON.stringify(payload);
     if (signature !== this.lastPayloadSignature) {
       this.lastPayloadSignature = signature;
       this.lastIdempotencyKey = newIdempotencyKey();

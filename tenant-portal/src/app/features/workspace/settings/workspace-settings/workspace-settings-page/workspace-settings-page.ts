@@ -24,6 +24,14 @@ import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { TimezonePicker } from '../timezone-picker/timezone-picker';
 import {
+  SESSION_POLICY_FIELDS,
+  SessionPolicyFieldKey,
+  SessionPolicyViewModel,
+  UpdateSessionPolicyDraft,
+  fakeGetSessionPolicy,
+  fakeUpdateSessionPolicy,
+} from '../session-policy.fake';
+import {
   getWorkspaceSettings,
   listCurrencyCatalogue,
   listTimezones,
@@ -42,9 +50,10 @@ import {
 
 const CAN_VIEW = true; // workspace.read
 const CAN_MANAGE = true; // workspace.manage, tenant-wide (later from the session)
-const SKELETON_CARDS = [0, 1, 2, 3] as const;
+const SKELETON_CARDS = [0, 1, 2, 3, 4] as const;
 const LIVE_CLOCK_INTERVAL_MS = 10_000;
 const CURRENCY_CODE_RE = /^[A-Za-z]{3}$/;
+const WHOLE_NUMBER_RE = /^\d+$/;
 const TIME_SENTINEL = '\u0000TIME\u0000';
 const OFFSET_SENTINEL = '\u0000OFFSET\u0000';
 
@@ -55,6 +64,13 @@ type ServerFieldErrorCodes = Partial<Record<ServerErrorField, string>>;
 interface LocalTimeSegment {
   kind: 'text' | 'time' | 'offset';
   value: string;
+}
+
+function parseWholeSeconds(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!WHOLE_NUMBER_RE.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function statusOf(error: unknown): number | null {
@@ -116,18 +132,21 @@ export class WorkspaceSettingsPage {
   protected readonly timezones = signal<TimezoneOption[]>([]);
   protected readonly currencyListFailed = signal(false);
   protected readonly retryingCurrencies = signal(false);
-  /** Settings are required; the currency and time zone lists are optional (null when their read failed). */
+  /** The settings and session policy are required; catalogue reads can fall back. */
   private readonly loaded = resource({
     params: () => (CAN_VIEW ? true : undefined),
     loader: async () => {
-      const [settingsResult, currenciesResult, timezonesResult] = await Promise.allSettled([
+      const [settingsResult, sessionPolicyResult, currenciesResult, timezonesResult] = await Promise.allSettled([
         getWorkspaceSettings(),
+        fakeGetSessionPolicy(),
         listCurrencyCatalogue(),
         listTimezones(),
       ]);
       if (settingsResult.status === 'rejected') throw settingsResult.reason;
+      if (sessionPolicyResult.status === 'rejected') throw sessionPolicyResult.reason;
       return {
         settings: settingsResult.value,
+        sessionPolicy: sessionPolicyResult.value,
         currencies: currenciesResult.status === 'fulfilled' ? currenciesResult.value : null,
         timezones: timezonesResult.status === 'fulfilled' ? timezonesResult.value : null,
       };
@@ -150,6 +169,8 @@ export class WorkspaceSettingsPage {
   protected readonly currencyDraft = signal('');
   protected readonly timezoneDraft = signal('');
   protected readonly allowSupportDraft = signal(true);
+  private readonly savedSessionPolicy = signal<SessionPolicyViewModel | null>(null);
+  private readonly sessionPolicyDraft = signal<Partial<Record<SessionPolicyFieldKey, string>>>({});
   protected readonly serverErrorCodes = signal<ServerFieldErrorCodes>({});
   private readonly clockTick = signal(Date.now());
 
@@ -162,6 +183,34 @@ export class WorkspaceSettingsPage {
     event.preventDefault();
     event.returnValue = '';
   };
+
+  protected readonly sessionPolicyFields = computed(() => {
+    const policy = this.savedSessionPolicy();
+    if (!policy) return [];
+    const draft = this.sessionPolicyDraft();
+    const fields = SESSION_POLICY_FIELDS.map((key) => {
+      const { value: savedValue, min, max } = policy[key];
+      const text = draft[key] ?? String(savedValue);
+      const value = parseWholeSeconds(text);
+      const valid = value !== null && value >= min && value <= max;
+      return { key, text, savedValue, value, bounds: { min, max }, error: valid ? null : 'rangeError' };
+    });
+
+    const idle = fields.find(({ key }) => key === 'idleTimeoutSeconds');
+    const absolute = fields.find(({ key }) => key === 'absoluteTimeoutSeconds');
+    if (idle?.value != null && absolute?.value != null && !idle.error && !absolute.error && idle.value > absolute.value) {
+      idle.error = 'idleExceedsSession';
+    }
+    return fields;
+  });
+
+  private readonly changedSessionPolicy = computed<UpdateSessionPolicyDraft>(() => {
+    const patch: UpdateSessionPolicyDraft = {};
+    for (const { key, value, savedValue, error } of this.sessionPolicyFields()) {
+      if (value !== null && value !== savedValue && !error) patch[key] = value;
+    }
+    return patch;
+  });
 
   protected readonly dirty = computed(() => {
     const current = this.saved();
@@ -176,7 +225,8 @@ export class WorkspaceSettingsPage {
       draftLang !== current.defaultLanguage ||
       draftCurr !== savedCurr ||
       draftTz !== current.timezone ||
-      this.allowSupportDraft() !== current.allowSupport
+      this.allowSupportDraft() !== current.allowSupport ||
+      this.sessionPolicyFields().some(({ value, savedValue }) => value !== savedValue)
     );
   });
 
@@ -216,7 +266,7 @@ export class WorkspaceSettingsPage {
     const curr = this.currencyDraft().trim();
     if (curr && !CURRENCY_CODE_RE.test(curr)) return false;
 
-    return true;
+    return this.sessionPolicyFields().every(({ error }) => !error);
   });
 
   protected readonly canSave = computed(
@@ -226,7 +276,7 @@ export class WorkspaceSettingsPage {
       this.isValid() &&
       !this.saving() &&
       !this.loading() &&
-      Object.keys(this.changedBody()).length > 0,
+      (Object.keys(this.changedBody()).length > 0 || Object.keys(this.changedSessionPolicy()).length > 0),
   );
 
   protected readonly languageError = computed(() => {
@@ -379,12 +429,13 @@ export class WorkspaceSettingsPage {
 
     effect(() => {
       if (!this.loaded.hasValue()) return;
-      const { settings, currencies, timezones } = this.loaded.value();
+      const { settings, sessionPolicy, currencies, timezones } = this.loaded.value();
       untracked(() => {
         this.currencies.set(currencies ?? []);
         this.currencyListFailed.set(currencies === null);
         this.timezones.set(timezones ?? []);
         this.applySettings(settings);
+        this.applySessionPolicy(sessionPolicy);
       });
     });
   }
@@ -466,10 +517,17 @@ export class WorkspaceSettingsPage {
     this.pendingIdemKey = null;
   }
 
+  protected onSessionPolicyInput(key: SessionPolicyFieldKey, event: Event): void {
+    if (!this.canManage || this.saving() || this.loading()) return;
+    const { value } = event.target as HTMLInputElement;
+    this.sessionPolicyDraft.update((draft) => ({ ...draft, [key]: value }));
+  }
+
   protected undo(): void {
     const current = this.saved();
     if (!current || this.saving()) return;
     this.applySettings(current);
+    this.sessionPolicyDraft.set({});
   }
 
   protected async onReloadClick(): Promise<void> {
@@ -486,22 +544,22 @@ export class WorkspaceSettingsPage {
   }
 
   protected async save(): Promise<boolean> {
-    const current = this.saved();
-    if (!this.canManage || !current || this.saving() || this.loading() || !this.dirty() || !this.isValid()) {
-      return false;
-    }
+    if (!this.canSave()) return false;
 
     const body = this.changedBody();
-    if (Object.keys(body).length === 0) return false;
-
-    const idempotencyKey = (this.pendingIdemKey ??= newIdempotencyKey());
+    const sessionPolicyPatch = this.changedSessionPolicy();
     this.saving.set(true);
     this.serverErrorCodes.set({});
 
     try {
-      const updated = await updateWorkspaceSettings(body, idempotencyKey);
-      this.applySettings(updated);
-      // Later refresh the app locale and time zone from the response.
+      if (Object.keys(body).length > 0) {
+        const idempotencyKey = (this.pendingIdemKey ??= newIdempotencyKey());
+        this.applySettings(await updateWorkspaceSettings(body, idempotencyKey));
+        // Later refresh the app locale and time zone from the response.
+      }
+      if (Object.keys(sessionPolicyPatch).length > 0) {
+        this.applySessionPolicy(await fakeUpdateSessionPolicy(sessionPolicyPatch));
+      }
       this.notify.success(this.transloco.translate('wsGeneral.toast.saved'));
       return true;
     } catch (error) {
@@ -534,6 +592,11 @@ export class WorkspaceSettingsPage {
     this.allowSupportDraft.set(settings.allowSupport);
     this.serverErrorCodes.set({});
     this.pendingIdemKey = null;
+  }
+
+  private applySessionPolicy(policy: SessionPolicyViewModel): void {
+    this.savedSessionPolicy.set(policy);
+    this.sessionPolicyDraft.set({});
   }
 
   private clearFieldError(field: ServerErrorField): void {

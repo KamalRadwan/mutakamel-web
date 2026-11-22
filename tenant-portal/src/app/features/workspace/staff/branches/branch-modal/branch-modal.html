@@ -17,6 +17,7 @@
           [readonly]="!canManage()"
           [disabledLevels]="saving() ? ['company'] : []"
           [activeOnly]="true"
+          [companySource]="companies()"
           [allowCompany]="allowCompany"
           [errors]="companyError() ? { company: companyError()! } : {}"
           [hints]="{ company: ('branches.fields.companyHint' | transloco) }"

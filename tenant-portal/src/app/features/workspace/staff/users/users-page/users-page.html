@@ -1,6 +1,8 @@
 <app-staff-list
   [addLabel]="'users.add' | transloco"
-  [showAdd]="canInvite()"
+  [showAdd]="hasInviteGrant()"
+  [addDisabled]="!canInvite()"
+  [addHint]="inviteHint()"
   [searchPlaceholder]="'users.search' | transloco"
   [loading]="loading()"
   [total]="total()"
@@ -15,49 +17,6 @@
   (add)="openInvite()"
   (reload)="reload()"
 >
-  @if (canInvite()) {
-    <button
-      #importBtn
-      type="button"
-      uiButton
-      variant="secondary"
-      class="shrink-0"
-      (click)="openImport()"
-    >
-      <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
-      <span>{{ 'users.import.button' | transloco }}</span>
-    </button>
-  }
-
-  @if (selectedCount() > 0) {
-    <div
-      notices
-      class="flex h-bulk-bar shrink-0 items-center justify-between gap-8 rounded-10 border border-brand bg-brand-soft px-10"
-      role="region"
-      [attr.aria-label]="('users.bulk.selectedPlural' | pluralKey: selectedCount()) | transloco: { n: selectedCount() }"
-    >
-      <div class="flex items-center gap-8">
-        <span class="text-12 font-medium text-on-brand-soft">
-          {{ ('users.bulk.selectedPlural' | pluralKey: selectedCount()) | transloco: { n: selectedCount() } }}
-        </span>
-        @if (canAssignRoles()) {
-          <button type="button" uiButton variant="primary" size="small" (click)="openBulkRole()">
-            {{ 'users.bulk.assignRole' | transloco }}
-          </button>
-        }
-      </div>
-
-      <button
-        type="button"
-        class="inline-flex size-btn-h-sm cursor-pointer items-center justify-center rounded-6 text-on-brand-soft outline-none hover:bg-neutral-soft focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-        [attr.aria-label]="'users.common.close' | transloco"
-        (click)="clearSelection()"
-      >
-        <ng-icon name="tablerX" size="14" aria-hidden="true" />
-      </button>
-    </div>
-  }
-
   @if (loadFailed() && !loading()) {
     <div
       class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
@@ -87,24 +46,6 @@
           class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
           [class]="tableColumns"
         >
-          <span role="columnheader" class="flex items-center justify-center">
-            <span class="relative inline-flex size-checkbox-size items-center justify-center">
-              <ui-checkbox
-                #pageCb
-                [checked]="pageSelectionState() === 'all'"
-                [attr.aria-label]="'users.cols.user' | transloco"
-                [attr.aria-checked]="pageSelectionState() === 'some' ? 'mixed' : (pageSelectionState() === 'all' ? 'true' : 'false')"
-                (checkedChange)="toggleSelectPage(pageCb)"
-              >
-                <span class="sr-only">{{ 'users.cols.user' | transloco }}</span>
-              </ui-checkbox>
-              @if (pageSelectionState() === 'some') {
-                <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-4 bg-brand text-on-brand">
-                  <ng-icon name="tablerMinus" size="12" aria-hidden="true" />
-                </span>
-              }
-            </span>
-          </span>
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
             {{ 'users.cols.user' | transloco }}
           </span>
@@ -126,9 +67,6 @@
           <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
             {{ 'users.cols.updated' | transloco }}
           </span>
-          <span role="columnheader" class="border-s border-on-nav-line">
-            <span class="sr-only">{{ 'users.cols.actions' | transloco }}</span>
-          </span>
         </div>
 
         @if (loading()) {
@@ -139,9 +77,6 @@
               class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
               [class]="tableColumns"
             >
-              <span role="cell" class="flex items-center justify-center">
-                <span class="size-checkbox-size rounded-4 bg-neutral-soft"></span>
-              </span>
               <span role="cell" class="flex items-center gap-8 border-s border-border px-10">
                 <span class="size-avatar shrink-0 rounded-full bg-neutral-soft"></span>
                 <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
@@ -164,36 +99,15 @@
               <span role="cell" class="flex items-center border-s border-border px-10">
                 <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
               </span>
-              <span role="cell" class="flex items-center justify-center border-s border-border">
-                <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
-              </span>
             </div>
           }
         } @else {
           @for (user of rows(); track user.id) {
             <div
               role="row"
-              class="mt-6 grid h-table-row cursor-pointer rounded-10 border text-14 leading-20 text-text shadow-card transition-colors duration-fast"
-              [class]="tableColumns + ' ' + (isRowSelected(user.id) ? 'border-brand bg-brand-soft' : 'border-border bg-surface hover:bg-row-hover')"
-              [attr.aria-selected]="isRowSelected(user.id)"
-              (click)="openUser(user)"
+              class="mt-6 grid h-table-row rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
+              [class]="tableColumns"
             >
-              <span
-                role="cell"
-                class="flex items-center justify-center"
-                (click)="onSelectCellClick($event, user, rowCb)"
-              >
-                <ui-checkbox
-                  #rowCb
-                  [checked]="isRowSelected(user.id)"
-                  [attr.aria-label]="fullName(user)"
-                  (click)="onRowCheckboxClick($event)"
-                  (checkedChange)="onRowCheckedChange(user, rowCb)"
-                >
-                  <span class="sr-only">{{ fullName(user) }}</span>
-                </ui-checkbox>
-              </span>
-
               <span role="cell" class="flex min-w-0 items-center gap-8 border-s border-border px-10">
                 <span
                   class="inline-flex size-avatar shrink-0 items-center justify-center rounded-full text-11 font-medium text-on-icon"
@@ -205,13 +119,7 @@
 
                 <span class="flex min-w-0 flex-1 flex-col justify-center">
                   <span class="flex min-w-0 items-center gap-6">
-                    <button
-                      type="button"
-                      class="min-w-0 cursor-pointer truncate rounded-4 text-start text-13 leading-18 font-medium outline-none hover:text-accent focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                      (click)="$event.stopPropagation(); openUser(user)"
-                    >
-                      {{ fullName(user) }}
-                    </button>
+                    <span class="min-w-0 truncate text-13 leading-18 font-medium">{{ fullName(user) }}</span>
                     @if (user.isTenantOwner) {
                       <span class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-brand-soft px-8 text-12 font-medium text-on-brand-soft whitespace-nowrap">
                         <ng-icon name="tablerCrown" size="11" aria-hidden="true" />
@@ -267,17 +175,6 @@
                 <span class="truncate text-12 text-text-muted">{{ formatDate(user.updatedAt) }}</span>
               </span>
 
-              <span
-                role="cell"
-                class="flex items-center justify-center border-s border-border"
-                (click)="$event.stopPropagation()"
-              >
-                <ui-actions-menu
-                  [items]="rowActionsFor(user)"
-                  [label]="'users.cols.actions' | transloco"
-                  (selected)="onRowAction(user, $event)"
-                />
-              </span>
             </div>
           } @empty {
             <div
@@ -303,85 +200,9 @@
 </app-staff-list>
 
 <app-invite-modal
-  [knownUsers]="knownUsers()"
-  [branches]="branches()"
-  [roles]="roles()"
-  (invited)="onUserInvited($event)"
+  [companies]="inviteCompanies()"
+  [branches]="inviteBranches()"
+  [departments]="inviteDepartments()"
+  [teams]="inviteTeams()"
+  (invited)="onUserInvited()"
 />
-
-<app-bulk-role-modal
-  [companies]="companies()"
-  [branches]="branches()"
-  [roles]="roles()"
-  (assigned)="onBulkRoleAssigned()"
-/>
-
-<app-import-modal
-  [companies]="companies()"
-  [branches]="branches()"
-  [departments]="departments()"
-  [teams]="teams()"
-  [roles]="roles()"
-  (imported)="onUsersImported()"
-/>
-
-<app-user-modal
-  [knownUsers]="knownUsers()"
-  [statusActionsFor]="statusActionsBuilder()"
-  (statusActionSelected)="onModalStatusAction($event)"
-  (userUpdated)="onUserUpdated($event)"
-  (deletedRemotely)="reload()"
-/>
-
-<ui-confirm-dialog
-  #statusConfirm
-  tone="warning"
-  [title]="statusConfirmTitle()"
-  [text]="statusConfirmText()"
-  [confirmLabel]="statusConfirmButtonLabel()"
-  [cancelLabel]="'users.common.cancel' | transloco"
-/>
-
-<ui-modal
-  #releaseDialog
-  size="confirm"
-  icon="tablerArmchair"
-  tile="bg-icon-orange"
-  [title]="'users.actions.releaseSeats' | transloco"
-  [closeLabel]="'users.common.close' | transloco"
-  (closed)="onReleaseDialogClosed()"
->
-  <div class="flex flex-col gap-10">
-    <p class="text-12 leading-18 text-text-muted">{{ releaseConfirmText() }}</p>
-    <app-seat-impact [changes]="releaseSeatChanges()" [compact]="true" [canBuySeats]="isOwner()" />
-  </div>
-
-  <button modal-footer type="button" uiButton variant="primary" (click)="settleReleaseConfirm(true)">
-    {{ 'users.actions.releaseSeats' | transloco }}
-  </button>
-  <button modal-footer type="button" uiButton variant="secondary" (click)="settleReleaseConfirm(false)">
-    {{ 'users.common.cancel' | transloco }}
-  </button>
-</ui-modal>
-
-<ui-modal
-  #deleteDialog
-  size="confirm"
-  icon="tablerTrash"
-  tile="bg-icon-red"
-  [title]="'users.confirm.deleteTitle' | transloco"
-  [closeLabel]="'users.common.close' | transloco"
-  (closed)="onDeleteDialogClosed()"
->
-  <div class="flex flex-col gap-10">
-    <p class="text-12 leading-18 text-text-muted">{{ deleteConfirmText() }}</p>
-    <app-seat-impact [changes]="deleteSeatChanges()" [compact]="true" [canBuySeats]="isOwner()" />
-  </div>
-
-  <button modal-footer type="button" uiButton variant="danger" (click)="settleDeleteConfirm(true)">
-    {{ 'users.actions.delete' | transloco }}
-  </button>
-  <button modal-footer type="button" uiButton variant="secondary" (click)="settleDeleteConfirm(false)">
-    {{ 'users.common.cancel' | transloco }}
-  </button>
-</ui-modal>

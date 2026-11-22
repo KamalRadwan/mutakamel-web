@@ -57,3 +57,6 @@ dist/
 test-output/
 test-reports/
 *.log
+
+# agent tool state
+.serena/

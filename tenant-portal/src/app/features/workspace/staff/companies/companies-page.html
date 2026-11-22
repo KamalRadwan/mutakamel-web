@@ -1,6 +1,6 @@
 <app-staff-list
   [addLabel]="'companies.add' | transloco"
-  [showAdd]="canManage()"
+  [showAdd]="canCreate()"
   [searchPlaceholder]="'companies.search' | transloco"
   [loading]="loading()"
   [total]="total()"
@@ -182,6 +182,8 @@
 
 <app-company-modal
   [canManage]="canManage()"
+  [canCreate]="canCreate()"
+  [currencies]="currencies()"
   (saved)="onModalSaved($event)"
   (deleteRequested)="requestDelete($event)"
   (deactivateBlocked)="onDeactivateBlocked($event)"

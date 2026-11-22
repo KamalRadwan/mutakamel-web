@@ -175,7 +175,8 @@
 </app-staff-list>
 
 <app-branch-modal
-  [canManage]="modalCanManage()"
+  [canManage]="false"
+  [canCreate]="canAddBranch()"
   [companies]="companies()"
   [branches]="allBranches()"
   [countries]="countries()"
