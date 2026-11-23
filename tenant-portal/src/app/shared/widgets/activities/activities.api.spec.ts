@@ -5,8 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../core/api/api-errors';
 import { TenantScopeState } from '../../../core/scope/tenant-scope';
-import { ActivitiesApi, activitySummary, listActivities } from './activities.api';
-import { resetActivitiesFake, setFakeActivitiesDelay } from './activities.fake';
+import { ActivitiesApi } from './activities.api';
 import type { Activity, ActivityListParams, ActivitySummaryScope, CreateActivity } from './activities.model';
 
 const path = '/api/tenant/core/v1';
@@ -104,7 +103,7 @@ describe('ActivitiesApi', () => {
     for (const call of calls) {
       const result = call.run();
       const req = request(call.route);
-      const key = req.request.headers.get('x-idempotency-key')!;
+      const key = req.request.headers.get('x-idempotency-key') ?? '';
       expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       keys.push(key);
       expect(req.request.headers.get('x-csrf-token')).toBe('proof');
@@ -154,15 +153,47 @@ describe('ActivitiesApi', () => {
     request('/activities').flush({ code: 'GW.RATE.LIMIT_EXCEEDED' }, { status: 429, statusText: 'Limited', headers: { 'Retry-After': '9' } });
     await limitRejection;
   });
-});
 
-describe('activities api', () => {
-  it('CRM plain exports stay available', async () => {
-    resetActivitiesFake();
-    setFakeActivitiesDelay(0);
-    const page = await listActivities({ limit: 1 });
-    expect(page.data.length).toBeLessThanOrEqual(1);
-    await expect(activitySummary({ app: 'CRM', type: 'LEAD', id: 'lead-001' }, dayStart, dayEnd)).resolves.toHaveProperty('byStatus');
-    resetActivitiesFake();
+  it('listActivities preserves full CorePageMeta and CRM target query params', async () => {
+    const pageMeta = { page: 2, limit: 20, total: 45, totalPages: 3, hasNext: true, hasPrev: true };
+    const result = api.listActivities({
+      targetApp: 'CRM',
+      targetType: 'LEAD',
+      targetId: 'lead-1',
+      statuses: ['PLANNED', 'IN_PROGRESS'],
+      page: 2,
+      limit: 20,
+      sortDir: 'ASC',
+    });
+    const req = request('/activities');
+    expect(req.request.params.get('targetApp')).toBe('CRM');
+    expect(req.request.params.get('targetType')).toBe('LEAD');
+    expect(req.request.params.get('targetId')).toBe('lead-1');
+    expect(req.request.params.getAll('statuses')).toEqual(['PLANNED', 'IN_PROGRESS']);
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('limit')).toBe('20');
+    expect(req.request.params.get('sortDir')).toBe('ASC');
+    req.flush({ success: true, data: [activity], meta: pageMeta });
+    await expect(result).resolves.toEqual({ data: [activity], meta: pageMeta });
+  });
+
+  it('listActivities rejects incomplete page meta', async () => {
+    const result = api.listActivities({ targetApp: 'CRM', targetType: 'LEAD', targetId: 'lead-1' });
+    const rejection = expect(result).rejects.toEqual(new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR'));
+    request('/activities').flush({ success: true, data: [], meta: { page: 1, limit: 20, total: 0 } });
+    await rejection;
+  });
+
+  it('activitySummary preserves canonical target keys and day bounds', async () => {
+    const summary = { overdue: 1, today: 2, upcoming: 3, completedToday: 1, byStatus: [] };
+    const result = api.activitySummary({ targetApp: 'CRM', targetType: 'OPPORTUNITY', targetId: 'opp-1' }, dayStart, dayEnd);
+    const req = request('/activities/summary');
+    expect(req.request.params.get('targetApp')).toBe('CRM');
+    expect(req.request.params.get('targetType')).toBe('OPPORTUNITY');
+    expect(req.request.params.get('targetId')).toBe('opp-1');
+    expect(req.request.params.get('dayStart')).toBe(dayStart);
+    expect(req.request.params.get('dayEnd')).toBe(dayEnd);
+    req.flush({ success: true, data: summary });
+    await expect(result).resolves.toEqual(summary);
   });
 });

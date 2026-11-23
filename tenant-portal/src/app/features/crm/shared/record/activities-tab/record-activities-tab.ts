@@ -13,11 +13,13 @@ import {
   tablerSquareCheck,
   tablerUsers,
 } from '@ng-icons/tabler-icons';
+import { errorMessage } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import { activitySummary, listActivities } from '../../../../../shared/widgets/activities/activities.api';
+import { ActivitiesApi } from '../../../../../shared/widgets/activities/activities.api';
 import {
   Activity,
   ActivityStatus,
@@ -65,7 +67,10 @@ const FILTER_STATUSES: Record<ActivityFilter, ActivityStatus[] | undefined> = {
   selector: 'app-record-activities-tab',
   imports: [NgIcon, TranslocoPipe, Button, Field, Segmented, RecordActivities],
   providers: [
-    provideTranslocoScope({ scope: 'record-activities-tab', alias: 'recordActivitiesTab' }),
+    provideTranslocoScope(
+      'activities',
+      { scope: 'record-activities-tab', alias: 'recordActivitiesTab' },
+    ),
     provideIcons({
       tablerPlus,
       tablerCalendarEvent,
@@ -87,6 +92,8 @@ export class RecordActivitiesTab {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
+  private readonly activitiesApi = inject(ActivitiesApi);
+  private readonly notify = inject(Notify);
   private readonly recordActivities = viewChild.required(RecordActivities);
 
   readonly targetType = input.required<RecordActivityTargetType>();
@@ -260,7 +267,7 @@ export class RecordActivitiesTab {
     this.loadingMore.set(true);
 
     try {
-      const res = await listActivities({
+      const res = await this.activitiesApi.listActivities({
         targetApp: 'CRM',
         targetType: type,
         targetId: id,
@@ -279,8 +286,10 @@ export class RecordActivitiesTab {
       this.page.set(res.meta.page);
       this.hasNext.set(hasNextPage(res));
       this.currentTotal.set(res.meta.total);
-    } catch {
+    } catch (error) {
+      if (seq !== this.loadSeq) return;
       // Keep the already loaded timeline rows when paging fails.
+      this.notify.error(errorMessage(error, 'activities', this.transloco));
     } finally {
       if (seq === this.loadSeq) {
         this.loadingMore.set(false);
@@ -347,7 +356,7 @@ export class RecordActivitiesTab {
 
     try {
       const [listPage, openPage, donePage, allPage, summary] = await Promise.all([
-        listActivities({
+        this.activitiesApi.listActivities({
           targetApp: 'CRM',
           targetType: type,
           targetId: id,
@@ -356,7 +365,7 @@ export class RecordActivitiesTab {
           limit: PAGE_LIMIT,
           sortDir: activeFilter === 'open' ? 'ASC' : 'DESC',
         }),
-        listActivities({
+        this.activitiesApi.listActivities({
           targetApp: 'CRM',
           targetType: type,
           targetId: id,
@@ -364,7 +373,7 @@ export class RecordActivitiesTab {
           page: 1,
           limit: 1,
         }),
-        listActivities({
+        this.activitiesApi.listActivities({
           targetApp: 'CRM',
           targetType: type,
           targetId: id,
@@ -372,14 +381,14 @@ export class RecordActivitiesTab {
           page: 1,
           limit: 1,
         }),
-        listActivities({
+        this.activitiesApi.listActivities({
           targetApp: 'CRM',
           targetType: type,
           targetId: id,
           page: 1,
           limit: 1,
         }),
-        activitySummary({ app: 'CRM', type, id }, dayStart, dayEnd),
+        this.activitiesApi.activitySummary({ app: 'CRM', type, id }, dayStart, dayEnd),
       ]);
 
       if (seq !== this.loadSeq || this.targetType() !== type || this.targetId() !== id || this.filter() !== activeFilter) {
@@ -395,9 +404,10 @@ export class RecordActivitiesTab {
       this.allCount.set(allPage.meta.total);
       this.summary.set(summary);
       this.countChange.emit({ open: openPage.meta.total, total: allPage.meta.total });
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
+      this.notify.error(errorMessage(error, 'activities', this.transloco));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

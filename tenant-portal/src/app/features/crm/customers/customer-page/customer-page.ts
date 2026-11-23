@@ -53,7 +53,7 @@ import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dial
 import { ConflictDialog } from '../../../../shared/ui/conflict-dialog/conflict-dialog';
 import { Field } from '../../../../shared/ui/field/field';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { listActivities } from '../../../../shared/widgets/activities/activities.api';
+import { ActivitiesApi } from '../../../../shared/widgets/activities/activities.api';
 import { PartyCalls } from '../../../../shared/widgets/party-calls/party-calls';
 import { getPartyCallsSummary } from '../../../../shared/widgets/party-calls/party-calls.api';
 import { RecordAttachments } from '../../../../shared/widgets/record-attachments/record-attachments';
@@ -223,6 +223,7 @@ export class CustomerPage implements CanLeaveRecord {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly draftStore = inject(RecordDraftStore);
+  private readonly activitiesApi = inject(ActivitiesApi);
   protected readonly language = inject(LanguageState).current;
 
   private readonly customerForm = viewChild(CustomerForm);
@@ -1467,7 +1468,7 @@ export class CustomerPage implements CanLeaveRecord {
 
   private async loadInitialTabCounts(customer: CustomerDetail, seq: number): Promise<void> {
     const [openResult, attachmentResult, callsResult] = await Promise.allSettled([
-      listActivities({
+      this.activitiesApi.listActivities({
         targetApp: 'CRM',
         targetType: 'CUSTOMER_PROFILE',
         targetId: customer.id,

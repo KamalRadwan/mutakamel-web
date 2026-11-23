@@ -3,7 +3,6 @@ import { QueryClient } from '@tanstack/angular-query';
 import { CoreHttp, type CoreQuery } from '../../../core/api/core-http';
 import { newIdempotencyKey } from '../../../core/api/idempotency';
 import { TenantScopeState } from '../../../core/scope/tenant-scope';
-import { fakeList, fakeSummary } from './activities.fake';
 import type {
   Activity, ActivityAssigneesParams, ActivityCalendarParams, ActivityCalendarResponse,
   ActivityListParams, ActivityPage, ActivitySummary, ActivitySummaryScope, ActivityTargetOption,
@@ -16,16 +15,6 @@ export type {
   ActivityScopeFilter, ActivityStatusSummary, ActivitySummaryScope, ActivityTargetOption,
   ActivityTargetSelector, ActivityTargetsParams, ActivityTypeDefinition,
 } from './activities.model';
-
-// FAKE-ONLY for CRM callers until their call sites move to ActivitiesApi (controller item; files outside OPS-ACT).
-export function listActivities(params: ActivityListParams = {}): Promise<ActivityPage> {
-  return fakeList(params);
-}
-
-// FAKE-ONLY for CRM callers until their call sites move to ActivitiesApi (controller item; files outside OPS-ACT).
-export function activitySummary(scope: ActivitySummaryScope = {}, dayStart?: string, dayEnd?: string): Promise<ActivitySummary> {
-  return fakeSummary(scope, dayStart, dayEnd);
-}
 
 const CORE_PATH = '/api/tenant/core/v1';
 const ACTIVITIES_QUERY_KEY = 'activities';

@@ -54,7 +54,7 @@ import { ActionItem, ActionSelection, ActionSwatch } from '../../../../shared/ui
 import { Button } from '../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { listActivities } from '../../../../shared/widgets/activities/activities.api';
+import { ActivitiesApi } from '../../../../shared/widgets/activities/activities.api';
 import { PartyCalls } from '../../../../shared/widgets/party-calls/party-calls';
 import { getPartyCallsSummary } from '../../../../shared/widgets/party-calls/party-calls.api';
 import { RecordAttachments } from '../../../../shared/widgets/record-attachments/record-attachments';
@@ -257,6 +257,7 @@ export class OpportunityPage implements CanLeaveRecord {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly activitiesApi = inject(ActivitiesApi);
   protected readonly language = inject(LanguageState).current;
   private readonly scope = inject(OpportunityLookups).scope;
   private readonly tenantScope = inject(TenantScopeState);
@@ -1598,7 +1599,7 @@ export class OpportunityPage implements CanLeaveRecord {
 
   private async loadInitialTabCounts(row: OpportunityRow, seq: number): Promise<void> {
     const [openResult, attachmentResult, callsResult, stagesResult] = await Promise.allSettled([
-      listActivities({
+      this.activitiesApi.listActivities({
         targetApp: 'CRM',
         targetType: 'OPPORTUNITY',
         targetId: row.id,
