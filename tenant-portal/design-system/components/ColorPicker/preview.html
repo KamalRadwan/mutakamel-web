@@ -1,0 +1,86 @@
+<!-- @dsCard group="Forms" height=360 -->
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>ColorPicker — preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500&family=Tajawal:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  .cp-demo { display: flex; gap: var(--space-16); align-items: flex-start; flex-wrap: wrap; }
+  .cp-col { width: calc(var(--toast-w) - var(--space-12)); display: flex; flex-direction: column; gap: var(--space-8); }
+  .cp-swatch { width: var(--checkbox-size); height: var(--checkbox-size); border-radius: var(--radius-4); border: var(--border-w) solid var(--border); flex: none; }
+  .cp-val { flex: 1; direction: ltr; text-align: start; font-variant-numeric: tabular-nums; }
+  .cp-chev { color: var(--text-muted); font-size: var(--fs-11); }
+  .cp-pop { width: calc(var(--toast-w) - var(--space-12)); background: var(--surface); border: var(--border-w) solid var(--border); border-radius: var(--radius-12); padding: var(--space-8); box-shadow: var(--shadow-popover); display: flex; flex-direction: column; gap: var(--space-8); box-sizing: border-box; }
+  .cp-plane { display: flex; gap: var(--space-8); }
+  .cp-sv { position: relative; flex: 1; height: calc(var(--time-list-max-h) + var(--space-4)); border-radius: var(--radius-8); border: var(--border-w) solid var(--border); background-color: hsl(220 100% 50%); background-image: linear-gradient(to top, rgb(0 0 0), transparent), linear-gradient(to right, rgb(255 255 255), transparent); }
+  .cp-knob { position: absolute; width: var(--switch-knob); height: var(--switch-knob); border-radius: var(--radius-full); border: var(--border-w-strong) solid var(--on-brand); box-shadow: var(--shadow-card); transform: translate(-50%, -50%); box-sizing: border-box; }
+  .cp-hue { position: relative; width: var(--icon-sm); height: calc(var(--time-list-max-h) + var(--space-4)); border-radius: var(--radius-6); border: var(--border-w) solid var(--border); background: linear-gradient(to top, hsl(0 100% 50%) 0%, hsl(60 100% 50%) 17%, hsl(120 100% 50%) 33%, hsl(180 100% 50%) 50%, hsl(240 100% 50%) 67%, hsl(300 100% 50%) 83%, hsl(360 100% 50%) 100%); flex: none; }
+  .cp-hue-knob { position: absolute; inset-inline: 0; top: 39%; height: var(--org-band-h); border-radius: var(--radius-2); border: var(--border-w-strong) solid var(--on-brand); box-shadow: var(--shadow-card); transform: translateY(-50%); box-sizing: border-box; }
+  .cp-alpha { position: relative; height: var(--icon-sm); border-radius: var(--radius-full); border: var(--border-w) solid var(--border); background-color: var(--surface-field); background-image: linear-gradient(to right, rgb(29 86 201 / 0), rgb(29 86 201 / 1)), linear-gradient(45deg, var(--neutral-soft) 25%, transparent 25%), linear-gradient(-45deg, var(--neutral-soft) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--neutral-soft) 75%), linear-gradient(-45deg, transparent 75%, var(--neutral-soft) 75%); background-size: 100% 100%, var(--space-8) var(--space-8), var(--space-8) var(--space-8), var(--space-8) var(--space-8), var(--space-8) var(--space-8); }
+  .cp-seg { display: inline-flex; gap: var(--space-2); background: var(--neutral-soft); border-radius: var(--radius-10); padding: var(--space-3); direction: ltr; align-self: flex-start; }
+  .cp-seg span { padding: 0 var(--space-8); height: var(--badge-h); display: inline-flex; align-items: center; border-radius: var(--radius-8); font-size: var(--fs-11); font-weight: 500; color: var(--text-muted); }
+  .cp-seg .is-on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
+  .cp-inputs { display: flex; gap: var(--space-4); direction: ltr; }
+  .cp-in { height: var(--field-h-compact); border: var(--border-w) solid var(--border-field); border-radius: var(--radius-6); background: var(--surface-field); padding: 0 var(--space-6); display: flex; align-items: center; font-size: var(--fs-11); font-variant-numeric: tabular-nums; box-sizing: border-box; }
+  .cp-swatches { display: flex; flex-wrap: wrap; gap: var(--space-4); border-top: var(--border-w) solid var(--border); padding-top: var(--space-6); }
+  .cp-sw { width: var(--badge-h); height: var(--badge-h); border-radius: var(--radius-6); border: var(--border-w) solid var(--border); box-sizing: border-box; }
+  .cp-sw-none { background-color: var(--surface-field); background-image: linear-gradient(to bottom right, transparent calc(50% - var(--border-w)), var(--danger-border) calc(50% - var(--border-w)), var(--danger-border) calc(50% + var(--border-w)), transparent calc(50% + var(--border-w))); }
+</style>
+</head>
+<body dir="rtl">
+<div class="cp-demo">
+  <div class="cp-col">
+    <div>
+      <div class="ds-label"><span>اللون الأساسي</span><span class="ds-req">*</span><span class="ds-hint" tabindex="-1">!</span></div>
+      <div class="ds-field ds-field-focus">
+        <span class="cp-swatch" style="background:var(--brand)"></span>
+        <span class="cp-val">#1D56C9</span>
+        <span class="cp-chev">▴</span>
+      </div>
+    </div>
+    <div class="cp-pop">
+      <div class="cp-plane">
+        <div class="cp-sv" dir="ltr"><span class="cp-knob" style="left:86%;top:21%"></span></div>
+        <div class="cp-hue"><span class="cp-hue-knob"></span></div>
+      </div>
+      <div class="cp-alpha" dir="ltr"><span class="cp-knob" style="left:100%;top:50%"></span></div>
+      <div class="cp-seg"><span class="is-on">HEX</span><span>RGB</span><span>HSL</span></div>
+      <div class="cp-inputs">
+        <div class="cp-in" style="flex:1">#1D56C9</div>
+        <div class="cp-in" style="width:var(--time-dd-w);justify-content:flex-end">100%</div>
+      </div>
+      <div class="cp-swatches">
+        <span class="cp-sw cp-sw-none"></span>
+        <span class="cp-sw" style="background:var(--brand);box-shadow:0 0 0 var(--border-w-strong) var(--brand)"></span>
+        <span class="cp-sw" style="background:var(--accent)"></span>
+        <span class="cp-sw" style="background:var(--brand-soft)"></span>
+        <span class="cp-sw" style="background:var(--text)"></span>
+        <span class="cp-sw" style="background:var(--text-muted)"></span>
+        <span class="cp-sw" style="background:var(--border)"></span>
+        <span class="cp-sw" style="background:var(--surface)"></span>
+      </div>
+    </div>
+  </div>
+  <div class="cp-col">
+    <div>
+      <div class="ds-label"><span>لون الخلفية</span><span class="ds-hint" tabindex="-1">!</span></div>
+      <div class="ds-field">
+        <span class="cp-swatch cp-sw-none"></span>
+        <span class="cp-val" style="color:var(--text-placeholder)">#RRGGBB</span>
+        <span class="cp-chev">▾</span>
+      </div>
+    </div>
+    <div>
+      <div class="ds-label"><span>قيمة غير صالحة</span><span class="ds-hint" tabindex="-1">!</span></div>
+      <div class="ds-field ds-field-error">
+        <span class="cp-swatch" style="background:var(--brand)"></span>
+        <span class="cp-val">#12345</span>
+        <span class="cp-chev">▾</span>
+      </div>
+      <div class="ds-msg">أدخل لونًا صالحًا</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

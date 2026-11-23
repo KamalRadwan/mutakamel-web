@@ -84,3 +84,21 @@ Three versions sharing one look: date, date + time, date range.
 - Presets: Maximum (from 01/01/2020 to today), Today, Yesterday, Today and yesterday, This month (to today), Last month, This year (to today), Last year, First quarter, Second quarter, Third quarter, Fourth quarter (of the current year, full quarter).
 - Default times: start 00:00, end 23:59. The system treats start as second 00 and end as second 59. Choosing a preset resets the times.
 - Week starts on Sunday. Use the two-month version by default and the one-month version in filters and modals.
+
+## Colour picker
+
+**"Every colour input in the product uses `ui-color-picker`. Never a raw hex text box, never `<input type=color>`."**
+
+Fixed-palette pickers (such as the card colour labels in `shared/ui/actions-menu` swatches and `rating-colour-field`) stay as they are: they choose a theme label, not a free colour.
+
+- **Trigger:** Same look and states as `ui-field` (`field-h` 24 high, `radius-8`, `surface-field` in every mode including view/read-only, `neutral-soft` when disabled, `danger-border` + `danger-halo` on error). Holds a 16 (`checkbox-size`, `radius-4`) colour swatch at the start (with a checkerboard behind it when opacity is below 100%, or a diagonal slash when empty), the LTR tabular-numeral hex value, and a 14 (`icon-sm`) chevron at the end. Every field keeps its label-line `"!"` hint (`tabindex="-1"`).
+- **Popover (B1):** Floating `surface` card (`z-dropdown`, `radius-12`, `border`, `p-8`, `shadow-popover`), 248 wide (`calc(var(--toast-w) - var(--space-12))`), anchored 4 (`space-4`) from the trigger. Flips above at the viewport edge and aligns to the inline start in both LTR and RTL.
+  - **Saturation/value square** (~200×140: `flex-1` by `calc(var(--time-list-max-h) + var(--space-4))`, `radius-8`) with a 12 (`switch-knob`) round `on-brand` knob.
+  - **Vertical hue bar** (`icon-sm` 14 wide, 140 high, `radius-6`) with a 6 (`org-band-h`) bar knob. Sits on the **right** in LTR and on the **left** in RTL.
+  - **Opacity slider** (`icon-sm` 14 high, `radius-full`) with a checkerboard track and a 12 (`switch-knob`) round knob. Hidden when `allowAlpha=false`.
+  - **Format row:** `ui-segmented` (`HEX · RGB · HSL`), compact `field-h-compact` (22) LTR tabular-numeral channel input(s), and a 44 (`time-dd-w`) opacity `%` input (hidden when `allowAlpha=false`).
+  - **Palette row:** 20 (`badge-h`, `radius-6`) swatch buttons from `swatches`, defaulting to the active theme's brand and neutral tokens resolved to uppercase hex. When `nullable=true`, starts with a "No colour" slash swatch that sets `null`.
+  - **Footer:** None.
+- **Behaviour:** Changes apply live as the user drags or types. `Escape` reverts to the value from when the popover opened and returns focus to the trigger; clicking outside closes the popover and commits. Invalid typed text shows the field error and keeps the last valid value.
+- **Keyboard & accessibility:** Clicking the trigger or pressing `Enter` / `Space` / `ArrowDown` opens the popover. Arrow keys move the SV knob (`Shift` = ×10), `ArrowUp` / `ArrowDown` move the hue bar (`Shift` = ×10), and `ArrowLeft` / `ArrowRight` move the opacity slider (`Shift` = ×10). Tab order: `square → hue → opacity → format → inputs → swatches`. All sliders expose `role="slider"` with `aria-valuetext`, paired with a polite `aria-live` announcement.
+- **Value format & `allowAlpha`:** Integrates with Angular Signal Forms `[formField]` (`FormValueControl`). Emits uppercase `#RRGGBB` when opaque, `#RRGGBBAA` when opacity < 100% and `allowAlpha` is `true`, or `null` when cleared via `nullable`. Accepts `#RGB`, `#RRGGBB`, `#RRGGBBAA`, `rgb()/rgba()`, and `hsl()/hsla()` on paste and normalises them to uppercase hex. Use `allowAlpha=false` whenever the backend schema or CSS target stores opaque 6-digit `#RRGGBB` only (for example CRM tag colours).

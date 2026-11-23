@@ -5,6 +5,7 @@ import { tablerAlertTriangle, tablerCheck, tablerTag } from '@ng-icons/tabler-ic
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
+import { ColorPicker } from '../../../../../shared/ui/color-picker/color-picker';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
@@ -29,7 +30,7 @@ function normalizePrefixedHex(raw: string): string | null {
 
 @Component({
   selector: 'app-tag-modal',
-  imports: [NgIcon, TranslocoPipe, Button, ConfirmDialog, Field, Modal],
+  imports: [NgIcon, TranslocoPipe, Button, ColorPicker, ConfirmDialog, Field, Modal],
   providers: [provideIcons({ tablerTag, tablerCheck, tablerAlertTriangle })],
   templateUrl: './tag-modal.html',
 })
@@ -206,10 +207,20 @@ export class TagModal {
     this.colorServerError.set(null);
   }
 
-  protected onHexInput(field: 'bg' | 'text', event: Event): void {
+  protected onColorPicked(field: 'bg' | 'text', value: string | null): void {
     if (!this.canWrite()) return;
-    const inputEl = event.target as HTMLInputElement;
-    const upper = inputEl.value.toUpperCase();
+    const upper = (value ?? '').toUpperCase();
+    this.colorServerError.set(null);
+    if (field === 'bg') {
+      this.customBg.set(upper);
+    } else {
+      this.customText.set(upper);
+    }
+  }
+
+  protected onColorRawInput(field: 'bg' | 'text', raw: string): void {
+    if (!this.canWrite()) return;
+    const upper = raw.toUpperCase();
     this.colorServerError.set(null);
     if (field === 'bg') {
       this.customBg.set(upper);

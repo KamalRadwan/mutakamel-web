@@ -1,0 +1,383 @@
+<div
+  #triggerBox
+  data-color-trigger
+  [class]="triggerBoxClasses()"
+  (click)="onTriggerBoxClick($event)"
+>
+  <!-- Approved data exception: colour swatch displays the user-selected colour value inline. -->
+  <span
+    data-trigger-swatch
+    class="relative size-checkbox-size shrink-0 overflow-hidden rounded-4 border border-border"
+    [class.cp-checkerboard]="showSwatchCheckerboard()"
+    [class.cp-no-color-slash]="!hasActiveColor()"
+    aria-hidden="true"
+  >
+    @if (hasActiveColor()) {
+      <span class="absolute inset-0" [style.background-color]="swatchCssColor()"></span>
+    }
+  </span>
+
+  <input
+    #triggerInput
+    type="text"
+    dir="ltr"
+    autocomplete="off"
+    spellcheck="false"
+    class="h-full min-w-0 flex-1 bg-transparent text-start text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed disabled:text-text-placeholder"
+    [attr.id]="id() || null"
+    [attr.aria-label]="ariaLabel() || null"
+    [attr.aria-invalid]="hasErrorState() ? 'true' : null"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? popoverId : null"
+    [placeholder]="placeholder()"
+    [value]="triggerText()"
+    [disabled]="disabled()"
+    [readOnly]="readonly()"
+    (focus)="onTriggerFocus()"
+    (keydown)="onTriggerKeydown($event)"
+    (input)="onTriggerInput($event)"
+    (paste)="onPaste($event)"
+  />
+
+  @if (!readonly()) {
+    <span
+      data-chevron-btn
+      class="inline-flex shrink-0 items-center text-text-muted transition-transform duration-fast"
+      [class.rotate-180]="open()"
+      aria-hidden="true"
+    >
+      <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
+    </span>
+  }
+</div>
+
+@if (showInlineError()) {
+  <p
+    [id]="inlineErrorId"
+    data-color-error
+    role="alert"
+    class="mt-2 flex items-center gap-3 text-11 leading-16 text-danger-text"
+  >
+    <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+    <span>{{ invalidMessage() }}</span>
+  </p>
+}
+
+<span class="sr-only" aria-live="polite" data-live-label>{{ liveAnnouncement() }}</span>
+
+@if (open()) {
+  <div
+    #popover
+    [id]="popoverId"
+    role="dialog"
+    data-color-popover
+    [attr.aria-label]="dialogLabel()"
+    [attr.data-hue-side]="rtlLayout() ? 'left' : 'right'"
+    class="cp-popover fixed z-dropdown flex flex-col gap-8 rounded-12 border border-border bg-surface p-8 shadow-popover"
+    [style.top.px]="place().top"
+    [style.inset-inline-start.px]="place().start"
+    (keydown)="onPopoverKeydown($event)"
+  >
+    <div data-picker-plane class="flex items-stretch gap-8">
+      <!-- Approved data exception: saturation/value plane base hue comes from live picker state. -->
+      <div
+        #svSquare
+        role="slider"
+        tabindex="0"
+        dir="ltr"
+        data-sv-square
+        class="cp-sv-plane relative min-w-0 flex-1 cursor-crosshair select-none rounded-8 border border-border outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [style.background-color]="huePureCss()"
+        [attr.aria-label]="svAreaLabel()"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        [attr.aria-valuenow]="roundedS()"
+        [attr.aria-valuetext]="svValueText()"
+        (pointerdown)="onSvPointerDown($event)"
+        (pointermove)="onSvPointerMove($event)"
+        (pointerup)="onSvPointerUp($event)"
+        (lostpointercapture)="onSvPointerUp($event)"
+        (keydown)="onSvKeydown($event)"
+      >
+        <span
+          data-sv-knob
+          class="cp-knob-shadow pointer-events-none absolute size-switch-knob -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-on-brand"
+          [style.left.%]="svKnobLeftPercent()"
+          [style.top.%]="svKnobTopPercent()"
+          aria-hidden="true"
+        ></span>
+      </div>
+
+      <div
+        #hueBar
+        role="slider"
+        aria-orientation="vertical"
+        tabindex="0"
+        data-hue-bar
+        [attr.data-side]="rtlLayout() ? 'left' : 'right'"
+        class="cp-hue-bar relative shrink-0 cursor-pointer select-none rounded-6 border border-border outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="hueLabel()"
+        aria-valuemin="0"
+        aria-valuemax="360"
+        [attr.aria-valuenow]="roundedH()"
+        [attr.aria-valuetext]="hueValueText()"
+        (pointerdown)="onHuePointerDown($event)"
+        (pointermove)="onHuePointerMove($event)"
+        (pointerup)="onHuePointerUp($event)"
+        (lostpointercapture)="onHuePointerUp($event)"
+        (keydown)="onHueKeydown($event)"
+      >
+        <span
+          data-hue-knob
+          class="cp-knob-shadow pointer-events-none absolute inset-x-0 h-org-band -translate-y-1/2 rounded-2 border-2 border-on-brand"
+          [style.top.%]="hueKnobTopPercent()"
+          aria-hidden="true"
+        ></span>
+      </div>
+    </div>
+
+    @if (allowAlpha()) {
+      <div
+        #alphaBar
+        role="slider"
+        tabindex="0"
+        dir="ltr"
+        data-alpha-bar
+        class="cp-alpha-bar cp-checkerboard relative w-full cursor-pointer select-none rounded-full border border-border outline-none focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+        [attr.aria-label]="opacityLabel()"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        [attr.aria-valuenow]="roundedA()"
+        [attr.aria-valuetext]="opacityValueText()"
+        (pointerdown)="onAlphaPointerDown($event)"
+        (pointermove)="onAlphaPointerMove($event)"
+        (pointerup)="onAlphaPointerUp($event)"
+        (lostpointercapture)="onAlphaPointerUp($event)"
+        (keydown)="onAlphaKeydown($event)"
+      >
+        <!-- Approved data exception: opacity gradient reflects the active colour RGB channels. -->
+        <span
+          class="pointer-events-none absolute inset-0 rounded-full"
+          [style.background]="alphaTrackGradient()"
+          aria-hidden="true"
+        ></span>
+        <span
+          data-alpha-knob
+          class="cp-knob-shadow pointer-events-none absolute top-1/2 size-switch-knob -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-on-brand"
+          [style.left.%]="alphaKnobLeftPercent()"
+          aria-hidden="true"
+        ></span>
+      </div>
+    }
+
+    <div class="flex flex-col gap-6">
+      <ui-segmented
+        data-format-toggle
+        [label]="formatLabel()"
+        [options]="formatOptions"
+        [value]="format()"
+        (valueChange)="onFormatChange($event)"
+      />
+
+      <div dir="ltr" class="flex items-center gap-4" data-format-inputs>
+        @switch (format()) {
+          @case ('hex') {
+            <input
+              type="text"
+              data-hex-input
+              autocomplete="off"
+              spellcheck="false"
+              [placeholder]="placeholder()"
+              [attr.aria-label]="hexInputLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-11 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="hexDraft()"
+              (input)="onHexDraftInput($event)"
+              (paste)="onPaste($event)"
+            />
+          }
+          @case ('rgb') {
+            <input
+              type="text"
+              inputmode="numeric"
+              data-rgb-r
+              placeholder="R"
+              [attr.aria-label]="redLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-center text-11 tabular-nums text-text outline-none"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="rDraft()"
+              (input)="onRgbChannelInput('r', $event)"
+            />
+            <input
+              type="text"
+              inputmode="numeric"
+              data-rgb-g
+              placeholder="G"
+              [attr.aria-label]="greenLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-center text-11 tabular-nums text-text outline-none"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="gDraft()"
+              (input)="onRgbChannelInput('g', $event)"
+            />
+            <input
+              type="text"
+              inputmode="numeric"
+              data-rgb-b
+              placeholder="B"
+              [attr.aria-label]="blueLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-center text-11 tabular-nums text-text outline-none"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="bDraft()"
+              (input)="onRgbChannelInput('b', $event)"
+            />
+          }
+          @case ('hsl') {
+            <input
+              type="text"
+              inputmode="numeric"
+              data-hsl-h
+              placeholder="H"
+              [attr.aria-label]="hueLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-center text-11 tabular-nums text-text outline-none"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="hDraft()"
+              (input)="onHslChannelInput('h', $event)"
+            />
+            <input
+              type="text"
+              inputmode="numeric"
+              data-hsl-s
+              placeholder="S"
+              [attr.aria-label]="saturationLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-center text-11 tabular-nums text-text outline-none"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="sDraft()"
+              (input)="onHslChannelInput('s', $event)"
+            />
+            <input
+              type="text"
+              inputmode="numeric"
+              data-hsl-l
+              placeholder="L"
+              [attr.aria-label]="lightnessLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="h-field-h-compact min-w-0 flex-1 rounded-6 border bg-surface-field px-6 text-center text-11 tabular-nums text-text outline-none"
+              [class]="
+                parseError()
+                  ? 'border-danger-border ring-2 ring-danger-halo'
+                  : 'border-border-field focus:border-focus-ring focus:ring-2 focus:ring-focus-halo'
+              "
+              [value]="lDraft()"
+              (input)="onHslChannelInput('l', $event)"
+            />
+          }
+        }
+
+        @if (allowAlpha()) {
+          <div
+            class="flex h-field-h-compact w-time-dd shrink-0 items-center rounded-6 border bg-surface-field px-4 text-11 text-text"
+            [class]="
+              parseError()
+                ? 'border-danger-border ring-2 ring-danger-halo'
+                : 'border-border-field focus-within:border-focus-ring focus-within:ring-2 focus-within:ring-focus-halo'
+            "
+          >
+            <input
+              type="text"
+              inputmode="numeric"
+              data-alpha-input
+              [attr.aria-label]="opacityLabel()"
+              [attr.aria-invalid]="parseError() ? 'true' : null"
+              class="min-w-0 flex-1 bg-transparent text-end text-11 tabular-nums text-text outline-none"
+              [value]="alphaDraft()"
+              (input)="onAlphaDraftInput($event)"
+            />
+            <span class="ps-2 text-11 text-text-muted" aria-hidden="true">%</span>
+          </div>
+        }
+      </div>
+
+      @if (parseError()) {
+        <p
+          data-popover-error
+          role="alert"
+          class="flex items-center gap-3 text-11 leading-16 text-danger-text"
+        >
+          <ng-icon name="tablerCircleX" size="11" aria-hidden="true" />
+          <span>{{ invalidMessage() }}</span>
+        </p>
+      }
+    </div>
+
+    @if (nullable() || resolvedSwatches().length > 0) {
+      <div
+        role="group"
+        data-swatches-row
+        [attr.aria-label]="swatchesLabel()"
+        class="flex flex-wrap items-center gap-4 border-t border-border pt-6"
+      >
+        @if (nullable()) {
+          <button
+            type="button"
+            data-no-color
+            class="cp-no-color-slash inline-flex size-badge shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class.ring-2]="!hasActiveColor()"
+            [class.ring-brand]="!hasActiveColor()"
+            [attr.aria-label]="noColorLabel()"
+            [attr.aria-pressed]="!hasActiveColor()"
+            [title]="noColorLabel()"
+            (click)="selectNoColor()"
+          ></button>
+        }
+
+        @for (swatch of resolvedSwatches(); track swatch) {
+          <!-- Approved data exception: palette swatch background comes from resolved palette hex data. -->
+          <button
+            type="button"
+            data-swatch
+            [attr.data-swatch-hex]="swatch"
+            class="inline-flex size-badge shrink-0 cursor-pointer items-center justify-center rounded-6 border border-border outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
+            [class.ring-2]="normalizedHex() === swatch"
+            [class.ring-brand]="normalizedHex() === swatch"
+            [style.background-color]="swatch"
+            [attr.aria-label]="swatch"
+            [attr.aria-pressed]="normalizedHex() === swatch"
+            [title]="swatch"
+            (click)="selectSwatch(swatch)"
+          ></button>
+        }
+      </div>
+    }
+  </div>
+}

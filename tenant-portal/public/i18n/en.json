@@ -305,5 +305,24 @@
       "title": "All sessions ended",
       "text": "Sign in again to continue."
     }
+  },
+  "colorPicker": {
+    "dialog": "Colour picker",
+    "svArea": "Saturation and brightness",
+    "svValueText": "Saturation {{s}}%, brightness {{v}}%",
+    "hue": "Hue",
+    "hueValueText": "{{h}} degrees",
+    "opacity": "Opacity",
+    "opacityValueText": "{{a}}%",
+    "format": "Colour format",
+    "hex": "Hex colour",
+    "red": "Red",
+    "green": "Green",
+    "blue": "Blue",
+    "saturation": "Saturation",
+    "lightness": "Lightness",
+    "swatches": "Preset colours",
+    "noColor": "No colour",
+    "invalid": "Enter a valid colour"
   }
 }

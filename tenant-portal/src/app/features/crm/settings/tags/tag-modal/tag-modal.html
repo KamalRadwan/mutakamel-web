@@ -178,64 +178,52 @@
     @if (colorMode() === 'custom') {
       <div class="col-span-1">
         <ui-field
+          size="bare"
           [label]="'tags.color.background' | transloco"
           [for]="uid + '-bg'"
           [hint]="'tags.color.backgroundHint' | transloco"
           [required]="true"
           [error]="hexError('bg')"
         >
-          <!-- Approved data exception: tag colour preview comes from user-entered hex data, bound inline. -->
-          <span
-            class="size-16 shrink-0 rounded-4 border border-border"
-            [style.background-color]="validCustomBg() ?? 'transparent'"
-            aria-hidden="true"
-          ></span>
-          <input
+          <ui-color-picker
             [id]="uid + '-bg'"
-            type="text"
-            dir="ltr"
-            maxlength="7"
             placeholder="#RRGGBB"
-            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [ariaLabel]="'tags.color.background' | transloco"
+            [describedBy]="uid + '-bg-hint' + (hexError('bg') ? ' ' + uid + '-bg-error' : '')"
+            [allowAlpha]="false"
+            [readonly]="!canWrite()"
+            [invalid]="!!hexError('bg')"
+            [suppressInlineError]="true"
             [value]="customBg()"
-            [readOnly]="!canWrite()"
-            [attr.aria-readonly]="!canWrite() ? 'true' : null"
-            [attr.aria-invalid]="hexError('bg') ? 'true' : null"
-            [attr.aria-describedby]="uid + '-bg-hint' + (hexError('bg') ? ' ' + uid + '-bg-error' : '')"
-            (input)="onHexInput('bg', $event)"
-            (blur)="onHexBlur('bg')"
+            (valueChange)="onColorPicked('bg', $event)"
+            (rawValueChange)="onColorRawInput('bg', $event)"
+            (touch)="onHexBlur('bg')"
           />
         </ui-field>
       </div>
 
       <div class="col-span-1">
         <ui-field
+          size="bare"
           [label]="'tags.color.text' | transloco"
           [for]="uid + '-text'"
           [hint]="'tags.color.textHint' | transloco"
           [required]="true"
           [error]="hexError('text')"
         >
-          <!-- Approved data exception: tag colour preview comes from user-entered hex data, bound inline. -->
-          <span
-            class="size-16 shrink-0 rounded-4 border border-border"
-            [style.background-color]="validCustomText() ?? 'transparent'"
-            aria-hidden="true"
-          ></span>
-          <input
+          <ui-color-picker
             [id]="uid + '-text'"
-            type="text"
-            dir="ltr"
-            maxlength="7"
             placeholder="#RRGGBB"
-            class="w-full bg-transparent text-12 tabular-nums text-text outline-none placeholder:text-text-placeholder"
+            [ariaLabel]="'tags.color.text' | transloco"
+            [describedBy]="uid + '-text-hint' + (hexError('text') ? ' ' + uid + '-text-error' : '')"
+            [allowAlpha]="false"
+            [readonly]="!canWrite()"
+            [invalid]="!!hexError('text')"
+            [suppressInlineError]="true"
             [value]="customText()"
-            [readOnly]="!canWrite()"
-            [attr.aria-readonly]="!canWrite() ? 'true' : null"
-            [attr.aria-invalid]="hexError('text') ? 'true' : null"
-            [attr.aria-describedby]="uid + '-text-hint' + (hexError('text') ? ' ' + uid + '-text-error' : '')"
-            (input)="onHexInput('text', $event)"
-            (blur)="onHexBlur('text')"
+            (valueChange)="onColorPicked('text', $event)"
+            (rawValueChange)="onColorRawInput('text', $event)"
+            (touch)="onHexBlur('text')"
           />
         </ui-field>
       </div>
