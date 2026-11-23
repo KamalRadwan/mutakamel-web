@@ -2,6 +2,8 @@ import { Component, computed, inject, output, signal, viewChild } from '@angular
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerArrowsExchange, tablerCopy } from '@ng-icons/tabler-icons';
+import { ApiError, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -9,12 +11,12 @@ import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/drop
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import {
-  DuplicateTemplateDto,
-  TemplateConvertibleLayoutMode,
-  TemplateDefinitionDetail,
-  TemplateDefinitionScope,
-  TemplateDraftDto,
-  duplicateTemplate,
+  TemplatesApi,
+  type DuplicateTemplateDto,
+  type TemplateConvertibleLayoutMode,
+  type TemplateDefinitionDetail,
+  type TemplateDefinitionScope,
+  type TemplateDraftDto,
 } from '../../templates.api';
 import { TemplatePageService, errorDetailsOf } from '../template-page.service';
 
@@ -39,10 +41,13 @@ export class TemplateDuplicateModal {
 
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
+  private readonly templatesApi = inject(TemplatesApi);
   protected readonly language = inject(LanguageState).current;
   protected readonly service = inject(TemplatePageService);
 
   private readonly modal = viewChild.required<Modal>('modal');
+
+  private pendingAttempt: { intent: string; key: string } | null = null;
 
   readonly created = output<string>();
 
@@ -135,6 +140,7 @@ export class TemplateDuplicateModal {
 
     this.codeError.set(null);
     this.nameError.set(null);
+    this.pendingAttempt = null;
     this.modal().open();
   }
 
@@ -199,27 +205,50 @@ export class TemplateDuplicateModal {
       source,
       code: normalizedCode,
       name: trimmedName,
-      description: trimmedDesc || null,
+      ...(trimmedDesc ? { description: trimmedDesc } : {}),
       scope,
       copyAssignments: false,
       ...(this.convertMode() ? { conversion: { layoutMode: this.targetLayout() } } : {}),
     };
 
+    const intent = JSON.stringify([def.templateId, body]);
+    if (this.pendingAttempt?.intent !== intent) {
+      this.pendingAttempt = { intent, key: newIdempotencyKey() };
+    }
+    const key = this.pendingAttempt.key;
+
     this.submitting.set(true);
     try {
-      const created = await duplicateTemplate(def.templateId, body);
+      const res = await this.templatesApi.duplicateTemplate(def.templateId, body, key);
+      this.pendingAttempt = null;
+      const createdDef = res.etag ? { ...res.data.definition, etag: res.etag } : res.data.definition;
       this.modal().close();
       this.notify.success(this.transloco.translate('templatesPage.duplicateModal.createdToast'));
-      this.created.emit(created.definition.templateId);
+      this.created.emit(createdDef.templateId);
     } catch (error) {
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.pendingAttempt = null;
+      }
       const { status, code } = errorDetailsOf(error);
       if (status === 409 && code === 'CORE.TEMPLATE.CODE.CONFLICT') {
         this.codeError.set(this.transloco.translate('templates.errors.CORE.TEMPLATE.CODE.CONFLICT'));
       } else {
-        this.notify.error(this.service.translateError(this.transloco, error));
+        this.notify.error(this.translateWriteError(error));
       }
     } finally {
       this.submitting.set(false);
     }
+  }
+
+  private translateWriteError(error: unknown): string {
+    const { code } = errorDetailsOf(error);
+    if (code) {
+      const pageKey = `templatesPage.errors.${code}`;
+      const pageTranslated = this.transloco.translate(pageKey);
+      if (pageTranslated && pageTranslated !== pageKey) {
+        return pageTranslated;
+      }
+    }
+    return writeErrorMessage(error, 'templates', this.transloco);
   }
 }

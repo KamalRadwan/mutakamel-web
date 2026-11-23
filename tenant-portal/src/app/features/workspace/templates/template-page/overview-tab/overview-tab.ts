@@ -10,6 +10,8 @@ import {
   tablerPhoto,
   tablerRefresh,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf, errorMessage, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -17,12 +19,10 @@ import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-d
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import {
-  TemplateDirection,
-  TemplateThumbnailQuery,
-  TemplateThumbnailRetryRequest,
-  getTemplate,
-  getTemplateThumbnail,
-  retryTemplateThumbnail,
+  TemplatesApi,
+  type TemplateDirection,
+  type TemplateThumbnailQuery,
+  type TemplateThumbnailRetryRequest,
 } from '../../templates.api';
 import { TemplatePageService } from '../template-page.service';
 
@@ -51,6 +51,7 @@ export class OverviewTab {
   private readonly injector = inject(Injector);
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
+  private readonly templatesApi = inject(TemplatesApi);
   protected readonly language = inject(LanguageState).current;
   protected readonly service = inject(TemplatePageService);
 
@@ -68,6 +69,8 @@ export class OverviewTab {
   private thumbObjectUrl: string | null = null;
   private thumbLoadSeq = 0;
   private thumbPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryAttempt: { intent: string; key: string } | null = null;
+  private destroyed = false;
 
   protected readonly directionOptions = computed<DropdownOption<TemplateDirection>[]>(() => {
     this.language();
@@ -155,8 +158,15 @@ export class OverviewTab {
       }
 
       const seq = ++this.thumbLoadSeq;
-      const query = this.buildThumbnailQuery();
-      if (!query) {
+      const downloadPath = def.thumbnail.downloadPath;
+      const query = downloadPath ? null : this.buildThumbnailQuery();
+      const load = downloadPath
+        ? this.templatesApi.getTemplateThumbnail(downloadPath)
+        : query
+          ? this.templatesApi.getTemplateThumbnail(def.templateId, query)
+          : null;
+
+      if (!load) {
         this.clearThumbUrl();
         this.thumbLoading.set(false);
         this.thumbLoadError.set(true);
@@ -166,22 +176,33 @@ export class OverviewTab {
       this.thumbLoading.set(true);
       this.thumbLoadError.set(false);
 
-      void getTemplateThumbnail(def.templateId, query)
+      void load
         .then((blob) => {
-          if (seq !== this.thumbLoadSeq) return;
+          if (this.destroyed || seq !== this.thumbLoadSeq) return;
           this.clearThumbUrl();
           const url = URL.createObjectURL(blob);
           this.thumbObjectUrl = url;
           this.thumbUrl.set(url);
           this.thumbLoadError.set(false);
         })
-        .catch(() => {
-          if (seq !== this.thumbLoadSeq) return;
+        .catch((error: unknown) => {
+          if (this.destroyed || seq !== this.thumbLoadSeq) return;
           this.clearThumbUrl();
+          if (errorCodeOf(error) === 'CORE.TEMPLATE.THUMBNAIL.NOT_READY') {
+            const latest = this.service.definition();
+            if (latest && latest.templateId === def.templateId) {
+              this.service.syncFromDefinition(
+                { ...latest, thumbnail: { state: 'PENDING', sourceChecksum: def.thumbnail.sourceChecksum } },
+                true,
+              );
+            }
+            this.thumbLoadError.set(false);
+            return;
+          }
           this.thumbLoadError.set(true);
         })
         .finally(() => {
-          if (seq === this.thumbLoadSeq) {
+          if (!this.destroyed && seq === this.thumbLoadSeq) {
             this.thumbLoading.set(false);
           }
         });
@@ -194,6 +215,7 @@ export class OverviewTab {
     });
 
     this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
       this.clearThumbUrl();
       this.clearThumbPoll();
     });
@@ -245,12 +267,17 @@ export class OverviewTab {
     if (!def || this.thumbLoading()) return;
     this.thumbLoading.set(true);
     try {
-      const fresh = await getTemplate(def.templateId);
+      const fresh = await this.templatesApi.getTemplate(def.templateId);
+      if (this.destroyed || this.service.definition()?.templateId !== def.templateId) return;
       this.service.syncFromDefinition(fresh, true);
     } catch (error) {
-      this.notify.error(this.service.translateError(this.transloco, error));
+      if (!this.destroyed && this.service.definition()?.templateId === def.templateId) {
+        this.notify.error(this.translateReadError(error));
+      }
     } finally {
-      this.thumbLoading.set(false);
+      if (!this.destroyed) {
+        this.thumbLoading.set(false);
+      }
     }
   }
 
@@ -260,11 +287,20 @@ export class OverviewTab {
     const body = this.buildRetryRequest();
     if (!body) return;
 
+    const intent = JSON.stringify([def.templateId, body]);
+    if (this.retryAttempt?.intent !== intent) {
+      this.retryAttempt = { intent, key: newIdempotencyKey() };
+    }
+    const key = this.retryAttempt.key;
+
     this.thumbRetrying.set(true);
     try {
       // 202 THUMBNAIL_ACCEPTED: the worker renders later, so the card shows PENDING
       // and the definition is re-read until the projection leaves PENDING.
-      const accepted = await retryTemplateThumbnail(def.templateId, body);
+      const result = await this.templatesApi.retryTemplateThumbnail(def.templateId, body, key);
+      this.retryAttempt = null;
+      if (this.destroyed || this.service.definition()?.templateId !== def.templateId) return;
+      const accepted = result.data;
       const latest = this.service.definition() ?? def;
       this.service.syncFromDefinition(
         { ...latest, thumbnail: { state: 'PENDING', sourceChecksum: accepted.sourceChecksum } },
@@ -273,23 +309,31 @@ export class OverviewTab {
       this.notify.success(this.transloco.translate('templatesPage.overview.thumbnailCard.retriedToast'));
       this.pollPendingThumbnail(def.templateId);
     } catch (error) {
-      this.notify.error(this.service.translateError(this.transloco, error));
+      if (!isRetryableWriteError(error) && !(error instanceof ApiError && error.status === 401)) {
+        this.retryAttempt = null;
+      }
+      if (!this.destroyed && this.service.definition()?.templateId === def.templateId) {
+        this.notify.error(this.translateWriteError(error));
+      }
     } finally {
-      this.thumbRetrying.set(false);
+      if (!this.destroyed) {
+        this.thumbRetrying.set(false);
+      }
     }
   }
 
   /** Re-reads the definition a bounded number of times while its thumbnail is PENDING. */
   private pollPendingThumbnail(templateId: string, attempt = 0): void {
     this.clearThumbPoll();
-    if (attempt >= OverviewTab.THUMB_POLL_MAX_ATTEMPTS) return;
+    if (this.destroyed || attempt >= OverviewTab.THUMB_POLL_MAX_ATTEMPTS) return;
     this.thumbPollTimer = setTimeout(async () => {
       this.thumbPollTimer = null;
+      if (this.destroyed) return;
       const current = this.service.definition();
       if (!current || current.templateId !== templateId || current.thumbnail.state !== 'PENDING') return;
       try {
-        const fresh = await getTemplate(templateId);
-        if (this.service.definition()?.templateId !== templateId) return;
+        const fresh = await this.templatesApi.getTemplate(templateId);
+        if (this.destroyed || this.service.definition()?.templateId !== templateId) return;
         this.service.syncFromDefinition(fresh, true);
         if (fresh.thumbnail.state === 'PENDING') this.pollPendingThumbnail(templateId, attempt + 1);
       } catch {
@@ -309,7 +353,7 @@ export class OverviewTab {
     const def = this.service.definition();
     if (!def) return null;
     const checksum = def.thumbnail.sourceChecksum;
-    if (def.capabilities.update.state === 'ENABLED' || !def.currentPublishedVersion) {
+    if ((def.capabilities.update.state === 'ENABLED' && !this.service.draftAccessForbidden()) || !def.currentPublishedVersion) {
       return {
         sourceKind: 'DRAFT',
         draftRevision: def.currentDraft.revision,
@@ -325,6 +369,30 @@ export class OverviewTab {
 
   private buildRetryRequest(): TemplateThumbnailRetryRequest | null {
     return this.buildThumbnailQuery();
+  }
+
+  private translateReadError(error: unknown): string {
+    const code = errorCodeOf(error);
+    if (code) {
+      const pageKey = `templatesPage.errors.${code}`;
+      const pageTranslated = this.transloco.translate(pageKey);
+      if (pageTranslated && pageTranslated !== pageKey) {
+        return pageTranslated;
+      }
+    }
+    return errorMessage(error, 'templates', this.transloco);
+  }
+
+  private translateWriteError(error: unknown): string {
+    const code = errorCodeOf(error);
+    if (code) {
+      const pageKey = `templatesPage.errors.${code}`;
+      const pageTranslated = this.transloco.translate(pageKey);
+      if (pageTranslated && pageTranslated !== pageKey) {
+        return pageTranslated;
+      }
+    }
+    return writeErrorMessage(error, 'templates', this.transloco);
   }
 
   private clearThumbUrl(): void {
