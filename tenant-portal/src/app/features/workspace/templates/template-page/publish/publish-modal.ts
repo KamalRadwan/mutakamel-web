@@ -7,7 +7,7 @@ import { LanguageState } from '../../../../../core/i18n/language';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { getValidationRun } from '../../templates.api';
+import { TemplatesApi } from '../../templates.api';
 import { TemplatePageService } from '../template-page.service';
 import { TextSegment, ValidationActions, splitIsolatedTokens } from './validation-actions';
 
@@ -29,6 +29,7 @@ export class PublishModal {
 
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly templatesApi = inject(TemplatesApi);
   protected readonly language = inject(LanguageState).current;
   protected readonly service = inject(TemplatePageService);
   protected readonly actions = inject(ValidationActions);
@@ -104,6 +105,7 @@ export class PublishModal {
   });
 
   open(): void {
+    const seq = ++this.warningFetchSeq;
     this.changeNote.set('');
     this.changeNoteError.set(null);
     this.fetchedRunWarnings.set(null);
@@ -115,11 +117,25 @@ export class PublishModal {
     const runId = draft?.validation.lastValidationRunId;
     const lastRun = this.actions.lastRun();
     if (def && draft && runId && (!lastRun || lastRun.validationRunId !== runId)) {
-      const seq = ++this.warningFetchSeq;
-      void getValidationRun(def.templateId, runId)
+      void this.templatesApi
+        .getValidationRun(def.templateId, runId)
         .then((run) => {
           if (seq !== this.warningFetchSeq) return;
-          if (run.draftRevision === draft.revision) {
+          const currentDef = this.service.definition();
+          const currentDraft = this.service.draft();
+          if (
+            currentDef?.templateId !== def.templateId ||
+            !currentDraft ||
+            currentDraft.revision !== draft.revision
+          ) {
+            return;
+          }
+          if (
+            run.templateId === def.templateId &&
+            run.validationRunId === runId &&
+            run.draftRevision === currentDraft.revision &&
+            Array.isArray(run.issues)
+          ) {
             this.fetchedRunWarnings.set(run.issues.filter((issue) => issue.severity !== 'ERROR').length);
           }
         })

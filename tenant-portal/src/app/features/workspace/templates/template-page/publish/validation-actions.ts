@@ -1,20 +1,17 @@
 import { Injectable, Signal, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
+import { ApiError, isRetryableWriteError, writeErrorMessage } from '../../../../../core/api/api-errors';
 import { Notify } from '../../../../../core/notify/notify';
 import {
-  PublishTemplateRequestDto,
-  PublishTemplateResponseDto,
-  TemplateDocumentV1,
-  TemplateRendererTarget,
-  TemplateValidationRunDto,
-  TemplateVersionRef,
-  getDraft,
-  getTemplate,
-  listVersions,
+  TemplatesApi,
   newTemplateIdempotencyKey,
-  publishTemplate,
-  validateDraft,
+  type PublishTemplateRequestDto,
+  type PublishTemplateResponseDto,
+  type TemplateDocumentV1,
+  type TemplateRendererTarget,
+  type TemplateValidationRunDto,
+  type TemplateVersionRef,
 } from '../../templates.api';
 import { TemplatePageService, errorDetailsOf } from '../template-page.service';
 
@@ -86,6 +83,7 @@ export class ValidationActions {
   private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly notify = inject(Notify);
+  private readonly templatesApi = inject(TemplatesApi);
   private readonly pageService = inject(TemplatePageService);
 
   private readonly _running = signal(false);
@@ -93,6 +91,7 @@ export class ValidationActions {
   private readonly _lastRun = signal<ValidationRun | null>(null);
   private readonly _lastPublishClosedModal = signal(false);
 
+  private pendingValidateIntent: { signature: string; idempotencyKey: string } | null = null;
   private pendingPublishIntent: { signature: string; idempotencyKey: string } | null = null;
   private lastTemplateId: string | undefined;
 
@@ -110,6 +109,7 @@ export class ValidationActions {
       const templateId = this.pageService.definition()?.templateId;
       if (templateId !== this.lastTemplateId) {
         this.lastTemplateId = templateId;
+        this.pendingValidateIntent = null;
         this.pendingPublishIntent = null;
         this._lastPublishClosedModal.set(false);
       }
@@ -140,7 +140,14 @@ export class ValidationActions {
     const draftRevision = revisionFromEtag(draft.etag, draft.revision);
     const rendererTargets: [TemplateRendererTarget, TemplateRendererTarget] =
       def.outputChannel === 'PRINT' ? ['HTML', 'PDF'] : ['EMAIL_HTML', 'EMAIL_TEXT'];
-    const idempotencyKey = newTemplateIdempotencyKey();
+    const validateSignature = `${def.templateId}|${draftRevision}|${draft.etag}|${rendererTargets.join(',')}`;
+    if (!this.pendingValidateIntent || this.pendingValidateIntent.signature !== validateSignature) {
+      this.pendingValidateIntent = {
+        signature: validateSignature,
+        idempotencyKey: newTemplateIdempotencyKey(),
+      };
+    }
+    const { idempotencyKey } = this.pendingValidateIntent;
 
     this._running.set(true);
     this.pageService.validating.set(true);
@@ -148,7 +155,7 @@ export class ValidationActions {
     try {
       let run: ValidationRun;
       try {
-        run = await validateDraft(
+        const writeResult = await this.templatesApi.validateDraft(
           def.templateId,
           {
             draftRevision,
@@ -157,7 +164,15 @@ export class ValidationActions {
           draft.etag,
           idempotencyKey,
         );
+        this.pendingValidateIntent = null;
+        run = writeResult.data;
       } catch (error) {
+        if (!this.shouldKeepWriteKey(error)) {
+          this.pendingValidateIntent = null;
+        }
+        if (this.pageService.definition()?.templateId !== def.templateId) {
+          return null;
+        }
         const { status, code, correlationId } = errorDetailsOf(error);
         if (status === 409 && (code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION' || code === 'STALE_REVISION')) {
           this.pageService.openConflict();
@@ -167,8 +182,12 @@ export class ValidationActions {
         ) {
           this.notify.error(this.transloco.translate('tplValidation.errors.targetUnsupported'));
         } else {
-          this.notify.error(this.pageService.translateError(this.transloco, error), this.supportRef(correlationId));
+          this.notify.error(this.translateWriteError(error), this.supportRef(correlationId));
         }
+        return null;
+      }
+
+      if (this.pageService.definition()?.templateId !== def.templateId) {
         return null;
       }
 
@@ -195,9 +214,12 @@ export class ValidationActions {
 
       try {
         const [freshDef, freshDraft] = await Promise.all([
-          getTemplate(def.templateId),
-          getDraft(def.templateId),
+          this.templatesApi.getTemplate(def.templateId),
+          this.templatesApi.getDraft(def.templateId),
         ]);
+        if (this.pageService.definition()?.templateId !== def.templateId) {
+          return run;
+        }
         this.pageService.syncFromDefinition(freshDef, this.pageService.overviewDirty());
         if (!this.pageService.dirty()) {
           this.pageService.syncExternalDraft(freshDraft);
@@ -205,11 +227,13 @@ export class ValidationActions {
           this.pageService.setDraft(freshDraft);
         }
       } catch (refreshError) {
-        const { correlationId } = errorDetailsOf(refreshError);
-        this.notify.warning(
-          this.transloco.translate('tplValidation.refreshFailed'),
-          this.supportRef(correlationId),
-        );
+        if (this.pageService.definition()?.templateId === def.templateId) {
+          const { correlationId } = errorDetailsOf(refreshError);
+          this.notify.warning(
+            this.transloco.translate('tplValidation.refreshFailed'),
+            this.supportRef(correlationId),
+          );
+        }
       }
 
       void this.router.navigate(['/workspace/operations/template-platform', def.templateId, 'validation']);
@@ -280,15 +304,21 @@ export class ValidationActions {
     this._publishing.set(true);
     try {
       let result: PublishResult;
+      let definitionEtag: string;
       try {
-        result = await publishTemplate(def.templateId, body, draft.etag, idempotencyKey);
+        const writeResult = await this.templatesApi.publishTemplate(def.templateId, body, draft.etag, idempotencyKey);
         this.pendingPublishIntent = null;
+        result = writeResult.data;
+        definitionEtag = writeResult.etag ?? result.definitionEtag;
       } catch (error) {
-        const { status, code, correlationId } = errorDetailsOf(error);
-        if (status !== null && status < 500) {
+        if (!this.shouldKeepWriteKey(error)) {
           this.pendingPublishIntent = null;
         }
+        if (this.pageService.definition()?.templateId !== def.templateId) {
+          return null;
+        }
 
+        const { status, code, correlationId } = errorDetailsOf(error);
         if (status === 409 && (code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION' || code === 'STALE_REVISION')) {
           this._lastPublishClosedModal.set(true);
           this.pageService.openConflict();
@@ -315,14 +345,25 @@ export class ValidationActions {
           );
         } else if (code === 'CORE.TEMPLATE.ASSET.NOT_READY' || code === 'ASSET.NOT_READY') {
           this.notify.error(this.transloco.translate('tplValidation.publish.assetNotReady'));
+        } else if (
+          code === 'CORE.TEMPLATE.ASSET.EMAIL_RENDITION_UNAVAILABLE' ||
+          code === 'ASSET.EMAIL_RENDITION_UNAVAILABLE'
+        ) {
+          this.notify.error(
+            this.transloco.translate('tplValidation.issues.CORE_TEMPLATE_ASSET_EMAIL_RENDITION_UNAVAILABLE'),
+          );
         } else if (code === 'CORE.TEMPLATE.DEFINITION.ARCHIVED' || code === 'DEFINITION.ARCHIVED') {
           this.notify.error(this.transloco.translate('tplValidation.publish.archived'));
         } else if (code === 'CORE.TEMPLATE.DEFINITION.SYSTEM_PROTECTED' || code === 'DEFINITION.SYSTEM_PROTECTED') {
           this.notify.error(this.transloco.translate('tplValidation.publish.system'));
         } else {
-          this.notify.error(this.pageService.translateError(this.transloco, error), this.supportRef(correlationId));
+          this.notify.error(this.translateWriteError(error), this.supportRef(correlationId));
         }
         return null;
+      }
+
+      if (this.pageService.definition()?.templateId !== def.templateId) {
+        return result;
       }
 
       // Apply authoritative ETags, revision, published version and STALE draft state immediately from the 201 response.
@@ -349,7 +390,7 @@ export class ValidationActions {
         {
           ...def,
           revision: result.definitionRevision,
-          etag: result.definitionEtag,
+          etag: definitionEtag,
           thumbnail: result.thumbnail,
           currentPublishedVersion: publishedRef,
           currentDraft: {
@@ -374,6 +415,8 @@ export class ValidationActions {
         validation: {
           ...draft.validation,
           state: 'STALE' as const,
+          lastValidationRunId: null,
+          validatedDraftRevision: null,
         },
       };
       if (!this.pageService.dirty()) {
@@ -393,10 +436,13 @@ export class ValidationActions {
 
       try {
         const [freshDef, freshDraft, freshVersions] = await Promise.all([
-          getTemplate(def.templateId),
-          getDraft(def.templateId),
-          listVersions(def.templateId, { limit: 25 }),
+          this.templatesApi.getTemplate(def.templateId),
+          this.templatesApi.getDraft(def.templateId),
+          this.templatesApi.listVersions(def.templateId, { limit: 25 }),
         ]);
+        if (this.pageService.definition()?.templateId !== def.templateId) {
+          return result;
+        }
         this.pageService.syncFromDefinition(freshDef, this.pageService.overviewDirty());
         if (!this.pageService.dirty()) {
           this.pageService.syncExternalDraft(freshDraft);
@@ -407,11 +453,13 @@ export class ValidationActions {
         this.pageService.versionsHasNext.set(freshVersions.pageInfo.hasNextPage);
         this.pageService.versionsNextCursor.set(freshVersions.pageInfo.nextCursor);
       } catch (refreshError) {
-        const { correlationId } = errorDetailsOf(refreshError);
-        this.notify.warning(
-          this.transloco.translate('tplValidation.refreshFailed'),
-          this.supportRef(correlationId),
-        );
+        if (this.pageService.definition()?.templateId === def.templateId) {
+          const { correlationId } = errorDetailsOf(refreshError);
+          this.notify.warning(
+            this.transloco.translate('tplValidation.refreshFailed'),
+            this.supportRef(correlationId),
+          );
+        }
       }
 
       return result;
@@ -425,6 +473,22 @@ export class ValidationActions {
     const run = this.lastRun() ?? this.pageService.lastValidationRun();
     if (!run || run.validationRunId !== validationRunId) return false;
     return run.issues.some((issue) => issue.code === 'TEMPLATE_EMAIL_SUBJECT_EMPTY' && issue.severity === 'ERROR');
+  }
+
+  private shouldKeepWriteKey(error: unknown): boolean {
+    return isRetryableWriteError(error) || (error instanceof ApiError && error.status === 401);
+  }
+
+  private translateWriteError(error: unknown): string {
+    const { code } = errorDetailsOf(error);
+    if (code) {
+      const pageKey = `templatesPage.errors.${code}`;
+      const pageTranslated = this.transloco.translate(pageKey);
+      if (pageTranslated && pageTranslated !== pageKey) {
+        return pageTranslated;
+      }
+    }
+    return writeErrorMessage(error, 'templates', this.transloco);
   }
 
   private supportRef(correlationId: string | null): string {

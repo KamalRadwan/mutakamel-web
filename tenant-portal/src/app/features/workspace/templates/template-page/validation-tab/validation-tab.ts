@@ -4,16 +4,17 @@ import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCircleCheck, tablerRefresh, tablerShieldCheck } from '@ng-icons/tabler-icons';
+import { ApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { templateValidationMeta } from '../../shared/template-family';
 import {
-  TemplateIssueSeverity,
-  TemplateValidationRunDto,
-  TemplateValidationState,
-  getValidationRun,
+  TemplatesApi,
+  type TemplateIssueSeverity,
+  type TemplateValidationRunDto,
+  type TemplateValidationState,
 } from '../../templates.api';
 import { TextSegment, ValidationActions, issueCatalogueKey, splitIsolatedTokens } from '../publish/validation-actions';
 import { TemplatePageService, errorDetailsOf } from '../template-page.service';
@@ -38,6 +39,35 @@ interface ValidationIssueRow {
 function issueNodeId(issue: { nodeId: string | null; jsonPointer: string }): string | null {
   if (issue.nodeId) return issue.nodeId;
   return nodeIdFromJsonPointer(issue.jsonPointer);
+}
+
+function isRetainedValidationRun(
+  value: unknown,
+  templateId: string,
+  runId: string,
+): value is TemplateValidationRunDto {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    row['validationRunId'] === runId &&
+    row['templateId'] === templateId &&
+    typeof row['draftRevision'] === 'number' &&
+    Number.isSafeInteger(row['draftRevision']) &&
+    row['draftRevision'] > 0 &&
+    (row['status'] === 'PASSED' || row['status'] === 'FAILED') &&
+    Array.isArray(row['issues']) &&
+    row['issues'].every((issue: unknown) => {
+      if (typeof issue !== 'object' || issue === null || Array.isArray(issue)) return false;
+      const entry = issue as Record<string, unknown>;
+      return (
+        (entry['severity'] === 'ERROR' || entry['severity'] === 'WARNING' || entry['severity'] === 'INFO') &&
+        typeof entry['code'] === 'string' &&
+        typeof entry['jsonPointer'] === 'string' &&
+        (entry['nodeId'] === null || typeof entry['nodeId'] === 'string')
+      );
+    }) &&
+    typeof row['completedAt'] === 'string'
+  );
 }
 
 const TOKEN_AT = '\u0000AT\u0000';
@@ -66,6 +96,7 @@ export class ValidationTab {
   private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly templatesApi = inject(TemplatesApi);
   protected readonly language = inject(LanguageState).current;
   protected readonly service = inject(TemplatePageService);
   protected readonly actions = inject(ValidationActions);
@@ -309,6 +340,8 @@ export class ValidationTab {
           !runId ||
           actionRun.draftRevision >= (draft.validation.validatedDraftRevision ?? 0))
       ) {
+        this.loadSeq++;
+        this.lastLoadedKey = null;
         this.loadingRun.set(false);
         this.loadError.set(false);
         this.loadCorrelationId.set(null);
@@ -379,11 +412,14 @@ export class ValidationTab {
     this.notFoundRunId.set(null);
 
     try {
-      const run = await getValidationRun(templateId, runId);
-      if (seq !== this.loadSeq) return;
+      const run = await this.templatesApi.getValidationRun(templateId, runId);
+      if (seq !== this.loadSeq || this.service.definition()?.templateId !== templateId) return;
+      if (!isRetainedValidationRun(run, templateId, runId)) {
+        throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+      }
       this.fetchedRun.set(run);
     } catch (error) {
-      if (seq !== this.loadSeq) return;
+      if (seq !== this.loadSeq || this.service.definition()?.templateId !== templateId) return;
       const { status, code, correlationId } = errorDetailsOf(error);
       if (status === 404 || code === 'CORE.TEMPLATE.NOT_FOUND') {
         this.fetchedRun.set(null);
