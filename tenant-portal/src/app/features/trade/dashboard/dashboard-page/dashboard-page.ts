@@ -1,8 +1,9 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, Injector, computed, effect, inject, runInInjectionContext, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { ActivatedRoute, ParamMap, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { ScopeState } from '../../../../core/scope/scope';
@@ -12,6 +13,7 @@ import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dial
 import { WidgetFrame } from '../../../../shared/ui/widget-frame/widget-frame';
 import { WidgetState } from '../../../../shared/ui/widget-state/widget-state';
 import type { GridItem } from '../../../../shared/widgets/dashboard/dashboard-grid/dashboard-grid';
+import { branchGrants } from '../../shared/trade-access';
 import { ApiError, errorCodeOf, errorKey, newIdempotencyKey, type TradeContext } from '../../shared/trade-api';
 import { DashboardCanvas, buildDashboardGridItems } from '../dashboard-canvas/dashboard-canvas';
 import { DashboardCreateModal } from '../dashboard-create-modal/dashboard-create-modal';
@@ -30,7 +32,6 @@ import {
 import { DashboardHeader, type DashboardHeaderAction } from '../dashboard-header/dashboard-header';
 import { DashboardShareModal } from '../dashboard-share-modal/dashboard-share-modal';
 import {
-  createFromTemplate,
   deleteDashboard,
   duplicateDashboard,
   getCatalog,
@@ -55,8 +56,6 @@ import type {
 } from '../trade-dashboard.model';
 import { fromGridItem, overlaps, snapItems } from '../trade-widget-adapter';
 import { WidgetLibraryModal } from '../widget-library-modal/widget-library-modal';
-
-const CAN_MANAGE = true; // later from the session permissions
 
 type PageLoadState = 'loading' | 'ready' | 'empty' | 'forbidden' | 'error';
 
@@ -169,6 +168,7 @@ function applyQueryFilters(
 export class TradeDashboardPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
   private readonly scope = inject(ScopeState);
   private readonly language = inject(LanguageState).current;
@@ -184,19 +184,43 @@ export class TradeDashboardPage {
   private readonly conflictConfirm = viewChild.required<ConfirmDialog>('conflictConfirm');
   private readonly unsavedDialog = viewChild.required(UnsavedDialog);
 
-  protected readonly canManage = CAN_MANAGE;
+  private hasScopeGrant(key: string): boolean {
+    const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+    return grants === 'ALL' || grants.has(this.scope.branch().id);
+  }
+
+  protected readonly canRead = computed(() =>
+    this.hasScopeGrant('trade.dashboards.read'),
+  );
+  protected readonly canCreate = computed(() =>
+    this.hasScopeGrant('trade.dashboards.create'),
+  );
+  protected readonly canUpdate = computed(() =>
+    this.hasScopeGrant('trade.dashboards.update'),
+  );
+  protected readonly canDelete = computed(() =>
+    this.hasScopeGrant('trade.dashboards.delete'),
+  );
+  protected readonly canShare = computed(() =>
+    this.hasScopeGrant('trade.dashboards.share'),
+  );
+  protected readonly canReadWidgets = computed(() =>
+    this.hasScopeGrant('trade.widgets.read'),
+  );
+  protected readonly forbiddenReason = signal<'permission' | 'subscription'>('permission');
   protected readonly maxPlacements = MAX_PLACEMENTS;
   protected readonly skeletonCards = [0, 1, 2, 3] as const;
   protected readonly skeletonCharts = [0, 1, 2, 3] as const;
 
-  protected readonly ctx = computed<TradeContext>(() => ({
-    companyId: this.scope.company().id,
-  }));
+  protected readonly ctx = computed<TradeContext>(() => {
+    const companyId = this.scope.company().id;
+    return companyId ? { companyId } : {};
+  });
 
-  private readonly pref = computed<PreferenceContext>(() => ({
-    kind: 'COMPANY',
-    companyId: this.scope.company().id,
-  }));
+  private readonly pref = computed<PreferenceContext>(() => {
+    const companyId = this.scope.company().id;
+    return companyId ? { kind: 'COMPANY', companyId } : { kind: 'CONSOLIDATED' };
+  });
 
   protected readonly pageState = signal<PageLoadState>('loading');
   protected readonly catalog = signal<Catalog | null>(null);
@@ -225,7 +249,7 @@ export class TradeDashboardPage {
   protected readonly canEdit = computed(() => {
     const d = this.detail();
     return Boolean(
-      CAN_MANAGE && d && (d.accessLevel === 'OWNER' || d.accessLevel === 'EDIT'),
+      this.canUpdate() && d && (d.accessLevel === 'OWNER' || d.accessLevel === 'EDIT'),
     );
   });
 
@@ -270,8 +294,20 @@ export class TradeDashboardPage {
     });
 
     effect(() => {
+      const allowed = this.canRead();
       const companyId = this.scope.company().id;
       untracked(() => {
+        if (!allowed) {
+          this.loadSeq++;
+          this.runSeq++;
+          this.detail.set(null);
+          this.runResult.set(null);
+          this.loadingIds.set(new Set());
+          this.gridItems.set([]);
+          this.editBaseline.set([]);
+          this.enterForbidden();
+          return;
+        }
         const isCompanySwitch = this.lastCompanyId !== null && this.lastCompanyId !== companyId;
         this.lastCompanyId = companyId;
         this.lastBranchId = this.scope.branch().id;
@@ -333,8 +369,8 @@ export class TradeDashboardPage {
   }
 
   protected openCreateFromEmpty(): void {
-    if (!CAN_MANAGE) return;
-    this.createModal().openCreate('blank');
+    if (!this.canCreate()) return;
+    this.createModal().openCreate('template');
   }
 
   protected async onSwitchDashboard(targetId: string): Promise<void> {
@@ -396,7 +432,7 @@ export class TradeDashboardPage {
 
   protected onOpenLibrary(): void {
     const d = this.detail();
-    if (!d || !this.editing() || this.editDirty()) return;
+    if (!d || !this.editing() || this.editDirty() || !this.canReadWidgets()) return;
     this.libraryModal().open(d);
   }
 
@@ -519,6 +555,10 @@ export class TradeDashboardPage {
       this.notify.success(this.transloco.translate('tradeDashboard.toast.layoutSaved'));
       return true;
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return false;
+      }
       if (errorCodeOf(err) === 'TRADE.DASHBOARD.REVISION_CONFLICT') {
         return await this.resolveLayoutConflict(d.id);
       }
@@ -568,6 +608,10 @@ export class TradeDashboardPage {
       }
       this.notify.success(this.transloco.translate('tradeDashboard.toast.widgetRemoved'));
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
     } finally {
       this.savingLayout.set(false);
@@ -599,6 +643,10 @@ export class TradeDashboardPage {
       this.selectedId.set(added.placementId);
       void this.runSingleWidget(fresh, added.widgetId);
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
     }
   }
@@ -612,32 +660,32 @@ export class TradeDashboardPage {
 
   protected async onHeaderAction(action: DashboardHeaderAction): Promise<void> {
     const d = this.detail();
-    if (!d || !CAN_MANAGE) return;
+    if (!d) return;
 
     switch (action) {
       case 'newBlank':
-        this.createModal().openCreate('blank');
+        if (this.canCreate()) this.createModal().openCreate('blank');
         break;
       case 'newTemplate':
-        this.createModal().openCreate('template');
+        if (this.canCreate()) this.createModal().openCreate('template');
         break;
       case 'editDetails':
         if (this.canEdit()) this.createModal().openEdit(d);
         break;
       case 'duplicate':
-        await this.handleDuplicate(d);
+        if (this.canCreate()) await this.handleDuplicate(d);
         break;
       case 'share':
-        if (this.isOwner()) this.shareModal().open(d);
+        if (this.isOwner() && this.canShare()) this.shareModal().open(d);
         break;
       case 'setDefault':
-        await this.handleSetDefault(d);
+        if (this.canRead()) await this.handleSetDefault(d);
         break;
       case 'toggleFavorite':
-        await this.handleToggleFavorite(d);
+        if (this.canRead()) await this.handleToggleFavorite(d);
         break;
       case 'delete':
-        if (this.isOwner()) await this.handleDelete(d);
+        if (this.isOwner() && this.canDelete()) await this.handleDelete(d);
         break;
     }
   }
@@ -667,14 +715,22 @@ export class TradeDashboardPage {
     void this.refreshNavigation();
   }
 
+  protected onModalForbidden(): void {
+    this.enterForbidden();
+  }
+
   private async loadForCompany(
     companyId: string,
     requestedId: string | null,
     useUrlFilters: boolean,
   ): Promise<void> {
+    if (!this.canRead()) {
+      this.enterForbidden();
+      return;
+    }
     const seq = ++this.loadSeq;
-    const ctx: TradeContext = { companyId };
-    const pref: PreferenceContext = { kind: 'COMPANY', companyId };
+    const ctx: TradeContext = companyId ? { companyId } : {};
+    const pref: PreferenceContext = companyId ? { kind: 'COMPANY', companyId } : { kind: 'CONSOLIDATED' };
 
     this.pageState.set('loading');
     this.exitEditState();
@@ -704,7 +760,7 @@ export class TradeDashboardPage {
         } catch (err) {
           if (seq !== this.loadSeq || this.destroyed) return;
           if (this.isForbiddenError(err)) {
-            this.pageState.set('forbidden');
+            this.enterForbidden(err);
             return;
           }
           if (err instanceof ApiError && err.status === 404) {
@@ -717,33 +773,7 @@ export class TradeDashboardPage {
       }
 
       if (!resolved) {
-        if (defResult.dashboard) {
-          resolved = defResult.dashboard;
-        } else if (catalog.templates.some((t) => t.key === 'TRADE_EXECUTIVE')) {
-          try {
-            const created = await createFromTemplate(
-              ctx,
-              'TRADE_EXECUTIVE',
-              { preferenceContext: pref },
-              newIdempotencyKey(),
-              this.language(),
-            );
-            if (seq !== this.loadSeq || this.destroyed) return;
-            resolved = created.dashboard;
-            void this.refreshNavigation();
-          } catch (err) {
-            if (seq !== this.loadSeq || this.destroyed) return;
-            if (this.isForbiddenError(err)) {
-              this.pageState.set('forbidden');
-              return;
-            }
-            if (errorCodeOf(err) === 'TRADE.DASHBOARD.METRIC_PERMISSION_REQUIRED') {
-              this.pageState.set('empty');
-              return;
-            }
-            throw err;
-          }
-        }
+        resolved = defResult.dashboard;
       }
 
       if (seq !== this.loadSeq || this.destroyed) return;
@@ -758,7 +788,7 @@ export class TradeDashboardPage {
     } catch (err) {
       if (seq !== this.loadSeq || this.destroyed) return;
       if (this.isForbiddenError(err)) {
-        this.pageState.set('forbidden');
+        this.enterForbidden(err);
         return;
       }
       this.pageState.set('error');
@@ -767,6 +797,10 @@ export class TradeDashboardPage {
   }
 
   private async loadExternalDashboard(requestedId: string | null): Promise<void> {
+    if (!this.canRead()) {
+      this.enterForbidden();
+      return;
+    }
     if (requestedId) {
       await this.openDashboardById(requestedId, true);
       return;
@@ -775,6 +809,10 @@ export class TradeDashboardPage {
   }
 
   private async openDashboardById(id: string, useUrlFilters: boolean): Promise<void> {
+    if (!this.canRead()) {
+      this.enterForbidden();
+      return;
+    }
     const seq = ++this.loadSeq;
     this.pageState.set('loading');
     this.exitEditState();
@@ -790,7 +828,7 @@ export class TradeDashboardPage {
     } catch (err) {
       if (seq !== this.loadSeq || this.destroyed) return;
       if (this.isForbiddenError(err)) {
-        this.pageState.set('forbidden');
+        this.enterForbidden(err);
         return;
       }
       this.pageState.set('error');
@@ -859,6 +897,10 @@ export class TradeDashboardPage {
     } catch (err) {
       if (seq !== this.runSeq || this.detail()?.id !== d.id || this.destroyed) return;
       this.loadingIds.set(new Set());
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       if (this.isSourcesUnavailableError(err)) {
         this.sourcesDown.set(true);
         this.notify.error(this.transloco.translate('tradeDashboard.toast.sourcesDown'));
@@ -922,6 +964,10 @@ export class TradeDashboardPage {
         next.delete(widgetId);
         return next;
       });
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       if (this.isSourcesUnavailableError(err)) {
         this.runResult.update((prev) => {
           if (!prev || !(widgetId in prev.widgets)) return prev;
@@ -974,6 +1020,10 @@ export class TradeDashboardPage {
       this.editHistory.set([]);
       return false;
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return false;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
       return false;
     }
@@ -1001,6 +1051,10 @@ export class TradeDashboardPage {
       this.activateDashboard(res.dashboard, this.catalog(), false);
       void this.runAll(res.dashboard, this.filterState());
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
     } finally {
       this.headerBusy.set(false);
@@ -1031,6 +1085,10 @@ export class TradeDashboardPage {
       );
       this.notify.success(this.transloco.translate('tradeDashboard.toast.defaultSet'));
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
     } finally {
       this.headerBusy.set(false);
@@ -1073,6 +1131,10 @@ export class TradeDashboardPage {
         ),
       );
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
     } finally {
       this.headerBusy.set(false);
@@ -1094,6 +1156,10 @@ export class TradeDashboardPage {
       this.updateUrlQuery({ d: null, ...FILTER_QUERY_CLEAR });
       await this.loadForCompany(this.scope.company().id, null, false);
     } catch (err) {
+      if (this.isForbiddenError(err)) {
+        this.enterForbidden(err);
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(err)));
     } finally {
       this.headerBusy.set(false);
@@ -1168,10 +1234,18 @@ export class TradeDashboardPage {
     }
   }
 
+  private enterForbidden(err?: unknown): void {
+    this.exitEditState();
+    this.forbiddenReason.set(
+      errorCodeOf(err) === 'TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED' ? 'subscription' : 'permission',
+    );
+    this.pageState.set('forbidden');
+  }
+
   private isForbiddenError(err: unknown): boolean {
     return (
       errorCodeOf(err) === 'TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED' ||
-      (err instanceof ApiError && err.status === 403)
+      ((err instanceof ApiError || err instanceof CoreApiError) && err.status === 403)
     );
   }
 

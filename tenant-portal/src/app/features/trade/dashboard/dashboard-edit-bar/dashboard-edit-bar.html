@@ -36,17 +36,19 @@
 
   <span class="min-w-0 flex-1" aria-hidden="true"></span>
 
-  <button
-    type="button"
-    uiButton
-    variant="secondary"
-    [disabled]="addDisabled()"
-    [attr.title]="addDisabledReason()"
-    (click)="addWidget.emit()"
-  >
-    <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
-    <span>{{ 'tradeDashboard.editBar.addWidget' | transloco }}</span>
-  </button>
+  @if (canAddWidget()) {
+    <button
+      type="button"
+      uiButton
+      variant="secondary"
+      [disabled]="addDisabled()"
+      [attr.title]="addDisabledReason()"
+      (click)="addWidget.emit()"
+    >
+      <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
+      <span>{{ 'tradeDashboard.editBar.addWidget' | transloco }}</span>
+    </button>
+  }
 
   @if (dirty()) {
     <span class="shrink-0 whitespace-nowrap text-12 leading-18 font-medium text-warning-text">

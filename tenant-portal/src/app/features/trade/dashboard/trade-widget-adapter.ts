@@ -183,8 +183,8 @@ function mapUnit(unit: MetricUnit | undefined): SeriesUnit {
   }
 }
 
-function toNumber(raw: number | string | null | undefined): number | null {
-  if (raw === null || raw === undefined) return null;
+function toNumber(raw: number | string | undefined): number | null {
+  if (raw === undefined) return null;
   if (typeof raw === 'number') {
     return Number.isFinite(raw) ? raw : null;
   }
@@ -351,7 +351,7 @@ function adaptScalar(
   const others: { companyId: string; currencyCode: string | null; value: string }[] = [];
   for (const other of otherCompanyPartitions) {
     const raw = other.scalar ?? other.series?.[0]?.points[0]?.value;
-    if (raw === undefined || raw === null) continue;
+    if (raw === undefined) continue;
     const text = String(raw).trim();
     if (!text) continue;
     others.push({

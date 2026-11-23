@@ -4,6 +4,7 @@ import { translationEvents } from '../../../../core/i18n/translation-events';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerLayoutDashboard } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { type ScopeCompany, ScopeState } from '../../../../core/scope/scope';
@@ -16,6 +17,13 @@ import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dial
 import { ApiError, type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
 import { createDashboard, createFromTemplate, updateDashboard } from '../trade-dashboard.api';
 import type { Catalog, CreateDashboardBody, DashboardDetail, TemplateKey } from '../trade-dashboard.model';
+
+function isForbiddenError(err: unknown): boolean {
+  return (
+    errorCodeOf(err) === 'TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED' ||
+    ((err instanceof ApiError || err instanceof CoreApiError) && err.status === 403)
+  );
+}
 
 type ModalMode = 'create' | 'edit';
 type CreateTab = 'blank' | 'template';
@@ -70,6 +78,7 @@ export class DashboardCreateModal {
   readonly catalog = input<Catalog | null>(null);
   readonly created = output<{ dashboard: DashboardDetail; existed: boolean }>();
   readonly updated = output<DashboardDetail>();
+  readonly forbidden = output<void>();
 
   private idempotencyKey = '';
   private confirmingUnsaved = false;
@@ -206,22 +215,26 @@ export class DashboardCreateModal {
     if (next !== 'blank' && next !== 'template') return;
     if (next === this.createTab()) return;
     this.createTab.set(next);
+    if (this.modalMode() === 'create') this.idempotencyKey = newIdempotencyKey();
     this.clearErrors();
   }
 
   protected onNameInput(value: string): void {
     this.name.set(value);
+    if (this.modalMode() === 'create') this.idempotencyKey = newIdempotencyKey();
     this.nameError.set(null);
   }
 
   protected onDescriptionInput(value: string): void {
     this.description.set(value);
+    if (this.modalMode() === 'create') this.idempotencyKey = newIdempotencyKey();
     this.descriptionError.set(null);
   }
 
   protected onScopeModeChange(next: string | null): void {
     if (next !== 'SINGLE' && next !== 'MULTI') return;
     this.scopeMode.set(next);
+    if (this.modalMode() === 'create') this.idempotencyKey = newIdempotencyKey();
     this.companiesError.set(null);
   }
 
@@ -235,11 +248,13 @@ export class DashboardCreateModal {
       }
       return next;
     });
+    if (this.modalMode() === 'create') this.idempotencyKey = newIdempotencyKey();
     this.companiesError.set(null);
   }
 
   protected selectTemplate(key: TemplateKey): void {
     this.chosenTemplateKey.set(key);
+    if (this.modalMode() === 'create') this.idempotencyKey = newIdempotencyKey();
     this.templateError.set(null);
   }
 
@@ -422,7 +437,15 @@ export class DashboardCreateModal {
   }
 
   private handleSubmitError(error: unknown): void {
+    if (isForbiddenError(error)) {
+      this.modal().close();
+      this.forbidden.emit();
+      return;
+    }
     const code = errorCodeOf(error);
+    if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+      this.idempotencyKey = newIdempotencyKey();
+    }
     if (code === 'TRADE.DASHBOARD.NAME_CONFLICT') {
       this.nameError.set(this.transloco.translate('tradeDashboardModals.create.nameConflict'));
       return;

@@ -44,7 +44,7 @@
     <ui-full-state
       kind="not-found"
       [title]="'tradeDashboard.page.emptyTitle' | transloco"
-      [actionLabel]="canManage ? ('tradeDashboard.page.createDashboard' | transloco) : ''"
+      [actionLabel]="canCreate() ? ('tradeDashboard.page.createDashboard' | transloco) : ''"
       (action)="openCreateFromEmpty()"
     />
   }
@@ -52,7 +52,12 @@
   @case ('forbidden') {
     <ui-full-state
       kind="forbidden"
-      [title]="'tradeDashboard.page.forbiddenTitle' | transloco"
+      [title]="
+        (forbiddenReason() === 'subscription'
+          ? 'tradeDashboard.page.forbiddenTitle'
+          : 'tradeDashboard.page.forbiddenPermissionTitle'
+        ) | transloco
+      "
     />
   }
 
@@ -73,8 +78,11 @@
         [navigationItems]="navigationItems()"
         [generatedAt]="runResult()?.generatedAt ?? null"
         [editing]="editing()"
-        [canManage]="canManage"
+        [canCreate]="canCreate()"
         [canEdit]="canEdit()"
+        [canShare]="canShare()"
+        [canDelete]="canDelete()"
+        [canPreference]="canRead()"
         [isOwner]="isOwner()"
         [busy]="headerBusy() || savingLayout()"
         (switchTo)="onSwitchDashboard($event)"
@@ -97,6 +105,7 @@
           [dirty]="editDirty()"
           [canUndo]="canUndo()"
           [saving]="savingLayout()"
+          [canAddWidget]="canReadWidgets()"
           [placementCount]="current.placements.length + current.unavailablePlacements.length"
           [maxPlacements]="maxPlacements"
           (addWidget)="onOpenLibrary()"
@@ -129,17 +138,20 @@
   [catalog]="catalog()"
   (created)="onDashboardCreated($event)"
   (updated)="onDashboardUpdated($event)"
+  (forbidden)="onModalForbidden()"
 />
 
 <app-trade-dashboard-share-modal
   [ctx]="ctx()"
   (revisionChange)="onShareRevisionChange($event)"
+  (forbidden)="onModalForbidden()"
 />
 
 <app-trade-widget-library-modal
   [ctx]="ctx()"
   [catalog]="catalog()"
   (added)="onWidgetAdded($event)"
+  (forbidden)="onModalForbidden()"
 />
 
 <ui-confirm-dialog

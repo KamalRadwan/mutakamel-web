@@ -29,13 +29,21 @@ import {
   tablerX,
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { Notify } from '../../../../core/notify/notify';
 import { Button } from '../../../../shared/ui/button/button';
 import { Field } from '../../../../shared/ui/field/field';
 import { Modal } from '../../../../shared/ui/modal/modal';
-import { type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
 import { addPlacement, listWidgets } from '../trade-dashboard.api';
 import { vizDefaultSize, type Catalog, type DashboardDetail, type Size, type TradeViz, type WidgetListItem } from '../trade-dashboard.model';
+
+function isForbiddenError(err: unknown): boolean {
+  return (
+    errorCodeOf(err) === 'TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED' ||
+    ((err instanceof ApiError || err instanceof CoreApiError) && err.status === 403)
+  );
+}
 
 const VIZ_ICON: Record<TradeViz, string> = {
   METRIC_CARD: 'tablerNumber',
@@ -116,6 +124,7 @@ export class WidgetLibraryModal {
   readonly ctx = input.required<TradeContext>();
   readonly catalog = input<Catalog | null>(null);
   readonly added = output<{ placementId: string; widgetId: string; dashboardRevision: number }>();
+  readonly forbidden = output<void>();
 
   protected readonly uid = `trade-widget-library-${++nextLibraryModalSeq}`;
   protected readonly dashboardName = signal('');
@@ -292,7 +301,15 @@ export class WidgetLibraryModal {
       this.modal().close();
     } catch (error) {
       if (seq !== this.loadSeq || dashboardId !== this.dashboardId) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       const code = errorCodeOf(error);
+      if (code === 'GW.IDEM.MISMATCH' || code === 'TRADE.IDEMPOTENCY.MISMATCH') {
+        this.idempotencyKeys.delete(sel.id);
+      }
       if (code === 'TRADE.DASHBOARD.LIMIT_EXCEEDED') {
         this.notify.error(this.transloco.translate('tradeDashboardModals.library.limitExceeded'));
       } else {
@@ -315,6 +332,11 @@ export class WidgetLibraryModal {
       this.allWidgets.set(list.items);
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       this.loadFailed.set(true);
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {

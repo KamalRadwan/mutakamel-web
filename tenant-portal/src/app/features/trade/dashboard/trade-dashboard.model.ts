@@ -226,7 +226,7 @@ export interface PreferenceRow {
 export interface Point {
   key: string;
   labelKey?: string;
-  value: number | string | null;
+  value: number | string;
   secondaryValue?: number | string;
   occurredAt?: string;
   start?: string;
@@ -359,7 +359,7 @@ export interface MetricDescriptor {
   key: string;
   version: number;
   labelKey: string;
-  descriptionKey: string;
+  descriptionKey?: string;
   shape: DataShape;
   unit: MetricUnit;
   supportedAggregations: Aggregation[];
@@ -468,18 +468,16 @@ export interface Share {
   updatedAt: string;
 }
 
-// Target contract (backend fix queued): name kept, nameI18n added.
 export interface ShareTarget {
   subjectType: 'USER' | 'TEAM';
   subjectId: string;
   name: string;
-  nameI18n: { en: string; ar: string };
+  nameI18n?: { en: string; ar: string };
   status: 'ACTIVE';
 }
 
-export function shareTargetName(target: Pick<ShareTarget, 'name' | 'nameI18n'>, lang: string): string {
-  const localized = lang.toLowerCase().startsWith('ar') ? target.nameI18n?.ar : target.nameI18n?.en;
-  return localized?.trim() || target.name;
+export function shareTargetName(target: Pick<ShareTarget, 'name' | 'nameI18n'>, _lang?: string): string {
+  return target.name;
 }
 
 export interface OffsetPagination {
@@ -510,4 +508,140 @@ export interface CreateDashboardBody {
   scopeCoverage: ScopeCoverage;
   scopeTargets: ScopeTargetRef[];
   defaultFilters?: DashboardFilters;
+}
+
+// DashboardPreferenceQueryDto (dto/dashboard.dto.ts:574).
+export interface PreferenceQuery {
+  kind?: PreferenceContext['kind'];
+  companyId?: string;
+}
+
+// DashboardListQueryDto (dto/dashboard.dto.ts:644): limit 1..100 (default 50), offset >= 0.
+export interface ListDashboardsQuery extends PreferenceQuery {
+  limit?: number;
+  offset?: number;
+}
+
+// accessibleDashboards row (dashboard-access.service.ts:53).
+export interface DashboardListRow extends NavItem {
+  description: string | null;
+  scopeCoverage: ScopeCoverage;
+  defaultFilters: DashboardFilters;
+  definitionSchemaVersion: number;
+  createdAt: string;
+  lastOpenedAt: string | null;
+}
+
+export interface ListDashboardsResponse {
+  items: DashboardListRow[];
+  pagination: OffsetPagination;
+}
+
+// CreateDashboardFromTemplateDto (dto/dashboard.dto.ts:303).
+export interface CreateFromTemplateBody {
+  name?: string;
+  description?: string;
+  defaultFilters?: DashboardFilters;
+  preferenceContext?: PreferenceContext;
+}
+
+export interface CreateFromTemplateResponse {
+  created: boolean;
+  replayed: boolean;
+  warnings: DashboardWarning[];
+  dashboard: DashboardDetail;
+}
+
+export interface CreateDashboardResponse {
+  created: true;
+  replayed: boolean;
+  dashboard: DashboardDetail;
+}
+
+// UpdateDashboardDto (dto/dashboard.dto.ts:330); null clears the description.
+export type UpdateDashboardBody = Partial<Omit<CreateDashboardBody, 'description'>> & {
+  description?: string | null;
+};
+
+export interface DuplicateDashboardBody {
+  name?: string;
+}
+
+export interface DuplicateDashboardResponse {
+  replayed: boolean;
+  duplication: {
+    omittedUnavailableWidgetCount: number;
+  };
+  dashboard: DashboardDetail;
+}
+
+// LayoutPlacementDto (dto/dashboard.dto.ts:463).
+export interface LayoutPlacementInput {
+  placementId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sortOrder: number;
+}
+
+// CreatePlacementDto (dto/dashboard.dto.ts:428).
+export interface AddPlacementBody {
+  widgetId: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  sortOrder?: number;
+}
+
+// addPlacement result (dashboard-widget.service.ts:695).
+export interface AddPlacementResponse {
+  id: string;
+  placementId: string;
+  widgetId: string;
+  dashboardRevision: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sortOrder: number;
+  replayed: boolean;
+}
+
+// ShareChangeDto (dto/dashboard.dto.ts:595).
+export interface ShareChangeInput {
+  subjectType: 'USER' | 'TEAM';
+  subjectId: string;
+  accessLevel: 'VIEW' | 'EDIT';
+  expiresAt?: string;
+}
+
+export interface UpsertSharesBody {
+  resourceRevision: number;
+  changes: ShareChangeInput[];
+}
+
+// bulkUpsert result row (dashboard-share.service.ts): no subject name or status.
+export interface ShareChangeResult {
+  shareId: string;
+  subjectType: 'USER' | 'TEAM';
+  subjectId: string;
+  accessLevel: 'VIEW' | 'EDIT';
+  expiresAt?: string;
+  revision: number;
+  changed: boolean;
+}
+
+export interface UpsertSharesResponse {
+  resourceRevision: number;
+  changes: ShareChangeResult[];
+  replayed: boolean;
+}
+
+// ShareTargetsQueryDto (dto/dashboard.dto.ts:623): limit 1..100 (default 50).
+export interface ListShareTargetsQuery {
+  search?: string;
+  limit?: number;
+  offset?: number;
 }

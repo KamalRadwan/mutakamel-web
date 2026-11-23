@@ -12,6 +12,7 @@ import {
   tablerX,
 } from '@ng-icons/tabler-icons';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { ApiError as CoreApiError } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { Notify } from '../../../../core/notify/notify';
 import { Badge } from '../../../../shared/ui/badge/badge';
@@ -23,10 +24,17 @@ import { Modal } from '../../../../shared/ui/modal/modal';
 import { SectionBar } from '../../../../shared/ui/section-bar/section-bar';
 import { Segmented, type SegmentedOption } from '../../../../shared/ui/segmented/segmented';
 import { UnsavedDialog } from '../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
+import { ApiError, type TradeContext, errorCodeOf, errorKey, newIdempotencyKey } from '../../shared/trade-api';
 import { formatDate } from '../../shared/trade-format';
 import { getDashboard, listShareTargets, listShares, revokeShare, upsertShares } from '../trade-dashboard.api';
 import { shareTargetName, type DashboardDetail, type Share, type ShareTarget } from '../trade-dashboard.model';
+
+function isForbiddenError(err: unknown): boolean {
+  return (
+    errorCodeOf(err) === 'TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED' ||
+    ((err instanceof ApiError || err instanceof CoreApiError) && err.status === 403)
+  );
+}
 
 interface PendingShareRow {
   key: string;
@@ -111,6 +119,7 @@ export class DashboardShareModal {
 
   readonly ctx = input.required<TradeContext>();
   readonly revisionChange = output<number>();
+  readonly forbidden = output<void>();
 
   protected readonly uid = `trade-dash-share-${++nextShareModalSeq}`;
   protected readonly dashboardName = signal('');
@@ -346,6 +355,11 @@ export class DashboardShareModal {
       return true;
     } catch (error) {
       if (seq !== this.openSeq || dashboardId !== this.dashboardId) return false;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return false;
+      }
       const code = errorCodeOf(error);
       if (code === 'TRADE.DASHBOARD.REVISION_CONFLICT') {
         this.notify.warning(this.transloco.translate('tradeDashboardModals.toast.changed'));
@@ -393,6 +407,11 @@ export class DashboardShareModal {
       await this.loadShares(seq, true);
     } catch (error) {
       if (seq !== this.openSeq || dashboardId !== this.dashboardId) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (errorCodeOf(error) === 'TRADE.DASHBOARD.REVISION_CONFLICT') {
         this.notify.warning(this.transloco.translate('tradeDashboardModals.toast.changed'));
         await this.refreshAfterConflict(seq);
@@ -423,6 +442,11 @@ export class DashboardShareModal {
       this.sharesLoadFailed.set(false);
     } catch (error) {
       if (seq !== this.openSeq) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       if (!silent) {
         this.sharesLoadFailed.set(true);
         this.notify.error(this.transloco.translate(errorKey(error)));
@@ -446,6 +470,11 @@ export class DashboardShareModal {
       this.revisionChange.emit(this.revision);
     } catch (error) {
       if (seq !== this.openSeq) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       this.notify.error(this.transloco.translate(errorKey(error)));
     }
   }
@@ -459,6 +488,11 @@ export class DashboardShareModal {
       this.targets.set(results.items);
     } catch (error) {
       if (seq !== this.targetSeq || openSeq !== this.openSeq) return;
+      if (isForbiddenError(error)) {
+        this.modal().close();
+        this.forbidden.emit();
+        return;
+      }
       this.targets.set([]);
       this.notify.error(this.transloco.translate(errorKey(error)));
     } finally {

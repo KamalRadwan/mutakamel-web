@@ -69,8 +69,11 @@ export class DashboardHeader {
   readonly navigationItems = input<readonly NavItem[]>([]);
   readonly generatedAt = input<string | null>(null);
   readonly editing = input(false);
-  readonly canManage = input(true);
+  readonly canCreate = input(false);
   readonly canEdit = input(false);
+  readonly canShare = input(false);
+  readonly canDelete = input(false);
+  readonly canPreference = input(true);
   readonly isOwner = input(false);
   readonly busy = input(false);
 
@@ -95,23 +98,25 @@ export class DashboardHeader {
 
   protected readonly menuItems = computed<ActionItem[]>(() => {
     this.i18n();
-    if (!this.canManage()) return [];
-
     const d = this.detail();
-    const items: ActionItem[] = [
-      {
-        id: 'newBlank',
-        title: this.transloco.translate('tradeDashboard.header.menu.newDashboard'),
-        icon: 'tablerPlus',
-        tile: 'bg-icon-green',
-      },
-      {
-        id: 'newTemplate',
-        title: this.transloco.translate('tradeDashboard.header.menu.fromTemplate'),
-        icon: 'tablerTemplate',
-        tile: 'bg-icon-blue',
-      },
-    ];
+    const items: ActionItem[] = [];
+
+    if (this.canCreate()) {
+      items.push(
+        {
+          id: 'newBlank',
+          title: this.transloco.translate('tradeDashboard.header.menu.newDashboard'),
+          icon: 'tablerPlus',
+          tile: 'bg-icon-green',
+        },
+        {
+          id: 'newTemplate',
+          title: this.transloco.translate('tradeDashboard.header.menu.fromTemplate'),
+          icon: 'tablerTemplate',
+          tile: 'bg-icon-blue',
+        },
+      );
+    }
 
     if (this.canEdit()) {
       items.push({
@@ -122,14 +127,16 @@ export class DashboardHeader {
       });
     }
 
-    items.push({
-      id: 'duplicate',
-      title: this.transloco.translate('tradeDashboard.header.menu.duplicate'),
-      icon: 'tablerCopy',
-      tile: 'bg-icon-gray',
-    });
+    if (this.canCreate()) {
+      items.push({
+        id: 'duplicate',
+        title: this.transloco.translate('tradeDashboard.header.menu.duplicate'),
+        icon: 'tablerCopy',
+        tile: 'bg-icon-gray',
+      });
+    }
 
-    if (this.isOwner()) {
+    if (this.isOwner() && this.canShare()) {
       items.push({
         id: 'share',
         title: this.transloco.translate('tradeDashboard.header.menu.share'),
@@ -138,27 +145,29 @@ export class DashboardHeader {
       });
     }
 
-    if (!d.isDefault) {
+    if (this.canPreference()) {
+      if (!d.isDefault) {
+        items.push({
+          id: 'setDefault',
+          title: this.transloco.translate('tradeDashboard.header.menu.setDefault'),
+          icon: 'tablerStar',
+          tile: 'bg-icon-orange',
+        });
+      }
+
       items.push({
-        id: 'setDefault',
-        title: this.transloco.translate('tradeDashboard.header.menu.setDefault'),
-        icon: 'tablerStar',
+        id: 'toggleFavorite',
+        title: this.transloco.translate(
+          d.isFavorite
+            ? 'tradeDashboard.header.menu.removeFavorite'
+            : 'tradeDashboard.header.menu.addFavorite',
+        ),
+        icon: 'tablerHeart',
         tile: 'bg-icon-orange',
       });
     }
 
-    items.push({
-      id: 'toggleFavorite',
-      title: this.transloco.translate(
-        d.isFavorite
-          ? 'tradeDashboard.header.menu.removeFavorite'
-          : 'tradeDashboard.header.menu.addFavorite',
-      ),
-      icon: 'tablerHeart',
-      tile: 'bg-icon-orange',
-    });
-
-    if (this.isOwner()) {
+    if (this.isOwner() && this.canDelete()) {
       items.push({
         id: 'delete',
         title: this.transloco.translate('tradeDashboard.header.menu.delete'),

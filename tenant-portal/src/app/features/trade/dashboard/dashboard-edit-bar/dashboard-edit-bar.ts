@@ -24,6 +24,7 @@ export class DashboardEditBar {
   readonly dirty = input(false);
   readonly canUndo = input(false);
   readonly saving = input(false);
+  readonly canAddWidget = input(true);
   readonly placementCount = input(0);
   readonly maxPlacements = input(20);
 

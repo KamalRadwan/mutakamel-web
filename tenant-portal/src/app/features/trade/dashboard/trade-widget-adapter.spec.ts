@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { GridItem } from '../../../shared/widgets/dashboard/dashboard-grid/dashboard-grid';
-import type { Partition, Placement, RunResult, WidgetResult } from './trade-dashboard.model';
+import {
+  shareTargetName,
+  type Partition,
+  type Placement,
+  type RunResult,
+  type WidgetResult,
+} from './trade-dashboard.model';
 import {
   TRADE_H,
   TRADE_X,
@@ -312,5 +318,52 @@ describe('adaptWidget shapes and no summing', () => {
       'SAR 300',
     ]);
     expect(adapted.execution.rows).toHaveLength(2);
+  });
+});
+
+describe('field-diff H-1 and H-2', () => {
+  it('H-1: shareTargetName always shows name regardless of language or optional nameI18n', () => {
+    expect(shareTargetName({ name: 'Rana Mansour' }, 'ar')).toBe('Rana Mansour');
+    expect(
+      shareTargetName({ name: 'Sales team', nameI18n: { en: 'Sales EN', ar: 'فريق المبيعات' } }, 'ar'),
+    ).toBe('Sales team');
+  });
+
+  it('H-2: handles numeric and decimal-string Point.value and preserves alignment gap null', () => {
+    const res = result({
+      shape: 'TIME_SERIES',
+      partitions: [
+        {
+          companyId: 'c1',
+          branchIds: [],
+          currencyCode: 'EGP',
+          series: [
+            {
+              key: 'm',
+              unit: 'MONEY',
+              points: [
+                { key: '2026-11-01', value: '12500.50' },
+                { key: '2026-11-02', value: 300 },
+              ],
+            },
+          ],
+        },
+        {
+          companyId: 'c2',
+          branchIds: [],
+          currencyCode: 'SAR',
+          series: [
+            {
+              key: 'm',
+              unit: 'MONEY',
+              points: [{ key: '2026-11-01', value: 100 }],
+            },
+          ],
+        },
+      ],
+    });
+    const adapted = adaptWidget(placement('LINE'), res, ctx());
+    expect(adapted.execution.series[0].points.map((p) => p.value)).toEqual([12500.5, 300]);
+    expect(adapted.execution.series[1].points.map((p) => p.value)).toEqual([100, null]);
   });
 });
