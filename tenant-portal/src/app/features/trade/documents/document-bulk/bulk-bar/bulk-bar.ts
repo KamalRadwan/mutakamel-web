@@ -28,9 +28,11 @@ import {
   tablerSend,
 } from '@ng-icons/tabler-icons';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { BulkJobsTracker } from '../../../../../shared/bulk-jobs/bulk-jobs-tracker';
 import { Button } from '../../../../../shared/ui/button/button';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
+import { branchGrants } from '../../../shared/trade-access';
 import { KIND_CONFIG, kindFromSegment } from '../../shared/document-kinds';
 import type { DocumentKind, ListQuery } from '../../shared/document.model';
 import type { DocumentSelection } from '../../shared/document-selection';
@@ -42,13 +44,30 @@ import {
   type DocumentBulkActionSpec,
 } from '../documents-bulk.descriptor';
 
-// later from the session: the action permission (PRINT = the document read permission, RELEASE_HOLD =
-// trade.sales_orders.hold) plus trade.bulk_jobs.run; the handlers refuse either missing with 403 TRADE.AUTH.TARGET_DENIED.
-const PERMS: Readonly<Record<DocumentKind, Readonly<Partial<Record<DocumentBulkAction, boolean>>>>> = {
-  quotation: { SEND: true, PRINT: true, CANCEL: true },
-  'sales-order': { HOLD: true, RELEASE_HOLD: true, PRINT: true, CANCEL: true },
-  'purchase-order': { SUBMIT: true, PRINT: true, CANCEL: true },
-  'purchase-quotation': { ISSUE: true, PRINT: true, CANCEL: true },
+const BULK_RUN_PERMISSION = 'trade.bulk_jobs.run';
+
+const ACTION_PERMISSION: Readonly<Record<DocumentKind, Readonly<Partial<Record<DocumentBulkAction, string>>>>> = {
+  quotation: {
+    SEND: 'trade.quotations.send',
+    PRINT: 'trade.quotations.read',
+    CANCEL: 'trade.quotations.cancel',
+  },
+  'sales-order': {
+    HOLD: 'trade.sales_orders.hold',
+    RELEASE_HOLD: 'trade.sales_orders.hold',
+    PRINT: 'trade.sales_orders.read',
+    CANCEL: 'trade.sales_orders.cancel',
+  },
+  'purchase-order': {
+    SUBMIT: 'trade.purchase_orders.submit',
+    PRINT: 'trade.purchase_orders.read',
+    CANCEL: 'trade.purchase_orders.cancel',
+  },
+  'purchase-quotation': {
+    ISSUE: 'trade.purchase_quotations.issue',
+    PRINT: 'trade.purchase_quotations.read',
+    CANCEL: 'trade.purchase_quotations.cancel',
+  },
 };
 
 interface MenuPlace {
@@ -113,6 +132,7 @@ export class DocumentBulkBar {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly envInjector = inject(EnvironmentInjector);
+  private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly tracker = inject(BulkJobsTracker);
   private readonly i18n = translationEvents(this.transloco);
@@ -154,9 +174,18 @@ export class DocumentBulkBar {
   });
 
   private readonly permittedActions = computed<readonly DocumentBulkActionSpec[]>(() => {
+    const branchId = this.scope.branch()?.id ?? null;
+    const hasGrant = (key: string): boolean => {
+      const grants = runInInjectionContext(this.injector, () => branchGrants(key));
+      return grants === 'ALL' || (branchId !== null && grants.has(branchId));
+    };
+    if (!hasGrant(BULK_RUN_PERMISSION)) return [];
     const kind = this.kind();
-    const perms = PERMS[kind];
-    return DOCUMENT_BULK_ACTIONS[kind].filter((spec) => perms[spec.id] === true);
+    const perms = ACTION_PERMISSION[kind];
+    return DOCUMENT_BULK_ACTIONS[kind].filter((spec) => {
+      const permission = perms[spec.id];
+      return Boolean(permission && hasGrant(permission));
+    });
   });
 
   protected readonly barActions = computed<readonly DocumentBulkActionSpec[]>(() =>

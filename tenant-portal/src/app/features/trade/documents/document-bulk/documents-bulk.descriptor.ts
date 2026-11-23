@@ -1,8 +1,9 @@
+import type { ScopeState } from '../../../../core/scope/scope';
 import type { BulkJobActionDescriptor, BulkJobModuleDescriptor } from '../../../../shared/bulk-jobs/bulk-job-modules';
 import { type BulkJob, type BulkJobItem, isBulkJobActive } from '../../../../shared/bulk-jobs/bulk-jobs.model';
 import { KIND_CONFIG } from '../shared/document-kinds';
 import type { DocumentKind } from '../shared/document.model';
-import { errorCodeOf } from '../../shared/trade-api';
+import { errorCodeOf, type TradeContext } from '../../shared/trade-api';
 import type { BulkPrintArtifact } from '../shared/documents.api';
 
 export type DocumentBulkAction = 'SEND' | 'HOLD' | 'RELEASE_HOLD' | 'SUBMIT' | 'ISSUE' | 'PRINT' | 'CANCEL';
@@ -106,17 +107,20 @@ export const BULK_PRINT_NOT_READY_CODE = 'TRADE.BULK_JOB.ARTIFACT_NOT_READY';
 
 export type BulkPrintArtifactResult =
   | { ready: true; artifact: BulkPrintArtifact }
-  | { ready: false; messageKey: `td.errors.${typeof BULK_PRINT_NOT_READY_CODE}` };
+  | { ready: false; messageKey: `tdb.errors.${typeof BULK_PRINT_NOT_READY_CODE}` };
 
 /** A file that is not ready yet is an expected state (show the message, let the user try again), not a failure. */
-export async function openBulkPrintArtifact(jobId: string): Promise<BulkPrintArtifactResult> {
+export async function openBulkPrintArtifact(
+  jobId: string,
+  ctx?: TradeContext | ScopeState,
+): Promise<BulkPrintArtifactResult> {
   const { getBulkPrintArtifact } = await import('../shared/documents.api');
   let artifact: BulkPrintArtifact;
   try {
-    artifact = await getBulkPrintArtifact(jobId);
+    artifact = await getBulkPrintArtifact(jobId, ctx);
   } catch (error) {
     if (errorCodeOf(error) === BULK_PRINT_NOT_READY_CODE) {
-      return { ready: false, messageKey: `td.errors.${BULK_PRINT_NOT_READY_CODE}` };
+      return { ready: false, messageKey: `tdb.errors.${BULK_PRINT_NOT_READY_CODE}` };
     }
     throw error;
   }
@@ -152,7 +156,7 @@ function buildModuleDescriptor(kind: DocumentKind): BulkJobModuleDescriptor {
     module: `trading.${segment}`,
     i18nScopes: ['trade-documents', 'trade-documents-bulk'],
     actions,
-    codeKeyPrefixes: ['td.errors.'],
+    codeKeyPrefixes: ['td.errors.', 'tdb.errors.'],
     itemLink: (item: BulkJobItem) => {
       if (!item.entityId || item.current === null) return null;
       return { commands: ['/trade/documents', segment, item.entityId] };

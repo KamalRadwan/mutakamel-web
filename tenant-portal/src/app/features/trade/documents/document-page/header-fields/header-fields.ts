@@ -10,7 +10,6 @@ import {
   input,
   model,
   output,
-  resource,
   signal,
   untracked,
   viewChild,
@@ -26,12 +25,15 @@ import {
   tablerSearch,
   tablerX,
 } from '@ng-icons/tabler-icons';
+import { ApiError as CoreApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { Button } from '../../../../../shared/ui/button/button';
 import { DateField } from '../../../../../shared/ui/date-time/date-field';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
+import { ApiError } from '../../../shared/trade-api';
 import { PricingPanel } from '../../document-lines/pricing-panel/pricing-panel';
 import {
   type ContactOption,
@@ -40,7 +42,7 @@ import {
   type ReceivingNodeOption,
   type SupplierAccountOption,
   type SupplierOption,
-  getOpportunity,
+  embeddedSourceOpportunityOf,
   listContactOptions,
   listCustomerOptions,
   listOpportunityOptions,
@@ -107,7 +109,11 @@ function headerOpt(header: Record<string, unknown>, key: string): string | null 
   selector: 'app-header-fields',
   imports: [NgIcon, TranslocoPipe, Button, DateField, Dropdown, Field, PricingPanel],
   providers: [
-    provideTranslocoScope({ scope: 'trade-shared', alias: 'tradeShared' }, { scope: 'trade-documents-page', alias: 'tdpg' }),
+    provideTranslocoScope(
+      { scope: 'trade-shared', alias: 'tradeShared' },
+      { scope: 'trade-documents', alias: 'td' },
+      { scope: 'trade-documents-page', alias: 'tdpg' },
+    ),
     provideIcons({
       tablerCheck,
       tablerChevronDown,
@@ -132,6 +138,7 @@ export class HeaderFields {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   // Deferred so a synchronous scope load never writes the signal while Angular renders (NG0600).
   private readonly i18n = translationEvents(this.transloco);
@@ -182,6 +189,7 @@ export class HeaderFields {
   protected readonly selectedCustomer = signal<CustomerOption | null>(null);
 
   protected readonly contacts = signal<ContactOption[]>([]);
+  protected readonly contactPartyType = signal<'ORGANIZATION' | 'PERSON' | null>(null);
   protected readonly contactsLoading = signal(false);
   protected readonly contactsError = signal(false);
   private readonly contactsRetryTick = signal(0);
@@ -189,7 +197,8 @@ export class HeaderFields {
   protected readonly opportunities = signal<SourceCrmOpportunity[]>([]);
   protected readonly opportunitiesLoading = signal(false);
   protected readonly opportunitiesError = signal(false);
-  private readonly opportunitiesLoadedPartyId = signal<string | null>(null);
+  protected readonly opportunitiesForbidden = signal(false);
+  private readonly opportunitiesLoadedProfileId = signal<string | null>(null);
 
   protected readonly suppliers = signal<SupplierOption[]>([]);
   protected readonly suppliersLoading = signal(false);
@@ -303,14 +312,25 @@ export class HeaderFields {
   protected readonly currencyCode = computed(() => headerStr(this.draft().header, 'currencyCode'));
   protected readonly draftReference = computed(() => headerStr(this.draft().header, 'draftReference'));
   protected readonly pqReference = computed(() => headerStr(this.draft().header, 'reference'));
-  protected readonly sourceCrmOpportunityId = computed(() => headerOpt(this.draft().header, 'sourceCrmOpportunityId'));
+  protected readonly sourceCrmOpportunityId = computed(
+    () =>
+      headerOpt(this.draft().header, 'sourceCrmOpportunityId') ??
+      embeddedSourceOpportunityOf(this.detail())?.id ??
+      null,
+  );
+  protected readonly crmCustomerProfileId = computed<string | null>(
+    () =>
+      headerOpt(this.draft().header, 'crmCustomerProfileId') ??
+      this.selectedCustomer()?.crmCustomerProfileId ??
+      null,
+  );
   protected readonly supplierPartyId = computed(
     () => headerOpt(this.draft().header, 'supplierPartyId') ?? headerOpt(this.draft().header, 'partyId'),
   );
   protected readonly supplierAccountId = computed(() => headerOpt(this.draft().header, 'supplierAccountId'));
   protected readonly receivingNodeId = computed(() => headerOpt(this.draft().header, 'receivingNodeId'));
 
-  protected readonly isPersonCustomer = computed(() => this.selectedCustomer()?.partyType === 'PERSON');
+  protected readonly isPersonCustomer = computed(() => this.contactPartyType() === 'PERSON');
 
   protected readonly customerDisplay = computed(() => {
     const selected = this.selectedCustomer();
@@ -327,7 +347,7 @@ export class HeaderFields {
   protected readonly contactDisplay = computed(() => {
     const id = this.contactPartyId();
     if (!id) return '';
-    return this.contacts().find((c) => c.contactPartyId === id)?.displayName ?? id;
+    return this.contacts().find((c) => c.partyId === id)?.displayName ?? id;
   });
 
   protected readonly supplierDisplay = computed(() => {
@@ -381,28 +401,21 @@ export class HeaderFields {
 
   protected readonly validUntilDisplay = computed(() => formatDmy(this.draft().validUntil));
 
-  private readonly fallbackOpportunityParams = computed<{ id: string; lang: string } | undefined>(
-    () => {
-      if (!this.isQuotation()) return undefined;
-      const id = this.sourceCrmOpportunityId();
-      if (!id) return undefined;
-      const pid = this.partyId();
-      if (pid && this.opportunitiesLoadedPartyId() !== pid) return undefined;
-      if (this.opportunities().some((o) => o.id === id)) return undefined;
-      return { id, lang: this.lang() };
-    },
-    { equal: (a, b) => a?.id === b?.id && a?.lang === b?.lang },
-  );
-
-  private readonly fallbackOpportunity = resource({
-    params: () => this.fallbackOpportunityParams(),
-    loader: async ({ params }) => {
-      try {
-        return await getOpportunity(params.id);
-      } catch {
-        return null;
-      }
-    },
+  protected readonly embeddedOpportunity = computed<SourceCrmOpportunity | null>(() => {
+    const id = this.sourceCrmOpportunityId();
+    if (!id) return null;
+    const embedded = embeddedSourceOpportunityOf(this.detail());
+    if (!embedded || embedded.id !== id || !embedded.available || !embedded.name?.trim()) return null;
+    const lang = this.lang();
+    const stageName = embedded.stageName
+      ? ((lang === 'ar' ? embedded.stageName.ar || embedded.stageName.en : embedded.stageName.en || embedded.stageName.ar) ?? '')
+      : '';
+    return {
+      id: embedded.id,
+      name: embedded.name.trim(),
+      stageName: stageName.trim(),
+      status: embedded.status ?? 'IN_PROGRESS',
+    };
   });
 
   protected readonly selectedOpportunity = computed<SourceCrmOpportunity | null>(() => {
@@ -410,26 +423,18 @@ export class HeaderFields {
     if (!id) return null;
     const fromList = this.opportunities().find((o) => o.id === id);
     if (fromList) return fromList;
-    const resolved = this.fallbackOpportunity.hasValue() ? this.fallbackOpportunity.value() : null;
-    return resolved && resolved.id === id ? resolved : null;
-  });
-
-  protected readonly opportunityResolving = computed<boolean>(() => {
-    if (!this.isQuotation()) return false;
-    const id = this.sourceCrmOpportunityId();
-    if (!id || this.selectedOpportunity()) return false;
-    const pid = this.partyId();
-    if (pid && this.opportunitiesLoadedPartyId() !== pid) return true;
-    return this.fallbackOpportunity.isLoading();
+    return this.embeddedOpportunity();
   });
 
   protected readonly opportunityUnavailable = computed<boolean>(() => {
     if (!this.isQuotation()) return false;
     const id = this.sourceCrmOpportunityId();
-    if (!id || this.selectedOpportunity() || this.opportunityResolving()) return false;
-    const status = this.fallbackOpportunity.status();
-    if (status === 'error') return true;
-    return status === 'resolved' && this.fallbackOpportunity.hasValue() && this.fallbackOpportunity.value() === null;
+    if (!id || this.selectedOpportunity()) return false;
+    const profileId = this.crmCustomerProfileId();
+    if (this.opportunityEditable() && profileId && this.opportunitiesLoadedProfileId() !== profileId && this.opportunitiesLoading()) {
+      return false;
+    }
+    return true;
   });
 
   protected readonly filteredOpportunities = computed<SourceCrmOpportunity[]>(() => {
@@ -450,7 +455,7 @@ export class HeaderFields {
     if (!id) return false;
     const needle = this.searchQuery().trim().toLowerCase();
     if (!needle) return true;
-    const label = this.transloco.translate('tdpg.fields.opportunityNotAvailable').toLowerCase();
+    const label = this.transloco.translate('tdpg.header.linkedOpportunity').toLowerCase();
     return label.includes(needle) || id.toLowerCase().includes(needle);
   });
 
@@ -458,12 +463,16 @@ export class HeaderFields {
     CURRENCIES.map((code) => ({ value: code, label: code })),
   );
 
-  protected readonly contactOptions = computed<DropdownOption<string | null>[]>(() =>
-    this.contacts().map((c) => ({
-      value: c.contactPartyId,
-      label: c.role ? `${c.displayName} — ${c.role}` : c.displayName,
-    })),
-  );
+  protected readonly contactOptions = computed<DropdownOption<string | null>[]>(() => {
+    this.i18n();
+    return this.contacts().map((c) => {
+      const role = this.contactRoleText(c);
+      return {
+        value: c.partyId,
+        label: role ? `${c.displayName} — ${role}` : c.displayName,
+      };
+    });
+  });
 
   protected readonly supplierAccountOptions = computed<DropdownOption<string | null>[]>(() =>
     this.supplierAccounts().map((a) => ({
@@ -481,7 +490,7 @@ export class HeaderFields {
 
   protected readonly pricingErrors = computed<string | null>(() => {
     const errs = this.fieldErrors();
-    return errs['pricingReason'] ?? errs['pricingValue'] ?? null;
+    return errs['pricingReason'] ?? errs['pricingValue'] ?? errs['priceBookId'] ?? null;
   });
 
   constructor() {
@@ -495,6 +504,7 @@ export class HeaderFields {
         this.contactSeq++;
         untracked(() => {
           this.contacts.set([]);
+          this.contactPartyType.set(null);
           this.contactsError.set(false);
           this.contactsLoading.set(false);
         });
@@ -518,27 +528,29 @@ export class HeaderFields {
       untracked(() => void this.resolveCustomerById(pid));
     });
 
-    // Load opportunities for quotation customer.
+    // Load open CRM opportunities when picking/editing on a draft quotation for a CRM-linked customer.
     effect(() => {
-      const isQ = this.isQuotation();
-      const pid = this.partyId();
+      const active = this.isQuotation() && this.opportunityEditable();
+      const profileId = this.crmCustomerProfileId();
+      const branchId = this.scope.branch()?.id ?? null;
       this.lang();
-      if (!isQ || !pid) {
+      if (!active || !profileId || !branchId) {
         this.opportunitySeq++;
         untracked(() => {
           this.opportunities.set([]);
           this.opportunitiesLoading.set(false);
           this.opportunitiesError.set(false);
-          this.opportunitiesLoadedPartyId.set(null);
+          this.opportunitiesForbidden.set(false);
+          this.opportunitiesLoadedProfileId.set(null);
         });
         return;
       }
       untracked(() => {
-        if (this.opportunitiesLoadedPartyId() !== pid) {
+        if (this.opportunitiesLoadedProfileId() !== profileId) {
           this.opportunities.set([]);
-          this.opportunitiesLoadedPartyId.set(null);
+          this.opportunitiesLoadedProfileId.set(null);
         }
-        void this.loadOpportunities(pid);
+        void this.loadOpportunities(profileId);
       });
     });
 
@@ -609,6 +621,7 @@ export class HeaderFields {
       this.opportunities();
       this.opportunitiesLoading();
       this.opportunitiesError();
+      this.opportunitiesForbidden();
       this.searchQuery();
       if (menu) {
         untracked(() => this.schedulePlace(menu));
@@ -715,8 +728,8 @@ export class HeaderFields {
       void this.loadCustomers(this.searchQuery());
     } else if (menu === 'supplier') {
       void this.loadSuppliers(this.searchQuery());
-    } else if (menu === 'opportunity' && this.partyId()) {
-      void this.loadOpportunities(this.partyId()!);
+    } else if (menu === 'opportunity' && this.crmCustomerProfileId()) {
+      void this.loadOpportunities(this.crmCustomerProfileId()!);
     }
   }
 
@@ -725,7 +738,19 @@ export class HeaderFields {
   }
 
   protected isCustomerBlocked(opt: CustomerOption): boolean {
-    return !opt.quotationSelectable || opt.accountStatus === 'BLOCKED';
+    return Boolean(opt.denialCode) || opt.commercialAccountStatus === 'BLOCKED';
+  }
+
+  protected customerBlockedReason(opt: CustomerOption): string {
+    this.i18n();
+    if (opt.denialCode) {
+      const key = `td.errors.${opt.denialCode}`;
+      const translated = this.transloco.translate(key);
+      if (translated && translated !== key) {
+        return translated;
+      }
+    }
+    return this.transloco.translate('tdpg.fields.accountBlocked');
   }
 
   protected chooseCustomer(opt: CustomerOption): void {
@@ -915,7 +940,7 @@ export class HeaderFields {
     this.customersLoading.set(true);
     this.customersError.set(false);
     try {
-      const page = await listCustomerOptions(search.trim() || undefined, cursor);
+      const page = await listCustomerOptions(search.trim() || undefined, cursor, this.scope);
       if (seq !== this.customerSeq) return;
       if (cursor) {
         this.customers.update((prev) => [...prev, ...page.items]);
@@ -939,7 +964,7 @@ export class HeaderFields {
     try {
       let cursor: string | undefined;
       for (let i = 0; i < MAX_CUSTOMER_PREFILL_PAGES; i += 1) {
-        const page = await listCustomerOptions(undefined, cursor);
+        const page = await listCustomerOptions(undefined, cursor, this.scope);
         if (seq !== this.customerResolveSeq) return;
         const match = page.items.find((item) => item.partyId === partyId);
         if (match) {
@@ -959,11 +984,13 @@ export class HeaderFields {
     this.contactsLoading.set(true);
     this.contactsError.set(false);
     try {
-      const list = await listContactOptions(partyId);
+      const page = await listContactOptions(partyId, undefined, this.scope);
       if (seq !== this.contactSeq) return;
-      this.contacts.set(list);
+      this.contactPartyType.set(page.partyType);
+      this.contacts.set(page.items);
     } catch {
       if (seq !== this.contactSeq) return;
+      this.contactPartyType.set(null);
       this.contacts.set([]);
       this.contactsError.set(true);
     } finally {
@@ -973,22 +1000,38 @@ export class HeaderFields {
     }
   }
 
-  private async loadOpportunities(partyId: string): Promise<void> {
+  private contactRoleText(c: ContactOption): string | null {
+    const explicit = c.relationshipLabel?.trim();
+    if (explicit) return explicit;
+    const key = `tdpg.fields.contactRole.${c.relationshipType}`;
+    const translated = this.transloco.translate(key);
+    return translated && translated !== key ? translated : null;
+  }
+
+  private async loadOpportunities(customerProfileId: string): Promise<void> {
     const seq = ++this.opportunitySeq;
     this.opportunitiesLoading.set(true);
     this.opportunitiesError.set(false);
+    this.opportunitiesForbidden.set(false);
     try {
-      const list = await listOpportunityOptions(partyId);
+      const list = await listOpportunityOptions(customerProfileId, this.scope);
       if (seq !== this.opportunitySeq) return;
       this.opportunities.set(list);
-    } catch {
+    } catch (error: unknown) {
       if (seq !== this.opportunitySeq) return;
       this.opportunities.set([]);
-      this.opportunitiesError.set(true);
+      const status = error instanceof ApiError || error instanceof CoreApiError ? error.status : null;
+      if (status === 403) {
+        this.opportunitiesForbidden.set(true);
+        this.opportunitiesError.set(false);
+      } else {
+        this.opportunitiesForbidden.set(false);
+        this.opportunitiesError.set(true);
+      }
     } finally {
       if (seq === this.opportunitySeq) {
         this.opportunitiesLoading.set(false);
-        this.opportunitiesLoadedPartyId.set(partyId);
+        this.opportunitiesLoadedProfileId.set(customerProfileId);
       }
     }
   }
@@ -998,7 +1041,7 @@ export class HeaderFields {
     this.suppliersLoading.set(true);
     this.suppliersError.set(false);
     try {
-      const list = await listSupplierOptions(search.trim() || undefined);
+      const list = await listSupplierOptions(search.trim() || undefined, this.scope);
       if (seq !== this.supplierSeq) return;
       this.suppliers.set(list);
     } catch {
@@ -1015,7 +1058,7 @@ export class HeaderFields {
   private async resolveSupplierById(partyId: string): Promise<void> {
     const seq = ++this.supplierResolveSeq;
     try {
-      const list = await listSupplierOptions();
+      const list = await listSupplierOptions(undefined, this.scope);
       if (seq !== this.supplierResolveSeq) return;
       this.suppliers.set(list);
       const match = list.find((s) => s.partyId === partyId) ?? null;
@@ -1028,7 +1071,7 @@ export class HeaderFields {
   private async loadReceivingNodes(): Promise<void> {
     const seq = ++this.nodesSeq;
     try {
-      const list = await listReceivingNodes();
+      const list = await listReceivingNodes(this.scope);
       if (seq !== this.nodesSeq) return;
       this.receivingNodes.set(list);
     } catch {
@@ -1043,7 +1086,7 @@ export class HeaderFields {
       let cursor: string | undefined;
       let matchedCustomer: CustomerOption | null = null;
       for (let i = 0; i < MAX_CUSTOMER_PREFILL_PAGES; i += 1) {
-        const page = await listCustomerOptions(undefined, cursor);
+        const page = await listCustomerOptions(undefined, cursor, this.scope);
         const hit = page.items.find((c) => c.crmCustomerProfileId === prefill.customerProfileId);
         if (hit) {
           matchedCustomer = hit;
@@ -1058,8 +1101,8 @@ export class HeaderFields {
       if (headerOpt(this.draft().header, 'partyId')) return;
 
       let matchedOppId: string | null = null;
-      if (prefill.opportunityId) {
-        const opps = await listOpportunityOptions(matchedCustomer.partyId);
+      if (prefill.opportunityId && matchedCustomer.crmCustomerProfileId) {
+        const opps = await listOpportunityOptions(matchedCustomer.crmCustomerProfileId, this.scope);
         this.opportunities.set(opps);
         const oppHit = opps.find((o) => o.id === prefill.opportunityId);
         if (oppHit) {

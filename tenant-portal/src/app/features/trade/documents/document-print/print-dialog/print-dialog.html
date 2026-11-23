@@ -8,7 +8,15 @@
   (closed)="onModalClosed()"
 >
   <div class="flex flex-col gap-10" [attr.aria-busy]="templatesLoading() || running()">
-    @if (templatesLoading()) {
+    @if (phase() === 'forbidden') {
+      <ui-full-state
+        kind="forbidden"
+        [title]="'tdp.forbiddenTitle' | transloco"
+        [text]="'tdp.forbiddenText' | transloco"
+        [actionLabel]="'td.common.close' | transloco"
+        (action)="requestClose()"
+      />
+    } @else if (templatesLoading()) {
       <div class="flex flex-col gap-6">
         <div class="h-time-dd animate-pulse rounded-10 bg-neutral-soft"></div>
         <div class="h-time-dd animate-pulse rounded-10 bg-neutral-soft"></div>

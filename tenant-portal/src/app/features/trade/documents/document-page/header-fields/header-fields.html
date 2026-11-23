@@ -453,9 +453,11 @@
                   } @else if (selectedOpportunity(); as opp) {
                     {{ opp.name }}
                   } @else if (opportunityUnavailable()) {
-                    {{ 'tdpg.fields.opportunityNotAvailable' | transloco }}
-                  } @else if (opportunityResolving()) {
+                    {{ 'tdpg.header.linkedOpportunity' | transloco }}
+                  } @else if (opportunitiesLoading()) {
                     {{ 'tdpg.fields.loading' | transloco }}
+                  } @else if (opportunitiesForbidden()) {
+                    {{ 'tdpg.fields.opportunityPermissionHint' | transloco }}
                   } @else {
                     {{ 'tdpg.fields.opportunityPlaceholder' | transloco }}
                   }
@@ -489,8 +491,8 @@
                 @if (selectedOpportunity(); as opp) {
                   {{ opp.name }}
                 } @else if (opportunityUnavailable()) {
-                  {{ 'tdpg.fields.opportunityNotAvailable' | transloco }}
-                } @else if (opportunityResolving()) {
+                  {{ 'tdpg.header.linkedOpportunity' | transloco }}
+                } @else if (opportunitiesLoading()) {
                   {{ 'tdpg.fields.loading' | transloco }}
                 } @else {
                   —
@@ -535,6 +537,8 @@
         <p class="mt-4 text-11 leading-16 text-danger-text">{{ errMsg }}</p>
       }
     </div>
+  } @else if (fieldErrors()['priceBookId']; as pbErr) {
+    <p class="text-11 leading-16 text-danger-text">{{ pbErr }}</p>
   }
 </section>
 
@@ -583,11 +587,15 @@
       @if (
         (menuKind === 'customer' && customersLoading() && customers().length === 0) ||
         (menuKind === 'supplier' && suppliersLoading()) ||
-        (menuKind === 'opportunity' && (opportunitiesLoading() || opportunityResolving()))
+        (menuKind === 'opportunity' && opportunitiesLoading())
       ) {
         <li role="presentation" class="flex h-menu-item shrink-0 items-center gap-6 px-8 text-12 text-text-muted">
           <ng-icon name="tablerLoader2" size="14" class="shrink-0 animate-spin" aria-hidden="true" />
           <span>{{ 'tdpg.fields.loading' | transloco }}</span>
+        </li>
+      } @else if (menuKind === 'opportunity' && opportunitiesForbidden()) {
+        <li role="presentation" class="flex min-h-menu-item items-center px-8 py-4 text-12 text-text-muted">
+          {{ 'tdpg.fields.opportunityPermissionHint' | transloco }}
         </li>
       } @else if (
         (menuKind === 'customer' && customersError()) ||
@@ -627,7 +635,7 @@
                 <span class="flex min-w-0 flex-1 flex-col">
                   <span class="truncate">{{ opt.displayName }}</span>
                   @if (blocked) {
-                    <span class="text-11 leading-16 text-danger-text">{{ 'tdpg.fields.accountBlocked' | transloco }}</span>
+                    <span class="text-11 leading-16 text-danger-text">{{ customerBlockedReason(opt) }}</span>
                   }
                 </span>
                 @if (selected && !blocked) {
@@ -688,7 +696,7 @@
                 class="flex min-h-menu-item w-full cursor-pointer items-center justify-between gap-8 rounded-6 bg-brand-soft px-8 py-4 text-start text-12 text-on-brand-soft outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
                 (click)="closeSearchMenu(true)"
               >
-                <span class="min-w-0 flex-1 truncate">{{ 'tdpg.fields.opportunityNotAvailable' | transloco }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ 'tdpg.header.linkedOpportunity' | transloco }}</span>
                 <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
               </button>
             </li>

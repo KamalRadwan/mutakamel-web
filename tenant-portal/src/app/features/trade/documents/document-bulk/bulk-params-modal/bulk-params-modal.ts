@@ -25,7 +25,7 @@ import {
   type ReasonPickerValue,
   TradeReasonPicker,
 } from '../../../shared/pickers/reason-picker/reason-picker';
-import { errorCodeOf } from '../../../shared/trade-api';
+import { ApiError, errorCodeOf } from '../../../shared/trade-api';
 import { listReasons } from '../../../shared/trade-foundation.api';
 import type { ReasonCode, ReasonKind } from '../../../shared/trade-foundation.model';
 import { KIND_CONFIG } from '../../shared/document-kinds';
@@ -369,14 +369,19 @@ export class BulkParamsModal {
     this.templatesLoading.set(true);
     this.templatesError.set(false);
     try {
-      const rows = await listPrintTemplates(kind);
+      const rows = await listPrintTemplates(kind, this.scope);
       if (seq !== this.openSeq) return;
       this.templates.set(rows);
       this.selectedTemplate.set(DEFAULT_TEMPLATE_VALUE);
-    } catch {
+    } catch (error: unknown) {
       if (seq !== this.openSeq) return;
       this.templates.set([]);
-      this.templatesError.set(true);
+      if (error instanceof ApiError && error.status === 403) {
+        this.selectedTemplate.set(DEFAULT_TEMPLATE_VALUE);
+        this.templatesError.set(false);
+      } else {
+        this.templatesError.set(true);
+      }
     } finally {
       if (seq === this.openSeq) {
         this.templatesLoading.set(false);
@@ -444,9 +449,11 @@ export class BulkParamsModal {
 
   private translateError(code: string | null): string {
     if (code) {
-      const tdKey = `td.errors.${code}`;
-      const tdMsg = this.transloco.translate(tdKey);
-      if (tdMsg && tdMsg !== tdKey) return tdMsg;
+      for (const prefix of ['td.errors', 'tdb.errors']) {
+        const key = `${prefix}.${code}`;
+        const msg = this.transloco.translate(key);
+        if (msg && msg !== key) return msg;
+      }
 
       const bulkKey = `bulkJobs.codes.${code}`;
       const bulkMsg = this.transloco.translate(bulkKey, { max: '10,000' });

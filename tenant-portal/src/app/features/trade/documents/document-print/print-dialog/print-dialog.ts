@@ -23,15 +23,23 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { ScopeState } from '../../../../../core/scope/scope';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError, errorCodeOf } from '../../../shared/trade-api';
 import { KIND_CONFIG } from '../../shared/document-kinds';
 import { DocumentRequestKeys } from '../../shared/document-request-keys';
 import type { DocumentKind, PrintLocale, PrintTemplateOption } from '../../shared/document.model';
-import { getRenderJob, listPrintTemplates, renderPdf, type RenderPdfBody } from '../../shared/documents.api';
+import {
+  getRenderJob,
+  getRenderJobArtifact,
+  listPrintTemplates,
+  renderPdf,
+  type RenderPdfBody,
+} from '../../shared/documents.api';
 import {
   DEFAULT_POLL_INTERVAL_MS,
   DEFAULT_POLL_TIMEOUT_MS,
@@ -43,9 +51,11 @@ import { translationEvents } from '../../../../../core/i18n/translation-events';
 
 export type PrintSource = { revisionId: string } | { sourceVersion: number };
 
-type PrintPhase = 'idle' | 'running' | 'failed' | 'unavailable' | 'timeout';
+type PrintPhase = 'idle' | 'running' | 'failed' | 'unavailable' | 'timeout' | 'forbidden';
 // Every 503 the backend PDF services return is temporary, so each one gets the inline Retry state.
 const RETRYABLE_PDF_CODES = new Set([
+  'TRADE.QUOTE.PDF_BUNDLE_UNAVAILABLE',
+  'TRADE.QUOTE.PDF_ARTIFACT_UNAVAILABLE',
   'TRADE.BUSINESS_DOCUMENT.PDF_BUNDLE_UNAVAILABLE',
   'TRADE.BUSINESS_DOCUMENT.PDF_ARTIFACT_UNAVAILABLE',
 ]);
@@ -63,7 +73,7 @@ type ChoiceItem =
 
 @Component({
   selector: 'app-print-dialog',
-  imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field, Modal],
+  imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field, FullState, Modal],
   providers: [
     provideTranslocoScope(
       { scope: 'trade-shared', alias: 'tradeShared' },
@@ -86,6 +96,7 @@ export class PrintDialog {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly notify = inject(Notify);
+  private readonly scope = inject(ScopeState);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
@@ -112,6 +123,7 @@ export class PrintDialog {
   private dialogShown = false;
   private loadSeq = 0;
   private abortController: AbortController | null = null;
+  private readonly objectUrls = new Set<string>();
   /** x-idempotency-key of render-pdf: reused when the same print is retried, reset after a completed print. */
   private readonly renderKeys = new DocumentRequestKeys();
 
@@ -179,6 +191,7 @@ export class PrintDialog {
     () =>
       !this.templatesLoading() &&
       !this.running() &&
+        this.phase() !== 'forbidden' &&
       this.selectedChoice() !== null,
   );
 
@@ -205,7 +218,10 @@ export class PrintDialog {
       }
     });
 
-    this.destroyRef.onDestroy(() => this.cleanupOnClose());
+    this.destroyRef.onDestroy(() => {
+      this.cleanupOnClose();
+      this.revokeObjectUrls();
+    });
   }
 
   protected isChoiceTabStop(id: string): boolean {
@@ -308,8 +324,8 @@ export class PrintDialog {
 
     try {
       const result = await runPrint(
-        () => renderPdf(kind, docId, body, renderKey),
-        (jobId) => getRenderJob(kind, docId, jobId),
+        () => renderPdf(kind, docId, body, renderKey, this.scope),
+        (jobId) => getRenderJob(kind, docId, jobId, this.scope),
         {
           intervalMs: DEFAULT_POLL_INTERVAL_MS,
           timeoutMs: DEFAULT_POLL_TIMEOUT_MS,
@@ -326,20 +342,13 @@ export class PrintDialog {
 
       if (result.status === 'COMPLETED') {
         this.renderKeys.reset();
-        // Always re-read the job just before opening because the signed URL lives 300 s.
-        const fresh = await getRenderJob(kind, docId, result.renderJobId);
+        const blob = await getRenderJobArtifact(kind, docId, result.renderJobId, this.scope);
         if (controller.signal.aborted) return;
 
-        // Phase 5: open `/api/tenant/trade/v1/${KIND_CONFIG[kind].segment}/${docId}/render-jobs/${fresh.renderJobId}/artifact` for all kinds (API v2 F1); trade-app serves all four, the SO/PO/PQ gateway rows are pending.
-        const url = fresh.artifact?.downloadUrl ?? result.artifact?.downloadUrl;
-        if (!url) {
-          this.notify.error(this.transloco.translate('tdp.failed'));
-          this.phase.set('failed');
-          return;
-        }
-
+        const objectUrl = URL.createObjectURL(blob);
+        this.objectUrls.add(objectUrl);
         const win = this.document.defaultView ?? window;
-        win.open(url, '_blank', 'noopener');
+        win.open(objectUrl, '_blank', 'noopener');
         this.notify.success(this.transloco.translate('tdp.ready'));
         this.requestClose();
         return;
@@ -403,7 +412,7 @@ export class PrintDialog {
     this.templatesLoading.set(true);
 
     try {
-      const list = await listPrintTemplates(kind);
+      const list = await listPrintTemplates(kind, this.scope);
       if (seq !== this.loadSeq) return;
       this.templates.set(list);
     } catch (error: unknown) {
@@ -423,6 +432,11 @@ export class PrintDialog {
 
   private handleStartOrPollError(error: unknown): void {
     const code = errorCodeOf(error);
+
+    if (error instanceof ApiError && error.status === 403) {
+      this.phase.set('forbidden');
+      return;
+    }
 
     // 503 PDF_RENDER_UNAVAILABLE / PDF_BUNDLE_UNAVAILABLE / PDF_ARTIFACT_UNAVAILABLE: inline state with Retry, not a toast.
     if (error instanceof ApiError && error.status === 503 && isRenderUnavailable(code)) {
@@ -466,9 +480,11 @@ export class PrintDialog {
   }
 
   private translateDocumentError(code: string): string | null {
-    const key = `td.errors.${code}`;
-    const translated = this.transloco.translate(key);
-    return translated && translated !== key ? translated : null;
+    for (const key of [`tdp.errors.${code}`, `td.errors.${code}`]) {
+      const translated = this.transloco.translate(key);
+      if (translated && translated !== key) return translated;
+    }
+    return null;
   }
 
   private resolveGenericErrorMessage(error: unknown): string {
@@ -503,5 +519,12 @@ export class PrintDialog {
     this.abortActiveJob();
     this.loadSeq++;
     this.phase.set('idle');
+  }
+
+  private revokeObjectUrls(): void {
+    for (const url of this.objectUrls) {
+      URL.revokeObjectURL(url);
+    }
+    this.objectUrls.clear();
   }
 }
