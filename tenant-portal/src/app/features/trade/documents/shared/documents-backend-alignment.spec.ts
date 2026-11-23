@@ -1,45 +1,67 @@
-import { describe, expect, it } from 'vitest';
-import { getBulkPrintArtifact } from './documents-bulk.fake-module';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ApiError } from '../../shared/trade-api';
+import { bindTradeHttpForTest } from '../../shared/trade-http';
+import { TradeHttpStub } from '../../shared/testing/trade-http-testing';
 import { isRenderUnavailable } from '../document-print/print-dialog/print-dialog';
-import { documentGrandTotal, type PurchaseQuotation } from './document.model';
-import { fakeCreateSalesOrderFromQuotation, fakeGetDocument, fakeListDocuments } from './documents.fake';
+import { documentGrandTotal } from './document.model';
+import { createSalesOrderFromQuotation, getBulkPrintArtifact, getDocument, listDocuments } from './documents.api';
+
+const CTX = { companyId: 'company-1', branchId: 'branch-1' };
+const KEY = '019a0000-0000-7000-8000-000000000099';
 
 describe('documents follow the existing backend', () => {
-  it('lists purchase quotations as the backend entity: no grandTotal, draftReference, contactPartyId or extensionValues', async () => {
-    const page = await fakeListDocuments('purchase-quotation', { page: 1, limit: 50 });
-    expect(page.items.length).toBeGreaterThan(0);
-    for (const row of page.items) {
-      expect(row).not.toHaveProperty('grandTotal');
-      expect(row).not.toHaveProperty('draftReference');
-      expect(row).not.toHaveProperty('contactPartyId');
-      expect(row).not.toHaveProperty('extensionValues');
-      expect(documentGrandTotal(row)).toBe(row.totalsSnapshot?.grandTotal ?? null);
+  let http: TradeHttpStub;
+  let restore: () => void;
+
+  beforeEach(() => {
+    http = new TradeHttpStub();
+    restore = bindTradeHttpForTest(http);
+  });
+
+  afterEach(() => restore());
+
+  it('keeps purchase quotation totals in the server snapshot and delegates sorting to the backend', async () => {
+    const row = {
+      id: 'pq-1', lifecycleStatus: 'DRAFT', reference: 'Supplier quotation',
+      totalsSnapshot: { grandTotal: '250.50' },
+    };
+    http.register('GET', '/purchase-quotations', { items: [row], total: 1, page: 1, limit: 50 });
+    const page = await listDocuments('purchase-quotation', { page: 1, limit: 50, sort: 'grandTotal', order: 'asc' }, CTX);
+    expect(page.items).toEqual([row]);
+    for (const item of page.items) {
+      expect(item).not.toHaveProperty('grandTotal');
+      expect(item).not.toHaveProperty('draftReference');
+      expect(item).not.toHaveProperty('contactPartyId');
+      expect(item).not.toHaveProperty('extensionValues');
+      expect(documentGrandTotal(item)).toBe('250.50');
     }
+    expect(http.recordedReads()).toEqual([{
+      path: '/purchase-quotations', scope: CTX,
+      query: { page: 1, limit: 50, sort: 'grandTotal', order: 'asc' },
+    }]);
   });
 
-  it('sorts purchase quotations by the snapshot total, as the backend does', async () => {
-    const page = await fakeListDocuments('purchase-quotation', { page: 1, limit: 50, sort: 'grandTotal', order: 'asc' });
-    const totals = page.items.map((row: PurchaseQuotation) => Number(documentGrandTotal(row)));
-    expect(totals).toEqual([...totals].sort((a, b) => a - b));
+  it.each(['sales-order', 'purchase-quotation'] as const)('preserves the backend itemCompanyProfileId for %s', async (kind) => {
+    const segment = kind === 'sales-order' ? 'sales-orders' : 'purchase-quotations';
+    http.register('GET', `/${segment}/document-1`, {
+      id: 'document-1', lines: [{ itemCompanyProfileId: 'profile-1', itemId: 'item-1' }],
+    });
+    const detail = await getDocument(kind, 'document-1', CTX);
+    expect(detail.lines).toEqual([expect.objectContaining({ itemCompanyProfileId: 'profile-1', itemId: 'item-1' })]);
   });
 
-  it('returns itemCompanyProfileId on order and purchase quotation lines', async () => {
-    const orders = await fakeListDocuments('sales-order', { page: 1, limit: 1 });
-    const order = await fakeGetDocument('sales-order', orders.items[0].id);
-    expect(order.lines.every((line) => typeof line.itemCompanyProfileId === 'string')).toBe(true);
-
-    const quotes = await fakeListDocuments('purchase-quotation', { page: 1, limit: 1 });
-    const quote = await fakeGetDocument('purchase-quotation', quotes.items[0].id);
-    expect(quote.lines.every((line) => line.itemCompanyProfileId && line.itemId)).toBe(true);
-  });
-
-  it('rejects requestedDeadline on direct sales order creation (strict DTO)', async () => {
-    const quotes = await fakeListDocuments('quotation', { page: 1, limit: 50, status: 'ACCEPTED' });
-    const accepted = quotes.items[0];
-    expect(accepted).toBeDefined();
-    await expect(
-      fakeCreateSalesOrderFromQuotation(accepted.id, accepted.version, { requestedDeadline: '2026-12-01T14:00:00Z' } as never),
-    ).rejects.toMatchObject({ status: 400, code: 'TRADE.VALIDATION_FAILED' });
+  it('uses the direct conversion receipt and sends only the strict DTO fields', async () => {
+    http.register('POST', '/quotations/quote-1/create-sales-order', {
+      id: 'order-from-receipt', version: 1, sourceQuotationId: 'quote-1', lines: [],
+    });
+    const result = await createSalesOrderFromQuotation('quote-1', 3, { draftReference: '  Customer PO  ' }, KEY, CTX);
+    expect(result.id).toBe('order-from-receipt');
+    expect(result.sourceQuotationId).toBe('quote-1');
+    expect(http.recordedWrites()).toEqual([{
+      method: 'POST', path: '/quotations/quote-1/create-sales-order', body: { draftReference: 'Customer PO' },
+      key: KEY, ifMatch: '"3"', scope: CTX, query: undefined,
+    }]);
+    expect(http.recordedReads()).toEqual([]);
   });
 
   it('treats every 503 PDF code as retryable inline', () => {
@@ -49,10 +71,10 @@ describe('documents follow the existing backend', () => {
     expect(isRenderUnavailable('TRADE.BUSINESS_DOCUMENT.PDF_SOURCE_NOT_ELIGIBLE')).toBe(false);
   });
 
-  it('fails a bulk print download for a job that does not exist (404 BULK_JOB_NOT_FOUND)', async () => {
-    await expect(getBulkPrintArtifact('job-without-artifact')).rejects.toMatchObject({
-      status: 404,
-      code: 'BULK_JOB_NOT_FOUND',
+  it('propagates the backend 404 for a missing bulk print artifact', async () => {
+    http.register('GET', '/documents/bulk-prints/job-without-artifact/artifact', new ApiError(404, 'BULK_JOB_NOT_FOUND'));
+    await expect(getBulkPrintArtifact('job-without-artifact', CTX)).rejects.toMatchObject({
+      status: 404, code: 'BULK_JOB_NOT_FOUND',
     });
   });
 });

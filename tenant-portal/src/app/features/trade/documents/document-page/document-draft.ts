@@ -1,5 +1,5 @@
 import { termSelectionsBody } from '../../shared/terms/terms.model';
-import { fakeId } from '../../shared/trade-api';
+import { newIdempotencyKey } from '../../shared/trade-api';
 import { lineEvidence, rateBpsFromPercent, totalsEvidence } from '../shared/document-evidence';
 import type {
   ConvertPurchaseQuotationBody,
@@ -113,7 +113,7 @@ export function cloneTermSelections(sel: TermSelections): TermSelections {
 
 export function createEmptyLine(): EditableLine {
   return {
-    clientLineId: fakeId(),
+    clientLineId: newIdempotencyKey(),
     itemId: null,
     itemLabel: '',
     description: '',

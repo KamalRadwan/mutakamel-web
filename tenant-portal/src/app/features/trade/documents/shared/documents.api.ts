@@ -11,7 +11,6 @@ import {
 import type { CoreQuery } from '../../../../core/api/core-http';
 import { LanguageState } from '../../../../core/i18n/language';
 import { ScopeState } from '../../../../core/scope/scope';
-import { registerFakeBulkModuleLoader } from '../../../../shared/bulk-jobs/bulk-jobs.fake';
 import { termSelectionsBody } from '../../shared/terms/terms.model';
 import { crmHttp } from '../../../crm/shared/crm-http';
 import {
@@ -42,7 +41,6 @@ import type {
   PurchaseQuotationDetail,
   QuotationDetail,
   RenderJob,
-  SalesOrder,
   SalesOrderDetail,
   SourceCrmOpportunity,
   TaxSnapshot,
@@ -52,9 +50,6 @@ import type {
   TotalsEvidence,
 } from './document.model';
 import {
-  FAKE_CURRENT_USER_ID,
-  fakeFindSalesOrderByQuotation,
-  setDocumentInvalidationListener,
   type BulkPrintArtifact,
   type ConfirmSalesOrderResult,
   type ConvertPurchaseQuotationBody,
@@ -94,7 +89,7 @@ import {
   type UpdatePurchaseQuotationBody,
   type UpdateQuotationBody,
   type UpdateSalesOrderBody,
-} from './documents.fake';
+} from './documents.model';
 
 export interface DiscountPolicyLimit {
   id?: string;
@@ -165,7 +160,6 @@ export interface ListContactOptionsParams {
   limit?: number;
 }
 
-export { FAKE_CURRENT_USER_ID };
 export type {
   BulkPrintArtifact,
   ConfirmSalesOrderResult,
@@ -207,12 +201,6 @@ export type {
   UpdateQuotationBody,
   UpdateSalesOrderBody,
 };
-
-// Large fake bulk modules stay out of the initial bundle and load on first bulk action for these segments.
-const loadDocumentsBulkModules = () => import('./documents-bulk.fake-module');
-for (const segment of ['quotations', 'sales-orders', 'purchase-orders', 'purchase-quotations'] as const) {
-  registerFakeBulkModuleLoader('trading', `trading.${segment}`, loadDocumentsBulkModules);
-}
 
 // ---------------------------------------------------------------------------
 // Query keys & reactive cache invalidation (Angular resource() adapter;
@@ -267,8 +255,6 @@ export function invalidateDocumentQueries(kind?: DocumentKind): void {
   kindVersions['purchase-order'].update((n) => n + 1);
   kindVersions['purchase-quotation'].update((n) => n + 1);
 }
-
-setDocumentInvalidationListener((kind) => invalidateDocumentQueries(kind));
 
 function resolveInput<T>(val: T | Signal<T>): T {
   return typeof val === 'function' ? (val as Signal<T>)() : val;
@@ -1183,14 +1169,6 @@ export async function listPrintTemplates(
     });
   }
   return result;
-}
-
-/**
- * Fake-only lookup for openSalesOrder fallback.
- * Gap G1: real API has no `sourceQuotationId` filter; Phase 5 requests backend filter or uses convert receipt.
- */
-export function findSalesOrderByQuotation(quotationId: string): Promise<SalesOrder | null> {
-  return fakeFindSalesOrderByQuotation(quotationId);
 }
 
 /**

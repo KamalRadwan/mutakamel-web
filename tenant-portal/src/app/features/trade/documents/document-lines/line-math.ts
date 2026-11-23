@@ -9,7 +9,7 @@ import type {
   LineTaxInput,
   TaxCategory,
 } from '../shared/document.model';
-import { fakeId } from '../../shared/trade-api';
+import { newIdempotencyKey } from '../../shared/trade-api';
 import { formatMoney } from '../../shared/trade-format';
 import type { ItemSummary, TaxDefault } from '../../shared/trade-foundation.model';
 
@@ -63,7 +63,7 @@ export function safeIsZero(value: Dec | null | undefined): boolean {
 
 export function createEmptyEditableLine(): EditableLine {
   return {
-    clientLineId: fakeId(),
+    clientLineId: newIdempotencyKey(),
     itemId: null,
     itemLabel: '',
     description: '',
