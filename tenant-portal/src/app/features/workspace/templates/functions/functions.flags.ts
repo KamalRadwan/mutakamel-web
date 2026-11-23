@@ -1,2 +1,2 @@
-/** Feature flag gating the reusable functions route until backend handler and error catalogue ship (decision D11). */
-export const TEMPLATE_FUNCTIONS_ENABLED = false;
+/** Core HTTP contract checks and owned consumer tests pass; backend feature/permission checks still apply. */
+export const TEMPLATE_FUNCTIONS_ENABLED = true;

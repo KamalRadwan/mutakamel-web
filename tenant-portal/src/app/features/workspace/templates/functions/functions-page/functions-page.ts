@@ -1,5 +1,6 @@
 import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
+import { isRetryableWriteError } from '../../../../../core/api/api-errors';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -19,7 +20,7 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { ScopeState } from '../../../../../core/scope/scope';
+import { TenantScopeState } from '../../../../../core/scope/tenant-scope';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
@@ -36,20 +37,12 @@ import {
   FunctionSummaryDto,
   FunctionsListQuery,
   TemplateApiError,
-  archiveFunction,
-  buildFunctionCompanyOptions,
+  FunctionsApi,
   describeFunctionScope,
   formatFunctionDate,
-  listFunctions,
   newTemplateIdempotencyKey,
-  restoreFunction,
   translateFunctionError,
 } from '../functions.api';
-
-const CAN_READ = true; // later from the session permissions (templates.functions.read)
-const CAN_MANAGE = true; // later from the session permissions (templates.functions.manage)
-const CAN_PUBLISH = true; // later from the session permissions (templates.functions.publish)
-const CAN_UPDATE_TEMPLATES = true; // later from the session permissions (templates.update)
 
 interface FunctionFilters {
   status: '' | FunctionStatus;
@@ -107,7 +100,8 @@ export class FunctionsPage {
   protected readonly uid = `functions-page-${++FunctionsPage.nextId}`;
 
   private readonly destroyRef = inject(DestroyRef);
-  private readonly scopeState = inject(ScopeState);
+  private readonly api = inject(FunctionsApi);
+  private readonly scopeState = inject(TenantScopeState);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -117,10 +111,10 @@ export class FunctionsPage {
   private readonly rowReasonModal = viewChild.required<FunctionReasonModal>('rowReasonModal');
   private readonly filtersModal = viewChild.required<Modal>('filtersModal');
 
-  protected readonly canRead = CAN_READ;
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly canPublish = CAN_PUBLISH;
-  protected readonly canUpdateTemplates = CAN_UPDATE_TEMPLATES;
+  protected get canRead(): boolean { return this.hasPermission('templates.functions.read'); }
+  protected get canManage(): boolean { return this.hasPermission('templates.functions.manage'); }
+  protected get canPublish(): boolean { return this.hasPermission('templates.functions.publish'); }
+  protected get canUpdateTemplates(): boolean { return this.hasPermission('templates.update'); }
   protected readonly skeletonRows = [1, 2, 3, 4, 5];
 
   protected readonly searchDraft = signal('');
@@ -144,11 +138,12 @@ export class FunctionsPage {
 
   private loadSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly commandKeys = new Map<string, string>();
 
   protected readonly companyOptions = computed<FunctionCompanyOption[]>(() => {
     this.i18n();
-    const lang = this.language();
-    return buildFunctionCompanyOptions(this.scopeState.companies(), lang, (k) => this.transloco.translate(k));
+    // /me provides authorized IDs, but no company display names. Keep the IDs as honest labels.
+    return this.scopeState.selectorCompanyIds().map(id => ({ id, label: id }));
   });
 
   protected readonly statusFilterOptions = computed<DropdownOption<'' | FunctionStatus>[]>(() => {
@@ -162,19 +157,18 @@ export class FunctionsPage {
 
   protected readonly scopeFilterOptions = computed<DropdownOption<'' | FunctionScopeType>[]>(() => {
     this.i18n();
-    return [
+    const options: DropdownOption<'' | FunctionScopeType>[] = [
       { value: '', label: this.transloco.translate('tplFunctions.filters.allScopes') },
       { value: 'TENANT', label: this.transloco.translate('tplFunctions.scopes.tenant') },
       { value: 'COMPANY', label: this.transloco.translate('tplFunctions.scopes.company') },
     ];
+    return options.filter(option => option.value !== 'COMPANY' || this.companyOptions().length > 0);
   });
 
   protected readonly companyFilterOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
-    return [
-      { value: '', label: this.transloco.translate('tplFunctions.filters.allCompanies') },
-      ...this.companyOptions().map((c) => ({ value: c.id, label: c.label })),
-    ];
+    // Core requires an exact company whenever scopeType=COMPANY.
+    return this.companyOptions().map((c) => ({ value: c.id, label: c.label }));
   });
 
   protected readonly activeFiltersCount = computed(() => {
@@ -233,6 +227,7 @@ export class FunctionsPage {
     });
 
     effect(() => {
+      this.canRead;
       const name = this.searchQuery();
       const filters = this.filters();
       const cursor = this.currentCursor();
@@ -289,7 +284,7 @@ export class FunctionsPage {
     this.draftFilters.update((f) => ({
       ...f,
       scopeType,
-      companyId: scopeType === 'COMPANY' ? f.companyId : '',
+      companyId: scopeType === 'COMPANY' ? f.companyId || this.companyOptions()[0]?.id || '' : '',
     }));
   }
 
@@ -432,16 +427,22 @@ export class FunctionsPage {
     });
     if (!reason) return;
 
+    const fingerprint = JSON.stringify({ id: row.id, revision: row.revision, action, reason });
+    const key = this.commandKeys.get(fingerprint) ?? newTemplateIdempotencyKey();
+    this.commandKeys.set(fingerprint, key);
+
     try {
       if (action === 'archive') {
-        await archiveFunction(row.id, { reason }, row.etag, newTemplateIdempotencyKey());
+        await this.api.archiveFunction(row.id, { reason }, row.etag, key);
         this.notify.success(this.transloco.translate('tplFunctions.toasts.archived'));
       } else {
-        await restoreFunction(row.id, { reason }, row.etag, newTemplateIdempotencyKey());
+        await this.api.restoreFunction(row.id, { reason }, row.etag, key);
         this.notify.success(this.transloco.translate('tplFunctions.toasts.restored'));
       }
+      this.commandKeys.delete(fingerprint);
       this.reload();
     } catch (error) {
+      if (!isRetryableWriteError(error)) this.commandKeys.delete(fingerprint);
       this.notify.error(translateFunctionError(error, (k, p) => this.transloco.translate(k, p)));
     }
   }
@@ -474,7 +475,7 @@ export class FunctionsPage {
     this.correlationId.set(null);
 
     try {
-      const page = await listFunctions(query);
+      const page = await this.api.listFunctions(query);
       if (seq !== this.loadSeq) return;
       this.functions.set(page.items);
       this.pageInfo.set(page.pageInfo);
@@ -501,5 +502,9 @@ export class FunctionsPage {
       }
     }
     this.errorState.set('failed');
+  }
+
+  private hasPermission(key: string): boolean {
+    return this.scopeState.me()?.permissions.includes(key) ?? false;
   }
 }

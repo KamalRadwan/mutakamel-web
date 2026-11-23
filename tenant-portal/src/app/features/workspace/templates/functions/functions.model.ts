@@ -1,4 +1,5 @@
 import type { ScopeCompany } from '../../../../core/scope/scope';
+import { ApiError } from '../../../../core/api/api-errors';
 import { type FormulaReadableLabels, formatFormulaReadable } from '../designer/tables/table-ops';
 import type {
   TemplateAuthor,
@@ -23,16 +24,6 @@ export const FUNCTION_DECIMAL_RE = /^-?\d{1,30}(\.\d{1,18})?$/;
 
 export const FUNCTION_COMPANY_NILE_ID = '01948100-0000-7000-8000-00000000c001';
 export const FUNCTION_COMPANY_MTG_ID = '01948100-0000-7000-8000-00000000c002';
-
-const COMPANY_ALIAS_TO_UUID: Readonly<Record<string, string>> = {
-  c1: FUNCTION_COMPANY_NILE_ID,
-  c2: FUNCTION_COMPANY_MTG_ID,
-};
-
-const COMPANY_UUID_LABEL_KEY: Readonly<Record<string, string>> = {
-  [FUNCTION_COMPANY_NILE_ID]: 'tplFunctions.scopes.nileCompany',
-  [FUNCTION_COMPANY_MTG_ID]: 'tplFunctions.scopes.mtgCompany',
-};
 
 export type FunctionStatus = 'ACTIVE' | 'ARCHIVED';
 export type FunctionScopeType = 'TENANT' | 'COMPANY';
@@ -125,6 +116,10 @@ export interface FunctionValidationIssue {
   code: string;
   path?: string;
   testId?: string;
+  jsonPointer?: string;
+  nodeId?: string | null;
+  messageKey?: string;
+  params?: Record<string, never>;
 }
 
 export interface FunctionTestResultDto {
@@ -134,6 +129,8 @@ export interface FunctionTestResultDto {
 }
 
 export interface ValidateFunctionResponseDto {
+  /** Response ETag; the Core validation command advances the function revision. */
+  etag?: string;
   functionId: string;
   revision: number;
   validationId: string;
@@ -315,7 +312,7 @@ export interface FunctionCompanyOption {
 }
 
 export function normalizeCompanyUuid(companyId: string): string {
-  return COMPANY_ALIAS_TO_UUID[companyId] ?? companyId;
+  return companyId;
 }
 
 export function buildFunctionCompanyOptions(
@@ -329,8 +326,7 @@ export function buildFunctionCompanyOptions(
     const uuid = normalizeCompanyUuid(company.id);
     if (seen.has(uuid)) continue;
     seen.add(uuid);
-    const labelKey = COMPANY_UUID_LABEL_KEY[uuid];
-    const label = labelKey ? translate(labelKey) : lang === 'ar' ? company.nameAr : company.nameEn;
+    const label = lang === 'ar' ? company.nameAr : company.nameEn;
     options.push({ id: uuid, label });
   }
   return options;
@@ -350,9 +346,8 @@ export function describeFunctionScope(
   }
   const normalizedId = normalizeCompanyUuid(scope.companyId);
   const found = companies.find((c) => c.id === normalizedId || c.id === scope.companyId);
-  const labelKey = COMPANY_UUID_LABEL_KEY[normalizedId];
   return {
-    label: found?.label ?? (labelKey ? translate(labelKey) : scope.companyId),
+    label: found?.label ?? scope.companyId,
     icon: 'tablerBuilding',
     tile: 'bg-icon-navy',
   };
@@ -597,4 +592,136 @@ export interface FunctionEditorContextResponseDto {
   issuedAt: string;
   expiresAt: string;
   fingerprint: string;
+}
+
+function contractFailure(): never { throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR'); }
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function string(value: unknown): value is string { return typeof value === 'string'; }
+function positive(value: unknown): boolean { return Number.isSafeInteger(value) && Number(value) > 0; }
+function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(string); }
+function dimension(value: unknown): boolean { return ['SCALAR', 'MONEY', 'QUANTITY', 'UNIT_PRICE'].includes(String(value)); }
+function signature(value: unknown): boolean {
+  return record(value) && ['DECIMAL', 'STRING', 'BOOLEAN', 'DATE'].includes(String(value['type'])) &&
+    typeof value['nullable'] === 'boolean' && dimension(value['dimension']);
+}
+
+/** Core's ordinary function grammar excludes the dynamic-table SUM_ROWS variant at every depth. */
+export function checkFunctionExpression(value: unknown): asserts value is TemplateFormulaExpression {
+  let nodes = 0;
+  const visit = (v: unknown, depth: number): boolean => {
+    if (!record(v) || depth > 64 || ++nodes > 4096) return false;
+    const child = (x: unknown) => visit(x, depth + 1);
+    switch (v['kind']) {
+      case 'DECIMAL_LITERAL': return string(v['value']) && FUNCTION_DECIMAL_RE.test(v['value']) &&
+        (v['dimension'] === undefined || dimension(v['dimension'])) &&
+        (v['currencyCode'] === undefined || string(v['currencyCode'])) && (v['unitCode'] === undefined || string(v['unitCode']));
+      case 'STRING_LITERAL': case 'DATE_LITERAL': return string(v['value']);
+      case 'BOOLEAN_LITERAL': return typeof v['value'] === 'boolean';
+      case 'NULL_LITERAL': return true;
+      case 'BINDING': return string(v['path']) && (v['currencyCodePath'] === undefined || string(v['currencyCodePath']));
+      case 'ROOT_BINDING': case 'ROW_BINDING': return string(v['path']);
+      case 'FORMULA_REF': return string(v['formulaId']);
+      case 'PARAMETER': return string(v['name']);
+      case 'FUNCTION_CALL': return string(v['functionVersionId']) && Array.isArray(v['arguments']) &&
+        v['arguments'].every(arg => record(arg) && string(arg['name']) && child(arg['expression']));
+      case 'ADD': case 'SUBTRACT': case 'MULTIPLY': case 'SUM': case 'MIN': case 'MAX': case 'COALESCE': case 'CONCAT':
+        return Array.isArray(v['operands']) && v['operands'].every(child);
+      case 'DIVIDE': case 'ROUND': return Number.isInteger(v['scale']) &&
+        ['HALF_UP', 'HALF_EVEN', 'DOWN'].includes(String(v['rounding'])) &&
+        (v['kind'] === 'ROUND' ? child(v['value']) : child(v['dividend']) && child(v['divisor']));
+      case 'ABS': case 'NEGATE': case 'IS_NULL': case 'TRIM': return child(v['value']);
+      case 'DATE_ADD_DAYS': return child(v['date']) && child(v['days']);
+      case 'DATE_DIFF_DAYS': return child(v['left']) && child(v['right']);
+      case 'COMPARE': return ['EQ', 'NE', 'LT', 'LTE', 'GT', 'GTE'].includes(String(v['operator'])) && child(v['left']) && child(v['right']);
+      case 'IF': return child(v['condition']) && child(v['whenTrue']) && child(v['whenFalse']);
+      default: return false;
+    }
+  };
+  if (!visit(value, 0)) contractFailure();
+}
+
+export function checkFunctionSignature(parameters: unknown, result: unknown): void {
+  if (!Array.isArray(parameters) || !parameters.every(p => signature(p) && record(p) && string(p['name'])) || !signature(result)) contractFailure();
+}
+
+export function isFunctionValue(value: unknown): value is FunctionValue {
+  if (!record(value)) return false;
+  switch (value['kind']) {
+    case 'NULL': return true;
+    case 'STRING': case 'DATE': return string(value['value']);
+    case 'BOOLEAN': return typeof value['value'] === 'boolean';
+    // Evaluated values use exact256/128, which is wider than authored 30/18 literals.
+    case 'DECIMAL': return string(value['value']) && /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value['value']) &&
+      value['value'].replace(/[-.]/g, '').replace(/^0+/, '').length <= 256 &&
+      (value['value'].split('.')[1]?.length ?? 0) <= 128 && dimension(value['dimension']) &&
+      (value['currencyCode'] === undefined || string(value['currencyCode'])) && (value['unitCode'] === undefined || string(value['unitCode']));
+    default: return false;
+  }
+}
+
+export function checkFunctionWorking(value: unknown): asserts value is FunctionWorkingBody {
+  if (!record(value) || value['numericPolicy'] !== FUNCTION_NUMERIC_POLICY || !string(value['name']) ||
+      !(value['description'] === undefined || string(value['description'])) || !Array.isArray(value['tests']) ||
+      !value['tests'].every(test => record(test) && string(test['id']) && string(test['name']) && isFunctionValue(test['expected']) &&
+        Array.isArray(test['arguments']) && test['arguments'].every(arg => record(arg) && string(arg['name']) && isFunctionValue(arg['value'])))) contractFailure();
+  checkFunctionSignature(value['parameters'], value['result']);
+  checkFunctionExpression(value['expression']);
+}
+
+function pins(value: unknown): boolean {
+  return record(value) && string(value['templateSchemaVersion']) && string(value['templateEngineVersion']);
+}
+
+export function checkFunctionVersionProof(value: Record<string, unknown>): void {
+  const proof = value['testProof'];
+  if (!Array.isArray(value['dependencies']) || !value['dependencies'].every(dep => record(dep) &&
+      string(dep['functionVersionId']) && string(dep['contentChecksum'])) || !pins(value['packagePins']) ||
+      !record(proof) || !string(proof['validationId']) || !string(proof['checksum']) ||
+      !Number.isSafeInteger(proof['passedCount']) || Number(proof['passedCount']) < 0 ||
+      !Number.isSafeInteger(proof['totalCount']) || Number(proof['totalCount']) < Number(proof['passedCount'])) contractFailure();
+}
+
+export function checkFunctionEditorContext(value: unknown, request: FunctionEditorContextRequestDto): FunctionEditorContextResponseDto {
+  if (!record(value) || value['contract'] !== FUNCTION_EDITOR_CONTEXT_CONTRACT || !record(value['source']) ||
+      value['source']['templateId'] !== request.templateId || value['source']['draftRevision'] !== request.expectedDraftRevision ||
+      value['source']['contentChecksum'] !== request.expectedContentChecksum || !string(value['source']['draftId']) ||
+      value['ownerContextFingerprint'] !== request.expectedOwnerContextFingerprint || !record(value['request']) ||
+      !strings(value['rootFunctionVersionIds']) || !record(value['release']) || !record(value['membership']) ||
+      !strings(value['membership']['currencyCodes']) || !strings(value['membership']['unitCodes']) ||
+      !string(value['fingerprint']) || !string(value['issuedAt']) || !string(value['expiresAt']) ||
+      !Array.isArray(value['versions'])) contractFailure();
+  const echo = value['request'];
+  const equalSet = (a: unknown, b: readonly string[]) => strings(a) && a.length === b.length &&
+    [...a].sort().every((v, i) => v === [...b].sort()[i]);
+  for (const key of ['templateId', 'expectedDraftRevision', 'expectedContentChecksum', 'expectedOwnerContextFingerprint'] as const) {
+    if (echo[key] !== request[key]) contractFailure();
+  }
+  for (const key of ['functionVersionIds', 'currencyCodes', 'unitCodes'] as const) {
+    if (!equalSet(echo[key], request[key])) contractFailure();
+  }
+  if (!equalSet(value['rootFunctionVersionIds'], request.functionVersionIds) ||
+      !equalSet(value['membership']['currencyCodes'], request.currencyCodes) || !equalSet(value['membership']['unitCodes'], request.unitCodes)) contractFailure();
+  const release = value['release'];
+  if (!string(release['qualifiedManifestSha256']) || !pins(release['executionPackagePins']) ||
+      !Array.isArray(release['compatibleProducerPins']) || !release['compatibleProducerPins'].every(pins) ||
+      !record(release['ownerPackagePins'])) contractFailure();
+  const issued = Date.parse(value['issuedAt']);
+  const expires = Date.parse(value['expiresAt']);
+  if (!Number.isFinite(issued) || expires - issued !== FUNCTION_EDITOR_CONTEXT_TTL_MS || expires <= Date.now()) contractFailure();
+  const ids = new Set<string>();
+  for (const version of value['versions']) {
+    if (!record(version) || !string(version['id']) || ids.has(version['id']) || !string(version['functionId']) ||
+        !positive(version['versionNumber']) || !string(version['contentChecksum'])) contractFailure();
+    ids.add(version['id']);
+    checkFunctionWorking(version['definition']);
+    checkFunctionVersionProof(version);
+  }
+  if (request.functionVersionIds.some(id => !ids.has(id))) contractFailure();
+  for (const version of value['versions']) {
+    const item = version as Record<string, unknown>;
+    if ((item['dependencies'] as FunctionVersionDependency[]).some(dep => !ids.has(dep.functionVersionId))) contractFailure();
+  }
+  return value as unknown as FunctionEditorContextResponseDto;
 }

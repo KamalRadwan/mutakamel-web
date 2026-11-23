@@ -3,19 +3,23 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Notify } from '../../../../../core/notify/notify';
-import { listFunctions } from '../functions.api';
+import { FunctionsApi, TemplateApiError } from '../functions.api';
+import * as fixtures from '../functions.fake';
+import { TemplatesApi } from '../../templates.api';
+import { TemplatesHttp } from '../../templates-http';
 import type {
   FunctionCompanyOption,
   FunctionDetailDto,
   FunctionParameter,
   FunctionSummaryDto,
   FunctionTestCase,
+  ValidateFunctionResponseDto,
 } from '../functions.model';
 import { FunctionModal } from './function-modal';
 
 /*
- * The modal runs on the real functions fake (vi.mock of relative modules is not supported by the
- * Angular unit-test builder). No translations are loaded, so every text is its own key.
+ * Fixtures are confined to this component spec. Production receives the injected HTTP service.
+ * No translations are loaded, so every text is its own key.
  */
 
 /** Answers on a later microtask: a synchronous loader writes signals during render (NG0600). */
@@ -83,7 +87,7 @@ function tests(): FunctionTestCase[] {
 }
 
 async function summaryByCode(code: string): Promise<FunctionSummaryDto> {
-  const page = await run(listFunctions({ limit: 100 }));
+  const page = await run(fixtures.fakeListFunctions({ limit: 100 }));
   const found = page.items.find((f) => f.code === code);
   if (!found) throw new Error(`Seed ${code} missing`);
   return found;
@@ -114,6 +118,20 @@ beforeEach(async () => {
   };
   TestBed.configureTestingModule({
     providers: [
+      { provide: FunctionsApi, useValue: {
+        createFunction: fixtures.fakeCreateFunction,
+        getFunction: fixtures.fakeGetFunction,
+        patchFunction: fixtures.fakePatchFunction,
+        validateFunction: fixtures.fakeValidateFunction,
+        publishFunction: fixtures.fakePublishFunction,
+        archiveFunction: fixtures.fakeArchiveFunction,
+        restoreFunction: fixtures.fakeRestoreFunction,
+        listFunctionVersions: fixtures.fakeListFunctionVersions,
+        getFunctionVersion: fixtures.fakeGetFunctionVersion,
+        listFunctionUsage: fixtures.fakeListFunctionUsage,
+      } },
+      { provide: TemplatesApi, useValue: {} },
+      { provide: TemplatesHttp, useValue: {} },
       provideTransloco({
         config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
         loader: AsyncEmptyLoader,
@@ -523,6 +541,36 @@ describe('FunctionModal: edit mode', () => {
     expect(c['validationExpired']()).toBe(true);
     expect(c['publishDisabled']()).toBe(true);
     expect(c['publishTooltip']()).toBe('tplFunctions.modal.publishValidationExpired');
+  });
+
+  it('uses the revision and ETag advanced by Core validation for subsequent commands', async () => {
+    await openEdit(SEED.lineDiscount);
+    const previous = c['detail']() as FunctionDetailDto;
+    const result: ValidateFunctionResponseDto = {
+      functionId: previous.id, revision: previous.revision + 1, etag: `"${previous.revision + 1}"`,
+      validationId: 'new-proof', state: 'PASSED', contentChecksum: 'content', dependencyChecksum: 'dependency',
+      validatedAt: new Date().toISOString(), issues: [], testResults: [],
+    };
+    const api = TestBed.inject(FunctionsApi);
+    const validate = vi.spyOn(api, 'validateFunction').mockResolvedValueOnce(result);
+    await run(c['runValidate']());
+    expect(validate).toHaveBeenCalledWith(previous.id, { revision: previous.revision }, previous.etag, expect.any(String));
+    expect(c['detail']().revision).toBe(result.revision);
+    expect(c['detail']().etag).toBe(result.etag);
+    expect(c['publishDisabled']()).toBe(false);
+  });
+
+  it('reuses the validation command key after an ambiguous network failure', async () => {
+    await openEdit(SEED.lineDiscount);
+    const previous = c['detail']() as FunctionDetailDto;
+    const api = TestBed.inject(FunctionsApi);
+    const validate = vi.spyOn(api, 'validateFunction').mockRejectedValueOnce(new TemplateApiError(0, 'NETWORK_ERROR'))
+      .mockResolvedValueOnce({ functionId: previous.id, revision: previous.revision + 1, validationId: 'proof', state: 'PASSED',
+        contentChecksum: 'content', dependencyChecksum: 'dependency', validatedAt: new Date().toISOString(), issues: [], testResults: [] });
+    await run(c['runValidate']());
+    await run(c['runValidate']());
+    expect(validate).toHaveBeenCalledTimes(2);
+    expect(validate.mock.calls[1][3]).toBe(validate.mock.calls[0][3]);
   });
 
   it('an archived function is read-only: inputs are ignored and Save does nothing', async () => {

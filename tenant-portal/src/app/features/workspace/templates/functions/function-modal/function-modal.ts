@@ -11,6 +11,7 @@ import {
   viewChildren,
 } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
+import { isRetryableWriteError } from '../../../../../core/api/api-errors';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -75,24 +76,15 @@ import {
   FunctionVersionSummaryDto,
   FunctionWorkingBody,
   TemplateApiError,
+  FunctionsApi,
   ValidateFunctionResponseDto,
-  archiveFunction,
-  createFunction,
   defaultFunctionValue,
   formatFunctionDateTime,
   formatFunctionExpression,
   formatFunctionTime,
-  getFunction,
-  getFunctionVersion,
-  listFunctionUsage,
-  listFunctionVersions,
   newTemplateIdempotencyKey,
-  patchFunction,
-  publishFunction,
-  restoreFunction,
   translateFunctionError,
   translateFunctionIssueCode,
-  validateFunction,
 } from '../functions.api';
 
 type FunctionModalTab = 'definition' | 'tests' | 'versions' | 'usage';
@@ -261,6 +253,7 @@ export class FunctionModal {
   protected readonly uid = `fn-modal-${++FunctionModal.nextId}`;
 
   private readonly destroyRef = inject(DestroyRef);
+  private readonly api = inject(FunctionsApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
@@ -453,7 +446,8 @@ export class FunctionModal {
 
   protected readonly validationIssues = computed<readonly FunctionValidationIssue[]>(() => {
     const run = this.lastValidationRun();
-    if (!run || !this.validationSummary() || run.validationId !== this.validationSummary()!.id) return [];
+    const summary = this.validationSummary();
+    if (!run || !summary || run.validationId !== summary.id) return [];
     return run.issues;
   });
 
@@ -993,6 +987,8 @@ export class FunctionModal {
           working: { ...d.working, expression: res.expression },
         }));
       }
+    } catch (error) {
+      this.notify.error(translateFunctionError(error, (k, p) => this.transloco.translate(k, p)));
     } finally {
       this.childModalOpen.set(false);
     }
@@ -1177,7 +1173,8 @@ export class FunctionModal {
 
   protected testResultFor(testId: string): { state: FunctionValidationState; issueCodes: string[] } | null {
     const run = this.lastValidationRun();
-    if (!run || !this.validationSummary() || run.validationId !== this.validationSummary()!.id) return null;
+    const summary = this.validationSummary();
+    if (!run || !summary || run.validationId !== summary.id) return null;
     return run.testResults.find((r) => r.testId === testId) ?? null;
   }
 
@@ -1228,7 +1225,7 @@ export class FunctionModal {
       }
       this.saving.set(true);
       try {
-        const created = await createFunction(body, this.lastSaveIdempotencyKey);
+        const created = await this.api.createFunction(body, this.lastSaveIdempotencyKey);
         this.lastSaveFingerprint = null;
         this.lastSaveIdempotencyKey = null;
         this.applyLoadedDetail(created);
@@ -1254,7 +1251,7 @@ export class FunctionModal {
     }
     this.saving.set(true);
     try {
-      const updated = await patchFunction(
+      const updated = await this.api.patchFunction(
         currentDetail.id,
         { working },
         currentDetail.etag,
@@ -1282,18 +1279,21 @@ export class FunctionModal {
 
     this.validating.set(true);
     try {
-      const run = await validateFunction(
+      const run = await this.api.validateFunction(
         currentDetail.id,
         { revision: currentDetail.revision },
         currentDetail.etag,
-        newTemplateIdempotencyKey(),
+        this.commandKey({ action: 'validate', id: currentDetail.id, revision: currentDetail.revision }),
       );
+      this.clearCommandKey();
       this.lastValidationRun.set(run);
       this.nowTick.set(Date.now());
       this.detail.update((d) =>
         d
           ? {
               ...d,
+              revision: run.revision,
+              etag: run.etag ?? `"${run.revision}"`,
               validation: {
                 id: run.validationId,
                 state: run.state,
@@ -1338,7 +1338,7 @@ export class FunctionModal {
 
     this.publishing.set(true);
     try {
-      const version = await publishFunction(
+      const version = await this.api.publishFunction(
         currentDetail.id,
         {
           revision: currentDetail.revision,
@@ -1348,9 +1348,10 @@ export class FunctionModal {
           changeNote,
         },
         currentDetail.etag,
-        newTemplateIdempotencyKey(),
+        this.commandKey({ action: 'publish', id: currentDetail.id, revision: currentDetail.revision, validation: val, changeNote }),
       );
-      const refreshed = await getFunction(currentDetail.id);
+      const refreshed = await this.api.getFunction(currentDetail.id);
+      this.clearCommandKey();
       this.applyLoadedDetail(refreshed);
       this.versionDetailsById.update((map) => ({ ...map, [version.id]: version }));
       this.versionResolved.emit({ versionId: version.id, versionNumber: version.versionNumber });
@@ -1384,10 +1385,12 @@ export class FunctionModal {
 
     this.archiving.set(true);
     try {
+      const key = this.commandKey({ action, id: currentDetail.id, revision: currentDetail.revision, reason });
       const updated =
         action === 'archive'
-          ? await archiveFunction(currentDetail.id, { reason }, currentDetail.etag, newTemplateIdempotencyKey())
-          : await restoreFunction(currentDetail.id, { reason }, currentDetail.etag, newTemplateIdempotencyKey());
+          ? await this.api.archiveFunction(currentDetail.id, { reason }, currentDetail.etag, key)
+          : await this.api.restoreFunction(currentDetail.id, { reason }, currentDetail.etag, key);
+      this.clearCommandKey();
       this.applyLoadedDetail(updated);
       this.notify.success(
         this.transloco.translate(
@@ -1409,7 +1412,7 @@ export class FunctionModal {
     let full = this.versionDetailsById()[summary.id];
     if (!full) {
       try {
-        full = await getFunctionVersion(id, summary.id);
+        full = await this.api.getFunctionVersion(id, summary.id);
         this.versionDetailsById.update((m) => ({ ...m, [summary.id]: full }));
       } catch (error) {
         this.notify.error(translateFunctionError(error, (k, p) => this.transloco.translate(k, p)));
@@ -1480,7 +1483,7 @@ export class FunctionModal {
 
     this.openingImpact.set(true);
     try {
-      const unfiltered = await listFunctionUsage(currentDetail.id, { limit: 100 });
+      const unfiltered = await this.api.listFunctionUsage(currentDetail.id, { limit: 100 });
       this.childModalOpen.set(true);
       this.impactModal().open({
         functionId: currentDetail.id,
@@ -1568,8 +1571,8 @@ export class FunctionModal {
     this.loading.set(true);
     try {
       const [detailRes, versionsRes] = await Promise.all([
-        getFunction(functionId),
-        listFunctionVersions(functionId, { limit: 25 }),
+        this.api.getFunction(functionId),
+        this.api.listFunctionVersions(functionId, { limit: 25 }),
       ]);
       if (seq !== this.loadSeq) return;
 
@@ -1592,7 +1595,7 @@ export class FunctionModal {
     const seq = ++this.versionsSeq;
     this.versionsLoading.set(true);
     try {
-      const page = await listFunctionVersions(functionId, { cursor, limit: 25 });
+      const page = await this.api.listFunctionVersions(functionId, { cursor, limit: 25 });
       if (seq !== this.versionsSeq) return;
       this.versions.set(page.items);
       this.versionsPageInfo.set(page.pageInfo);
@@ -1615,7 +1618,12 @@ export class FunctionModal {
     const known = this.versionDetailsById();
     const missing = items.filter((v) => !known[v.id]);
     if (missing.length === 0) return;
-    const settled = await Promise.allSettled(missing.map((v) => getFunctionVersion(functionId, v.id)));
+    const settled = await Promise.allSettled(missing.map((v) => this.api.getFunctionVersion(functionId, v.id)));
+    if (this.detail()?.id !== functionId || !this.isOpen()) return;
+    const failed = settled.find(item => item.status === 'rejected');
+    if (failed?.status === 'rejected') {
+      this.notify.error(translateFunctionError(failed.reason, (k, p) => this.transloco.translate(k, p)));
+    }
     const additions: Record<string, FunctionVersionDetailDto> = {};
     for (const item of settled) {
       if (item.status === 'fulfilled') {
@@ -1631,7 +1639,7 @@ export class FunctionModal {
     const seq = ++this.usageSeq;
     this.usageLoading.set(true);
     try {
-      const page = await listFunctionUsage(functionId, {
+      const page = await this.api.listFunctionUsage(functionId, {
         versionId: versionId || undefined,
         cursor,
         limit: 25,
@@ -1669,6 +1677,7 @@ export class FunctionModal {
   }
 
   private handleMutationError(error: unknown): void {
+    if (!isRetryableWriteError(error)) this.clearCommandKey();
     if (error instanceof TemplateApiError) {
       if (error.status === 412 || error.code === 'STALE' || error.code === 'CORE.TEMPLATE.CONCURRENCY.STALE_REVISION') {
         this.conflictOpen.set(true);
@@ -1683,6 +1692,20 @@ export class FunctionModal {
       }
     }
     this.notify.error(translateFunctionError(error, (k, p) => this.transloco.translate(k, p)));
+  }
+
+  private commandKey(command: object): string {
+    const fingerprint = JSON.stringify(command);
+    if (fingerprint !== this.lastSaveFingerprint || !this.lastSaveIdempotencyKey) {
+      this.lastSaveFingerprint = fingerprint;
+      this.lastSaveIdempotencyKey = newTemplateIdempotencyKey();
+    }
+    return this.lastSaveIdempotencyKey;
+  }
+
+  private clearCommandKey(): void {
+    this.lastSaveFingerprint = null;
+    this.lastSaveIdempotencyKey = null;
   }
 
   private setTestArgumentValue(testId: string, paramName: string, value: FunctionValue): void {
