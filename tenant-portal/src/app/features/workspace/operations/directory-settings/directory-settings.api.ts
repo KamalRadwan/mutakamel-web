@@ -1,36 +1,45 @@
 import { inject, Service } from '@angular/core';
 import { QueryClient } from '@tanstack/angular-query';
+import { ApiError } from '../../../../core/api/api-errors';
+import { CoreHttp } from '../../../../core/api/core-http';
 import { TenantScopeState } from '../../../../core/scope/tenant-scope';
-import { fakeGetDirectorySettings, fakeUpdateDirectorySettings } from './directory-settings.fake';
-import { DirectorySettingsPatch, DirectorySettingsResult } from './directory-settings.model';
+import { DirectorySettings, DirectorySettingsPatch, DirectorySettingsResult } from './directory-settings.model';
 
 export * from './directory-settings.model';
 
 const SETTINGS_QUERY_KEY = 'workspace-directory-settings';
+const SETTINGS_PATH = '/api/tenant/core/v1/directory/settings';
 
 @Service()
 export class DirectorySettingsApi {
+  private readonly http = inject(CoreHttp);
   private readonly scope = inject(TenantScopeState);
   private readonly queries = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, networkMode: 'always' } },
   });
 
   getDirectorySettings(): Promise<DirectorySettingsResult> {
-    // FAKE-ONLY until BE-DIR is merged: GET/PATCH /api/tenant/core/v1/directory/settings (version + If-Match)
     return this.queries.fetchQuery({
       queryKey: [SETTINGS_QUERY_KEY, this.scope.me()?.id],
       queryFn: async () => {
-        const settings = await fakeGetDirectorySettings();
-        return { settings, etag: `"${settings.version}"` };
+        const result = await this.http.readWithEtag<DirectorySettings>(SETTINGS_PATH);
+        return settingsResult(result.data, result.etag);
       },
     });
   }
 
   async updateDirectorySettings(patch: DirectorySettingsPatch, ifMatch: string): Promise<DirectorySettingsResult> {
-    // FAKE-ONLY until BE-DIR is merged: GET/PATCH /api/tenant/core/v1/directory/settings (version + If-Match)
-    const settings = await fakeUpdateDirectorySettings(patch, ifMatch);
+    const response = await this.http.write<DirectorySettings>('PATCH', SETTINGS_PATH, patch, { ifMatch });
+    const result = settingsResult(response.data, response.etag);
     await this.queries.cancelQueries({ queryKey: [SETTINGS_QUERY_KEY] });
     await this.queries.invalidateQueries({ queryKey: [SETTINGS_QUERY_KEY] });
-    return { settings, etag: `"${settings.version}"` };
+    return result;
   }
+}
+
+function settingsResult(settings: DirectorySettings, etag: string | null): DirectorySettingsResult {
+  if (!etag || !/^"[1-9]\d*"$/.test(etag)) {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
+  return { settings, etag };
 }
