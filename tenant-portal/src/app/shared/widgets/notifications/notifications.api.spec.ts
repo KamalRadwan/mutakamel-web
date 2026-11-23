@@ -1,15 +1,15 @@
 import { newIdempotencyKey } from '../../../core/api/idempotency';
 import {
-  acknowledgeNotification,
-  dismissNotification,
-  getNotification,
-  getNotificationConfig,
-  getUnreadNotificationCount,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from './notifications.api';
-import { resetFakeNotifications, setFakeNotificationUserInactive } from './notifications.fake';
+  fakeAcknowledgeNotification as acknowledgeNotification,
+  fakeDismissNotification as dismissNotification,
+  fakeGetNotification as getNotification,
+  fakeGetUnreadCount as getUnreadNotificationCount,
+  fakeListNotifications as listNotifications,
+  fakeMarkAllNotificationsRead as markAllNotificationsRead,
+  fakeMarkNotificationRead as markNotificationRead,
+  resetFakeNotifications,
+  setFakeNotificationUserInactive,
+} from './notifications.fake';
 import { KNOWN_NOTIFICATION_TYPES, inAppActionPath, notificationLook } from './notifications.model';
 
 const MISSING_ID = '019a7c10-ffff-7000-8000-00000000ffff';
@@ -68,11 +68,17 @@ describe('notifications fake follows TenantNotificationsController', () => {
     expect(first.items).toHaveLength(3);
     expect(first.hasNext).toBe(true);
     const second = await listNotifications({ limit: 3, cursor: first.nextCursor as string });
-    expect(second.items.map((item) => item.id)).toEqual(all.items.slice(3, 6).map((item) => item.id));
+    expect(second.items.map((item) => item.id)).toEqual(
+      all.items.slice(3, 6).map((item) => item.id),
+    );
   });
 
   it('rejects a bad cursor with 400 NOTIFICATION_CURSOR_INVALID and a bad limit with 400 CORE_VALIDATION_FAILED', async () => {
-    await rejectsWith(listNotifications({ cursor: 'not-a-cursor' }), 400, 'NOTIFICATION_CURSOR_INVALID');
+    await rejectsWith(
+      listNotifications({ cursor: 'not-a-cursor' }),
+      400,
+      'NOTIFICATION_CURSOR_INVALID',
+    );
     await rejectsWith(listNotifications({ limit: 51 }), 400, 'CORE_VALIDATION_FAILED');
     await rejectsWith(listNotifications({ limit: 0 }), 400, 'CORE_VALIDATION_FAILED');
   });
@@ -84,12 +90,12 @@ describe('notifications fake follows TenantNotificationsController', () => {
     expect(unread.unreadCount).toBe(unread.items.length);
   });
 
-  it('returns stored text in the request language', async () => {
+  it('keeps stored text across language switches', async () => {
     const en = await listNotifications({ limit: 1 });
     document.documentElement.lang = 'ar';
     const ar = await listNotifications({ limit: 1 });
     expect(ar.items[0].id).toBe(en.items[0].id);
-    expect(ar.items[0].title).not.toBe(en.items[0].title);
+    expect(ar.items[0].title).toBe(en.items[0].title);
   });
 
   it('marks one read (idempotent) and lowers the unread count', async () => {
@@ -121,14 +127,18 @@ describe('notifications fake follows TenantNotificationsController', () => {
     const { items } = await listNotifications();
     await expect(dismissNotification(items[0].id, newIdempotencyKey())).resolves.toBeUndefined();
     await rejectsWith(getNotification(items[0].id), 404, 'NOTIFICATION_NOT_FOUND');
-    await rejectsWith(markNotificationRead(items[0].id, newIdempotencyKey()), 404, 'NOTIFICATION_NOT_FOUND');
-    await rejectsWith(dismissNotification(items[0].id, newIdempotencyKey()), 404, 'NOTIFICATION_NOT_FOUND');
+    await expect(markNotificationRead(items[0].id, newIdempotencyKey())).resolves.toBeUndefined();
+    await expect(dismissNotification(items[0].id, newIdempotencyKey())).resolves.toBeUndefined();
     expect((await listNotifications()).items.some((item) => item.id === items[0].id)).toBe(false);
   });
 
   it('returns 404 NOTIFICATION_NOT_FOUND for an unknown id and 400 CORE_VALIDATION_FAILED for a non-UUID', async () => {
     await rejectsWith(getNotification(MISSING_ID), 404, 'NOTIFICATION_NOT_FOUND');
-    await rejectsWith(acknowledgeNotification(MISSING_ID, newIdempotencyKey()), 404, 'NOTIFICATION_NOT_FOUND');
+    await rejectsWith(
+      acknowledgeNotification(MISSING_ID, newIdempotencyKey()),
+      404,
+      'NOTIFICATION_NOT_FOUND',
+    );
     await rejectsWith(getNotification('n-1'), 400, 'CORE_VALIDATION_FAILED');
   });
 
@@ -137,17 +147,31 @@ describe('notifications fake follows TenantNotificationsController', () => {
     setFakeNotificationUserInactive(true);
     await rejectsWith(listNotifications(), 404, 'NOTIFICATION_USER_NOT_FOUND');
     await rejectsWith(getUnreadNotificationCount(), 404, 'NOTIFICATION_USER_NOT_FOUND');
-    await rejectsWith(markNotificationRead(items[0].id, newIdempotencyKey()), 404, 'NOTIFICATION_USER_NOT_FOUND');
-    await rejectsWith(markAllNotificationsRead(newIdempotencyKey()), 404, 'NOTIFICATION_USER_NOT_FOUND');
+    await rejectsWith(
+      markNotificationRead(items[0].id, newIdempotencyKey()),
+      404,
+      'NOTIFICATION_USER_NOT_FOUND',
+    );
+    await rejectsWith(
+      markAllNotificationsRead(newIdempotencyKey()),
+      404,
+      'NOTIFICATION_USER_NOT_FOUND',
+    );
     setFakeNotificationUserInactive(false);
   });
 
-  it('serves the runtime config with the preference catalogue', async () => {
-    const config = await getNotificationConfig();
-    expect(Object.keys(config).sort()).toEqual(
-      ['enabled', 'inAppEnabled', 'pollIntervalMs', 'preferenceCatalogue', 'previewLimit', 'realtimeEnabled'].sort(),
-    );
-    expect(config.preferenceCatalogue.map((row) => row.notificationType)).toEqual([...KNOWN_NOTIFICATION_TYPES]);
+  it('fake matches backend dismissed and v7 rules', async () => {
+    const { items } = await listNotifications();
+    const id = items[0].id;
+    await dismissNotification(id);
+    await expect(markNotificationRead(id)).resolves.toBeUndefined();
+    await expect(acknowledgeNotification(id)).resolves.toBeUndefined();
+    await expect(dismissNotification(id)).resolves.toBeUndefined();
+    const v4 = id.replace('-7000-', '-4000-');
+    await rejectsWith(getNotification(v4), 400, 'CORE_VALIDATION_FAILED');
+    await rejectsWith(markNotificationRead(v4), 400, 'CORE_VALIDATION_FAILED');
+    await rejectsWith(acknowledgeNotification(v4), 400, 'CORE_VALIDATION_FAILED');
+    await rejectsWith(dismissNotification(v4), 400, 'CORE_VALIDATION_FAILED');
   });
 });
 

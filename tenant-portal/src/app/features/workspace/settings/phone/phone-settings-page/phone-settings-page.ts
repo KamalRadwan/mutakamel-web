@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   Component,
   DestroyRef,
@@ -26,7 +27,6 @@ import {
   tablerExclamationCircle,
   tablerEye,
   tablerGripVertical,
-  tablerLoader2,
   tablerPhone,
   tablerPlus,
   tablerRefresh,
@@ -38,31 +38,28 @@ import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError, correlationIdOf, errorCodeOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import {
-  createPhoneServer,
-  deletePhoneServer,
-  getPhoneConfig,
-  getPhoneSeats,
-  listPhoneServers,
-  reorderPhoneServers,
-  updatePhoneServer,
-} from '../phone-servers.api';
+import { PhoneServersApi, phoneErrorMessage } from '../phone-servers.api';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { LanguageState } from '../../../../../core/i18n/language';
+import { ActionKeys } from '../../core-response.model';
+import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
+import { RouteError } from '../../../../../shared/ui/route-error/route-error';
 import {
   PHONE_SERVER_LIMIT,
   PhoneConfig,
   PhoneSeats,
   PhoneServer,
   protocolOfUrl,
+  phonePermissions,
 } from '../phone-servers.model';
 import { ServerModal } from '../server-modal/server-modal';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 
-const CAN_MANAGE = true; // later from session permissions (webphone.settings.update)
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
 
-type PageFullState = 'notPurchased' | 'provisioning' | 'loadFailed' | null;
+type PageFullState = 'notPurchased' | 'provisioning' | 'forbidden' | null;
 
 interface DraggedServer {
   serverId: string;
@@ -184,6 +181,9 @@ export class PhoneServerDrop {
   selector: 'app-phone-settings-page',
   imports: [
     RouterLink,
+    NgTemplateOutlet,
+    SettingsNotice,
+    RouteError,
     NgIcon,
     TranslocoPipe,
     ActionsMenu,
@@ -201,8 +201,7 @@ export class PhoneServerDrop {
       tablerServer,
       tablerPlus,
       tablerRefresh,
-      tablerLoader2,
-      tablerPhone,
+          tablerPhone,
       tablerClock,
       tablerCloudOff,
       tablerEye,
@@ -249,33 +248,41 @@ export class PhoneSettingsPage {
   }
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(PhoneServersApi);
+  private readonly session = inject(AuthSession);
+  private readonly language = inject(LanguageState).current;
+  private readonly actionKeys = new ActionKeys(newIdempotencyKey);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly serverModal = viewChild.required(ServerModal);
   private readonly deleteDialog = viewChild.required<ConfirmDialog>('deleteDialog');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly moduleInactive = signal(false);
+  protected readonly tenantWideDenied = signal(false);
+  protected readonly canRead = computed(() => phonePermissions(this.session.me()).readable);
+  protected readonly canManage = computed(() => phonePermissions(this.session.me()).editable && !this.tenantWideDenied() && !this.moduleInactive());
   protected readonly serverLimit = PHONE_SERVER_LIMIT;
   protected readonly skeletonRows = SKELETON_ROWS;
 
   protected readonly servers = signal<PhoneServer[]>([]);
-  protected readonly config = signal<PhoneConfig>({ enabled: false });
+  protected readonly config = signal<PhoneConfig | null>(null);
   protected readonly seats = signal<PhoneSeats | null>(null);
-  protected readonly loading = signal(true);
+  protected readonly cardLoading = signal({ config: true, seats: true, servers: true });
+  protected readonly cardErrors = signal<{ config: unknown; seats: unknown; servers: unknown }>({ config: null, seats: null, servers: null });
+  protected readonly loading = computed(() => Object.values(this.cardLoading()).some(Boolean));
   protected readonly fullState = signal<PageFullState>(null);
-  protected readonly adding = signal(false);
   protected readonly reordering = signal(false);
   protected readonly deleting = signal(false);
   protected readonly togglingIds = signal<ReadonlySet<string>>(new Set());
   protected readonly pendingDeleteServer = signal<PhoneServer | null>(null);
 
-  private loadSeq = 0;
+  private readonly loadSeq = { config: 0, seats: 0, servers: 0 };
 
   protected readonly atLimit = computed(() => this.servers().length >= PHONE_SERVER_LIMIT);
 
   protected readonly tableColumns = computed(() =>
-    this.canManage
+    this.canManage()
       ? 'grid-cols-phone-server-row-manage'
       : 'grid-cols-phone-server-row',
   );
@@ -285,34 +292,48 @@ export class PhoneSettingsPage {
   }
 
   protected async load(): Promise<void> {
-    const seq = ++this.loadSeq;
-    this.loading.set(true);
+    if (!this.canRead()) { this.fullState.set('forbidden'); return; }
     this.fullState.set(null);
+    await Promise.allSettled([this.loadCard('config'), this.loadCard('seats'), this.loadCard('servers')]);
+  }
+
+  protected async loadCard(card: 'config' | 'seats' | 'servers'): Promise<void> {
+    if (!this.canRead()) { this.fullState.set('forbidden'); return; }
+    const seq = ++this.loadSeq[card];
+    this.cardLoading.update(value => ({ ...value, [card]: true }));
+    this.cardErrors.update(value => ({ ...value, [card]: null }));
     try {
-      const [config, seats, servers] = await Promise.all([
-        getPhoneConfig(),
-        getPhoneSeats(),
-        listPhoneServers(),
-      ]);
-      if (seq !== this.loadSeq) return;
-      this.config.set(config);
-      this.seats.set(seats);
-      this.servers.set(servers);
-    } catch (error) {
-      if (seq !== this.loadSeq) return;
-      const code = errorCodeOf(error);
-      if (code === 'WEBPHONE_MODULE_NOT_PURCHASED') {
-        this.fullState.set('notPurchased');
-      } else if (code === 'WEBPHONE_PROVISIONING_PENDING') {
-        this.fullState.set('provisioning');
+      if (card === 'config') {
+        const value = await this.api.getPhoneConfig();
+        if (seq === this.loadSeq[card]) this.config.set(value);
+      } else if (card === 'seats') {
+        const value = await this.api.getPhoneSeats();
+        if (seq === this.loadSeq[card]) this.seats.set(value);
       } else {
-        this.fullState.set('loadFailed');
+        const value = await this.api.listPhoneServers();
+        if (seq === this.loadSeq[card]) this.servers.set(value);
       }
+    } catch (error) {
+      if (seq !== this.loadSeq[card]) return;
+      this.cardErrors.update(value => ({ ...value, [card]: error }));
+      const code = errorCodeOf(error);
+      if (code === 'WEBPHONE_MODULE_NOT_PURCHASED') this.fullState.set('notPurchased');
+      else if (code === 'WEBPHONE_PROVISIONING_PENDING') this.fullState.set('provisioning');
+      else if (error instanceof ApiError && error.status === 403) this.fullState.set('forbidden');
+      else if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(this.resolveError(error), '');
     } finally {
-      if (seq === this.loadSeq) {
-        this.loading.set(false);
+      if (seq === this.loadSeq[card]) this.cardLoading.update(value => ({ ...value, [card]: false }));
+      if (!this.loading() && !Object.values(this.cardErrors()).some(error => error instanceof ApiError && error.status === 0)) {
+        this.notify.connectionRestored();
       }
     }
+  }
+
+  protected date(value: string): string {
+    const parts = new Intl.DateTimeFormat(this.language() === 'ar' ? 'ar-u-nu-latn' : 'en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    }).formatToParts(new Date(value));
+    return parts.filter(part => ['day', 'month', 'year'].includes(part.type)).map(part => part.value).join(' ');
   }
 
   protected protocolOf(server: PhoneServer): 'wss' | 'ws' {
@@ -324,7 +345,7 @@ export class PhoneSettingsPage {
   }
 
   protected canRowDrag(): boolean {
-    return this.canManage && !this.reordering() && this.servers().length > 1;
+    return this.canManage() && !this.reordering() && this.servers().length > 1;
   }
 
   protected openServer(server: PhoneServer): void {
@@ -337,33 +358,13 @@ export class PhoneSettingsPage {
     this.openServer(server);
   }
 
-  protected async addServer(): Promise<void> {
-    if (!this.canManage || this.atLimit() || this.adding() || this.loading()) return;
-
-    this.adding.set(true);
-    try {
-      const placeholderName = this.transloco.translate('wsPhone.placeholder.name');
-      const created = await createPhoneServer(
-        {
-          name: placeholderName,
-          sipDomain: 'example.invalid',
-          websocketUrl: 'wss://example.invalid/ws',
-          enabled: false,
-        },
-        newIdempotencyKey(),
-      );
-      await this.refreshQuiet();
-      const fresh = this.servers().find((s) => s.id === created.id) ?? created;
-      this.serverModal().open(fresh);
-    } catch (error) {
-      this.handleActionError(error);
-    } finally {
-      this.adding.set(false);
-    }
+  protected addServer(): void {
+    if (!this.canManage() || this.atLimit() || this.cardLoading().servers || this.cardErrors().servers) return;
+    this.serverModal().open();
   }
 
   protected async toggleEnabled(server: PhoneServer, next: boolean): Promise<void> {
-    if (!this.canManage || this.isToggling(server.id)) return;
+    if (!this.canManage() || this.isToggling(server.id)) return;
     if (next === server.enabled) return;
 
     const prevServers = this.servers();
@@ -373,11 +374,13 @@ export class PhoneSettingsPage {
       item.id === server.id ? { ...item, enabled: next } : item,
     );
     this.servers.set(optimisticServers);
-    this.config.set({ enabled: this.computeEnabled(optimisticServers) });
+    this.config.set({ tenantId: this.config()?.tenantId ?? this.servers()[0]?.tenantId ?? '', enabled: this.computeEnabled(optimisticServers) });
     this.setToggling(server.id, true);
 
     try {
-      await updatePhoneServer(server.id, { enabled: next }, newIdempotencyKey());
+      const signature = `toggle:${server.id}:${next}`;
+      await this.api.updatePhoneServer(server.id, { enabled: next }, this.actionKeys.keyFor(signature));
+      this.actionKeys.done(signature);
       await this.refreshQuiet();
       this.notify.success(
         this.transloco.translate(next ? 'wsPhone.toasts.enabled' : 'wsPhone.toasts.disabled'),
@@ -402,7 +405,7 @@ export class PhoneSettingsPage {
       },
     ];
 
-    if (this.canManage) {
+    if (this.canManage()) {
       items.push(
         {
           id: 'moveUp',
@@ -449,7 +452,7 @@ export class PhoneSettingsPage {
   }
 
   protected onRowDrop(event: ServerDropEvent): void {
-    if (!this.canManage || this.reordering()) return;
+    if (!this.canManage() || this.reordering()) return;
     const current = this.servers().slice();
     const sourceIdx = current.findIndex((item) => item.id === event.sourceId);
     const targetIdx = current.findIndex((item) => item.id === event.targetId);
@@ -471,9 +474,11 @@ export class PhoneSettingsPage {
 
   protected onServerPatched(updated: PhoneServer): void {
     this.servers.update((list) =>
-      list.map((item) => (item.id === updated.id ? updated : item)),
+      list.some(item => item.id === updated.id)
+        ? list.map((item) => (item.id === updated.id ? updated : item))
+        : [...list, updated],
     );
-    this.config.set({ enabled: this.computeEnabled(this.servers()) });
+    this.config.set({ tenantId: this.config()?.tenantId ?? this.servers()[0]?.tenantId ?? '', enabled: this.computeEnabled(this.servers()) });
   }
 
   protected onServerDeletedRemotely(): void {
@@ -481,7 +486,7 @@ export class PhoneSettingsPage {
   }
 
   protected async requestDelete(server: PhoneServer): Promise<void> {
-    if (!this.canManage || this.deleting()) return;
+    if (!this.canManage() || this.deleting()) return;
     this.pendingDeleteServer.set(server);
     const confirmed = await this.deleteDialog().open();
     if (!confirmed) {
@@ -489,9 +494,12 @@ export class PhoneSettingsPage {
       return;
     }
 
+    if (!this.canManage()) return;
     this.deleting.set(true);
     try {
-      await deletePhoneServer(server.id, newIdempotencyKey());
+      const signature = `delete:${server.id}`;
+      await this.api.deletePhoneServer(server.id, this.actionKeys.keyFor(signature));
+      this.actionKeys.done(signature);
       if (this.serverModal().editingId() === server.id) {
         this.serverModal().close();
       }
@@ -509,7 +517,7 @@ export class PhoneSettingsPage {
   }
 
   private async moveStep(index: number, delta: -1 | 1): Promise<void> {
-    if (!this.canManage || this.reordering()) return;
+    if (!this.canManage() || this.reordering()) return;
     const current = this.servers();
     const target = index + delta;
     if (index < 0 || target < 0 || target >= current.length) return;
@@ -527,7 +535,9 @@ export class PhoneSettingsPage {
     this.servers.set(optimistic);
     this.reordering.set(true);
     try {
-      await reorderPhoneServers(ids, newIdempotencyKey());
+      const signature = `reorder:${ids.join(',')}`;
+      await this.api.reorderPhoneServers(ids, this.actionKeys.keyFor(signature));
+      this.actionKeys.done(signature);
       await this.refreshQuiet();
       this.notify.success(this.transloco.translate('wsPhone.toasts.reordered'));
     } catch (error) {
@@ -539,40 +549,24 @@ export class PhoneSettingsPage {
   }
 
   private async refreshQuiet(): Promise<void> {
-    const seq = ++this.loadSeq;
-    try {
-      const [config, seats, servers] = await Promise.all([
-        getPhoneConfig(),
-        getPhoneSeats(),
-        listPhoneServers(),
-      ]);
-      if (seq !== this.loadSeq) return;
-      this.config.set(config);
-      this.seats.set(seats);
-      this.servers.set(servers);
-      this.fullState.set(null);
-    } catch (error) {
-      if (seq !== this.loadSeq) return;
-      this.handleActionError(error);
-    }
+    await this.load();
   }
 
-  private handleActionError(error: unknown): void {
+  protected handleActionError(error: unknown): void {
     const code = errorCodeOf(error);
-    if (code === 'WEBPHONE_MODULE_NOT_PURCHASED') {
-      this.fullState.set('notPurchased');
+    if (code === 'WEBPHONE_MODULE_INACTIVE') {
+      if (!this.moduleInactive()) this.notify.error(this.resolveError(error), correlationIdOf(error) ?? '');
+      this.moduleInactive.set(true);
       return;
     }
-    if (code === 'WEBPHONE_PROVISIONING_PENDING') {
-      this.fullState.set('provisioning');
-      return;
-    }
-    if (code === 'WEBPHONE_SERVER_NOT_FOUND' || code === 'WEBPHONE_SERVER_ORDER_INVALID') {
-      this.notify.error(this.resolveError(error));
+    if (code === 'TENANT_WIDE_PERMISSION_REQUIRED') this.tenantWideDenied.set(true);
+    if (code === 'WEBPHONE_MODULE_NOT_PURCHASED') this.fullState.set('notPurchased');
+    if (code === 'WEBPHONE_PROVISIONING_PENDING') this.fullState.set('provisioning');
+    if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(this.resolveError(error), '');
+    else this.notify.error(this.resolveError(error), correlationIdOf(error) ?? '');
+    if (error instanceof ApiError && error.status === 404 || code === 'WEBPHONE_SERVER_ORDER_INVALID') {
       void this.refreshQuiet();
-      return;
     }
-    this.notify.error(this.resolveError(error));
   }
 
   private computeEnabled(servers: readonly PhoneServer[]): boolean {
@@ -591,12 +585,6 @@ export class PhoneSettingsPage {
   }
 
   private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `wsPhone.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) return translated;
-    }
-    return this.transloco.translate('wsPhone.errors.generic');
+    return phoneErrorMessage(error, this.transloco, true);
   }
 }

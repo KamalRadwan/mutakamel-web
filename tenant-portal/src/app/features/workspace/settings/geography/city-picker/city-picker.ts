@@ -1,28 +1,38 @@
-import { DestroyRef, Component, ElementRef, computed, effect, inject, input, model, signal, untracked } from '@angular/core';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { geoErrorMessage } from '../geo-admin.model';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  model,
+  signal,
+  untracked,
+} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCheck, tablerSearch, tablerX } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
+import { SuggestInput } from '../../../../../shared/ui/suggest-input/suggest-input';
 import {
   CityWithPath,
   GEO_LIMITS,
+  GeoAdminApi,
   GeoCity,
   GeoCountry,
   GeoState,
   GeoZone,
   geoFlagUrl,
   geoNameIn,
-  listCities,
-  getCitiesByIds,
-  listCountries,
-  listAllZones,
-  listStates,
 } from '../geo-admin.api';
 
 /** The cities list includes inactive cities; only active ones are offered for new membership. */
@@ -58,12 +68,20 @@ interface CountryCityGroup {
 /** Dual-pane city selector enforcing single-zone city ownership and the 500-city limit. */
 @Component({
   selector: 'app-zone-city-picker',
-  imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field],
+  imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field, SuggestInput],
+  viewProviders: [
+    provideTranslocoScope(
+      'settings',
+      { scope: 'ws-geo', alias: 'wsGeo' },
+      { scope: 'ws-geo-zones', alias: 'geoZones' },
+    ),
+  ],
   providers: [provideIcons({ tablerCheck, tablerSearch, tablerX })],
   templateUrl: './city-picker.html',
   host: { class: 'block min-w-0' },
 })
 export class CityPicker {
+  private readonly api = inject(GeoAdminApi);
   private static nextId = 0;
   protected readonly uid = `zone-city-picker-${++CityPicker.nextId}`;
 
@@ -84,6 +102,7 @@ export class CityPicker {
   readonly disabled = input(false);
 
   protected readonly maxCities = GEO_LIMITS.zoneCities;
+  protected readonly zoneSearchMax = GEO_LIMITS.name;
   protected readonly skeletonRows = [0, 1, 2, 3];
 
   protected readonly countries = signal<GeoCountry[]>([]);
@@ -99,6 +118,7 @@ export class CityPicker {
   protected readonly loadingCities = signal(false);
   protected readonly loadingMore = signal(false);
   protected readonly citiesFailed = signal(false);
+  protected readonly lookupFailed = signal(false);
 
   private readonly cityPaths = signal<ReadonlyMap<string, CityWithPath>>(new Map());
   private readonly confirmedMissing = signal<ReadonlySet<string>>(new Set());
@@ -114,7 +134,39 @@ export class CityPicker {
   private countriesLoaded = false;
   private statesSeq = 0;
   private citiesSeq = 0;
+  private cursorContext = '';
   private zonesSeq = 0;
+  protected readonly zonesTruncated = signal(false);
+  protected readonly zoneSearch = signal('');
+  protected readonly zoneSuggestions = signal<string[]>([]);
+  private zoneSearchSeq = 0;
+  private zoneSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  protected onZoneSearch(value: string): void {
+    this.zoneSearch.set(value);
+    if (this.zoneSearchTimer !== null) clearTimeout(this.zoneSearchTimer);
+    const seq = ++this.zoneSearchSeq;
+    this.zoneSearchTimer = setTimeout(async () => {
+      this.zoneSearchTimer = null;
+      try {
+        const page = await this.api.listZones({
+          search: value.trim().slice(0, GEO_LIMITS.name),
+          limit: GEO_LIMITS.pageMax,
+        });
+        if (seq !== this.zoneSearchSeq) return;
+        this.zoneSuggestions.set(page.items.map((zone) => geoNameIn(zone, this.language())));
+        this.zonesById.update(
+          (current) => new Map([...current, ...page.items.map((zone) => [zone.id, zone] as const)]),
+        );
+      } catch (error) {
+        if (seq === this.zoneSearchSeq) {
+          this.zoneSuggestions.set([]);
+          this.showLoadError(error);
+        }
+      }
+    }, 300);
+  }
+
   private initialQueryStateApplied = false;
 
   protected readonly availableLabelledBy = computed(() => {
@@ -179,7 +231,10 @@ export class CityPicker {
     const confirmed = this.confirmedMissing();
     const countryByIso = new Map(this.countries().map((country) => [country.iso2, country]));
 
-    const countryMap = new Map<string, { label: string; states: Map<string, { label: string; cities: SelectedCityItem[] }> }>();
+    const countryMap = new Map<
+      string,
+      { label: string; states: Map<string, { label: string; cities: SelectedCityItem[] }> }
+    >();
     const pendingIds: string[] = [];
     const unknownIds: string[] = [];
 
@@ -300,6 +355,7 @@ export class CityPicker {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      if (this.zoneSearchTimer !== null) clearTimeout(this.zoneSearchTimer);
       if (this.searchTimer !== null) clearTimeout(this.searchTimer);
     });
 
@@ -355,7 +411,9 @@ export class CityPicker {
       const ids = this.value();
       const known = untracked(() => this.cityPaths());
       const confirmed = untracked(() => this.confirmedMissing());
-      const missing = ids.filter((id) => !known.has(id) && !confirmed.has(id) && !this.inFlightCityIds.has(id));
+      const missing = ids.filter(
+        (id) => !known.has(id) && !confirmed.has(id) && !this.inFlightCityIds.has(id),
+      );
       if (missing.length > 0) {
         void this.loadMissingCityPaths(missing);
       }
@@ -391,6 +449,16 @@ export class CityPicker {
   }
 
   /** Clears all conflict highlights from selected city chips. */
+  markInvalid(cityId: string): void {
+    this.cityPaths.update((current) => {
+      const next = new Map(current);
+      next.delete(cityId);
+      return next;
+    });
+    this.confirmedMissing.update((current) => new Set(current).add(cityId));
+    this.markConflict(cityId);
+  }
+
   clearConflicts(): void {
     if (this.conflicts().size > 0) {
       this.conflicts.set(new Map());
@@ -398,22 +466,30 @@ export class CityPicker {
   }
 
   /** Resolves localized city and zone names for conflict error toasts. */
-  async resolveConflictNames(cityId: string, conflictZoneId?: string | null): Promise<{ city: string; zone: string | null }> {
+  async resolveConflictNames(
+    cityId: string,
+    conflictZoneId?: string | null,
+  ): Promise<{ city: string; zone: string | null }> {
     const lang = this.language();
     let cityPath = this.cityPaths().get(cityId);
     if (!cityPath) {
-      const fetched = await getCitiesByIds([cityId]).catch(() => []);
+      const fetched = await this.api.getCitiesByIds([cityId]).catch(() => []);
       cityPath = fetched[0];
     }
 
     let zone = conflictZoneId ? this.zonesById().get(conflictZoneId) : undefined;
     if (conflictZoneId && !zone) {
-      await this.loadZonesMap();
-      zone = this.zonesById().get(conflictZoneId);
+      const resolved = await this.api.getZone(conflictZoneId).catch(() => null);
+      if (resolved) {
+        this.zonesById.update((current) => new Map(current).set(resolved.id, resolved));
+        zone = resolved;
+      }
     }
 
     return {
-      city: cityPath ? geoNameIn(cityPath, lang) : this.transloco.translate('geoZones.picker.unknownCity'),
+      city: cityPath
+        ? geoNameIn(cityPath, lang)
+        : this.transloco.translate('geoZones.picker.unknownCity'),
       zone: zone ? geoNameIn(zone, lang) : null,
     };
   }
@@ -456,13 +532,22 @@ export class CityPicker {
   }
 
   protected retryCities(): void {
+    this.lookupFailed.set(false);
     const stateId = this.selectedStateId();
     if (stateId) {
       void this.loadCitiesFirstPage(stateId, this.debouncedSearch());
+    } else if (this.selectedCountryId()) {
+      void this.loadStatesForCountry(this.selectedCountryId());
+    } else {
+      void this.loadCountries();
     }
   }
 
   protected async loadMore(): Promise<void> {
+    if (this.cursorContext !== JSON.stringify([this.selectedStateId(), this.debouncedSearch()])) {
+      this.retryCities();
+      return;
+    }
     const stateId = this.selectedStateId();
     const cursor = this.nextCursor();
     if (!stateId || !cursor || this.loadingMore()) return;
@@ -470,7 +555,7 @@ export class CityPicker {
     const seq = this.citiesSeq;
     this.loadingMore.set(true);
     try {
-      const page = await listCities(stateId, {
+      const page = await this.api.listCities(stateId, {
         search: this.debouncedSearch() || undefined,
         cursor,
         limit: GEO_LIMITS.pageSize,
@@ -478,14 +563,17 @@ export class CityPicker {
       if (seq !== this.citiesSeq) return;
       const items = activeOnly(page.items);
       this.cacheAvailableCities(items);
+      void this.loadAssignedZoneNames(items);
       this.availableCities.update((prev) => {
+        if (page.cursorReset) return items;
         const seen = new Set(prev.map((c) => c.id));
         return [...prev, ...items.filter((c) => !seen.has(c.id))];
       });
       this.nextCursor.set(page.nextCursor);
-    } catch {
+      this.notify.connectionRestored();
+    } catch (error) {
       if (seq === this.citiesSeq) {
-        this.notify.error(this.transloco.translate('geoZones.errors.generic'));
+        this.showLoadError(error);
       }
     } finally {
       if (seq === this.citiesSeq) {
@@ -514,7 +602,9 @@ export class CityPicker {
   protected otherZoneName(city: GeoCity): string | null {
     if (!city.zoneId || city.zoneId === this.zoneId()) return null;
     const zone = this.zonesById().get(city.zoneId);
-    return zone ? geoNameIn(zone, this.language()) : this.transloco.translate('geoZones.picker.unknownZone');
+    return zone
+      ? geoNameIn(zone, this.language())
+      : this.transloco.translate('geoZones.picker.unknownZone');
   }
 
   protected isRowDisabled(city: GeoCity): boolean {
@@ -541,7 +631,9 @@ export class CityPicker {
       return this.transloco.translate('geoZones.errors.GEO_ZONE_CITY_INVALID');
     }
     const zone = conflictZoneId ? this.zonesById().get(conflictZoneId) : undefined;
-    const zoneName = zone ? geoNameIn(zone, this.language()) : this.transloco.translate('geoZones.picker.unknownZone');
+    const zoneName = zone
+      ? geoNameIn(zone, this.language())
+      : this.transloco.translate('geoZones.picker.unknownZone');
     return this.transloco.translate('geoZones.picker.otherZoneHint', { zone: zoneName });
   }
 
@@ -614,15 +706,24 @@ export class CityPicker {
   }
 
   private handleListboxArrowNav(event: KeyboardEvent): void {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') {
+    if (
+      event.key !== 'ArrowDown' &&
+      event.key !== 'ArrowUp' &&
+      event.key !== 'Home' &&
+      event.key !== 'End'
+    ) {
       return;
     }
-    const listbox = event.currentTarget instanceof HTMLElement ? event.currentTarget.closest('[role="listbox"]') : null;
+    const listbox =
+      event.currentTarget instanceof HTMLElement
+        ? event.currentTarget.closest('[role="listbox"]')
+        : null;
     if (!listbox) return;
     const options = Array.from(listbox.querySelectorAll<HTMLElement>('[role="option"]'));
     if (options.length === 0) return;
 
-    const current = event.currentTarget instanceof HTMLElement ? options.indexOf(event.currentTarget) : -1;
+    const current =
+      event.currentTarget instanceof HTMLElement ? options.indexOf(event.currentTarget) : -1;
     let nextIndex = -1;
     if (event.key === 'ArrowDown') nextIndex = (current + 1) % options.length;
     else if (event.key === 'ArrowUp') nextIndex = (current - 1 + options.length) % options.length;
@@ -638,7 +739,8 @@ export class CityPicker {
   private async loadZonesMap(): Promise<void> {
     const seq = ++this.zonesSeq;
     try {
-      const zones = await listAllZones();
+      const { items: zones, truncated } = await this.api.listAllZones();
+      this.zonesTruncated.set(truncated);
       if (seq !== this.zonesSeq) return;
       this.zonesById.set(new Map(zones.map((zone) => [zone.id, zone])));
     } catch {
@@ -649,9 +751,11 @@ export class CityPicker {
   private async loadCountries(): Promise<void> {
     if (this.countriesLoaded) return;
     try {
-      const list = (await listCountries()).items;
+      const list = (await this.api.listCountries()).items;
       this.countriesLoaded = true;
       this.countries.set(list);
+      this.lookupFailed.set(false);
+      this.notify.connectionRestored();
       if (list.length === 0) return;
 
       const queryCountry = this.route?.snapshot.queryParamMap.get('country');
@@ -659,7 +763,9 @@ export class CityPicker {
       const egypt = list.find((c) => c.iso2 === 'EG');
       const initial = matchedQuery ?? egypt ?? list[0];
       this.selectedCountryId.set(initial.id);
-    } catch {
+    } catch (error) {
+      this.lookupFailed.set(true);
+      this.showLoadError(error);
       this.countries.set([]);
     }
   }
@@ -667,9 +773,11 @@ export class CityPicker {
   private async loadStatesForCountry(countryId: string): Promise<void> {
     const seq = ++this.statesSeq;
     try {
-      const list = (await listStates(countryId)).items;
+      const list = (await this.api.listStates(countryId)).items;
       if (seq !== this.statesSeq) return;
       this.states.set(list);
+      this.lookupFailed.set(false);
+      this.notify.connectionRestored();
       if (list.length === 0) {
         this.selectedStateId.set('');
         return;
@@ -686,10 +794,16 @@ export class CityPicker {
       }
 
       const lang = this.language();
-      const sorted = list.slice().sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang));
+      const sorted = list
+        .slice()
+        .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang));
       this.selectedStateId.set(sorted[0].id);
-    } catch {
+    } catch (error) {
       if (seq === this.statesSeq) {
+        this.showLoadError(error);
+      }
+      if (seq === this.statesSeq) {
+        this.lookupFailed.set(true);
         this.states.set([]);
         this.selectedStateId.set('');
       }
@@ -698,20 +812,26 @@ export class CityPicker {
 
   private async loadCitiesFirstPage(stateId: string, search: string): Promise<void> {
     const seq = ++this.citiesSeq;
+    this.cursorContext = JSON.stringify([stateId, search]);
+    this.nextCursor.set(null);
+    this.loadingMore.set(false);
     this.loadingCities.set(true);
     this.citiesFailed.set(false);
     try {
-      const page = await listCities(stateId, {
+      const page = await this.api.listCities(stateId, {
         search: search || undefined,
         limit: GEO_LIMITS.pageSize,
       });
       if (seq !== this.citiesSeq) return;
       const items = activeOnly(page.items);
       this.cacheAvailableCities(items);
+      void this.loadAssignedZoneNames(items);
       this.availableCities.set(items);
       this.nextCursor.set(page.nextCursor);
-    } catch {
+      this.notify.connectionRestored();
+    } catch (error) {
       if (seq !== this.citiesSeq) return;
+      this.showLoadError(error);
       this.citiesFailed.set(true);
       this.availableCities.set([]);
       this.nextCursor.set(null);
@@ -727,7 +847,7 @@ export class CityPicker {
       this.inFlightCityIds.add(id);
     }
     try {
-      const resolved = await getCitiesByIds([...ids]);
+      const resolved = await this.api.getCitiesByIds([...ids]);
       const resolvedById = new Map(resolved.map((item) => [item.id, item]));
       this.cityPaths.update((prev) => {
         const next = new Map(prev);
@@ -761,6 +881,28 @@ export class CityPicker {
     }
   }
 
+  private showLoadError(error: unknown): void {
+    const message = geoErrorMessage(error, 'geoZones', this.transloco);
+    if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(message, '');
+    else this.notify.error(message);
+  }
+
+  private async loadAssignedZoneNames(cities: readonly GeoCity[]): Promise<void> {
+    const ids = [
+      ...new Set(
+        cities.flatMap((city) =>
+          city.zoneId && !this.zonesById().has(city.zoneId) ? [city.zoneId] : [],
+        ),
+      ),
+    ];
+    await Promise.allSettled(
+      ids.map(async (id) => {
+        const zone = await this.api.getZone(id);
+        this.zonesById.update((current) => new Map(current).set(id, zone));
+      }),
+    );
+  }
+
   private cacheAvailableCities(cities: readonly GeoCity[]): void {
     const state = this.activeState();
     const country = this.activeCountry();
@@ -773,6 +915,7 @@ export class CityPicker {
           cachedIds.push(city.id);
           next.set(city.id, {
             ...city,
+            countryId: country.id,
             stateName: { en: state.nameEn, ar: state.nameAr },
             countryIso2: country.iso2,
           });

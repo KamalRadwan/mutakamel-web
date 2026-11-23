@@ -1,16 +1,33 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerBuildingCommunity, tablerCloudOff, tablerLock, tablerMap } from '@ng-icons/tabler-icons';
+import {
+  tablerBuildingCommunity,
+  tablerCloudOff,
+  tablerLock,
+  tablerMap,
+} from '@ng-icons/tabler-icons';
+import { ApiError } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
-import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
+import { Notify } from '../../../../../core/notify/notify';
+import {
+  ActionItem,
+  ActionSelection,
+  ActionsMenu,
+} from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
-import { listCountries } from '../geo-admin.api';
-import { GeoCountry, geoFlagUrl, geoNameIn, normalizeGeoSearch } from '../geo-admin.model';
+import { GeoAdminApi } from '../geo-admin.api';
+import {
+  GeoCountry,
+  geoErrorMessage,
+  geoFlagUrl,
+  geoNameIn,
+  normalizeGeoSearch,
+} from '../geo-admin.model';
 
 const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
 @Component({
@@ -21,9 +38,11 @@ const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
     provideIcons({ tablerLock, tablerMap, tablerBuildingCommunity, tablerCloudOff }),
   ],
   templateUrl: './countries-tab.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class CountriesTab {
+  private readonly notify = inject(Notify);
+  private readonly api = inject(GeoAdminApi);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly transloco = inject(TranslocoService);
@@ -42,7 +61,9 @@ export class CountriesTab {
     const lang = this.language();
     return this.countries()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }));
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      );
   });
 
   protected readonly filteredCountries = computed(() => {
@@ -92,10 +113,14 @@ export class CountriesTab {
     this.loading.set(true);
     this.failed.set(false);
     try {
-      const { items } = await listCountries();
+      const { items } = await this.api.listCountries();
       if (seq !== this.loadSeq) return;
       this.countries.set(items);
-    } catch {
+      this.notify.connectionRestored();
+    } catch (error) {
+      const message = geoErrorMessage(error, 'wsGeo', this.transloco);
+      if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(message, '');
+      else this.notify.error(message);
       if (seq !== this.loadSeq) return;
       this.failed.set(true);
     } finally {

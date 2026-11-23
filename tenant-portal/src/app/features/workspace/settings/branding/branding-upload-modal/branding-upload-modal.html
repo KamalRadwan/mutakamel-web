@@ -2,7 +2,9 @@
   size="form"
   icon="tablerPhotoUp"
   tile="bg-icon-teal"
-  [title]="(kind() === 'logo' ? 'wsBranding.upload.logoTitle' : 'wsBranding.upload.iconTitle') | transloco"
+  [title]="
+    (kind() === 'logo' ? 'wsBranding.upload.logoTitle' : 'wsBranding.upload.iconTitle') | transloco
+  "
   [closeLabel]="'wsBranding.actions.close' | transloco"
   [dismissable]="!uploading()"
   (closed)="onModalClosed()"
@@ -12,9 +14,16 @@
       <h3 class="text-12 leading-18 font-medium text-text">
         {{ 'wsBranding.upload.current' | transloco }}
       </h3>
-      <div class="flex h-agenda-cell-min items-center justify-center overflow-hidden rounded-8 border border-border bg-surface p-8">
+      <div
+        class="flex h-agenda-cell-min items-center justify-center overflow-hidden rounded-8 border border-border bg-surface p-8"
+      >
         @if (currentUrl(); as current) {
-          <img [src]="current" alt="" class="max-h-full max-w-full object-contain" />
+          <img
+            [src]="current"
+            alt=""
+            class="max-h-full max-w-full object-contain"
+            (error)="currentUrl.set(null)"
+          />
         } @else {
           <div class="flex flex-col items-center gap-4 text-center text-text-muted">
             <ng-icon name="tablerPhoto" size="16" aria-hidden="true" />
@@ -28,10 +37,20 @@
       <h3 class="text-12 leading-18 font-medium text-text">
         {{ 'wsBranding.upload.selected' | transloco }}
       </h3>
-      <div class="flex h-agenda-cell-min items-center justify-center overflow-hidden rounded-8 border border-border bg-surface p-8">
+      <div
+        class="flex h-agenda-cell-min items-center justify-center overflow-hidden rounded-8 border border-border bg-surface p-8"
+      >
         @if (inspecting()) {
-          <div class="flex flex-col items-center gap-4 text-center text-text-muted" aria-busy="true">
-            <ng-icon name="tablerLoader2" size="16" class="animate-spin text-accent" aria-hidden="true" />
+          <div
+            class="flex flex-col items-center gap-4 text-center text-text-muted"
+            aria-busy="true"
+          >
+            <ng-icon
+              name="tablerLoader2"
+              size="16"
+              class="animate-spin text-accent"
+              aria-hidden="true"
+            />
             <span class="text-11 leading-16">{{ 'wsBranding.upload.inspecting' | transloco }}</span>
           </div>
         } @else if (previewUrl(); as nextPreview) {
@@ -64,26 +83,24 @@
       [for]="uid + '-file'"
       [label]="'wsBranding.upload.field' | transloco"
       [hint]="'wsBranding.upload.fieldHint' | transloco"
+      [error]="activeError()"
     >
       <ui-file-drop
         [id]="uid + '-file'"
-        [describedBy]="uid + '-file-hint'"
+        [describedBy]="uid + '-file-hint' + (activeError() ? ' ' + uid + '-file-error' : '')"
         [accept]="acceptTypes"
         [maxBytes]="limits().maxBytes"
         [title]="'wsBranding.upload.dropTitle' | transloco"
         [hint]="limitsHintKey() | transloco"
-        [browseLabel]="(selectedFile() ? 'wsBranding.upload.chooseAnother' : 'wsBranding.upload.browse') | transloco"
+        [browseLabel]="
+          (selectedFile() ? 'wsBranding.upload.chooseAnother' : 'wsBranding.upload.browse')
+            | transloco
+        "
         [disabled]="uploading() || inspecting()"
         (picked)="onFilePicked($event)"
         (rejected)="onFileRejected($event)"
       />
     </ui-field>
-
-    @if (activeErrorKey(); as errKey) {
-      <p role="alert" class="mt-8 text-12 leading-18 text-danger-text">
-        {{ errKey | transloco }}
-      </p>
-    }
   </div>
 
   <div modal-footer class="flex flex-1 items-center gap-8">
@@ -97,13 +114,7 @@
       {{ 'wsBranding.upload.confirm' | transloco }}
     </button>
 
-    <button
-      type="button"
-      uiButton
-      variant="ghost"
-      [disabled]="uploading()"
-      (click)="cancel()"
-    >
+    <button type="button" uiButton variant="ghost" [disabled]="uploading()" (click)="cancel()">
       {{ 'wsBranding.actions.cancel' | transloco }}
     </button>
   </div>

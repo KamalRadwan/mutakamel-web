@@ -1,39 +1,85 @@
-import {
-  fakeChangePassword,
-  fakeConfirmMfa,
-  fakeGetSecurityMe,
-  fakeResendMfa,
-  fakeStartMfa,
-} from './security.fake';
-import { ChangePasswordBody, MfaStep, SecurityMe } from './security.model';
+import { Service, inject } from '@angular/core';
+import { ApiError } from '../../../../core/api/api-errors';
+import { CoreHttp } from '../../../../core/api/core-http';
+import { AuthSession } from '../../../../core/auth/auth-session';
+import type { LoginSession, MfaStep } from '../../../../core/auth/auth-session.model';
+import type { ChangePasswordBody } from './security.model';
 
-// Real browser base: /api/tenant/core/v1 (envelope { data }). Self-service. Security writes use the
-// credentialed CSRF channel and must NEVER be replayed or auto-retried (no idempotency key).
+const AUTH = '/api/tenant/core/v1/auth';
 
-export function getSecurityMe(): Promise<SecurityMe> {
-  // GET /auth/me (private, no-store)
-  return fakeGetSecurityMe();
-}
+@Service()
+export class SecurityApi {
+  private readonly http = inject(CoreHttp);
+  private readonly session = inject(AuthSession);
 
-export function changePassword(body: ChangePasswordBody): Promise<void> {
-  // POST /auth/change-password → 200 (safe session metadata, not used); ends OTHER sessions;
-  // 400 CORE_VALIDATION_FAILED (newPassword 12..128 + policy); 422 CURRENT_PASSWORD_INVALID|WEAK_PASSWORD;
-  // 429 COMMON.GENERIC.RATE_LIMITED (5/min, Retry-After header, no details)
-  return fakeChangePassword(body);
-}
+  async changePassword(body: ChangePasswordBody): Promise<LoginSession | null> {
+    const version = this.session.requestVersion();
+    const send = async () =>
+      (await this.http.write<LoginSession>('POST', `${AUTH}/change-password`, body)).data;
+    try {
+      return await send();
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      const recovered = await this.session.recoverRequest(error, version);
+      if (!recovered) {
+        if (error.code !== 'INVALID_CREDENTIALS') throw error;
+        if ((await this.session.refresh()) === 'ended') return null;
+      }
+      try {
+        return await send();
+      } catch (retryError) {
+        if (
+          retryError instanceof ApiError &&
+          retryError.status === 401 &&
+          retryError.code === 'INVALID_CREDENTIALS'
+        ) {
+          await this.session.sessionEnded();
+          return null;
+        }
+        throw retryError;
+      }
+    }
+  }
 
-export function startMfaChange(enabled: boolean, currentPassword: string): Promise<MfaStep> {
-  // POST /auth/mfa/settings/challenge → 200 step; 401 AUTH_MFA_INVALID_CHALLENGE (already in that state);
-  // 422 CURRENT_PASSWORD_INVALID; 503 AUTH_MFA_UNAVAILABLE; 429 AUTH_MFA_THROTTLED (details.retryAfterSeconds: ['n'])
-  return fakeStartMfa(enabled, currentPassword);
-}
+  startMfaChange(enabled: boolean, currentPassword: string): Promise<MfaStep> {
+    return this.recoverOnce(
+      async () =>
+        (
+          await this.http.write<MfaStep>('POST', `${AUTH}/mfa/settings/challenge`, {
+            enabled,
+            currentPassword,
+          })
+        ).data,
+    );
+  }
 
-export function resendMfaCode(challengeId: string): Promise<MfaStep> {
-  // POST /auth/mfa/settings/resend → same deadline; 401 AUTH_MFA_INVALID_CHALLENGE; 429 AUTH_MFA_THROTTLED
-  return fakeResendMfa(challengeId);
-}
+  resendMfaCode(challengeId: string): Promise<MfaStep> {
+    return this.recoverOnce(
+      async () =>
+        (await this.http.write<MfaStep>('POST', `${AUTH}/mfa/settings/resend`, { challengeId }))
+          .data,
+    );
+  }
 
-export function confirmMfaChange(challengeId: string, code: string): Promise<void> {
-  // POST /auth/mfa/settings/confirm → 204; ENDS EVERY SESSION incl. this one; 401 AUTH_MFA_INVALID_CHALLENGE
-  return fakeConfirmMfa(challengeId, code);
+  confirmMfaChange(challengeId: string, code: string): Promise<void> {
+    return this.recoverOnce(async () => {
+      await this.http.write<void>('POST', `${AUTH}/mfa/settings/confirm`, { challengeId, code });
+    });
+  }
+
+  private async recoverOnce<T>(send: () => Promise<T>): Promise<T> {
+    const version = this.session.requestVersion();
+    try {
+      return await send();
+    } catch (error) {
+      if (
+        !(error instanceof ApiError) ||
+        error.status !== 401 ||
+        error.code === 'AUTH_MFA_INVALID_CHALLENGE'
+      )
+        throw error;
+      if (await this.session.recoverRequest(error, version)) return send();
+      throw error;
+    }
+  }
 }

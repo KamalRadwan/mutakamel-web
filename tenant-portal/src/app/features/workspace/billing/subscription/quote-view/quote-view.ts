@@ -5,24 +5,8 @@ import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowRight, tablerRefresh, tablerUpload } from '@ng-icons/tabler-icons';
 import { Button } from '../../../../../shared/ui/button/button';
-import { CommercialPreview, Money, PreviewChange } from '../../billing.model';
-import { formatUsd, isGreater, isZero } from '../../shared/money';
-
-function formatMoneyTwoDecimalsCeil(raw: Money): string {
-  const trimmed = raw.trim().replace(/^[+-]/, '');
-  const dotIdx = trimmed.indexOf('.');
-  const intDigits = (dotIdx === -1 ? trimmed : trimmed.slice(0, dotIdx)).replace(/^0+(?=\d)/, '') || '0';
-  const frac = (dotIdx === -1 ? '' : trimmed.slice(dotIdx + 1)).padEnd(4, '0').slice(0, 4);
-  if (!/^\d+$/.test(intDigits) || !/^\d{4}$/.test(frac)) return '0.00';
-
-  let totalCents = BigInt(intDigits) * 100n + BigInt(frac.slice(0, 2));
-  if (frac.slice(2) !== '00') {
-    totalCents += 1n;
-  }
-  const whole = totalCents / 100n;
-  const cents = (totalCents % 100n).toString().padStart(2, '0');
-  return `${whole}.${cents}`;
-}
+import { CommercialPreview, PreviewChange } from '../../billing.model';
+import { formatUsd, isGreater } from '../../shared/money';
 
 @Component({
   selector: 'app-quote-view',
@@ -49,27 +33,11 @@ export class QuoteView {
 
   protected readonly hasShortfall = computed(() => {
     const fin = this.preview().financial;
-    return fin.walletStatus !== 'NOT_APPLICABLE' && !isZero(fin.walletShortfallUsd);
-  });
-
-  protected readonly shortfallTwoDecimals = computed(() => {
-    const fin = this.preview().financial;
-    if (fin.walletStatus === 'NOT_APPLICABLE') return '0.00';
-    return formatMoneyTwoDecimalsCeil(fin.walletShortfallUsd);
-  });
-
-  /** The top-up link amount: never below the minimum top-up of 1.00. */
-  protected readonly topupAmount = computed(() => {
-    const amount = this.shortfallTwoDecimals();
-    return isGreater('1.00', amount) ? '1.00' : amount;
+    return fin.walletStatus !== 'NOT_APPLICABLE' && isGreater(fin.walletShortfallUsd, '0');
   });
 
   protected itemLabel(change: PreviewChange): string {
-    return (
-      this.itemLabels().get(change.selectionKey) ??
-      change.addonId ??
-      change.applicationId
-    );
+    return this.itemLabels().get(change.selectionKey) ?? change.addonId ?? change.applicationId;
   }
 
   protected tierLabel(tierId: string | null): string {
@@ -84,6 +52,8 @@ export class QuoteView {
 
   protected hasSeatsTransition(change: PreviewChange): boolean {
     if (change.operation === 'ADD') return change.toSeats !== null;
-    return change.fromSeats !== null && change.toSeats !== null && change.fromSeats !== change.toSeats;
+    return (
+      change.fromSeats !== null && change.toSeats !== null && change.fromSeats !== change.toSeats
+    );
   }
 }

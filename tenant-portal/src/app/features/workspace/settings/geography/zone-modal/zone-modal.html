@@ -7,7 +7,12 @@
   [dismissable]="!saving()"
   (closed)="onModalClosed()"
 >
-  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+  <form
+    [id]="uid + '-form'"
+    class="grid grid-cols-2 gap-x-10 gap-y-8"
+    novalidate
+    (submit)="save($event)"
+  >
     <div class="col-span-1">
       <ui-field
         [for]="uid + '-name-en'"
@@ -24,8 +29,8 @@
           dir="ltr"
           class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="nameEn()"
-          [readonly]="!canManage()"
-          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [readonly]="!editable()"
+          [attr.aria-readonly]="!editable() ? 'true' : null"
           [attr.aria-invalid]="nameEnError() ? 'true' : null"
           (input)="onNameInput('nameEn', $event)"
           (blur)="markTouched('nameEn')"
@@ -49,8 +54,8 @@
           dir="rtl"
           class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
           [value]="nameAr()"
-          [readonly]="!canManage()"
-          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [readonly]="!editable()"
+          [attr.aria-readonly]="!editable() ? 'true' : null"
           [attr.aria-invalid]="nameArError() ? 'true' : null"
           (input)="onNameInput('nameAr', $event)"
           (blur)="markTouched('nameAr')"
@@ -74,8 +79,8 @@
           dir="auto"
           class="w-full resize-none bg-transparent text-12 leading-18 text-text outline-none placeholder:text-text-placeholder"
           [value]="description()"
-          [readonly]="!canManage()"
-          [attr.aria-readonly]="!canManage() ? 'true' : null"
+          [readonly]="!editable()"
+          [attr.aria-readonly]="!editable() ? 'true' : null"
           [attr.aria-invalid]="descriptionError() ? 'true' : null"
           (input)="onDescriptionInput($event)"
           (blur)="markTouched('description')"
@@ -91,13 +96,15 @@
         [hint]="'geoZones.modal.activeHint' | transloco"
       >
         <div class="flex items-start gap-8 pt-2">
-          <ui-switch
-            [id]="uid + '-active'"
-            [describedBy]="uid + '-active-hint'"
-            [(checked)]="isActive"
-            [disabled]="!canManage() || saving()"
-            [label]="'geoZones.modal.active' | transloco"
-          />
+          @if (editable()) {
+            <ui-switch
+              [id]="uid + '-active'"
+              [describedBy]="uid + '-active-hint'"
+              [(checked)]="isActive"
+              [disabled]="!editable() || saving()"
+              [label]="'geoZones.modal.active' | transloco"
+            />
+          }
           <span class="text-12 leading-18 font-medium text-text">
             {{ (isActive() ? 'wsGeo.active' : 'wsGeo.inactive') | transloco }}
           </span>
@@ -117,7 +124,7 @@
           [zoneId]="editingZone()?.id ?? null"
           [listboxId]="uid + '-cities'"
           [describedBy]="uid + '-cities-hint'"
-          [readonly]="!canManage()"
+          [readonly]="!editable()"
           [disabled]="saving() || loadingDetail()"
         />
       </ui-field>
@@ -125,7 +132,7 @@
   </form>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage()) {
+    @if (editable()) {
       <button
         type="submit"
         [attr.form]="uid + '-form'"
@@ -137,16 +144,12 @@
       </button>
 
       @if (dirty()) {
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="saving()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
           {{ 'geoZones.modal.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'geoZones.modal.unsaved' | transloco }}</span>
+        <span class="text-12 leading-18 text-text-muted">{{
+          'geoZones.modal.unsaved' | transloco
+        }}</span>
       } @else {
         <button
           type="button"

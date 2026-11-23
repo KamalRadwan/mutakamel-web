@@ -3,14 +3,51 @@
   size="form"
   icon="tablerShieldCheck"
   [tile]="targetEnabled() ? 'bg-icon-green' : 'bg-icon-orange'"
-  [title]="(targetEnabled() ? 'wsAccSec.mfa.modalOnTitle' : 'wsAccSec.mfa.modalOffTitle') | transloco"
+  [title]="
+    (targetEnabled() ? 'wsAccSec.mfa.modalOnTitle' : 'wsAccSec.mfa.modalOffTitle') | transloco
+  "
   [closeLabel]="'wsAccSec.cancel' | transloco"
   [dismissable]="!submitting()"
   (closed)="onClosed()"
 >
+  <div role="status">
+    @if (isThrottled()) {
+      <app-settings-notice tone="warning">
+        {{ 'wsAccSec.mfa.throttledStatic' | transloco }}
+        <span aria-hidden="true">{{
+          'wsAccSec.mfa.throttleCountdown' | transloco: { s: throttleRemainingSeconds() }
+        }}</span>
+      </app-settings-notice>
+    } @else if (throttleEnded()) {
+      <span class="sr-only">{{ 'wsAccSec.mfa.throttleEnded' | transloco }}</span>
+    }
+  </div>
+  @if (noticeErrorKey()) {
+    <app-settings-notice tone="warning">{{ noticeErrorKey()! | transloco }}</app-settings-notice>
+  }
+  @if (unknownOutcome()) {
+    <app-settings-notice tone="warning">
+      {{ 'wsAccSec.unknown.text' | transloco }}
+      <button
+        type="button"
+        uiButton
+        variant="ghost"
+        size="small"
+        [disabled]="submitting()"
+        (click)="checkAgain()"
+      >
+        {{ 'wsAccSec.unknown.check' | transloco }}
+      </button>
+    </app-settings-notice>
+  }
   @switch (step()) {
     @case ('password') {
-      <form [id]="uid + '-password-form'" class="flex flex-col gap-10" novalidate (submit)="submitPassword($event)">
+      <form
+        [id]="uid + '-password-form'"
+        class="flex flex-col gap-10"
+        novalidate
+        (submit)="submitPassword($event)"
+      >
         @if (unavailable()) {
           <div
             role="alert"
@@ -28,17 +65,6 @@
             {{ 'wsAccSec.mfa.signOutWarning' | transloco }}
           </app-settings-notice>
         }
-
-        <div role="status">
-          @if (isThrottled()) {
-            <app-settings-notice tone="warning">
-              {{ 'wsAccSec.mfa.throttledStatic' | transloco }}
-              <span aria-hidden="true">{{ 'wsAccSec.mfa.throttleCountdown' | transloco: { s: throttleRemainingSeconds() } }}</span>
-            </app-settings-notice>
-          } @else if (throttleEnded()) {
-            <span class="sr-only">{{ 'wsAccSec.mfa.throttleEnded' | transloco }}</span>
-          }
-        </div>
 
         <ui-field
           [for]="uid + '-password'"
@@ -62,18 +88,29 @@
           <button
             type="button"
             class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-            [attr.aria-label]="(showPassword() ? 'wsAccSec.password.hide' : 'wsAccSec.password.show') | transloco"
+            [attr.aria-label]="
+              (showPassword() ? 'wsAccSec.password.hide' : 'wsAccSec.password.show') | transloco
+            "
             [attr.aria-pressed]="showPassword()"
             (click)="showPassword.set(!showPassword())"
           >
-            <ng-icon [name]="showPassword() ? 'tablerEyeOff' : 'tablerEye'" size="14" aria-hidden="true" />
+            <ng-icon
+              [name]="showPassword() ? 'tablerEyeOff' : 'tablerEye'"
+              size="14"
+              aria-hidden="true"
+            />
           </button>
         </ui-field>
       </form>
     }
 
     @case ('code') {
-      <form [id]="uid + '-code-form'" class="flex flex-col gap-10" novalidate (submit)="submitCode($event)">
+      <form
+        [id]="uid + '-code-form'"
+        class="flex flex-col gap-10"
+        novalidate
+        (submit)="submitCode($event)"
+      >
         @if (unavailable()) {
           <div
             role="alert"
@@ -88,20 +125,13 @@
           </div>
         }
 
-        <div role="status">
-          @if (isThrottled()) {
-            <app-settings-notice tone="warning">
-              {{ 'wsAccSec.mfa.throttledStatic' | transloco }}
-              <span aria-hidden="true">{{ 'wsAccSec.mfa.throttleCountdown' | transloco: { s: throttleRemainingSeconds() } }}</span>
-            </app-settings-notice>
-          } @else if (throttleEnded()) {
-            <span class="sr-only">{{ 'wsAccSec.mfa.throttleEnded' | transloco }}</span>
-          }
-        </div>
-
         @let sent = codeSentParts();
         <p class="text-12 leading-18 text-text">
-          {{ sent.before }}@if (sent.hasEmail) {<bdi dir="ltr">{{ email() }}</bdi>}{{ sent.after }}
+          {{ sent.before }}
+          @if (sent.hasEmail) {
+            <bdi dir="ltr">{{ email() }}</bdi>
+          }
+          {{ sent.after }}
         </p>
 
         <ui-field
@@ -183,7 +213,14 @@
     </button>
   }
 
-  <button modal-footer type="button" uiButton variant="secondary" [disabled]="submitting()" (click)="close()">
+  <button
+    modal-footer
+    type="button"
+    uiButton
+    variant="secondary"
+    [disabled]="submitting()"
+    (click)="close()"
+  >
     {{ 'wsAccSec.cancel' | transloco }}
   </button>
 </ui-modal>

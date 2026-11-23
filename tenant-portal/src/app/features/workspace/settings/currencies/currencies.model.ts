@@ -1,5 +1,7 @@
 import { ApiError, errorMessage } from '../../../../core/api/api-errors';
 import { SettingsTranslator } from '../../../../core/api/settings-translator';
+import type { TenantMe } from '../../../../core/auth/auth-session.model';
+import { hasTenantWidePermission } from '../../../../core/auth/tenant-wide-permission';
 export type { CorePage } from '../core-response.model';
 
 export type CurrencyStatus = 'ACTIVE' | 'INACTIVE';
@@ -55,7 +57,7 @@ export const CURRENCY_LIMITS = {
   code: 3,
   name: 80,
   symbol: 8,
-  rateMax: 1_000_000_000,
+  rateMax: 10_000_000_000,
   rateDecimals: 8,
   pageSizes: [20, 50, 100],
 } as const;
@@ -156,9 +158,9 @@ export function isValidRateText(text: string): boolean {
   if (!CURRENCY_RATE_PATTERN.test(trimmed)) return false;
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || parsed <= 0 || parsed > CURRENCY_LIMITS.rateMax) return false;
-  // Guard against values like 1000000000.00000001 rounding down to rateMax in IEEE 754 float.
-  const [, fracPart = ''] = trimmed.split('.');
-  if (parsed === CURRENCY_LIMITS.rateMax && /[1-9]/.test(fracPart)) return false;
+  // Check the integer part too: a fraction above the maximum can round down in IEEE 754.
+  const [integerPart, fracPart = ''] = trimmed.split('.');
+  if (Number(integerPart) >= CURRENCY_LIMITS.rateMax && /[1-9]/.test(fracPart)) return false;
   return true;
 }
 
@@ -198,22 +200,41 @@ export function isSupportedCurrencyCode(code: string): boolean {
   return cachedSupportedCodeSet?.has(code.trim().toUpperCase()) ?? false;
 }
 
-export function mapCurrencyErrorCode(code: string | null): string | null {
-  if (!code) return null;
-  if (code === 'GW.IDEM.IN_FLIGHT' || code === 'IDEM_IN_FLIGHT') return 'IDEM_IN_FLIGHT';
-  if (code.startsWith('IDEM_') || code.startsWith('GW.IDEM.')) return 'IDEM_OTHER';
-  return code;
+export function currencyPermissions(me: TenantMe | null | undefined): { readable: boolean; manage: boolean } {
+  return {
+    readable: me?.permissions.includes('currencies.currency.read') ?? false,
+    manage: hasTenantWidePermission(me, 'currencies.currency.manage'),
+  };
 }
 
-export function currencyErrorMessage(error: unknown, t: SettingsTranslator): string {
-  if (error instanceof ApiError) {
-    const mapped = mapCurrencyErrorCode(error.code);
-    const normalized = mapped && mapped !== error.code ? new ApiError(error.status, mapped, error.details) : error;
-    return errorMessage(normalized, 'wsCurrencies', t);
+export interface CurrencyCompanyBlocker {
+  companies: { id: string; name: string }[];
+  more: number;
+}
+
+export function currencyCompanyBlocker(error: ApiError): CurrencyCompanyBlocker {
+  const ids = error.details?.['companyIds'];
+  const names = error.details?.['companyNames'];
+  const companies: CurrencyCompanyBlocker['companies'] = [];
+  if (error.code === 'CURRENCY_COMPANY_IN_USE' && Array.isArray(ids) && Array.isArray(names)) {
+    for (let index = 0; index < Math.min(ids.length, names.length, 20); index++) {
+      if (typeof ids[index] === 'string' && ids[index] && typeof names[index] === 'string' && names[index]) {
+        companies.push({ id: ids[index], name: names[index] });
+      }
+    }
   }
-  if (typeof error === 'string') {
-    const mapped = mapCurrencyErrorCode(error) ?? error;
-    return errorMessage(mapped, 'wsCurrencies', t);
+  const remaining = error.details?.['more'];
+  const more = Array.isArray(remaining) ? Number(remaining[0]) : 0;
+  return { companies, more: Number.isSafeInteger(more) && more > 0 ? more : 0 };
+}
+
+export function currencyErrorMessage(error: unknown, t: SettingsTranslator, operation: 'read' | 'write' = 'read'): string {
+  const translate = typeof t === 'function' ? t : (key: string) => t.translate(key);
+  if (operation === 'write' && error instanceof ApiError && error.status === 401) {
+    return translate('wsCurrencies.errors.notSaved');
+  }
+  if (error instanceof ApiError && error.code === 'CURRENCY_DEFAULT_DELETE') {
+    return translate('wsCurrencies.blocker.next.CURRENCY_DEFAULT_DELETE');
   }
   return errorMessage(error, 'wsCurrencies', t);
 }

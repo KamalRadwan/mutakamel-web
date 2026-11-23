@@ -1,16 +1,18 @@
+import { ApiError } from '../../../../../core/api/api-errors';
 import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerServer } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { patchEmailConfig } from '../email.api';
+import { EmailApi } from '../email.api';
 import {
   EmailConflictPayload,
   EmailResult,
@@ -19,13 +21,14 @@ import {
   TenantEmailConfig,
   extractApiErrorField,
   isConflictError,
+  isManagedProvider,
   providerDriverLabel,
   resolveEmailError,
 } from '../email.model';
 
 @Component({
   selector: 'app-provider-modal',
-  imports: [TranslocoPipe, Button, Dropdown, Field, Modal, SettingsNotice],
+  imports: [ConfirmDialog, TranslocoPipe, Button, Dropdown, Field, Modal, SettingsNotice],
   providers: [provideIcons({ tablerServer })],
   templateUrl: './provider-modal.html',
 })
@@ -34,13 +37,16 @@ export class ProviderModal {
   protected readonly uid = `ws-email-provider-modal-${++ProviderModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly suspendConfirm = viewChild.required<ConfirmDialog>('suspendConfirm');
+  private readonly discardConfirm = viewChild.required<ConfirmDialog>('discardConfirm');
   private readonly modal = viewChild.required<Modal>('modal');
 
   readonly config = input<TenantEmailConfig | null>(null);
-  readonly revision = input<number | null>(null);
-  readonly canManage = input(true);
+  readonly etag = input<string | null>(null);
+  readonly canManage = input(false);
 
   readonly saved = output<EmailResult>();
   readonly conflict = output<EmailConflictPayload>();
@@ -51,28 +57,36 @@ export class ProviderModal {
   protected readonly fieldError = signal<string | null>(null);
   protected readonly topError = signal<string | null>(null);
 
-  private allowClose = false;
-  private saveOp: { fingerprint: string; key: string } | null = null;
+  private readonly opened = signal(false);
+  readonly hasUnsavedDraft = computed(() => this.opened() && this.dirty());
 
-  protected readonly isReadonly = computed(() => !this.canManage());
+  private allowClose = false;
+  private saveOp: { bodyJson: string; key: string } | null = null;
+
+  protected readonly managedProvider = computed(() => {
+    const config = this.config();
+    return !!config && isManagedProvider(config);
+  });
+  protected readonly providerName = computed(() => {
+    this.i18n();
+    const config = this.config();
+    return config
+      ? providerDriverLabel(config.providerDriver, (key) => this.transloco.translate(key))
+      : '';
+  });
+  protected readonly isReadonly = computed(
+    () => !this.canManage() || !this.api.gates().manage || this.managedProvider(),
+  );
 
   protected readonly driverOptions = computed<DropdownOption<ProviderDriver>[]>(() => {
     this.i18n();
-    const cfg = this.config();
     const options: DropdownOption<ProviderDriver>[] = [
-      { value: 'smtp', label: 'SMTP' },
       {
         value: 'platform-shared',
         label: this.transloco.translate('wsEmail.provider.platform-shared'),
       },
+      { value: 'smtp', label: 'SMTP' },
     ];
-    if (cfg && (cfg.providerDriver === 'ses' || cfg.providerDriver === 'sendgrid')) {
-      options.push({
-        value: cfg.providerDriver,
-        label: providerDriverLabel(cfg.providerDriver, (key) => this.transloco.translate(key)),
-        disabled: true,
-      });
-    }
     return options;
   });
 
@@ -107,10 +121,19 @@ export class ProviderModal {
     this.driverDraft.set(cfg.providerDriver);
     this.fieldError.set(null);
     this.topError.set(null);
+    this.opened.set(true);
     this.modal().open();
   }
 
+  protected async requestClose(): Promise<void> {
+    if (this.saving()) return;
+    if (this.hasUnsavedDraft() && !(await this.discardConfirm().open())) return;
+    this.close();
+  }
+
   close(): void {
+    this.opened.set(false);
+    this.saveOp = null;
     this.allowClose = true;
     this.modal().close();
   }
@@ -121,6 +144,7 @@ export class ProviderModal {
       return;
     }
     this.allowClose = false;
+    this.opened.set(false);
     this.saveOp = null;
   }
 
@@ -142,7 +166,6 @@ export class ProviderModal {
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     const cfg = this.config();
-    const rev = this.revision();
     if (!cfg || !this.canSubmit()) return;
 
     if (this.isNextToSmtp()) {
@@ -152,18 +175,25 @@ export class ProviderModal {
     }
 
     const patch: PatchEmailConfigRequest = { providerDriver: this.driverDraft() };
-    const key = this.keyForPatch(patch);
+    if (patch.providerDriver !== undefined && !(await this.suspendConfirm().open())) return;
+    if (this.isReadonly()) return;
+    const etag = this.etag() ?? `"${cfg.revision}"`;
+    const key = this.keyForPatch(patch, etag);
     this.saving.set(true);
     this.fieldError.set(null);
     this.topError.set(null);
 
     try {
-      const result = await patchEmailConfig(patch, rev ?? cfg.revision, key);
+      const result = await this.api.patchEmailConfig(patch, etag, key);
       this.saveOp = null;
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
       this.saved.emit(result);
       this.close();
     } catch (error) {
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+        return;
+      }
       if (isConflictError(error)) {
         this.saveOp = null;
         this.close();
@@ -183,13 +213,13 @@ export class ProviderModal {
     }
   }
 
-  private keyForPatch(patch: PatchEmailConfigRequest): string {
-    const fp = JSON.stringify(patch);
-    if (this.saveOp && this.saveOp.fingerprint === fp) {
+  private keyForPatch(patch: PatchEmailConfigRequest, etag: string): string {
+    const bodyJson = JSON.stringify([patch, etag]);
+    if (this.saveOp && this.saveOp.bodyJson === bodyJson) {
       return this.saveOp.key;
     }
     const key = newIdempotencyKey();
-    this.saveOp = { fingerprint: fp, key };
+    this.saveOp = { bodyJson, key };
     return key;
   }
 }

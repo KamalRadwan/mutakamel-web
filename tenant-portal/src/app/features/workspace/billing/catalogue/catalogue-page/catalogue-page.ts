@@ -6,8 +6,10 @@ import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerApps, tablerRefresh } from '@ng-icons/tabler-icons';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
-import { ApiError, correlationIdOf, getSubscription, listCatalogue } from '../../billing.api';
-import { BillingCycle, SubscriptionOffer } from '../../billing.model';
+import { Button } from '../../../../../shared/ui/button/button';
+import { Notify } from '../../../../../core/notify/notify';
+import { ApiError, BillingApi, billingErrorMessage, correlationIdOf } from '../../billing.api';
+import { BillingCycle } from '../../billing.model';
 import { BillingFailed } from '../../shared/billing-failed/billing-failed';
 import { BillingForbidden } from '../../shared/billing-forbidden/billing-forbidden';
 import { BillingSession } from '../../shared/billing-session';
@@ -15,24 +17,14 @@ import { catalogueNames } from '../../shared/catalogue-names';
 import { AppOfferCard } from '../app-offer-card/app-offer-card';
 import {
   CatalogueAppGroup,
+  CatalogueTooLargeError,
   PriceLadderTarget,
   filterAppGroups,
   groupCatalogueOffers,
   localizeCatalogueGroups,
+  loadAllCatalogue,
 } from '../catalogue.service';
 import { PriceLadderModal } from '../price-ladder-modal/price-ladder-modal';
-
-async function loadAllCatalogue(): Promise<SubscriptionOffer[]> {
-  const all: SubscriptionOffer[] = [];
-  let page = 1;
-  while (true) {
-    const res = await listCatalogue({ page, limit: 100 });
-    all.push(...res.items);
-    if (!res.meta.hasNext || res.items.length === 0) break;
-    page += 1;
-  }
-  return all;
-}
 
 function isForbiddenError(error: unknown): boolean {
   return (
@@ -47,6 +39,7 @@ function isForbiddenError(error: unknown): boolean {
     TranslocoPipe,
     NgIcon,
     Dropdown,
+    Button,
     BillingForbidden,
     BillingFailed,
     AppOfferCard,
@@ -68,6 +61,8 @@ export class CataloguePage {
   private readonly router = inject(Router);
   private readonly transloco = inject(TranslocoService);
   private readonly session = inject(BillingSession);
+  private readonly api = inject(BillingApi);
+  private readonly notify = inject(Notify);
   private readonly i18n = translationEvents(this.transloco);
   private readonly queryParams = toSignal(this.route.queryParamMap);
   private readonly priceLadderModal = viewChild(PriceLadderModal);
@@ -84,6 +79,7 @@ export class CataloguePage {
   protected readonly isForbidden = computed(() => !this.session.isOwner() || this.apiForbidden());
   protected readonly failed = computed(() => !this.isForbidden() && this.loadError() !== null);
   protected readonly errorCorrelationId = computed(() => correlationIdOf(this.loadError()));
+  protected readonly tooLarge = computed(() => this.loadError() instanceof CatalogueTooLargeError);
 
   protected readonly selectedAppKey = computed(() => {
     const raw = this.queryParams()?.get('app') ?? '';
@@ -142,9 +138,13 @@ export class CataloguePage {
     this.loadError.set(null);
 
     try {
-      const [offers, subscription] = await Promise.all([loadAllCatalogue(), getSubscription()]);
+      const [offers, subscription] = await Promise.all([
+        loadAllCatalogue(this.api),
+        this.api.getSubscription().catch(() => null),
+      ]);
       if (seq !== this.loadSeq) return;
-      this.cycle.set(subscription.subscription.billingCycle);
+      this.notify.connectionRestored();
+      this.cycle.set(subscription?.subscription.billingCycle ?? 'MONTHLY');
       this.groups.set(groupCatalogueOffers(offers, subscription));
     } catch (error) {
       if (seq !== this.loadSeq) return;
@@ -152,6 +152,9 @@ export class CataloguePage {
         this.apiForbidden.set(true);
       } else {
         this.loadError.set(error);
+        if (error instanceof ApiError && error.status === 0) {
+          this.notify.connectionLost(billingErrorMessage(error, this.transloco), '');
+        }
       }
     } finally {
       if (seq === this.loadSeq) {

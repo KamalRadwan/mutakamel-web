@@ -1,20 +1,62 @@
-import { fakeListSessions, fakeLogoutAll, fakeRevokeSession } from './sessions.fake';
-import { SessionList } from './sessions.model';
+import { DestroyRef, Service, inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { CoreHttp } from '../../../../../core/api/core-http';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import type { SessionList } from './sessions.model';
 
-// Real browser base: /api/tenant/core/v1 (envelope { data }). Self-service. Responses are private, no-store.
-// Writes use the credentialed CSRF channel and are never auto-retried.
+const AUTH = '/api/tenant/core/v1/auth';
 
-/** GET /auth/sessions?historyPage=n — all active (current first) on every page + 50 ended per page; 400 CORE_VALIDATION_FAILED */
-export function listSessions(historyPage = 1): Promise<SessionList> {
-  return fakeListSessions(historyPage);
-}
+@Service()
+export class SessionsApi {
+  private readonly http = inject(CoreHttp);
+  private readonly session = inject(AuthSession);
+  private readonly queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, networkMode: 'always' } },
+  });
 
-/** DELETE /auth/sessions/:id → 204 (also when already ended or not owned), endReason DEVICE_REVOKED; 400 COMMON.VALIDATION.UUID_V7_INVALID; current id → cookies cleared = signed out */
-export function revokeSession(id: string): Promise<void> {
-  return fakeRevokeSession(id);
-}
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.queries.clear());
+  }
 
-/** POST /auth/logout-all → 204; ends EVERY session incl. this one */
-export function logoutAll(): Promise<void> {
-  return fakeLogoutAll();
+  listSessions(historyPage = 1): Promise<SessionList> {
+    return this.queries.fetchQuery({
+      queryKey: [
+        'account-sessions',
+        this.session.me()?.id,
+        this.session.requestVersion().generation,
+        historyPage,
+      ],
+      queryFn: () =>
+        this.recoverOnce(() => this.http.read<SessionList>(`${AUTH}/sessions`, { historyPage })),
+    });
+  }
+
+  revokeSession(id: string): Promise<void> {
+    return this.recoverOnce(async () => {
+      await this.http.write<void>(
+        'DELETE',
+        `${AUTH}/sessions/${encodeURIComponent(id)}`,
+        undefined,
+        { noBody: true },
+      );
+    });
+  }
+
+  logoutAll(): Promise<void> {
+    return this.recoverOnce(async () => {
+      await this.http.write<void>('POST', `${AUTH}/logout-all`, undefined, { noBody: true });
+    });
+  }
+
+  private async recoverOnce<T>(send: () => Promise<T>): Promise<T> {
+    const version = this.session.requestVersion();
+    try {
+      return await send();
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      if (await this.session.recoverRequest(error, version)) return send();
+      throw error;
+    }
+  }
 }

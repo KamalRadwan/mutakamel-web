@@ -21,7 +21,7 @@
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
         <ng-icon name="tablerFileInvoice" size="18" aria-hidden="true" />
       </span>
-      <p class="text-13 leading-18 font-medium text-text">{{ 'binv.list.empty' | transloco }}</p>
+      <p class="text-13 leading-18 font-medium text-text">{{ 'binv.empty.none' | transloco }}</p>
     </div>
   } @else {
     <div class="overflow-x-auto pb-4">
@@ -165,7 +165,7 @@
                     {{ formatAmount(inv.legacyOriginalAmounts?.total ?? null, inv.legacyOriginalAmounts?.currencyCode ?? inv.currencyCode) }}
                   </span>
                   <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 leading-16 font-medium text-on-neutral-soft whitespace-nowrap">
-                    {{ 'binv.list.legacy' | transloco }}
+                    {{ 'binv.detail.offlineOnly' | transloco }}
                   </span>
                 }
               </span>

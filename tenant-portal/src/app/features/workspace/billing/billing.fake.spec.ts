@@ -11,7 +11,7 @@ import {
   prepareChange,
   topUpWallet,
 } from './billing.api';
-import { setFakeBillingFailNext } from './billing.fake';
+import { setFakeBillingErrorNext, setFakeBillingFailNext } from './billing.fake';
 
 // The fakes stand in for the backend until Phase 5, so their status codes, error
 // codes, details and list shapes are checked against the backend contract here.
@@ -40,7 +40,33 @@ describe('billing fakes follow the backend contract', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
     setFakeBillingFailNext(false);
+    setFakeBillingErrorNext(null);
     vi.useRealTimers();
+  });
+
+  it('fake raises the backend billing codes', async () => {
+    for (const [code, status, request] of [
+      ['PAYMENT_PROVIDER_UNCONFIGURED', 503, () => topUpWallet({ amount: '10', currencyCode: 'USD' }, crypto.randomUUID())],
+      ['PAYMENT_INTENT_UNAVAILABLE', 409, () => createPaymentIntent('invoice', 'quote', crypto.randomUUID())],
+      ['WALLET_NOT_ACTIVE', 409, () => topUpWallet({ amount: '10', currencyCode: 'USD' }, crypto.randomUUID())],
+      ['WALLET_FROZEN', 409, () => topUpWallet({ amount: '10', currencyCode: 'USD' }, crypto.randomUUID())],
+      ['TOPUP_LIMITS_INVALID', 503, () => topUpWallet({ amount: '10', currencyCode: 'USD' }, crypto.randomUUID())],
+      ['ACCESS_POLICY_BLOCKED', 403, () => getSubscription()],
+      ['ACCESS_POLICY_UNAVAILABLE', 503, () => getSubscription()],
+      ['SEAT_MODULE_HOLDERS_EXCEED_PURCHASE', 422, () => prepareChange({ expectedSubscriptionRevision: '1', changes: [] }, crypto.randomUUID())],
+    ] as const) {
+      setFakeBillingErrorNext(code);
+      const error = await failure(request());
+      expect([error.status, error.code]).toEqual([status, code]);
+      for (const value of Object.values(error.details ?? {})) {
+        expect(Array.isArray(value) && value.every((item) => typeof item === 'string')).toBe(true);
+      }
+      if (code === 'SEAT_MODULE_HOLDERS_EXCEED_PURCHASE') {
+        expect(error.details).toEqual({ moduleKey: ['crm'], holders: ['4'], seats: ['2'] });
+      }
+      if (status >= 500) expect(error.details).toBeUndefined();
+    }
+    await settle(listPaymentCurrencies());
   });
 
   it('echoes the requested page and reports zero pages past the end like the backend', async () => {

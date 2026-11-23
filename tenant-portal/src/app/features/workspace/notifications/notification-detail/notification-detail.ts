@@ -6,7 +6,6 @@ import {
   effect,
   inject,
   signal,
-  untracked,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -25,10 +24,11 @@ import {
   tablerUserPlus,
   tablerUserShare,
 } from '@ng-icons/tabler-icons';
-import { errorCodeOf, errorMessage } from '../../../../core/api/api-errors';
+import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Notify } from '../../../../core/notify/notify';
+import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { Button } from '../../../../shared/ui/button/button';
 import { Modal } from '../../../../shared/ui/modal/modal';
 import { NotificationInbox } from '../../../../shared/widgets/notifications/notification-inbox';
@@ -37,7 +37,10 @@ import {
   formatNotificationTime,
   isJustNow,
 } from '../../../../shared/widgets/notifications/notification-time';
-import { getNotification } from '../../../../shared/widgets/notifications/notifications.api';
+import {
+  NotificationsApi,
+  notificationsErrorMessage,
+} from '../../../../shared/widgets/notifications/notifications.api';
 import {
   NotificationView,
   entityTypeLabel,
@@ -45,11 +48,11 @@ import {
   notificationLook,
 } from '../../../../shared/widgets/notifications/notifications.model';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Component({
   selector: 'app-notification-detail',
-  imports: [TranslocoPipe, Modal, Button],
+  imports: [TranslocoPipe, Modal, Button, FullState],
   providers: [
     provideIcons({
       tablerChecklist,
@@ -67,6 +70,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
   templateUrl: './notification-detail.html',
 })
 export class NotificationDetail {
+  private readonly api = inject(NotificationsApi);
+  readonly pageState = signal<'not-found' | 'load-failure' | 'user-missing' | null>(null);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -119,7 +124,13 @@ export class NotificationDetail {
     if (!iso) return '';
     const now = new Date();
     if (isJustNow(iso, now.getTime())) return null;
-    return formatNotificationTime(iso, dayGroupOf(iso, now), this.language.current(), now.getTime(), true);
+    return formatNotificationTime(
+      iso,
+      dayGroupOf(iso, now),
+      this.language.current(),
+      now.getTime(),
+      true,
+    );
   });
 
   protected readonly entityLabelKey = computed(() => {
@@ -150,34 +161,19 @@ export class NotificationDetail {
         modal.open();
       }
     });
-
-    let prevLang = this.language.current();
-    effect(() => {
-      const lang = this.language.current();
-      if (lang === prevLang) return;
-      prevLang = lang;
-      const id = untracked(() => this.currentId());
-      const hasDirect = untracked(() => this.directItem() !== null);
-      if (id && UUID.test(id) && hasDirect) {
-        untracked(() => void this.refreshDirectItem(id, this.loadSeq));
-      }
-    });
   }
 
   private async loadForId(id: string): Promise<void> {
     const seq = ++this.loadSeq;
     this.pendingNavigation = null;
+    this.pageState.set(null);
     this.directItem.set(null);
     this.dismissingSnapshot.set(null);
     this.actionPath.set(null);
     this.currentId.set(id);
 
     if (!UUID.test(id)) {
-      await Promise.resolve();
-      await firstValueFrom(this.transloco.selectTranslation('ws-notifications')).catch(() => undefined);
-      if (this.destroyed || seq !== this.loadSeq) return;
-      this.notify.error(this.transloco.translate('wsNotif.detail.gone'));
-      void this.navigateBack(true);
+      this.pageState.set('not-found');
       return;
     }
 
@@ -185,23 +181,33 @@ export class NotificationDetail {
     let found = fromInbox;
     if (!found) {
       try {
-        found = await getNotification(id);
+        found = await this.api.getNotification(id);
       } catch (error) {
-        await firstValueFrom(this.transloco.selectTranslation('ws-notifications')).catch(() => undefined);
+        await firstValueFrom(this.transloco.selectTranslation('ws-notifications')).catch(
+          () => undefined,
+        );
         if (this.destroyed || seq !== this.loadSeq) return;
         const code = errorCodeOf(error);
-        if (code === 'NOTIFICATION_NOT_FOUND' || code === 'CORE_VALIDATION_FAILED') {
-          this.notify.error(this.transloco.translate('wsNotif.detail.gone'));
-        } else {
-          this.notify.error(errorMessage(error, 'wsNotif', this.transloco));
+        this.pageState.set(
+          code === 'NOTIFICATION_NOT_FOUND' || code === 'CORE_VALIDATION_FAILED'
+            ? 'not-found'
+            : code === 'NOTIFICATION_USER_NOT_FOUND'
+              ? 'user-missing'
+              : 'load-failure',
+        );
+        if (error instanceof ApiError && error.status === 0) {
+          this.notify.connectionLost(
+            this.transloco.translate('session.connectionLost.title'),
+            this.transloco.translate('session.connectionLost.text'),
+          );
         }
-        void this.navigateBack(true);
         return;
       }
       if (this.destroyed || seq !== this.loadSeq) return;
       this.directItem.set(found);
     }
 
+    this.notify.connectionRestored();
     const resolvedPath = await inAppActionPath(found.actionUrl, this.router.config, this.injector);
     if (this.destroyed || seq !== this.loadSeq) return;
 
@@ -213,15 +219,12 @@ export class NotificationDetail {
     }
   }
 
-  private async refreshDirectItem(id: string, seq: number): Promise<void> {
-    try {
-      const fresh = await getNotification(id);
-      if (!this.destroyed && seq === this.loadSeq && this.directItem() !== null) {
-        this.directItem.set(fresh);
-      }
-    } catch {
-      // Keep the existing snapshot if a language reload fails transiently.
-    }
+  protected retry(): void {
+    void this.loadForId(this.currentId());
+  }
+
+  protected backHome(): void {
+    void this.router.navigateByUrl('/workspace/home');
   }
 
   private async markReadOnOpen(found: NotificationView, seq: number): Promise<void> {
@@ -232,7 +235,8 @@ export class NotificationDetail {
     }
     try {
       await this.inbox.markRead(found.id, found);
-    } catch {
+    } catch (error) {
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
       if (!this.destroyed && seq === this.loadSeq && hadDirect) {
         this.directItem.set(found);
       }
@@ -262,7 +266,7 @@ export class NotificationDetail {
       }
     } catch (error) {
       if (!wasInInbox) this.directItem.set(prevDirect);
-      this.notify.error(errorMessage(error, 'wsNotif', this.transloco));
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
     } finally {
       this.busy.set(false);
     }
@@ -278,7 +282,7 @@ export class NotificationDetail {
       this.modal()?.close();
     } catch (error) {
       this.dismissingSnapshot.set(null);
-      this.notify.error(errorMessage(error, 'wsNotif', this.transloco));
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
     } finally {
       this.busy.set(false);
     }

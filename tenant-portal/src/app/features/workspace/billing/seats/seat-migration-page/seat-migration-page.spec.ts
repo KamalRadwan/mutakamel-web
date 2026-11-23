@@ -7,10 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../../core/api/api-errors';
 import { Notify } from '../../../../../core/notify/notify';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
-import { fakeGetSeatUsage, setFakeMigrationShort, setFakeSeatMode } from '../../../seats/seats.fake';
+import { fakeGetSeatUsage, resetSeatsFake, setFakeMigrationShort, setFakeSeatMode } from '../../../seats/seats.fake';
 import { SeatUsage } from '../../../seats/seats.model';
 import { StaffSession } from '../../../staff/shared/staff-session';
-import { setFakeOverCapacity } from '../../../staff/shared/staff.fake';
+import { resetStaffFake, setFakeOverCapacity } from '../../../staff/shared/staff.fake';
 import { SeatMigrationPage } from './seat-migration-page';
 
 /*
@@ -95,6 +95,8 @@ async function clickSwitch(): Promise<void> {
 }
 
 beforeEach(() => {
+  resetStaffFake();
+  resetSeatsFake();
   vi.useFakeTimers();
   setFakeSeatMode('MANUAL');
   setFakeMigrationShort(true);
@@ -115,9 +117,8 @@ beforeEach(() => {
 afterEach(() => {
   fixture?.destroy();
   TestBed.resetTestingModule();
-  setFakeSeatMode('DERIVED');
-  setFakeMigrationShort(false);
-  setFakeOverCapacity(false);
+  resetStaffFake();
+  resetSeatsFake();
   vi.useRealTimers();
 });
 

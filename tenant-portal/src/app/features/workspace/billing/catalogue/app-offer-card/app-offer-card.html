@@ -44,10 +44,11 @@
           </div>
 
           <div class="text-12 leading-18">
-            @if (tier.fromPrice; as price) {
+            @if (tier.priceNotSet) {
+              <p class="text-text-muted">{{ 'bcat.price.notSet' | transloco }}</p>
+            } @else if (tier.fromPrice; as price) {
               <p class="flex flex-wrap items-baseline gap-4 text-text-muted">
-                <span>{{ 'bcat.price.fromPrefix' | transloco }}</span>
-                <span dir="ltr" class="font-medium text-text tabular-nums">{{ price }}</span>
+                <span class="tabular-nums">{{ 'bcat.price.startingAt' | transloco: { price: '\u2066' + price + '\u2069' } }}</span>
                 <span>{{
                   (cycle() === 'ANNUAL' ? 'bcat.price.perUserYear' : 'bcat.price.perUserMonth')
                     | transloco
@@ -99,7 +100,9 @@
                 </span>
               }
               @default {
-                <span></span>
+                <button uiButton type="button" variant="secondary" size="small" [disabled]="true">
+                  {{ 'bcat.actions.addToPlan' | transloco }}
+                </button>
               }
             }
 
@@ -142,16 +145,17 @@
                 {{ addon.name }}
               </span>
               <span [class]="'shrink-0 ' + addon.statusBadge.classes">
-                {{ addon.statusBadge.labelKey | transloco: { app: item.application.name } }}
+                {{ (addon.priceNotSet ? 'bcat.price.notSet' : addon.statusBadge.labelKey) | transloco: { app: item.application.name } }}
               </span>
             </div>
 
             <div class="flex shrink-0 flex-wrap items-center gap-8">
               <div class="text-12 leading-18">
-                @if (addon.fromPrice; as price) {
+                @if (addon.priceNotSet) {
+                  <span class="text-text-muted">{{ 'bcat.price.notSet' | transloco }}</span>
+                } @else if (addon.fromPrice; as price) {
                   <span class="inline-flex flex-wrap items-baseline gap-4 text-text-muted">
-                    <span>{{ 'bcat.price.fromPrefix' | transloco }}</span>
-                    <span dir="ltr" class="font-medium text-text tabular-nums">{{ price }}</span>
+                    <span class="tabular-nums">{{ 'bcat.price.startingAt' | transloco: { price: '\u2066' + price + '\u2069' } }}</span>
                     <span>{{
                       (cycle() === 'ANNUAL' ? 'bcat.price.perUserYear' : 'bcat.price.perUserMonth')
                         | transloco
@@ -195,18 +199,10 @@
                     </a>
                   }
                 }
-                @case ('upgradeTier') {
-                  @if (addon.actionLink; as link) {
-                    <a
-                      uiButton
-                      variant="secondary"
-                      size="small"
-                      [routerLink]="link.path"
-                      [queryParams]="link.queryParams"
-                    >
-                      {{ 'bcat.actions.upgradeTier' | transloco }}
-                    </a>
-                  }
+                @default {
+                  <button uiButton type="button" variant="secondary" size="small" [disabled]="true">
+                    {{ 'bcat.actions.addToPlan' | transloco }}
+                  </button>
                 }
               }
             </div>

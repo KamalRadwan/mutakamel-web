@@ -31,8 +31,16 @@
       <div class="h-table-row rounded-10 border border-border bg-surface shadow-card"></div>
     }
   </div>
-} @else if (loadFailed() && !summary()) {
+} @else if (loadFailed()) {
   <app-billing-failed [correlationId]="correlationId()" (retry)="loadSummary()" />
+} @else if (noSubscription()) {
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+      <ng-icon name="tablerFileInvoice" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 text-text-muted">{{ 'bov.empty.noSubscription' | transloco }}</p>
+    <a uiButton routerLink="/workspace/billing/catalogue">{{ 'bov.empty.browseCatalogue' | transloco }}</a>
+  </div>
 } @else if (summary(); as data) {
   <section class="grid grid-cols-1 gap-12 desktop:grid-cols-3">
     <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
@@ -128,75 +136,79 @@
         <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
           {{ 'bov.wallet.title' | transloco }}
         </h2>
-        @let walBadge = walletStatusBadge(data.wallet.status);
+        @let walBadge = walletStatusBadge(wallet()?.status ?? data.wallet.status);
         <span [class]="walBadge.classes">{{ walBadge.labelKey | transloco }}</span>
       </header>
 
-      <div class="flex flex-col gap-2">
-        <span class="text-12 leading-18 text-text-muted">{{ 'bov.wallet.available' | transloco }}</span>
-        <span dir="ltr" class="text-20 leading-26 font-medium tabular-nums text-text">
-          {{ formatUsd(data.wallet.availableBalanceUsd) }}
-        </span>
-      </div>
-
-      <dl class="flex flex-1 flex-col gap-6">
-        <div class="flex items-center justify-between gap-8 text-13 leading-18">
-          <dt class="text-12 text-text-muted">{{ 'bov.wallet.balance' | transloco }}</dt>
-          <dd dir="ltr" class="font-medium tabular-nums text-text">
-            {{ formatUsd(data.wallet.balanceUsd) }}
-          </dd>
+      @if (walletFailed()) {
+        <app-billing-failed (retry)="loadWallet()" />
+      } @else {
+        <div class="flex flex-col gap-2">
+          <span class="text-12 leading-18 text-text-muted">{{ 'bov.wallet.available' | transloco }}</span>
+          <span dir="ltr" class="text-20 leading-26 font-medium tabular-nums text-text">
+            {{ formatUsd(wallet()?.availableBalanceUsd ?? null) }}
+          </span>
         </div>
 
-        <div class="flex items-center justify-between gap-8 text-13 leading-18">
-          <dt class="flex items-center gap-4 text-12 text-text-muted">
-            <span>{{ 'bov.wallet.reserved' | transloco }}</span>
-            <span
-              #reservedTrigger
-              class="group relative inline-flex shrink-0 items-center text-accent"
-              (mouseenter)="placeReservedTip(reservedTrigger)"
-              (mouseleave)="hideReservedTip()"
-            >
-              <ng-icon
-                name="tablerExclamationCircle"
-                size="14"
-                class="cursor-help"
-                tabindex="-1"
-                aria-hidden="true"
-              />
+        <dl class="flex flex-1 flex-col gap-6">
+          <div class="flex items-center justify-between gap-8 text-13 leading-18">
+            <dt class="text-12 text-text-muted">{{ 'bov.wallet.balance' | transloco }}</dt>
+            <dd dir="ltr" class="font-medium tabular-nums text-text">
+              {{ formatUsd(wallet()?.balanceUsd ?? null) }}
+            </dd>
+          </div>
+
+          <div class="flex items-center justify-between gap-8 text-13 leading-18">
+            <dt class="flex items-center gap-4 text-12 text-text-muted">
+              <span>{{ 'bov.wallet.reserved' | transloco }}</span>
               <span
-                #reservedTip
-                [id]="uid + '-reserved-hint'"
-                role="tooltip"
-                class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
-                [class]="reservedTipPlaced() ? 'invisible group-hover:visible' : 'invisible'"
-                [style.top.px]="reservedTipPlace().top"
-                [style.inset-inline-start.px]="reservedTipPlace().start"
+                #reservedTrigger
+                class="group relative inline-flex shrink-0 items-center text-accent"
+                (mouseenter)="placeReservedTip(reservedTrigger)"
+                (mouseleave)="hideReservedTip()"
               >
-                {{ 'bov.wallet.reservedHint' | transloco }}
+                <ng-icon
+                  name="tablerExclamationCircle"
+                  size="14"
+                  class="cursor-help"
+                  tabindex="-1"
+                  aria-hidden="true"
+                />
+                <span
+                  #reservedTip
+                  [id]="uid + '-reserved-hint'"
+                  role="tooltip"
+                  class="fixed z-tooltip flex min-h-tooltip w-max max-w-modal-alert items-center whitespace-normal rounded-6 bg-tooltip-bg px-8 text-12 leading-20 text-on-tooltip"
+                  [class]="reservedTipPlaced() ? 'invisible group-hover:visible' : 'invisible'"
+                  [style.top.px]="reservedTipPlace().top"
+                  [style.inset-inline-start.px]="reservedTipPlace().start"
+                >
+                  {{ 'bov.wallet.reservedHint' | transloco }}
+                </span>
               </span>
-            </span>
-          </dt>
-          <dd
-            dir="ltr"
-            class="tabular-nums text-text"
-            [attr.aria-describedby]="uid + '-reserved-hint'"
-          >
-            {{ formatUsd(data.wallet.reservedBalanceUsd) }}
-          </dd>
-        </div>
-      </dl>
+            </dt>
+            <dd
+              dir="ltr"
+              class="tabular-nums text-text"
+              [attr.aria-describedby]="uid + '-reserved-hint'"
+            >
+              {{ formatUsd(wallet()?.reservedBalanceUsd ?? null) }}
+            </dd>
+          </div>
+        </dl>
 
+      }
       <footer class="mt-auto flex flex-wrap items-center gap-8 border-t border-border pt-8">
         <span
           class="inline-flex"
-          [title]="data.wallet.status !== 'ACTIVE' ? ('bov.wallet.topUpDisabled.' + data.wallet.status | transloco) : ''"
+          [title]="wallet() && wallet()?.status !== 'ACTIVE' ? ('bov.wallet.topUpDisabled.' + wallet()?.status | transloco) : ''"
         >
           <button
             type="button"
             uiButton
             variant="primary"
             size="small"
-            [disabled]="data.wallet.status !== 'ACTIVE'"
+            [disabled]="walletLoading() || walletFailed() || wallet()?.status !== 'ACTIVE'"
             (click)="openTopup()"
           >
             {{ 'bill.common.topUp' | transloco }}
@@ -205,14 +217,14 @@
       </footer>
     </article>
 
-    <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
-      @if (data.outstandingInvoice; as inv) {
+    @if (data.outstandingInvoice; as inv) {
+      <article class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
         <header class="flex items-center gap-8">
           <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
             <ng-icon name="tablerFileInvoice" size="15" aria-hidden="true" />
           </span>
           <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
-            {{ 'bov.due.title' | transloco }}
+            {{ 'bov.cards.dueNow' | transloco }}
           </h2>
           @let invBadge = invoiceStatusBadge(inv.status);
           <span [class]="invBadge.classes">{{ invBadge.labelKey | transloco }}</span>
@@ -257,22 +269,13 @@
           >
             {{ 'bov.due.viewInvoice' | transloco }}
           </a>
+          <a uiButton variant="ghost" size="small" routerLink="/workspace/billing/invoices"
+            [queryParams]="{ status: 'ISSUED,PARTIALLY_PAID,OVERDUE' }">
+            {{ 'bov.cards.allInvoices' | transloco }}
+          </a>
         </footer>
-      } @else {
-        <header class="flex items-center gap-8">
-          <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
-            <ng-icon name="tablerCircleCheck" size="15" aria-hidden="true" />
-          </span>
-          <h2 class="min-w-0 flex-1 truncate text-13 leading-18 font-medium text-text">
-            {{ 'bov.due.title' | transloco }}
-          </h2>
-        </header>
-
-        <div class="flex flex-1 items-center">
-          <p class="text-13 leading-18 text-text-muted">{{ 'bov.due.nothingToPay' | transloco }}</p>
-        </div>
-      }
-    </article>
+      </article>
+    }
   </section>
 
   <div

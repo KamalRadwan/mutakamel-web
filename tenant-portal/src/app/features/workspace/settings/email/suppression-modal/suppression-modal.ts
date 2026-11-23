@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -11,20 +20,15 @@ import { LanguageState } from '../../../../../core/i18n/language';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { Notify } from '../../../../../core/notify/notify';
+import { ApiError, errorCodeOf, fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { liftSuppression, lookupSuppression } from '../email.api';
-import { SuppressionLookup, formatEmailDateTime } from '../email.model';
+import { EmailApi } from '../email.api';
+import { SuppressionLookup, formatEmailDateTime, resolveEmailError } from '../email.model';
 
 type SuppressionViewState =
-  | 'idle'
-  | 'loading'
-  | 'clear'
-  | 'suppressed'
-  | 'liftedOk'
-  | 'liftedNone'
-  | 'error';
+  'idle' | 'loading' | 'clear' | 'suppressed' | 'liftedOk' | 'liftedNone' | 'error';
 
 @Component({
   selector: 'app-suppression-modal',
@@ -33,11 +37,15 @@ type SuppressionViewState =
   templateUrl: './suppression-modal.html',
 })
 export class SuppressionModal {
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly language = inject(LanguageState).current;
   private readonly modal = viewChild.required<Modal>('modal');
   private readonly liftConfirm = viewChild.required<ConfirmDialog>('liftConfirm');
 
+  private readonly notify = inject(Notify);
+  readonly canLift = input(false);
+  readonly addressError = output<string>();
   readonly forbidden = output<void>();
   readonly busyChange = output<boolean>();
 
@@ -120,7 +128,8 @@ export class SuppressionModal {
   }
 
   protected async requestLift(): Promise<void> {
-    if (this.busy() || this.state() !== 'suppressed') return;
+    if (!this.canLift() || !this.api.gates().manage || this.busy() || this.state() !== 'suppressed')
+      return;
     const confirmed = await this.liftConfirm().open();
     if (!confirmed) return;
     await this.runLift();
@@ -137,7 +146,7 @@ export class SuppressionModal {
     this.errorRetryable.set(false);
 
     try {
-      const result = await lookupSuppression(address);
+      const result = await this.api.lookupSuppression(address);
       if (seq !== this.requestSeq) return;
       this.lookupData.set(result);
       this.state.set(result.suppressed ? 'suppressed' : 'clear');
@@ -149,7 +158,7 @@ export class SuppressionModal {
 
   private async runLift(): Promise<void> {
     const address = this.targetAddress();
-    if (!address) return;
+    if (!address || !this.canLift() || !this.api.gates().manage) return;
 
     if (!this.liftOp || this.liftOp.address !== address) {
       this.liftOp = { address, key: newIdempotencyKey() };
@@ -162,7 +171,7 @@ export class SuppressionModal {
     this.errorRetryable.set(false);
 
     try {
-      const result = await liftSuppression(address, this.liftOp.key);
+      const result = await this.api.liftSuppression(address, this.liftOp.key);
       if (seq !== this.requestSeq) return;
       this.liftOp = null;
       this.lookupData.set(null);
@@ -179,7 +188,11 @@ export class SuppressionModal {
     const code = errorCodeOf(error);
     const status = error instanceof ApiError ? error.status : null;
 
-    if (status === 403 || code === 'TENANT_WIDE_PERMISSION_REQUIRED' || code === 'ACCESS_POLICY_BLOCKED') {
+    if (
+      status === 403 ||
+      code === 'TENANT_WIDE_PERMISSION_REQUIRED' ||
+      code === 'ACCESS_POLICY_BLOCKED'
+    ) {
       this.clearResults();
       this.state.set('error');
       this.errorText.set(this.transloco.translate('wsEmail.bar.readOnlyHint'));
@@ -189,22 +202,17 @@ export class SuppressionModal {
     }
 
     this.lastAction = action;
-    if (status === 400 || status === 422) {
-      this.state.set('error');
-      this.errorText.set(this.transloco.translate('wsEmail.suppression.errors.invalidAddress'));
-      this.errorRetryable.set(false);
-      return;
-    }
-
-    if (status === 429 || code === 'TOO_MANY_REQUESTS') {
-      this.state.set('error');
-      this.errorText.set(this.transloco.translate('wsEmail.suppression.errors.rateLimited'));
-      this.errorRetryable.set(true);
-      return;
-    }
-
     this.state.set('error');
-    this.errorText.set(this.transloco.translate('wsEmail.suppression.errors.failed'));
-    this.errorRetryable.set(true);
+    const message = resolveEmailError(error, this.transloco);
+    const addressMessage = fieldErrorsOf(error)['address']?.[0];
+    if (status === 400 && addressMessage) {
+      this.addressError.emit(addressMessage);
+      this.close();
+      return;
+    }
+    this.errorText.set(message);
+    this.errorRetryable.set(status === 0 || status === 429 || (status !== null && status >= 500));
+    if (status === 0) this.notify.connectionLost(message, '');
+    else this.notify.error(message);
   }
 }

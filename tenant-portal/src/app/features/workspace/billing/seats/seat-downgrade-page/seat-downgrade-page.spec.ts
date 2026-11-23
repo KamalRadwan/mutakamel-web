@@ -6,9 +6,10 @@ import { map, timer } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Notify } from '../../../../../core/notify/notify';
 import { SeatCascadeConfirm } from '../../../seats/cascade-confirm/cascade-confirm';
-import { fakeFreeUp, fakeGetSeatUsage, fakeListSeatHolders } from '../../../seats/seats.fake';
+import { fakeFreeUp, fakeGetSeatUsage, fakeListSeatHolders, resetSeatsFake } from '../../../seats/seats.fake';
 import { CascadeAddonItem, SeatHolder, SeatUsage } from '../../../seats/seats.model';
 import { StaffSession } from '../../../staff/shared/staff-session';
+import { resetStaffFake } from '../../../staff/shared/staff.fake';
 import { SeatDowngradePage } from './seat-downgrade-page';
 
 /*
@@ -123,6 +124,8 @@ async function freeAndConfirm(): Promise<void> {
 }
 
 beforeEach(() => {
+  resetStaffFake();
+  resetSeatsFake();
   vi.useFakeTimers();
   dialogProto['showModal'] = function (this: HTMLDialogElement) {
     this.setAttribute('open', '');
@@ -150,6 +153,8 @@ beforeEach(() => {
 afterEach(() => {
   fixture?.destroy();
   TestBed.resetTestingModule();
+  resetStaffFake();
+  resetSeatsFake();
   dialogProto['showModal'] = originalDialog.showModal;
   dialogProto['close'] = originalDialog.close;
   vi.useRealTimers();

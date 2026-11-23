@@ -7,12 +7,13 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
-import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError } from '../../../../../core/api/api-errors';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { AccountSection } from '../../shared/account-section/account-section';
 import { AppearanceCard } from '../appearance-card/appearance-card';
-import { getMe, getMyProfile, updateMyProfile } from '../preferences.api';
-import { AccountMe, StartPage, TenantProfile, isStartPage } from '../preferences.model';
+import { PreferencesApi, preferencesErrorMessage } from '../preferences.api';
+import { StartPage, TenantProfile, isStartPage } from '../preferences.model';
 import { ProfileCard } from '../profile-card/profile-card';
 
 const SKELETON_CARDS = [0, 1, 2] as const;
@@ -32,11 +33,12 @@ export class PreferencesPage {
   protected readonly uid = `preferences-page-${++PreferencesPage.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(PreferencesApi);
+  protected readonly me = inject(AuthSession).me;
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
   protected readonly skeletonCards = SKELETON_CARDS;
-  protected readonly me = signal<AccountMe | null>(null);
   protected readonly profile = signal<TenantProfile | null>(null);
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
@@ -67,22 +69,24 @@ export class PreferencesPage {
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const [me, profile] = await Promise.all([getMe(), getMyProfile()]);
+      const profile = await this.api.getMyProfile();
       if (seq !== this.loadSeq) return;
-      this.me.set(me);
       this.profile.set(profile);
-    } catch {
+      this.notify.connectionRestored();
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(
+          this.transloco.translate('session.connectionLost.title'),
+          this.transloco.translate('session.connectionLost.text'),
+        );
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
-  }
-
-  protected onMeChange(next: AccountMe): void {
-    this.me.set(next);
   }
 
   protected onProfileChange(next: TenantProfile): void {
@@ -101,7 +105,7 @@ export class PreferencesPage {
 
     try {
       // One start-page pick is one user action; a failure reverts the pick, so there is no retry to reuse a key for.
-      const updated = await updateMyProfile({ extensions: { startPage: next } }, newIdempotencyKey());
+      const updated = await this.api.updateMyProfile({ extensions: { startPage: next } }, newIdempotencyKey());
       this.profile.set(updated);
       this.notify.success(this.transloco.translate('wsAccPrefs.toast.saved'));
     } catch (error) {
@@ -109,19 +113,9 @@ export class PreferencesPage {
       this.profile.update((latest) =>
         latest ? { ...latest, extensions: { ...latest.extensions, startPage: current.extensions['startPage'] } } : latest,
       );
-      this.notify.error(this.resolveError(error));
+      this.notify.error(preferencesErrorMessage(error, this.transloco, 'write'));
     } finally {
       this.savingStartPage.set(false);
     }
-  }
-
-  private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `wsAccPrefs.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) return translated;
-    }
-    return this.transloco.translate('wsAccPrefs.errors.generic');
   }
 }

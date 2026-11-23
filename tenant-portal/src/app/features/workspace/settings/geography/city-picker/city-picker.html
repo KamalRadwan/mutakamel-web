@@ -1,3 +1,21 @@
+@if (zonesTruncated()) {
+  <ui-field
+    size="bare"
+    [for]="uid + '-zone-lookup'"
+    [label]="'geoZones.picker.zoneLookup' | transloco"
+    [hint]="'geoZones.picker.zoneLookupHint' | transloco"
+  >
+    <ui-suggest-input
+      [inputId]="uid + '-zone-lookup'"
+      [describedBy]="uid + '-zone-lookup-hint'"
+      [label]="'geoZones.picker.zoneLookup' | transloco"
+      [maxLength]="zoneSearchMax"
+      [options]="zoneSuggestions()"
+      [value]="zoneSearch()"
+      (valueChange)="onZoneSearch($event)"
+    />
+  </ui-field>
+}
 <div class="grid grid-cols-2 gap-x-10">
   <ui-field
     size="bare"
@@ -79,7 +97,9 @@
 <div class="mt-8 grid grid-cols-2 gap-x-10">
   <section class="flex min-w-0 flex-col gap-4">
     <div class="flex h-label items-center justify-between gap-6">
-      <span [id]="uid + '-available-label'" class="truncate text-12 text-text-muted">{{ 'geoZones.picker.available' | transloco }}</span>
+      <span [id]="uid + '-available-label'" class="truncate text-12 text-text-muted">{{
+        'geoZones.picker.available' | transloco
+      }}</span>
       @if (!interactionLocked() && selectableOnPage().length > 0 && !atLimit()) {
         <button
           type="button"
@@ -94,7 +114,14 @@
     <div
       class="flex max-h-kanban-col-min min-h-time-list-max flex-col gap-2 overflow-y-auto rounded-10 border border-border bg-surface p-4"
     >
-      @if (!selectedStateId()) {
+      @if (citiesFailed() || lookupFailed()) {
+        <div class="m-auto flex flex-col items-center gap-6 p-12 text-center">
+          <p class="text-12 text-danger-text">{{ 'geoZones.errors.generic' | transloco }}</p>
+          <button type="button" uiButton variant="secondary" size="small" (click)="retryCities()">
+            {{ 'geoZones.retry' | transloco }}
+          </button>
+        </div>
+      } @else if (!selectedStateId()) {
         <p class="m-auto p-12 text-center text-12 text-text-muted">
           {{ 'geoZones.picker.chooseState' | transloco }}
         </p>
@@ -105,13 +132,6 @@
             <span class="h-skeleton-line w-2/3 rounded-4 bg-neutral-soft"></span>
           </div>
         }
-      } @else if (citiesFailed()) {
-        <div class="m-auto flex flex-col items-center gap-6 p-12 text-center">
-          <p class="text-12 text-danger-text">{{ 'geoZones.errors.generic' | transloco }}</p>
-          <button type="button" uiButton variant="secondary" size="small" (click)="retryCities()">
-            {{ 'geoZones.retry' | transloco }}
-          </button>
-        </div>
       } @else if (availableCities().length === 0) {
         <p class="m-auto p-12 text-center text-12 text-text-muted">
           {{ 'geoZones.noResults' | transloco }}
@@ -167,7 +187,9 @@
               </span>
 
               @if (otherZone) {
-                <span class="inline-flex h-badge max-w-preset shrink-0 items-center truncate rounded-8 bg-neutral-soft px-8 text-11 font-medium text-text-muted">
+                <span
+                  class="inline-flex h-badge max-w-preset shrink-0 items-center truncate rounded-8 bg-neutral-soft px-8 text-11 font-medium text-text-muted"
+                >
                   {{ 'geoZones.picker.inZone' | transloco: { zone: otherZone } }}
                 </span>
               }
@@ -232,10 +254,16 @@
           @for (countryGroup of groupedSelected(); track countryGroup.countryIso2) {
             <div class="flex flex-col gap-4">
               @if (!countryGroup.hideHeader) {
-                <p class="truncate text-11 font-medium text-text-muted" aria-hidden="true">{{ countryGroup.countryLabel }}</p>
+                <p class="truncate text-11 font-medium text-text-muted" aria-hidden="true">
+                  {{ countryGroup.countryLabel }}
+                </p>
               }
               @for (stateGroup of countryGroup.states; track stateGroup.stateId) {
-                <div role="group" [attr.aria-label]="stateGroup.groupAriaLabel" class="flex flex-wrap items-center gap-4">
+                <div
+                  role="group"
+                  [attr.aria-label]="stateGroup.groupAriaLabel"
+                  class="flex flex-wrap items-center gap-4"
+                >
                   @for (city of stateGroup.cities; track city.id) {
                     @let conflict = conflicts().has(city.id);
                     <div
@@ -275,7 +303,9 @@
                           type="button"
                           tabindex="-1"
                           class="inline-flex size-icon-tile-sm shrink-0 cursor-pointer items-center justify-center rounded-4 text-text-muted outline-none hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                          [attr.aria-label]="'geoZones.picker.remove' | transloco: { name: cityLabel(city) }"
+                          [attr.aria-label]="
+                            'geoZones.picker.remove' | transloco: { name: cityLabel(city) }
+                          "
                           (click)="$event.stopPropagation(); removeCity(city.id)"
                         >
                           <ng-icon name="tablerX" size="11" aria-hidden="true" />

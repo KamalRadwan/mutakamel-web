@@ -1,67 +1,59 @@
 import {
   Component,
   DestroyRef,
-  ElementRef,
-  Injector,
-  afterNextRender,
   computed,
   effect,
   inject,
   signal,
   untracked,
   viewChild,
-  viewChildren,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
-import { NgIcon, provideIcons } from '@ng-icons/core';
+import { provideIcons } from '@ng-icons/core';
 import {
   tablerAlertTriangle,
-  tablerCheck,
-  tablerChevronDown,
   tablerEye,
   tablerHome,
   tablerPencil,
-  tablerSearch,
   tablerToggleRight,
   tablerTrash,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
-import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
+import {
+  ActionItem,
+  ActionSelection,
+  ActionsMenu,
+} from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
-import { Switch } from '../../../../../shared/ui/switch/switch';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
-import { ApiError, errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
+import { SuggestInput } from '../../../../../shared/ui/suggest-input/suggest-input';
+import { Switch } from '../../../../../shared/ui/switch/switch';
+import { ActionKeys } from '../../core-response.model';
 import {
   GEO_LIMITS,
+  GeoAdminApi,
   GeoCity,
   GeoCountry,
   GeoDistrict,
   GeoDistrictKind,
   GeoState,
-  deleteDistrict,
   geoNameIn,
-  getCitiesByIds,
-  listCities,
-  listCountries,
-  listDistricts,
-  listStates,
-  updateDistrict,
 } from '../geo-admin.api';
+import { type CityWithPath, geoErrorMessage, placesEditable } from '../geo-admin.model';
 import { PlaceFormModal } from '../place-form-modal/place-form-modal';
-import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { ActionKeys } from '../../core-response.model';
 
-const CAN_MANAGE = true; // later from permission core.geo.manage
 const SEARCH_DEBOUNCE_MS = 300;
 const CITY_SEARCH_DEBOUNCE_MS = 250;
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
@@ -69,17 +61,12 @@ const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
 /** The list search: a literal, case-insensitive substring of either name, as GeoService filters. */
 function containsSearch(item: { nameEn: string; nameAr: string }, search: string): boolean {
   const term = search.trim().toLowerCase();
-  return !term || item.nameEn.toLowerCase().includes(term) || item.nameAr.toLowerCase().includes(term);
+  return (
+    !term || item.nameEn.toLowerCase().includes(term) || item.nameAr.toLowerCase().includes(term)
+  );
 }
 
 type KindFilter = 'ALL' | GeoDistrictKind;
-
-interface CityPopoverPlace {
-  top: number;
-  start: number;
-  width: number;
-  maxHeight: number | null;
-}
 
 function compareDistrictsByNameEn(a: GeoDistrict, b: GeoDistrict): number {
   const byBase = a.nameEn.localeCompare(b.nameEn, 'en', { sensitivity: 'base' });
@@ -92,7 +79,6 @@ function compareDistrictsByNameEn(a: GeoDistrict, b: GeoDistrict): number {
 @Component({
   selector: 'app-districts-tab',
   imports: [
-    NgIcon,
     TranslocoPipe,
     ActionsMenu,
     Button,
@@ -102,36 +88,34 @@ function compareDistrictsByNameEn(a: GeoDistrict, b: GeoDistrict): number {
     Modal,
     PlaceFormModal,
     Segmented,
+    SuggestInput,
     SettingsFrame,
     Switch,
   ],
   providers: [
-    provideTranslocoScope({ scope: 'ws-geo', alias: 'wsGeo' }, 'settings', { scope: 'ws-geo-places', alias: 'geoPlaces' }),
+    provideTranslocoScope({ scope: 'ws-geo', alias: 'wsGeo' }, 'settings', {
+      scope: 'ws-geo-places',
+      alias: 'geoPlaces',
+    }),
     provideIcons({
       tablerAlertTriangle,
-      tablerCheck,
-      tablerChevronDown,
-      tablerEye,
+              tablerEye,
       tablerHome,
       tablerPencil,
-      tablerSearch,
-      tablerToggleRight,
+          tablerToggleRight,
       tablerTrash,
     }),
   ],
   templateUrl: './districts-tab.html',
   host: {
-    class: 'flex min-h-0 flex-1 flex-col',
-    '(document:click)': 'closeCityPickerIfOutside($event)',
-    '(window:resize)': 'closeCityPicker()',
+    class: 'flex flex-1 shrink-0 flex-col',
   },
 })
 export class DistrictsTab {
+  private readonly api = inject(GeoAdminApi);
   private static nextId = 0;
   protected readonly uid = `districts-tab-${++DistrictsTab.nextId}`;
 
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly injector = inject(Injector);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notify = inject(Notify);
@@ -143,18 +127,18 @@ export class DistrictsTab {
   private readonly placeModal = viewChild.required(PlaceFormModal);
   private readonly confirmDelete = viewChild.required<ConfirmDialog>('confirmDelete');
   private readonly inUseModal = viewChild.required<Modal>('inUseModal');
-  private readonly cityTrigger = viewChild<ElementRef<HTMLButtonElement>>('cityTrigger');
-  private readonly cityPopover = viewChild<ElementRef<HTMLElement>>('cityPopover');
-  private readonly citySearchInput = viewChild<ElementRef<HTMLInputElement>>('citySearchInput');
-  private readonly cityOptionItems = viewChildren<ElementRef<HTMLElement>>('cityOptionItem');
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly session = inject(AuthSession);
+  protected readonly canManage = computed(
+    () => placesEditable(this.session.me()) && !this.api.placesDenied(),
+  );
+  protected readonly citySearchMax = GEO_LIMITS.name;
   protected readonly skeletonRows = SKELETON_ROWS;
 
   protected readonly countries = signal<GeoCountry[]>([]);
   protected readonly states = signal<GeoState[]>([]);
   protected readonly cityOptionsList = signal<GeoCity[]>([]);
-  protected readonly cachedCity = signal<GeoCity | null>(null);
+  protected readonly cachedCity = signal<GeoCity | CityWithPath | null>(null);
   protected readonly districts = signal<GeoDistrict[]>([]);
   protected readonly nextCursor = signal<string | null>(null);
 
@@ -169,11 +153,13 @@ export class DistrictsTab {
   protected readonly busy = signal(false);
   protected readonly togglingIds = signal<ReadonlySet<string>>(new Set());
 
-  protected readonly cityPickerOpen = signal(false);
-  protected readonly cityPickerPlaced = signal(false);
-  protected readonly cityPickerPlace = signal<CityPopoverPlace>({ top: 0, start: 0, width: 0, maxHeight: null });
   protected readonly citySearchText = signal('');
-  protected readonly cityActiveIndex = signal(-1);
+  protected readonly cityLookupCursor = signal<string | null>(null);
+  protected readonly cityLookupLoading = signal(false);
+  protected readonly cityLookupFailed = signal(false);
+  protected readonly citySuggestions = computed(() =>
+    this.cityOptionsList().map((city) => this.citySuggestion(city)),
+  );
 
   protected readonly deletingDistrict = signal<GeoDistrict | null>(null);
   protected readonly inUseState = signal<{ district: GeoDistrict } | null>(null);
@@ -183,9 +169,10 @@ export class DistrictsTab {
   private citiesLoadedStateId: string | null = null;
   private statesSeq = 0;
   private citiesLookupSeq = 0;
+  private cityLookupSearch = '';
   private cityResolveSeq = 0;
-  private cityPopoverSeq = 0;
   private districtsSeq = 0;
+  private cursorContext = '';
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly actionKeys = new ActionKeys(newIdempotencyKey);
   private citySearchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -233,7 +220,9 @@ export class DistrictsTab {
     const lang = this.language();
     return this.countries()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }))
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      )
       .map((item) => ({ value: item.id, label: geoNameIn(item, lang) }));
   });
 
@@ -241,7 +230,9 @@ export class DistrictsTab {
     const lang = this.language();
     return this.states()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }))
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      )
       .map((item) => ({ value: item.id, label: geoNameIn(item, lang) }));
   });
 
@@ -255,14 +246,14 @@ export class DistrictsTab {
   });
 
   protected readonly gridColumns = computed(() =>
-    this.canManage
-      ? 'grid-cols-geo-district-row-actions'
-      : 'grid-cols-geo-district-row',
+    this.canManage() ? 'grid-cols-geo-district-row-actions' : 'grid-cols-geo-district-row',
   );
 
   /** The API lists inactive places too; the switch only hides them on screen. */
   protected readonly visibleDistricts = computed(() =>
-    this.showInactive() ? this.districts() : this.districts().filter((district) => district.isActive),
+    this.showInactive()
+      ? this.districts()
+      : this.districts().filter((district) => district.isActive),
   );
 
   protected readonly deletingName = computed(() => {
@@ -287,7 +278,7 @@ export class DistrictsTab {
       if (state === this.citiesLoadedStateId) return;
       this.citiesLoadedStateId = state;
       untracked(() => {
-        this.closeCityPicker();
+        this.citySearchText.set('');
         void this.loadCitiesForState(state, '');
       });
     });
@@ -342,15 +333,7 @@ export class DistrictsTab {
       });
     });
 
-    const onScroll = (event: Event) => {
-      if (!this.cityPickerOpen()) return;
-      const target = event.target;
-      if (target instanceof Node && this.cityPopover()?.nativeElement.contains(target)) return;
-      this.closeCityPicker();
-    };
-    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
     inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('scroll', onScroll, { capture: true });
       if (this.searchTimer !== null) clearTimeout(this.searchTimer);
       if (this.citySearchTimer !== null) clearTimeout(this.citySearchTimer);
     });
@@ -358,6 +341,8 @@ export class DistrictsTab {
 
   protected onCountryChange(nextCountry: string): void {
     if (nextCountry === this.countryId()) return;
+    this.nextCursor.set(null);
+    this.districtsSeq++;
     this.cachedCity.set(null);
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -372,6 +357,8 @@ export class DistrictsTab {
 
   protected onStateChange(nextState: string): void {
     if (nextState === this.stateId()) return;
+    this.nextCursor.set(null);
+    this.districtsSeq++;
     this.cachedCity.set(null);
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -391,161 +378,56 @@ export class DistrictsTab {
 
   protected onShowInactiveChange(checked: boolean): void {
     this.showInactive.set(checked);
+    const cityId = this.selectedCityId();
+    if (cityId) void this.loadDistricts(cityId, this.debouncedSearch(), this.kindFilter(), true);
   }
 
-  protected toggleCityPicker(): void {
-    if (!this.selectedState()) return;
-    if (this.cityPickerOpen()) {
-      this.closeCityPicker();
+  private citySuggestion(city: GeoCity): string {
+    return `${geoNameIn(city, this.language())} · ${this.language() === 'ar' ? city.nameEn : city.nameAr}`;
+  }
+
+  protected onCitySearchChange(value: string): void {
+    this.citySearchText.set(value);
+    this.clearCitySearchTimer();
+    const city = this.cityOptionsList().find((item) => this.citySuggestion(item) === value);
+    if (city) {
+      this.cachedCity.set(city);
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { city: city.id },
+        queryParamsHandling: 'merge',
+      });
       return;
     }
-    const trigger = this.cityTrigger()?.nativeElement;
-    if (!trigger) return;
-
-    const seq = ++this.cityPopoverSeq;
-    this.clearCitySearchTimer();
-    this.citySearchText.set('');
-    this.cityActiveIndex.set(-1);
-    this.cityPickerPlaced.set(false);
-    this.cityPickerPlace.set(this.initialCityPlace(trigger));
-    this.cityPickerOpen.set(true);
-
-    void this.loadCitiesForState(this.stateId(), '');
-
-    afterNextRender(
-      () => {
-        this.placeCityPopover(seq, trigger);
-        this.citySearchInput()?.nativeElement.focus();
-      },
-      { injector: this.injector },
-    );
-  }
-
-  protected closeCityPicker(): void {
-    this.cityPopoverSeq++;
-    this.clearCitySearchTimer();
-    this.cityPickerOpen.set(false);
-    this.cityPickerPlaced.set(false);
-  }
-
-  protected closeCityPickerIfOutside(event: Event): void {
-    if (!this.cityPickerOpen()) return;
-    const target = event.target;
-    if (!(target instanceof Node)) {
-      this.closeCityPicker();
-      return;
+    this.cityLookupCursor.set(null);
+    this.citiesLookupSeq++;
+    if (!value) {
+      this.cachedCity.set(null);
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { city: null },
+        queryParamsHandling: 'merge',
+      });
     }
-    if (
-      this.cityTrigger()?.nativeElement.contains(target) ||
-      this.cityPopover()?.nativeElement.contains(target)
-    ) {
-      return;
-    }
-    this.closeCityPicker();
-  }
-
-  protected onCityTriggerKeydown(event: KeyboardEvent): void {
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (!this.cityPickerOpen()) {
-        this.toggleCityPicker();
-      }
-    }
-  }
-
-  protected onCitySearchInput(event: Event): void {
-    const query = (event.target as HTMLInputElement).value;
-    this.citySearchText.set(query);
-    this.cityActiveIndex.set(query.trim() ? 0 : -1);
-
-    this.clearCitySearchTimer();
-    const state = this.stateId();
-    if (!state) return;
     this.citySearchTimer = setTimeout(() => {
       this.citySearchTimer = null;
-      void this.loadCitiesForState(state, query.trim());
+      void this.loadCitiesForState(this.stateId(), value.trim().slice(0, GEO_LIMITS.name));
     }, CITY_SEARCH_DEBOUNCE_MS);
   }
 
-  protected onCitySearchKeydown(event: KeyboardEvent): void {
-    const options = this.cityOptionsList();
-    switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault();
-        if (options.length > 0) {
-          const next = this.cityActiveIndex() < 0 ? 0 : (this.cityActiveIndex() + 1) % options.length;
-          this.cityActiveIndex.set(next);
-          this.cityOptionItems()[next]?.nativeElement.scrollIntoView({ block: 'nearest' });
-        }
-        break;
-      case 'ArrowUp':
-        event.preventDefault();
-        if (options.length > 0) {
-          const prev =
-            this.cityActiveIndex() < 0 ? options.length - 1 : (this.cityActiveIndex() - 1 + options.length) % options.length;
-          this.cityActiveIndex.set(prev);
-          this.cityOptionItems()[prev]?.nativeElement.scrollIntoView({ block: 'nearest' });
-        }
-        break;
-      case 'Home':
-        if (options.length > 0) {
-          event.preventDefault();
-          this.cityActiveIndex.set(0);
-          this.cityOptionItems()[0]?.nativeElement.scrollIntoView({ block: 'nearest' });
-        }
-        break;
-      case 'End':
-        if (options.length > 0) {
-          event.preventDefault();
-          const last = options.length - 1;
-          this.cityActiveIndex.set(last);
-          this.cityOptionItems()[last]?.nativeElement.scrollIntoView({ block: 'nearest' });
-        }
-        break;
-      case 'Enter': {
-        event.preventDefault();
-        const option = options[this.cityActiveIndex()];
-        if (option) {
-          this.selectCityOption(option);
-        }
-        break;
-      }
-    }
-  }
-
-  protected onCityPopoverKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      this.closeCityPicker();
-      this.cityTrigger()?.nativeElement.focus();
-    }
-  }
-
-  protected onCityPopoverFocusOut(event: FocusEvent): void {
-    const next = event.relatedTarget as Node | null;
-    if (next && this.cityPopover()?.nativeElement.contains(next)) return;
-    if (next) {
-      this.closeCityPicker();
-    }
-  }
-
-  protected selectCityOption(city: GeoCity): void {
-    this.cachedCity.set(city);
-    this.closeCityPicker();
-    this.cityTrigger()?.nativeElement.focus();
-    if (city.id === this.cityId()) return;
-    void this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { city: city.id },
-      queryParamsHandling: 'merge',
-    });
+  protected loadMoreCityOptions(): void {
+    if (!this.cityLookupCursor() || this.cityLookupLoading()) return;
+    void this.loadCitiesForState(this.stateId(), this.cityLookupSearch, true);
   }
 
   protected formatDate(iso: string): string {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return iso;
-    return new Intl.DateTimeFormat(this.language() + '-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+    return new Intl.DateTimeFormat(this.language() + '-u-nu-latn', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
   }
 
   protected cityOptionLabel(city: GeoCity): string {
@@ -590,7 +472,7 @@ export class DistrictsTab {
 
   protected openCreate(): void {
     const city = this.selectedCity();
-    if (!this.canManage || !city) return;
+    if (!this.canManage() || !city) return;
     const defaultKind: GeoDistrictKind = this.kindFilter() === 'VILLAGE' ? 'VILLAGE' : 'DISTRICT';
     this.placeModal().openCreateDistrict({
       cityId: city.id,
@@ -670,7 +552,9 @@ export class DistrictsTab {
       if (!matchesKind || !containsSearch(saved, this.debouncedSearch())) return;
       this.districts.update((list) => {
         if (list.some((item) => item.id === saved.id)) {
-          return list.map((item) => (item.id === saved.id ? saved : item)).sort(compareDistrictsByNameEn);
+          return list
+            .map((item) => (item.id === saved.id ? saved : item))
+            .sort(compareDistrictsByNameEn);
         }
         const last = list.at(-1);
         if (!this.nextCursor() || !last || compareDistrictsByNameEn(saved, last) <= 0) {
@@ -693,7 +577,7 @@ export class DistrictsTab {
   }
 
   protected async requestDelete(district: GeoDistrict): Promise<void> {
-    if (!this.canManage || this.busy()) return;
+    if (!this.canManage() || this.busy()) return;
     this.deletingDistrict.set(district);
     const confirmed = await this.confirmDelete().open();
     if (!confirmed) {
@@ -703,8 +587,8 @@ export class DistrictsTab {
 
     this.busy.set(true);
     try {
-      const signature = `delete:${district.id}`;
-      await deleteDistrict(district.id, this.actionKeys.keyFor(signature));
+      const signature = `delete:district:${district.id}`;
+      await this.api.deleteDistrict(district.id, this.actionKeys.keyFor(signature));
       this.actionKeys.done(signature);
       this.placeModal().close();
       this.removeDistrictFromList(district.id);
@@ -717,7 +601,7 @@ export class DistrictsTab {
         this.inUseModal().open();
         return;
       }
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       if (code === 'GEO_DISTRICT_NOT_FOUND') {
         this.placeModal().close();
         this.onDistrictNotFound(district.id);
@@ -735,18 +619,22 @@ export class DistrictsTab {
 
   protected async deactivateInUseDistrict(): Promise<void> {
     const state = this.inUseState();
-    if (!state || this.deactivating()) return;
+    if (!state || !this.canManage() || this.deactivating()) return;
 
     this.deactivating.set(true);
     try {
-      const signature = `active:${state.district.id}:false`;
-      const updated = await updateDistrict(state.district.id, { isActive: false }, this.actionKeys.keyFor(signature));
+      const signature = `toggle:district:${state.district.id}:false`;
+      const updated = await this.api.updateDistrict(
+        state.district.id,
+        { isActive: false },
+        this.actionKeys.keyFor(signature),
+      );
       this.actionKeys.done(signature);
       this.applyDistrictUpdate(updated);
       this.notify.success(this.transloco.translate('geoPlaces.saved'));
       this.closeInUseModal();
     } catch (error) {
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       if (errorCodeOf(error) === 'GEO_DISTRICT_NOT_FOUND') {
         this.onDistrictNotFound(state.district.id);
         this.closeInUseModal();
@@ -757,16 +645,20 @@ export class DistrictsTab {
   }
 
   private async toggleActive(district: GeoDistrict): Promise<void> {
-    if (!this.canManage || this.busy() || this.togglingIds().has(district.id)) return;
+    if (!this.canManage() || this.busy() || this.togglingIds().has(district.id)) return;
     this.togglingIds.update((set) => new Set(set).add(district.id));
     try {
-      const signature = `active:${district.id}:${!district.isActive}`;
-      const updated = await updateDistrict(district.id, { isActive: !district.isActive }, this.actionKeys.keyFor(signature));
+      const signature = `toggle:district:${district.id}:${!district.isActive}`;
+      const updated = await this.api.updateDistrict(
+        district.id,
+        { isActive: !district.isActive },
+        this.actionKeys.keyFor(signature),
+      );
       this.actionKeys.done(signature);
       this.applyDistrictUpdate(updated);
       this.notify.success(this.transloco.translate('geoPlaces.saved'));
     } catch (error) {
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       if (errorCodeOf(error) === 'GEO_DISTRICT_NOT_FOUND') {
         this.onDistrictNotFound(district.id);
       }
@@ -811,7 +703,7 @@ export class DistrictsTab {
 
   private async loadCountriesLookup(): Promise<void> {
     try {
-      this.countries.set((await listCountries()).items);
+      this.countries.set((await this.api.listCountries()).items);
     } catch (error) {
       this.showErrorToast(error);
     }
@@ -819,12 +711,13 @@ export class DistrictsTab {
 
   private async loadStatesForCountry(countryId: string): Promise<void> {
     const seq = ++this.statesSeq;
+    this.states.set([]);
     if (!countryId) {
       this.states.set([]);
       return;
     }
     try {
-      const { items: loaded } = await listStates(countryId);
+      const { items: loaded } = await this.api.listStates(countryId);
       if (seq !== this.statesSeq) return;
       this.states.set(loaded);
       const currentState = this.stateId();
@@ -844,50 +737,45 @@ export class DistrictsTab {
     }
   }
 
-  private async loadCitiesForState(stateId: string, search: string): Promise<void> {
+  private async loadCitiesForState(stateId: string, search: string, append = false): Promise<void> {
     const seq = ++this.citiesLookupSeq;
-    if (!stateId) {
+    const cursor = append ? this.cityLookupCursor() : null;
+    this.cityLookupSearch = search;
+    if (!append) {
       this.cityOptionsList.set([]);
-      return;
+      this.cityLookupCursor.set(null);
     }
+    if (!stateId) return;
+    this.cityLookupLoading.set(true);
+    this.cityLookupFailed.set(false);
     try {
-      const items: GeoCity[] = [];
-      const seen = new Set<string>();
-      let cursor: string | null = null;
-      do {
-        const page = await listCities(stateId, {
-          search: search || undefined,
-          cursor,
-          limit: GEO_LIMITS.pageMax,
-        });
-        if (seq !== this.citiesLookupSeq) return;
-        for (const item of page.items) {
-          if (!seen.has(item.id)) {
-            seen.add(item.id);
-            items.push(item);
-          }
-        }
-        if (page.items.length === 0) break;
-        cursor = page.nextCursor;
-      } while (cursor);
-
-      this.cityOptionsList.set(items);
-      const currentCityId = this.cityId();
-      const matched = currentCityId ? items.find((item) => item.id === currentCityId) : undefined;
-      if (matched) {
-        this.cachedCity.set(matched);
-      }
-    } catch {
-      if (seq === this.citiesLookupSeq && !search) {
-        this.cityOptionsList.set([]);
-      }
+      const page = await this.api.listCities(stateId, {
+        search,
+        cursor,
+        limit: GEO_LIMITS.pageSize,
+      });
+      if (seq !== this.citiesLookupSeq) return;
+      this.cityOptionsList.update((items) =>
+        append && !page.cursorReset
+          ? [...items, ...page.items.filter((city) => !items.some((item) => item.id === city.id))]
+          : page.items,
+      );
+      this.cityLookupCursor.set(page.nextCursor);
+      const selected = this.cityOptionsList().find((city) => city.id === this.cityId());
+      if (selected) this.cachedCity.set(selected);
+    } catch (error) {
+      if (seq !== this.citiesLookupSeq) return;
+      this.cityLookupFailed.set(true);
+      this.showErrorToast(error);
+    } finally {
+      if (seq === this.citiesLookupSeq) this.cityLookupLoading.set(false);
     }
   }
 
   private async resolveCityContext(cityId: string, knownCountries: GeoCountry[]): Promise<void> {
     const seq = ++this.cityResolveSeq;
     try {
-      const resolved = await getCitiesByIds([cityId]);
+      const resolved = await this.api.getCitiesByIds([cityId]);
       if (seq !== this.cityResolveSeq || this.cityId() !== cityId) return;
       const item = resolved[0];
       if (!item) {
@@ -902,11 +790,13 @@ export class DistrictsTab {
       }
 
       this.cachedCity.set(item);
-      const countries = knownCountries.length ? knownCountries : (await listCountries()).items;
+      const countries = knownCountries.length
+        ? knownCountries
+        : (await this.api.listCountries()).items;
       if (seq !== this.cityResolveSeq || this.cityId() !== cityId) return;
       if (!knownCountries.length) this.countries.set(countries);
 
-      const ownerCountry = countries.find((c) => c.iso2 === item.countryIso2);
+      const ownerCountry = countries.find((c) => c.id === item.countryId);
       const needsCountry = ownerCountry && this.countryId() !== ownerCountry.id;
       const needsState = this.stateId() !== item.stateId;
       if (needsCountry || needsState) {
@@ -931,10 +821,15 @@ export class DistrictsTab {
     kind: KindFilter,
     reset: boolean,
   ): Promise<void> {
+    const context = JSON.stringify([cityId, search, kind]);
+    reset = reset || context !== this.cursorContext;
+    this.cursorContext = context;
     const seq = ++this.districtsSeq;
     const cursor = reset ? null : this.nextCursor();
 
     if (reset) {
+      this.nextCursor.set(null);
+      this.loadingMore.set(false);
       this.loading.set(true);
       this.loadFailed.set(false);
     } else {
@@ -942,7 +837,7 @@ export class DistrictsTab {
     }
 
     try {
-      const page = await listDistricts(cityId, {
+      const page = await this.api.listDistricts(cityId, {
         search: search || undefined,
         cursor,
         limit: GEO_LIMITS.pageSize,
@@ -950,11 +845,12 @@ export class DistrictsTab {
       });
       if (seq !== this.districtsSeq) return;
       this.districts.update((current) => {
-        if (reset) return page.items;
+        if (reset || page.cursorReset) return page.items;
         const seen = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !seen.has(item.id))];
       });
       this.nextCursor.set(page.nextCursor);
+      this.notify.connectionRestored();
     } catch (error) {
       if (seq !== this.districtsSeq) return;
       if (errorCodeOf(error) === 'GEO_CITY_NOT_FOUND') {
@@ -963,6 +859,7 @@ export class DistrictsTab {
         return;
       }
       if (reset) {
+        this.showErrorToast(error);
         this.loadFailed.set(true);
         this.districts.set([]);
         this.nextCursor.set(null);
@@ -984,65 +881,10 @@ export class DistrictsTab {
     }
   }
 
-  private initialCityPlace(trigger: HTMLElement): CityPopoverPlace {
-    const rect = rectInPage(trigger);
-    const { width } = viewport();
-    const rtl = getComputedStyle(this.host.nativeElement).direction === 'rtl';
-    return {
-      top: rect.bottom + 4,
-      start: rtl ? width - rect.right : rect.left,
-      width: rect.width,
-      maxHeight: null,
-    };
-  }
-
-  private placeCityPopover(seq: number, trigger: HTMLElement): void {
-    if (seq !== this.cityPopoverSeq || !this.cityPickerOpen() || this.cityPickerPlaced()) return;
-    const popoverEl = this.cityPopover()?.nativeElement;
-    if (!popoverEl) return;
-
-    const rect = rectInPage(trigger);
-    const listRect = rectInPage(popoverEl);
-    const { width, height } = viewport();
-    const rtl = getComputedStyle(this.host.nativeElement).direction === 'rtl';
-
-    const belowTop = rect.bottom + 4;
-    const spaceBelow = Math.max(8, height - 8 - belowTop);
-    const spaceAbove = Math.max(8, rect.top - 12);
-    const flipUp = listRect.height > spaceBelow && spaceAbove > spaceBelow;
-    const avail = flipUp ? spaceAbove : spaceBelow;
-    const maxHeight = listRect.height > avail ? avail : null;
-    const finalHeight = maxHeight ?? listRect.height;
-    const top = flipUp ? Math.max(8, rect.top - 4 - finalHeight) : belowTop;
-
-    const triggerStart = rtl ? width - rect.right : rect.left;
-    const triggerEnd = rtl ? width - rect.left : rect.right;
-    const alignEnd = triggerStart + listRect.width > width - 8;
-    const rawStart = alignEnd ? triggerEnd - listRect.width : triggerStart;
-    const start = Math.min(Math.max(8, rawStart), Math.max(8, width - 8 - listRect.width));
-
-    this.cityPickerPlace.set({ top, start, width: rect.width, maxHeight });
-    this.cityPickerPlaced.set(true);
-
-    popoverEl.style.top = `${top}px`;
-    popoverEl.style.insetInlineStart = `${start}px`;
-    popoverEl.style.minWidth = `${rect.width}px`;
-    popoverEl.style.maxHeight = maxHeight !== null ? `${maxHeight}px` : '';
-    popoverEl.classList.remove('invisible');
-  }
-
-  private showErrorToast(error: unknown): void {
-    const code = errorCodeOf(error);
-    if (code) {
-      const scopedKey = `geoPlaces.errors.${code}`;
-      const scoped = this.transloco.translate(scopedKey);
-      if (scoped && scoped !== scopedKey) {
-        this.notify.error(scoped);
-        return;
-      }
-      this.notify.error(errorMessage(error, 'geoPlaces', this.transloco));
-      return;
-    }
-    this.notify.error(this.transloco.translate('geoPlaces.errors.generic'));
+  private showErrorToast(error: unknown, write = false): void {
+    if (errorCodeOf(error) === 'TENANT_WIDE_PERMISSION_REQUIRED') this.api.placesDenied.set(true);
+    const message = geoErrorMessage(error, 'geoPlaces', this.transloco, write);
+    if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(message, '');
+    else this.notify.error(message);
   }
 }

@@ -1,3 +1,4 @@
+import { ApiError } from '../../../../../core/api/api-errors';
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
@@ -6,12 +7,13 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCopy, tablerShieldCheck } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { patchEmailConfig, verifyEmailDomain } from '../email.api';
+import { EmailApi } from '../email.api';
 import {
   EmailConflictPayload,
   EmailResult,
@@ -26,7 +28,7 @@ import {
 
 @Component({
   selector: 'app-dns-modal',
-  imports: [NgIcon, TranslocoPipe, Button, Field, Modal, SettingsNotice],
+  imports: [ConfirmDialog, NgIcon, TranslocoPipe, Button, Field, Modal, SettingsNotice],
   providers: [provideIcons({ tablerShieldCheck, tablerCopy })],
   templateUrl: './dns-modal.html',
 })
@@ -36,14 +38,18 @@ export class DnsModal {
 
   private readonly document = inject(DOCUMENT);
   private readonly notify = inject(Notify);
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
+  private readonly turnOnConfirm = viewChild.required<ConfirmDialog>('turnOnConfirm');
+  private readonly suspendConfirm = viewChild.required<ConfirmDialog>('suspendConfirm');
+  private readonly discardConfirm = viewChild.required<ConfirmDialog>('discardConfirm');
   private readonly modal = viewChild.required<Modal>('modal');
 
   readonly config = input<TenantEmailConfig | null>(null);
-  readonly revision = input<number | null>(null);
-  readonly canManage = input(true);
+  readonly etag = input<string | null>(null);
+  readonly canManage = input(false);
 
   readonly saved = output<EmailResult>();
   readonly conflict = output<EmailConflictPayload>();
@@ -58,19 +64,20 @@ export class DnsModal {
   protected readonly serverSelectorError = signal<string | null>(null);
   protected readonly topError = signal<string | null>(null);
 
-  private allowClose = false;
-  private saveOp: { fingerprint: string; key: string } | null = null;
-  private verifyKey: string | null = null;
+  private readonly opened = signal(false);
+  readonly hasUnsavedDraft = computed(() => this.opened() && this.dirty());
 
-  protected readonly isReadonly = computed(() => !this.canManage());
+  private allowClose = false;
+  private saveOp: { bodyJson: string; key: string } | null = null;
+  private verifyOp: { etag: string; key: string } | null = null;
+
+  protected readonly isReadonly = computed(() => !this.canManage() || !this.api.gates().manage);
   protected readonly busy = computed(() => this.saving() || this.verifying());
 
-  protected readonly effectiveConfig = computed(
-    () => this.localResult()?.config ?? this.config(),
-  );
+  protected readonly effectiveConfig = computed(() => this.localResult()?.config ?? this.config());
 
-  protected readonly effectiveRevision = computed(
-    () => this.localResult()?.revision ?? this.revision() ?? this.effectiveConfig()?.revision ?? 1,
+  protected readonly effectiveEtag = computed(
+    () => this.localResult()?.etag ?? this.etag() ?? `"${this.effectiveConfig()?.revision ?? 1}"`,
   );
 
   protected readonly dirty = computed(() => {
@@ -124,14 +131,23 @@ export class DnsModal {
     this.allowClose = false;
     this.localResult.set(null);
     this.saveOp = null;
-    this.verifyKey = null;
+    this.verifyOp = null;
     const cfg = this.config();
     if (!cfg) return;
     this.applyConfig(cfg);
+    this.opened.set(true);
     this.modal().open();
   }
 
+  protected async requestClose(): Promise<void> {
+    if (this.busy()) return;
+    if (this.hasUnsavedDraft() && !(await this.discardConfirm().open())) return;
+    this.close();
+  }
+
   close(): void {
+    this.opened.set(false);
+    this.saveOp = null;
     this.allowClose = true;
     this.modal().close();
   }
@@ -142,9 +158,10 @@ export class DnsModal {
       return;
     }
     this.allowClose = false;
+    this.opened.set(false);
     this.localResult.set(null);
     this.saveOp = null;
-    this.verifyKey = null;
+    this.verifyOp = null;
   }
 
   protected undo(): void {
@@ -194,18 +211,25 @@ export class DnsModal {
     const patch: PatchEmailConfigRequest = {
       dkimSelector: normalized ? normalized : null,
     };
-    const key = this.keyForPatch(patch);
+    if (patch.dkimSelector !== undefined && !(await this.suspendConfirm().open())) return;
+    if (this.isReadonly()) return;
+    const etag = this.effectiveEtag();
+    const key = this.keyForPatch(patch, etag);
     this.saving.set(true);
 
     try {
-      const result = await patchEmailConfig(patch, this.effectiveRevision(), key);
+      const result = await this.api.patchEmailConfig(patch, etag, key);
       this.saveOp = null;
-      this.verifyKey = null;
+      this.verifyOp = null;
       this.localResult.set(result);
       this.applyConfig(result.config);
       this.saved.emit(result);
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
     } catch (error) {
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+        return;
+      }
       if (isConflictError(error)) {
         this.saveOp = null;
         this.close();
@@ -230,19 +254,34 @@ export class DnsModal {
     if (!cfg || this.isReadonly() || this.busy() || this.dirty()) return;
 
     this.topError.set(null);
-    const key = (this.verifyKey ??= newIdempotencyKey());
+    const etag = this.effectiveEtag();
+    if (this.verifyOp?.etag !== etag) this.verifyOp = { etag, key: newIdempotencyKey() };
+    const key = this.verifyOp.key;
     this.verifying.set(true);
 
     try {
-      const result = await verifyEmailDomain(this.effectiveRevision(), key);
-      this.verifyKey = null;
+      const result = await this.api.verifyEmailDomain(etag, key);
+      this.verifyOp = null;
       this.localResult.set(result);
       this.applyConfig(result.config);
       this.saved.emit(result);
       this.notify.success(this.transloco.translate('wsEmail.toast.verified'));
+      if (
+        result.config.dkimVerified &&
+        result.config.status !== 'ACTIVE' &&
+        (await this.turnOnConfirm().open())
+      ) {
+        if (!this.isReadonly()) {
+          await this.turnOn(result);
+        }
+      }
     } catch (error) {
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+        return;
+      }
       if (isConflictError(error)) {
-        this.verifyKey = null;
+        this.verifyOp = null;
         this.close();
         this.conflict.emit({ status: error.status, patch: null });
         return;
@@ -250,6 +289,29 @@ export class DnsModal {
       this.topError.set(resolveEmailError(error, this.transloco));
     } finally {
       this.verifying.set(false);
+    }
+  }
+
+  private async turnOn(result: EmailResult): Promise<void> {
+    const patch: PatchEmailConfigRequest = { status: 'ACTIVE' };
+    try {
+      const updated = await this.api.patchEmailConfig(
+        patch,
+        result.etag,
+        this.keyForPatch(patch, result.etag),
+      );
+      this.saveOp = null;
+      this.localResult.set(updated);
+      this.saved.emit(updated);
+    } catch (error) {
+      if (isConflictError(error)) {
+        this.close();
+        this.conflict.emit({ status: error.status, patch });
+      } else if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+      } else {
+        this.topError.set(resolveEmailError(error, this.transloco));
+      }
     }
   }
 
@@ -261,13 +323,13 @@ export class DnsModal {
     this.topError.set(null);
   }
 
-  private keyForPatch(patch: PatchEmailConfigRequest): string {
-    const fp = JSON.stringify(patch);
-    if (this.saveOp && this.saveOp.fingerprint === fp) {
+  private keyForPatch(patch: PatchEmailConfigRequest, etag: string): string {
+    const bodyJson = JSON.stringify([patch, etag]);
+    if (this.saveOp && this.saveOp.bodyJson === bodyJson) {
       return this.saveOp.key;
     }
     const key = newIdempotencyKey();
-    this.saveOp = { fingerprint: fp, key };
+    this.saveOp = { bodyJson, key };
     return key;
   }
 }

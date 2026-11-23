@@ -1,81 +1,105 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Language, LanguageState } from '../../../core/i18n/language';
+import { TranslocoService } from '@jsverse/transloco';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '../../../../../public/i18n/en.json';
 import ar from '../../../../../public/i18n/ar.json';
-import { getNotification, getUnreadNotificationCount } from './notifications.api';
-import { resetFakeNotifications } from './notifications.fake';
+import { Notify } from '../../../core/notify/notify';
+import { NotificationsFeed } from '../../../core/realtime/notifications-feed';
+import { fakeListNotifications, resetFakeNotifications } from './notifications.fake';
 import { KNOWN_NOTIFICATION_TYPES } from './notifications.model';
 import { NotificationsState } from './notifications-state';
 
-async function until(check: () => boolean, timeoutMs = 3000): Promise<void> {
-  const start = Date.now();
-  while (!check()) {
-    if (Date.now() - start > timeoutMs) throw new Error('timed out');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
+const BASE = '/api/tenant/core/v1/notifications';
+const settle = async () => {
+  for (let i = 0; i < 15; i++) await Promise.resolve();
+};
 
-describe('NotificationsState reads through notifications.api', () => {
-  let state: NotificationsState;
+describe('NotificationsState public bell contract', () => {
+  let http: HttpTestingController;
+  const unread = signal<{ unreadCount: number; unreadRevision: number | null; at: number } | null>(
+    null,
+  );
+  const notify = { error: vi.fn(), connectionLost: vi.fn(), connectionRestored: vi.fn() };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     resetFakeNotifications();
-    document.documentElement.lang = 'en';
+    unread.set(null);
+    vi.clearAllMocks();
+    document.cookie = 'mutakamel-http-tenant-csrf=csrf; path=/';
     TestBed.configureTestingModule({
-      providers: [{ provide: LanguageState, useValue: { current: signal<Language>('en') } }],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: Notify, useValue: notify },
+        {
+          provide: TranslocoService,
+          useValue: {
+            translate: (key: string) =>
+              key === 'wsNotif.errors.notSaved' ? 'Not saved. Try again.' : key,
+          },
+        },
+        { provide: NotificationsFeed, useValue: { unread, onEvent: () => () => undefined } },
+      ],
     });
-    state = TestBed.inject(NotificationsState);
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => {
+    http.verify();
+    document.cookie = 'mutakamel-http-tenant-csrf=; Max-Age=0; path=/';
+  });
+
+  it('exposes items, revisions, stale, load and missing-user state', async () => {
+    const snapshot = await fakeListNotifications();
+    const state = TestBed.inject(NotificationsState);
     TestBed.tick();
-    await until(() => state.items().length > 0 && !state.loading());
+    http.expectOne((r) => r.url === BASE).flush({ success: true, data: snapshot });
+    await settle();
+    expect(state.items()).toEqual(snapshot.items);
+    expect(state.unreadRevision()).toBe(snapshot.unreadRevision);
+    expect(state.loading()).toBe(false);
+    expect(state.userMissing()).toBe(false);
+    expect(state.loadFailed()).toBe(false);
+    expect(state.nextCursor()).toBeNull();
+    unread.set({ unreadCount: snapshot.unreadCount + 1, unreadRevision: 10, at: 1 });
+    TestBed.tick();
+    expect(state.stale()).toBe(true);
   });
 
-  it('loads the first page and the server unread count', async () => {
-    expect(state.unreadCount()).toBe((await getUnreadNotificationCount()).unreadCount);
-    expect(state.items().every((item) => typeof item.notificationType === 'string')).toBe(true);
-  });
-
-  it('markRead updates the item, the count and the server', async () => {
-    const target = state.items().find((item) => item.readAt === null);
-    expect(target).toBeDefined();
-    const before = state.unreadCount();
-    await state.markRead(target!.id);
-    expect(state.items().find((item) => item.id === target!.id)?.readAt).not.toBeNull();
-    expect(state.unreadCount()).toBe(before - 1);
-    expect((await getNotification(target!.id)).readAt).not.toBeNull();
-  });
-
-  it('markAllRead clears the unread count', async () => {
-    await state.markAllRead();
-    expect(state.unreadCount()).toBe(0);
-    expect(state.items().every((item) => item.readAt !== null)).toBe(true);
-  });
-
-  it('dismiss removes the item locally and on the server', async () => {
+  it('inbox write 401 keeps key and shows notSaved', async () => {
+    const snapshot = await fakeListNotifications();
+    const state = TestBed.inject(NotificationsState);
+    TestBed.tick();
+    http.expectOne((r) => r.url === BASE).flush({ success: true, data: snapshot });
+    await settle();
     const id = state.items()[0].id;
-    await state.dismiss(id);
-    expect(state.items().some((item) => item.id === id)).toBe(false);
-    await expect(getNotification(id)).rejects.toMatchObject({ status: 404, code: 'NOTIFICATION_NOT_FOUND' });
-  });
-
-  it('drops an item the server no longer has (404 NOTIFICATION_NOT_FOUND)', async () => {
-    const target = state.items().find((item) => item.readAt === null)!;
-    await state.dismiss(target.id);
-    state.items.update((items) => [target, ...items]);
-    await state.markRead(target.id);
-    expect(state.items().some((item) => item.id === target.id)).toBe(false);
+    const done = state.markRead(id);
+    const request = http.expectOne(BASE + '/' + id + '/read');
+    const key = request.request.headers.get('x-idempotency-key');
+    request.flush({ code: 'GW.AUTH.UNAUTHORIZED' }, { status: 401, statusText: 'Unauthorized' });
+    await done;
+    expect(state.items()[0].readAt).toBeNull();
+    expect(notify.error).toHaveBeenCalledWith('Not saved. Try again.');
+    const retry = state.markRead(id);
+    const retried = http.expectOne(BASE + '/' + id + '/read');
+    expect(retried.request.headers.get('x-idempotency-key')).toBe(key);
+    retried.flush(null, { status: 204, statusText: 'No content' });
+    await settle();
+    http.expectOne(BASE + '/unread-count').flush({ success: true, data: { unreadCount: 3 } });
+    await retry;
   });
 });
 
 describe('notification type labels', () => {
-  type Dict = { notifications: { types: Record<string, string> } };
   it.each([
-    ['en', en as unknown as Dict],
-    ['ar', ar as unknown as Dict],
-  ])('%s has a label for every known type plus other', (_lang, dict) => {
-    for (const type of KNOWN_NOTIFICATION_TYPES) {
-      expect(dict.notifications.types[type.replace(/\./g, '_')]).toBeTruthy();
-    }
-    expect(dict.notifications.types['other']).toBeTruthy();
+    ['en', en],
+    ['ar', ar],
+  ])('%s has every known type plus other', (_lang, dict) => {
+    const types: Record<string, string> = dict.notifications.types;
+    for (const type of KNOWN_NOTIFICATION_TYPES)
+      expect(types[type.replace(/\./g, '_')]).toBeTruthy();
+    expect(types['other']).toBeTruthy();
   });
 });

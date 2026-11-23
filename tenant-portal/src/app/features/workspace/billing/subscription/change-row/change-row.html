@@ -10,18 +10,10 @@
       >
         <ng-icon [name]="kind.icon" size="14" aria-hidden="true" />
       </span>
-      <h3 class="truncate text-13 leading-18 font-medium text-text">{{ kind.labelKey | transloco }}</h3>
+      <h3 class="truncate text-13 leading-18 font-medium text-text">
+        {{ kind.labelKey | transloco }}
+      </h3>
     </div>
-
-    <button
-      type="button"
-      class="inline-flex size-btn-h-sm shrink-0 cursor-pointer items-center justify-center rounded-6 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-      [attr.aria-label]="'bsub.change.row.remove' | transloco"
-      [title]="'bsub.change.row.remove' | transloco"
-      (click)="removed.emit()"
-    >
-      <ng-icon name="tablerX" size="14" aria-hidden="true" />
-    </button>
   </header>
 
   @switch (currentRow.kind) {
@@ -157,7 +149,7 @@
               type="number"
               inputmode="numeric"
               dir="ltr"
-              [min]="1"
+              [min]="seatInputMin()"
               [max]="seatInputMax()"
               class="min-w-0 flex-1 bg-transparent text-12 text-text tabular-nums outline-none placeholder:text-text-placeholder"
               [value]="currentRow.newSeats"
@@ -176,7 +168,7 @@
                 [routerLink]="['/workspace/billing/subscription/seats/reduce']"
                 [queryParams]="{ module: moduleKey }"
               >
-                {{ 'bsub.change.freeSeats' | transloco }}
+                {{ 'bsub.row.freeUpSeats' | transloco }}
               </a>
             </div>
           }
@@ -197,7 +189,11 @@
               type="text"
               readonly
               class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
-              [value]="upgradeBaseItem()?.applicationName ?? upgradeBaseItem()?.applicationKey ?? currentRow.itemId"
+              [value]="
+                upgradeBaseItem()?.applicationName ??
+                upgradeBaseItem()?.applicationKey ??
+                currentRow.itemId
+              "
             />
           </ui-field>
         } @else {
@@ -247,11 +243,16 @@
             class="w-full"
             size="field"
             [id]="uid + '-new-tier'"
-            [describedBy]="uid + '-new-tier-hint' + (tierFieldError() ? ' ' + uid + '-new-tier-error' : '')"
+            [describedBy]="
+              uid + '-new-tier-hint' + (tierFieldError() ? ' ' + uid + '-new-tier-error' : '')
+            "
             [options]="upgradeTierOptions()"
             [value]="currentRow.tierId"
             [label]="'bsub.change.row.newTier' | transloco"
-            [disabled]="!upgradeBaseItem() || (upgradeTierOptions().length === 1 && upgradeTierOptions()[0].value === '')"
+            [disabled]="
+              !upgradeBaseItem() ||
+              (upgradeTierOptions().length === 1 && upgradeTierOptions()[0].value === '')
+            "
             (valueChange)="onUpgradeTierChange($event)"
           />
         </ui-field>

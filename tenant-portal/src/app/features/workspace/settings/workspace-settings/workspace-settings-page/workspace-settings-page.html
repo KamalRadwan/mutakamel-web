@@ -1,18 +1,34 @@
 @if (fullState() === 'forbidden') {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+  >
+    <span
+      class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon"
+    >
       <ng-icon name="tablerLock" size="20" aria-hidden="true" />
     </span>
-    <h2 class="text-16 leading-22 font-medium text-text">{{ 'wsGeneral.states.forbiddenTitle' | transloco }}</h2>
-    <p class="text-12 leading-18 text-text-muted">{{ 'wsGeneral.states.forbiddenLine' | transloco }}</p>
+    <h2 class="text-16 leading-22 font-medium text-text">
+      {{ 'wsGeneral.states.forbiddenTitle' | transloco }}
+    </h2>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'wsGeneral.states.forbiddenLine' | transloco }}
+    </p>
   </div>
 } @else if (fullState() === 'notReady') {
-  <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+  <div
+    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+  >
+    <span
+      class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+    >
       <ng-icon name="tablerClock" size="20" aria-hidden="true" />
     </span>
-    <h2 class="text-16 leading-22 font-medium text-text">{{ 'wsGeneral.states.notReadyTitle' | transloco }}</h2>
-    <p class="text-12 leading-18 text-text-muted">{{ 'wsGeneral.states.notReadyLine' | transloco }}</p>
+    <h2 class="text-16 leading-22 font-medium text-text">
+      {{ 'wsGeneral.states.notReadyTitle' | transloco }}
+    </h2>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'wsGeneral.states.notReadyLine' | transloco }}
+    </p>
     <button type="button" uiButton variant="primary" (click)="load()">
       {{ 'wsGeneral.bar.reload' | transloco }}
     </button>
@@ -22,11 +38,17 @@
     role="alert"
     class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
   >
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+    <span
+      class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+    >
       <ng-icon name="tablerCloudOff" size="20" aria-hidden="true" />
     </span>
-    <h2 class="text-16 leading-22 font-medium text-text">{{ 'wsGeneral.states.failedTitle' | transloco }}</h2>
-    <p class="text-12 leading-18 text-text-muted">{{ 'wsGeneral.states.failedLine' | transloco }}</p>
+    <h2 class="text-16 leading-22 font-medium text-text">
+      {{ 'wsGeneral.states.failedTitle' | transloco }}
+    </h2>
+    <p class="text-12 leading-18 text-text-muted">
+      {{ 'wsGeneral.states.failedLine' | transloco }}
+    </p>
     <button type="button" uiButton variant="primary" (click)="load()">
       {{ 'wsGeneral.states.retry' | transloco }}
     </button>
@@ -37,18 +59,32 @@
     aria-busy="true"
     [attr.aria-label]="'wsGeneral.states.loadingLabel' | transloco"
   >
-    <div class="flex items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card" aria-hidden="true">
+    <div
+      class="flex items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+      aria-hidden="true"
+    >
       <div class="flex items-center gap-8">
-        <span class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
-        <span class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+        <span
+          class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"
+        ></span>
+        <span
+          class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"
+        ></span>
       </div>
-      <span class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+      <span
+        class="h-badge w-stat-chart-w rounded-8 bg-neutral-soft motion-safe:animate-pulse"
+      ></span>
     </div>
 
     @for (card of skeletonCards; track card) {
-      <div class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card" aria-hidden="true">
+      <div
+        class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card"
+        aria-hidden="true"
+      >
         <div class="flex items-center gap-8">
-          <span class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
+          <span
+            class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"
+          ></span>
           <div class="flex min-w-0 flex-1 flex-col gap-4">
             <span class="h-badge w-1/4 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
             <span class="h-badge w-1/2 rounded-8 bg-neutral-soft motion-safe:animate-pulse"></span>
@@ -60,246 +96,215 @@
     }
   </div>
 } @else if (saved()) {
-  <div class="flex shrink-0 flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
-    @if (canManage) {
-      <div class="flex flex-wrap items-center gap-8">
-        <button
-          type="button"
-          uiButton
-          variant="primary"
-          [loading]="saving()"
-          [disabled]="!canSave()"
-          (click)="save()"
-        >
-          {{ 'wsGeneral.bar.save' | transloco }}
-        </button>
-
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="!dirty() || saving() || loading()"
-          (click)="undo()"
-        >
-          {{ 'wsGeneral.bar.undo' | transloco }}
-        </button>
-
-        @if (dirty()) {
-          <span class="text-12 leading-18 text-text-muted">{{ 'wsGeneral.bar.unsaved' | transloco }}</span>
-        }
-      </div>
-    }
-
-    <div class="ms-auto flex items-center gap-8">
-      @if (!canManage) {
-        <span
-          class="inline-flex h-badge shrink-0 items-center gap-4 rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft"
-          [title]="'wsGeneral.bar.readOnlyHint' | transloco"
-          [attr.aria-label]="'wsGeneral.bar.readOnly' | transloco"
-        >
-          <ng-icon name="tablerLock" size="12" aria-hidden="true" />
-          <span>{{ 'wsGeneral.bar.readOnly' | transloco }}</span>
-        </span>
-      }
-
-      <button
-        type="button"
-        uiButton
-        variant="ghost"
-        [disabled]="loading() || saving()"
-        (click)="onReloadClick()"
-      >
-        <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
-        <span>{{ 'wsGeneral.bar.reload' | transloco }}</span>
-      </button>
-    </div>
+  <div class="flex justify-end">
+    <button
+      type="button"
+      uiButton
+      variant="ghost"
+      [disabled]="loading() || busy()"
+      (click)="reload()"
+    >
+      <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
+      {{ 'wsGeneral.bar.reload' | transloco }}
+    </button>
   </div>
 
-  <!-- 1. Language -->
-  <section class="rounded-10 border border-border bg-surface p-10 shadow-card">
+  <section
+    data-card="general"
+    class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card"
+  >
     <header class="flex items-center gap-8">
-      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+      <span
+        class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+      >
         <ng-icon name="tablerLanguage" size="15" aria-hidden="true" />
       </span>
-      <div class="flex min-w-0 flex-1 flex-col">
-        <h2 class="truncate text-13 leading-18 font-medium text-text">{{ 'wsGeneral.language.title' | transloco }}</h2>
-        <p class="truncate text-12 leading-18 text-text-muted">{{ 'wsGeneral.language.line' | transloco }}</p>
-      </div>
+      <h2 class="text-13 leading-18 font-medium text-text">
+        {{ 'wsGeneral.generalTitle' | transloco }}
+      </h2>
     </header>
-
-    <div class="my-8 border-t border-border"></div>
-
-    <ui-field
-      size="bare"
-      [for]="uid + '-language'"
-      [label]="'wsGeneral.language.label' | transloco"
-      [hint]="'wsGeneral.language.hint' | transloco"
-      [error]="languageError()"
-    >
-      <div class="flex items-center">
+    <div class="border-t border-border"></div>
+    @if (!canManage()) {
+      <app-settings-notice tone="info">{{ generalReason() | transloco }}</app-settings-notice>
+    }
+    <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 desktop:grid-cols-2 wide:grid-cols-3">
+      <ui-field
+        size="bare"
+        [for]="uid + '-language'"
+        [label]="'wsGeneral.language.label' | transloco"
+        [hint]="'wsGeneral.language.hint' | transloco"
+        [error]="generalErrors()['defaultLanguage'] ?? null"
+      >
         <ui-segmented
           [id]="uid + '-language'"
-          [describedBy]="languageError() ? uid + '-language-hint ' + uid + '-language-error' : uid + '-language-hint'"
+          [describedBy]="
+            uid +
+            '-language-hint' +
+            (generalErrors()['defaultLanguage'] ? ' ' + uid + '-language-error' : '')
+          "
           [label]="'wsGeneral.language.label' | transloco"
           [options]="languageOptions()"
           [value]="languageDraft()"
           (valueChange)="onLanguageChange($event)"
         />
-      </div>
-    </ui-field>
-  </section>
+      </ui-field>
 
-  <!-- 2. Currency -->
-  <section class="rounded-10 border border-border bg-surface p-10 shadow-card">
-    <header class="flex items-center gap-8">
-      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
-        <ng-icon name="tablerCoin" size="15" aria-hidden="true" />
-      </span>
-      <div class="flex min-w-0 flex-1 flex-col">
-        <h2 class="truncate text-13 leading-18 font-medium text-text">{{ 'wsGeneral.currency.title' | transloco }}</h2>
-        <p class="truncate text-12 leading-18 text-text-muted">{{ 'wsGeneral.currency.line' | transloco }}</p>
-      </div>
-      @if (!currencyListFailed()) {
-        <a
-          uiButton
-          variant="ghost"
-          size="small"
-          routerLink="/workspace/settings/currencies"
-          class="ms-auto shrink-0"
+      <div class="flex flex-col gap-8">
+        <ui-field
+          size="bare"
+          [for]="uid + '-currency'"
+          [label]="'wsGeneral.currency.label' | transloco"
+          [hint]="'wsGeneral.currency.hint' | transloco"
         >
-          {{ 'wsGeneral.currency.manage' | transloco }}
-        </a>
-      }
-    </header>
+          <span
+            [id]="uid + '-currency'"
+            dir="ltr"
+            class="text-12 text-text"
+            [attr.aria-describedby]="uid + '-currency-hint'"
+          >
+            {{ saved()?.defaultCurrencyCode ?? ('wsGeneral.currency.notSet' | transloco) }}
+          </span>
+        </ui-field>
+        <a uiButton variant="ghost" size="small" routerLink="/workspace/settings/currencies">{{
+          'wsGeneral.currency.changeInCurrencies' | transloco
+        }}</a>
+        @if (canManageCurrency()) {
+          <ui-field
+            size="bare"
+            [for]="uid + '-currency-select'"
+            [label]="'wsGeneral.currency.changeDefault' | transloco"
+            [hint]="'wsGeneral.currency.hint' | transloco"
+          >
+            <ui-dropdown
+              #currencyDropdown
+              class="w-full"
+              size="field"
+              [id]="uid + '-currency-select'"
+              [describedBy]="uid + '-currency-select-hint'"
+              [label]="'wsGeneral.currency.changeDefault' | transloco"
+              [options]="currencyOptions()"
+              [value]="selectedCurrency()"
+              [disabled]="busy() || loading()"
+              (valueChange)="changeCurrency($event)"
+            />
+          </ui-field>
+        }
+      </div>
 
-    <div class="my-8 border-t border-border"></div>
+      <div class="flex flex-col gap-8">
+        <app-timezone-picker
+          [value]="timezoneDraft()"
+          [savedValue]="saved()?.timezone ?? null"
+          [options]="timezones()"
+          [fallbackInput]="timezones().length === 0"
+          [disabled]="!canManage() || savingGeneral() || loading()"
+          [required]="canManage()"
+          [error]="timezoneError()"
+          (valueChange)="onTimezoneChange($event)"
+        />
+        @if (liveLocalTime().length) {
+          <span class="text-12 leading-18 text-text-muted">
+            @for (part of liveLocalTime(); track $index) {
+              <span [attr.dir]="part.ltr ? 'ltr' : null" [class.tabular-nums]="part.ltr">{{
+                part.text
+              }}</span>
+            }
+          </span>
+        }
+      </div>
 
-    @if (!currencyListFailed()) {
       <ui-field
         size="bare"
-        [for]="uid + '-currency'"
-        [label]="'wsGeneral.currency.label' | transloco"
-        [hint]="'wsGeneral.currency.hint' | transloco"
-        [error]="currencyError()"
+        [for]="uid + '-support'"
+        [label]="'wsGeneral.support.label' | transloco"
+        [hint]="'wsGeneral.support.hint' | transloco"
+        [error]="generalErrors()['allowSupport'] ?? null"
       >
-        <ui-dropdown
-          class="w-full"
-          size="field"
-          [id]="uid + '-currency'"
-          [describedBy]="currencyError() ? uid + '-currency-hint ' + uid + '-currency-error' : uid + '-currency-hint'"
-          [label]="'wsGeneral.currency.label' | transloco"
-          [options]="currencyDropdownOptions()"
-          [value]="currencyDraft()"
-          [disabled]="!canManage || saving()"
-          (valueChange)="onCurrencyChange($event)"
-        />
-      </ui-field>
-    } @else {
-      <div class="flex flex-col gap-8">
-        <app-settings-notice tone="warning">
-          <div class="flex flex-wrap items-center justify-between gap-8">
-            <span>{{ 'wsGeneral.currency.listFailed' | transloco }}</span>
-            <button
-              type="button"
-              uiButton
-              variant="ghost"
-              size="small"
-              [loading]="retryingCurrencies()"
-              [disabled]="retryingCurrencies() || saving()"
-              (click)="retryCurrencies()"
-            >
-              {{ 'wsGeneral.currency.retry' | transloco }}
-            </button>
-          </div>
-        </app-settings-notice>
-
-        <ui-field
-          [for]="uid + '-currency-manual'"
-          [label]="'wsGeneral.currency.manualLabel' | transloco"
-          [hint]="'wsGeneral.currency.manualHint' | transloco"
-          [error]="currencyError()"
-        >
-          <input
-            [id]="uid + '-currency-manual'"
-            type="text"
-            dir="ltr"
-            [attr.maxlength]="currencyCodeLength"
-            class="min-w-0 flex-1 bg-transparent text-12 uppercase text-text outline-none placeholder:text-text-placeholder"
-            [value]="currencyDraft()"
-            [readOnly]="!canManage || saving()"
-            [attr.aria-readonly]="!canManage ? 'true' : null"
-            [attr.aria-invalid]="currencyError() ? 'true' : null"
-            (input)="onCurrencyManualInput($event)"
+        <div class="flex h-field items-center gap-8">
+          <ui-switch
+            [id]="uid + '-support'"
+            [describedBy]="
+              uid +
+              '-support-hint' +
+              (generalErrors()['allowSupport'] ? ' ' + uid + '-support-error' : '')
+            "
+            [label]="'wsGeneral.support.label' | transloco"
+            [checked]="allowSupportDraft()"
+            [disabled]="!canManage() || savingGeneral()"
+            (checkedChange)="onAllowSupportChange($event)"
           />
-        </ui-field>
-      </div>
+          <span class="text-12 text-text">{{
+            (allowSupportDraft() ? 'wsGeneral.support.on' : 'wsGeneral.support.off') | transloco
+          }}</span>
+        </div>
+      </ui-field>
+    </div>
+    @if (generalErrors()['_']) {
+      <p role="alert" class="text-12 leading-18 text-danger">{{ generalErrors()['_'] }}</p>
+    }
+    <app-settings-notice tone="info">{{
+      'wsGeneral.note.lastWrite' | transloco
+    }}</app-settings-notice>
+    @if (canManage()) {
+      <footer class="flex items-center gap-8 border-t border-border pt-8">
+        <button
+          type="button"
+          uiButton
+          size="small"
+          variant="primary"
+          [loading]="savingGeneral()"
+          [disabled]="!canSaveGeneral()"
+          (click)="saveGeneral()"
+        >
+          {{ 'wsGeneral.bar.save' | transloco }}
+        </button>
+        <button
+          type="button"
+          uiButton
+          size="small"
+          variant="ghost"
+          [disabled]="!generalDirty() || savingGeneral() || loading()"
+          (click)="undoGeneral()"
+        >
+          {{ 'wsGeneral.bar.undo' | transloco }}
+        </button>
+        @if (generalDirty()) {
+          <span class="text-12 text-text-muted">{{ 'wsGeneral.bar.unsaved' | transloco }}</span>
+        }
+      </footer>
     }
   </section>
 
-  <!-- 3. Time zone -->
-  <section class="rounded-10 border border-border bg-surface p-10 shadow-card">
-    <header class="flex items-center gap-8">
-      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
-        <ng-icon name="tablerClock" size="15" aria-hidden="true" />
-      </span>
-      <div class="flex min-w-0 flex-1 flex-col">
-        <h2 class="truncate text-13 leading-18 font-medium text-text">{{ 'wsGeneral.timezone.title' | transloco }}</h2>
-        <p class="truncate text-12 leading-18 text-text-muted">{{ 'wsGeneral.timezone.line' | transloco }}</p>
-      </div>
-      @if (liveLocalTime(); as localParts) {
-        <span class="ms-auto inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium whitespace-nowrap text-on-neutral-soft">
-          <span>
-            @for (part of localParts; track $index) {
-              @if (part.kind === 'time' || part.kind === 'offset') {
-                <span dir="ltr" class="tabular-nums">{{ part.value }}</span>
-              } @else {
-                {{ part.value }}
-              }
-            }
-          </span>
+  @if (savedPolicy()) {
+    <section
+      data-card="session"
+      class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-10 shadow-card"
+    >
+      <header class="flex items-center gap-8">
+        <span
+          class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+        >
+          <ng-icon name="tablerLock" size="15" aria-hidden="true" />
         </span>
+        <h2 class="text-13 leading-18 font-medium text-text">
+          {{ 'wsGeneral.sessionPolicy.title' | transloco }}
+        </h2>
+      </header>
+      <div class="border-t border-border"></div>
+      @if (!canManageSession()) {
+        <app-settings-notice tone="info">{{ sessionReason() | transloco }}</app-settings-notice>
       }
-    </header>
-
-    <div class="my-8 border-t border-border"></div>
-
-    <app-timezone-picker
-      [value]="timezoneDraft()"
-      [savedValue]="saved()?.timezone ?? null"
-      [options]="timezones()"
-      [fallbackInput]="timezones().length === 0"
-      [disabled]="!canManage || saving()"
-      [required]="canManage"
-      [error]="timezoneError()"
-      (valueChange)="onTimezoneChange($event)"
-    />
-  </section>
-
-  <!-- 4. Session lifetimes -->
-  <section class="rounded-10 border border-border bg-surface p-10 shadow-card">
-    <header class="flex items-center gap-8">
-      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-        <ng-icon name="tablerLock" size="15" aria-hidden="true" />
-      </span>
-      <h2 class="min-w-0 truncate text-13 leading-18 font-medium text-text">
-        {{ 'wsGeneral.sessionPolicy.title' | transloco }}
-      </h2>
-    </header>
-
-    <div class="my-8 border-t border-border"></div>
-
-    <div class="flex flex-col gap-8">
-      <div class="grid grid-cols-1 items-start gap-x-10 gap-y-8 desktop:grid-cols-2 wide:grid-cols-3">
-        @for (field of sessionPolicyFields(); track field.key) {
+      <div
+        class="grid grid-cols-1 items-start gap-x-10 gap-y-8 desktop:grid-cols-2 wide:grid-cols-3"
+      >
+        @for (field of sessionFields(); track field.key) {
           @let fieldId = uid + '-' + field.key;
-          @let i18nKey = 'wsGeneral.sessionPolicy.' + field.key;
-          @let error = field.error ? ('wsGeneral.sessionPolicy.' + field.error | transloco: field.bounds) : null;
           <ui-field
             [for]="fieldId"
-            [label]="i18nKey + '.label' | transloco"
-            [hint]="i18nKey + '.hint' | transloco: field.bounds"
-            [required]="canManage"
-            [error]="error"
+            [label]="'wsGeneral.sessionPolicy.' + field.key + '.label' | transloco"
+            [hint]="field.hint"
+            [required]="canManageSession()"
+            [error]="field.error"
           >
             <input
               [id]="fieldId"
@@ -310,64 +315,70 @@
               spellcheck="false"
               class="min-w-0 flex-1 bg-transparent text-12 tabular-nums text-text outline-none"
               [value]="field.text"
-              [readOnly]="!canManage || saving() || loading()"
-              [attr.aria-required]="canManage ? 'true' : null"
-              [attr.aria-invalid]="error ? 'true' : null"
-              [attr.aria-describedby]="fieldId + '-hint' + (error ? ' ' + fieldId + '-error' : '')"
-              (input)="onSessionPolicyInput(field.key, $event)"
+              [readOnly]="!canManageSession() || savingSession() || refreshingPolicy() || loading()"
+              [attr.aria-readonly]="!canManageSession() ? 'true' : null"
+              [attr.aria-required]="canManageSession() ? 'true' : null"
+              [attr.aria-invalid]="field.error ? 'true' : null"
+              [attr.aria-describedby]="
+                fieldId + '-hint' + (field.error ? ' ' + fieldId + '-error' : '')
+              "
+              (input)="onSessionInput(field.key, $event)"
             />
-            <span class="shrink-0 select-none text-12 text-text-muted" aria-hidden="true">
-              {{ 'wsGeneral.sessionPolicy.unitSeconds' | transloco }}
-            </span>
+            <span class="shrink-0 select-none text-12 text-text-muted" aria-hidden="true">{{
+              'wsGeneral.sessionPolicy.unitSeconds' | transloco
+            }}</span>
           </ui-field>
         }
       </div>
-
+      @if (sessionErrors()['_']) {
+        <p role="alert" class="text-12 leading-18 text-danger">{{ sessionErrors()['_'] }}</p>
+      }
       <p class="text-12 leading-18 text-text-muted">
         {{ 'wsGeneral.sessionPolicy.rememberMeNote' | transloco }}
       </p>
-    </div>
-  </section>
-
-  <!-- 5. Support access -->
-  <section class="rounded-10 border border-border bg-surface p-10 shadow-card">
-    <header class="flex items-center gap-8">
-      <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
-        <ng-icon name="tablerHeadset" size="15" aria-hidden="true" />
-      </span>
-      <div class="flex min-w-0 flex-1 flex-col">
-        <h2 class="truncate text-13 leading-18 font-medium text-text">{{ 'wsGeneral.support.title' | transloco }}</h2>
-        <p class="truncate text-12 leading-18 text-text-muted">{{ 'wsGeneral.support.line' | transloco }}</p>
-      </div>
-    </header>
-
-    <div class="my-8 border-t border-border"></div>
-
-    <ui-field
-      size="bare"
-      [for]="uid + '-support'"
-      [label]="'wsGeneral.support.label' | transloco"
-      [hint]="'wsGeneral.support.hint' | transloco"
-    >
-      <div class="flex h-field items-center gap-8">
-        <ui-switch
-          [id]="uid + '-support'"
-          [describedBy]="uid + '-support-hint'"
-          [label]="'wsGeneral.support.label' | transloco"
-          [checked]="allowSupportDraft()"
-          [disabled]="!canManage || saving()"
-          (checkedChange)="onAllowSupportChange($event)"
-        />
-        <span class="text-12 text-text">
-          {{ (allowSupportDraft() ? 'wsGeneral.support.on' : 'wsGeneral.support.off') | transloco }}
-        </span>
-      </div>
-    </ui-field>
-  </section>
-
-  <app-settings-notice tone="info">
-    {{ 'wsGeneral.note.lastWrite' | transloco }}
-  </app-settings-notice>
+      @if (canManageSession()) {
+        <footer class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
+          <button
+            type="button"
+            uiButton
+            size="small"
+            variant="secondary"
+            [loading]="savingSession()"
+            [disabled]="!canSaveSession()"
+            (click)="saveSession()"
+          >
+            {{ 'wsGeneral.bar.save' | transloco }}
+          </button>
+          <button
+            type="button"
+            uiButton
+            size="small"
+            variant="ghost"
+            [disabled]="!sessionDirty() || savingSession() || refreshingPolicy() || loading()"
+            (click)="undoSession()"
+          >
+            {{ 'wsGeneral.bar.undo' | transloco }}
+          </button>
+          @if (sessionDirty()) {
+            <span class="text-12 text-text-muted">{{ 'wsGeneral.bar.unsaved' | transloco }}</span>
+          }
+          @if (savedPolicy()?.data?.override) {
+            <button
+              type="button"
+              uiButton
+              size="small"
+              variant="ghost"
+              class="ms-auto"
+              [disabled]="busy() || loading() || conflictOpen()"
+              (click)="restoreDefaults()"
+            >
+              {{ 'wsSession.restoreDefaults' | transloco }}
+            </button>
+          }
+        </footer>
+      }
+    </section>
+  }
 }
 
 <ui-unsaved-dialog
@@ -377,4 +388,18 @@
   [saveLabel]="'wsGeneral.leave.save' | transloco"
   [discardLabel]="'wsGeneral.leave.discard' | transloco"
   [cancelLabel]="'wsGeneral.leave.cancel' | transloco"
+/>
+<ui-confirm-dialog
+  #confirmDialog
+  tone="warning"
+  [title]="confirmTitle()"
+  [text]="confirmText()"
+  [confirmLabel]="'wsGeneral.confirm' | transloco"
+  [cancelLabel]="'wsGeneral.leave.cancel' | transloco"
+/>
+<ui-conflict-dialog
+  [(open)]="conflictOpen"
+  [recordLabel]="'wsGeneral.sessionPolicy.title' | transloco"
+  (reload)="resolveConflict(false)"
+  (keepEditing)="resolveConflict(true)"
 />

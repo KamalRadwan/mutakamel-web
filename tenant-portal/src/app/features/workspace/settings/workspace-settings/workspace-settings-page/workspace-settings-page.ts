@@ -1,86 +1,63 @@
-import { Component, DestroyRef, computed, effect, inject, resource, signal, untracked, viewChild } from '@angular/core';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  resource,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { CanDeactivateFn, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerClock,
   tablerCloudOff,
-  tablerCoin,
-  tablerHeadset,
   tablerLanguage,
   tablerLock,
   tablerRefresh,
 } from '@ng-icons/tabler-icons';
+import {
+  ApiError,
+  errorCodeOf,
+  errorMessage,
+  fieldErrorsOf,
+} from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { hasTenantWidePermission } from '../../../../../core/auth/tenant-wide-permission';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
-import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
+import { ConflictDialog } from '../../../../../shared/ui/conflict-dialog/conflict-dialog';
+import { Dropdown, type DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
-import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
+import { Segmented, type SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
+import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
-import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
+import { ActionKeys } from '../../core-response.model';
 import { TimezonePicker } from '../timezone-picker/timezone-picker';
+import { WorkspaceSettingsApi } from '../workspace-settings.api';
 import {
   SESSION_POLICY_FIELDS,
-  SessionPolicyFieldKey,
-  SessionPolicyViewModel,
-  UpdateSessionPolicyDraft,
-  fakeGetSessionPolicy,
-  fakeUpdateSessionPolicy,
-} from '../session-policy.fake';
-import {
-  getWorkspaceSettings,
-  listCurrencyCatalogue,
-  listTimezones,
-  updateWorkspaceSettings,
-} from '../workspace-settings.api';
-import {
-  CURRENCY_CODE_LENGTH,
-  CurrencyOption,
   TIMEZONE_MAX_LENGTH,
-  TimezoneOption,
-  UpdateWorkspaceSettingsRequest,
-  WorkspaceLanguage,
-  WorkspaceSettings,
   formatTimezoneOffset,
+  type ActiveCurrency,
+  type SessionPolicyFieldKey,
+  type SessionPolicyResult,
+  type TimezoneOption,
+  type UpdateSessionPolicyRequest,
+  type UpdateWorkspaceSettingsRequest,
+  type WorkspaceLanguage,
+  type WorkspaceSettings,
 } from '../workspace-settings.model';
 
-const CAN_VIEW = true; // workspace.read
-const CAN_MANAGE = true; // workspace.manage, tenant-wide (later from the session)
-const SKELETON_CARDS = [0, 1, 2, 3, 4] as const;
-const LIVE_CLOCK_INTERVAL_MS = 10_000;
-const CURRENCY_CODE_RE = /^[A-Za-z]{3}$/;
-const WHOLE_NUMBER_RE = /^\d+$/;
-const TIME_SENTINEL = '\u0000TIME\u0000';
-const OFFSET_SENTINEL = '\u0000OFFSET\u0000';
-
-type PageFullState = 'forbidden' | 'notReady' | 'loadFailed' | null;
-type ServerErrorField = 'language' | 'currency' | 'timezone';
-type ServerFieldErrorCodes = Partial<Record<ServerErrorField, string>>;
-
-interface LocalTimeSegment {
-  kind: 'text' | 'time' | 'offset';
-  value: string;
-}
-
-function parseWholeSeconds(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (!WHOLE_NUMBER_RE.test(trimmed)) return null;
-  const parsed = Number(trimmed);
-  return Number.isSafeInteger(parsed) ? parsed : null;
-}
-
-function statusOf(error: unknown): number | null {
-  if (error instanceof ApiError) return error.status;
-  if (error && typeof error === 'object' && 'status' in error) {
-    const value = (error as { status: unknown }).status;
-    return typeof value === 'number' ? value : null;
-  }
-  return null;
-}
+type Card = 'general' | 'session';
+type HeldAction = { key: string; bodyJson: string };
 
 @Component({
   selector: 'app-workspace-settings-page',
@@ -89,6 +66,8 @@ function statusOf(error: unknown): number | null {
     NgIcon,
     TranslocoPipe,
     Button,
+    ConfirmDialog,
+    ConflictDialog,
     Dropdown,
     Field,
     Segmented,
@@ -98,16 +77,11 @@ function statusOf(error: unknown): number | null {
     UnsavedDialog,
   ],
   providers: [
-    provideTranslocoScope({ scope: 'ws-general', alias: 'wsGeneral' }),
-    provideIcons({
-      tablerLanguage,
-      tablerCoin,
-      tablerClock,
-      tablerHeadset,
-      tablerLock,
-      tablerRefresh,
-      tablerCloudOff,
-    }),
+    provideTranslocoScope(
+      { scope: 'ws-general', alias: 'wsGeneral' },
+      { scope: 'ws-session', alias: 'wsSession' },
+    ),
+    provideIcons({ tablerLanguage, tablerClock, tablerLock, tablerRefresh, tablerCloudOff }),
   ],
   templateUrl: './workspace-settings-page.html',
   host: { class: 'flex min-h-0 flex-1 flex-col gap-8 p-12' },
@@ -115,525 +89,555 @@ function statusOf(error: unknown): number | null {
 export class WorkspaceSettingsPage {
   private static nextId = 0;
   protected readonly uid = `workspace-settings-page-${++WorkspaceSettingsPage.nextId}`;
-
-  private readonly destroyRef = inject(DestroyRef);
+  protected readonly skeletonCards = [0, 1] as const;
+  private readonly api = inject(WorkspaceSettingsApi);
+  private readonly auth = inject(AuthSession);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-
   private readonly unsavedDialog = viewChild.required<UnsavedDialog>('unsavedDialog');
-
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly skeletonCards = SKELETON_CARDS;
-  protected readonly currencyCodeLength = CURRENCY_CODE_LENGTH;
-
+  private readonly confirmDialog = viewChild.required<ConfirmDialog>('confirmDialog');
+  protected readonly confirmText = signal('');
+  protected readonly confirmTitle = signal('');
+  protected readonly conflictOpen = signal(false);
   protected readonly saved = signal<WorkspaceSettings | null>(null);
-  protected readonly currencies = signal<CurrencyOption[]>([]);
+  protected readonly savedPolicy = signal<SessionPolicyResult | null>(null);
+  protected readonly currencies = signal<ActiveCurrency[]>([]);
   protected readonly timezones = signal<TimezoneOption[]>([]);
-  protected readonly currencyListFailed = signal(false);
-  protected readonly retryingCurrencies = signal(false);
-  /** The settings and session policy are required; catalogue reads can fall back. */
+  protected readonly languageDraft = signal<WorkspaceLanguage>('en');
+  protected readonly timezoneDraft = signal('');
+  protected readonly allowSupportDraft = signal(true);
+  protected readonly sessionDraft = signal<Partial<Record<SessionPolicyFieldKey, string>>>({});
+  protected readonly savingGeneral = signal(false);
+  protected readonly savingSession = signal(false);
+  protected readonly changingCurrency = signal(false);
+  protected readonly refreshingPolicy = signal(false);
+  protected readonly generalErrors = signal<Record<string, string>>({});
+  protected readonly sessionErrors = signal<Record<string, string>>({});
+  private readonly planBlocked = signal(false);
+  private readonly generalScoped = signal(false);
+  private readonly sessionScoped = signal(false);
+  private generalAction: HeldAction | null = null;
+  private sessionAction: HeldAction | null = null;
+  private readonly currencyKeys = new ActionKeys(newIdempotencyKey);
+  private readonly clockTick = signal(Date.now());
+
+  protected readonly canView = computed(
+    () => this.auth.me()?.permissions.includes('workspace.read') === true,
+  );
+  protected readonly canManage = computed(
+    () =>
+      !this.planBlocked() &&
+      !this.generalScoped() &&
+      hasTenantWidePermission(this.auth.me(), 'workspace.manage'),
+  );
+  protected readonly canManageSession = computed(
+    () =>
+      !this.planBlocked() &&
+      !this.sessionScoped() &&
+      hasTenantWidePermission(this.auth.me(), 'workspace.session-policy.manage'),
+  );
+  protected readonly canManageCurrency = computed(
+    () =>
+      !this.planBlocked() &&
+      hasTenantWidePermission(this.auth.me(), 'currencies.currency.manage') &&
+      this.currencies().length > 0,
+  );
+  protected readonly busy = computed(
+    () =>
+      this.savingGeneral() ||
+      this.savingSession() ||
+      this.changingCurrency() ||
+      this.refreshingPolicy(),
+  );
+  protected readonly generalReason = computed(() =>
+    this.planBlocked()
+      ? 'wsGeneral.planReadOnly'
+      : this.generalScoped()
+        ? 'wsGeneral.needsTenantWide'
+        : 'wsGeneral.bar.readOnlyHint',
+  );
+  protected readonly sessionReason = computed(() =>
+    this.planBlocked()
+      ? 'wsSession.planReadOnly'
+      : this.sessionScoped()
+        ? 'wsSession.needsTenantWide'
+        : 'wsSession.ownerOnly',
+  );
+
   private readonly loaded = resource({
-    params: () => (CAN_VIEW ? true : undefined),
+    params: () => (this.canView() ? this.auth.me()?.id : undefined),
     loader: async () => {
-      const [settingsResult, sessionPolicyResult, currenciesResult, timezonesResult] = await Promise.allSettled([
-        getWorkspaceSettings(),
-        fakeGetSessionPolicy(),
-        listCurrencyCatalogue(),
-        listTimezones(),
+      const [settings, session, currencies, timezones] = await Promise.allSettled([
+        this.api.getSettings(),
+        this.api.getSessionPolicy(),
+        hasTenantWidePermission(this.auth.me(), 'currencies.currency.manage')
+          ? this.api.listActiveCurrencies()
+          : Promise.resolve([]),
+        this.api.listTimezones(),
       ]);
-      if (settingsResult.status === 'rejected') throw settingsResult.reason;
-      if (sessionPolicyResult.status === 'rejected') throw sessionPolicyResult.reason;
+      if (settings.status === 'rejected') throw settings.reason;
+      if (
+        session.status === 'rejected' &&
+        !(session.reason instanceof ApiError && session.reason.status === 403)
+      )
+        throw session.reason;
       return {
-        settings: settingsResult.value,
-        sessionPolicy: sessionPolicyResult.value,
-        currencies: currenciesResult.status === 'fulfilled' ? currenciesResult.value : null,
-        timezones: timezonesResult.status === 'fulfilled' ? timezonesResult.value : null,
+        settings: settings.value,
+        session: session.status === 'fulfilled' ? session.value : null,
+        currencies: currencies.status === 'fulfilled' ? currencies.value : [],
+        timezones: timezones.status === 'fulfilled' ? timezones.value : [],
       };
     },
   });
   protected readonly loading = this.loaded.isLoading;
-  protected readonly saving = signal(false);
-  protected readonly fullState = computed<PageFullState>(() => {
-    if (!CAN_VIEW) return 'forbidden';
+  protected readonly fullState = computed(() => {
+    if (!this.canView()) return 'forbidden';
     if (this.loading()) return null;
     const error = this.loaded.error();
     if (!error) return null;
-    const code = errorCodeOf(error);
-    if (code === 'TENANT_NOT_READY') return 'notReady';
-    if (statusOf(error) === 403 || code === 'TENANT_WIDE_PERMISSION_REQUIRED') return 'forbidden';
-    return 'loadFailed';
-  });
-
-  protected readonly languageDraft = signal<WorkspaceLanguage>('en');
-  protected readonly currencyDraft = signal('');
-  protected readonly timezoneDraft = signal('');
-  protected readonly allowSupportDraft = signal(true);
-  private readonly savedSessionPolicy = signal<SessionPolicyViewModel | null>(null);
-  private readonly sessionPolicyDraft = signal<Partial<Record<SessionPolicyFieldKey, string>>>({});
-  protected readonly serverErrorCodes = signal<ServerFieldErrorCodes>({});
-  private readonly clockTick = signal(Date.now());
-
-  private currencySeq = 0;
-  private pendingIdemKey: string | null = null;
-  private beforeUnloadAttached = false;
-
-  private readonly onBeforeUnload = (event: BeforeUnloadEvent): void => {
-    if (!this.dirty()) return;
-    event.preventDefault();
-    event.returnValue = '';
-  };
-
-  protected readonly sessionPolicyFields = computed(() => {
-    const policy = this.savedSessionPolicy();
-    if (!policy) return [];
-    const draft = this.sessionPolicyDraft();
-    const fields = SESSION_POLICY_FIELDS.map((key) => {
-      const { value: savedValue, min, max } = policy[key];
-      const text = draft[key] ?? String(savedValue);
-      const value = parseWholeSeconds(text);
-      const valid = value !== null && value >= min && value <= max;
-      return { key, text, savedValue, value, bounds: { min, max }, error: valid ? null : 'rangeError' };
-    });
-
-    const idle = fields.find(({ key }) => key === 'idleTimeoutSeconds');
-    const absolute = fields.find(({ key }) => key === 'absoluteTimeoutSeconds');
-    if (idle?.value != null && absolute?.value != null && !idle.error && !absolute.error && idle.value > absolute.value) {
-      idle.error = 'idleExceedsSession';
-    }
-    return fields;
-  });
-
-  private readonly changedSessionPolicy = computed<UpdateSessionPolicyDraft>(() => {
-    const patch: UpdateSessionPolicyDraft = {};
-    for (const { key, value, savedValue, error } of this.sessionPolicyFields()) {
-      if (value !== null && value !== savedValue && !error) patch[key] = value;
-    }
-    return patch;
-  });
-
-  protected readonly dirty = computed(() => {
-    const current = this.saved();
-    if (!this.canManage || !current) return false;
-
-    const draftLang = this.languageDraft().trim().toLowerCase();
-    const savedCurr = (current.defaultCurrencyCode ?? '').trim().toUpperCase();
-    const draftCurr = this.currencyDraft().trim().toUpperCase();
-    const draftTz = this.timezoneDraft().trim();
-
-    return (
-      draftLang !== current.defaultLanguage ||
-      draftCurr !== savedCurr ||
-      draftTz !== current.timezone ||
-      this.allowSupportDraft() !== current.allowSupport ||
-      this.sessionPolicyFields().some(({ value, savedValue }) => value !== savedValue)
-    );
+    if (errorCodeOf(error) === 'TENANT_NOT_READY') return 'notReady';
+    return error instanceof ApiError && error.status === 403 ? 'forbidden' : 'loadFailed';
   });
 
   protected readonly changedBody = computed<UpdateWorkspaceSettingsRequest>(() => {
-    const current = this.saved();
-    if (!current) return {};
-
+    const saved = this.saved();
+    if (!saved) return {};
     const body: UpdateWorkspaceSettingsRequest = {};
-    const draftLang = this.languageDraft().trim().toLowerCase();
-    if ((draftLang === 'en' || draftLang === 'ar') && draftLang !== current.defaultLanguage) {
-      body.defaultLanguage = draftLang;
-    }
-
-    const savedCurr = (current.defaultCurrencyCode ?? '').trim().toUpperCase();
-    const draftCurr = this.currencyDraft().trim().toUpperCase();
-    if (draftCurr && draftCurr !== savedCurr) {
-      body.defaultCurrencyCode = draftCurr;
-    }
-
-    const draftTz = this.timezoneDraft().trim();
-    if (draftTz !== current.timezone) {
-      body.timezone = draftTz;
-    }
-
-    const draftSupport = this.allowSupportDraft();
-    if (draftSupport !== current.allowSupport) {
-      body.allowSupport = draftSupport;
-    }
-
+    if (this.languageDraft() !== saved.defaultLanguage) body.defaultLanguage = this.languageDraft();
+    if (this.timezoneDraft().trim() !== saved.timezone) body.timezone = this.timezoneDraft().trim();
+    if (this.allowSupportDraft() !== saved.allowSupport)
+      body.allowSupport = this.allowSupportDraft();
     return body;
   });
-
-  protected readonly isValid = computed(() => {
-    const tz = this.timezoneDraft().trim();
-    if (!tz || tz.length > TIMEZONE_MAX_LENGTH) return false;
-
-    const curr = this.currencyDraft().trim();
-    if (curr && !CURRENCY_CODE_RE.test(curr)) return false;
-
-    return this.sessionPolicyFields().every(({ error }) => !error);
-  });
-
-  protected readonly canSave = computed(
-    () =>
-      this.canManage &&
-      this.dirty() &&
-      this.isValid() &&
-      !this.saving() &&
-      !this.loading() &&
-      (Object.keys(this.changedBody()).length > 0 || Object.keys(this.changedSessionPolicy()).length > 0),
-  );
-
-  protected readonly languageError = computed(() => {
+  protected readonly generalDirty = computed(() => Object.keys(this.changedBody()).length > 0);
+  protected readonly sessionFields = computed(() => {
     this.i18n();
-    const code = this.serverErrorCodes().language;
-    return code ? this.translateCode(code) : null;
-  });
-
-  protected readonly currencyError = computed(() => {
-    this.i18n();
-    if (this.saved()) {
-      const trimmed = this.currencyDraft().trim();
-      if (trimmed && !CURRENCY_CODE_RE.test(trimmed)) {
-        return this.transloco.translate('wsGeneral.currency.invalidCode');
-      }
+    const policy = this.savedPolicy()?.data;
+    if (!policy) return [];
+    const fields = SESSION_POLICY_FIELDS.map((key) => {
+      const text = this.sessionDraft()[key] ?? String(policy.effective[key]);
+      const value = /^\d+$/.test(text.trim()) ? Number(text) : null;
+      const bounds = { ...policy.limits[key], default: policy.defaults[key] };
+      const localError =
+        value === null || !Number.isSafeInteger(value) || value < bounds.min || value > bounds.max
+          ? this.transloco.translate('wsGeneral.sessionPolicy.rangeError', bounds)
+          : null;
+      const hint =
+        this.transloco.translate(`wsGeneral.sessionPolicy.${key}.hint`, bounds) +
+        ' ' +
+        this.transloco.translate('wsSession.defaultHint', bounds);
+      return { key, text, value, hint, error: this.sessionErrors()[key] ?? localError };
+    });
+    const idle = fields.find((field) => field.key === 'idleTimeoutSeconds');
+    const absolute = fields.find((field) => field.key === 'absoluteTimeoutSeconds');
+    if (
+      idle?.value != null &&
+      absolute?.value != null &&
+      !idle.error &&
+      idle.value > absolute.value
+    ) {
+      idle.error = this.transloco.translate(
+        'wsSession.errors.SESSION_POLICY_IDLE_EXCEEDS_ABSOLUTE',
+      );
     }
-    const code = this.serverErrorCodes().currency;
-    return code ? this.translateCode(code) : null;
+    return fields;
   });
-
+  protected readonly sessionDirty = computed(() =>
+    this.sessionFields().some(
+      (field) => field.text !== String(this.savedPolicy()?.data.effective[field.key]),
+    ),
+  );
+  protected readonly dirty = computed(() => this.generalDirty() || this.sessionDirty());
   protected readonly timezoneError = computed(() => {
     this.i18n();
-    if (this.saved()) {
-      const trimmed = this.timezoneDraft().trim();
-      if (!trimmed) {
-        return this.transloco.translate('wsGeneral.timezone.required');
-      }
-      if (trimmed.length > TIMEZONE_MAX_LENGTH) {
-        return this.transloco.translate('wsGeneral.errors.TIMEZONE_INVALID');
-      }
-    }
-    const code = this.serverErrorCodes().timezone;
-    return code ? this.translateCode(code) : null;
+    const zone = this.timezoneDraft().trim();
+    if (!zone) return this.transloco.translate('wsGeneral.timezone.required');
+    return (
+      this.generalErrors()['timezone'] ??
+      (zone.length > TIMEZONE_MAX_LENGTH
+        ? this.transloco.translate('wsGeneral.errors.TIMEZONE_INVALID')
+        : null)
+    );
   });
-
+  protected readonly canSaveGeneral = computed(
+    () =>
+      this.canManage() &&
+      this.generalDirty() &&
+      !this.timezoneError() &&
+      !this.savingGeneral() &&
+      !this.loading(),
+  );
+  protected readonly canSaveSession = computed(
+    () =>
+      this.canManageSession() &&
+      this.sessionDirty() &&
+      !this.sessionFields().some((field) => field.error) &&
+      !this.savingSession() &&
+      !this.refreshingPolicy() &&
+      !this.conflictOpen() &&
+      !this.loading(),
+  );
   protected readonly languageOptions = computed<SegmentedOption[]>(() => {
     this.i18n();
-    const disabled = !this.canManage || this.saving();
-    return [
-      { value: 'en', label: this.transloco.translate('wsGeneral.language.en'), disabled },
-      { value: 'ar', label: this.transloco.translate('wsGeneral.language.ar'), disabled },
-    ];
+    return ['en', 'ar'].map((value) => ({
+      value,
+      label: this.transloco.translate(`wsGeneral.language.${value}`),
+      disabled: !this.canManage() || this.savingGeneral(),
+    }));
   });
-
-  protected readonly currencyDropdownOptions = computed<DropdownOption<string>[]>(() => {
+  protected readonly currencyOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
-    const savedCurr = (this.saved()?.defaultCurrencyCode ?? '').trim().toUpperCase();
-    const draftCurr = this.currencyDraft().trim().toUpperCase();
-    const result: DropdownOption<string>[] = [];
-    const seen = new Set<string>();
-
-    if (!savedCurr && !draftCurr) {
-      seen.add('');
-      result.push({
+    const options = this.currencies().map((currency) => ({
+      value: currency.id,
+      label: `${currency.code} · ${currency.name}`,
+    }));
+    if (
+      !this.currencies().some((currency) => currency.code === this.saved()?.defaultCurrencyCode)
+    ) {
+      options.unshift({
         value: '',
-        label: this.transloco.translate('wsGeneral.currency.notSet'),
+        label:
+          this.saved()?.defaultCurrencyCode ??
+          this.transloco.translate('wsGeneral.currency.notSet'),
       });
     }
-
-    for (const currency of this.currencies()) {
-      const code = currency.code.trim().toUpperCase();
-      if (seen.has(code)) continue;
-      seen.add(code);
-      result.push({
-        value: code,
-        label: this.transloco.translate('wsGeneral.currency.option', {
-          name: currency.name,
-          code,
-          symbol: currency.symbol,
-        }),
-      });
-    }
-
-    if (savedCurr && !seen.has(savedCurr)) {
-      seen.add(savedCurr);
-      result.push({ value: savedCurr, label: savedCurr });
-    }
-
-    if (draftCurr && !seen.has(draftCurr)) {
-      seen.add(draftCurr);
-      result.push({ value: draftCurr, label: draftCurr });
-    }
-
-    return result;
+    return options;
   });
-
-  protected readonly liveLocalTime = computed<LocalTimeSegment[] | null>(() => {
+  protected readonly selectedCurrency = computed(
+    () =>
+      this.currencies().find((currency) => currency.code === this.saved()?.defaultCurrencyCode)
+        ?.id ?? '',
+  );
+  protected readonly liveLocalTime = computed(() => {
     this.i18n();
     const now = new Date(this.clockTick());
-    const tz = this.timezoneDraft().trim();
-    if (!tz) return null;
-
-    let timeText: string;
     try {
-      timeText = new Intl.DateTimeFormat('en-GB', {
-        timeZone: tz,
+      const time = new Intl.DateTimeFormat('en-GB', {
+        timeZone: this.timezoneDraft(),
         hour: '2-digit',
         minute: '2-digit',
         hourCycle: 'h23',
       }).format(now);
+      const offset = `UTC${formatTimezoneOffset(this.timezoneDraft(), now)}`;
+      const pattern = this.transloco.translate('wsGeneral.timezone.localTime', {
+        time: '\u0000TIME\u0000',
+        offset: '\u0000OFFSET\u0000',
+      });
+      return pattern
+        .split(/(\u0000TIME\u0000|\u0000OFFSET\u0000)/)
+        .filter(Boolean)
+        .map((part) => ({
+          ltr: part === '\u0000TIME\u0000' || part === '\u0000OFFSET\u0000',
+          text: part === '\u0000TIME\u0000' ? time : part === '\u0000OFFSET\u0000' ? offset : part,
+        }));
     } catch {
-      return null;
+      return [];
     }
-
-    const offsetText = `UTC${formatTimezoneOffset(tz, now)}`;
-    const pattern = this.transloco.translate('wsGeneral.timezone.localTime', {
-      time: TIME_SENTINEL,
-      offset: OFFSET_SENTINEL,
-    });
-
-    const parts = pattern.split(/(\u0000TIME\u0000|\u0000OFFSET\u0000)/);
-    const segments: LocalTimeSegment[] = [];
-    for (const part of parts) {
-      if (!part) continue;
-      if (part === TIME_SENTINEL) {
-        segments.push({ kind: 'time', value: timeText });
-      } else if (part === OFFSET_SENTINEL) {
-        segments.push({ kind: 'offset', value: offsetText });
-      } else {
-        segments.push({ kind: 'text', value: part });
-      }
-    }
-    return segments;
   });
 
   constructor() {
-    const timer = setInterval(() => {
-      this.clockTick.set(Date.now());
-    }, LIVE_CLOCK_INTERVAL_MS);
-
-    effect(() => {
-      if (typeof window === 'undefined') return;
-      const isDirty = this.dirty();
-      if (isDirty && !this.beforeUnloadAttached) {
-        window.addEventListener('beforeunload', this.onBeforeUnload);
-        this.beforeUnloadAttached = true;
-      } else if (!isDirty && this.beforeUnloadAttached) {
-        window.removeEventListener('beforeunload', this.onBeforeUnload);
-        this.beforeUnloadAttached = false;
+    const timer = setInterval(() => this.clockTick.set(Date.now()), 10_000);
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (this.dirty()) {
+        event.preventDefault();
+        event.returnValue = '';
       }
+    };
+    effect((onCleanup) => {
+      if (!this.dirty()) return;
+      window.addEventListener('beforeunload', onBeforeUnload);
+      onCleanup(() => window.removeEventListener('beforeunload', onBeforeUnload));
     });
-
-    this.destroyRef.onDestroy(() => {
-      clearInterval(timer);
-      if (typeof window !== 'undefined' && this.beforeUnloadAttached) {
-        window.removeEventListener('beforeunload', this.onBeforeUnload);
-        this.beforeUnloadAttached = false;
-      }
-    });
-
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
     effect(() => {
       if (!this.loaded.hasValue()) return;
-      const { settings, sessionPolicy, currencies, timezones } = this.loaded.value();
+      const value = this.loaded.value();
       untracked(() => {
-        this.currencies.set(currencies ?? []);
-        this.currencyListFailed.set(currencies === null);
-        this.timezones.set(timezones ?? []);
-        this.applySettings(settings);
-        this.applySessionPolicy(sessionPolicy);
+        this.applySettings(value.settings);
+        this.applyPolicy(value.session);
+        this.currencies.set(value.currencies);
+        this.timezones.set(value.timezones);
+        this.notify.connectionRestored();
       });
+    });
+    effect(() => {
+      const error = this.loaded.error();
+      if (error instanceof ApiError && error.status === 0) {
+        untracked(() =>
+          this.notify.connectionLost(
+            this.transloco.translate('wsGeneral.states.failedTitle'),
+            this.message(error, 'general'),
+          ),
+        );
+      }
     });
   }
 
   async confirmLeave(): Promise<boolean> {
-    if (this.saving()) return false;
+    if (this.busy()) return false;
     if (!this.dirty()) return true;
     const choice = await this.unsavedDialog().open();
     if (choice === 'discard') return true;
-    if (choice === 'save') return this.save();
-    return false;
+    if (choice !== 'save') return false;
+    // Each card remains an independent action even when leaving the page.
+    const results = await Promise.all([
+      this.generalDirty() ? this.saveGeneral() : true,
+      this.sessionDirty() ? this.saveSession() : true,
+    ]);
+    return results.every(Boolean) && !this.dirty();
   }
 
   protected load(): void {
-    if (!CAN_VIEW) return;
     this.loaded.reload();
   }
-
-  protected async retryCurrencies(): Promise<void> {
-    if (this.retryingCurrencies() || this.saving()) return;
-    const seq = ++this.currencySeq;
-    this.retryingCurrencies.set(true);
-    try {
-      const list = await listCurrencyCatalogue();
-      if (seq !== this.currencySeq) return;
-      this.currencies.set(list);
-      this.currencyListFailed.set(false);
-    } catch {
-      if (seq !== this.currencySeq) return;
-      this.currencyListFailed.set(true);
-    } finally {
-      if (seq === this.currencySeq) {
-        this.retryingCurrencies.set(false);
-      }
-    }
+  protected async reload(): Promise<void> {
+    if (!this.loading() && !this.busy() && (await this.confirmLeave())) this.load();
   }
-
   protected onLanguageChange(value: string | null): void {
-    if (!this.canManage || this.saving()) return;
-    if (value !== 'en' && value !== 'ar') return;
-    this.languageDraft.set(value);
-    this.clearFieldError('language');
-    this.pendingIdemKey = null;
-  }
-
-  protected onCurrencyChange(value: string): void {
-    if (!this.canManage || this.saving()) return;
-    this.currencyDraft.set(value.trim().toUpperCase());
-    this.clearFieldError('currency');
-    this.pendingIdemKey = null;
-  }
-
-  protected onCurrencyManualInput(event: Event): void {
-    const inputEl = event.target as HTMLInputElement;
-    const start = inputEl.selectionStart;
-    const end = inputEl.selectionEnd;
-    const upper = inputEl.value.toUpperCase();
-    if (inputEl.value !== upper) {
-      inputEl.value = upper;
-      if (start !== null && end !== null) {
-        inputEl.setSelectionRange(start, end);
-      }
+    if (this.canManage() && !this.savingGeneral() && (value === 'en' || value === 'ar')) {
+      this.languageDraft.set(value);
+      this.clearGeneralError('defaultLanguage');
     }
-    this.currencyDraft.set(upper);
-    this.clearFieldError('currency');
-    this.pendingIdemKey = null;
   }
-
   protected onTimezoneChange(value: string): void {
-    if (!this.canManage || this.saving()) return;
-    this.timezoneDraft.set(value);
-    this.clearFieldError('timezone');
-    this.pendingIdemKey = null;
-  }
-
-  protected onAllowSupportChange(next: boolean): void {
-    if (!this.canManage || this.saving()) return;
-    this.allowSupportDraft.set(next);
-    this.pendingIdemKey = null;
-  }
-
-  protected onSessionPolicyInput(key: SessionPolicyFieldKey, event: Event): void {
-    if (!this.canManage || this.saving() || this.loading()) return;
-    const { value } = event.target as HTMLInputElement;
-    this.sessionPolicyDraft.update((draft) => ({ ...draft, [key]: value }));
-  }
-
-  protected undo(): void {
-    const current = this.saved();
-    if (!current || this.saving()) return;
-    this.applySettings(current);
-    this.sessionPolicyDraft.set({});
-  }
-
-  protected async onReloadClick(): Promise<void> {
-    if (this.loading() || this.saving()) return;
-    if (this.dirty()) {
-      const choice = await this.unsavedDialog().open();
-      if (choice === 'cancel') return;
-      if (choice === 'save') {
-        const ok = await this.save();
-        if (!ok) return;
-      }
+    if (this.canManage() && !this.savingGeneral()) {
+      this.timezoneDraft.set(value);
+      this.clearGeneralError('timezone');
     }
-    this.load();
+  }
+  protected onAllowSupportChange(value: boolean): void {
+    if (this.canManage() && !this.savingGeneral()) {
+      this.allowSupportDraft.set(value);
+      this.clearGeneralError('allowSupport');
+    }
+  }
+  protected onSessionInput(key: SessionPolicyFieldKey, event: Event): void {
+    if (!this.canManageSession() || this.savingSession() || this.refreshingPolicy()) return;
+    this.sessionDraft.update((draft) => ({
+      ...draft,
+      [key]: (event.target as HTMLInputElement).value,
+    }));
+    this.sessionErrors.update((errors) => {
+      const next = { ...errors };
+      delete next[key];
+      return next;
+    });
+  }
+  protected undoGeneral(): void {
+    if (!this.savingGeneral() && this.saved()) this.applySettings(this.saved()!);
+  }
+  protected undoSession(): void {
+    if (!this.savingSession() && !this.refreshingPolicy()) this.applyPolicy(this.savedPolicy());
   }
 
-  protected async save(): Promise<boolean> {
-    if (!this.canSave()) return false;
-
+  protected async saveGeneral(): Promise<boolean> {
+    if (!this.canSaveGeneral()) return false;
     const body = this.changedBody();
-    const sessionPolicyPatch = this.changedSessionPolicy();
-    this.saving.set(true);
-    this.serverErrorCodes.set({});
-
+    const bodyJson = JSON.stringify(body);
+    if (this.generalAction?.bodyJson !== bodyJson)
+      this.generalAction = { bodyJson, key: newIdempotencyKey() };
+    this.savingGeneral.set(true);
+    this.generalErrors.set({});
     try {
-      if (Object.keys(body).length > 0) {
-        const idempotencyKey = (this.pendingIdemKey ??= newIdempotencyKey());
-        this.applySettings(await updateWorkspaceSettings(body, idempotencyKey));
-        // Later refresh the app locale and time zone from the response.
-      }
-      if (Object.keys(sessionPolicyPatch).length > 0) {
-        this.applySessionPolicy(await fakeUpdateSessionPolicy(sessionPolicyPatch));
-      }
+      const result = await this.api.updateSettings(body, this.generalAction.key);
+      this.applySettings(result);
+      await this.auth.reloadProfile(this.auth.requestVersion());
       this.notify.success(this.transloco.translate('wsGeneral.toast.saved'));
       return true;
     } catch (error) {
-      const code = errorCodeOf(error);
-      if (code === 'LANGUAGE_INVALID') {
-        this.serverErrorCodes.update((prev) => ({ ...prev, language: code }));
-      } else if (code === 'CURRENCY_NOT_ENABLED') {
-        this.serverErrorCodes.update((prev) => ({ ...prev, currency: code }));
-      } else if (code === 'TIMEZONE_INVALID') {
-        this.serverErrorCodes.update((prev) => ({ ...prev, timezone: code }));
-      } else {
-        // The key now belongs to another body: the next save must start a new action.
-        if (code === 'GW.IDEM.MISMATCH') this.pendingIdemKey = null;
-        this.notify.error(
-          this.transloco.translate('wsGeneral.toast.failedTitle'),
-          this.resolveErrorMessage(error),
-        );
-      }
+      this.handleError(error, 'general');
       return false;
     } finally {
-      this.saving.set(false);
+      this.savingGeneral.set(false);
     }
   }
+
+  protected async saveSession(): Promise<boolean> {
+    if (!this.canSaveSession()) return false;
+    const override = { ...this.savedPolicy()!.data.effective };
+    for (const field of this.sessionFields()) override[field.key] = field.value!;
+    return this.writePolicy({ override });
+  }
+
+  protected async restoreDefaults(): Promise<void> {
+    if (
+      !this.canManageSession() ||
+      this.busy() ||
+      this.loading() ||
+      this.conflictOpen() ||
+      !this.savedPolicy()?.data.override
+    )
+      return;
+    this.confirmTitle.set(this.transloco.translate('wsSession.restoreDefaults'));
+    this.confirmText.set(this.transloco.translate('wsSession.restoreDefaultsConfirm'));
+    this.savingSession.set(true);
+    try {
+      if (await this.confirmDialog().open()) await this.writePolicy({ override: null });
+    } finally {
+      this.savingSession.set(false);
+    }
+  }
+
+  private async writePolicy(body: UpdateSessionPolicyRequest): Promise<boolean> {
+    const etag = this.savedPolicy()?.etag;
+    if (!etag) {
+      this.handleError(new ApiError(428, 'SESSION_POLICY_PRECONDITION_REQUIRED'), 'session');
+      return false;
+    }
+    // If-Match is part of the request identity: a conflict resolution starts a new action.
+    const bodyJson = JSON.stringify([body, etag]);
+    if (this.sessionAction?.bodyJson !== bodyJson)
+      this.sessionAction = { bodyJson, key: newIdempotencyKey() };
+    this.savingSession.set(true);
+    this.sessionErrors.set({});
+    try {
+      this.applyPolicy(await this.api.updateSessionPolicy(body, this.sessionAction.key, etag));
+      this.notify.success(this.transloco.translate('wsSession.saved'));
+      return true;
+    } catch (error) {
+      this.handleError(error, 'session');
+      return false;
+    } finally {
+      this.savingSession.set(false);
+    }
+  }
+
+  protected async resolveConflict(keepChanges: boolean): Promise<void> {
+    if (this.refreshingPolicy()) return;
+    this.refreshingPolicy.set(true);
+    try {
+      const latest = await this.api.getSessionPolicy();
+      if (keepChanges) {
+        const current = this.savedPolicy();
+        if (current) this.savedPolicy.set({ data: current.data, etag: latest.etag });
+        this.sessionAction = null;
+        this.sessionErrors.set({});
+      } else this.applyPolicy(latest);
+      this.conflictOpen.set(false);
+    } catch (error) {
+      this.notify.error(
+        this.transloco.translate('wsSession.saveFailed'),
+        this.message(error, 'session'),
+      );
+    } finally {
+      this.refreshingPolicy.set(false);
+    }
+  }
+
+  protected async changeCurrency(id: string): Promise<void> {
+    const currency = this.currencies().find((item) => item.id === id);
+    if (
+      !currency ||
+      currency.code === this.saved()?.defaultCurrencyCode ||
+      !this.canManageCurrency() ||
+      this.busy() ||
+      this.loading()
+    )
+      return;
+    this.changingCurrency.set(true);
+    this.confirmTitle.set(this.transloco.translate('wsGeneral.currency.changeInCurrencies'));
+    this.confirmText.set(
+      this.transloco.translate('wsGeneral.currency.setDefaultConfirm', { code: currency.code }),
+    );
+    try {
+      if (!(await this.confirmDialog().open())) return;
+      const signature = `set-default:${id}`;
+      await this.api.setDefaultCurrency(id, this.currencyKeys.keyFor(signature));
+      this.currencyKeys.done(signature);
+      const settings = await this.api.getSettings();
+      // Currency is a separate action; preserve unsaved general fields.
+      this.saved.update((saved) =>
+        saved ? { ...saved, defaultCurrencyCode: settings.defaultCurrencyCode } : settings,
+      );
+      this.notify.success(this.transloco.translate('wsGeneral.toast.saved'));
+    } catch (error) {
+      this.handleError(error, 'general');
+    } finally {
+      this.changingCurrency.set(false);
+      // The dropdown owns a model, so explicitly restore the authoritative value after cancellation/failure.
+      this.currencyDropdown()?.value.set(this.selectedCurrency());
+    }
+  }
+  private readonly currencyDropdown = viewChild<Dropdown<string>>('currencyDropdown');
 
   private applySettings(settings: WorkspaceSettings): void {
     this.saved.set(settings);
     this.languageDraft.set(settings.defaultLanguage);
-    this.currencyDraft.set(settings.defaultCurrencyCode ?? '');
     this.timezoneDraft.set(settings.timezone);
     this.allowSupportDraft.set(settings.allowSupport);
-    this.serverErrorCodes.set({});
-    this.pendingIdemKey = null;
+    this.generalErrors.set({});
+    this.generalAction = null;
   }
-
-  private applySessionPolicy(policy: SessionPolicyViewModel): void {
-    this.savedSessionPolicy.set(policy);
-    this.sessionPolicyDraft.set({});
+  private applyPolicy(policy: SessionPolicyResult | null): void {
+    this.savedPolicy.set(policy);
+    this.sessionDraft.set({});
+    this.sessionErrors.set({});
+    this.sessionAction = null;
   }
-
-  private clearFieldError(field: ServerErrorField): void {
-    if (!this.serverErrorCodes()[field]) return;
-    this.serverErrorCodes.update((prev) => {
-      const next = { ...prev };
+  private clearGeneralError(field: string): void {
+    this.generalErrors.update((errors) => {
+      const next = { ...errors };
       delete next[field];
       return next;
     });
   }
-
-  private translateCode(code: string): string {
-    const directKey = `wsGeneral.errors.${code}`;
-    const direct = this.transloco.translate(directKey);
-    if (direct !== directKey) return direct;
-    return this.transloco.translate('wsGeneral.errors.generic');
-  }
-
-  private resolveErrorMessage(error: unknown): string {
+  private handleError(error: unknown, card: Card): void {
     const code = errorCodeOf(error);
-    if (code) {
-      const directKey = `wsGeneral.errors.${code}`;
-      const direct = this.transloco.translate(directKey);
-      if (direct !== directKey) return direct;
-
-      // Gateway codes (GW.IDEM.*) contain dots, so they cannot be translation keys.
-      if (code === 'GW.IDEM.MISMATCH') return this.transloco.translate('wsGeneral.errors.IDEM_MISMATCH');
-      if (code === 'GW.IDEM.IN_FLIGHT') return this.transloco.translate('wsGeneral.errors.IDEM_IN_FLIGHT');
-      if (code.startsWith('IDEM_') || code.startsWith('GW.IDEM.')) {
-        return this.transloco.translate('wsGeneral.errors.IDEM_BAD_VALUE');
+    if (error instanceof ApiError && error.status === 403) {
+      if (code === 'ACCESS_POLICY_BLOCKED') this.planBlocked.set(true);
+      if (code === 'TENANT_WIDE_PERMISSION_REQUIRED')
+        (card === 'general' ? this.generalScoped : this.sessionScoped).set(true);
+    }
+    if (
+      card === 'session' &&
+      error instanceof ApiError &&
+      (error.status === 412 ||
+        (error.status === 409 &&
+          (code === 'SESSION_POLICY_IDEMPOTENCY_CONFLICT' ||
+            code === 'SESSION_POLICY_PRECONDITION_FAILED')))
+    ) {
+      this.conflictOpen.set(true);
+      return;
+    }
+    const errors = Object.fromEntries(
+      Object.entries(fieldErrorsOf(error)).map(([field, messages]) => [
+        field.replace(/^override\./, ''),
+        messages[0] ?? this.message(error, card),
+      ]),
+    );
+    if (code === 'TIMEZONE_INVALID') errors['timezone'] = this.message(error, card);
+    if (code === 'LANGUAGE_INVALID') errors['defaultLanguage'] = this.message(error, card);
+    if (
+      card === 'session' &&
+      code === 'SESSION_POLICY_LIMIT_EXCEEDED' &&
+      error instanceof ApiError
+    ) {
+      for (const field of SESSION_POLICY_FIELDS) {
+        const range = error.details?.[field] ?? error.details?.[`override.${field}`];
+        if (range)
+          errors[field] = this.transloco.translate(
+            'wsSession.errors.SESSION_POLICY_LIMIT_EXCEEDED',
+            { range: Array.isArray(range) ? range.join(', ') : String(range) },
+          );
       }
     }
-
-    const status = statusOf(error);
-    if (status === 0) return this.transloco.translate('wsGeneral.errors.network');
-    if (status === 403) return this.transloco.translate('wsGeneral.errors.permission');
-    return this.transloco.translate('wsGeneral.errors.generic');
+    if (code === 'SESSION_POLICY_IDLE_EXCEEDS_ABSOLUTE')
+      errors['idleTimeoutSeconds'] = this.message(error, card);
+    (card === 'general' ? this.generalErrors : this.sessionErrors).set(errors);
+    if (Object.keys(errors).length) return;
+    const title = this.transloco.translate(
+      card === 'general' ? 'wsGeneral.toast.failedTitle' : 'wsSession.saveFailed',
+    );
+    if (error instanceof ApiError && error.status === 0)
+      this.notify.connectionLost(title, this.message(error, card));
+    else this.notify.error(title, this.message(error, card));
+  }
+  private message(error: unknown, card: Card): string {
+    const scope = card === 'general' ? 'wsGeneral' : 'wsSession';
+    if (error instanceof ApiError && error.status === 401)
+      return this.transloco.translate(`${scope}.notSaved`);
+    return errorMessage(error, scope, this.transloco);
   }
 }
 

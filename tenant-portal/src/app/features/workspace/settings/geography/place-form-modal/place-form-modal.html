@@ -7,12 +7,18 @@
   [dismissable]="!saving()"
   (closed)="onModalClosed()"
 >
-  <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
+  <form
+    [id]="uid + '-form'"
+    class="grid grid-cols-2 gap-x-10 gap-y-8"
+    novalidate
+    (submit)="save($event)"
+  >
     <div class="col-span-2">
       <ui-field
         [for]="uid + '-location'"
         [label]="'geoPlaces.modal.location' | transloco"
         [hint]="'geoPlaces.modal.locationHint' | transloco"
+        [error]="parentError()"
       >
         <input
           [id]="uid + '-location'"
@@ -66,7 +72,9 @@
         [value]="nameEn()"
         [readonly]="isReadOnly() || saving()"
         [attr.aria-invalid]="nameEnError() ? 'true' : null"
-        [attr.aria-describedby]="uid + '-name-en-hint' + (nameEnError() ? ' ' + uid + '-name-en-error' : '')"
+        [attr.aria-describedby]="
+          uid + '-name-en-hint' + (nameEnError() ? ' ' + uid + '-name-en-error' : '')
+        "
         (input)="onNameInput('en', $event)"
         (blur)="markTouched('en')"
       />
@@ -90,7 +98,9 @@
         [value]="nameAr()"
         [readonly]="isReadOnly() || saving()"
         [attr.aria-invalid]="nameArError() ? 'true' : null"
-        [attr.aria-describedby]="uid + '-name-ar-hint' + (nameArError() ? ' ' + uid + '-name-ar-error' : '')"
+        [attr.aria-describedby]="
+          uid + '-name-ar-hint' + (nameArError() ? ' ' + uid + '-name-ar-error' : '')
+        "
         (input)="onNameInput('ar', $event)"
         (blur)="markTouched('ar')"
       />
@@ -105,13 +115,15 @@
           [hint]="'geoPlaces.modal.activeHint' | transloco"
         >
           <div class="flex items-start gap-8 pt-2">
-            <ui-switch
-              [id]="uid + '-active'"
-              [describedBy]="uid + '-active-hint'"
-              [(checked)]="isActive"
-              [disabled]="isReadOnly() || saving()"
-              [label]="'geoPlaces.modal.active' | transloco"
-            />
+            @if (!isReadOnly()) {
+              <ui-switch
+                [id]="uid + '-active'"
+                [describedBy]="uid + '-active-hint'"
+                [(checked)]="isActive"
+                [disabled]="isReadOnly() || saving()"
+                [label]="'geoPlaces.modal.active' | transloco"
+              />
+            }
             <div class="flex min-w-0 flex-1 flex-col gap-2">
               <span class="text-12 leading-18 font-medium text-text">
                 {{ (isActive() ? 'geoPlaces.active' : 'geoPlaces.inactive') | transloco }}
@@ -148,16 +160,30 @@
           <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
             {{ 'geoPlaces.modal.undo' | transloco }}
           </button>
-          <span class="text-12 leading-18 text-text-muted">{{ 'geoPlaces.modal.unsaved' | transloco }}</span>
+          <span class="text-12 leading-18 text-text-muted">{{
+            'geoPlaces.modal.unsaved' | transloco
+          }}</span>
         } @else {
-          <button type="button" uiButton variant="ghost" [disabled]="saving()" (click)="requestClose()">
+          <button
+            type="button"
+            uiButton
+            variant="ghost"
+            [disabled]="saving()"
+            (click)="requestClose()"
+          >
             {{ 'geoPlaces.modal.cancel' | transloco }}
           </button>
         }
       </div>
 
       @if (mode() === 'edit') {
-        <button type="button" uiButton variant="danger" [disabled]="saving()" (click)="requestDelete()">
+        <button
+          type="button"
+          uiButton
+          variant="danger"
+          [disabled]="saving()"
+          (click)="requestDelete()"
+        >
           {{ 'geoPlaces.modal.delete' | transloco }}
         </button>
       }
@@ -172,4 +198,13 @@
   [text]="'geoPlaces.discard.text' | transloco"
   [confirmLabel]="'geoPlaces.discard.confirm' | transloco"
   [cancelLabel]="'geoPlaces.discard.keep' | transloco"
+/>
+
+<ui-confirm-dialog
+  #deactivateDialog
+  tone="warning"
+  [title]="'geoPlaces.deactivateTitle' | transloco"
+  [text]="'geoPlaces.districtsStayActive' | transloco"
+  [confirmLabel]="'geoPlaces.actions.deactivate' | transloco"
+  [cancelLabel]="'geoPlaces.modal.cancel' | transloco"
 />

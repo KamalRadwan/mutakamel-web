@@ -6,7 +6,11 @@
   [closeLabel]="'wsBranding.actions.close' | transloco"
 >
   <div class="mb-8 flex flex-wrap items-center justify-between gap-8">
-    <ui-field size="bare" [label]="'wsBranding.preview.themeLabel' | transloco" [hint]="'wsBranding.preview.themeHint' | transloco">
+    <ui-field
+      size="bare"
+      [label]="'wsBranding.preview.themeLabel' | transloco"
+      [hint]="'wsBranding.preview.themeHint' | transloco"
+    >
       <ui-segmented
         class="self-start"
         [options]="themeOptions()"
@@ -32,12 +36,23 @@
       <span class="text-11 leading-16 font-medium text-text-muted">
         {{ 'wsBranding.preview.tabLabel' | transloco }}
       </span>
-      <div inert aria-hidden="true" class="overflow-hidden rounded-10 border border-border bg-surface shadow-card">
+      <div
+        inert
+        aria-hidden="true"
+        class="overflow-hidden rounded-10 border border-border bg-surface shadow-card"
+      >
         <div class="flex items-center gap-8 px-10 py-6">
           @if (values().iconUrl; as iconUrl) {
-            <img [src]="iconUrl" alt="" class="size-icon-tile-sm shrink-0 rounded-6 object-contain" />
+            <img
+              [src]="iconUrl"
+              (error)="imageFailed('iconUrl')"
+              alt=""
+              class="size-icon-tile-sm shrink-0 rounded-6 object-contain"
+            />
           } @else {
-            <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-6 bg-neutral-soft text-12 font-medium text-on-neutral-soft">
+            <span
+              class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-6 bg-neutral-soft text-12 font-medium text-on-neutral-soft"
+            >
               {{ tabMonogram() }}
             </span>
           }
@@ -64,7 +79,12 @@
         class="flex h-table-head items-center gap-8 rounded-10 bg-nav-gradient px-10 text-on-nav shadow-card"
       >
         @if (values().logoUrl; as logoUrl) {
-          <img [src]="logoUrl" alt="" class="h-icon-tile-sm max-w-preset shrink-0 object-contain" />
+          <img
+            [src]="logoUrl"
+            (error)="imageFailed('logoUrl')"
+            alt=""
+            class="h-icon-tile-sm max-w-preset shrink-0 object-contain"
+          />
         } @else {
           <span
             class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 text-12 font-medium"
@@ -93,11 +113,22 @@
       <span class="text-11 leading-16 font-medium text-text-muted">
         {{ 'wsBranding.preview.signInLabel' | transloco }}
       </span>
-      <div inert aria-hidden="true" class="flex justify-center rounded-10 border border-border bg-bg p-12">
-        <div class="flex w-full max-w-modal-alert flex-col gap-8 rounded-10 border border-border bg-surface p-12 shadow-card">
+      <div
+        inert
+        aria-hidden="true"
+        class="flex justify-center rounded-10 border border-border bg-bg p-12"
+      >
+        <div
+          class="flex w-full max-w-modal-alert flex-col gap-8 rounded-10 border border-border bg-surface p-12 shadow-card"
+        >
           <div class="flex flex-col items-center gap-6 text-center">
             @if (values().logoUrl; as logoUrl) {
-              <img [src]="logoUrl" alt="" class="h-table-head max-w-preset object-contain" />
+              <img
+                [src]="logoUrl"
+                (error)="imageFailed('logoUrl')"
+                alt=""
+                class="h-table-head max-w-preset object-contain"
+              />
             } @else {
               <span
                 class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 text-15 font-medium"
@@ -114,10 +145,14 @@
             </p>
           </div>
 
-          <div class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text-placeholder">
+          <div
+            class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text-placeholder"
+          >
             <span class="truncate">{{ 'wsBranding.preview.email' | transloco }}</span>
           </div>
-          <div class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text-placeholder">
+          <div
+            class="flex h-field items-center rounded-8 border border-border-field bg-surface-field px-8 text-12 text-text-placeholder"
+          >
             <span class="truncate">{{ 'wsBranding.preview.password' | transloco }}</span>
           </div>
 

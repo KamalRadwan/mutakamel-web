@@ -1,245 +1,231 @@
-import { Injectable } from '@angular/core';
-import { type ComponentFixture, TestBed } from '@angular/core/testing';
-import { TranslocoLoader, provideTransloco } from '@jsverse/transloco';
-import { map, timer } from 'rxjs';
+import { signal } from '@angular/core';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { provideTransloco, TRANSLOCO_LOADER, TranslocoService } from '@jsverse/transloco';
+import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../../core/api/api-errors';
-import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
-import { deletePhoneServer, listPhoneServers } from '../phone-servers.api';
-import { resetPhoneServersFake } from '../phone-servers.fake';
-import { PhoneServer } from '../phone-servers.model';
+import { PhoneServersApi } from '../phone-servers.api';
+import type { PhoneServer, IceEntryDraft, IceEntry } from '../phone-servers.model';
 import { ServerModal } from './server-modal';
 
-/*
- * ServerModal error mapping (handleSaveError / onIceEnabledToggle) on the real phone-servers fake.
- * Translations are empty, so every message is its key: resolveError() falls back to
- * 'wsPhone.errors.generic' and field messages show their 'wsPhone.validation.*' key.
- */
+const server: PhoneServer = {
+  id: 'server-1', tenantId: 'tenant-1', createdAt: '', updatedAt: '', name: 'Cairo', priority: 1, enabled: false,
+  sipDomain: 'pbx.example.com', websocketUrl: 'wss://pbx.example.com/ws', realm: null, fromDomain: null,
+  registrarServer: null, outboundProxy: null, contactUri: null, defaultCallerId: null, registerExpires: 600,
+  sessionTimers: true, defaultTimeoutSeconds: 20, defaultMaxRetries: 4, traceSip: false,
+  allowInvalidTlsCertificate: false, iceEnabled: false, iceTransportPolicy: 'all', iceServers: [],
+};
+const ice: IceEntry = { id: 'ice-1', kind: 'STUN', urls: ['stun:pbx.example.com'], username: null, credentialConfigured: false, enabled: true, sortOrder: 0 };
+const draft: IceEntryDraft = { uid: 'draft-1', id: null, kind: 'STUN', urlsText: 'stun:pbx.example.com', username: '', credentialConfigured: false, credentialAction: 'keep', credentialValue: '', enabled: true };
 
-@Injectable()
-class EmptyLoader implements TranslocoLoader {
-  getTranslation() {
-    return timer(0).pipe(map(() => ({})));
+describe('ServerModal', () => {
+  const api = { createPhoneServer: vi.fn(), updatePhoneServer: vi.fn(), listPhoneServers: vi.fn(),
+    createIceServer: vi.fn(), updateIceServer: vi.fn(), deleteIceServer: vi.fn() };
+  const notify = { error: vi.fn(), success: vi.fn() };
+  let fixture: ComponentFixture<ServerModal>;
+  let c: ServerModal;
+  let close: ReturnType<typeof vi.spyOn>;
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    api.createPhoneServer.mockResolvedValue(server);
+    api.updatePhoneServer.mockImplementation(async (_id, patch) => ({ ...server, ...patch }));
+    api.listPhoneServers.mockResolvedValue([server]);
+    api.createIceServer.mockResolvedValue(ice);
+    api.updateIceServer.mockResolvedValue(ice);
+    api.deleteIceServer.mockResolvedValue(undefined);
+    TestBed.configureTestingModule({ providers: [
+      provideTransloco({ config: { availableLangs: ['en', 'ar'], defaultLang: 'en', prodMode: true, missingHandler: { logMissingKey: false } } }),
+      { provide: TRANSLOCO_LOADER, useValue: { getTranslation: () => of({}) } },
+      { provide: PhoneServersApi, useValue: api }, { provide: Notify, useValue: notify },
+      { provide: LanguageState, useValue: { current: signal('en') } },
+    ] });
+    const messages: Record<string, string> = { 'apiErrors.idempotencyMismatch': 'Request body changed', 'wsPhone.errors.notSaved': 'Not saved. Try again', 'wsPhone.errors.stillProcessing': 'Still processing' };
+    vi.spyOn(TestBed.inject(TranslocoService), 'translate').mockImplementation(key => messages[String(key)] ?? String(key));
+    fixture = TestBed.createComponent(ServerModal);
+    c = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    vi.spyOn(c['modal'](), 'open').mockImplementation(() => {});
+    close = vi.spyOn(c['modal'](), 'close').mockImplementation(() => {});
+    c.open(structuredClone(server));
+  });
+  afterEach(() => { fixture.destroy(); vi.restoreAllMocks(); });
+  function change() { c['nameDraft'].set('Alexandria'); }
+
+  it('add opens an empty modal', () => {
+    c.open();
+    expect(c.editingId()).toBeNull();
+    expect(c['nameDraft']()).toBe('');
+    expect(c['sipDomainDraft']()).toBe('');
+    expect(c['websocketUrlDraft']()).toBe('');
+    c['requestClose']();
+    expect(close).toHaveBeenCalled();
+    expect(api.createPhoneServer).not.toHaveBeenCalled();
+  });
+
+  function create() {
+    c.open();
+    c['nameDraft'].set('Cairo'); c['sipDomainDraft'].set(server.sipDomain); c['websocketUrlDraft'].set(server.websocketUrl);
+    c['iceEntries'].set([structuredClone(draft)]);
   }
-}
 
-const dialogProto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-const originalDialog = { showModal: dialogProto['showModal'], close: dialogProto['close'] };
-
-// Protected and private members are reached through this view on purpose: the spec drives the modal state directly.
-type Internals = Record<string, any>;
-
-let fixture: ComponentFixture<ServerModal>;
-let c: Internals;
-
-async function flush(ms = 2000): Promise<void> {
-  fixture.detectChanges();
-  await vi.advanceTimersByTimeAsync(ms);
-  fixture.detectChanges();
-}
-
-async function drive<T>(promise: Promise<T>): Promise<T> {
-  await vi.advanceTimersByTimeAsync(3000);
-  const value = await promise;
-  fixture.detectChanges();
-  return value;
-}
-
-async function server(id: string): Promise<PhoneServer> {
-  const list = await drive(listPhoneServers());
-  return list.find((item) => item.id === id)!;
-}
-
-function errorToasts(): string[] {
-  return TestBed.inject(Notify)
-    .toasts()
-    .filter((toast) => toast.type === 'error')
-    .map((toast) => toast.title);
-}
-
-async function openOn(id: string): Promise<PhoneServer> {
-  const base = await server(id);
-  fixture.componentInstance.open(base);
-  await flush();
-  return base;
-}
-
-beforeEach(async () => {
-  vi.useFakeTimers();
-  resetPhoneServersFake();
-  dialogProto['showModal'] = function (this: HTMLDialogElement) {
-    this.setAttribute('open', '');
-  };
-  dialogProto['close'] = function (this: HTMLDialogElement) {
-    if (!this.hasAttribute('open')) return;
-    this.removeAttribute('open');
-    this.dispatchEvent(new Event('close'));
-  };
-  TestBed.configureTestingModule({
-    providers: [
-      provideTransloco({
-        config: { availableLangs: ['ar', 'en'], defaultLang: 'en', missingHandler: { logMissingKey: false } },
-        loader: EmptyLoader,
-      }),
-    ],
-  });
-  fixture = TestBed.createComponent(ServerModal);
-  c = fixture.componentInstance as unknown as Internals;
-  await flush();
-});
-
-afterEach(() => {
-  fixture.destroy();
-  TestBed.resetTestingModule();
-  dialogProto['showModal'] = originalDialog.showModal;
-  dialogProto['close'] = originalDialog.close;
-  vi.useRealTimers();
-});
-
-describe('ServerModal handleSaveError', () => {
-  it('WEBPHONE_RELAY_WITHOUT_TURN flags the relay error on the ICE tab without a toast', async () => {
-    await openOn('srv-cairo-1');
-    c['handleSaveError'](new ApiError(422, 'WEBPHONE_RELAY_WITHOUT_TURN'), 'srv-cairo-1');
-    expect(c['relayServerError']()).toBe(true);
-    expect(c['activeTab']()).toBe('ice');
-    expect(errorToasts()).toEqual([]);
+  it('create posts the server then its ICE rows', async () => {
+    create();
+    await c['save']();
+    expect(api.createPhoneServer).toHaveBeenCalledTimes(1);
+    expect(api.createIceServer).toHaveBeenCalledWith(server.id, expect.objectContaining({ kind: 'STUN', urls: ice.urls }), expect.any(String));
+    expect(api.createPhoneServer.mock.invocationCallOrder[0]).toBeLessThan(api.createIceServer.mock.invocationCallOrder[0]);
+    expect(close).toHaveBeenCalled();
   });
 
-  it('WEBPHONE_SERVER_NOT_FOUND toasts, emits deletedRemotely and closes', async () => {
-    await openOn('srv-cairo-1');
-    const deleted = vi.fn();
-    fixture.componentInstance.deletedRemotely.subscribe(deleted);
-    c['handleSaveError'](new ApiError(404, 'WEBPHONE_SERVER_NOT_FOUND'), 'srv-cairo-1');
-    await flush();
-    expect(deleted).toHaveBeenCalledWith('srv-cairo-1');
-    expect(errorToasts()).toEqual(['wsPhone.errors.generic']);
-    expect(fixture.componentInstance.editingId()).toBeNull();
+  it('ICE failure after create keeps the modal', async () => {
+    create();
+    api.createIceServer.mockRejectedValueOnce(new ApiError(503, 'WEBPHONE_INTERNAL_ERROR'));
+    await c['save']();
+    expect(c.editingId()).toBe(server.id);
+    expect(close).not.toHaveBeenCalled();
+    const first = api.createIceServer.mock.calls[0];
+    await c['save']();
+    expect(api.createPhoneServer).toHaveBeenCalledTimes(1);
+    expect(api.createIceServer.mock.calls[1]).toEqual(first);
   });
 
-  it('a 409 idempotency mismatch opens the conflict dialog', async () => {
-    await openOn('srv-cairo-1');
-    const openConflict = vi.spyOn(c['conflictModal'](), 'open');
-    c['handleSaveError'](new ApiError(409, 'GW.IDEM.MISMATCH'), 'srv-cairo-1');
-    expect(openConflict).toHaveBeenCalledTimes(1);
-    expect(errorToasts()).toEqual([]);
+  it('empty timeout and retries send defaults', async () => {
+    c['defaultTimeoutDraft'].set(''); c['defaultMaxRetriesDraft'].set('');
+    await c['save']();
+    expect(api.updatePhoneServer).toHaveBeenCalledWith(server.id, { defaultTimeoutSeconds: 10, defaultMaxRetries: 2 }, expect.any(String));
   });
 
-  it('a 409 in flight (GW.IDEM.IN_FLIGHT, IDEM_IN_FLIGHT) is a "still processing" toast, not a conflict', async () => {
-    await openOn('srv-cairo-1');
-    const openConflict = vi.spyOn(c['conflictModal'](), 'open');
-    c['handleSaveError'](new ApiError(409, 'GW.IDEM.IN_FLIGHT'), 'srv-cairo-1');
-    c['handleSaveError'](new ApiError(409, 'IDEM_IN_FLIGHT'), 'srv-cairo-1');
-    expect(openConflict).not.toHaveBeenCalled();
-    // Notify collapses the identical second toast into the first.
-    expect(errorToasts()).toEqual(['wsPhone.errors.stillProcessing']);
+  it('not-null fields are never null', async () => {
+    create();
+    c['defaultTimeoutDraft'].set(''); c['defaultMaxRetriesDraft'].set('');
+    await c['save']();
+    const body = api.createPhoneServer.mock.calls[0][0];
+    for (const field of ['registerExpires', 'defaultTimeoutSeconds', 'defaultMaxRetries', 'enabled', 'iceEnabled', 'iceTransportPolicy', 'sessionTimers', 'traceSip', 'allowInvalidTlsCertificate']) {
+      expect(body[field]).not.toBeNull(); expect(body[field]).not.toBeUndefined();
+    }
+    api.updatePhoneServer.mockClear();
+    c.open(server); c['registerExpiresDraft'].set('');
+    await c['save']();
+    expect(c['registerExpiresError']()).toBeTruthy();
+    expect(api.updatePhoneServer).not.toHaveBeenCalled();
   });
 
-  it('409 WEBPHONE_SERVER_LIMIT_REACHED is a toast, not a conflict', async () => {
-    await openOn('srv-cairo-1');
-    const openConflict = vi.spyOn(c['conflictModal'](), 'open');
-    c['handleSaveError'](new ApiError(409, 'WEBPHONE_SERVER_LIMIT_REACHED'), 'srv-cairo-1');
-    expect(openConflict).not.toHaveBeenCalled();
-    expect(errorToasts()).toEqual(['wsPhone.errors.generic']);
+  it('sips is refused by the client', async () => {
+    for (const field of ['registrarServerDraft', 'outboundProxyDraft', 'contactUriDraft'] as const) {
+      c.open(server); c[field].set('sips:pbx.example.com');
+      await c['save']();
+      expect(c['activeTab']()).toBe('advanced');
+    }
+    expect(api.updatePhoneServer).not.toHaveBeenCalled();
   });
 
-  it('409 WEBPHONE_PROVISIONING_PENDING is a toast, not a conflict', async () => {
-    await openOn('srv-cairo-1');
-    const openConflict = vi.spyOn(c['conflictModal'](), 'open');
-    c['handleSaveError'](new ApiError(409, 'WEBPHONE_PROVISIONING_PENDING'), 'srv-cairo-1');
-    expect(openConflict).not.toHaveBeenCalled();
-    expect(errorToasts()).toEqual(['wsPhone.errors.generic']);
-  });
-
-  it('CORE_VALIDATION_FAILED on a connection field sets the field message and the connection tab', async () => {
-    await openOn('srv-cairo-1');
-    c['activeTab'].set('ice');
-    c['handleSaveError'](new ApiError(400, 'CORE_VALIDATION_FAILED', { sipDomain: ['sipDomain is not valid'] }), 'srv-cairo-1');
-    expect(c['serverFieldErrors']()).toEqual({ sipDomain: 'wsPhone.validation.sipDomainPattern' });
+  it('validation errors map to fields', async () => {
+    change();
+    api.updatePhoneServer.mockRejectedValue(new ApiError(400, 'CORE_VALIDATION_FAILED', { name: ['Name rejected'], websocketUrl: ['URL rejected'] }));
+    await c['save']();
+    expect(c['nameError']()).toBe('Name rejected'); expect(c['websocketUrlError']()).toBe('URL rejected');
     expect(c['activeTab']()).toBe('connection');
-    expect(errorToasts()).toEqual([]);
+    expect(close).not.toHaveBeenCalled();
   });
 
-  it('CORE_VALIDATION_FAILED on an advanced field sets the field message and the advanced tab', async () => {
-    await openOn('srv-cairo-1');
-    c['handleSaveError'](
-      new ApiError(400, 'CORE_VALIDATION_FAILED', { registerExpires: ['registerExpires is not valid'] }),
-      'srv-cairo-1',
-    );
-    expect(c['serverFieldErrors']()).toEqual({ registerExpires: 'wsPhone.validation.registerExpiresRange' });
+  it('advanced validation errors remain beside their fields', async () => {
+    c['realmDraft'].set('rejected-realm');
+    api.updatePhoneServer.mockRejectedValue(new ApiError(400, 'CORE_VALIDATION_FAILED', { realm: ['Realm rejected'], fromDomain: ['Domain rejected'] }));
+    await c['save'](); fixture.detectChanges();
     expect(c['activeTab']()).toBe('advanced');
+    expect(fixture.nativeElement.textContent).toContain('Realm rejected');
+    expect(fixture.nativeElement.textContent).toContain('Domain rejected');
   });
 
-  it('CORE_VALIDATION_FAILED on urls, username or credential lands on the ICE row being saved', async () => {
-    await openOn('srv-cairo-1');
-    const uid = c['iceEntries']()[0].uid as string;
-    c['savingIceUid'] = uid;
-    c['handleSaveError'](
-      new ApiError(400, 'CORE_VALIDATION_FAILED', { urls: ['bad'], username: ['bad'], credential: ['bad'] }),
-      'srv-cairo-1',
-    );
-    expect(c['iceServerErrors']()[uid]).toEqual({
-      urls: 'wsPhone.validation.iceUrlsPattern',
-      username: 'wsPhone.validation.turnUsernameRequired',
-      credential: 'wsPhone.validation.turnCredentialRequired',
-    });
-    expect(c['iceRowErrorsMap']()[uid]).toMatchObject({ urls: 'wsPhone.validation.iceUrlsPattern' });
-    expect(c['activeTab']()).toBe('ice');
-    expect(errorToasts()).toEqual([]);
+  it('relay without TURN', async () => {
+    change(); api.updatePhoneServer.mockRejectedValue(new ApiError(422, 'WEBPHONE_RELAY_WITHOUT_TURN'));
+    await c['save']();
+    expect(c['activeTab']()).toBe('ice'); expect(c['iceTransportError']()).toBeTruthy();
   });
 
-  it('CORE_VALIDATION_FAILED on a field the form does not map, or ICE fields with no row, falls back to a toast', async () => {
-    await openOn('srv-cairo-1');
-    c['handleSaveError'](new ApiError(400, 'CORE_VALIDATION_FAILED', { urls: ['bad'] }), 'srv-cairo-1');
-    c['handleSaveError'](new ApiError(400, 'CORE_VALIDATION_FAILED', { other: ['bad'] }), 'srv-cairo-1');
-    expect(c['serverFieldErrors']()).toEqual({});
-    expect(c['iceServerErrors']()).toEqual({});
-    expect(errorToasts()).toEqual(['wsPhone.errors.generic']);
+  it('in-flight is not a conflict', async () => {
+    change(); api.updatePhoneServer.mockRejectedValue(new ApiError(409, 'GW.IDEM.IN_FLIGHT'));
+    await c['save'](); fixture.detectChanges();
+    expect(notify.error).toHaveBeenCalledWith('Still processing', '');
+    expect(fixture.nativeElement.querySelectorAll('ui-modal').length).toBe(1);
+    expect(close).not.toHaveBeenCalled();
   });
 
-  it('any other error is a toast through resolveError', async () => {
-    await openOn('srv-cairo-1');
-    c['handleSaveError'](new ApiError(500, 'INTERNAL_ERROR'), 'srv-cairo-1');
-    c['handleSaveError'](new Error('boom'), 'srv-cairo-1');
-    expect(errorToasts()).toEqual(['wsPhone.errors.generic']);
-  });
-});
-
-describe('ServerModal save and ICE toggle on the fake', () => {
-  it('saves a renamed server and emits saved with the fresh record', async () => {
-    await openOn('srv-cairo-1');
-    const saved = vi.fn();
-    fixture.componentInstance.saved.subscribe(saved);
-    c['nameDraft'].set('Cairo main');
-    await drive(c['save']() as Promise<void>);
-    expect(saved).toHaveBeenCalledWith(expect.objectContaining({ id: 'srv-cairo-1', name: 'Cairo main' }));
-    expect((await server('srv-cairo-1')).name).toBe('Cairo main');
+  it('mismatch uses the core mapper', async () => {
+    change(); api.updatePhoneServer.mockRejectedValue(new ApiError(422, 'GW.IDEM.MISMATCH'));
+    await c['save']();
+    expect(notify.error).toHaveBeenCalledWith('Request body changed', '');
   });
 
-  it('a server deleted elsewhere maps the save to deletedRemotely', async () => {
-    await openOn('srv-cairo-1');
-    const deleted = vi.fn();
-    fixture.componentInstance.deletedRemotely.subscribe(deleted);
-    await drive(deletePhoneServer('srv-cairo-1', newIdempotencyKey()));
-    c['nameDraft'].set('Renamed');
-    await drive(c['save']() as Promise<void>);
-    expect(deleted).toHaveBeenCalledWith('srv-cairo-1');
+  it('404 closes the modal', async () => {
+    const removed = vi.fn(); c.deletedRemotely.subscribe(removed);
+    change(); api.updatePhoneServer.mockRejectedValue(new ApiError(404, 'WEBPHONE_SERVER_NOT_FOUND'));
+    await c['save']();
+    expect(removed).toHaveBeenCalledWith(server.id); expect(close).toHaveBeenCalled(); expect(notify.error).toHaveBeenCalled();
   });
 
-  it('turning ICE off on a relay server reverts the switch and shows the relay error', async () => {
-    await openOn('srv-cairo-2');
-    await drive(c['onIceEnabledToggle'](false) as Promise<void>);
-    expect(c['relayServerError']()).toBe(true);
-    expect(c['iceEnabledDraft']()).toBe(true);
-    expect((await server('srv-cairo-2')).iceEnabled).toBe(true);
+  it('401 keeps the form', async () => {
+    change(); api.updatePhoneServer.mockRejectedValueOnce(new ApiError(401, 'GW.AUTH.EXPIRED'));
+    await c['save']();
+    expect(c['nameDraft']()).toBe('Alexandria'); expect(close).not.toHaveBeenCalled();
+    expect(notify.error).toHaveBeenCalledWith('Not saved. Try again', '');
+    await c['save']();
+    expect(api.updatePhoneServer.mock.calls[1]).toEqual(api.updatePhoneServer.mock.calls[0]);
   });
 
-  it('turning ICE off on a normal server patches it and emits serverPatched', async () => {
-    await openOn('srv-cairo-1');
-    const patched = vi.fn();
-    fixture.componentInstance.serverPatched.subscribe(patched);
-    await drive(c['onIceEnabledToggle'](false) as Promise<void>);
-    expect(c['iceEnabledDraft']()).toBe(false);
-    expect(patched).toHaveBeenCalledWith(expect.objectContaining({ id: 'srv-cairo-1', iceEnabled: false }));
+  it('STUN sends null credentials', async () => {
+    c['iceEntries'].set([structuredClone(draft)]);
+    await c['save']();
+    expect(api.createIceServer.mock.calls[0][1]).toMatchObject({ username: null, credential: null });
+  });
+
+  it('STUN updates also clear both credentials', async () => {
+    c.open({ ...server, iceServers: [ice] });
+    c['iceEntries'].update(rows => rows.map(row => ({ ...row, urlsText: 'stun:new.example.com' })));
+    await c['save']();
+    expect(api.updateIceServer.mock.calls[0][2]).toMatchObject({ username: null, credential: null });
+  });
+
+  it('ICE credential keep and clear', async () => {
+    const turn: IceEntry = { ...ice, kind: 'TURN', username: 'user', credentialConfigured: true };
+    c.open({ ...server, iceServers: [turn] });
+    c['iceEntries'].update(rows => rows.map(row => ({ ...row, urlsText: 'turn:new.example.com' })));
+    api.updateIceServer.mockResolvedValue({ ...turn, urls: ['turn:new.example.com'] });
+    await c['save']();
+    expect(api.updateIceServer.mock.calls[0][2]).not.toHaveProperty('credential');
+    c.open({ ...server, iceServers: [turn] });
+    c['iceEntries'].update(rows => rows.map(row => ({ ...row, username: '', credentialAction: 'clear' })));
+    await c['save']();
+    expect(api.updateIceServer.mock.calls[1][2]).toMatchObject({ username: null, credential: null });
+  });
+
+  it('ICE pairing error on the row', async () => {
+    c['iceEntries'].set([structuredClone(draft)]);
+    api.createIceServer.mockRejectedValue(new ApiError(400, 'WEBPHONE_ICE_CREDENTIALS_INVALID'));
+    await c['save']();
+    expect(c['iceRowErrorsMap']()[draft.uid].entry).toBeTruthy(); expect(c['activeTab']()).toBe('ice');
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('no test-' + 'connection control exists', () => {
+    fixture.detectChanges();
+    const labels = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('button')).map(button => button.textContent?.trim());
+    expect(labels.some(label => /test.*connection/i.test(label ?? ''))).toBe(false);
+    expect(Object.keys(api).some(key => /^test/i.test(key))).toBe(false);
+  });
+
+  it('read-only fields retain hints and have no Save action', () => {
+    fixture.componentRef.setInput('canManage', false);
+    for (const tab of ['connection', 'advanced', 'ice'] as const) {
+      c['activeTab'].set(tab); fixture.detectChanges();
+      for (const field of Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('ui-field'))) {
+        expect(field.querySelector('[role="tooltip"]')).not.toBeNull();
+      }
+    }
+    expect(fixture.nativeElement.querySelector('button[type="submit"]')).toBeNull();
+    expect(api.updatePhoneServer).not.toHaveBeenCalled();
   });
 });

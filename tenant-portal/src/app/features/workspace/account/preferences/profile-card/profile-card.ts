@@ -1,12 +1,11 @@
 import {
   Component,
-  DestroyRef,
   ElementRef,
   computed,
   effect,
   inject,
   input,
-  output,
+  linkedSignal,
   signal,
   untracked,
   viewChild,
@@ -15,16 +14,17 @@ import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerPhoto, tablerTrash, tablerUser } from '@ng-icons/tabler-icons';
-import { CurrentUser } from '../../../../../core/auth/current-user';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import type { TenantMe } from '../../../../../core/auth/auth-session.model';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
-import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError, errorCodeOf, fieldErrorsOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { AccountSection } from '../../shared/account-section/account-section';
-import { deleteAvatar, getAvatar, updateMyName, uploadAvatar } from '../preferences.api';
-import { AVATAR_MAX_BYTES, AVATAR_TYPES, AccountMe, NAME_MAX, OwnNamePatch } from '../preferences.model';
+import { PreferencesApi, preferencesErrorMessage } from '../preferences.api';
+import { AVATAR_MAX_BYTES, AVATAR_TYPES, NAME_MAX, OwnNamePatch } from '../preferences.model';
 
 @Component({
   selector: 'app-profile-card',
@@ -36,8 +36,8 @@ export class ProfileCard {
   private static nextId = 0;
   protected readonly uid = `profile-card-${++ProfileCard.nextId}`;
 
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly currentUser = inject(CurrentUser);
+  private readonly session = inject(AuthSession);
+  private readonly api = inject(PreferencesApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -45,8 +45,7 @@ export class ProfileCard {
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
   private readonly removePhotoDialog = viewChild.required<ConfirmDialog>('removePhotoDialog');
 
-  readonly me = input.required<AccountMe>();
-  readonly meChange = output<AccountMe>();
+  readonly me = input.required<TenantMe>();
 
   protected readonly nameMax = NAME_MAX;
 
@@ -58,13 +57,17 @@ export class ProfileCard {
   protected readonly savingName = signal(false);
   protected readonly uploadingPhoto = signal(false);
   protected readonly removingPhoto = signal(false);
-  protected readonly avatarUrl = signal<string | null>(null);
+  protected readonly avatarError = signal<string | null>(null);
+  protected readonly avatarPresent = linkedSignal(() => this.me().hasAvatar);
+  protected readonly avatarFailed = signal(false);
+  private readonly avatarRevision = signal(0);
+  protected readonly avatarUrl = computed(() =>
+    this.avatarPresent() && !this.avatarFailed() ? this.api.avatarUrl(this.avatarRevision()) : null,
+  );
+  private readonly nameErrors = signal<Record<string, string[]>>({});
 
   /** Key of the last failed name save; reused when the same patch is saved again (retry). */
-  private pendingNameKey: { key: string; patchJson: string } | null = null;
-  private currentObjectUrl: string | null = null;
-  private avatarLoadSeq = 0;
-  private destroyed = false;
+  private pendingNameKey: { key: string; bodyJson: string } | null = null;
 
   private readonly nameSyncKey = computed(() => `${this.me().firstName}\u0000${this.me().lastName}`);
 
@@ -78,6 +81,8 @@ export class ProfileCard {
 
   protected readonly firstNameError = computed(() => {
     this.i18n();
+    const serverError = this.nameErrors()['firstName'];
+    if (serverError) return serverError.join(' ') || this.transloco.translate('wsAccPrefs.errors.CORE_VALIDATION_FAILED');
     if (!this.submitted() && !this.firstNameTouched()) return null;
     if (!this.firstNameDraft().trim()) {
       return this.transloco.translate('wsAccPrefs.profile.required');
@@ -87,6 +92,8 @@ export class ProfileCard {
 
   protected readonly lastNameError = computed(() => {
     this.i18n();
+    const serverError = this.nameErrors()['lastName'];
+    if (serverError) return serverError.join(' ') || this.transloco.translate('wsAccPrefs.errors.CORE_VALIDATION_FAILED');
     if (!this.submitted() && !this.lastNameTouched()) return null;
     if (!this.lastNameDraft().trim()) {
       return this.transloco.translate('wsAccPrefs.profile.required');
@@ -109,11 +116,6 @@ export class ProfileCard {
   });
 
   constructor() {
-    this.destroyRef.onDestroy(() => {
-      this.destroyed = true;
-      this.setAvatarUrl(null);
-    });
-
     effect(() => {
       this.nameSyncKey();
       const current = untracked(() => this.me());
@@ -125,27 +127,15 @@ export class ProfileCard {
         this.submitted.set(false);
       });
     });
-
-    effect(() => {
-      const hasAvatar = this.me().hasAvatar;
-      untracked(() => {
-        if (hasAvatar) {
-          if (!this.currentObjectUrl) {
-            void this.loadAvatar();
-          }
-        } else {
-          this.avatarLoadSeq++;
-          this.setAvatarUrl(null);
-        }
-      });
-    });
   }
 
   protected onFirstNameInput(event: Event): void {
+    this.nameErrors.update(({ firstName, ...rest }) => rest);
     this.firstNameDraft.set((event.target as HTMLInputElement).value);
   }
 
   protected onLastNameInput(event: Event): void {
+    this.nameErrors.update(({ lastName, ...rest }) => rest);
     this.lastNameDraft.set((event.target as HTMLInputElement).value);
   }
 
@@ -160,44 +150,54 @@ export class ProfileCard {
     input.value = '';
     if (!file || this.uploadingPhoto() || this.removingPhoto()) return;
 
+    this.avatarError.set(null);
     if (!(AVATAR_TYPES as readonly string[]).includes(file.type)) {
-      this.notify.error(this.transloco.translate('wsAccPrefs.errors.PARTY_IMAGE_INVALID'));
+      this.avatarError.set(this.transloco.translate('wsAccPrefs.errors.PARTY_IMAGE_INVALID'));
       return;
     }
 
     if (file.size > AVATAR_MAX_BYTES) {
-      this.notify.error(this.transloco.translate('wsAccPrefs.errors.PARTY_IMAGE_TOO_LARGE'));
+      this.avatarError.set(this.transloco.translate('wsAccPrefs.errors.PARTY_IMAGE_TOO_LARGE'));
       return;
     }
 
     this.uploadingPhoto.set(true);
     try {
-      await uploadAvatar(file);
-      await this.loadAvatar();
-      this.meChange.emit({ ...this.me(), hasAvatar: true });
+      await this.api.uploadAvatar(file);
+      this.refreshAvatar(true);
+      await this.session.reloadProfile(this.session.requestVersion());
       this.notify.success(this.transloco.translate('wsAccPrefs.toast.photoSaved'));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      if (error instanceof ApiError && (error.status === 413 || error.status === 415)) {
+        const code = error.status === 413 ? 'PARTY_IMAGE_TOO_LARGE' : 'PARTY_IMAGE_INVALID';
+        this.avatarError.set(this.transloco.translate(`wsAccPrefs.errors.${code}`));
+      } else {
+        this.notify.error(preferencesErrorMessage(error, this.transloco, 'write'));
+      }
     } finally {
       this.uploadingPhoto.set(false);
     }
   }
 
   protected async requestRemovePhoto(): Promise<void> {
-    if (!this.me().hasAvatar || this.uploadingPhoto() || this.removingPhoto()) return;
+    if (!this.avatarPresent() || this.uploadingPhoto() || this.removingPhoto()) return;
 
     const confirmed = await this.removePhotoDialog().open();
     if (!confirmed) return;
 
     this.removingPhoto.set(true);
+    this.avatarError.set(null);
     try {
-      await deleteAvatar();
-      this.avatarLoadSeq++;
-      this.setAvatarUrl(null);
-      this.meChange.emit({ ...this.me(), hasAvatar: false });
+      try {
+        await this.api.deleteAvatar();
+      } catch (error) {
+        if (errorCodeOf(error) !== 'PARTY_IMAGE_NOT_FOUND') throw error;
+      }
+      this.refreshAvatar(false);
+      await this.session.reloadProfile(this.session.requestVersion());
       this.notify.success(this.transloco.translate('wsAccPrefs.toast.photoRemoved'));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      this.notify.error(preferencesErrorMessage(error, this.transloco, 'write'));
     } finally {
       this.removingPhoto.set(false);
     }
@@ -211,6 +211,8 @@ export class ProfileCard {
     this.firstNameTouched.set(false);
     this.lastNameTouched.set(false);
     this.submitted.set(false);
+    this.nameErrors.set({});
+    this.pendingNameKey = null;
   }
 
   protected async saveName(event?: Event): Promise<void> {
@@ -231,20 +233,17 @@ export class ProfileCard {
       patch.lastName = nextLast;
     }
 
+    const version = this.session.requestVersion();
     this.savingName.set(true);
+    this.nameErrors.set({});
     try {
-      const patchJson = JSON.stringify(patch);
-      if (!this.pendingNameKey || this.pendingNameKey.patchJson !== patchJson) {
-        this.pendingNameKey = { key: newIdempotencyKey(), patchJson };
+      const bodyJson = JSON.stringify(patch);
+      if (!this.pendingNameKey || this.pendingNameKey.bodyJson !== bodyJson) {
+        this.pendingNameKey = { key: newIdempotencyKey(), bodyJson };
       }
-      const updated = await updateMyName(patch, this.pendingNameKey.key);
+      const updated = await this.api.updateMyName(patch, this.pendingNameKey.key);
       this.pendingNameKey = null;
-      // PATCH users/me returns the user view without hasAvatar: keep the rest of the current me.
-      this.meChange.emit({ ...current, firstName: updated.firstName, lastName: updated.lastName, email: updated.email });
-      this.currentUser.user.set({
-        displayName: `${updated.firstName} ${updated.lastName}`.trim(),
-        email: updated.email,
-      });
+      await this.session.reloadProfile(version);
       this.firstNameDraft.set(updated.firstName);
       this.lastNameDraft.set(updated.lastName);
       this.firstNameTouched.set(false);
@@ -252,40 +251,19 @@ export class ProfileCard {
       this.submitted.set(false);
       this.notify.success(this.transloco.translate('wsAccPrefs.toast.nameSaved'));
     } catch (error) {
-      this.notify.error(this.resolveError(error));
+      const fields = fieldErrorsOf(error);
+      this.nameErrors.set(fields);
+      if ((!fields['firstName'] && !fields['lastName']) || fields['_']) {
+        this.notify.error(preferencesErrorMessage(error, this.transloco, 'write'));
+      }
     } finally {
       this.savingName.set(false);
     }
   }
 
-  private async loadAvatar(): Promise<void> {
-    const seq = ++this.avatarLoadSeq;
-    try {
-      const blob = await getAvatar();
-      if (this.destroyed || seq !== this.avatarLoadSeq) return;
-      this.setAvatarUrl(URL.createObjectURL(blob));
-    } catch {
-      if (!this.destroyed && seq === this.avatarLoadSeq) {
-        this.setAvatarUrl(null);
-      }
-    }
-  }
-
-  private setAvatarUrl(next: string | null): void {
-    if (this.currentObjectUrl) {
-      URL.revokeObjectURL(this.currentObjectUrl);
-    }
-    this.currentObjectUrl = next;
-    this.avatarUrl.set(next);
-  }
-
-  private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `wsAccPrefs.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) return translated;
-    }
-    return this.transloco.translate('wsAccPrefs.errors.generic');
+  private refreshAvatar(present: boolean): void {
+    this.avatarRevision.update((revision) => revision + 1);
+    this.avatarFailed.set(false);
+    this.avatarPresent.set(present);
   }
 }

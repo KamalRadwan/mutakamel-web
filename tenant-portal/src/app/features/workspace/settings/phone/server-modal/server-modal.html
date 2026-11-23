@@ -178,6 +178,7 @@
                   [for]="uid + '-realm'"
                   [label]="'wsPhone.modal.fields.realm' | transloco"
                   [hint]="'wsPhone.modal.fields.realmHint' | transloco"
+                  [error]="serverFieldErrors()['realm'] ?? null"
                 >
                   <input
                     [id]="uid + '-realm'"
@@ -197,6 +198,7 @@
                   [for]="uid + '-from-domain'"
                   [label]="'wsPhone.modal.fields.fromDomain' | transloco"
                   [hint]="'wsPhone.modal.fields.fromDomainHint' | transloco"
+                  [error]="serverFieldErrors()['fromDomain'] ?? null"
                 >
                   <input
                     [id]="uid + '-from-domain'"
@@ -362,7 +364,7 @@
                 <ui-field
                   [for]="uid + '-default-timeout'"
                   [label]="'wsPhone.modal.fields.defaultTimeoutSeconds' | transloco"
-                  [hint]="'wsPhone.modal.fields.defaultTimeoutSecondsHint' | transloco"
+                  [hint]="'wsPhone.defaultTimeoutHint' | transloco"
                   [error]="defaultTimeoutError()"
                 >
                   <input
@@ -386,7 +388,7 @@
                 <ui-field
                   [for]="uid + '-default-retries'"
                   [label]="'wsPhone.modal.fields.defaultMaxRetries' | transloco"
-                  [hint]="'wsPhone.modal.fields.defaultMaxRetriesHint' | transloco"
+                  [hint]="'wsPhone.defaultRetriesHint' | transloco"
                   [error]="defaultMaxRetriesError()"
                 >
                   <input
@@ -473,7 +475,7 @@
                     [describedBy]="uid + '-ice-enabled-hint'"
                     [label]="'wsPhone.modal.fields.iceEnabled' | transloco"
                     [checked]="iceEnabledDraft()"
-                    [disabled]="isReadonly() || saving() || togglingIceEnabled()"
+                    [disabled]="isReadonly() || saving()"
                     (checkedChange)="onIceEnabledToggle($event)"
                   />
                   <span class="text-12 text-text">
@@ -583,6 +585,7 @@
         </button>
       }
 
+      @if (baselineServer()) {
       <button
         type="button"
         uiButton
@@ -593,6 +596,7 @@
       >
         {{ 'wsPhone.modal.footer.delete' | transloco }}
       </button>
+      }
     } @else {
       <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'wsPhone.modal.footer.close' | transloco }}
@@ -609,37 +613,3 @@
   [confirmLabel]="'wsPhone.modal.discard.confirm' | transloco"
   [cancelLabel]="'wsPhone.modal.discard.cancel' | transloco"
 />
-
-<ui-modal
-  #conflictModal
-  size="confirm"
-  icon="tablerAlertTriangle"
-  tile="bg-icon-orange"
-  [title]="'wsPhone.modal.conflict.title' | transloco"
-  [closeLabel]="'wsPhone.modal.footer.close' | transloco"
-  [dismissable]="!conflictBusy()"
->
-  <p class="text-12 leading-18 text-text-muted">{{ 'wsPhone.modal.conflict.text' | transloco }}</p>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="primary"
-    [loading]="conflictBusy()"
-    (click)="reloadFromConflict()"
-  >
-    {{ 'wsPhone.modal.conflict.reload' | transloco }}
-  </button>
-
-  <button
-    modal-footer
-    type="button"
-    uiButton
-    variant="secondary"
-    [disabled]="conflictBusy()"
-    (click)="keepMyChangesAfterConflict()"
-  >
-    {{ 'wsPhone.modal.conflict.keepMine' | transloco }}
-  </button>
-</ui-modal>

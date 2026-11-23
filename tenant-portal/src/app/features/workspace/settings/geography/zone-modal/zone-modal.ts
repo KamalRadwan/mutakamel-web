@@ -1,29 +1,40 @@
-import { Component, ElementRef, Injector, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerPolygon } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { ApiError, errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
-import { ActionKeys, coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
-import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
 import { CityPicker } from '../city-picker/city-picker';
 import {
   GEO_LIMITS,
+  GeoAdminApi,
   GeoZone,
   GeoZoneDetail,
   UpdateGeoZoneBody,
-  createZone,
-  getZone,
   invalidCityIdsOf,
-  updateZone,
   zoneConflictsOf,
 } from '../geo-admin.api';
+import { geoErrorMessage, zonesEditable } from '../geo-admin.model';
 
 const ZONE_FIELDS = ['nameEn', 'nameAr', 'description', 'cityIds'] as const;
 
@@ -41,10 +52,18 @@ function sameCitySet(a: readonly string[], b: readonly string[]): boolean {
 @Component({
   selector: 'app-zone-modal',
   imports: [TranslocoPipe, Button, ConfirmDialog, Field, Modal, Switch, CityPicker],
+  viewProviders: [
+    provideTranslocoScope(
+      'settings',
+      { scope: 'ws-geo', alias: 'wsGeo' },
+      { scope: 'ws-geo-zones', alias: 'geoZones' },
+    ),
+  ],
   providers: [provideIcons({ tablerPolygon })],
   templateUrl: './zone-modal.html',
 })
 export class ZoneModal {
+  private readonly api = inject(GeoAdminApi);
   private static nextId = 0;
   protected readonly uid = `zone-modal-${++ZoneModal.nextId}`;
 
@@ -59,6 +78,10 @@ export class ZoneModal {
   private readonly cityPicker = viewChild.required(CityPicker);
 
   readonly canManage = input(true);
+  private readonly session = inject(AuthSession);
+  protected readonly editable = computed(
+    () => this.canManage() && zonesEditable(this.session.me()) && !this.api.zonesDenied(),
+  );
   readonly saved = output<{ zone: GeoZoneDetail; isNew: boolean }>();
   readonly deletedRemotely = output<string>();
   readonly deleteRequested = output<GeoZoneDetail>();
@@ -76,7 +99,11 @@ export class ZoneModal {
   protected readonly cityIds = signal<string[]>([]);
   protected readonly saving = signal(false);
 
-  protected readonly touched = signal<{ nameEn?: boolean; nameAr?: boolean; description?: boolean }>({});
+  protected readonly touched = signal<{
+    nameEn?: boolean;
+    nameAr?: boolean;
+    description?: boolean;
+  }>({});
   protected readonly submitted = signal(false);
   /** Already translated: our own keys, or the messages of CORE_VALIDATION_FAILED. */
   protected readonly serverErrors = signal<{
@@ -88,23 +115,23 @@ export class ZoneModal {
 
   private allowClose = false;
   private confirmingDiscard = false;
-  private readonly actionKeys = new ActionKeys(newIdempotencyKey);
-  private idempotencySignature = '';
-  private idempotencyKey = '';
+  private pendingWrite: { key: string; bodyJson: string } | null = null;
 
   protected readonly nameEnCount = computed(() => this.nameEn().trim().length);
   protected readonly nameArCount = computed(() => this.nameAr().trim().length);
   protected readonly descriptionCount = computed(() => this.description().trim().length);
 
   protected readonly dirty = computed(() => {
-    if (!this.canManage()) return false;
+    if (!this.editable()) return false;
     const en = this.nameEn().trim();
     const ar = this.nameAr().trim();
     const desc = this.description().trim();
     const cities = this.cityIds();
 
     if (this.mode() === 'create') {
-      return en.length > 0 || ar.length > 0 || desc.length > 0 || cities.length > 0 || !this.isActive();
+      return (
+        en.length > 0 || ar.length > 0 || desc.length > 0 || cities.length > 0 || !this.isActive()
+      );
     }
     const base = this.editingZone();
     if (!base) return false;
@@ -148,8 +175,7 @@ export class ZoneModal {
     this.allowClose = false;
     this.mode.set('create');
     this.editingZone.set(null);
-    this.idempotencySignature = '';
-    this.idempotencyKey = '';
+    this.pendingWrite = null;
     this.resetFields({ nameEn: '', nameAr: '', description: '', isActive: true, cityIds: [] });
     this.modal().open();
     this.cityPicker().clearConflicts();
@@ -160,6 +186,7 @@ export class ZoneModal {
   async openEdit(zone: GeoZone): Promise<void> {
     this.allowClose = false;
     this.mode.set('edit');
+    this.pendingWrite = null;
     this.editingZone.set(null);
     this.resetFields({
       nameEn: zone.nameEn,
@@ -172,7 +199,7 @@ export class ZoneModal {
     this.cityPicker().clearConflicts();
     this.loadingDetail.set(true);
     try {
-      const detail = await getZone(zone.id);
+      const detail = await this.api.getZone(zone.id);
       this.editingZone.set(detail);
       this.resetFields({
         nameEn: detail.nameEn,
@@ -183,7 +210,7 @@ export class ZoneModal {
       });
       this.focusNameEnAndReloadPicker();
     } catch (error) {
-      this.notify.error(errorMessage(error, 'geoZones', this.transloco));
+      this.notify.error(geoErrorMessage(error, 'geoZones', this.transloco));
       if (errorCodeOf(error) === 'GEO_ZONE_NOT_FOUND') this.deletedRemotely.emit(zone.id);
       this.closeImmediate();
     } finally {
@@ -245,7 +272,7 @@ export class ZoneModal {
 
   protected requestDelete(): void {
     const base = this.editingZone();
-    if (!base || this.saving() || !this.canManage()) return;
+    if (!base || this.saving() || !this.editable()) return;
     this.deleteRequested.emit(base);
   }
 
@@ -266,7 +293,7 @@ export class ZoneModal {
 
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
-    if (!this.canManage() || this.saving() || this.loadingDetail()) return;
+    if (!this.editable() || this.saving() || this.loadingDetail()) return;
 
     this.submitted.set(true);
     this.serverErrors.set({});
@@ -289,8 +316,9 @@ export class ZoneModal {
           isActive: this.isActive(),
           cityIds,
         };
-        const key = this.keyForCreateBody(body);
-        const created = await createZone(body, key);
+        const key = this.keyForBody(body);
+        const created = await this.api.createZone(body, key);
+        this.pendingWrite = null;
         this.notify.success(this.transloco.translate('geoZones.created'));
         this.saved.emit({ zone: created, isNew: true });
         this.closeImmediate();
@@ -310,9 +338,8 @@ export class ZoneModal {
 
       if (Object.keys(patch).length === 0) return;
 
-      const signature = `update:${base.id}:${JSON.stringify(patch)}`;
-      const updated = await updateZone(base.id, patch, this.actionKeys.keyFor(signature));
-      this.actionKeys.done(signature);
+      const updated = await this.api.updateZone(base.id, patch, this.keyForBody(patch));
+      this.pendingWrite = null;
       this.notify.success(this.transloco.translate('geoZones.saved'));
       this.saved.emit({ zone: updated, isNew: false });
       this.closeImmediate();
@@ -339,33 +366,41 @@ export class ZoneModal {
       const messages = fieldMessages(fields, ZONE_FIELDS);
       this.serverErrors.set(messages);
       if (messages.cityIds) this.notify.error(messages.cityIds);
-      if (hasOtherFields(fields, ZONE_FIELDS)) this.notify.error(errorMessage(error, 'geoZones', this.transloco));
+      if (hasOtherFields(fields, ZONE_FIELDS))
+        this.notify.error(geoErrorMessage(error, 'geoZones', this.transloco, true));
       return;
     }
 
     if (code === 'GEO_ZONE_CITY_CONFLICT') {
       const conflicts = zoneConflictsOf(details);
-      for (const conflict of conflicts) this.cityPicker().markConflict(conflict.cityId, conflict.zoneId);
+      for (const conflict of conflicts)
+        this.cityPicker().markConflict(conflict.cityId, conflict.zoneId);
       const first = conflicts[0];
       if (first) {
         const names = await this.cityPicker().resolveConflictNames(first.cityId, first.zoneId);
         void this.cityPicker().reloadContext();
-        const key = names.zone ? 'geoZones.errors.GEO_ZONE_CITY_CONFLICT' : 'geoZones.errors.GEO_ZONE_CITY_CONFLICT_OTHER';
+        const key = names.zone
+          ? 'geoZones.errors.GEO_ZONE_CITY_CONFLICT'
+          : 'geoZones.errors.GEO_ZONE_CITY_CONFLICT_OTHER';
         this.notify.error(
-          this.transloco.translate(key, { city: names.city, zone: names.zone ?? '', count: conflicts.length }),
+          this.transloco.translate(key, {
+            city: names.city,
+            zone: names.zone ?? '',
+            count: conflicts.length,
+          }),
         );
         return;
       }
     }
 
     if (code === 'GEO_ZONE_CITY_INVALID') {
-      for (const cityId of invalidCityIdsOf(details)) this.cityPicker().markConflict(cityId);
+      for (const cityId of invalidCityIdsOf(details)) this.cityPicker().markInvalid(cityId);
       void this.cityPicker().reloadContext();
       this.notify.error(this.transloco.translate('geoZones.errors.GEO_ZONE_CITY_INVALID'));
       return;
     }
 
-    this.notify.error(errorMessage(error, 'geoZones', this.transloco));
+    this.notify.error(geoErrorMessage(error, 'geoZones', this.transloco, true));
     if (code === 'GEO_ZONE_NOT_FOUND') {
       const id = this.editingZone()?.id;
       if (id) this.deletedRemotely.emit(id);
@@ -386,7 +421,13 @@ export class ZoneModal {
     return null;
   }
 
-  private resetFields(values: { nameEn: string; nameAr: string; description: string; isActive: boolean; cityIds: string[] }): void {
+  private resetFields(values: {
+    nameEn: string;
+    nameAr: string;
+    description: string;
+    isActive: boolean;
+    cityIds: string[];
+  }): void {
     this.isActive.set(values.isActive);
     this.nameEn.set(values.nameEn);
     this.nameAr.set(values.nameAr);
@@ -397,13 +438,11 @@ export class ZoneModal {
     this.serverErrors.set({});
   }
 
-  private keyForCreateBody(body: { nameEn: string; nameAr: string; description: string | null; isActive: boolean; cityIds: string[] }): string {
-    const signature = JSON.stringify([body.nameEn, body.nameAr, body.description, body.isActive, [...body.cityIds].sort()]);
-    if (signature !== this.idempotencySignature || !this.idempotencyKey) {
-      this.idempotencySignature = signature;
-      this.idempotencyKey = newIdempotencyKey();
-    }
-    return this.idempotencyKey;
+  private keyForBody(body: unknown): string {
+    const bodyJson = JSON.stringify(body);
+    if (this.pendingWrite?.bodyJson !== bodyJson)
+      this.pendingWrite = { key: newIdempotencyKey(), bodyJson };
+    return this.pendingWrite.key;
   }
 
   private focusNameEnAndReloadPicker(): void {

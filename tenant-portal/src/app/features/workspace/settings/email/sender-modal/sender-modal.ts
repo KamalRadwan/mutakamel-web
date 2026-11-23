@@ -1,15 +1,17 @@
+import { ApiError } from '../../../../../core/api/api-errors';
 import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerMail } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { patchEmailConfig } from '../email.api';
+import { EmailApi } from '../email.api';
 import {
   EmailConflictPayload,
   EmailResult,
@@ -35,7 +37,7 @@ type SenderField = 'fromName' | 'fromAddress' | 'replyTo' | 'senderDomain';
 
 @Component({
   selector: 'app-sender-modal',
-  imports: [TranslocoPipe, Button, Field, Modal, SettingsNotice],
+  imports: [ConfirmDialog, TranslocoPipe, Button, Field, Modal, SettingsNotice],
   providers: [provideIcons({ tablerMail })],
   templateUrl: './sender-modal.html',
 })
@@ -44,13 +46,16 @@ export class SenderModal {
   protected readonly uid = `ws-email-sender-modal-${++SenderModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly suspendConfirm = viewChild.required<ConfirmDialog>('suspendConfirm');
+  private readonly discardConfirm = viewChild.required<ConfirmDialog>('discardConfirm');
   private readonly modal = viewChild.required<Modal>('modal');
 
   readonly config = input<TenantEmailConfig | null>(null);
-  readonly revision = input<number | null>(null);
-  readonly canManage = input(true);
+  readonly etag = input<string | null>(null);
+  readonly canManage = input(false);
 
   readonly saved = output<EmailResult>();
   readonly conflict = output<EmailConflictPayload>();
@@ -73,10 +78,13 @@ export class SenderModal {
   protected readonly serverFieldErrors = signal<Partial<Record<SenderField, string>>>({});
   protected readonly topError = signal<string | null>(null);
 
-  private allowClose = false;
-  private saveOp: { fingerprint: string; key: string } | null = null;
+  private readonly opened = signal(false);
+  readonly hasUnsavedDraft = computed(() => this.opened() && this.dirty());
 
-  protected readonly isReadonly = computed(() => !this.canManage());
+  private allowClose = false;
+  private saveOp: { bodyJson: string; key: string } | null = null;
+
+  protected readonly isReadonly = computed(() => !this.canManage() || !this.api.gates().manage);
 
   protected readonly dirty = computed(() => {
     if (this.isReadonly()) return false;
@@ -104,7 +112,8 @@ export class SenderModal {
     if (server) return server;
     const value = this.fromNameDraft().trim();
     if (!value) return this.transloco.translate('wsEmail.errors.required');
-    if (value.length > 200) return this.transloco.translate('wsEmail.errors.TENANT_EMAIL_CONFIG_INVALID');
+    if (value.length > 200)
+      return this.transloco.translate('wsEmail.errors.TENANT_EMAIL_CONFIG_INVALID');
     return null;
   });
 
@@ -138,7 +147,8 @@ export class SenderModal {
     const server = this.serverFieldErrors().replyTo;
     if (server) return server;
     const value = this.replyToDraft().trim();
-    if (value && !isValidBareEmail(value)) return this.transloco.translate('wsEmail.errors.address');
+    if (value && !isValidBareEmail(value))
+      return this.transloco.translate('wsEmail.errors.address');
     return null;
   });
 
@@ -199,10 +209,19 @@ export class SenderModal {
 
     this.baseline.set(initial);
     this.applyBaseline(initial);
+    this.opened.set(true);
     this.modal().open();
   }
 
+  protected async requestClose(): Promise<void> {
+    if (this.saving()) return;
+    if (this.hasUnsavedDraft() && !(await this.discardConfirm().open())) return;
+    this.close();
+  }
+
   close(): void {
+    this.opened.set(false);
+    this.saveOp = null;
     this.allowClose = true;
     this.modal().close();
   }
@@ -213,6 +232,7 @@ export class SenderModal {
       return;
     }
     this.allowClose = false;
+    this.opened.set(false);
     this.saveOp = null;
   }
 
@@ -254,7 +274,6 @@ export class SenderModal {
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     const cfg = this.config();
-    const rev = this.revision();
     if (!cfg || this.isReadonly() || this.saving() || !this.dirty()) return;
 
     this.submitted.set(true);
@@ -266,16 +285,27 @@ export class SenderModal {
     const patch = this.buildPatch(cfg);
     if (Object.keys(patch).length === 0) return;
 
-    const key = this.keyForPatch(patch);
+    if (
+      (patch.fromAddress !== undefined || patch.senderDomain !== undefined) &&
+      !(await this.suspendConfirm().open())
+    )
+      return;
+    if (this.isReadonly()) return;
+    const etag = this.etag() ?? `"${cfg.revision}"`;
+    const key = this.keyForPatch(patch, etag);
     this.saving.set(true);
 
     try {
-      const result = await patchEmailConfig(patch, rev ?? cfg.revision, key);
+      const result = await this.api.patchEmailConfig(patch, etag, key);
       this.saveOp = null;
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
       this.saved.emit(result);
       this.close();
     } catch (error) {
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+        return;
+      }
       if (isConflictError(error)) {
         this.saveOp = null;
         this.close();
@@ -339,13 +369,13 @@ export class SenderModal {
     });
   }
 
-  private keyForPatch(patch: PatchEmailConfigRequest): string {
-    const fp = JSON.stringify(patch);
-    if (this.saveOp && this.saveOp.fingerprint === fp) {
+  private keyForPatch(patch: PatchEmailConfigRequest, etag: string): string {
+    const bodyJson = JSON.stringify([patch, etag]);
+    if (this.saveOp && this.saveOp.bodyJson === bodyJson) {
       return this.saveOp.key;
     }
     const key = newIdempotencyKey();
-    this.saveOp = { fingerprint: fp, key };
+    this.saveOp = { bodyJson, key };
     return key;
   }
 }

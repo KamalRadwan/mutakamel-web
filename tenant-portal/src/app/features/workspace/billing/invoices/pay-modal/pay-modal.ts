@@ -19,10 +19,8 @@ import {
   InvoicePaymentQuote,
   PaymentInputCurrencies,
   billingErrorMessage,
-  createPaymentIntent,
-  createPaymentQuote,
-  getActivePaymentIntent,
-  listPaymentCurrencies,
+  BillingApi,
+  ApiError,
   newIdempotencyKey,
 } from '../../billing.api';
 import { catalogueNames } from '../../shared/catalogue-names';
@@ -49,6 +47,7 @@ let nextPayModalId = 0;
   templateUrl: './pay-modal.html',
 })
 export class PayModal {
+  private readonly api = inject(BillingApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly notify = inject(Notify);
@@ -57,6 +56,7 @@ export class PayModal {
 
   private readonly modal = viewChild.required(Modal);
 
+  readonly refresh = output<void>();
   readonly paid = output<void>();
   readonly closed = output<void>();
 
@@ -74,12 +74,16 @@ export class PayModal {
   protected readonly remainingMs = signal(0);
   protected readonly quoting = signal(false);
   protected readonly paying = signal(false);
+  protected readonly currencyError = signal<string | null>(null);
+  protected readonly intentInFlight = signal(false);
+  protected readonly offlinePayment = signal(false);
+  protected readonly checking = signal(false);
 
   protected readonly formatAmount = formatAmount;
   protected readonly formatRate = formatRate;
   protected readonly formatUsd = formatUsd;
 
-  private quoteIdempotencyKey: string | null = null;
+  private intentRequest: { quoteId: string; key: string; bodyJson: string } | null = null;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private sessionSeq = 0;
 
@@ -143,6 +147,7 @@ export class PayModal {
     this.clearQuote();
     this.selectedCurrency.set('USD');
     this.step.set('loading');
+    this.offlinePayment.set(false);
     this.modal().open();
     void this.initializeSession(this.sessionSeq, invoiceId);
   }
@@ -161,6 +166,7 @@ export class PayModal {
 
   protected onCurrencyChange(currencyCode: string): void {
     if (currencyCode === this.selectedCurrency()) return;
+    this.currencyError.set(null);
     this.selectedCurrency.set(currencyCode);
     this.clearQuote();
   }
@@ -171,13 +177,23 @@ export class PayModal {
 
     const seq = this.sessionSeq;
     this.quoting.set(true);
+    this.currencyError.set(null);
     try {
-      const quote = await createPaymentQuote(id, this.selectedCurrency());
+      const quote = await this.api.createPaymentQuote(id, this.selectedCurrency());
       if (seq !== this.sessionSeq) return;
       this.setQuote(quote);
     } catch (error) {
       if (seq !== this.sessionSeq) return;
-      this.notify.error(billingErrorMessage(error, this.transloco));
+      const code = apiErrorCodeOf(error);
+      if (error instanceof ApiError && error.status === 422 && (code?.startsWith('FX_') || code === 'PAYMENT_PROVIDER_CURRENCY_UNSUPPORTED')) {
+        this.currencyError.set(billingErrorMessage(error, this.transloco, 'write'));
+      } else {
+        this.notify.error(billingErrorMessage(error, this.transloco, 'write'));
+        if (['INVOICE_NOT_PAYABLE', 'INVOICE_ALREADY_PAID', 'INVOICE_NOT_CANONICAL_USD'].includes(code ?? '')) {
+          this.refresh.emit();
+          this.close();
+        }
+      }
     } finally {
       if (seq === this.sessionSeq) {
         this.quoting.set(false);
@@ -188,17 +204,18 @@ export class PayModal {
   protected async confirmPay(): Promise<void> {
     const id = this.invoiceId();
     const q = this.quote();
-    if (!id || !q || this.paying() || this.quoting() || this.quoteExpired()) return;
+    if (!id || !q || this.paying() || this.quoting() || this.quoteExpired() || this.intentInFlight()) return;
 
     const seq = this.sessionSeq;
-    const key = (this.quoteIdempotencyKey ??= newIdempotencyKey());
+    const request = this.intentRequest;
+    if (!request || request.quoteId !== q.quoteId) return;
     this.paying.set(true);
 
     try {
-      const intent = await createPaymentIntent(id, q.quoteId, key);
+      const intent = await this.api.createPaymentIntent(id, q.quoteId, request.key);
       if (seq !== this.sessionSeq) return;
 
-      if (intent.status === 'SUCCEEDED') {
+      if (!intent.requiresExternalPayment && intent.status === 'SUCCEEDED') {
         this.notify.success(this.transloco.translate('binv.toast.paid'));
         this.paid.emit();
         this.close();
@@ -239,12 +256,17 @@ export class PayModal {
         code === 'FX_QUOTE_ALREADY_CONSUMED'
       ) {
         this.clearQuote();
-        this.notify.warning(this.transloco.translate('binv.toast.quoteChanged'));
+        this.notify.warning(this.transloco.translate('binv.pay.quoteExpired'));
+        this.paying.set(false);
+        await this.requestQuote();
       } else if (code === 'PAYMENT_INTENT_ALREADY_ACTIVE') {
+        this.notify.warning(billingErrorMessage(error, this.transloco, 'write'));
+        this.refresh.emit();
         this.step.set('loading');
         void this.initializeSession(seq, id);
       } else {
-        this.notify.error(billingErrorMessage(error, this.transloco));
+        if (code === 'GW.IDEM.IN_FLIGHT') this.intentInFlight.set(true);
+        this.notify.error(billingErrorMessage(error, this.transloco, 'write'));
       }
     } finally {
       if (seq === this.sessionSeq) {
@@ -255,7 +277,7 @@ export class PayModal {
 
   protected openCheckoutUrl(): void {
     const current = this.attempt();
-    if (!current?.checkoutUrl) return;
+    if (!current?.checkoutUrl || this.offlinePayment()) return;
 
     const opened = this.openCheckoutTab(current.checkoutUrl);
     if (!opened) {
@@ -274,10 +296,29 @@ export class PayModal {
     }
   }
 
-  protected retryPolling(): void {
+  protected async retryPolling(): Promise<void> {
     const current = this.attempt();
-    if (!current || current.recoveryAction === 'RECONCILIATION_REQUIRED') return;
-    this.startPolling(current.paymentId);
+    if (!current || current.recoveryAction === 'RECONCILIATION_REQUIRED' || this.checking()) return;
+    const seq = this.sessionSeq;
+    this.checking.set(true);
+    try {
+      const active = await this.api.getActivePaymentIntent(this.invoiceId());
+      if (seq !== this.sessionSeq) return;
+      if (active) {
+        const recovered = this.offlinePayment()
+          ? { ...active, checkoutUrl: null, recoveryAction: 'CHECK_STATUS' as const }
+          : active;
+        this.attempt.set(recovered);
+        this.pollTimedOut.set(recovered.recoveryAction === 'CHECK_STATUS');
+      } else {
+        this.refresh.emit();
+        this.close();
+      }
+    } catch (error) {
+      if (seq === this.sessionSeq) this.notify.error(billingErrorMessage(error, this.transloco));
+    } finally {
+      if (seq === this.sessionSeq) this.checking.set(false);
+    }
   }
 
   protected onModalClosed(): void {
@@ -288,7 +329,7 @@ export class PayModal {
   private async initializeSession(seq: number, invoiceId: string): Promise<void> {
     try {
       const [active] = await Promise.all([
-        getActivePaymentIntent(invoiceId),
+        this.api.getActivePaymentIntent(invoiceId),
         this.ensureCurrencies(),
       ]);
       if (seq !== this.sessionSeq) return;
@@ -312,7 +353,7 @@ export class PayModal {
   private async ensureCurrencies(): Promise<void> {
     if (this.currencies()) return;
     try {
-      const list = await listPaymentCurrencies();
+      const list = await this.api.listPaymentCurrencies();
       this.currencies.set(list);
       const base =
         list.items.find((item) => item.isBaseCurrency)?.currencyCode ??
@@ -354,12 +395,16 @@ export class PayModal {
   private handlePollEvent(event: PollEvent): void {
     switch (event.kind) {
       case 'active':
-        this.attempt.set(event.intent);
+        this.attempt.set(this.offlinePayment() ? { ...event.intent, checkoutUrl: null, recoveryAction: 'CHECK_STATUS' } : event.intent);
         if (event.intent.recoveryAction === 'RECONCILIATION_REQUIRED') {
           this.poller.stop();
         }
         break;
       case 'resolved':
+        this.offlinePayment.set(event.payment.provider === 'OFFLINE');
+        if (event.payment.provider === 'OFFLINE') {
+          this.attempt.update((active) => active ? { ...active, checkoutUrl: null, recoveryAction: 'CHECK_STATUS' } : null);
+        }
         switch (event.payment.status) {
           case 'SUCCEEDED':
             this.notify.success(this.transloco.translate('binv.toast.paid'));
@@ -391,7 +436,7 @@ export class PayModal {
         break;
       case 'timeout':
         this.pollTimedOut.set(true);
-        this.notify.info(this.transloco.translate('binv.toast.stillWaiting'));
+        this.notify.info(this.transloco.translate('bill.poll.stillProcessing'));
         break;
       case 'error':
         this.pollTimedOut.set(true);
@@ -413,7 +458,11 @@ export class PayModal {
   private setQuote(quote: InvoicePaymentQuote): void {
     this.stopCountdown();
     this.quote.set(quote);
-    this.quoteIdempotencyKey = newIdempotencyKey();
+    if (this.intentRequest?.quoteId !== quote.quoteId) {
+      this.intentRequest = { quoteId: quote.quoteId, key: newIdempotencyKey(),
+        bodyJson: JSON.stringify({ paymentQuoteId: quote.quoteId }) };
+      this.intentInFlight.set(false);
+    }
 
     const updateRemaining = () => {
       const left = Date.parse(quote.expiresAt) - Date.now();
@@ -433,7 +482,9 @@ export class PayModal {
     this.stopCountdown();
     this.quote.set(null);
     this.remainingMs.set(0);
-    this.quoteIdempotencyKey = null;
+    this.intentRequest = null;
+    this.intentInFlight.set(false);
+    this.currencyError.set(null);
   }
 
   private stopCountdown(): void {
@@ -458,6 +509,9 @@ export class PayModal {
 
   private teardown(): void {
     this.sessionSeq += 1;
+    this.paying.set(false);
+    this.quoting.set(false);
+    this.checking.set(false);
     this.poller.stop();
     this.stopCountdown();
   }

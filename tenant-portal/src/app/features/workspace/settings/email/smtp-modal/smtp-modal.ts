@@ -1,3 +1,4 @@
+import { ApiError } from '../../../../../core/api/api-errors';
 import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -9,6 +10,7 @@ import {
   tablerPlug,
 } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -16,7 +18,7 @@ import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { patchEmailConfig, verifySmtpConnection } from '../email.api';
+import { EmailApi } from '../email.api';
 import {
   EmailConflictPayload,
   EmailResult,
@@ -31,7 +33,8 @@ import {
   resolveEmailError,
 } from '../email.model';
 
-type SmtpField = 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'smtpProtocol' | 'smtpPassword' | 'smtpSecure';
+type SmtpField =
+  'smtpHost' | 'smtpPort' | 'smtpUsername' | 'smtpProtocol' | 'smtpPassword' | 'smtpSecure';
 type ProbeState = 'idle' | 'checking' | 'ok' | 'error';
 
 interface SmtpBaseline {
@@ -44,7 +47,17 @@ interface SmtpBaseline {
 
 @Component({
   selector: 'app-smtp-modal',
-  imports: [NgIcon, TranslocoPipe, Button, Dropdown, Field, Modal, SettingsNotice, Switch],
+  imports: [
+    ConfirmDialog,
+    NgIcon,
+    TranslocoPipe,
+    Button,
+    Dropdown,
+    Field,
+    Modal,
+    SettingsNotice,
+    Switch,
+  ],
   providers: [provideIcons({ tablerPlug, tablerLoader2, tablerCircleCheck, tablerCircleX })],
   templateUrl: './smtp-modal.html',
 })
@@ -53,13 +66,16 @@ export class SmtpModal {
   protected readonly uid = `ws-email-smtp-modal-${++SmtpModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly suspendConfirm = viewChild.required<ConfirmDialog>('suspendConfirm');
+  private readonly discardConfirm = viewChild.required<ConfirmDialog>('discardConfirm');
   private readonly modal = viewChild.required<Modal>('modal');
 
   readonly config = input<TenantEmailConfig | null>(null);
-  readonly revision = input<number | null>(null);
-  readonly canManage = input(true);
+  readonly etag = input<string | null>(null);
+  readonly canManage = input(false);
 
   readonly saved = output<EmailResult>();
   readonly conflict = output<EmailConflictPayload>();
@@ -89,10 +105,14 @@ export class SmtpModal {
   protected readonly serverFieldErrors = signal<Partial<Record<SmtpField, string>>>({});
   protected readonly topError = signal<string | null>(null);
 
-  private allowClose = false;
-  private saveOp: { fingerprint: string; key: string } | null = null;
+  private readonly opened = signal(false);
+  readonly hasUnsavedDraft = computed(() => this.opened() && (this.dirty() || this.switching()));
 
-  protected readonly isReadonly = computed(() => !this.canManage());
+  private allowClose = false;
+  private probeKey: string | null = null;
+  private saveOp: { bodyJson: string; key: string } | null = null;
+
+  protected readonly isReadonly = computed(() => !this.canManage() || !this.api.gates().manage);
   protected readonly busy = computed(() => this.saving() || this.probing());
 
   protected readonly portOptions: DropdownOption<SmtpPort>[] = SMTP_ALLOWED_PORTS.map((port) => ({
@@ -137,7 +157,8 @@ export class SmtpModal {
 
   protected readonly testButtonTitle = computed(() => {
     this.i18n();
-    if (this.dirty()) return this.transloco.translate('wsEmail.smtp.testNeedsSave');
+    if (this.dirty() || this.switching() || !this.hasSavedPassword())
+      return this.transloco.translate('wsEmail.smtp.testNeedsSave');
     return null;
   });
 
@@ -157,7 +178,8 @@ export class SmtpModal {
     if (server) return server;
     const value = this.usernameDraft().trim();
     if (!value) return this.transloco.translate('wsEmail.errors.required');
-    if (value.length > 320) return this.transloco.translate('wsEmail.errors.TENANT_EMAIL_CONFIG_INVALID');
+    if (value.length > 320)
+      return this.transloco.translate('wsEmail.errors.TENANT_EMAIL_CONFIG_INVALID');
     return null;
   });
 
@@ -223,7 +245,8 @@ export class SmtpModal {
   );
 
   protected readonly canSubmit = computed(
-    () => !this.isReadonly() && !this.busy() && (this.dirty() || this.switching()) && this.isValid(),
+    () =>
+      !this.isReadonly() && !this.busy() && (this.dirty() || this.switching()) && this.isValid(),
   );
 
   open(switching = false): void {
@@ -231,6 +254,7 @@ export class SmtpModal {
     if (!cfg) return;
     this.allowClose = false;
     this.saveOp = null;
+    this.probeKey = null;
     this.switching.set(switching);
 
     const protocol: SmtpProtocol = cfg.smtpProtocol ?? 'smtp';
@@ -244,10 +268,21 @@ export class SmtpModal {
 
     this.baseline.set(initial);
     this.applyBaseline(initial);
+    this.opened.set(true);
     this.modal().open();
   }
 
+  protected async requestClose(): Promise<void> {
+    if (this.busy()) return;
+    if (this.hasUnsavedDraft() && !(await this.discardConfirm().open())) return;
+    this.close();
+  }
+
   close(): void {
+    this.opened.set(false);
+    this.saveOp = null;
+    this.passwordDraft.set('');
+    this.probeKey = null;
     this.allowClose = true;
     this.modal().close();
   }
@@ -258,7 +293,10 @@ export class SmtpModal {
       return;
     }
     this.allowClose = false;
+    this.opened.set(false);
     this.saveOp = null;
+    this.passwordDraft.set('');
+    this.probeKey = null;
   }
 
   protected undo(): void {
@@ -320,7 +358,8 @@ export class SmtpModal {
     this.probeError.set(null);
 
     try {
-      await verifySmtpConnection(newIdempotencyKey());
+      await this.api.verifySmtpConnection((this.probeKey ??= newIdempotencyKey()));
+      this.probeKey = null;
       this.probeState.set('ok');
     } catch (error) {
       this.probeState.set('error');
@@ -333,7 +372,6 @@ export class SmtpModal {
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     const cfg = this.config();
-    const rev = this.revision();
     if (!cfg || this.isReadonly() || this.busy()) return;
     if (!this.dirty() && !this.switching()) return;
 
@@ -346,16 +384,23 @@ export class SmtpModal {
     const patch = this.buildPatch();
     if (Object.keys(patch).length === 0) return;
 
-    const key = this.keyForPatch(patch);
+    if (patch.providerDriver !== undefined && !(await this.suspendConfirm().open())) return;
+    if (this.isReadonly()) return;
+    const etag = this.etag() ?? `"${cfg.revision}"`;
+    const key = this.keyForPatch(patch, etag);
     this.saving.set(true);
 
     try {
-      const result = await patchEmailConfig(patch, rev ?? cfg.revision, key);
+      const result = await this.api.patchEmailConfig(patch, etag, key);
       this.saveOp = null;
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
       this.saved.emit(result);
       this.close();
     } catch (error) {
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+        return;
+      }
       if (isConflictError(error)) {
         this.saveOp = null;
         this.close();
@@ -450,13 +495,13 @@ export class SmtpModal {
     });
   }
 
-  private keyForPatch(patch: PatchEmailConfigRequest): string {
-    const fp = JSON.stringify(patch);
-    if (this.saveOp && this.saveOp.fingerprint === fp) {
+  private keyForPatch(patch: PatchEmailConfigRequest, etag: string): string {
+    const bodyJson = JSON.stringify([patch, etag]);
+    if (this.saveOp && this.saveOp.bodyJson === bodyJson) {
       return this.saveOp.key;
     }
     const key = newIdempotencyKey();
-    this.saveOp = { fingerprint: fp, key };
+    this.saveOp = { bodyJson, key };
     return key;
   }
 }

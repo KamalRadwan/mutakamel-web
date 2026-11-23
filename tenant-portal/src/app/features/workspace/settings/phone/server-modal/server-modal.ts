@@ -4,7 +4,6 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerAdjustmentsHorizontal,
-  tablerAlertTriangle,
   tablerBroadcast,
   tablerLink,
   tablerPlus,
@@ -18,19 +17,12 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError, correlationIdOf, errorCodeOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { IceEntryRow } from '../ice-entry-row/ice-entry-row';
 import { CoreFieldErrors, coreFieldErrors } from '../../core-response.model';
+import { PhoneServersApi, phoneErrorMessage } from '../phone-servers.api';
 import {
-  createIceServer,
-  deleteIceServer,
-  listPhoneServers,
-  updateIceServer,
-  updatePhoneServer,
-} from '../phone-servers.api';
-import {
-  CALLER_ID_PATTERN,
   ICE_URL_PATTERN,
   IceEntry,
   IceEntryDraft,
@@ -71,15 +63,6 @@ type StringDraftField =
   | 'defaultTimeoutSeconds'
   | 'defaultMaxRetries';
 
-/** The original write is still running (gateway GW.IDEM.IN_FLIGHT is a 409): not a data conflict. */
-const IN_FLIGHT_CODES: ReadonlySet<string> = new Set(['GW.IDEM.IN_FLIGHT', 'IDEM_IN_FLIGHT']);
-
-/** 409 answers that are not an edit conflict, so they never open the conflict dialog. */
-const NOT_A_CONFLICT_CODES: ReadonlySet<string> = new Set([
-  'WEBPHONE_PROVISIONING_PENDING',
-  'WEBPHONE_SERVER_LIMIT_REACHED',
-]);
-
 const ICE_ROW_FIELDS = ['urls', 'username', 'credential'] as const;
 type IceRowField = (typeof ICE_ROW_FIELDS)[number];
 
@@ -87,6 +70,8 @@ const SERVER_FIELD_NAMES: ReadonlySet<string> = new Set([
   'name',
   'websocketUrl',
   'sipDomain',
+  'realm',
+  'fromDomain',
   'registrarServer',
   'outboundProxy',
   'contactUri',
@@ -189,8 +174,7 @@ function iceEntriesEqual(drafts: readonly IceEntryDraft[], base: readonly IceEnt
       tablerAdjustmentsHorizontal,
       tablerBroadcast,
       tablerPlus,
-      tablerAlertTriangle,
-    }),
+        }),
   ],
   templateUrl: './server-modal.html',
 })
@@ -199,18 +183,19 @@ export class ServerModal {
   protected readonly uid = `phone-server-modal-${++ServerModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(PhoneServersApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
 
   private readonly modal = viewChild.required<Modal>('mainModal');
-  private readonly conflictModal = viewChild.required<Modal>('conflictModal');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
   private readonly tabButtons = viewChildren<ElementRef<HTMLButtonElement>>('tabBtn');
 
   readonly canManage = input(true);
 
   readonly saved = output<PhoneServer>();
+  readonly writeFailed = output<unknown>();
   readonly serverPatched = output<PhoneServer>();
   readonly deleteRequested = output<PhoneServer>();
   readonly deletedRemotely = output<string>();
@@ -223,8 +208,6 @@ export class ServerModal {
   protected readonly baselineServer = signal<PhoneServer | null>(null);
   protected readonly activeTab = signal<ServerModalTab>('connection');
   protected readonly saving = signal(false);
-  protected readonly togglingIceEnabled = signal(false);
-  protected readonly conflictBusy = signal(false);
 
   protected readonly nameDraft = signal('');
   protected readonly websocketUrlDraft = signal('');
@@ -266,7 +249,8 @@ export class ServerModal {
   protected readonly modalTitle = computed(() => {
     const liveName = this.nameDraft().trim();
     if (liveName) return liveName;
-    return this.baselineServer()?.name ?? '';
+    this.i18n();
+    return this.baselineServer()?.name ?? this.transloco.translate('wsPhone.toolbar.add');
   });
 
   protected readonly protocolValue = computed<WebsocketProtocol>(() => protocolOfUrl(this.websocketUrlDraft()));
@@ -335,7 +319,7 @@ export class ServerModal {
     if (!this.submitted() && !this.touched()['registrarServer']) return null;
     const trimmed = this.registrarServerDraft().trim();
     if (trimmed && !SIP_URI_PATTERN.test(trimmed)) {
-      return this.transloco.translate('wsPhone.validation.sipUriPattern');
+      return this.transloco.translate('wsPhone.sipOnly');
     }
     return null;
   });
@@ -347,7 +331,7 @@ export class ServerModal {
     if (!this.submitted() && !this.touched()['outboundProxy']) return null;
     const trimmed = this.outboundProxyDraft().trim();
     if (trimmed && !SIP_URI_PATTERN.test(trimmed)) {
-      return this.transloco.translate('wsPhone.validation.sipUriPattern');
+      return this.transloco.translate('wsPhone.sipOnly');
     }
     return null;
   });
@@ -358,8 +342,8 @@ export class ServerModal {
     if (server) return server;
     if (!this.submitted() && !this.touched()['contactUri']) return null;
     const trimmed = this.contactUriDraft().trim();
-    if (trimmed && /\s/.test(trimmed)) {
-      return this.transloco.translate('wsPhone.validation.contactUriPattern');
+    if (trimmed && !SIP_URI_PATTERN.test(trimmed)) {
+      return this.transloco.translate('wsPhone.sipOnly');
     }
     return null;
   });
@@ -370,8 +354,8 @@ export class ServerModal {
     if (server) return server;
     if (!this.submitted() && !this.touched()['defaultCallerId']) return null;
     const trimmed = this.defaultCallerIdDraft().trim();
-    if (trimmed && !CALLER_ID_PATTERN.test(trimmed)) {
-      return this.transloco.translate('wsPhone.validation.callerIdPattern');
+    if (trimmed.length > 64) {
+      return this.transloco.translate('wsPhone.validation.callerIdMax');
     }
     return null;
   });
@@ -419,7 +403,7 @@ export class ServerModal {
     }
     if (!this.submitted() && !this.touched()['iceTransportPolicy']) return null;
     if (
-      this.iceTransportPolicyDraft() === 'relay' &&
+      this.enabledDraft() && this.iceTransportPolicyDraft() === 'relay' &&
       (!this.iceEnabledDraft() || !hasEnabledTurn(this.iceEntries()))
     ) {
       return this.transloco.translate('wsPhone.validation.relayWithoutTurn');
@@ -480,17 +464,19 @@ export class ServerModal {
 
   protected readonly dirty = computed(() => {
     const base = this.baselineServer();
-    if (!base || this.isReadonly()) return false;
+    if (this.isReadonly()) return false;
+    if (!base) return Boolean(this.nameDraft() || this.websocketUrlDraft() || this.sipDomainDraft() || this.iceEntries().length || Object.keys(this.touched()).length);
 
     const regExp = parseRequiredInt(this.registerExpiresDraft());
-    const timeoutVal = parseOptionalInt(this.defaultTimeoutDraft());
-    const retriesVal = parseOptionalInt(this.defaultMaxRetriesDraft());
+    const timeoutVal = parseOptionalInt(this.defaultTimeoutDraft()) ?? TIMEOUT_SECONDS_DEFAULT;
+    const retriesVal = parseOptionalInt(this.defaultMaxRetriesDraft()) ?? MAX_RETRIES_DEFAULT;
 
     return (
       this.nameDraft().trim() !== base.name ||
       this.websocketUrlDraft().trim() !== base.websocketUrl ||
       this.sipDomainDraft().trim() !== base.sipDomain ||
       this.enabledDraft() !== base.enabled ||
+      this.iceEnabledDraft() !== base.iceEnabled ||
       normalizeNullableText(this.realmDraft()) !== base.realm ||
       normalizeNullableText(this.fromDomainDraft()) !== base.fromDomain ||
       normalizeNullableText(this.registrarServerDraft()) !== base.registrarServer ||
@@ -508,10 +494,10 @@ export class ServerModal {
     );
   });
 
-  open(server: PhoneServer): void {
+  open(server: PhoneServer | null = null): void {
     this.allowClose = false;
     this.opKeys.clear();
-    this.baselineServer.set(structuredClone(server));
+    this.baselineServer.set(server ? structuredClone(server) : null);
     this.applyServerToDraft(server);
     this.activeTab.set('connection');
     this.modal().open();
@@ -628,43 +614,11 @@ export class ServerModal {
     });
   }
 
-  protected async onIceEnabledToggle(next: boolean): Promise<void> {
-    const base = this.baselineServer();
-    if (!base || this.isReadonly() || this.saving() || this.togglingIceEnabled()) return;
-    if (next === base.iceEnabled) return;
-
-    const prev = base.iceEnabled;
-    this.relayServerError.set(false);
+  protected onIceEnabledToggle(next: boolean): void {
+    if (this.isReadonly() || this.saving()) return;
     this.iceEnabledDraft.set(next);
-    if (!next && this.iceTransportPolicyDraft() === 'relay') {
-      this.markTouched('iceTransportPolicy');
-    }
-    this.togglingIceEnabled.set(true);
-
-    try {
-      const key = newIdempotencyKey();
-      const updated = await updatePhoneServer(base.id, { iceEnabled: next }, key);
-      this.baselineServer.update((current) => (current ? { ...current, iceEnabled: updated.iceEnabled } : current));
-      this.iceEnabledDraft.set(updated.iceEnabled);
-      this.notify.success(
-        this.transloco.translate(updated.iceEnabled ? 'wsPhone.toasts.iceEnabled' : 'wsPhone.toasts.iceDisabled'),
-      );
-      this.serverPatched.emit(updated);
-    } catch (error) {
-      this.iceEnabledDraft.set(prev);
-      const code = errorCodeOf(error);
-      if (code === 'WEBPHONE_RELAY_WITHOUT_TURN') {
-        this.relayServerError.set(true);
-      } else if (code === 'WEBPHONE_SERVER_NOT_FOUND') {
-        this.notify.error(this.resolveError(error));
-        this.deletedRemotely.emit(base.id);
-        this.close();
-      } else {
-        this.notify.error(this.resolveError(error));
-      }
-    } finally {
-      this.togglingIceEnabled.set(false);
-    }
+    this.relayServerError.set(false);
+    this.markTouched('iceTransportPolicy');
   }
 
   protected onIceTransportPolicyChange(value: string | null): void {
@@ -718,7 +672,6 @@ export class ServerModal {
 
   protected undo(): void {
     const base = this.baselineServer();
-    if (!base) return;
     this.opKeys.clear();
     this.applyServerToDraft(base);
   }
@@ -753,42 +706,10 @@ export class ServerModal {
     this.opKeys.clear();
   }
 
-  protected async reloadFromConflict(): Promise<void> {
-    const base = this.baselineServer();
-    if (!base || this.conflictBusy()) return;
-    this.conflictBusy.set(true);
-    try {
-      const list = await listPhoneServers();
-      const fresh = list.find((s) => s.id === base.id);
-      if (!fresh) {
-        this.conflictModal().close();
-        this.notify.error(this.transloco.translate('wsPhone.errors.WEBPHONE_SERVER_NOT_FOUND'));
-        this.deletedRemotely.emit(base.id);
-        this.close();
-        return;
-      }
-      this.baselineServer.set(structuredClone(fresh));
-      this.applyServerToDraft(fresh);
-      this.opKeys.clear();
-      this.conflictModal().close();
-      this.serverPatched.emit(fresh);
-    } catch (error) {
-      this.notify.error(this.resolveError(error));
-    } finally {
-      this.conflictBusy.set(false);
-    }
-  }
-
-  protected keepMyChangesAfterConflict(): void {
-    if (this.conflictBusy()) return;
-    this.opKeys.clear();
-    this.conflictModal().close();
-  }
-
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
-    const base = this.baselineServer();
-    if (!base || this.isReadonly() || this.saving() || !this.dirty()) return;
+    let base = this.baselineServer();
+    if (this.isReadonly() || this.saving() || !this.dirty()) return;
 
     this.submitted.set(true);
     this.serverFieldErrors.set({});
@@ -801,15 +722,28 @@ export class ServerModal {
       return;
     }
 
-    const serverPatch = this.buildServerPatch(base);
-    const { created, updated, deletedIds } = this.diffIceEntries(base.iceServers);
-
     this.saving.set(true);
     try {
+      if (!base) {
+        const body = {
+          ...this.buildServerPatch(null),
+          name: this.nameDraft().trim(),
+          sipDomain: this.sipDomainDraft().trim(),
+          websocketUrl: this.websocketUrlDraft().trim(),
+        };
+        // Relay can only be enabled after its TURN rows exist under the new server id.
+        if (body.iceTransportPolicy === 'relay') body.enabled = false;
+        base = await this.api.createPhoneServer(body, this.keyFor('create-server', body));
+        this.opKeys.delete('create-server');
+        this.baselineServer.set(base);
+        this.serverPatched.emit(base);
+      }
+      const serverPatch = this.buildServerPatch(base);
+      const { created, updated, deletedIds } = this.diffIceEntries(base.iceServers);
       const switchingToAll = serverPatch.iceTransportPolicy === 'all' && base.iceTransportPolicy === 'relay';
 
       if (switchingToAll && Object.keys(serverPatch).length > 0) {
-        const patched = await updatePhoneServer(
+        const patched = await this.api.updatePhoneServer(
           base.id,
           serverPatch,
           this.keyFor('patch-server', { id: base.id, serverPatch }),
@@ -824,7 +758,7 @@ export class ServerModal {
       for (const draft of created) {
         this.savingIceUid = draft.uid;
         const body = this.toCreateIceBody(draft);
-        const createdIce = await createIceServer(
+        const createdIce = await this.api.createIceServer(
           base.id,
           body,
           this.keyFor(`create-ice:${draft.uid}`, body),
@@ -834,7 +768,7 @@ export class ServerModal {
 
       for (const item of enableFirst) {
         this.savingIceUid = item.draft.uid;
-        const savedIce = await updateIceServer(
+        const savedIce = await this.api.updateIceServer(
           base.id,
           item.id,
           item.patch,
@@ -845,7 +779,7 @@ export class ServerModal {
       this.savingIceUid = null;
 
       if (!switchingToAll && Object.keys(serverPatch).length > 0) {
-        const patched = await updatePhoneServer(
+        const patched = await this.api.updatePhoneServer(
           base.id,
           serverPatch,
           this.keyFor('patch-server', { id: base.id, serverPatch }),
@@ -855,7 +789,7 @@ export class ServerModal {
 
       for (const item of restUpdates) {
         this.savingIceUid = item.draft.uid;
-        const savedIce = await updateIceServer(
+        const savedIce = await this.api.updateIceServer(
           base.id,
           item.id,
           item.patch,
@@ -867,18 +801,19 @@ export class ServerModal {
       this.savingIceUid = null;
 
       for (const iceId of deletedIds) {
-        await deleteIceServer(base.id, iceId, this.keyFor(`delete-ice:${iceId}`, { iceId }));
+        await this.api.deleteIceServer(base.id, iceId, this.keyFor(`delete-ice:${iceId}`, { iceId }));
         this.recordDeletedIceBaseline(iceId);
       }
 
-      const freshList = await listPhoneServers();
-      const fresh = freshList.find((s) => s.id === base.id) ?? this.baselineServer()!;
+      const serverId = base.id;
+      const freshList = await this.api.listPhoneServers();
+      const fresh = freshList.find((s) => s.id === serverId) ?? this.baselineServer()!;
       this.opKeys.clear();
       this.notify.success(this.transloco.translate('wsPhone.toasts.saved'));
       this.saved.emit(fresh);
       this.close();
     } catch (error) {
-      this.handleSaveError(error, base.id);
+      this.handleSaveError(error, base?.id ?? '');
     } finally {
       this.savingIceUid = null;
       this.saving.set(false);
@@ -913,7 +848,7 @@ export class ServerModal {
     return null;
   }
 
-  private buildServerPatch(base: PhoneServer): UpdatePhoneServerPatch {
+  private buildServerPatch(base: PhoneServer | null): UpdatePhoneServerPatch {
     const patch: UpdatePhoneServerPatch = {};
     const name = this.nameDraft().trim();
     const websocketUrl = this.websocketUrlDraft().trim();
@@ -927,29 +862,30 @@ export class ServerModal {
     const defaultCallerId = normalizeNullableText(this.defaultCallerIdDraft());
     const registerExpires = parseRequiredInt(this.registerExpiresDraft());
     const sessionTimers = this.sessionTimersDraft();
-    const defaultTimeoutSeconds = parseOptionalInt(this.defaultTimeoutDraft());
-    const defaultMaxRetries = parseOptionalInt(this.defaultMaxRetriesDraft());
+    const defaultTimeoutSeconds = parseOptionalInt(this.defaultTimeoutDraft()) ?? TIMEOUT_SECONDS_DEFAULT;
+    const defaultMaxRetries = parseOptionalInt(this.defaultMaxRetriesDraft()) ?? MAX_RETRIES_DEFAULT;
     const iceTransportPolicy = this.iceTransportPolicyDraft();
     const traceSip = this.traceSipDraft();
     const allowInvalidTlsCertificate = this.allowInvalidTlsDraft();
 
-    if (name !== base.name) patch.name = name;
-    if (websocketUrl !== base.websocketUrl) patch.websocketUrl = websocketUrl;
-    if (sipDomain !== base.sipDomain) patch.sipDomain = sipDomain;
-    if (enabled !== base.enabled) patch.enabled = enabled;
-    if (realm !== base.realm) patch.realm = realm;
-    if (fromDomain !== base.fromDomain) patch.fromDomain = fromDomain;
-    if (registrarServer !== base.registrarServer) patch.registrarServer = registrarServer;
-    if (outboundProxy !== base.outboundProxy) patch.outboundProxy = outboundProxy;
-    if (contactUri !== base.contactUri) patch.contactUri = contactUri;
-    if (defaultCallerId !== base.defaultCallerId) patch.defaultCallerId = defaultCallerId;
-    if (registerExpires !== base.registerExpires) patch.registerExpires = registerExpires;
-    if (sessionTimers !== base.sessionTimers) patch.sessionTimers = sessionTimers;
-    if (defaultTimeoutSeconds !== base.defaultTimeoutSeconds) patch.defaultTimeoutSeconds = defaultTimeoutSeconds;
-    if (defaultMaxRetries !== base.defaultMaxRetries) patch.defaultMaxRetries = defaultMaxRetries;
-    if (iceTransportPolicy !== base.iceTransportPolicy) patch.iceTransportPolicy = iceTransportPolicy;
-    if (traceSip !== base.traceSip) patch.traceSip = traceSip;
-    if (allowInvalidTlsCertificate !== base.allowInvalidTlsCertificate) {
+    if (name !== base?.name) patch.name = name;
+    if (websocketUrl !== base?.websocketUrl) patch.websocketUrl = websocketUrl;
+    if (sipDomain !== base?.sipDomain) patch.sipDomain = sipDomain;
+    if (enabled !== base?.enabled) patch.enabled = enabled;
+    if (realm !== base?.realm) patch.realm = realm;
+    if (fromDomain !== base?.fromDomain) patch.fromDomain = fromDomain;
+    if (registrarServer !== base?.registrarServer) patch.registrarServer = registrarServer;
+    if (outboundProxy !== base?.outboundProxy) patch.outboundProxy = outboundProxy;
+    if (contactUri !== base?.contactUri) patch.contactUri = contactUri;
+    if (defaultCallerId !== base?.defaultCallerId) patch.defaultCallerId = defaultCallerId;
+    if (registerExpires !== base?.registerExpires) patch.registerExpires = registerExpires;
+    if (sessionTimers !== base?.sessionTimers) patch.sessionTimers = sessionTimers;
+    if (defaultTimeoutSeconds !== base?.defaultTimeoutSeconds) patch.defaultTimeoutSeconds = defaultTimeoutSeconds;
+    if (defaultMaxRetries !== base?.defaultMaxRetries) patch.defaultMaxRetries = defaultMaxRetries;
+    if (iceTransportPolicy !== base?.iceTransportPolicy) patch.iceTransportPolicy = iceTransportPolicy;
+    if (this.iceEnabledDraft() !== base?.iceEnabled) patch.iceEnabled = this.iceEnabledDraft();
+    if (traceSip !== base?.traceSip) patch.traceSip = traceSip;
+    if (allowInvalidTlsCertificate !== base?.allowInvalidTlsCertificate) {
       patch.allowInvalidTlsCertificate = allowInvalidTlsCertificate;
     }
 
@@ -997,6 +933,10 @@ export class ServerModal {
       }
 
       if (Object.keys(patch).length > 0) {
+        if (draft.kind === 'STUN') {
+          patch.username = null;
+          patch.credential = null;
+        }
         updated.push({ id: draft.id, draft, patch });
       }
     }
@@ -1008,20 +948,22 @@ export class ServerModal {
   private toCreateIceBody(draft: IceEntryDraft) {
     const urls = parseIceUrls(draft.urlsText);
     if (draft.kind === 'STUN') {
-      return { kind: 'STUN' as const, urls, enabled: draft.enabled };
+      return { kind: 'STUN' as const, urls, username: null, credential: null, enabled: draft.enabled, sortOrder: this.iceEntries().indexOf(draft) };
     }
     const username = normalizeNullableText(draft.username);
-    const cred = draft.credentialValue.trim().length > 0 ? draft.credentialValue : undefined;
+    const credential = draft.credentialValue.trim().length > 0 ? draft.credentialValue : null;
     return {
       kind: 'TURN' as const,
       urls,
-      ...(username !== null ? { username } : {}),
-      ...(cred !== undefined ? { credential: cred } : {}),
+      username,
+      credential,
       enabled: draft.enabled,
+      sortOrder: this.iceEntries().indexOf(draft),
     };
   }
 
   private mergeServerScalarBaseline(patched: PhoneServer): void {
+    this.opKeys.delete('patch-server');
     this.baselineServer.update((current) =>
       current
         ? {
@@ -1034,6 +976,7 @@ export class ServerModal {
   }
 
   private recordCreatedIceBaseline(draftUid: string, created: IceEntry): void {
+    this.opKeys.delete(`create-ice:${draftUid}`);
     this.iceEntries.update((list) =>
       list.map((item) =>
         item.uid === draftUid
@@ -1053,6 +996,7 @@ export class ServerModal {
   }
 
   private recordUpdatedIceBaseline(draftUid: string, saved: IceEntry): void {
+    this.opKeys.delete(`update-ice:${saved.id}`);
     this.iceEntries.update((list) =>
       list.map((item) =>
         item.uid === draftUid
@@ -1081,6 +1025,7 @@ export class ServerModal {
   }
 
   private recordDeletedIceBaseline(iceId: string): void {
+    this.opKeys.delete(`delete-ice:${iceId}`);
     this.baselineServer.update((current) =>
       current
         ? {
@@ -1099,20 +1044,22 @@ export class ServerModal {
       return;
     }
 
-    if (code === 'WEBPHONE_SERVER_NOT_FOUND') {
-      this.notify.error(this.resolveError(error));
+    if (error instanceof ApiError && error.status === 404) {
+      this.notify.error(this.resolveError(error), correlationIdOf(error) ?? '');
       this.deletedRemotely.emit(serverId);
       this.close();
       return;
     }
 
-    if (code && IN_FLIGHT_CODES.has(code)) {
-      this.notify.error(this.resolveError(error));
+    if (code === 'WEBPHONE_ICE_CREDENTIALS_INVALID' && this.savingIceUid) {
+      const uid = this.savingIceUid;
+      this.iceServerErrors.update(errors => ({ ...errors, [uid]: { entry: this.resolveError(error) } }));
+      this.activeTab.set('ice');
       return;
     }
-
-    if (error instanceof ApiError && error.status === 409 && !(code && NOT_A_CONFLICT_CODES.has(code))) {
-      this.conflictModal().open();
+    if (['WEBPHONE_MODULE_INACTIVE', 'TENANT_WIDE_PERMISSION_REQUIRED', 'WEBPHONE_MODULE_NOT_PURCHASED',
+      'WEBPHONE_PROVISIONING_PENDING', 'WEBPHONE_SERVER_LIMIT_REACHED'].includes(code ?? '')) {
+      this.writeFailed.emit(error);
       return;
     }
 
@@ -1122,7 +1069,7 @@ export class ServerModal {
       return;
     }
 
-    this.notify.error(this.resolveError(error));
+    this.notify.error(this.resolveError(error), correlationIdOf(error) ?? '');
   }
 
   /**
@@ -1140,88 +1087,41 @@ export class ServerModal {
       this.activeTab.set('ice');
       return;
     }
-    const field = fields.find((name) => SERVER_FIELD_NAMES.has(name));
-    if (field) {
-      this.applyServerFieldValidation(field);
-      return;
+    const visible = fields.filter(field => SERVER_FIELD_NAMES.has(field));
+    if (visible.length) {
+      this.serverFieldErrors.set(Object.fromEntries(visible.map(field => [field, errors[field][0]])));
+      this.activeTab.set(visible.some(field => ['name', 'websocketUrl', 'sipDomain'].includes(field)) ? 'connection' : 'advanced');
     }
-    this.notify.error(this.transloco.translate('wsPhone.errors.generic'));
+    if (visible.length !== fields.length) this.notify.error(this.transloco.translate('wsPhone.errors.generic'));
   }
 
   private iceFieldMessage(field: IceRowField): string {
-    switch (field) {
-      case 'urls':
-        return this.transloco.translate('wsPhone.validation.iceUrlsPattern');
-      case 'username':
-        return this.transloco.translate('wsPhone.validation.turnUsernameRequired');
-      case 'credential':
-        return this.transloco.translate('wsPhone.validation.turnCredentialRequired');
-    }
+    const keys = { urls: 'iceUrlsPattern', username: 'turnUsernameRequired', credential: 'turnCredentialRequired' };
+    return this.transloco.translate(`wsPhone.validation.${keys[field]}`);
   }
 
-  private applyServerFieldValidation(field: string): void {
-    const fieldKeyMap: Readonly<Record<string, string>> = {
-      name: 'wsPhone.validation.nameMax',
-      websocketUrl: 'wsPhone.validation.websocketUrlPattern',
-      sipDomain: 'wsPhone.validation.sipDomainPattern',
-      registrarServer: 'wsPhone.validation.sipUriPattern',
-      outboundProxy: 'wsPhone.validation.sipUriPattern',
-      contactUri: 'wsPhone.validation.contactUriPattern',
-      defaultCallerId: 'wsPhone.validation.callerIdPattern',
-      registerExpires: 'wsPhone.validation.registerExpiresRange',
-      defaultTimeoutSeconds: 'wsPhone.validation.timeoutRange',
-      defaultMaxRetries: 'wsPhone.validation.retriesRange',
-    };
-    const connectionFields = new Set(['name', 'websocketUrl', 'sipDomain']);
-    const advancedFields = new Set([
-      'registrarServer',
-      'outboundProxy',
-      'contactUri',
-      'defaultCallerId',
-      'registerExpires',
-      'defaultTimeoutSeconds',
-      'defaultMaxRetries',
-    ]);
-    const msgKey = fieldKeyMap[field];
-    const message = msgKey
-      ? this.transloco.translate(msgKey, { max: PHONE_SERVER_NAME_MAX })
-      : this.transloco.translate('wsPhone.errors.generic');
+  private applyServerToDraft(server: PhoneServer | null): void {
+    this.nameDraft.set(server?.name ?? '');
+    this.websocketUrlDraft.set(server?.websocketUrl ?? '');
+    this.sipDomainDraft.set(server?.sipDomain ?? '');
+    this.enabledDraft.set(server?.enabled ?? false);
 
-    if (connectionFields.has(field)) {
-      this.serverFieldErrors.update((prev) => ({ ...prev, [field]: message }));
-      this.activeTab.set('connection');
-      return;
-    }
-    if (advancedFields.has(field)) {
-      this.serverFieldErrors.update((prev) => ({ ...prev, [field]: message }));
-      this.activeTab.set('advanced');
-      return;
-    }
-    this.notify.error(this.transloco.translate('wsPhone.errors.generic'));
-  }
+    this.realmDraft.set(server?.realm ?? '');
+    this.fromDomainDraft.set(server?.fromDomain ?? '');
+    this.registrarServerDraft.set(server?.registrarServer ?? '');
+    this.outboundProxyDraft.set(server?.outboundProxy ?? '');
+    this.contactUriDraft.set(server?.contactUri ?? '');
+    this.defaultCallerIdDraft.set(server?.defaultCallerId ?? '');
+    this.registerExpiresDraft.set(String(server?.registerExpires ?? REGISTER_EXPIRES_DEFAULT));
+    this.sessionTimersDraft.set(server?.sessionTimers ?? true);
+    this.defaultTimeoutDraft.set(String(server?.defaultTimeoutSeconds ?? TIMEOUT_SECONDS_DEFAULT));
+    this.defaultMaxRetriesDraft.set(String(server?.defaultMaxRetries ?? MAX_RETRIES_DEFAULT));
+    this.traceSipDraft.set(server?.traceSip ?? false);
+    this.allowInvalidTlsDraft.set(server?.allowInvalidTlsCertificate ?? false);
 
-  private applyServerToDraft(server: PhoneServer): void {
-    this.nameDraft.set(server.name);
-    this.websocketUrlDraft.set(server.websocketUrl);
-    this.sipDomainDraft.set(server.sipDomain);
-    this.enabledDraft.set(server.enabled);
-
-    this.realmDraft.set(server.realm ?? '');
-    this.fromDomainDraft.set(server.fromDomain ?? '');
-    this.registrarServerDraft.set(server.registrarServer ?? '');
-    this.outboundProxyDraft.set(server.outboundProxy ?? '');
-    this.contactUriDraft.set(server.contactUri ?? '');
-    this.defaultCallerIdDraft.set(server.defaultCallerId ?? '');
-    this.registerExpiresDraft.set(String(server.registerExpires));
-    this.sessionTimersDraft.set(server.sessionTimers);
-    this.defaultTimeoutDraft.set(server.defaultTimeoutSeconds !== null ? String(server.defaultTimeoutSeconds) : '');
-    this.defaultMaxRetriesDraft.set(server.defaultMaxRetries !== null ? String(server.defaultMaxRetries) : '');
-    this.traceSipDraft.set(server.traceSip);
-    this.allowInvalidTlsDraft.set(server.allowInvalidTlsCertificate);
-
-    this.iceEnabledDraft.set(server.iceEnabled);
-    this.iceTransportPolicyDraft.set(server.iceTransportPolicy);
-    this.iceEntries.set(server.iceServers.map(toIceDraft));
+    this.iceEnabledDraft.set(server?.iceEnabled ?? false);
+    this.iceTransportPolicyDraft.set(server?.iceTransportPolicy ?? 'all');
+    this.iceEntries.set((server?.iceServers ?? []).map(toIceDraft));
 
     this.touched.set({});
     this.iceTouchedUids.set(new Set());
@@ -1264,15 +1164,6 @@ export class ServerModal {
   }
 
   private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code && IN_FLIGHT_CODES.has(code)) {
-      return this.transloco.translate('wsPhone.errors.stillProcessing');
-    }
-    if (code) {
-      const key = `wsPhone.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated !== key) return translated;
-    }
-    return this.transloco.translate('wsPhone.errors.generic');
+    return phoneErrorMessage(error, this.transloco, true);
   }
 }

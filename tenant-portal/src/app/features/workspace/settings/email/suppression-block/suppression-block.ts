@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -24,6 +24,9 @@ export class SuppressionBlock {
   private readonly i18n = translationEvents(this.transloco);
   private readonly modal = viewChild.required(SuppressionModal);
 
+  readonly canLift = input(false);
+  protected readonly serverAddressError = signal<string | null>(null);
+
   protected readonly addressDraft = signal('');
   protected readonly submitted = signal(false);
   protected readonly checking = signal(false);
@@ -31,6 +34,7 @@ export class SuppressionBlock {
 
   protected readonly addressError = computed(() => {
     this.i18n();
+    if (this.serverAddressError()) return this.serverAddressError();
     if (!this.submitted() || this.locked()) return null;
     const trimmed = this.addressDraft().trim();
     if (!trimmed || trimmed.length > 320 || !isValidBareEmail(trimmed)) {
@@ -40,6 +44,7 @@ export class SuppressionBlock {
   });
 
   protected onAddressInput(event: Event): void {
+    this.serverAddressError.set(null);
     this.addressDraft.set((event.target as HTMLInputElement).value);
     this.submitted.set(false);
     this.modal().clearResults();

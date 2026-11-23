@@ -1,28 +1,7 @@
-/*
- * Geography admin calls. Public path: /api/tenant/core/v1/geo/... (the api-gateway canonical form;
- * Core's controller path /api/v1/tenant/geo is only the gateway's upstream).
- * Core wraps each body in { success, data }; these functions return `data`.
- * Every write sends x-idempotency-key: the gateway requires it on these routes (idempotent: true in
- * the route contracts); Core geo itself does not check it. One key per user action, reused on retry.
- */
-import {
-  fakeAdminCreateCity,
-  fakeAdminCreateDistrict,
-  fakeAdminCreateZone,
-  fakeAdminDeleteCity,
-  fakeAdminDeleteDistrict,
-  fakeAdminDeleteZone,
-  fakeAdminGetCitiesByIds,
-  fakeAdminGetZone,
-  fakeAdminListCities,
-  fakeAdminListCountries,
-  fakeAdminListDistricts,
-  fakeAdminListStates,
-  fakeAdminListZones,
-  fakeAdminUpdateCity,
-  fakeAdminUpdateDistrict,
-  fakeAdminUpdateZone,
-} from './geo-admin.fake';
+import { Service, inject, signal } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { ApiError } from '../../../../core/api/api-errors';
+import { CoreHttp, type CoreWriteMethod } from '../../../../core/api/core-http';
 import {
   CityWithPath,
   CreateGeoCityBody,
@@ -42,99 +21,213 @@ import {
   UpdateGeoCityBody,
   UpdateGeoDistrictBody,
   UpdateGeoZoneBody,
+  isRejectedGeoCursor,
 } from './geo-admin.model';
 
-export { FAKE_GEO_FAIL_NEXT, FAKE_GEO_READ_ONLY, setFakeGeoFailNext, setFakeGeoReadOnly } from './geo-admin.fake';
 export * from './geo-admin.model';
+const BASE = '/api/tenant/core/v1/geo';
+type CursorResult<T> = GeoCursorPage<T> & { cursorReset?: boolean };
+type LookupRow = Omit<CityWithPath, 'stateName'> & { stateNameEn: string; stateNameAr: string };
 
-/** GET /api/tenant/core/v1/geo/countries -> { items } (active only, no paging) */
-export function listCountries(): Promise<GeoItems<GeoCountry>> {
-  return fakeAdminListCountries();
+@Service()
+export class GeoAdminApi {
+  private readonly http = inject(CoreHttp);
+  private readonly queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, networkMode: 'always', gcTime: 0 } },
+  });
+  readonly placesDenied = signal(false);
+  readonly zonesDenied = signal(false);
+
+  listCountries(): Promise<GeoItems<GeoCountry>> {
+    return this.items('countries', '/countries');
+  }
+  listStates(countryId: string): Promise<GeoItems<GeoState>> {
+    return this.items('states', `/countries/${encodeURIComponent(countryId)}/states`, countryId);
+  }
+  listCities(stateId: string, query: GeoListQuery = {}): Promise<CursorResult<GeoCity>> {
+    return this.page('cities', `/states/${encodeURIComponent(stateId)}/cities`, stateId, query);
+  }
+  listDistricts(cityId: string, query: GeoDistrictQuery = {}): Promise<CursorResult<GeoDistrict>> {
+    return this.page('districts', `/cities/${encodeURIComponent(cityId)}/districts`, cityId, query);
+  }
+  listZones(query: GeoListQuery = {}): Promise<CursorResult<GeoZone>> {
+    return this.page('zones', '/zones', '', query);
+  }
+
+  async listAllZones(): Promise<{ items: GeoZone[]; truncated: boolean }> {
+    const items: GeoZone[] = [];
+    let cursor: string | null = null;
+    for (let count = 0; count < 5; count++) {
+      const page = await this.listZones({ cursor, limit: GEO_LIMITS.pageMax });
+      if (page.cursorReset) return { items: page.items, truncated: true };
+      items.push(...page.items);
+      cursor = page.nextCursor;
+      if (!cursor) return { items, truncated: false };
+    }
+    return { items, truncated: true };
+  }
+
+  getZone(id: string): Promise<GeoZoneDetail> {
+    return this.queries.fetchQuery({
+      queryKey: ['ws-geo', 'zones', id],
+      queryFn: () => this.http.read<GeoZoneDetail>(`${BASE}/zones/${encodeURIComponent(id)}`),
+    });
+  }
+
+  async getCitiesByIds(ids: string[]): Promise<CityWithPath[]> {
+    const unique = [...new Set(ids)];
+    if (!unique.length) return [];
+    if (unique.length > GEO_LIMITS.zoneCities) throw new ApiError(400, 'CORE_VALIDATION_FAILED');
+    return this.queries.fetchQuery({
+      queryKey: ['ws-geo', 'city-lookup', [...unique].sort()],
+      queryFn: async () => {
+        // Read-like POST: CSRF is required; the gateway route accepts no idempotency key.
+        const { data } = await this.http.write<GeoItems<LookupRow>>(
+          'POST',
+          `${BASE}/cities/lookup`,
+          { ids: unique },
+        );
+        checkedItems(data);
+        if (
+          data.items.some(
+            (row) =>
+              typeof row.stateNameEn !== 'string' ||
+              typeof row.stateNameAr !== 'string' ||
+              typeof row.countryId !== 'string' ||
+              typeof row.countryIso2 !== 'string',
+          )
+        )
+          throw malformed();
+        return data.items.map(({ stateNameEn, stateNameAr, ...city }) => ({
+          ...city,
+          stateName: { en: stateNameEn, ar: stateNameAr },
+        }));
+      },
+    });
+  }
+
+  createCity(body: CreateGeoCityBody, key: string): Promise<GeoCity> {
+    return this.write('POST', 'cities', '', body, key);
+  }
+  updateCity(id: string, body: UpdateGeoCityBody, key: string): Promise<GeoCity> {
+    return this.write('PATCH', 'cities', id, body, key);
+  }
+  deleteCity(id: string, key: string): Promise<void> {
+    return this.write('DELETE', 'cities', id, undefined, key);
+  }
+
+  createDistrict(body: CreateGeoDistrictBody, key: string): Promise<GeoDistrict> {
+    return this.write('POST', 'districts', '', body, key);
+  }
+  updateDistrict(id: string, body: UpdateGeoDistrictBody, key: string): Promise<GeoDistrict> {
+    return this.write('PATCH', 'districts', id, body, key);
+  }
+  deleteDistrict(id: string, key: string): Promise<void> {
+    return this.write('DELETE', 'districts', id, undefined, key);
+  }
+
+  createZone(body: CreateGeoZoneBody, key: string): Promise<GeoZoneDetail> {
+    return this.write('POST', 'zones', '', body, key);
+  }
+  updateZone(id: string, body: UpdateGeoZoneBody, key: string): Promise<GeoZoneDetail> {
+    return this.write('PATCH', 'zones', id, body, key);
+  }
+  deleteZone(id: string, key: string): Promise<void> {
+    return this.write('DELETE', 'zones', id, undefined, key);
+  }
+
+  private items<T>(resource: string, path: string, parent = ''): Promise<GeoItems<T>> {
+    return this.queries.fetchQuery({
+      queryKey: ['ws-geo', resource, parent],
+      queryFn: async () => {
+        const data = await this.http.read<GeoItems<T>>(BASE + path);
+        checkedItems(data);
+        return data;
+      },
+    });
+  }
+
+  private async page<T>(
+    resource: string,
+    path: string,
+    parent: string,
+    query: GeoDistrictQuery,
+  ): Promise<CursorResult<T>> {
+    try {
+      return await this.queries.fetchQuery({
+        queryKey: ['ws-geo', resource, parent, query],
+        queryFn: async () => {
+          const data = await this.http.read<GeoCursorPage<T>>(BASE + path, { ...query });
+          checkedItems(data);
+          if (!(data.nextCursor === null || typeof data.nextCursor === 'string')) throw malformed();
+          return data;
+        },
+      });
+    } catch (error) {
+      if (!isRejectedGeoCursor(error, query.cursor)) throw error;
+      return {
+        ...(await this.page<T>(resource, path, parent, { ...query, cursor: null })),
+        cursorReset: true,
+      };
+    }
+  }
+
+  private async write<T>(
+    method: CoreWriteMethod,
+    resource: 'cities' | 'districts' | 'zones',
+    id: string,
+    body: unknown,
+    key: string,
+  ): Promise<T> {
+    try {
+      const result = await this.http.write<T>(
+        method,
+        `${BASE}/${resource}${id ? '/' + encodeURIComponent(id) : ''}`,
+        body,
+        { key },
+      );
+      // City names and zone membership also appear in zone details and selected-city metadata.
+      const resources =
+        resource === 'districts' ? ['districts'] : ['cities', 'zones', 'city-lookup'];
+      for (const affected of resources) {
+        const filters = { queryKey: ['ws-geo', affected] };
+        await this.queries.cancelQueries(filters);
+        await this.queries.invalidateQueries(filters);
+      }
+      return result.data;
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        error.status === 403 &&
+        error.code === 'TENANT_WIDE_PERMISSION_REQUIRED'
+      ) {
+        (resource === 'zones' ? this.zonesDenied : this.placesDenied).set(true);
+      }
+      throw error;
+    }
+  }
 }
 
-/** GET /api/tenant/core/v1/geo/countries/:countryId/states -> { items } (active only, no paging) */
-export function listStates(countryId: string): Promise<GeoItems<GeoState>> {
-  return fakeAdminListStates(countryId);
+function malformed(): ApiError {
+  return new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
 }
-
-/** GET /api/tenant/core/v1/geo/states/:stateId/cities?search&cursor&limit (inactive cities included) */
-export function listCities(stateId: string, query: GeoListQuery = {}): Promise<GeoCursorPage<GeoCity>> {
-  return fakeAdminListCities(stateId, query);
-}
-
-/** POST /api/tenant/core/v1/geo/cities (x-idempotency-key) -> 201 city */
-export function createCity(body: CreateGeoCityBody, _key: string): Promise<GeoCity> {
-  return fakeAdminCreateCity(body);
-}
-
-/** PATCH /api/tenant/core/v1/geo/cities/:id (x-idempotency-key) -> 200 city */
-export function updateCity(id: string, patch: UpdateGeoCityBody, _key: string): Promise<GeoCity> {
-  return fakeAdminUpdateCity(id, patch);
-}
-
-/** DELETE /api/tenant/core/v1/geo/cities/:id (x-idempotency-key) -> 204 */
-export function deleteCity(id: string, _key: string): Promise<void> {
-  return fakeAdminDeleteCity(id);
-}
-
-/** GET /api/tenant/core/v1/geo/cities/:cityId/districts?search&cursor&limit&kind (inactive included) */
-export function listDistricts(cityId: string, query: GeoDistrictQuery = {}): Promise<GeoCursorPage<GeoDistrict>> {
-  return fakeAdminListDistricts(cityId, query);
-}
-
-/** POST /api/tenant/core/v1/geo/districts (x-idempotency-key) -> 201 district */
-export function createDistrict(body: CreateGeoDistrictBody, _key: string): Promise<GeoDistrict> {
-  return fakeAdminCreateDistrict(body);
-}
-
-/** PATCH /api/tenant/core/v1/geo/districts/:id (x-idempotency-key) -> 200 district */
-export function updateDistrict(id: string, patch: UpdateGeoDistrictBody, _key: string): Promise<GeoDistrict> {
-  return fakeAdminUpdateDistrict(id, patch);
-}
-
-/** DELETE /api/tenant/core/v1/geo/districts/:id (x-idempotency-key) -> 204 */
-export function deleteDistrict(id: string, _key: string): Promise<void> {
-  return fakeAdminDeleteDistrict(id);
-}
-
-/** GET /api/tenant/core/v1/geo/zones?search&cursor&limit -> cursor page of zones with cityCount */
-export function listZones(query: GeoListQuery = {}): Promise<GeoCursorPage<GeoZone>> {
-  return fakeAdminListZones(query);
-}
-
-/** Every zone, page by page (zone names on city rows and in the city picker). */
-export async function listAllZones(): Promise<GeoZone[]> {
-  const zones: GeoZone[] = [];
-  let cursor: string | null = null;
-  do {
-    const page: GeoCursorPage<GeoZone> = await listZones({ cursor, limit: GEO_LIMITS.pageMax });
-    zones.push(...page.items);
-    cursor = page.nextCursor;
-  } while (cursor);
-  return zones;
-}
-
-/** GET /api/tenant/core/v1/geo/zones/:id -> zone with cities[] */
-export function getZone(id: string): Promise<GeoZoneDetail> {
-  return fakeAdminGetZone(id);
-}
-
-/** POST /api/tenant/core/v1/geo/zones (x-idempotency-key) -> 201 zone with cities[] */
-export function createZone(body: CreateGeoZoneBody, _key: string): Promise<GeoZoneDetail> {
-  return fakeAdminCreateZone(body);
-}
-
-/** PATCH /api/tenant/core/v1/geo/zones/:id (x-idempotency-key) -> 200 zone with cities[] */
-export function updateZone(id: string, patch: UpdateGeoZoneBody, _key: string): Promise<GeoZoneDetail> {
-  return fakeAdminUpdateZone(id, patch);
-}
-
-/** DELETE /api/tenant/core/v1/geo/zones/:id (x-idempotency-key) -> 204 */
-export function deleteZone(id: string, _key: string): Promise<void> {
-  return fakeAdminDeleteZone(id);
-}
-
-/** No backend route: GET /api/tenant/core/v1/geo/cities?ids=... (city chips with their state and country). */
-export function getCitiesByIds(ids: string[]): Promise<CityWithPath[]> {
-  return fakeAdminGetCitiesByIds(ids);
+function checkedItems(data: unknown): void {
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !('items' in data) ||
+    !Array.isArray(data.items) ||
+    data.items.some(
+      (row: unknown) =>
+        !row ||
+        typeof row !== 'object' ||
+        !('id' in row) ||
+        typeof row.id !== 'string' ||
+        !('nameEn' in row) ||
+        typeof row.nameEn !== 'string' ||
+        !('nameAr' in row) ||
+        typeof row.nameAr !== 'string',
+    )
+  )
+    throw malformed();
 }

@@ -1,7 +1,9 @@
 @if (!isOwner) {
   <app-billing-forbidden />
 } @else {
-  <header class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
+  <header
+    class="flex flex-wrap items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
+  >
     <div class="flex min-w-0 items-center gap-8">
       <a
         [routerLink]="['/workspace/billing/subscription']"
@@ -11,12 +13,21 @@
       >
         <ng-icon name="tablerArrowLeft" size="15" class="rtl:-scale-x-100" aria-hidden="true" />
       </a>
-      <h1 #pageHeading tabindex="-1" class="truncate text-15 leading-22 font-medium text-text outline-none">{{ 'bsub.change.title' | transloco }}</h1>
+      <h1
+        #pageHeading
+        tabindex="-1"
+        class="truncate text-15 leading-22 font-medium text-text outline-none"
+      >
+        {{ 'bsub.change.title' | transloco }}
+      </h1>
     </div>
   </header>
 
   @if (loading() && !subscription()) {
-    <div class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card" aria-busy="true">
+    <div
+      class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+      aria-busy="true"
+    >
       <span class="h-skeleton-line w-1/3 animate-pulse rounded-4 bg-neutral-soft"></span>
       @for (row of skeletonRows; track row) {
         <div class="grid grid-cols-1 gap-8 desktop:grid-cols-3">
@@ -70,8 +81,26 @@
       }
     </nav>
 
+    @if (noticeKey(); as key) {
+      <p role="status" class="text-12 leading-18 text-text-muted">{{ key | transloco }}</p>
+      @if (key === 'bsub.dunning.settleFirst') {
+        <a
+          uiButton
+          variant="secondary"
+          class="self-start"
+          [routerLink]="
+            summary()?.outstandingInvoice?.id
+              ? ['/workspace/billing/invoices', summary()!.outstandingInvoice!.id]
+              : ['/workspace/billing/invoices']
+          "
+          >{{ 'bsub.toolbar.viewInvoice' | transloco }}</a
+        >
+      }
+    }
     @if (step() === 1) {
-      <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      <section
+        class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+      >
         @if (cart().length) {
           <div class="flex flex-col gap-8">
             @for (row of cart(); track row.selectionKey; let idx = $index) {
@@ -83,12 +112,13 @@
                 [allRows]="cart()"
                 [submitted]="step1Submitted()"
                 (changed)="updateRow(idx, $event)"
-                (removed)="removeRow(idx)"
               />
             }
           </div>
         } @else {
-          <p class="rounded-8 border border-border bg-surface-muted p-16 text-center text-12 leading-18 text-text-muted">
+          <p
+            class="rounded-8 border border-border bg-surface-muted p-16 text-center text-12 leading-18 text-text-muted"
+          >
             {{ 'bsub.change.emptyCart' | transloco }}
           </p>
         }
@@ -117,15 +147,26 @@
                 type="button"
                 role="menuitem"
                 class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="addAppAvailable() ? 'cursor-pointer hover:bg-row-hover' : 'cursor-not-allowed opacity-drag-source'"
+                [class]="
+                  addAppAvailable()
+                    ? 'cursor-pointer hover:bg-row-hover'
+                    : 'cursor-not-allowed opacity-drag-source'
+                "
                 [disabled]="!addAppAvailable()"
-                [attr.title]="addAppAvailable() ? null : ('bsub.change.addMenu.noAppsLeft' | transloco)"
+                [attr.title]="
+                  addAppAvailable() ? null : ('bsub.change.addMenu.noAppsLeft' | transloco)
+                "
                 (click)="addRow('add-app')"
               >
-                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon"
+                >
                   <ng-icon name="tablerPlus" size="14" aria-hidden="true" />
                 </span>
-                <span class="text-12 font-medium" [class]="addAppAvailable() ? 'text-text' : 'text-text-placeholder'">
+                <span
+                  class="text-12 font-medium"
+                  [class]="addAppAvailable() ? 'text-text' : 'text-text-placeholder'"
+                >
                   {{ 'bsub.change.addMenu.addApp' | transloco }}
                 </span>
               </button>
@@ -134,15 +175,26 @@
                 type="button"
                 role="menuitem"
                 class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="changeSeatsAvailable() ? 'cursor-pointer hover:bg-row-hover' : 'cursor-not-allowed opacity-drag-source'"
+                [class]="
+                  changeSeatsAvailable()
+                    ? 'cursor-pointer hover:bg-row-hover'
+                    : 'cursor-not-allowed opacity-drag-source'
+                "
                 [disabled]="!changeSeatsAvailable()"
-                [attr.title]="changeSeatsAvailable() ? null : ('bsub.change.addMenu.noItemsLeft' | transloco)"
+                [attr.title]="
+                  changeSeatsAvailable() ? null : ('bsub.change.addMenu.noItemsLeft' | transloco)
+                "
                 (click)="addRow('change-seats')"
               >
-                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+                >
                   <ng-icon name="tablerUsers" size="14" aria-hidden="true" />
                 </span>
-                <span class="text-12 font-medium" [class]="changeSeatsAvailable() ? 'text-text' : 'text-text-placeholder'">
+                <span
+                  class="text-12 font-medium"
+                  [class]="changeSeatsAvailable() ? 'text-text' : 'text-text-placeholder'"
+                >
                   {{ 'bsub.change.addMenu.changeSeats' | transloco }}
                 </span>
               </button>
@@ -151,15 +203,26 @@
                 type="button"
                 role="menuitem"
                 class="flex w-full items-center gap-8 rounded-6 px-8 py-6 text-start outline-none transition-colors duration-fast focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
-                [class]="upgradeTierAvailable() ? 'cursor-pointer hover:bg-row-hover' : 'cursor-not-allowed opacity-drag-source'"
+                [class]="
+                  upgradeTierAvailable()
+                    ? 'cursor-pointer hover:bg-row-hover'
+                    : 'cursor-not-allowed opacity-drag-source'
+                "
                 [disabled]="!upgradeTierAvailable()"
-                [attr.title]="upgradeTierAvailable() ? null : ('bsub.change.addMenu.noUpgradesLeft' | transloco)"
+                [attr.title]="
+                  upgradeTierAvailable() ? null : ('bsub.change.addMenu.noUpgradesLeft' | transloco)
+                "
                 (click)="addRow('upgrade-tier')"
               >
-                <span class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+                <span
+                  class="inline-flex size-icon-tile-sm shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+                >
                   <ng-icon name="tablerTrendingUp" size="14" aria-hidden="true" />
                 </span>
-                <span class="text-12 font-medium" [class]="upgradeTierAvailable() ? 'text-text' : 'text-text-placeholder'">
+                <span
+                  class="text-12 font-medium"
+                  [class]="upgradeTierAvailable() ? 'text-text' : 'text-text-placeholder'"
+                >
                   {{ 'bsub.change.addMenu.upgradeTier' | transloco }}
                 </span>
               </button>
@@ -207,13 +270,94 @@
         </footer>
       </section>
     } @else if (step() === 2) {
-      <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      <section
+        class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+      >
         @if (reviewPhase() === 'preparing' || reviewPhase() === 'quoting') {
-          <div class="flex flex-col items-center justify-center gap-8 p-16 text-center" role="status" aria-live="polite" aria-busy="true">
-            <ng-icon name="tablerLoader2" size="20" class="animate-spin text-brand-text" aria-hidden="true" />
+          <div
+            class="flex flex-col items-center justify-center gap-8 p-16 text-center"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <ng-icon
+              name="tablerLoader2"
+              size="20"
+              class="animate-spin text-brand-text"
+              aria-hidden="true"
+            />
             <p class="text-13 leading-18 font-medium text-text">
-              {{ (reviewPhase() === 'preparing' ? 'bsub.change.preparing' : 'bsub.change.quoting') | transloco }}
+              {{
+                (reviewPhase() === 'preparing' ? 'bsub.change.preparing' : 'bsub.change.quoting')
+                  | transloco
+              }}
             </p>
+          </div>
+        } @else if (
+          reviewPhase() === 'blocked' ||
+          reviewPhase() === 'review' ||
+          reviewPhase() === 'aborted' ||
+          reviewPhase() === 'timeout' ||
+          reviewPhase() === 'quote-error'
+        ) {
+          <div
+            class="flex flex-col items-center justify-center gap-8 p-16 text-center"
+            role="status"
+          >
+            <span
+              class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+            >
+              <ng-icon name="tablerAlertTriangle" size="18" aria-hidden="true" />
+            </span>
+            @switch (reviewPhase()) {
+              @case ('blocked') {
+                <p class="text-13 leading-18 font-medium text-text">{{ operationReason() }}</p>
+                <button
+                  uiButton
+                  type="button"
+                  [loading]="recovering()"
+                  [disabled]="recovering()"
+                  (click)="recover()"
+                >
+                  {{ 'bsub.operation.recover' | transloco }}
+                </button>
+              }
+              @case ('review') {
+                <p class="text-13 leading-18 font-medium text-text">
+                  {{ 'bsub.operation.review' | transloco }}
+                </p>
+              }
+              @case ('aborted') {
+                <button uiButton type="button" (click)="startAgain()">
+                  {{ 'bsub.operation.startAgain' | transloco }}
+                </button>
+              }
+              @case ('quote-error') {
+                <button
+                  uiButton
+                  type="button"
+                  [loading]="refreshingQuote()"
+                  [disabled]="refreshingQuote()"
+                  (click)="refreshQuote()"
+                >
+                  {{ 'bsub.change.refreshPrice' | transloco }}
+                </button>
+              }
+              @case ('timeout') {
+                <p class="text-13 leading-18 font-medium text-text">
+                  {{ 'bill.poll.stillProcessing' | transloco }}
+                </p>
+                <button
+                  uiButton
+                  type="button"
+                  [loading]="recovering()"
+                  [disabled]="recovering()"
+                  (click)="checkOperation()"
+                >
+                  {{ 'bill.poll.checkNow' | transloco }}
+                </button>
+              }
+            }
           </div>
         } @else if (preview(); as currentPreview) {
           <app-quote-view
@@ -227,6 +371,41 @@
           />
         }
 
+        @if (receiptState() === 'failed') {
+          <div
+            role="status"
+            class="flex flex-wrap items-center gap-8 text-12 leading-18 text-text-muted"
+          >
+            <span>{{ receiptError() }}</span>
+            <button uiButton type="button" variant="secondary" (click)="retryReceipt()">
+              {{ 'bill.common.retry' | transloco }}
+            </button>
+          </div>
+        } @else if (applyConflict()) {
+          <button
+            uiButton
+            type="button"
+            variant="secondary"
+            class="self-start"
+            (click)="retryReceipt()"
+          >
+            {{ 'bill.poll.checkNow' | transloco }}
+          </button>
+        } @else if (receiptState() === 'checking') {
+          <p role="status" class="text-12 leading-18 text-text-muted">
+            {{ 'bill.poll.stillProcessing' | transloco }}
+          </p>
+        }
+        @if (walletRefused()) {
+          <a
+            uiButton
+            variant="secondary"
+            class="self-start"
+            [routerLink]="['/workspace/billing/overview']"
+            [queryParams]="{ topup: 1 }"
+            >{{ 'bsub.change.topUpWallet' | transloco }}</a
+          >
+        }
         <footer class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
           @if (preview() && quoteExpired()) {
             <button
@@ -234,35 +413,48 @@
               uiButton
               variant="primary"
               [loading]="refreshingQuote()"
-              [disabled]="refreshingQuote() || cancelling()"
+              [disabled]="
+                refreshingQuote() ||
+                cancelling() ||
+                receiptState() === 'checking' ||
+                receiptState() === 'failed' ||
+                applyConflict()
+              "
               (click)="refreshQuote()"
             >
               <ng-icon name="tablerRefresh" size="15" aria-hidden="true" />
               {{ 'bsub.change.refreshPrice' | transloco }}
             </button>
-          } @else if (canConfirmApply()) {
+          } @else if (preview() && reviewPhase() === 'quoted') {
             <button
               type="button"
               uiButton
               variant="primary"
               [loading]="applying()"
-              [disabled]="applying() || cancelling() || refreshingQuote()"
+              [disabled]="!canConfirmApply() || applying() || cancelling() || refreshingQuote()"
               (click)="confirmApply()"
             >
               {{ 'bsub.change.confirmBtn' | transloco }}
             </button>
           }
 
-          <button
-            type="button"
-            uiButton
-            variant="secondary"
-            [loading]="cancelling()"
-            [disabled]="cancelling() || applying()"
-            (click)="goBackToStep1()"
-          >
-            {{ 'bill.common.back' | transloco }}
-          </button>
+          @if (
+            reviewPhase() !== 'review' &&
+            receiptState() !== 'failed' &&
+            receiptState() !== 'checking' &&
+            !applyConflict()
+          ) {
+            <button
+              type="button"
+              uiButton
+              variant="secondary"
+              [loading]="cancelling()"
+              [disabled]="cancelling() || applying() || recovering()"
+              (click)="goBackToStep1()"
+            >
+              {{ 'bill.common.back' | transloco }}
+            </button>
+          }
 
           <span class="ms-auto text-12 leading-18 text-text-muted tabular-nums">
             {{ 'bsub.change.stepCounter' | transloco: stepCounterParams() }}
@@ -270,13 +462,23 @@
         </footer>
       </section>
     } @else if (step() === 3 && receipt(); as doneReceipt) {
-      <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+      <section
+        class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+      >
         <div class="flex items-start gap-10 rounded-8 border border-border bg-surface-muted p-12">
-          <span class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+          <span
+            class="inline-flex size-icon-tile-lg shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon"
+          >
             <ng-icon name="tablerCircleCheck" size="18" aria-hidden="true" />
           </span>
           <div class="flex min-w-0 flex-1 flex-col gap-4">
-            <h2 #doneHeading tabindex="-1" class="text-16 leading-24 font-medium text-text outline-none">{{ 'bsub.change.done.title' | transloco }}</h2>
+            <h2
+              #doneHeading
+              tabindex="-1"
+              class="text-16 leading-24 font-medium text-text outline-none"
+            >
+              {{ 'bsub.change.done.title' | transloco }}
+            </h2>
 
             <p class="text-13 leading-18 text-text">
               {{ 'bsub.change.done.newRecurring' | transloco }}:
@@ -286,17 +488,30 @@
               <span class="text-text-muted">{{ receiptCycleUnitKey() | transloco }}</span>
             </p>
 
+            @if (doneReceipt.projection.state === 'PENDING') {
+              <p class="text-12 leading-18 text-text-muted">
+                {{ 'bsub.receipt.settingUp' | transloco }}
+              </p>
+            }
             @if (doneReceipt.settlement; as settle) {
               <p class="text-12 leading-18 text-text-muted tabular-nums">
                 @if (settle.direction === 'DEBIT') {
                   {{
                     'bsub.change.done.settlementDebit'
-                      | transloco: { amount: formatUsd(settle.amountUsd), balance: formatUsd(settle.balanceAfterUsd) }
+                      | transloco
+                        : {
+                            amount: formatUsd(settle.amountUsd),
+                            balance: formatUsd(settle.balanceAfterUsd),
+                          }
                   }}
                 } @else {
                   {{
                     'bsub.change.done.settlementCredit'
-                      | transloco: { amount: formatUsd(settle.amountUsd), balance: formatUsd(settle.balanceAfterUsd) }
+                      | transloco
+                        : {
+                            amount: formatUsd(settle.amountUsd),
+                            balance: formatUsd(settle.balanceAfterUsd),
+                          }
                   }}
                 }
               </p>

@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { formatAmount, formatUnitPrice, formatUsd, isGreater, isZero } from './money';
+import { formatAmount, formatRate, formatUnitPrice, formatUsd, isGreater, isZero } from './money';
 
 const MINUS = '−';
+
+it('money formatters keep their output', () => {
+  expect(formatAmount('12500.0000', 'EGP')).toBe('EGP 12,500');
+  expect(formatAmount('12500.5000', 'EGP')).toBe('EGP 12,500.50');
+  expect(formatUsd('99999999999999.9999')).toBe('USD 100,000,000,000,000');
+  expect(formatAmount(null, 'EGP')).toBe('—');
+  expect(formatUnitPrice('12500.5000', 'EGP')).toBe('EGP 12,500.50');
+  expect(formatUnitPrice('12500.5001', 'EGP')).toBe('EGP 12,500.5001');
+  expect(formatRate('48.12345')).toBe('48.1235');
+  expect(formatRate('999.99995')).toBe('1,000.0000');
+  expect(formatRate('-0.00001')).toBe('0.0000');
+});
+
+it('money comparisons handle decimal strings', () => {
+  expect(isZero('0.0000')).toBe(true);
+  expect(isZero('-1.0000')).toBe(false);
+  expect(isZero('0000.0000')).toBe(true);
+  expect(isGreater('10.0000', '9.9999')).toBe(true);
+  expect(isGreater('00010.0000', '0009.9999')).toBe(true);
+  expect(isGreater('-1.0000', '0.0000')).toBe(false);
+  expect(isGreater('0000.0000', '-0.0000')).toBe(false);
+});
 
 describe('isGreater', () => {
   it('returns true when the integer part is larger', () => {

@@ -45,16 +45,6 @@ export interface NotificationQuery {
   unreadOnly?: boolean;
 }
 
-/** `NotificationRuntimeConfig` from `GET tenant/notifications/config`. */
-export interface NotificationRuntimeConfig {
-  enabled: boolean;
-  inAppEnabled: boolean;
-  realtimeEnabled: boolean;
-  previewLimit: number;
-  pollIntervalMs: number;
-  preferenceCatalogue: { notificationType: string; inAppEnabled: boolean }[];
-}
-
 export interface NotificationUnreadCount {
   unreadCount: number;
 }

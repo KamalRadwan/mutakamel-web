@@ -1,4 +1,7 @@
 import type { CorePage } from '../core-response.model';
+import type { TenantMe } from '../../../../core/auth/auth-session.model';
+import { hasTenantWidePermission } from '../../../../core/auth/tenant-wide-permission';
+import type { WorkspaceCompany } from '../../../../shared/widgets/workspace-lookups/workspace-lookups.model';
 
 export interface NumberingSequence {
   id: string;
@@ -12,6 +15,7 @@ export interface NumberingSequence {
 }
 
 export interface NumberingListQuery {
+  code?: string;
   page?: number;
   limit?: number;
   sortBy?: 'code' | 'nextValue' | 'createdAt';
@@ -47,8 +51,7 @@ export interface NumberingPeek {
 
 export interface CompanyOption {
   id: string;
-  nameEn: string;
-  nameAr: string;
+  label: string;
   active: boolean;
 }
 
@@ -105,9 +108,17 @@ export function canManageScope(access: NumberingAccess, companyId: string | null
   if (normalizedCompanyId === null) {
     return access.tenantWideManage;
   }
-  return access.manageCompanyIds.includes(normalizedCompanyId);
+  return access.tenantWideManage || access.manageCompanyIds.includes(normalizedCompanyId);
 }
 
-export function companyNameIn(company: CompanyOption, lang: 'ar' | 'en'): string {
-  return lang === 'ar' ? company.nameAr : company.nameEn;
+export function numberingAccess(me: TenantMe | null | undefined): NumberingAccess {
+  return {
+    tenantWideManage: hasTenantWidePermission(me, 'numbering.manage'),
+    manageCompanyIds: me?.permissions.includes('numbering.manage')
+      ? me.permissionScopes['numbering.manage']?.companyIds ?? [] : [],
+  };
+}
+
+export function companyOption(company: WorkspaceCompany): CompanyOption {
+  return { id: company.id, label: company.name, active: company.status === 'ACTIVE' };
 }

@@ -1,6 +1,8 @@
 <section class="flex flex-col gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
   <div class="flex items-center gap-8">
-    <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon">
+    <span
+      class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-red text-on-icon"
+    >
       <ng-icon name="tablerMailOff" size="15" aria-hidden="true" />
     </span>
     <h2 class="text-13 leading-18 font-medium text-text">
@@ -26,6 +28,7 @@
         [error]="addressError()"
       >
         <input
+          [attr.aria-describedby]="uid + '-address' + '-hint'"
           [id]="uid + '-address'"
           type="email"
           dir="ltr"
@@ -52,13 +55,17 @@
         [loading]="checking()"
         [disabled]="locked() || checking()"
       >
-        {{ (checking() ? 'wsEmail.suppression.checking' : 'wsEmail.suppression.check') | transloco }}
+        {{
+          (checking() ? 'wsEmail.suppression.checking' : 'wsEmail.suppression.check') | transloco
+        }}
       </button>
     </div>
   </form>
 </section>
 
 <app-suppression-modal
+  [canLift]="canLift()"
+  (addressError)="serverAddressError.set($event)"
   (busyChange)="checking.set($event)"
   (forbidden)="onForbidden()"
 />

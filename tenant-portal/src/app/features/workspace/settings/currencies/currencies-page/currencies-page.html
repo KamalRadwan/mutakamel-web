@@ -1,6 +1,6 @@
 <app-settings-frame
   [addLabel]="'wsCurrencies.new' | transloco"
-  [showAdd]="canManage"
+  [showAdd]="canManage()"
   [searchPlaceholder]="'wsCurrencies.search' | transloco"
   [loading]="loading()"
   [(search)]="search"
@@ -8,6 +8,9 @@
   (reload)="reload()"
 >
   <div notices class="flex flex-col gap-8">
+    @if (permissions().readable && !canManage()) {
+      <app-settings-notice tone="info">{{ 'wsCurrencies.readOnly' | transloco }}</app-settings-notice>
+    }
     @if (showDefaultUnknown()) {
       <app-settings-notice tone="warning">
         {{ 'wsCurrencies.base.unknown' | transloco }}
@@ -82,7 +85,7 @@
         <div
           role="row"
           class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
-          [class]="gridColumns"
+          [class]="gridColumns()"
         >
           <span role="columnheader" [attr.aria-sort]="ariaSortFor('code')" class="flex min-w-0 items-center px-10">
             <button
@@ -145,7 +148,7 @@
             {{ 'wsCurrencies.table.status' | transloco }}
           </span>
 
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="border-s border-on-nav-line">
               <span class="sr-only">{{ 'settings.common.actions' | transloco }}</span>
             </span>
@@ -157,7 +160,7 @@
             <div
               role="row"
               class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
-              [class]="gridColumns"
+              [class]="gridColumns()"
               aria-hidden="true"
             >
               <span role="cell" class="flex items-center gap-8 px-10">
@@ -176,7 +179,7 @@
               <span role="cell" class="flex items-center border-s border-border px-10">
                 <span class="h-badge w-time-dd rounded-8 bg-neutral-soft"></span>
               </span>
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center border-s border-border">
                   <span class="size-icon-tile-sm rounded-6 bg-neutral-soft"></span>
                 </span>
@@ -188,7 +191,7 @@
             <div
               role="row"
               class="mt-6 grid h-table-row cursor-pointer rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card transition-colors duration-fast hover:bg-row-hover"
-              [class]="gridColumns"
+              [class]="gridColumns()"
               (click)="onRowClick(currency, $event)"
             >
               <span role="cell" class="flex min-w-0 items-center gap-8 px-10">
@@ -236,7 +239,7 @@
                 }
               </span>
 
-              @if (canManage) {
+              @if (canManage()) {
                 <span
                   role="cell"
                   data-row-action
@@ -257,7 +260,7 @@
               class="mt-6 flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
             >
               <span role="cell" class="text-12 text-text-muted">
-                {{ (hasActiveFilters() ? 'wsCurrencies.emptyFiltered' : 'wsCurrencies.empty') | transloco }}
+                {{ (hasActiveFilters() ? 'wsCurrencies.emptyFiltered' : 'wsCurrencies.addFirst') | transloco }}
               </span>
               @if (hasActiveFilters()) {
                 <button type="button" uiButton variant="ghost" size="small" (click)="clearFilters()">
@@ -284,7 +287,7 @@
 </app-settings-frame>
 
 <app-currency-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
   [defaultCurrency]="defaultCurrency()"
   [hasCurrencies]="hasCurrencies()"
   (saved)="onModalSaved()"

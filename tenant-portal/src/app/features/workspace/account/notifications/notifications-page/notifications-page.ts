@@ -11,10 +11,10 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { AccountSection } from '../../shared/account-section/account-section';
-import { listNotificationPreferences, upsertNotificationPreference } from '../notifications.api';
+import { NotificationPreferencesApi, notificationsErrorMessage } from '../notifications.api';
 import {
   NOTIFICATION_GROUPS,
   effectivePreferences,
@@ -43,6 +43,7 @@ export class NotificationsPage {
 
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
+  private readonly api = inject(NotificationPreferencesApi);
 
   protected readonly groups = NOTIFICATION_GROUPS;
   protected readonly skeletonCards = [0, 1, 2] as const;
@@ -63,12 +64,19 @@ export class NotificationsPage {
     this.loading.set(true);
     this.loadFailed.set(false);
     try {
-      const rows = await listNotificationPreferences();
+      const rows = await this.api.listNotificationPreferences();
       if (seq !== this.loadSeq) return;
       this.values.set(effectivePreferences(rows));
-    } catch {
+      this.notify.connectionRestored();
+    } catch (error) {
       if (seq !== this.loadSeq) return;
       this.loadFailed.set(true);
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(
+          this.transloco.translate('session.connectionLost.title'),
+          this.transloco.translate('session.connectionLost.text'),
+        );
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -97,7 +105,7 @@ export class NotificationsPage {
 
     try {
       // One toggle is one user action: a fresh key per toggle (a failed toggle reverts, so there is no retry).
-      const saved = await upsertNotificationPreference(
+      const saved = await this.api.upsertNotificationPreference(
         { notificationType: type, inAppEnabled: next },
         newIdempotencyKey(),
       );
@@ -105,7 +113,7 @@ export class NotificationsPage {
       this.notify.success(this.transloco.translate('wsAccNotif.toast.saved'));
     } catch (error) {
       this.values.update((current) => ({ ...current, [type]: previous }));
-      this.notify.error(this.resolveError(error));
+      this.notify.error(notificationsErrorMessage(error, 'wsAccNotif', this.transloco, 'write'));
     } finally {
       this.setPending(type, false);
     }
@@ -118,17 +126,5 @@ export class NotificationsPage {
       else next.delete(type);
       return next;
     });
-  }
-
-  private resolveError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const key = `wsAccNotif.errors.${code}`;
-      const translated = this.transloco.translate(key);
-      if (translated && translated !== key) {
-        return translated;
-      }
-    }
-    return this.transloco.translate('wsAccNotif.errors.generic');
   }
 }

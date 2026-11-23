@@ -86,4 +86,8 @@ export class BrandingPreviewModal {
       this.previewTheme.set(value);
     }
   }
+
+  protected imageFailed(kind: 'logoUrl' | 'iconUrl'): void {
+    this.values.update((values) => ({ ...values, [kind]: null }));
+  }
 }

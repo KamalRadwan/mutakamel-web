@@ -1,11 +1,14 @@
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
-import { Button } from '../../../../../shared/ui/button/button';
 import { Pagination } from '../../../../../shared/ui/pagination/pagination';
-import { LedgerReason, WalletLedgerEntry, correlationIdOf, listWalletLedger } from '../../billing.api';
+import { BillingApi, billingErrorMessage } from '../../billing.api';
+import type { LedgerReason, WalletLedgerEntry } from '../../billing.model';
+import { ApiError, correlationIdOf } from '../../../../../core/api/api-errors';
+import { TranslocoService } from '@jsverse/transloco';
+import { Notify } from '../../../../../core/notify/notify';
+import { BillingFailed } from '../../shared/billing-failed/billing-failed';
+import { BillingForbidden } from '../../shared/billing-forbidden/billing-forbidden';
 import { BillingBadge, ledgerReasonBadge } from '../../shared/billing-badges';
 import { formatAmount, formatUsd, isZero } from '../../shared/money';
 import { formatBillingDate } from '../overview-dates';
@@ -15,12 +18,15 @@ const PAGE_SIZES = [20, 50, 100];
 
 @Component({
   selector: 'app-billing-ledger-table',
-  imports: [NgIcon, TranslocoPipe, Button, Pagination],
-  providers: [provideIcons({ tablerAlertTriangle })],
+  imports: [TranslocoPipe, Pagination, BillingFailed, BillingForbidden],
   templateUrl: './ledger-table.html',
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8' },
 })
 export class LedgerTable {
+  private readonly api = inject(BillingApi);
+  private readonly notify = inject(Notify);
+  private readonly transloco = inject(TranslocoService);
+  protected readonly forbidden = signal(false);
   private readonly language = inject(LanguageState).current;
 
   readonly reloadToken = input(0);
@@ -95,12 +101,17 @@ export class LedgerTable {
     this.correlationId.set(null);
 
     try {
-      const res = await listWalletLedger({ page, limit });
+      const res = await this.api.listWalletLedger({ page, limit });
       if (seq !== this.loadSeq) return;
-      this.items.set(res.items);
+      this.items.set(res.data);
+      this.notify.connectionRestored();
       this.total.set(res.meta.total);
     } catch (error) {
       if (seq !== this.loadSeq) return;
+      if (error instanceof ApiError && error.code === 'TENANT_OWNER_REQUIRED') this.forbidden.set(true);
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(billingErrorMessage(error, this.transloco, 'read'), '');
+      }
       this.loadFailed.set(true);
       this.correlationId.set(correlationIdOf(error));
       this.items.set([]);

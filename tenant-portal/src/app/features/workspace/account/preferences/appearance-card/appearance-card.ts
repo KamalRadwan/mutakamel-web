@@ -11,7 +11,7 @@ import { ViewScale, ViewSize } from '../../../../../core/view/view-scale';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { AccountSection } from '../../shared/account-section/account-section';
-import { updateMyProfile } from '../preferences.api';
+import { PreferencesApi } from '../preferences.api';
 import { TenantProfile, TenantProfilePatch } from '../preferences.model';
 
 const LANGUAGE_OPTIONS: readonly SegmentedOption[] = [
@@ -45,6 +45,7 @@ export class AppearanceCard {
   protected readonly theme = inject(ThemeState);
   protected readonly viewScale = inject(ViewScale);
   private readonly notify = inject(Notify);
+  private readonly api = inject(PreferencesApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -92,7 +93,7 @@ export class AppearanceCard {
   private async persist(patch: TenantProfilePatch): Promise<void> {
     try {
       // Each appearance change is its own user action (no retry: failure keeps the device-only value).
-      const updated = await updateMyProfile(patch, newIdempotencyKey());
+      const updated = await this.api.updateMyProfile(patch, newIdempotencyKey());
       this.profileChange.emit(updated);
     } catch {
       this.notify.warning(this.transloco.translate('wsAccPrefs.toast.deviceOnly'));

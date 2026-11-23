@@ -1,7 +1,18 @@
 @if (isForbidden()) {
   <app-billing-forbidden />
 } @else if (failed()) {
-  <app-billing-failed [correlationId]="errorCorrelationId()" (retry)="reload()" />
+  @if (tooLarge()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center">
+      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+        <ng-icon name="tablerRefresh" size="18" aria-hidden="true" />
+      </span>
+      <h1 class="text-16 leading-24 font-medium text-text">{{ 'bill.failed.title' | transloco }}</h1>
+      <p class="text-12 leading-18 text-text-muted">{{ 'bcat.errors.tooLarge' | transloco }}</p>
+      <button uiButton type="button" (click)="reload()">{{ 'bill.common.retry' | transloco }}</button>
+    </div>
+  } @else {
+    <app-billing-failed [correlationId]="errorCorrelationId()" (retry)="reload()" />
+  }
 } @else {
   <div
     class="flex shrink-0 items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card"
@@ -77,7 +88,7 @@
       >
         <ng-icon name="tablerApps" size="18" aria-hidden="true" />
       </span>
-      <p class="text-12 leading-18 text-text-muted">{{ 'bcat.empty.title' | transloco }}</p>
+      <p class="text-12 leading-18 text-text-muted">{{ 'bcat.empty.none' | transloco }}</p>
     </div>
   } @else {
     <div class="flex flex-col gap-12">

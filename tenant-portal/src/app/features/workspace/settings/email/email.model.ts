@@ -1,5 +1,7 @@
 import { TranslocoService } from '@jsverse/transloco';
-import { ApiError, errorCodeOf } from '../../../../core/api/api-errors';
+import { ApiError, errorCodeOf, errorMessage } from '../../../../core/api/api-errors';
+import type { TenantMe } from '../../../../core/auth/auth-session.model';
+import { hasTenantWidePermission } from '../../../../core/auth/tenant-wide-permission';
 import { coreFieldErrors } from '../core-response.model';
 
 export type ProviderDriver = 'smtp' | 'ses' | 'sendgrid' | 'platform-shared';
@@ -12,7 +14,6 @@ export const SMTP_ALLOWED_PORTS = [25, 465, 587, 2525] as const;
 export const DKIM_SELECTOR_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?$/;
 export const EMAIL_QUOTA_MAX = { daily: 1_000_000, perMinute: 10_000 } as const;
 export const DOMAIN_LABEL_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-export const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface TenantEmailConfig {
   revision: number;
@@ -48,7 +49,7 @@ export interface TenantEmailConfig {
 
 export interface EmailResult {
   config: TenantEmailConfig;
-  revision: number;
+  etag: string;
 }
 
 export interface PatchEmailConfigRequest {
@@ -82,7 +83,7 @@ export interface SuppressionLift {
 }
 
 export interface EmailConflictPayload {
-  status: 409 | 428;
+  status: 409;
   patch: PatchEmailConfigRequest | null;
 }
 
@@ -102,7 +103,13 @@ export function isValidBareEmail(raw: string): boolean {
   const parts = value.split('@');
   if (parts.length !== 2) return false;
   const [local, domain] = parts;
-  if (!local || local.length > 64 || local.startsWith('.') || local.endsWith('.') || local.includes('..')) {
+  if (
+    !local ||
+    local.length > 64 ||
+    local.startsWith('.') ||
+    local.endsWith('.') ||
+    local.includes('..')
+  ) {
     return false;
   }
   return isValidDomain(domain);
@@ -126,15 +133,28 @@ export function isValidDkimSelector(raw: string): boolean {
 }
 
 /**
- * A revision conflict (409 stale revision, 428 missing If-Match). The gateway's 409 GW.IDEM.IN_FLIGHT
- * means the earlier attempt is still running, not that the config changed, so it is not a conflict.
+ * Only the config's stale revision is recoverable by rebasing the draft.
  */
-export function isConflictError(error: unknown): error is ApiError & { status: 409 | 428 } {
-  return error instanceof ApiError && (error.status === 409 || error.status === 428) && !isIdempotencyCode(error.code);
+export function isConflictError(error: unknown): error is ApiError & { status: 409 } {
+  return (
+    error instanceof ApiError &&
+    error.status === 409 &&
+    error.code === 'TENANT_EMAIL_CONFIG_STALE_REVISION'
+  );
 }
 
-function isIdempotencyCode(code: string | null | undefined): boolean {
-  return !!code && (code.startsWith('GW.IDEM.') || code.startsWith('IDEM_') || code.startsWith('IDEMPOTENCY_'));
+export function emailGates(me: TenantMe | null | undefined) {
+  const manage = hasTenantWidePermission(me, 'workspace.email.manage');
+  return {
+    entitled: !!me && me.featureEntitlements['crm.outbound_email'] !== false,
+    readable: !!me?.permissions.includes('workspace.email.read'),
+    manage,
+    lookup: manage || hasTenantWidePermission(me, 'workspace.email.read'),
+  };
+}
+
+export function isManagedProvider(config: TenantEmailConfig): boolean {
+  return config.providerDriver === 'ses' || config.providerDriver === 'sendgrid';
 }
 
 /**
@@ -176,7 +196,10 @@ export function formatEmailNumber(value: number, language: string): string {
   return new Intl.NumberFormat(`${language}-u-nu-latn`).format(value);
 }
 
-export function providerDriverLabel(driver: ProviderDriver, translate: (key: string) => string): string {
+export function providerDriverLabel(
+  driver: ProviderDriver,
+  translate: (key: string) => string,
+): string {
   switch (driver) {
     case 'smtp':
       return 'SMTP';
@@ -190,6 +213,13 @@ export function providerDriverLabel(driver: ProviderDriver, translate: (key: str
 }
 
 export function resolveEmailError(error: unknown, transloco: TranslocoService): string {
+  if (error instanceof ApiError && error.status === 401)
+    return transloco.translate('wsEmail.notSaved');
+  if (error instanceof ApiError && error.status === 428)
+    return errorMessage(new ApiError(428, 'GENERIC'), 'wsEmail', transloco);
+  const fields = coreFieldErrors(error);
+  const field = fields && Object.keys(fields).find((key) => key !== '_');
+  if (field && fields?.[field]?.[0]) return fields[field][0];
   const code = errorCodeOf(error);
   if (code) {
     switch (code) {
@@ -203,22 +233,7 @@ export function resolveEmailError(error: unknown, transloco: TranslocoService): 
       case 'ACCESS_POLICY_BLOCKED':
         return transloco.translate('wsEmail.states.blockedTitle');
       case 'TENANT_WIDE_PERMISSION_REQUIRED':
-        return transloco.translate('wsEmail.bar.readOnlyHint');
-      case 'TENANT_SMTP_CONNECTION_VERIFICATION_UNAVAILABLE':
-        return transloco.translate('wsEmail.smtp.testNeedsSave');
-      case 'TOO_MANY_REQUESTS':
-        return transloco.translate('wsEmail.suppression.errors.rateLimited');
-    }
-
-    // Gateway codes (GW.IDEM.*) contain dots, so they cannot be translation keys.
-    if (code === 'GW.IDEM.MISMATCH') {
-      return transloco.translate('wsEmail.errors.idemMismatch');
-    }
-    if (isIdempotencyCode(code)) {
-      return transloco.translate('settings.errors.idempotency');
-    }
-    if (code === 'CORE_VALIDATION_FAILED') {
-      return transloco.translate('settings.errors.validation');
+        return transloco.translate('wsEmail.needsTenantWide');
     }
 
     const key = `wsEmail.errors.${code}`;
@@ -228,11 +243,5 @@ export function resolveEmailError(error: unknown, transloco: TranslocoService): 
     }
   }
 
-  if (error instanceof ApiError) {
-    if (error.status === 0) return transloco.translate('settings.errors.network');
-    if (error.status === 403) return transloco.translate('settings.errors.permission');
-    if (error.status === 429) return transloco.translate('wsEmail.suppression.errors.rateLimited');
-  }
-
-  return transloco.translate('settings.errors.generic');
+  return errorMessage(error, 'wsEmail', transloco);
 }

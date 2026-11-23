@@ -19,6 +19,7 @@ import {
   tablerStar,
 } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -29,40 +30,24 @@ import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import {
-  deactivateCurrency,
-  getDefaultCurrency,
-  listCurrencies,
-  updateCurrency,
-} from '../currencies.api';
+import { ActionKeys } from '../../core-response.model';
+import { CurrenciesApi } from '../currencies.api';
 import {
   CURRENCY_LIMITS,
   Currency,
   CurrencyListQuery,
   CurrencySortBy,
   currencyErrorMessage,
+  currencyPermissions,
 } from '../currencies.model';
 import { CurrencyModal } from '../currency-modal/currency-modal';
 import { DeactivateBlockerModal } from '../deactivate-blocker-modal/deactivate-blocker-modal';
 import { SetDefaultDialog } from '../set-default-dialog/set-default-dialog';
 
-const CAN_MANAGE = true; // later: currencies.currency.manage with a tenant-wide grant (company grants are not enough)
 const SEARCH_DEBOUNCE_MS = 300;
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
 
 type CurrencyFilterKey = 'all' | 'active' | 'inactive' | 'default' | 'nonDefault';
-
-const DEACTIVATE_BLOCKER_CODES: ReadonlySet<string> = new Set([
-  'CURRENCY_DEFAULT_DELETE',
-  'CURRENCY_IN_USE',
-  'CURRENCY_COMPANY_IN_USE',
-  'CURRENCY_NOT_FOUND',
-]);
-
-const REACTIVATE_BLOCKER_CODES: ReadonlySet<string> = new Set([
-  'CURRENCY_EXCHANGE_RATE_REQUIRED',
-  'CURRENCY_NOT_FOUND',
-]);
 
 @Component({
   selector: 'app-currencies-page',
@@ -86,13 +71,16 @@ const REACTIVATE_BLOCKER_CODES: ReadonlySet<string> = new Set([
     provideIcons({ tablerCurrencyDollar, tablerChevronUp, tablerChevronDown, tablerStar }),
   ],
   templateUrl: './currencies-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class CurrenciesPage {
   private static nextId = 0;
   protected readonly uid = `currencies-page-${++CurrenciesPage.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(CurrenciesApi);
+  private readonly me = inject(AuthSession).me;
+  private readonly actionKeys = new ActionKeys(newIdempotencyKey);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
@@ -101,12 +89,13 @@ export class CurrenciesPage {
   private readonly blockerModal = viewChild.required(DeactivateBlockerModal);
   private readonly deactivateConfirm = viewChild.required<ConfirmDialog>('deactivateConfirm');
 
-  protected readonly canManage = CAN_MANAGE;
+  protected readonly permissions = computed(() => currencyPermissions(this.me()));
+  protected readonly canManage = computed(() => this.permissions().manage);
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly pageSizes: number[] = [...CURRENCY_LIMITS.pageSizes];
-  protected readonly gridColumns = CAN_MANAGE
+  protected readonly gridColumns = computed(() => this.canManage()
     ? 'grid-cols-ws-currency-row-actions'
-    : 'grid-cols-ws-currency-row';
+    : 'grid-cols-ws-currency-row');
 
   protected readonly search = signal('');
   protected readonly debouncedSearch = signal('');
@@ -152,12 +141,13 @@ export class CurrenciesPage {
   });
 
   private readonly listResource = resource({
-    params: () => this.listQuery(),
-    loader: ({ params }) => listCurrencies(params),
+    params: () => this.permissions().readable ? { meId: this.me()!.id, query: this.listQuery() } : undefined,
+    loader: ({ params }) => this.api.listCurrencies(params.query),
   });
 
   private readonly defaultResource = resource({
-    loader: () => getDefaultCurrency(),
+    params: () => this.permissions().readable ? this.me()!.id : undefined,
+    loader: () => this.api.getDefaultCurrency(),
   });
 
   protected readonly items = computed(() =>
@@ -171,7 +161,7 @@ export class CurrenciesPage {
   protected readonly loadForbidden = computed(() => {
     const error = this.listResource.error();
     const cause = error instanceof ApiError ? error : (error as { cause?: unknown } | undefined)?.cause;
-    return this.loadFailed() && cause instanceof ApiError && cause.status === 403;
+    return !this.permissions().readable || (this.loadFailed() && cause instanceof ApiError && cause.status === 403);
   });
 
   protected readonly defaultCurrency = computed(() =>
@@ -209,6 +199,15 @@ export class CurrenciesPage {
   });
 
   constructor() {
+    effect(() => {
+      const raw = this.listResource.error();
+      const error = raw instanceof ApiError ? raw : (raw as { cause?: unknown } | undefined)?.cause;
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(currencyErrorMessage(error, this.transloco), '');
+      } else if (this.listResource.hasValue()) {
+        this.notify.connectionRestored();
+      }
+    });
     effect(() => {
       const term = this.search().trim();
       if (this.searchTimer !== null) {
@@ -297,7 +296,7 @@ export class CurrenciesPage {
   }
 
   protected openCreate(): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     this.currencyModal().openCreate();
   }
 
@@ -312,6 +311,7 @@ export class CurrenciesPage {
   }
 
   protected actionsFor(currency: Currency): ActionItem[] {
+    if (!this.canManage()) return [];
     this.i18n();
     const t = (key: string) => this.transloco.translate(key);
 
@@ -363,7 +363,7 @@ export class CurrenciesPage {
   }
 
   protected onRowAction(currency: Currency, selection: ActionSelection): void {
-    if (!this.canManage) return;
+    if (!this.canManage()) return;
     switch (selection.id) {
       case 'setDefault':
         this.setDefaultDialog().open(currency, this.defaultCurrency());
@@ -390,14 +390,15 @@ export class CurrenciesPage {
   }
 
   protected onSetDefaultBlocked(event: { currency: Currency; error: ApiError }): void {
-    this.blockerModal().open('setDefault', event.currency, event.error);
     if (event.error.code === 'CURRENCY_NOT_FOUND') {
       this.reload();
+      return;
     }
+    this.blockerModal().open('setDefault', event.currency, event.error);
   }
 
   private async handleReactivate(currency: Currency): Promise<void> {
-    if (!this.canManage || this.busy()) return;
+    if (!this.canManage() || this.busy()) return;
     if (currency.exchangeRate === null) {
       this.currencyModal().openEdit(currency, { reactivate: true });
       return;
@@ -405,26 +406,21 @@ export class CurrenciesPage {
 
     this.busy.set(true);
     try {
-      const updated = await updateCurrency(currency.id, { status: 'ACTIVE' }, newIdempotencyKey());
+      const signature = `reactivate:${currency.id}`;
+      const updated = await this.api.updateCurrency(currency.id, { status: 'ACTIVE' }, this.actionKeys.keyFor(signature));
+      this.actionKeys.done(signature);
       this.notify.success(this.transloco.translate('wsCurrencies.toast.reactivated', { code: updated.code }));
       this.reload();
     } catch (error) {
-      const code = errorCodeOf(error);
-      if (error instanceof ApiError && code && REACTIVATE_BLOCKER_CODES.has(code)) {
-        this.blockerModal().open('reactivate', currency, error);
-        if (code === 'CURRENCY_NOT_FOUND') {
-          this.reload();
-        }
-        return;
-      }
-      this.notify.error(currencyErrorMessage(error, this.transloco));
+      this.notify.error(currencyErrorMessage(error, this.transloco, 'write'));
+      if (errorCodeOf(error) === 'CURRENCY_NOT_FOUND') this.reload();
     } finally {
       this.busy.set(false);
     }
   }
 
   private async handleDeactivate(currency: Currency): Promise<void> {
-    if (!this.canManage || this.busy() || currency.isDefault) return;
+    if (!this.canManage() || this.busy() || currency.isDefault) return;
 
     this.pendingDeactivate.set(currency);
     const confirmed = await this.deactivateConfirm().open();
@@ -435,19 +431,19 @@ export class CurrenciesPage {
 
     this.busy.set(true);
     try {
-      await deactivateCurrency(currency.id, newIdempotencyKey());
+      const signature = `deactivate:${currency.id}`;
+      await this.api.deactivateCurrency(currency.id, this.actionKeys.keyFor(signature));
+      this.actionKeys.done(signature);
       this.notify.success(this.transloco.translate('wsCurrencies.toast.deactivated', { code: currency.code }));
       this.reload();
     } catch (error) {
       const code = errorCodeOf(error);
-      if (error instanceof ApiError && code && DEACTIVATE_BLOCKER_CODES.has(code)) {
+      if (error instanceof ApiError && code === 'CURRENCY_COMPANY_IN_USE') {
         this.blockerModal().open('deactivate', currency, error);
-        if (code === 'CURRENCY_NOT_FOUND') {
-          this.reload();
-        }
         return;
       }
-      this.notify.error(currencyErrorMessage(error, this.transloco));
+      this.notify.error(currencyErrorMessage(error, this.transloco, 'write'));
+      if (code === 'CURRENCY_NOT_FOUND') this.reload();
     } finally {
       this.busy.set(false);
       this.pendingDeactivate.set(null);

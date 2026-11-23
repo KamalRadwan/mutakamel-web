@@ -23,7 +23,7 @@
   </div>
 } @else if (me(); as currentMe) {
   @if (profile(); as currentProfile) {
-    <app-profile-card [me]="currentMe" (meChange)="onMeChange($event)" />
+    <app-profile-card [me]="currentMe" />
 
     <app-appearance-card [profile]="currentProfile" (profileChange)="onProfileChange($event)" />
 

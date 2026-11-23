@@ -18,11 +18,15 @@ import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Pagination } from '../../../../../shared/ui/pagination/pagination';
-import { errorMessage } from '../../../../../core/api/api-errors';
+import { ApiError, errorMessage } from '../../../../../core/api/api-errors';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { NumberingModal } from '../numbering-modal/numbering-modal';
-import { getNumberingAccess, listCompanyOptions, listNumbering } from '../numbering.api';
+import { NumberingApi } from '../numbering.api';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { hasTenantWidePermission } from '../../../../../core/auth/tenant-wide-permission';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { FullState } from '../../../../../shared/ui/full-state/full-state';
 import {
   CompanyOption,
   NUMBERING_PAGE_SIZES,
@@ -30,11 +34,10 @@ import {
   NumberingListQuery,
   type NumberingPage as NumberingPageResult,
   NumberingSequence,
-  companyNameIn,
-  formatNumber,
+  companyOption,
+  numberingAccess,
 } from '../numbering.model';
 
-const CAN_READ = true; // later numbering.read
 const ALL_COMPANIES = '__all__';
 const SEARCH_DEBOUNCE_MS = 300;
 const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
@@ -48,12 +51,11 @@ const SORT_CONFIG: Readonly<Record<SortKey, { sortBy: 'code' | 'nextValue' | 'cr
   nextDesc: { sortBy: 'nextValue', sortDir: 'DESC' },
 };
 
-const DEFAULT_ACCESS: NumberingAccess = { tenantWideManage: false, manageCompanyIds: [] };
-
 @Component({
   selector: 'app-numbering-page',
   imports: [
     NgIcon,
+    FullState,
     TranslocoPipe,
     ActionsMenu,
     Button,
@@ -65,9 +67,12 @@ const DEFAULT_ACCESS: NumberingAccess = { tenantWideManage: false, manageCompany
   ],
   providers: [provideIcons({ tablerBuilding, tablerHash, tablerPlus })],
   templateUrl: './numbering-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class NumberingPage {
+  private readonly api = inject(NumberingApi);
+  private readonly auth = inject(AuthSession);
+  private readonly lookups = inject(WorkspaceLookups);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -75,7 +80,12 @@ export class NumberingPage {
 
   private readonly numberingModal = viewChild.required(NumberingModal);
 
-  protected readonly canRead = CAN_READ;
+  protected readonly canRead = computed(() => {
+    const me = this.auth.me();
+    return me?.isTenantOwner === true || me?.permissions.includes('numbering.read') === true;
+  });
+  protected readonly scopedReader = computed(() =>
+    this.canRead() && !hasTenantWidePermission(this.auth.me(), 'numbering.read'));
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly pageSizes = NUMBERING_PAGE_SIZES;
   protected readonly gridColumns = 'grid-cols-ws-numbering-row-actions';
@@ -87,14 +97,10 @@ export class NumberingPage {
   protected readonly page = signal(1);
   protected readonly pageSize = signal(NUMBERING_PAGE_SIZES[0]);
   private readonly reloadTick = signal(0);
-  private readonly lastResult = signal<NumberingPageResult | null>(null);
 
   private readonly companiesResource = resource({
-    loader: () => listCompanyOptions(),
-  });
-
-  private readonly accessResource = resource({
-    loader: () => getNumberingAccess(),
+    params: () => this.auth.me() ? this.api.scopeRevision() : undefined,
+    loader: async () => (await this.lookups.allCompanies()).map(companyOption),
   });
 
   private readonly listQuery = computed<NumberingListQuery>(() => {
@@ -114,28 +120,22 @@ export class NumberingPage {
   });
 
   private readonly listResource = resource({
-    params: () => (this.canRead ? this.listQuery() : undefined),
-    loader: async ({ params }) => {
-      const result = await listNumbering(params);
-      const maxPage = Math.max(1, result.meta.totalPages);
-      if ((params.page ?? 1) <= maxPage) {
-        this.lastResult.set(result);
-      }
-      return result;
-    },
+    params: () => this.canRead() ? { query: this.listQuery(), scope: this.api.scopeRevision() } : undefined,
+    loader: ({ params }) => this.api.listNumbering(params.query),
   });
 
   protected readonly companies = computed<CompanyOption[]>(() =>
-    this.companiesResource.hasValue() ? this.companiesResource.value() : [],
+    this.companiesResource.hasValue() ? this.companiesResource.value()
+      : (this.auth.me()?.accessibleCompanies ?? []).map((id) => ({
+        id, label: this.fallbackCompanyLabel(id), active: true,
+      })),
   );
 
   protected readonly companiesFailed = computed(
     () => !this.companiesResource.isLoading() && Boolean(this.companiesResource.error()),
   );
 
-  protected readonly access = computed<NumberingAccess>(() =>
-    this.accessResource.hasValue() ? this.accessResource.value() : DEFAULT_ACCESS,
-  );
+  protected readonly access = computed<NumberingAccess>(() => numberingAccess(this.auth.me()));
 
   protected readonly canCreate = computed(() => {
     const access = this.access();
@@ -143,19 +143,23 @@ export class NumberingPage {
   });
 
   protected readonly isReadOnly = computed(
-    () => !this.accessResource.isLoading() && !this.canCreate(),
+    () => !this.canCreate(),
   );
 
   protected readonly loading = this.listResource.isLoading;
+  protected readonly forbidden = computed(() => {
+    const error = this.listResource.error();
+    return !this.canRead() || (error instanceof ApiError && error.status === 403);
+  });
   protected readonly loadFailed = computed(
-    () => !this.loading() && Boolean(this.listResource.error()),
+    () => !this.forbidden() && !this.loading() && Boolean(this.listResource.error()),
   );
 
   private readonly activePage = computed<NumberingPageResult | null>(() => {
     if (this.listResource.hasValue()) {
       return this.listResource.value();
     }
-    return this.lastResult();
+    return null;
   });
 
   protected readonly rows = computed<NumberingSequence[]>(() => this.activePage()?.data ?? []);
@@ -167,12 +171,11 @@ export class NumberingPage {
 
   protected readonly companyOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
-    const lang = this.language();
     return [
       { value: ALL_COMPANIES, label: this.transloco.translate('wsNumbering.filters.allCompanies') },
       ...this.companies().map((company) => ({
         value: company.id,
-        label: companyNameIn(company, lang),
+        label: company.label,
       })),
     ];
   });
@@ -209,6 +212,14 @@ export class NumberingPage {
   );
 
   constructor() {
+    effect(() => {
+      const error = this.listResource.error();
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(errorMessage(error, 'wsNumbering', this.transloco), '');
+      } else if (this.listResource.hasValue()) {
+        this.notify.connectionRestored();
+      }
+    });
     effect((onCleanup) => {
       const next = this.search();
       if (next === untracked(() => this.debouncedSearch())) return;
@@ -234,9 +245,6 @@ export class NumberingPage {
     this.reloadTick.update((n) => n + 1);
     if (this.companiesFailed()) {
       this.companiesResource.reload();
-    }
-    if (this.accessResource.error()) {
-      this.accessResource.reload();
     }
   }
 
@@ -302,11 +310,12 @@ export class NumberingPage {
   protected companyLabel(companyId: string | null): string | null {
     if (companyId === null) return null;
     const match = this.companyMap().get(companyId);
-    return match ? companyNameIn(match, this.language()) : null;
+    return match?.label ?? this.fallbackCompanyLabel(companyId);
   }
 
-  protected formatPreview(sequence: NumberingSequence): string {
-    return formatNumber(sequence.prefix, sequence.padding, sequence.nextValue);
+  private fallbackCompanyLabel(id: string): string {
+    this.i18n();
+    return this.transloco.translate('wsNumbering.companyFallback', { id: id.slice(0, 8) });
   }
 
   protected formatDate(iso: string): string {

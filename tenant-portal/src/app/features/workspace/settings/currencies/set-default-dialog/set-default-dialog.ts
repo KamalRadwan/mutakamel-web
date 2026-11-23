@@ -3,21 +3,15 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerStar } from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { setDefaultCurrency } from '../currencies.api';
-import { Currency, currencyErrorMessage } from '../currencies.model';
-
-const BLOCKER_ERROR_CODES: ReadonlySet<string> = new Set([
-  'CURRENCY_INACTIVE_DEFAULT',
-  'CURRENCY_REBASE_OUT_OF_RANGE',
-  'CURRENCY_REBASE_PRECISION_LOSS',
-  'CURRENCY_EXCHANGE_RATE_REQUIRED',
-  'CURRENCY_NOT_FOUND',
-]);
+import { ActionKeys } from '../../core-response.model';
+import { CurrenciesApi } from '../currencies.api';
+import { Currency, currencyErrorMessage, currencyPermissions } from '../currencies.model';
 
 @Component({
   selector: 'app-set-default-dialog',
@@ -27,6 +21,9 @@ const BLOCKER_ERROR_CODES: ReadonlySet<string> = new Set([
 })
 export class SetDefaultDialog {
   private readonly notify = inject(Notify);
+  private readonly api = inject(CurrenciesApi);
+  private readonly me = inject(AuthSession).me;
+  private readonly actionKeys = new ActionKeys(newIdempotencyKey);
   private readonly transloco = inject(TranslocoService);
   private readonly modal = viewChild.required(Modal);
 
@@ -37,38 +34,36 @@ export class SetDefaultDialog {
   protected readonly current = signal<Currency | null>(null);
   protected readonly saving = signal(false);
 
-  private pendingKey = '';
   private allowClose = false;
 
   open(target: Currency, current: Currency | null): void {
+    if (!currencyPermissions(this.me()).manage) return;
     this.allowClose = false;
     this.target.set(target);
     this.current.set(current);
     this.saving.set(false);
-    this.pendingKey = newIdempotencyKey();
     this.modal().open();
   }
 
   protected async confirm(): Promise<void> {
     const row = this.target();
-    if (!row || this.saving()) return;
+    if (!row || this.saving() || !currencyPermissions(this.me()).manage) return;
 
-    const key = this.pendingKey || (this.pendingKey = newIdempotencyKey());
+    const signature = `set-default:${row.id}`;
+    const key = this.actionKeys.keyFor(signature);
     this.saving.set(true);
     try {
-      const updated = await setDefaultCurrency(row.id, key);
-      this.pendingKey = '';
+      const updated = await this.api.setDefaultCurrency(row.id, key);
+      this.actionKeys.done(signature);
       this.notify.success(this.transloco.translate('wsCurrencies.toast.defaultSet', { code: updated.code }));
       this.closeImmediate();
       this.confirmed.emit(updated);
     } catch (error) {
-      if (error instanceof ApiError && BLOCKER_ERROR_CODES.has(error.code)) {
-        this.pendingKey = '';
+      this.notify.error(currencyErrorMessage(error, this.transloco, 'write'));
+      if (error instanceof ApiError && error.code === 'CURRENCY_NOT_FOUND') {
         this.closeImmediate();
         this.blocked.emit({ currency: row, error });
-        return;
       }
-      this.notify.error(currencyErrorMessage(error, this.transloco));
     } finally {
       this.saving.set(false);
     }
@@ -87,7 +82,6 @@ export class SetDefaultDialog {
     this.allowClose = false;
     this.target.set(null);
     this.current.set(null);
-    this.pendingKey = '';
   }
 
   private closeImmediate(): void {

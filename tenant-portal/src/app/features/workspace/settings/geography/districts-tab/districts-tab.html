@@ -4,11 +4,14 @@
   [addHint]="!selectedCity() ? ('geoPlaces.districts.addHint' | transloco) : null"
   [searchPlaceholder]="'geoPlaces.districts.search' | transloco"
   [loading]="loading()"
-  [showAdd]="canManage"
+  [showAdd]="canManage()"
   [(search)]="search"
   (add)="openCreate()"
   (reload)="reload()"
 >
+  @if (!canManage()) {
+    <p notices class="text-12 text-text-muted">{{ 'wsGeo.needsTenantWide' | transloco }}</p>
+  }
   <div notices class="rounded-10 border border-border bg-surface p-8 shadow-card">
     <div class="flex flex-wrap items-start gap-x-10 gap-y-8">
       <ui-field
@@ -57,35 +60,38 @@
         [label]="'geoPlaces.filters.city' | transloco"
         [hint]="'geoPlaces.filters.cityHint' | transloco"
       >
-        <button
-          #cityTrigger
-          type="button"
-          role="combobox"
-          [id]="uid + '-city'"
-          class="inline-flex h-field w-full items-center justify-between gap-6 rounded-8 border px-8 text-12 outline-none transition-colors duration-fast"
-          [class]="
-            !selectedState()
-              ? 'cursor-not-allowed border-border-field bg-neutral-soft text-text-placeholder'
-              : cityPickerOpen()
-                ? 'cursor-pointer border-focus-ring bg-surface-field text-text ring-3 ring-focus-halo'
-                : 'cursor-pointer border-border-field bg-surface-field text-text hover:border-border-field-hover focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-halo'
-          "
-          aria-haspopup="listbox"
-          [attr.aria-expanded]="cityPickerOpen()"
-          [attr.aria-controls]="cityPickerOpen() ? uid + '-city-listbox' : null"
-          [attr.aria-label]="('geoPlaces.filters.city' | transloco) + (selectedCityLabel() ? ': ' + selectedCityLabel() : '')"
-          [attr.aria-describedby]="uid + '-city-hint'"
-          [disabled]="!selectedState()"
-          (click)="toggleCityPicker()"
-          (keydown)="onCityTriggerKeydown($event)"
-        >
-          <span class="truncate" [class.text-text-muted]="!selectedCityLabel()">
-            {{ selectedCityLabel() || ('geoPlaces.filters.cityPlaceholder' | transloco) }}
-          </span>
-          <span class="inline-flex shrink-0 text-text-muted">
-            <ng-icon name="tablerChevronDown" size="14" aria-hidden="true" />
-          </span>
-        </button>
+        <ui-suggest-input
+          [inputId]="uid + '-city'"
+          [describedBy]="uid + '-city-hint'"
+          [label]="'geoPlaces.filters.city' | transloco"
+          [placeholder]="selectedCityLabel() || ('geoPlaces.filters.cityPlaceholder' | transloco)"
+          [options]="citySuggestions()"
+          [maxLength]="citySearchMax"
+          [readonly]="!selectedState()"
+          [value]="citySearchText()"
+          (valueChange)="onCitySearchChange($event)"
+        />
+        @if (cityLookupCursor()) {
+          <button
+            uiButton
+            variant="secondary"
+            size="small"
+            [disabled]="cityLookupLoading()"
+            (click)="loadMoreCityOptions()"
+          >
+            {{ 'geoPlaces.loadMore' | transloco }}
+          </button>
+        }
+        @if (cityLookupFailed()) {
+          <button
+            uiButton
+            variant="secondary"
+            size="small"
+            (click)="onCitySearchChange(citySearchText())"
+          >
+            {{ 'geoPlaces.retry' | transloco }}
+          </button>
+        }
       </ui-field>
 
       <ui-field
@@ -127,11 +133,16 @@
   </div>
 
   @if (!selectedCity()) {
-    <div class="flex flex-col items-center justify-center rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <div
+      class="flex flex-col items-center justify-center rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    >
       <p class="text-12 text-text-muted">{{ 'geoPlaces.chooseCity' | transloco }}</p>
     </div>
   } @else if (loadFailed()) {
-    <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card" role="alert">
+    <div
+      class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+      role="alert"
+    >
       <p class="text-12 text-danger-text">{{ 'geoPlaces.loadFailed' | transloco }}</p>
       <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
         {{ 'geoPlaces.retry' | transloco }}
@@ -153,19 +164,31 @@
           <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
             {{ 'geoPlaces.cols.nameEn' | transloco }}
           </span>
-          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+          >
             {{ 'geoPlaces.cols.nameAr' | transloco }}
           </span>
-          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+          >
             {{ 'geoPlaces.cols.kind' | transloco }}
           </span>
-          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+          >
             {{ 'geoPlaces.cols.updated' | transloco }}
           </span>
-          <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+          <span
+            role="columnheader"
+            class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+          >
             {{ 'geoPlaces.cols.status' | transloco }}
           </span>
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="border-s border-on-nav-line">
               <span class="sr-only">{{ 'geoPlaces.cols.actions' | transloco }}</span>
             </span>
@@ -195,7 +218,7 @@
               <span role="cell" class="flex items-center border-s border-border px-10">
                 <span class="h-badge w-2/3 rounded-8 bg-neutral-soft"></span>
               </span>
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center border-s border-border">
                   <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
                 </span>
@@ -228,30 +251,44 @@
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                 <span
                   class="inline-flex h-badge max-w-full items-center truncate rounded-8 px-8 text-12 font-medium"
-                  [class]="district.kind === 'VILLAGE' ? 'bg-success-soft text-on-success-soft' : 'bg-neutral-soft text-text'"
+                  [class]="
+                    district.kind === 'VILLAGE'
+                      ? 'bg-success-soft text-on-success-soft'
+                      : 'bg-neutral-soft text-text'
+                  "
                 >
                   {{ 'geoPlaces.kind.' + district.kind | transloco }}
                 </span>
               </span>
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
-                <span class="truncate text-12 text-text-muted">{{ formatDate(district.updatedAt) }}</span>
+                <span class="truncate text-12 text-text-muted">{{
+                  formatDate(district.updatedAt)
+                }}</span>
               </span>
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
                 @if (district.isActive) {
-                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success px-8 text-12 font-medium text-on-success">
+                  <span
+                    class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-success px-8 text-12 font-medium text-on-success"
+                  >
                     {{ 'geoPlaces.active' | transloco }}
                   </span>
                 } @else {
-                  <span class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
+                  <span
+                    class="inline-flex h-badge max-w-full items-center truncate rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted"
+                  >
                     {{ 'geoPlaces.inactive' | transloco }}
                   </span>
                 }
               </span>
 
-              @if (canManage) {
-                <span role="cell" data-row-action class="flex items-center justify-center border-s border-border">
+              @if (canManage()) {
+                <span
+                  role="cell"
+                  data-row-action
+                  class="flex items-center justify-center border-s border-border"
+                >
                   <ui-actions-menu
                     [items]="rowActions(district)"
                     [label]="'geoPlaces.cols.actions' | transloco"
@@ -261,10 +298,21 @@
               }
             </div>
           } @empty {
-            <div role="row" class="mt-6 flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-              <span role="cell" class="text-12 text-text-muted">{{ 'geoPlaces.noResults' | transloco }}</span>
+            <div
+              role="row"
+              class="mt-6 flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+            >
+              <span role="cell" class="text-12 text-text-muted">{{
+                'geoPlaces.noResults' | transloco
+              }}</span>
               @if (debouncedSearch()) {
-                <button type="button" uiButton variant="secondary" size="small" (click)="clearSearch()">
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  (click)="clearSearch()"
+                >
                   {{ 'geoPlaces.clearSearch' | transloco }}
                 </button>
               }
@@ -294,94 +342,8 @@
   }
 </app-settings-frame>
 
-@if (cityPickerOpen()) {
-  <div
-    #cityPopover
-    class="fixed z-dropdown flex max-h-notif-list-max flex-col rounded-10 border border-border bg-surface p-4 shadow-popover"
-    [class.invisible]="!cityPickerPlaced()"
-    [style.top.px]="cityPickerPlace().top"
-    [style.inset-inline-start.px]="cityPickerPlace().start"
-    [style.min-width.px]="cityPickerPlace().width"
-    [style.max-height.px]="cityPickerPlace().maxHeight"
-    (keydown)="onCityPopoverKeydown($event)"
-    (focusout)="onCityPopoverFocusOut($event)"
-  >
-    <div
-      class="mb-4 flex h-field shrink-0 items-center gap-6 rounded-8 border border-border-field bg-surface-field px-8 text-12 focus-within:border-focus-ring focus-within:ring-3 focus-within:ring-focus-halo"
-    >
-      <ng-icon name="tablerSearch" size="14" class="shrink-0 text-text-muted" aria-hidden="true" />
-      <input
-        #citySearchInput
-        type="text"
-        role="combobox"
-        aria-autocomplete="list"
-        [attr.aria-expanded]="true"
-        [attr.aria-controls]="uid + '-city-listbox'"
-        [attr.aria-activedescendant]="
-          cityActiveIndex() >= 0 && cityActiveIndex() < cityOptionsList().length
-            ? uid + '-city-opt-' + cityActiveIndex()
-            : null
-        "
-        class="w-full bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
-        [placeholder]="'geoPlaces.cities.search' | transloco"
-        [attr.aria-label]="'geoPlaces.cities.search' | transloco"
-        [value]="citySearchText()"
-        (input)="onCitySearchInput($event)"
-        (keydown)="onCitySearchKeydown($event)"
-      />
-    </div>
-
-    <ul
-      [id]="uid + '-city-listbox'"
-      role="listbox"
-      class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
-      [attr.aria-label]="'geoPlaces.filters.city' | transloco"
-    >
-      @for (option of cityOptionsList(); track option.id; let idx = $index) {
-        @let isSelected = option.id === cityId();
-        <li
-          #cityOptionItem
-          [id]="uid + '-city-opt-' + idx"
-          role="option"
-          [attr.aria-selected]="isSelected"
-          class="flex h-menu-item w-full cursor-pointer items-center justify-between gap-8 whitespace-nowrap rounded-6 px-8 text-12"
-          [class]="
-            isSelected
-              ? 'bg-brand-soft text-on-brand-soft'
-              : idx === cityActiveIndex()
-                ? 'bg-row-hover text-text'
-                : 'text-text hover:bg-row-hover'
-          "
-          (click)="selectCityOption(option)"
-        >
-          <span class="flex min-w-0 items-center gap-6">
-            <span class="truncate">{{ cityOptionLabel(option) }}</span>
-            @if (!option.isActive) {
-              <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-neutral-soft px-8 text-12 font-medium text-text-muted">
-                {{ 'geoPlaces.inactive' | transloco }}
-              </span>
-            }
-          </span>
-          @if (isSelected) {
-            <ng-icon name="tablerCheck" size="14" class="shrink-0" aria-hidden="true" />
-          }
-        </li>
-      } @empty {
-        <li
-          role="option"
-          aria-disabled="true"
-          aria-selected="false"
-          class="flex h-menu-item items-center px-8 text-12 text-text-muted"
-        >
-          {{ 'geoPlaces.noResults' | transloco }}
-        </li>
-      }
-    </ul>
-  </div>
-}
-
 <app-place-form-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
   [locationPath]="locationPath()"
   (districtSaved)="onDistrictSaved($event)"
   (districtDeleteRequested)="requestDelete($event)"

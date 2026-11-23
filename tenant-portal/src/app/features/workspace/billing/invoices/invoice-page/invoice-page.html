@@ -2,6 +2,21 @@
   <app-billing-forbidden />
 } @else if (notFound() && !loading()) {
   <app-not-found-page />
+} @else if (historyUnavailable() && !loading()) {
+  @if (rowHeader(); as row) {
+    <header class="flex items-center gap-8 rounded-10 border border-border bg-surface px-10 py-8 shadow-card">
+      <h1 dir="ltr" class="text-16 leading-24 font-medium text-text">{{ row.number }}</h1>
+      @let badge = statusBadge(row.status);
+      <span [class]="badge.classes">{{ badge.labelKey | transloco }}</span>
+    </header>
+  }
+  <div class="flex flex-1 flex-col items-center justify-center gap-8 p-16 text-center" role="status">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+      <ng-icon name="tablerFileInvoice" size="18" aria-hidden="true" />
+    </span>
+    <p class="text-13 leading-18 text-text">{{ 'binv.detail.historyUnavailable' | transloco }}</p>
+    <button uiButton type="button" (click)="goBack()">{{ 'bill.common.back' | transloco }}</button>
+  </div>
 } @else if (loadFailed() && !loading()) {
   <app-billing-failed [correlationId]="correlationId()" (retry)="reload()" />
 } @else if (loading() && !data()) {
@@ -57,6 +72,9 @@
 
       <span class="flex-1"></span>
 
+      @if (!canonicalUsd()) {
+        <span class="text-12 leading-18 text-text-muted">{{ 'binv.detail.offlineOnly' | transloco }}</span>
+      }
       @if (canPay()) {
         <button type="button" uiButton (click)="openPayModal()">
           <ng-icon name="tablerCreditCard" size="15" aria-hidden="true" />
@@ -65,6 +83,26 @@
       }
     </header>
 
+    @if (activeFailed()) {
+      <div class="flex items-center gap-8 text-12 leading-18 text-text-muted" role="status">
+        <span>{{ 'binv.pay.loadFailed' | transloco }}</span>
+        <button uiButton variant="secondary" type="button" [disabled]="activeLoading()" (click)="loadActiveIntent()">{{ 'bill.common.retry' | transloco }}</button>
+      </div>
+    } @else if (activeIntent(); as active) {
+      <div class="flex items-center gap-8 rounded-10 border border-border bg-surface p-10 text-13 leading-18 text-text" role="status">
+        @switch (active.recoveryAction) {
+          @case ('RECONCILIATION_REQUIRED') { <span>{{ 'binv.pay.underReview' | transloco }}</span> }
+          @case ('CONTINUE_CHECKOUT') {
+            <span>{{ 'binv.pay.inProgress' | transloco }}</span>
+            <button uiButton type="button" (click)="resumePayment()">{{ 'binv.pay.continuePayment' | transloco }}</button>
+          }
+          @case ('CHECK_STATUS') {
+            <span>{{ 'bill.poll.stillProcessing' | transloco }}</span>
+            <button uiButton type="button" (click)="resumePayment()">{{ 'bill.poll.checkNow' | transloco }}</button>
+          }
+        }
+      </div>
+    }
     <section class="rounded-10 border border-border bg-surface p-8 shadow-card">
       <div class="flex items-center gap-8">
         <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-navy text-on-icon">
@@ -260,5 +298,5 @@
     </div>
   </div>
 
-  <app-pay-modal (paid)="reload()" (closed)="onPayModalClosed()" />
+  <app-pay-modal (refresh)="reload()" (paid)="reload()" (closed)="onPayModalClosed()" />
 }

@@ -1,55 +1,71 @@
-import { newIdempotencyKey } from '../../../../core/api/idempotency';
-import {
-  fakeDeleteAvatar,
-  fakeGetAvatar,
-  fakeGetMe,
-  fakeGetMyProfile,
-  fakeUpdateMyName,
-  fakeUpdateMyProfile,
-  fakeUploadAvatar,
-} from './preferences.fake';
-import { AccountMe, OwnNamePatch, OwnNameUser, TenantProfile, TenantProfilePatch } from './preferences.model';
+import { Service, inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { ApiError, errorCodeOf, errorMessage } from '../../../../core/api/api-errors';
+import { CoreHttp, type CoreWriteMethod, type CoreWriteOptions } from '../../../../core/api/core-http';
+import type { SettingsTranslator } from '../../../../core/api/settings-translator';
+import { AuthSession } from '../../../../core/auth/auth-session';
+import type { OwnNamePatch, OwnNameUser, TenantProfile, TenantProfilePatch } from './preferences.model';
 
-// Real browser base: /api/tenant/core/v1 (envelope { data }). Self-service: no permission key.
+const BASE = '/api/tenant/core/v1';
 
-export function getMe(): Promise<AccountMe> {
-  // GET /api/tenant/core/v1/auth/me (private, no-store)
-  return fakeGetMe();
+@Service()
+export class PreferencesApi {
+  private readonly http = inject(CoreHttp);
+  private readonly session = inject(AuthSession);
+  private readonly queries = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, networkMode: 'always' },
+      mutations: { retry: false, gcTime: 0, networkMode: 'always' },
+    },
+  });
+
+  getMyProfile(): Promise<TenantProfile> {
+    return this.queries.fetchQuery({
+      queryKey: ['account-preferences', this.session.requestVersion()],
+      queryFn: () => this.http.read<TenantProfile>(`${BASE}/users/me/profile`),
+    });
+  }
+
+  updateMyProfile(patch: TenantProfilePatch, key: string): Promise<TenantProfile> {
+    return this.write('PUT', '/users/me/profile', patch, { key });
+  }
+
+  updateMyName(patch: OwnNamePatch, key: string): Promise<OwnNameUser> {
+    return this.write('PATCH', '/users/me', patch, { key });
+  }
+
+  uploadAvatar(file: File): Promise<void> {
+    const form = new FormData();
+    form.append('file', file);
+    // CoreHttp.writeMultipart is POST-only and requires a key; this route is PUT with mode NONE.
+    return this.write('PUT', '/profile/avatar', form);
+  }
+
+  avatarUrl(revision: number): string {
+    return `${BASE}/profile/avatar?v=${revision}`;
+  }
+
+  deleteAvatar(): Promise<void> {
+    return this.write('DELETE', '/profile/avatar', undefined, { noBody: true });
+  }
+
+  private write<T>(method: CoreWriteMethod, path: string, body?: unknown, options?: CoreWriteOptions): Promise<T> {
+    return this.queries.getMutationCache().build(this.queries, {
+      mutationFn: async () => (await this.http.write<T>(method, `${BASE}${path}`, body, options)).data,
+    }).execute(undefined);
+  }
 }
 
-export function updateMyName(patch: OwnNamePatch, _idempotencyKey: string = newIdempotencyKey()): Promise<OwnNameUser> {
-  // PATCH /api/tenant/core/v1/users/me -> TenantUserView (only changed name fields; 1..80, trimmed;
-  // 400 CORE_VALIDATION_FAILED). Header x-idempotency-key UUIDv7, required by the gateway (WRITE_SENSITIVE route).
-  return fakeUpdateMyName(patch);
-}
-
-export function getMyProfile(): Promise<TenantProfile> {
-  // GET /api/tenant/core/v1/users/me/profile (creates defaults on first read)
-  return fakeGetMyProfile();
-}
-
-export function updateMyProfile(
-  patch: TenantProfilePatch,
-  _idempotencyKey: string = newIdempotencyKey(),
-): Promise<TenantProfile> {
-  // PUT /api/tenant/core/v1/users/me/profile (extensions merged; > 16 KB -> 422 PROFILE_EXTENSIONS_TOO_LARGE;
-  // themeKey <= 64, language en|ar -> else 400 CORE_VALIDATION_FAILED). Header x-idempotency-key UUIDv7,
-  // required by the gateway (WRITE_SENSITIVE route).
-  return fakeUpdateMyProfile(patch);
-}
-
-export function uploadAvatar(file: File): Promise<void> {
-  // PUT /api/tenant/core/v1/profile/avatar multipart 'file' (PNG/JPEG/WebP, <= 2 MB) -> 204;
-  // 415 PARTY_IMAGE_INVALID, 413 PARTY_IMAGE_TOO_LARGE, 400 PARTY_IMAGE_REQUIRED, 404 PARTY_NOT_FOUND
-  return fakeUploadAvatar(file);
-}
-
-export function getAvatar(): Promise<Blob> {
-  // GET /api/tenant/core/v1/profile/avatar -> image bytes, 404 PARTY_IMAGE_NOT_FOUND when none
-  return fakeGetAvatar();
-}
-
-export function deleteAvatar(): Promise<void> {
-  // DELETE /api/tenant/core/v1/profile/avatar -> 204, 404 PARTY_IMAGE_NOT_FOUND when none
-  return fakeDeleteAvatar();
+export function preferencesErrorMessage(
+  error: unknown,
+  t: SettingsTranslator,
+  operation: 'read' | 'write' = 'read',
+): string {
+  const translate = typeof t === 'function' ? t : (key: string, params?: Record<string, unknown>) => t.translate(key, params);
+  if (operation === 'write' && error instanceof ApiError && error.status === 401) {
+    return translate('wsAccPrefs.errors.notSaved');
+  }
+  const code = errorCodeOf(error);
+  if (code === 'GW.IDEM.MISSING' || code === 'GW.IDEM.BAD_VALUE') return translate('wsAccPrefs.errors.generic');
+  return errorMessage(error, 'wsAccPrefs', t);
 }

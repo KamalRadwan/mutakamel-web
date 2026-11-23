@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, resource, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  resource,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -23,7 +32,8 @@ import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { ConflictDialog } from '../conflict-dialog/conflict-dialog';
 import { DnsModal } from '../dns-modal/dns-modal';
-import { getEmailConfig, patchEmailConfig, verifyEmailDomain } from '../email.api';
+import { EmailApi } from '../email.api';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import {
   EmailConflictPayload,
   EmailResult,
@@ -33,6 +43,7 @@ import {
   formatEmailNumber,
   isConflictError,
   isPlaceholderConfig,
+  isManagedProvider,
   providerDriverLabel,
   resolveEmailError,
 } from '../email.model';
@@ -42,9 +53,6 @@ import { SenderModal } from '../sender-modal/sender-modal';
 import { SmtpModal } from '../smtp-modal/smtp-modal';
 import { SuppressionBlock } from '../suppression-block/suppression-block';
 
-const CAN_READ = true; // workspace.email.read
-const CAN_MANAGE = true; // workspace.email.manage, tenant-wide
-const OUTBOUND_EMAIL_ENTITLED = true; // crm.outbound_email
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
 
 type FullState = 'forbidden' | 'notEntitled' | 'notReady' | 'blocked' | 'failed' | null;
@@ -64,6 +72,7 @@ type FullState = 'forbidden' | 'notEntitled' | 'notReady' | 'blocked' | 'failed'
     DnsModal,
     ConflictDialog,
     SuppressionBlock,
+    ConfirmDialog,
   ],
   providers: [
     provideTranslocoScope('settings', { scope: 'ws-email', alias: 'wsEmail' }),
@@ -84,6 +93,7 @@ type FullState = 'forbidden' | 'notEntitled' | 'notReady' | 'blocked' | 'failed'
   host: { class: 'flex min-h-0 flex-1 flex-col gap-8 p-12' },
 })
 export class EmailPage {
+  private readonly api = inject(EmailApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -96,14 +106,38 @@ export class EmailPage {
   private readonly dnsModal = viewChild.required(DnsModal);
   private readonly conflictDialog = viewChild.required(ConflictDialog);
 
-  protected readonly canRead = CAN_READ;
-  protected readonly canManage = CAN_MANAGE;
-  protected readonly entitled = OUTBOUND_EMAIL_ENTITLED;
+  protected get canRead() {
+    return this.api.gates().readable;
+  }
+  protected get canManage() {
+    return this.api.gates().manage;
+  }
+  protected get entitled() {
+    return this.api.gates().entitled;
+  }
+  protected get canLookup() {
+    return this.api.gates().lookup;
+  }
+  protected readonly managedProvider = isManagedProvider;
+  private readonly turnOnConfirm = viewChild.required<ConfirmDialog>('turnOnConfirm');
+  protected readonly testing = signal(false);
+  private verifyOp: { etag: string; key: string } | null = null;
+  private statusOp: { bodyJson: string; key: string } | null = null;
+  private testKey: string | null = null;
+  protected readonly hasDrafts = computed(
+    () =>
+      this.senderModal().hasUnsavedDraft() ||
+      this.providerModal().hasUnsavedDraft() ||
+      this.smtpModal().hasUnsavedDraft() ||
+      this.limitsModal().hasUnsavedDraft() ||
+      this.dnsModal().hasUnsavedDraft() ||
+      this.conflictDialog().hasUnsavedDraft(),
+  );
   protected readonly skeletonRows = SKELETON_ROWS;
 
   private readonly loaded = resource({
-    params: () => (this.canRead && this.entitled ? true : undefined),
-    loader: () => getEmailConfig(),
+    params: () => (this.canRead && this.entitled ? this.api.me()?.id : undefined),
+    loader: () => this.api.getEmailConfig(),
   });
   private readonly localResult = signal<EmailResult | null>(null);
   /** Last good result, kept so a failed reload does not wipe the page. */
@@ -115,21 +149,22 @@ export class EmailPage {
   protected readonly result = computed<EmailResult | null>(
     () => this.localResult() ?? (this.loaded.hasValue() ? this.loaded.value() : this.lastGood()),
   );
-  protected readonly config = computed<TenantEmailConfig | null>(() => this.result()?.config ?? null);
-  protected readonly revision = computed<number | null>(() => this.result()?.revision ?? null);
+  protected readonly config = computed<TenantEmailConfig | null>(
+    () => this.result()?.config ?? null,
+  );
+  protected readonly etag = computed<string | null>(() => this.result()?.etag ?? null);
   protected readonly loading = this.loaded.isLoading;
 
   protected readonly fullState = computed<FullState>(() => {
     if (!this.canRead) return 'forbidden';
     if (!this.entitled) return 'notEntitled';
-    if (this.config() || this.loading()) return null;
-
     const err = this.loaded.error();
-    if (!err) return null;
     const code = errorCodeOf(err);
-    if (code === 'TENANT_EMAIL_CONFIG_NOT_READY') return 'notReady';
     if (code === 'ACCESS_POLICY_BLOCKED') return 'blocked';
     if (err instanceof ApiError && err.status === 403) return 'forbidden';
+    if (this.config() || this.loading()) return null;
+    if (!err) return null;
+    if (code === 'TENANT_EMAIL_CONFIG_NOT_READY') return 'notReady';
     return 'failed';
   });
 
@@ -146,9 +181,15 @@ export class EmailPage {
     });
     effect(() => {
       const err = this.loaded.error();
-      if (err && untracked(() => this.lastGood())) {
-        this.notify.error(resolveEmailError(err, this.transloco));
-      }
+      if (err) untracked(() => this.showError(err));
+      else if (this.loaded.hasValue()) this.notify.connectionRestored();
+    });
+    effect(() => {
+      this.api.me()?.id;
+      untracked(() => {
+        this.localResult.set(null);
+        this.lastGood.set(null);
+      });
     });
   }
 
@@ -195,7 +236,7 @@ export class EmailPage {
   }
 
   protected openProvider(): void {
-    if (!this.canManage || !this.config()) return;
+    if (!this.canManage || !this.config() || isManagedProvider(this.config()!)) return;
     this.providerModal().open();
   }
 
@@ -224,19 +265,23 @@ export class EmailPage {
 
   protected async verifyDomain(cfg: TenantEmailConfig): Promise<void> {
     if (!this.canManage || this.verifyingDomain()) return;
-    const rev = this.revision() ?? cfg.revision;
+    const rev = this.etag() ?? `"${cfg.revision}"`;
     this.verifyingDomain.set(true);
 
     try {
-      const updated = await verifyEmailDomain(rev, newIdempotencyKey());
+      if (!this.verifyOp || this.verifyOp.etag !== rev)
+        this.verifyOp = { etag: rev, key: newIdempotencyKey() };
+      const updated = await this.api.verifyEmailDomain(rev, this.verifyOp.key);
+      this.verifyOp = null;
       this.localResult.set(updated);
       this.notify.success(this.transloco.translate('wsEmail.toast.verified'));
+      await this.offerTurnOn(updated);
     } catch (error) {
       if (isConflictError(error)) {
         this.conflictDialog().open({ status: error.status, patch: null });
         return;
       }
-      this.notify.error(resolveEmailError(error, this.transloco));
+      this.showError(error);
     } finally {
       this.verifyingDomain.set(false);
     }
@@ -248,19 +293,23 @@ export class EmailPage {
     if (nextStatus === cfg.status) return;
     if (nextStatus === 'ACTIVE' && !cfg.dkimVerified) return;
 
-    const prevResult = this.result() ?? { config: cfg, revision: cfg.revision };
+    const prevResult = this.result() ?? { config: cfg, etag: `"${cfg.revision}"` };
     this.localResult.set({
       config: { ...cfg, status: nextStatus },
-      revision: prevResult.revision,
+      etag: prevResult.etag,
     });
     this.togglingStatus.set(true);
 
     try {
-      const updated = await patchEmailConfig(
+      const bodyJson = JSON.stringify([{ status: nextStatus }, prevResult.etag]);
+      if (this.statusOp?.bodyJson !== bodyJson)
+        this.statusOp = { bodyJson, key: newIdempotencyKey() };
+      const updated = await this.api.patchEmailConfig(
         { status: nextStatus },
-        prevResult.revision,
-        newIdempotencyKey(),
+        prevResult.etag,
+        this.statusOp.key,
       );
+      this.statusOp = null;
       this.localResult.set(updated);
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
     } catch (error) {
@@ -272,9 +321,38 @@ export class EmailPage {
         });
         return;
       }
-      this.notify.error(resolveEmailError(error, this.transloco));
+      this.showError(error);
     } finally {
       this.togglingStatus.set(false);
     }
+  }
+  protected async offerTurnOn(result: EmailResult): Promise<void> {
+    if (!result.config.dkimVerified || result.config.status === 'ACTIVE' || !this.canManage) return;
+    if (await this.turnOnConfirm().open()) await this.toggleDeliveryStatus(result.config, true);
+  }
+
+  protected async sendTest(): Promise<void> {
+    if (!this.canManage || this.hasDrafts() || this.testing()) return;
+    this.testing.set(true);
+    try {
+      await this.api.sendTestEmail((this.testKey ??= newIdempotencyKey()));
+      this.testKey = null;
+      this.notify.success(
+        this.transloco.translate('wsEmail.sendTestDone', { email: this.api.me()?.email }),
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        this.notify.error(this.transloco.translate('wsEmail.errors.EMAIL_TEST_RATE_LIMITED'));
+        this.testKey = null;
+      } else this.showError(error);
+    } finally {
+      this.testing.set(false);
+    }
+  }
+
+  private showError(error: unknown): void {
+    const message = resolveEmailError(error, this.transloco);
+    if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(message, '');
+    else this.notify.error(message);
   }
 }

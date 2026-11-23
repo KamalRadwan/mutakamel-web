@@ -4,7 +4,9 @@
       role="alert"
       class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
     >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+      >
         <ng-icon name="tablerLock" size="20" aria-hidden="true" />
       </span>
       <h2 class="text-16 leading-22 font-medium text-text">
@@ -14,8 +16,12 @@
   }
 
   @case ('notEntitled') {
-    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon">
+    <div
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    >
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-gray text-on-icon"
+      >
         <ng-icon name="tablerMail" size="20" aria-hidden="true" />
       </span>
       <h2 class="text-16 leading-22 font-medium text-text">
@@ -23,14 +29,18 @@
       </h2>
     </div>
 
-    @if (canManage) {
-      <app-suppression-block />
+    @if (canLookup) {
+      <app-suppression-block [canLift]="canManage" />
     }
   }
 
   @case ('notReady') {
-    <div class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+    <div
+      class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
+    >
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+      >
         <ng-icon name="tablerClock" size="20" aria-hidden="true" />
       </span>
       <h2 class="text-16 leading-22 font-medium text-text">
@@ -47,7 +57,9 @@
       role="alert"
       class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
     >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+      >
         <ng-icon name="tablerBan" size="20" aria-hidden="true" />
       </span>
       <h2 class="text-16 leading-22 font-medium text-text">
@@ -61,7 +73,9 @@
       role="alert"
       class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
     >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"
+      >
         <ng-icon name="tablerCloudOff" size="20" aria-hidden="true" />
       </span>
       <h2 class="text-16 leading-22 font-medium text-text">
@@ -78,15 +92,27 @@
     @if (loading() && !config()) {
       <div class="flex flex-col gap-8" aria-busy="true">
         @for (row of skeletonRows; track row) {
-          <div class="flex items-center justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+          <div
+            class="flex items-center justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+          >
             <div class="flex min-w-0 flex-1 items-center gap-10">
-              <span class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse" aria-hidden="true"></span>
+              <span
+                class="size-icon-tile shrink-0 rounded-8 bg-neutral-soft motion-safe:animate-pulse"
+                aria-hidden="true"
+              ></span>
               <div class="flex min-w-0 flex-1 flex-col gap-6">
-                <span class="h-skeleton-line w-picker-w-single max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
-                <span class="h-skeleton-line w-modal-confirm max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"></span>
+                <span
+                  class="h-skeleton-line w-picker-w-single max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"
+                ></span>
+                <span
+                  class="h-skeleton-line w-modal-confirm max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse"
+                ></span>
               </div>
             </div>
-            <span class="h-btn-h-sm w-stat-chart-w shrink-0 rounded-6 bg-neutral-soft motion-safe:animate-pulse" aria-hidden="true"></span>
+            <span
+              class="h-btn-h-sm w-stat-chart-w shrink-0 rounded-6 bg-neutral-soft motion-safe:animate-pulse"
+              aria-hidden="true"
+            ></span>
           </div>
         }
       </div>
@@ -99,7 +125,10 @@
               [title]="'wsEmail.bar.readOnlyHint' | transloco"
             >
               <ng-icon name="tablerLock" size="12" aria-hidden="true" />
-              <span>{{ 'wsEmail.common.readOnly' | transloco }}</span>
+              <span
+                >{{ 'wsEmail.common.readOnly' | transloco }} —
+                {{ 'wsEmail.needsTenantWide' | transloco }}</span
+              >
             </span>
           }
         </div>
@@ -113,16 +142,25 @@
           [title]="'settings.common.reload' | transloco"
           (click)="reload()"
         >
-          <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+          <ng-icon
+            name="tablerRefresh"
+            size="15"
+            [class.animate-spin]="loading()"
+            aria-hidden="true"
+          />
           <span>{{ 'settings.common.reload' | transloco }}</span>
         </button>
       </div>
 
       <div class="flex flex-col gap-8">
         <!-- 1. Sender details -->
-        <section class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        <section
+          class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+        >
           <div class="flex min-w-0 flex-1 items-start gap-10">
-            <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon">
+            <span
+              class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-blue text-on-icon"
+            >
               <ng-icon name="tablerMail" size="15" aria-hidden="true" />
             </span>
 
@@ -132,20 +170,26 @@
                   {{ 'wsEmail.sender.title' | transloco }}
                 </h2>
                 @if (isPlaceholder(cfg)) {
-                  <span class="inline-flex h-badge shrink-0 items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning">
+                  <span
+                    class="inline-flex h-badge shrink-0 items-center rounded-8 bg-warning px-8 text-12 font-medium whitespace-nowrap text-on-warning"
+                  >
                     {{ 'wsEmail.sender.notSetUp' | transloco }}
                   </span>
                 }
               </div>
 
               @if (!isPlaceholder(cfg)) {
-                <div class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text">
+                <div
+                  class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text"
+                >
                   <span dir="auto" class="font-medium">{{ cfg.fromName }}</span>
                   <span dir="ltr" class="text-text-muted">{{ cfg.fromAddress }}</span>
                   @if (cfg.replyTo; as replyTo) {
                     <span dir="ltr" class="text-text-muted">{{ replyTo }}</span>
                   } @else {
-                    <span class="text-text-muted">{{ 'wsEmail.sender.replyToSame' | transloco }}</span>
+                    <span class="text-text-muted">{{
+                      'wsEmail.sender.replyToSame' | transloco
+                    }}</span>
                   }
                 </div>
               }
@@ -154,7 +198,13 @@
 
           @if (canManage) {
             <div class="flex shrink-0 items-center gap-6">
-              <button type="button" uiButton variant="secondary" size="small" (click)="openSender()">
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                (click)="openSender()"
+              >
                 {{ 'wsEmail.common.edit' | transloco }}
               </button>
             </div>
@@ -162,9 +212,13 @@
         </section>
 
         <!-- 2. Delivery provider -->
-        <section class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        <section
+          class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+        >
           <div class="flex min-w-0 flex-1 items-start gap-10">
-            <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+            <span
+              class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+            >
               <ng-icon name="tablerServer" size="15" aria-hidden="true" />
             </span>
 
@@ -177,46 +231,107 @@
                   @case ('smtp') {
                     <span
                       class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-                      [class]="cfg.smtpPasswordConfigured ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                      [class]="
+                        cfg.smtpPasswordConfigured
+                          ? 'bg-success text-on-success'
+                          : 'bg-neutral-soft text-text-muted'
+                      "
                     >
-                      {{ (cfg.smtpPasswordConfigured ? 'wsEmail.provider.configured' : 'wsEmail.provider.notConfigured') | transloco }}
+                      {{
+                        (cfg.smtpPasswordConfigured
+                          ? 'wsEmail.provider.configured'
+                          : 'wsEmail.provider.notConfigured'
+                        ) | transloco
+                      }}
                     </span>
                   }
                   @case ('platform-shared') {
                     <span
                       class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-                      [class]="cfg.providerCredentialsConfigured ? 'bg-success text-on-success' : 'bg-danger-soft text-on-danger-soft'"
+                      [class]="
+                        cfg.providerCredentialsConfigured
+                          ? 'bg-success text-on-success'
+                          : 'bg-danger-soft text-on-danger-soft'
+                      "
                     >
-                      {{ (cfg.providerCredentialsConfigured ? 'wsEmail.provider.available' : 'wsEmail.provider.unavailable') | transloco }}
+                      {{
+                        (cfg.providerCredentialsConfigured
+                          ? 'wsEmail.provider.available'
+                          : 'wsEmail.provider.unavailable'
+                        ) | transloco
+                      }}
                     </span>
                   }
                   @default {
                     <span
                       class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-                      [class]="cfg.providerCredentialsConfigured ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                      [class]="
+                        cfg.providerCredentialsConfigured
+                          ? 'bg-success text-on-success'
+                          : 'bg-neutral-soft text-text-muted'
+                      "
                     >
-                      {{ (cfg.providerCredentialsConfigured ? 'wsEmail.provider.configured' : 'wsEmail.provider.notConfigured') | transloco }}
+                      {{
+                        (cfg.providerCredentialsConfigured
+                          ? 'wsEmail.provider.configured'
+                          : 'wsEmail.provider.notConfigured'
+                        ) | transloco
+                      }}
                     </span>
                   }
                 }
               </div>
 
-              <div class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text">
+              <div
+                class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text"
+              >
                 <span>{{ providerName(cfg) }}</span>
                 @if (cfg.providerDriver === 'smtp' && cfg.smtpHost && cfg.smtpPort) {
-                  <span dir="ltr" class="tabular-nums text-text-muted">{{ cfg.smtpHost }}:{{ cfg.smtpPort }}</span>
+                  <span dir="ltr" class="tabular-nums text-text-muted"
+                    >{{ cfg.smtpHost }}:{{ cfg.smtpPort }}</span
+                  >
                 }
               </div>
             </div>
           </div>
 
+          @if (managedProvider(cfg)) {
+            <span class="text-12 leading-18 text-text-muted">{{
+              'wsEmail.managedBySupport' | transloco
+            }}</span>
+          }
           @if (canManage) {
             <div class="flex shrink-0 flex-wrap items-center gap-6">
-              <button type="button" uiButton variant="secondary" size="small" (click)="openProvider()">
-                {{ 'wsEmail.provider.change' | transloco }}
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                [loading]="testing()"
+                [disabled]="testing() || hasDrafts()"
+                (click)="sendTest()"
+              >
+                {{ 'wsEmail.sendTest' | transloco }}
               </button>
+              @if (!managedProvider(cfg)) {
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  (click)="openProvider()"
+                >
+                  {{ 'wsEmail.provider.change' | transloco }}
+                </button>
+              }
               @if (cfg.providerDriver === 'smtp') {
-                <button type="button" uiButton variant="secondary" size="small" (click)="openSmtp(false)">
+                <button
+                  type="button"
+                  uiButton
+                  variant="secondary"
+                  size="small"
+                  (click)="openSmtp(false)"
+                >
                   {{ 'wsEmail.provider.smtpSettings' | transloco }}
                 </button>
               }
@@ -225,9 +340,13 @@
         </section>
 
         <!-- 3. Domain verification -->
-        <section class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        <section
+          class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+        >
           <div class="flex min-w-0 flex-1 items-start gap-10">
-            <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon">
+            <span
+              class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-violet text-on-icon"
+            >
               <ng-icon name="tablerShieldCheck" size="15" aria-hidden="true" />
             </span>
 
@@ -238,13 +357,22 @@
                 </h2>
                 <span
                   class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-                  [class]="cfg.dkimVerified ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                  [class]="
+                    cfg.dkimVerified
+                      ? 'bg-success text-on-success'
+                      : 'bg-neutral-soft text-text-muted'
+                  "
                 >
-                  {{ (cfg.dkimVerified ? 'wsEmail.domain.verified' : 'wsEmail.domain.notVerified') | transloco }}
+                  {{
+                    (cfg.dkimVerified ? 'wsEmail.domain.verified' : 'wsEmail.domain.notVerified')
+                      | transloco
+                  }}
                 </span>
               </div>
 
-              <div class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text">
+              <div
+                class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text"
+              >
                 <span dir="ltr">{{ cfg.senderDomain }}</span>
                 @if (cfg.dkimVerified && verifiedDate(cfg); as verifiedOn) {
                   <span class="text-text-muted">
@@ -276,9 +404,13 @@
         </section>
 
         <!-- 4. Delivery status -->
-        <section class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        <section
+          class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+        >
           <div class="flex min-w-0 flex-1 items-start gap-10">
-            <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+            <span
+              class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+            >
               <ng-icon name="tablerSend" size="15" aria-hidden="true" />
             </span>
 
@@ -289,9 +421,18 @@
                 </h2>
                 <span
                   class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-                  [class]="cfg.status === 'ACTIVE' ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+                  [class]="
+                    cfg.status === 'ACTIVE'
+                      ? 'bg-success text-on-success'
+                      : 'bg-neutral-soft text-text-muted'
+                  "
                 >
-                  {{ (cfg.status === 'ACTIVE' ? 'settings.common.active' : 'wsEmail.status.SUSPENDED') | transloco }}
+                  {{
+                    (cfg.status === 'ACTIVE'
+                      ? 'settings.common.active'
+                      : 'wsEmail.status.SUSPENDED'
+                    ) | transloco
+                  }}
                 </span>
               </div>
 
@@ -312,7 +453,9 @@
                   />
                 </ui-field>
                 @if (cfg.status === 'SUSPENDED' && !cfg.dkimVerified) {
-                  <span class="text-text-muted">{{ 'wsEmail.delivery.hintBlocked' | transloco }}</span>
+                  <span class="text-text-muted">{{
+                    'wsEmail.delivery.hintBlocked' | transloco
+                  }}</span>
                 }
               </div>
             </div>
@@ -320,9 +463,13 @@
         </section>
 
         <!-- 5. Sending limits -->
-        <section class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card">
+        <section
+          class="flex flex-wrap items-start justify-between gap-10 rounded-10 border border-border bg-surface p-10 shadow-card"
+        >
           <div class="flex min-w-0 flex-1 items-start gap-10">
-            <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon">
+            <span
+              class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-green text-on-icon"
+            >
               <ng-icon name="tablerGauge" size="15" aria-hidden="true" />
             </span>
 
@@ -331,14 +478,24 @@
                 {{ 'wsEmail.limits.title' | transloco }}
               </h2>
 
-              <div class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text">
+              <div
+                class="flex flex-wrap items-center gap-x-12 gap-y-4 text-12 leading-18 text-text"
+              >
                 <span class="inline-flex items-center gap-4">
-                  <span class="text-text-muted">{{ 'wsEmail.fields.dailyQuota.label' | transloco }}:</span>
-                  <span dir="ltr" class="font-medium tabular-nums">{{ formatNumber(cfg.effectiveDailyQuota) }}</span>
+                  <span class="text-text-muted"
+                    >{{ 'wsEmail.fields.dailyQuota.label' | transloco }}:</span
+                  >
+                  <span dir="ltr" class="font-medium tabular-nums">{{
+                    formatNumber(cfg.effectiveDailyQuota)
+                  }}</span>
                 </span>
                 <span class="inline-flex items-center gap-4">
-                  <span class="text-text-muted">{{ 'wsEmail.fields.rateLimitPerMin.label' | transloco }}:</span>
-                  <span dir="ltr" class="font-medium tabular-nums">{{ formatNumber(cfg.effectiveRateLimitPerMin) }}</span>
+                  <span class="text-text-muted"
+                    >{{ 'wsEmail.fields.rateLimitPerMin.label' | transloco }}:</span
+                  >
+                  <span dir="ltr" class="font-medium tabular-nums">{{
+                    formatNumber(cfg.effectiveRateLimitPerMin)
+                  }}</span>
                 </span>
               </div>
 
@@ -350,7 +507,13 @@
 
           @if (canManage) {
             <div class="flex shrink-0 items-center gap-6">
-              <button type="button" uiButton variant="secondary" size="small" (click)="openLimits()">
+              <button
+                type="button"
+                uiButton
+                variant="secondary"
+                size="small"
+                (click)="openLimits()"
+              >
                 {{ 'wsEmail.limits.edit' | transloco }}
               </button>
             </div>
@@ -358,8 +521,8 @@
         </section>
       </div>
 
-      @if (canManage) {
-        <app-suppression-block />
+      @if (canLookup) {
+        <app-suppression-block [canLift]="canManage" />
       }
     }
   }
@@ -367,7 +530,7 @@
 
 <app-sender-modal
   [config]="config()"
-  [revision]="revision()"
+  [etag]="etag()"
   [canManage]="canManage"
   (saved)="onResultSaved($event)"
   (conflict)="onConflict($event)"
@@ -375,7 +538,7 @@
 
 <app-provider-modal
   [config]="config()"
-  [revision]="revision()"
+  [etag]="etag()"
   [canManage]="canManage"
   (saved)="onResultSaved($event)"
   (conflict)="onConflict($event)"
@@ -384,7 +547,7 @@
 
 <app-smtp-modal
   [config]="config()"
-  [revision]="revision()"
+  [etag]="etag()"
   [canManage]="canManage"
   (saved)="onResultSaved($event)"
   (conflict)="onConflict($event)"
@@ -392,7 +555,7 @@
 
 <app-limits-modal
   [config]="config()"
-  [revision]="revision()"
+  [etag]="etag()"
   [canManage]="canManage"
   (saved)="onResultSaved($event)"
   (conflict)="onConflict($event)"
@@ -400,10 +563,21 @@
 
 <app-dns-modal
   [config]="config()"
-  [revision]="revision()"
+  [etag]="etag()"
   [canManage]="canManage"
   (saved)="onResultSaved($event)"
   (conflict)="onConflict($event)"
 />
 
-<app-conflict-dialog (adopted)="onResultSaved($event)" />
+<app-conflict-dialog
+  [canManage]="canManage"
+  (adopted)="onResultSaved($event)"
+  (verified)="offerTurnOn($event)"
+/>
+<ui-confirm-dialog
+  #turnOnConfirm
+  tone="warning"
+  [title]="'wsEmail.turnOnPrompt' | transloco"
+  [confirmLabel]="'settings.common.yes' | transloco"
+  [cancelLabel]="'settings.common.no' | transloco"
+/>

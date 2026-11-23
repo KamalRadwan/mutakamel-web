@@ -65,6 +65,7 @@ export class NotificationBell {
 
   protected toggle() {
     this.open.update((value) => !value);
+    if (this.open() && this.state.stale()) void this.state.reload();
   }
 
   protected formatTime(iso: string, dayGroup: NotificationDayGroup): string {

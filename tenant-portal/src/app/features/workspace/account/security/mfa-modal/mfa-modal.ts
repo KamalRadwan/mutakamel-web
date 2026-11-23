@@ -1,29 +1,36 @@
-import { Component, DestroyRef, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
-import { Router } from '@angular/router';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerAlertTriangle, tablerEye, tablerEyeOff, tablerShieldCheck } from '@ng-icons/tabler-icons';
+import {
+  tablerAlertTriangle,
+  tablerEye,
+  tablerEyeOff,
+  tablerShieldCheck,
+} from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { confirmMfaChange, resendMfaCode, startMfaChange } from '../security.api';
-import { MFA_CODE_PATTERN } from '../security.model';
+import { SecurityApi } from '../security.api';
+import { MFA_CODE_PATTERN, isUnknownOutcome, retryAfterSecondsOf } from '../security.model';
 
 type MfaStepName = 'password' | 'code';
 
 const EMAIL_SENTINEL = '\u0000';
-
-function retryAfterSecondsOf(error: unknown): number {
-  if (!(error instanceof ApiError)) return 60;
-  // Backend details are string arrays: { retryAfterSeconds: ['30'] }.
-  const raw = error.details?.['retryAfterSeconds'];
-  const seconds = Number(Array.isArray(raw) ? raw[0] : raw);
-  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 60;
-}
 
 @Component({
   selector: 'app-mfa-modal',
@@ -34,7 +41,8 @@ function retryAfterSecondsOf(error: unknown): number {
 export class MfaModal {
   private static nextId = 0;
 
-  private readonly router = inject(Router);
+  private readonly session = inject(AuthSession);
+  private readonly api = inject(SecurityApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -61,6 +69,8 @@ export class MfaModal {
   protected readonly codeErrorKey = signal<string | null>(null);
 
   protected readonly unavailable = signal(false);
+  protected readonly noticeErrorKey = signal<string | null>(null);
+  protected readonly unknownOutcome = signal(false);
   protected readonly throttleUntil = signal<number | null>(null);
   protected readonly now = signal(Date.now());
 
@@ -86,7 +96,8 @@ export class MfaModal {
   });
 
   protected readonly isExpired = computed(
-    () => this.step() === 'code' && this.deadline() !== null && this.expiresRemainingSeconds() === 0,
+    () =>
+      this.step() === 'code' && this.deadline() !== null && this.expiresRemainingSeconds() === 0,
   );
 
   protected readonly formattedExpiresIn = computed(() => {
@@ -130,6 +141,7 @@ export class MfaModal {
   protected readonly canConfirm = computed(
     () =>
       MFA_CODE_PATTERN.test(this.code()) &&
+      !this.unknownOutcome() &&
       !this.isExpired() &&
       !this.unavailable() &&
       !this.isThrottled() &&
@@ -138,6 +150,7 @@ export class MfaModal {
 
   protected readonly canResend = computed(
     () =>
+      !this.unknownOutcome() &&
       !this.isExpired() &&
       this.resendRemainingSeconds() === 0 &&
       !this.unavailable() &&
@@ -214,7 +227,7 @@ export class MfaModal {
     this.submitting.set(true);
 
     try {
-      const mfaStep = await startMfaChange(this.targetEnabled(), this.currentPassword());
+      const mfaStep = await this.api.startMfaChange(this.targetEnabled(), this.currentPassword());
       if (seq !== this.openSeq) return;
       const nowMs = Date.now();
       this.now.set(nowMs);
@@ -245,12 +258,11 @@ export class MfaModal {
     this.resending.set(true);
 
     try {
-      const mfaStep = await resendMfaCode(id);
+      const mfaStep = await this.api.resendMfaCode(id);
       if (seq !== this.openSeq) return;
       const nowMs = Date.now();
       this.now.set(nowMs);
       this.challengeId.set(mfaStep.challengeId);
-      this.deadline.set(nowMs + mfaStep.expiresIn * 1000);
       this.resendAt.set(nowMs + mfaStep.resendAfterSeconds * 1000);
       this.codeErrorKey.set(null);
       this.throttleUntil.set(null);
@@ -258,20 +270,6 @@ export class MfaModal {
       this.notify.success(this.transloco.translate('wsAccSec.toast.codeSent'));
     } catch (error) {
       if (seq !== this.openSeq) return;
-      if (errorCodeOf(error) === 'AUTH_MFA_INVALID_CHALLENGE') {
-        // The challenge cannot be refreshed any more (expired or attempts used up): start over.
-        this.startAgain();
-        this.notify.error(this.transloco.translate('wsAccSec.errors.AUTH_MFA_INVALID_CHALLENGE'));
-        return;
-      }
-      if (errorCodeOf(error) === 'AUTH_MFA_THROTTLED' || (error instanceof ApiError && error.status === 429)) {
-        // A throttled resend only delays the next resend; confirming the code stays possible.
-        const nowMs = Date.now();
-        this.now.set(nowMs);
-        this.resendAt.set(nowMs + retryAfterSecondsOf(error) * 1000);
-        this.startTimer();
-        return;
-      }
       this.handleMfaError(error, 'code');
     } finally {
       if (seq === this.openSeq) {
@@ -293,17 +291,16 @@ export class MfaModal {
     this.submitting.set(true);
 
     try {
-      await confirmMfaChange(id, value);
+      await this.api.confirmMfaChange(id, value);
       // The change is already applied server-side: finish the flow even if the modal was closed meanwhile.
       if (seq === this.openSeq) this.modal().close();
-      this.notify.success(
-        this.transloco.translate(enabled ? 'wsAccSec.toast.mfaOn' : 'wsAccSec.toast.mfaOff'),
-        this.transloco.translate('wsAccSec.toast.signInAgain'),
-      );
-      await this.router.navigate(['/login']);
+      await this.session.signedOutByServer('security.mfaChanged');
     } catch (error) {
-      if (seq !== this.openSeq) return;
-      this.handleMfaError(error, 'code');
+      if (isUnknownOutcome(error)) {
+        await this.checkOutcome(seq, enabled);
+      } else if (seq === this.openSeq) {
+        this.handleMfaError(error, 'code');
+      }
     } finally {
       if (seq === this.openSeq) {
         this.submitting.set(false);
@@ -311,8 +308,37 @@ export class MfaModal {
     }
   }
 
+  protected async checkAgain(): Promise<void> {
+    if (this.submitting()) return;
+    const seq = this.openSeq;
+    this.submitting.set(true);
+    try {
+      await this.checkOutcome(seq, this.targetEnabled());
+    } finally {
+      if (seq === this.openSeq) this.submitting.set(false);
+    }
+  }
+
+  private async checkOutcome(seq: number, enabled: boolean): Promise<void> {
+    try {
+      if ((await this.session.refresh()) === 'ended') {
+        await this.session.signedOutByServer('security.mfaChanged');
+        return;
+      }
+      await this.session.reloadProfile(this.session.requestVersion());
+      if (this.session.me()?.mfaEnabled === enabled) {
+        await this.session.signedOutByServer('security.mfaChanged');
+        return;
+      }
+    } catch {
+      // A failed check leaves the outcome unknown; the confirmation itself must never be replayed.
+    }
+    if (seq === this.openSeq) this.unknownOutcome.set(true);
+  }
+
   private handleMfaError(error: unknown, activeStep: MfaStepName): void {
     const code = errorCodeOf(error);
+    this.noticeErrorKey.set(null);
     if (code === 'CURRENT_PASSWORD_INVALID') {
       this.passwordErrorKey.set('wsAccSec.errors.CURRENT_PASSWORD_INVALID');
       queueMicrotask(() => this.passwordInput()?.nativeElement.focus());
@@ -329,13 +355,17 @@ export class MfaModal {
       this.startTimer();
       return;
     }
+    if (code === 'AUTH_MFA_INVALID_CHALLENGE' && activeStep === 'password') {
+      this.noticeErrorKey.set('wsAccSec.errors.AUTH_MFA_INVALID_CHALLENGE');
+      return;
+    }
     if (code === 'AUTH_MFA_INVALID_CHALLENGE' && activeStep === 'code') {
       this.codeErrorKey.set('wsAccSec.errors.AUTH_MFA_INVALID_CHALLENGE');
       this.code.set('');
       queueMicrotask(() => this.codeInput()?.nativeElement.focus());
       return;
     }
-    this.notify.error(this.transloco.translate('wsAccSec.errors.generic'));
+    this.noticeErrorKey.set('wsAccSec.errors.generic');
   }
 
   private startTimer(): void {
@@ -372,6 +402,9 @@ export class MfaModal {
     this.code.set('');
     this.codeErrorKey.set(null);
     this.unavailable.set(false);
+    this.noticeErrorKey.set(null);
+    this.unknownOutcome.set(false);
+    this.throttleEnded.set(false);
     this.throttleUntil.set(null);
     this.submitting.set(false);
     this.resending.set(false);

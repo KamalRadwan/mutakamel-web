@@ -1,9 +1,23 @@
-import { Component, ElementRef, Injector, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerBuildingCommunity, tablerHome } from '@ng-icons/tabler-icons';
+import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { GeoCity, GeoDistrict, GeoDistrictKind } from '../../../../../core/geo/geo.model';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
@@ -11,18 +25,14 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Segmented, SegmentedOption } from '../../../../../shared/ui/segmented/segmented';
 import { Switch } from '../../../../../shared/ui/switch/switch';
-import { errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
-import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { ActionKeys, coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
+import { coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
 import {
   GEO_LIMITS,
+  GeoAdminApi,
   UpdateGeoCityBody,
   UpdateGeoDistrictBody,
-  createCity,
-  createDistrict,
-  updateCity,
-  updateDistrict,
 } from '../geo-admin.api';
+import { geoErrorMessage, placesEditable } from '../geo-admin.model';
 
 export type PlaceEntityType = 'city' | 'district';
 
@@ -34,13 +44,17 @@ interface ServerFieldError {
 @Component({
   selector: 'app-place-form-modal',
   imports: [TranslocoPipe, Button, ConfirmDialog, Field, Modal, Segmented, Switch],
-  providers: [
-    provideTranslocoScope({ scope: 'ws-geo', alias: 'wsGeo' }, 'settings', { scope: 'ws-geo-places', alias: 'geoPlaces' }),
+  viewProviders: [
+    provideTranslocoScope({ scope: 'ws-geo', alias: 'wsGeo' }, 'settings', {
+      scope: 'ws-geo-places',
+      alias: 'geoPlaces',
+    }),
     provideIcons({ tablerBuildingCommunity, tablerHome }),
   ],
   templateUrl: './place-form-modal.html',
 })
 export class PlaceFormModal {
+  private readonly api = inject(GeoAdminApi);
   private static nextId = 0;
   protected readonly uid = `place-form-modal-${++PlaceFormModal.nextId}`;
 
@@ -50,10 +64,15 @@ export class PlaceFormModal {
   private readonly i18n = translationEvents(this.transloco);
 
   private readonly modal = viewChild.required(Modal);
+  private readonly deactivateDialog = viewChild.required<ConfirmDialog>('deactivateDialog');
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
   private readonly nameEnInput = viewChild<ElementRef<HTMLInputElement>>('nameEnInput');
 
   readonly canManage = input(true);
+  private readonly session = inject(AuthSession);
+  protected readonly editable = computed(
+    () => this.canManage() && placesEditable(this.session.me()) && !this.api.placesDenied(),
+  );
   readonly locationPath = input('');
 
   readonly citySaved = output<{ city: GeoCity; isNew: boolean }>();
@@ -78,17 +97,18 @@ export class PlaceFormModal {
   protected readonly touched = signal<{ en?: boolean; ar?: boolean }>({});
   protected readonly submitted = signal(false);
   protected readonly saving = signal(false);
+  protected readonly parentError = signal<string | null>(null);
   protected readonly serverErrors = signal<ServerFieldError>({});
 
   private allowClose = false;
   private confirmingDiscard = false;
-  private readonly actionKeys = new ActionKeys(newIdempotencyKey);
-  private lastCreateSignature = '';
-  private lastCreateKey = '';
+  private pendingWrite: { key: string; bodyJson: string } | null = null;
 
-  protected readonly isReadOnly = computed(() => !this.canManage());
+  protected readonly isReadOnly = computed(() => !this.editable());
 
-  protected readonly resolvedLocationPath = computed(() => this.locationPath() || this.contextLocationPath());
+  protected readonly resolvedLocationPath = computed(
+    () => this.locationPath() || this.contextLocationPath(),
+  );
 
   protected readonly modalIcon = computed(() =>
     this.entityType() === 'city' ? 'tablerBuildingCommunity' : 'tablerHome',
@@ -112,8 +132,16 @@ export class PlaceFormModal {
     this.i18n();
     const locked = this.isReadOnly() || this.saving();
     return [
-      { value: 'DISTRICT', label: this.transloco.translate('geoPlaces.kind.DISTRICT'), disabled: locked },
-      { value: 'VILLAGE', label: this.transloco.translate('geoPlaces.kind.VILLAGE'), disabled: locked },
+      {
+        value: 'DISTRICT',
+        label: this.transloco.translate('geoPlaces.kind.DISTRICT'),
+        disabled: locked,
+      },
+      {
+        value: 'VILLAGE',
+        label: this.transloco.translate('geoPlaces.kind.VILLAGE'),
+        disabled: locked,
+      },
     ];
   });
 
@@ -128,7 +156,11 @@ export class PlaceFormModal {
     if (this.entityType() === 'city') {
       const current = this.city();
       if (!current) return false;
-      return trimmedEn !== current.nameEn || trimmedAr !== current.nameAr || this.isActive() !== current.isActive;
+      return (
+        trimmedEn !== current.nameEn ||
+        trimmedAr !== current.nameAr ||
+        this.isActive() !== current.isActive
+      );
     }
     const current = this.district();
     if (!current) return false;
@@ -153,7 +185,6 @@ export class PlaceFormModal {
 
   protected readonly nameEnError = computed(() => this.resolveFieldError('en', this.nameEn()));
   protected readonly nameArError = computed(() => this.resolveFieldError('ar', this.nameAr()));
-
 
   openCreateCity(context: { stateId: string; locationPath?: string }): void {
     this.entityType.set('city');
@@ -251,9 +282,19 @@ export class PlaceFormModal {
     if (!this.isValid()) return;
     if (this.mode() === 'edit' && !this.dirty()) return;
 
+    if (
+      this.entityType() === 'city' &&
+      this.mode() === 'edit' &&
+      this.city()?.isActive &&
+      !this.isActive()
+    ) {
+      if (!(await this.deactivateDialog().open())) return;
+      if (this.isReadOnly()) return;
+    }
     const trimmedEn = this.nameEn().trim();
     const trimmedAr = this.nameAr().trim();
     this.serverErrors.set({});
+    this.parentError.set(null);
     this.saving.set(true);
 
     try {
@@ -300,8 +341,8 @@ export class PlaceFormModal {
 
   private openDialogAndFocus(): void {
     this.allowClose = false;
-    this.lastCreateSignature = '';
-    this.lastCreateKey = '';
+    this.pendingWrite = null;
+    this.parentError.set(null);
     this.modal().open();
     if (!this.isReadOnly()) {
       afterNextRender(() => this.nameEnInput()?.nativeElement.focus(), { injector: this.injector });
@@ -311,10 +352,10 @@ export class PlaceFormModal {
   private async saveCity(trimmedEn: string, trimmedAr: string): Promise<void> {
     if (this.mode() === 'create') {
       const stateId = this.parentId();
-      const key = this.idempotencyKeyFor(`city|${stateId}|${trimmedEn}|${trimmedAr}`);
-      const created = await createCity({ stateId, nameEn: trimmedEn, nameAr: trimmedAr }, key);
-      this.lastCreateSignature = '';
-      this.lastCreateKey = '';
+      const body = { stateId, nameEn: trimmedEn, nameAr: trimmedAr, isActive: this.isActive() };
+      const key = this.keyForBody(body);
+      const created = await this.api.createCity(body, key);
+      this.pendingWrite = null;
       this.notify.success(this.transloco.translate('geoPlaces.created'));
       this.citySaved.emit({ city: created, isNew: true });
       this.close();
@@ -329,9 +370,8 @@ export class PlaceFormModal {
     if (this.isActive() !== current.isActive) patch.isActive = this.isActive();
     if (Object.keys(patch).length === 0) return;
 
-    const signature = `update:${current.id}:${JSON.stringify(patch)}`;
-    const updated = await updateCity(current.id, patch, this.actionKeys.keyFor(signature));
-    this.actionKeys.done(signature);
+    const updated = await this.api.updateCity(current.id, patch, this.keyForBody(patch));
+    this.pendingWrite = null;
     this.notify.success(this.transloco.translate('geoPlaces.saved'));
     this.citySaved.emit({ city: updated, isNew: false });
     this.close();
@@ -341,10 +381,16 @@ export class PlaceFormModal {
     if (this.mode() === 'create') {
       const cityId = this.parentId();
       const kind = this.kind();
-      const key = this.idempotencyKeyFor(`district|${cityId}|${kind}|${trimmedEn}|${trimmedAr}`);
-      const created = await createDistrict({ cityId, kind, nameEn: trimmedEn, nameAr: trimmedAr }, key);
-      this.lastCreateSignature = '';
-      this.lastCreateKey = '';
+      const body = {
+        cityId,
+        kind,
+        nameEn: trimmedEn,
+        nameAr: trimmedAr,
+        isActive: this.isActive(),
+      };
+      const key = this.keyForBody(body);
+      const created = await this.api.createDistrict(body, key);
+      this.pendingWrite = null;
       this.notify.success(this.transloco.translate('geoPlaces.created'));
       this.districtSaved.emit({ district: created, isNew: true });
       this.close();
@@ -360,24 +406,26 @@ export class PlaceFormModal {
     if (this.isActive() !== current.isActive) patch.isActive = this.isActive();
     if (Object.keys(patch).length === 0) return;
 
-    const signature = `update:${current.id}:${JSON.stringify(patch)}`;
-    const updated = await updateDistrict(current.id, patch, this.actionKeys.keyFor(signature));
-    this.actionKeys.done(signature);
+    const updated = await this.api.updateDistrict(current.id, patch, this.keyForBody(patch));
+    this.pendingWrite = null;
     this.notify.success(this.transloco.translate('geoPlaces.saved'));
     this.districtSaved.emit({ district: updated, isNew: false });
     this.close();
   }
 
-  private idempotencyKeyFor(signature: string): string {
-    if (signature !== this.lastCreateSignature || !this.lastCreateKey) {
-      this.lastCreateSignature = signature;
-      this.lastCreateKey = newIdempotencyKey();
-    }
-    return this.lastCreateKey;
+  private keyForBody(body: unknown): string {
+    const bodyJson = JSON.stringify(body);
+    if (this.pendingWrite?.bodyJson !== bodyJson)
+      this.pendingWrite = { key: newIdempotencyKey(), bodyJson };
+    return this.pendingWrite.key;
   }
 
   private handleSaveError(error: unknown): void {
     const code = errorCodeOf(error);
+    if (code === 'GEO_PARENT_INACTIVE') {
+      this.parentError.set(geoErrorMessage(error, 'geoPlaces', this.transloco, true));
+      return;
+    }
 
     // The backend sends no language detail: either name may be the one taken.
     if (code === 'GEO_CITY_NAME_TAKEN' || code === 'GEO_DISTRICT_NAME_TAKEN') {
@@ -390,31 +438,29 @@ export class PlaceFormModal {
     if (fields) {
       const messages = fieldMessages(fields, ['nameEn', 'nameAr'] as const);
       this.serverErrors.set({ en: messages.nameEn, ar: messages.nameAr });
-      if (hasOtherFields(fields, ['nameEn', 'nameAr'])) this.notify.error(this.resolveToastError(error));
+      if (hasOtherFields(fields, ['nameEn', 'nameAr']))
+        this.notify.error(this.resolveToastError(error));
       return;
     }
 
     this.notify.error(this.resolveToastError(error));
     const parentMissing =
-      (code === 'GEO_STATE_NOT_FOUND' && this.entityType() === 'city' && this.mode() === 'create') ||
+      (code === 'GEO_STATE_NOT_FOUND' &&
+        this.entityType() === 'city' &&
+        this.mode() === 'create') ||
       (code === 'GEO_CITY_NOT_FOUND' && this.entityType() === 'district');
     const selfMissing = code === 'GEO_CITY_NOT_FOUND' || code === 'GEO_DISTRICT_NOT_FOUND';
     if (parentMissing || selfMissing) {
-      const missingId = parentMissing ? this.parentId() : (this.city()?.id ?? this.district()?.id ?? this.parentId());
+      const missingId = parentMissing
+        ? this.parentId()
+        : (this.city()?.id ?? this.district()?.id ?? this.parentId());
       if (missingId) this.notFound.emit(missingId);
       this.close();
     }
   }
 
   private resolveToastError(error: unknown): string {
-    const code = errorCodeOf(error);
-    if (code) {
-      const scopedKey = `geoPlaces.errors.${code}`;
-      const scoped = this.transloco.translate(scopedKey);
-      if (scoped && scoped !== scopedKey) return scoped;
-      return errorMessage(error, 'geoPlaces', this.transloco);
-    }
-    return this.transloco.translate('geoPlaces.errors.generic');
+    return geoErrorMessage(error, 'geoPlaces', this.transloco, true);
   }
 
   private async confirmDiscardAndClose(): Promise<void> {
@@ -470,7 +516,8 @@ export class PlaceFormModal {
 
     const trimmed = raw.trim();
     if (!trimmed) return this.transloco.translate('geoPlaces.required');
-    if (trimmed.length > this.maxNameLength) return this.transloco.translate('geoPlaces.errors.GEO_NAME_TOO_LONG');
+    if (trimmed.length > this.maxNameLength)
+      return this.transloco.translate('geoPlaces.errors.GEO_NAME_TOO_LONG');
     return null;
   }
 }

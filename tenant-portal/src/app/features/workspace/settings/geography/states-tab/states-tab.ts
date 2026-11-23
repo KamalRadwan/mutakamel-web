@@ -1,34 +1,55 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBuildingCommunity, tablerCloudOff, tablerLock } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
-import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
+import {
+  ActionItem,
+  ActionSelection,
+  ActionsMenu,
+} from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
-import { errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
-import { listCountries, listStates } from '../geo-admin.api';
-import { GeoCountry, GeoState, geoFlagUrl, geoNameIn, normalizeGeoSearch } from '../geo-admin.model';
+import { GeoAdminApi } from '../geo-admin.api';
+import {
+  GeoCountry,
+  GeoState,
+  geoErrorMessage,
+  geoFlagUrl,
+  geoNameIn,
+  normalizeGeoSearch,
+} from '../geo-admin.model';
 
 const SKELETON_ROWS = [1, 2, 3, 4, 5] as const;
 @Component({
   selector: 'app-states-tab',
-  imports: [NgOptimizedImage, NgIcon, TranslocoPipe, SettingsFrame, Button, ActionsMenu, Dropdown, Field],
+  imports: [
+    NgOptimizedImage,
+    NgIcon,
+    TranslocoPipe,
+    SettingsFrame,
+    Button,
+    ActionsMenu,
+    Dropdown,
+    Field,
+  ],
   providers: [
     provideTranslocoScope('settings', { scope: 'ws-geo', alias: 'wsGeo' }),
     provideIcons({ tablerLock, tablerBuildingCommunity, tablerCloudOff }),
   ],
   templateUrl: './states-tab.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class StatesTab {
+  private readonly api = inject(GeoAdminApi);
   private static nextId = 0;
   protected readonly uid = `ws-geo-states-${++StatesTab.nextId}`;
 
@@ -64,7 +85,9 @@ export class StatesTab {
     const lang = this.language();
     return this.countries()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }))
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      )
       .map((country) => ({
         value: country.id,
         label: `${geoNameIn(country, lang)} · \u2068${country.iso2}\u2069`,
@@ -75,7 +98,9 @@ export class StatesTab {
     const lang = this.language();
     return this.states()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }));
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      );
   });
 
   protected readonly filteredStates = computed(() => {
@@ -183,7 +208,7 @@ export class StatesTab {
     this.loading.set(true);
     this.failed.set(false);
     try {
-      const { items } = await listCountries();
+      const { items } = await this.api.listCountries();
       if (seq !== this.loadSeq) return;
       this.countries.set(items);
       this.countriesLoaded = true;
@@ -211,7 +236,8 @@ export class StatesTab {
         replaceUrl: true,
       });
       await this.loadStates(defaultCountry.id);
-    } catch {
+    } catch (error) {
+      this.showLoadError(error);
       if (seq !== this.loadSeq) return;
       this.failed.set(true);
       this.loading.set(false);
@@ -224,14 +250,15 @@ export class StatesTab {
     this.loading.set(true);
     this.failed.set(false);
     try {
-      const { items } = await listStates(countryId);
+      const { items } = await this.api.listStates(countryId);
       if (seq !== this.statesSeq) return;
       this.states.set(items);
+      this.notify.connectionRestored();
     } catch (error) {
       if (seq !== this.statesSeq) return;
       this.states.set([]);
       if (errorCodeOf(error) === 'GEO_COUNTRY_NOT_FOUND') {
-        this.notify.error(errorMessage(error, 'wsGeo', this.transloco));
+        this.notify.error(this.transloco.translate('wsGeo.states.countryUnavailable'));
         const fallback = this.pickDefaultCountry(this.countries().filter((c) => !tried.has(c.id)));
         if (fallback) {
           this.selectedCountryId.set(fallback.id);
@@ -245,12 +272,20 @@ export class StatesTab {
           return;
         }
       }
+      this.showLoadError(error);
       this.failed.set(true);
     } finally {
       if (seq === this.statesSeq) {
         this.loading.set(false);
       }
     }
+  }
+
+  private showLoadError(error: unknown): void {
+    if (errorCodeOf(error) === 'GEO_COUNTRY_NOT_FOUND') return;
+    const message = geoErrorMessage(error, 'wsGeo', this.transloco);
+    if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(message, '');
+    else this.notify.error(message);
   }
 
   private pickDefaultCountry(list: readonly GeoCountry[]): GeoCountry | null {

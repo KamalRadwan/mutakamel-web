@@ -2,7 +2,11 @@
 @let fin = p.financial;
 
 <div class="overflow-x-auto pb-4">
-  <div role="table" class="min-w-doc-table-min" [attr.aria-label]="'bsub.change.quote.tableLabel' | transloco">
+  <div
+    role="table"
+    class="min-w-doc-table-min"
+    [attr.aria-label]="'bsub.change.quote.tableLabel' | transloco"
+  >
     <div
       role="row"
       class="grid grid-cols-billing-quote-row h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
@@ -10,19 +14,34 @@
       <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
         {{ 'bsub.change.quote.cols.item' | transloco }}
       </span>
-      <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+      >
         {{ 'bsub.change.quote.cols.change' | transloco }}
       </span>
-      <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10"
+      >
         {{ 'bsub.change.quote.cols.before' | transloco }}
       </span>
-      <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10"
+      >
         {{ 'bsub.change.quote.cols.after' | transloco }}
       </span>
-      <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10"
+      >
         {{ 'bsub.change.quote.cols.periodDelta' | transloco }}
       </span>
-      <span role="columnheader" class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10">
+      <span
+        role="columnheader"
+        class="flex min-w-0 items-center justify-end truncate border-s border-on-nav-line px-10"
+      >
         {{ 'bsub.change.quote.cols.dueNow' | transloco }}
       </span>
     </div>
@@ -32,11 +51,17 @@
         role="row"
         class="mt-6 grid grid-cols-billing-quote-row min-h-table-row items-center rounded-10 border border-border bg-surface text-14 leading-20 text-text shadow-card"
       >
-        <span role="cell" class="flex min-w-0 items-center px-10 text-13 leading-18 font-medium text-text">
+        <span
+          role="cell"
+          class="flex min-w-0 items-center px-10 text-13 leading-18 font-medium text-text"
+        >
           <span class="truncate">{{ itemLabel(change) }}</span>
         </span>
 
-        <span role="cell" class="flex min-w-0 flex-wrap items-center gap-6 border-s border-border px-10 py-4 text-12 leading-18 text-text">
+        <span
+          role="cell"
+          class="flex min-w-0 flex-wrap items-center gap-6 border-s border-border px-10 py-4 text-12 leading-18 text-text"
+        >
           @if (hasTierTransition(change)) {
             <span class="inline-flex items-center gap-4">
               @if (change.fromTierId) {
@@ -44,7 +69,12 @@
               } @else {
                 <span class="text-text-muted">{{ 'bill.common.none' | transloco }}</span>
               }
-              <ng-icon name="tablerArrowRight" size="12" class="shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true" />
+              <ng-icon
+                name="tablerArrowRight"
+                size="12"
+                class="shrink-0 text-text-muted rtl:-scale-x-100"
+                aria-hidden="true"
+              />
               <span class="font-medium">{{ tierLabel(change.toTierId) }}</span>
             </span>
           }
@@ -52,32 +82,63 @@
           @if (hasSeatsTransition(change)) {
             <span class="inline-flex items-center gap-4 tabular-nums">
               @if (change.fromSeats !== null) {
-                <span>{{ ('bsub.change.quote.seatsCountPlural' | pluralKey: change.fromSeats) | transloco: { n: change.fromSeats } }}</span>
+                <span>{{
+                  'bsub.change.quote.seatsCountPlural'
+                    | pluralKey: change.fromSeats
+                    | transloco: { n: change.fromSeats }
+                }}</span>
               } @else if (!hasTierTransition(change)) {
                 <span class="text-text-muted">{{ 'bill.common.none' | transloco }}</span>
               }
               @if (change.fromSeats !== null || !hasTierTransition(change)) {
-                <ng-icon name="tablerArrowRight" size="12" class="shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true" />
+                <ng-icon
+                  name="tablerArrowRight"
+                  size="12"
+                  class="shrink-0 text-text-muted rtl:-scale-x-100"
+                  aria-hidden="true"
+                />
               }
-              <span class="font-medium">{{ ('bsub.change.quote.seatsCountPlural' | pluralKey: (change.toSeats ?? 0)) | transloco: { n: change.toSeats } }}</span>
+              <span class="font-medium">{{
+                'bsub.change.quote.seatsCountPlural'
+                  | pluralKey: change.toSeats ?? 0
+                  | transloco: { n: change.toSeats }
+              }}</span>
             </span>
           }
         </span>
 
-        <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 text-text">
-          <span dir="ltr" class="truncate tabular-nums">{{ formatUsd(change.previousAmountUsd) }}</span>
+        <span
+          role="cell"
+          class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 text-text"
+        >
+          <span dir="ltr" class="truncate tabular-nums">{{
+            formatUsd(change.previousAmountUsd)
+          }}</span>
         </span>
 
-        <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 text-text">
+        <span
+          role="cell"
+          class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 text-text"
+        >
           <span dir="ltr" class="truncate tabular-nums">{{ formatUsd(change.nextAmountUsd) }}</span>
         </span>
 
-        <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 font-medium text-text">
-          <span dir="ltr" class="truncate tabular-nums">{{ formatUsd(change.fullPeriodDeltaUsd, { signed: true }) }}</span>
+        <span
+          role="cell"
+          class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 font-medium text-text"
+        >
+          <span dir="ltr" class="truncate tabular-nums">{{
+            formatUsd(change.fullPeriodDeltaUsd, { signed: true })
+          }}</span>
         </span>
 
-        <span role="cell" class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 font-medium text-text">
-          <span dir="ltr" class="truncate tabular-nums">{{ formatUsd(change.proratedAllocationUsd, { signed: true }) }}</span>
+        <span
+          role="cell"
+          class="flex min-w-0 items-center justify-end border-s border-border px-10 text-13 leading-18 font-medium text-text"
+        >
+          <span dir="ltr" class="truncate tabular-nums">{{
+            formatUsd(change.proratedAllocationUsd, { signed: true })
+          }}</span>
         </span>
       </div>
     }
@@ -89,10 +150,14 @@
   [class]="expired() ? 'bg-surface-muted text-text-muted' : 'bg-surface text-text'"
 >
   <header class="flex flex-wrap items-center justify-between gap-8">
-    <h3 class="text-13 leading-18 font-medium">{{ 'bsub.change.quote.summaryTitle' | transloco }}</h3>
+    <h3 class="text-13 leading-18 font-medium">
+      {{ 'bsub.change.quote.summaryTitle' | transloco }}
+    </h3>
     <span
       class="inline-flex h-badge items-center rounded-8 px-8 text-12 leading-16 font-medium tabular-nums"
-      [class]="expired() ? 'bg-danger-soft text-on-danger-soft' : 'bg-brand-soft text-on-brand-soft'"
+      [class]="
+        expired() ? 'bg-danger-soft text-on-danger-soft' : 'bg-brand-soft text-on-brand-soft'
+      "
     >
       @if (expired()) {
         {{ 'bsub.change.quote.expired' | transloco }}
@@ -107,7 +172,12 @@
       <span class="text-text-muted">{{ 'bsub.change.quote.recurring' | transloco }}</span>
       <span class="inline-flex items-center gap-6 tabular-nums">
         <span dir="ltr">{{ formatUsd(fin.previousRecurringUsd) }}</span>
-        <ng-icon name="tablerArrowRight" size="12" class="shrink-0 text-text-muted rtl:-scale-x-100" aria-hidden="true" />
+        <ng-icon
+          name="tablerArrowRight"
+          size="12"
+          class="shrink-0 text-text-muted rtl:-scale-x-100"
+          aria-hidden="true"
+        />
         <span dir="ltr" class="font-medium">{{ formatUsd(fin.nextRecurringUsd) }}</span>
         <span class="text-text-muted">{{ cycleUnitKey() | transloco }}</span>
       </span>
@@ -119,7 +189,9 @@
         <span dir="ltr" class="text-15 leading-22 font-medium tabular-nums">
           {{ formatUsd(fin.proratedAmountUsd) }}
         </span>
-        <span class="text-text-muted">{{ 'bsub.change.quote.direction.' + fin.direction | transloco }}</span>
+        <span class="text-text-muted">{{
+          'bsub.change.quote.direction.' + fin.direction | transloco
+        }}</span>
       </span>
     </div>
 
@@ -128,7 +200,9 @@
       @if (fin.walletStatus === 'NOT_APPLICABLE') {
         <span>{{ 'bill.common.none' | transloco }}</span>
       } @else {
-        <span dir="ltr" class="font-medium tabular-nums">{{ formatUsd(fin.walletAvailableUsd) }}</span>
+        <span dir="ltr" class="font-medium tabular-nums">{{
+          formatUsd(fin.walletAvailableUsd)
+        }}</span>
       }
     </div>
 
@@ -142,19 +216,19 @@
     }
   </div>
 
-  @if (!fin.canApply && !expired()) {
+  @if ((!fin.canApply || hasShortfall()) && !expired()) {
     <div class="flex flex-wrap items-center gap-8 border-t border-border pt-8">
       @if (hasShortfall()) {
         <a
           uiButton
           variant="secondary"
           [routerLink]="['/workspace/billing/overview']"
-          [queryParams]="{ topup: topupAmount() }"
+          [queryParams]="{ topup: 1 }"
           target="_blank"
           rel="noopener noreferrer"
         >
           <ng-icon name="tablerUpload" size="15" aria-hidden="true" />
-          {{ 'bsub.change.topUpWallet' | transloco }}
+          {{ 'bsub.preview.topUp' | transloco: { amount: formatUsd(fin.walletShortfallUsd) } }}
         </a>
       }
 

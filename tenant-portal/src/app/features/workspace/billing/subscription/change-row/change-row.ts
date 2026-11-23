@@ -4,7 +4,7 @@ import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerPlus, tablerPuzzle, tablerTrendingUp, tablerUsers, tablerX } from '@ng-icons/tabler-icons';
+import { tablerPlus, tablerPuzzle, tablerTrendingUp, tablerUsers } from '@ng-icons/tabler-icons';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
@@ -288,17 +288,35 @@ export function toCommercialChange(row: CartRow): CommercialChange | null {
   }
 }
 
-const KIND_LOOK: Readonly<Record<CartRow['kind'], { icon: string; tile: string; labelKey: string }>> = {
-  'add-app': { icon: 'tablerPlus', tile: 'bg-icon-green', labelKey: 'bsub.change.row.kinds.addApp' },
-  'change-seats': { icon: 'tablerUsers', tile: 'bg-icon-teal', labelKey: 'bsub.change.row.kinds.changeSeats' },
-  'upgrade-tier': { icon: 'tablerTrendingUp', tile: 'bg-icon-blue', labelKey: 'bsub.change.row.kinds.upgradeTier' },
-  'add-addon': { icon: 'tablerPuzzle', tile: 'bg-icon-violet', labelKey: 'bsub.change.row.kinds.addAddon' },
+const KIND_LOOK: Readonly<
+  Record<CartRow['kind'], { icon: string; tile: string; labelKey: string }>
+> = {
+  'add-app': {
+    icon: 'tablerPlus',
+    tile: 'bg-icon-green',
+    labelKey: 'bsub.change.row.kinds.addApp',
+  },
+  'change-seats': {
+    icon: 'tablerUsers',
+    tile: 'bg-icon-teal',
+    labelKey: 'bsub.change.row.kinds.changeSeats',
+  },
+  'upgrade-tier': {
+    icon: 'tablerTrendingUp',
+    tile: 'bg-icon-blue',
+    labelKey: 'bsub.change.row.kinds.upgradeTier',
+  },
+  'add-addon': {
+    icon: 'tablerPuzzle',
+    tile: 'bg-icon-violet',
+    labelKey: 'bsub.change.row.kinds.addAddon',
+  },
 };
 
 @Component({
   selector: 'app-change-row',
   imports: [RouterLink, NgIcon, TranslocoPipe, Button, Dropdown, Field],
-  providers: [provideIcons({ tablerPlus, tablerPuzzle, tablerTrendingUp, tablerUsers, tablerX })],
+  providers: [provideIcons({ tablerPlus, tablerPuzzle, tablerTrendingUp, tablerUsers })],
   templateUrl: './change-row.html',
   host: { class: 'block' },
 })
@@ -308,7 +326,9 @@ export class ChangeRow {
 
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly bsubReady = toSignal(this.transloco.selectTranslation('ws-billing-subscription'));
+  private readonly bsubReady = toSignal(
+    this.transloco.selectTranslation('ws-billing-subscription'),
+  );
 
   readonly row = input.required<CartRow>();
   readonly subscription = input.required<SubscriptionView>();
@@ -318,7 +338,6 @@ export class ChangeRow {
   readonly submitted = input(false);
 
   readonly changed = output<CartRow>();
-  readonly removed = output<void>();
 
   private readonly localTouched = signal(false);
 
@@ -347,7 +366,10 @@ export class ChangeRow {
     const subAppIds = new Set(this.subscription().baseItems.map((b) => b.applicationId));
     const usedAppIds = new Set(
       this.allRows()
-        .filter((other): other is AddAppCartRow => other.kind === 'add-app' && other.selectionKey !== r.selectionKey)
+        .filter(
+          (other): other is AddAppCartRow =>
+            other.kind === 'add-app' && other.selectionKey !== r.selectionKey,
+        )
         .map((other) => other.applicationId),
     );
     const options: DropdownOption<string>[] = this.catalogueGroups()
@@ -581,7 +603,17 @@ export class ChangeRow {
     if (r.kind !== 'change-seats' || r.targetKind !== 'ADDON') return MAX_SEATS;
     const addon = this.subscription().addonSelections.find((a) => a.id === r.targetId);
     if (!addon) return MAX_SEATS;
-    return Math.max(1, effectiveParentSeats(addon.parentItemId, this.subscription(), this.allRows()));
+    return Math.max(
+      1,
+      effectiveParentSeats(addon.parentItemId, this.subscription(), this.allRows()),
+    );
+  });
+
+  protected readonly seatInputMin = computed(() => {
+    const row = this.row();
+    if (row.kind !== 'change-seats' || row.targetKind !== 'ADDON') return 1;
+    const addon = this.subscription().addonSelections.find((item) => item.id === row.targetId);
+    return addon ? addon.seats + 1 : 1;
   });
 
   protected readonly seatHintKey = computed(() => {
@@ -597,7 +629,13 @@ export class ChangeRow {
     const r = this.row();
     if (r.serverError) return r.serverError;
     if (!this.showErrors()) return null;
-    return validateCartRow(r, this.subscription(), this.catalogueGroups(), this.allRows(), this.transloco);
+    return validateCartRow(
+      r,
+      this.subscription(),
+      this.catalogueGroups(),
+      this.allRows(),
+      this.transloco,
+    );
   });
 
   protected readonly appFieldError = computed<string | null>(() => {
@@ -611,13 +649,25 @@ export class ChangeRow {
     if (r.kind === 'add-app') {
       if (r.serverError) return r.serverError;
       if (!this.showErrors() || !r.applicationId) return null;
-      const err = validateCartRow(r, this.subscription(), this.catalogueGroups(), this.allRows(), this.transloco);
+      const err = validateCartRow(
+        r,
+        this.subscription(),
+        this.catalogueGroups(),
+        this.allRows(),
+        this.transloco,
+      );
       return !r.tierId ? err : null;
     }
     if (r.kind === 'upgrade-tier') {
       if (r.serverError) return r.serverError;
       if (!this.showErrors()) return null;
-      return validateCartRow(r, this.subscription(), this.catalogueGroups(), this.allRows(), this.transloco);
+      return validateCartRow(
+        r,
+        this.subscription(),
+        this.catalogueGroups(),
+        this.allRows(),
+        this.transloco,
+      );
     }
     return null;
   });
@@ -626,7 +676,13 @@ export class ChangeRow {
     const r = this.row();
     if (r.kind === 'add-app') {
       if (!this.showErrors() || !r.applicationId || !r.tierId) return null;
-      return validateCartRow(r, this.subscription(), this.catalogueGroups(), this.allRows(), this.transloco);
+      return validateCartRow(
+        r,
+        this.subscription(),
+        this.catalogueGroups(),
+        this.allRows(),
+        this.transloco,
+      );
     }
     if (r.kind === 'change-seats' || r.kind === 'add-addon') {
       return this.rowValidationError();
@@ -705,11 +761,14 @@ export class ChangeRow {
     const r = this.row();
     if (r.kind !== 'upgrade-tier') return;
     const base = this.subscription().baseItems.find((b) => b.id === itemId);
-    const group = base ? this.catalogueGroups().find((g) => g.applicationId === base.applicationId) : undefined;
+    const group = base
+      ? this.catalogueGroups().find((g) => g.applicationId === base.applicationId)
+      : undefined;
     const cycle = this.subscription().subscription.billingCycle;
     const firstHigher =
       base && group
-        ? group.tiers.find((t) => t.tier.rank > base.tierRank && isAppTierAvailable(t, cycle))?.tier.id ?? ''
+        ? (group.tiers.find((t) => t.tier.rank > base.tierRank && isAppTierAvailable(t, cycle))
+            ?.tier.id ?? '')
         : '';
     this.localTouched.set(false);
     this.changed.emit({

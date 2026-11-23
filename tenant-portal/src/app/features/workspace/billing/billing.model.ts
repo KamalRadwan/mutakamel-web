@@ -1,3 +1,5 @@
+export type { CorePage } from '../../../core/api/core-page';
+
 export type Money = string; // ^(?:0|[1-9][0-9]{0,13})\.[0-9]{4}$ ; signed deltas may start with '-'
 export interface PageMeta {
   page: number;
@@ -22,6 +24,7 @@ export type BillingCycle = 'MONTHLY' | 'ANNUAL';
 export type AccessMode = 'FULL' | 'DUNNING' | 'READ_ONLY' | 'BLOCKED';
 export type WalletStatus = 'ACTIVE' | 'FROZEN' | 'CLOSED';
 export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID';
+export type InvoiceListQuery = PageQuery & { status?: InvoiceStatus[]; from?: string; to?: string };
 export type InvoicePurpose = 'TRIAL_ACTIVATION' | 'RENEWAL' | 'PRORATION' | 'MANUAL';
 export type PaymentStatus =
   | 'CREATED'
@@ -179,6 +182,7 @@ export interface PaymentInputCurrencies {
   walletCurrencyCode: 'USD';
   items: { currencyCode: string; isBaseCurrency: boolean }[];
   total: number;
+  topUpLimitsUsd?: { min: Money; max: Money };
 }
 export interface InvoicePaymentQuote {
   quoteId: string;

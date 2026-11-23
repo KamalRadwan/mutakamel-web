@@ -1,14 +1,11 @@
-import { Service } from '@angular/core';
-import { FAKE_BILLING_OWNER, setFakeBillingOwner } from '../billing.fake';
+import { inject, Service } from '@angular/core';
+import { AuthSession } from '../../../../core/auth/auth-session';
 
 @Service()
 export class BillingSession {
-  // Later reads the active user session's isTenantOwner flag.
-  isOwner(): boolean {
-    return FAKE_BILLING_OWNER;
-  }
+  private readonly session = inject(AuthSession);
 
-  setOwner(value: boolean): void {
-    setFakeBillingOwner(value);
+  isOwner(): boolean {
+    return this.session.me()?.isTenantOwner === true;
   }
 }

@@ -1,4 +1,4 @@
-import { Component, computed, inject, output, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
@@ -8,8 +8,9 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { ApiError } from '../../../../../core/api/api-errors';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { getEmailConfig, patchEmailConfig } from '../email.api';
+import { EmailApi } from '../email.api';
 import {
   EmailConflictPayload,
   EmailResult,
@@ -56,36 +57,35 @@ const PATCH_FIELD_ORDER: readonly (keyof PatchEmailConfigRequest)[] = [
 })
 export class ConflictDialog {
   private readonly notify = inject(Notify);
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
   private readonly modal = viewChild.required<Modal>('modal');
 
+  readonly canManage = input(false);
+  readonly verified = output<EmailResult>();
+  readonly hasUnsavedDraft = computed(() => this.opened() && !!this.patch());
+  private readonly opened = signal(false);
+  private saveOp: { bodyJson: string; key: string } | null = null;
+
   readonly adopted = output<EmailResult>();
 
-  protected readonly status = signal<409 | 428>(409);
   protected readonly patch = signal<PatchEmailConfigRequest | null>(null);
-  protected readonly phase = signal<'initial' | 'reviewed'>('initial');
   protected readonly latestResult = signal<EmailResult | null>(null);
   protected readonly busy = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
 
   private allowClose = false;
 
-  protected readonly titleKey = computed(() =>
-    this.status() === 428 ? 'wsEmail.conflict.title428' : 'wsEmail.conflict.title409',
-  );
-
-  protected readonly isLoadOnly = computed(
-    () => this.status() === 428 || this.patch() === null,
-  );
+  protected readonly titleKey = () => 'wsEmail.conflict.title409';
 
   protected readonly diffRows = computed<ConflictDiffRow[]>(() => {
     this.i18n();
     const lang = this.language();
     const patchObj = this.patch();
     const latest = this.latestResult();
-    if (!patchObj || !latest || this.phase() !== 'reviewed') return [];
+    if (!patchObj || !latest) return [];
 
     const cfg = latest.config;
     const rows: ConflictDiffRow[] = [];
@@ -129,15 +129,19 @@ export class ConflictDialog {
 
   open(payload: EmailConflictPayload): void {
     this.allowClose = false;
-    this.status.set(payload.status);
+    this.opened.set(true);
+    this.saveOp = null;
     this.patch.set(payload.patch);
-    this.phase.set('initial');
     this.latestResult.set(null);
     this.errorMessage.set(null);
     this.modal().open();
+    void this.reviewLatest();
   }
 
   close(): void {
+    this.opened.set(false);
+    this.patch.set(null);
+    this.saveOp = null;
     this.allowClose = true;
     this.modal().close();
   }
@@ -148,6 +152,9 @@ export class ConflictDialog {
       return;
     }
     this.allowClose = false;
+    this.opened.set(false);
+    this.patch.set(null);
+    this.saveOp = null;
   }
 
   protected async loadLatest(): Promise<void> {
@@ -155,7 +162,7 @@ export class ConflictDialog {
     this.busy.set(true);
     this.errorMessage.set(null);
     try {
-      const fresh = await getEmailConfig();
+      const fresh = await this.api.getEmailConfig();
       this.adopted.emit(fresh);
       this.close();
     } catch (error) {
@@ -170,9 +177,9 @@ export class ConflictDialog {
     this.busy.set(true);
     this.errorMessage.set(null);
     try {
-      const fresh = await getEmailConfig();
+      const fresh = await this.api.getEmailConfig();
+      if (!this.opened()) return;
       this.latestResult.set(fresh);
-      this.phase.set('reviewed');
     } catch (error) {
       this.errorMessage.set(resolveEmailError(error, this.transloco));
     } finally {
@@ -180,31 +187,31 @@ export class ConflictDialog {
     }
   }
 
-  protected useLatestSaved(): void {
-    const latest = this.latestResult();
-    if (!latest || this.busy()) return;
-    this.adopted.emit(latest);
-    this.close();
-  }
-
   protected async keepMyChanges(): Promise<void> {
-    const latest = this.latestResult();
     const patchBody = this.patch();
-    if (!latest || !patchBody || this.busy()) return;
+    if (!this.canManage() || !this.api.gates().manage || this.busy()) return;
 
     this.busy.set(true);
     this.errorMessage.set(null);
     try {
-      const saved = await patchEmailConfig(patchBody, latest.revision, newIdempotencyKey());
+      const latest = await this.api.getEmailConfig();
+      const bodyJson = JSON.stringify([patchBody, latest.etag]);
+      if (this.saveOp?.bodyJson !== bodyJson) this.saveOp = { bodyJson, key: newIdempotencyKey() };
+      const saved = patchBody
+        ? await this.api.patchEmailConfig(patchBody, latest.etag, this.saveOp.key)
+        : await this.api.verifyEmailDomain(latest.etag, this.saveOp.key);
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
       this.adopted.emit(saved);
       this.close();
+      if (!patchBody) this.verified.emit(saved);
     } catch (error) {
       if (isConflictError(error)) {
-        this.status.set(error.status);
-        this.phase.set('initial');
         this.latestResult.set(null);
         this.errorMessage.set(null);
+        return;
+      }
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
         return;
       }
       this.errorMessage.set(resolveEmailError(error, this.transloco));

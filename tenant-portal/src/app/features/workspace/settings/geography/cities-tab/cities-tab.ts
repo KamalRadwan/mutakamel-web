@@ -1,6 +1,14 @@
-import { Component, DestroyRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
@@ -13,46 +21,41 @@ import {
   tablerToggleRight,
   tablerTrash,
 } from '@ng-icons/tabler-icons';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { LanguageState } from '../../../../../core/i18n/language';
+import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { Notify } from '../../../../../core/notify/notify';
-import { ActionItem, ActionSelection, ActionsMenu } from '../../../../../shared/ui/actions-menu/actions-menu';
+import {
+  ActionItem,
+  ActionSelection,
+  ActionsMenu,
+} from '../../../../../shared/ui/actions-menu/actions-menu';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { Switch } from '../../../../../shared/ui/switch/switch';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
-import { ApiError, errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
+import { Switch } from '../../../../../shared/ui/switch/switch';
+import { ActionKeys } from '../../core-response.model';
 import {
   GEO_LIMITS,
+  GeoAdminApi,
   GeoCity,
   GeoCountry,
   GeoState,
   GeoUsedBy,
   GeoZone,
-  deleteCity,
   geoNameIn,
-  listCities,
-  listCountries,
-  listStates,
-  listAllZones,
-  updateCity,
   usedByOf,
 } from '../geo-admin.api';
+import { geoErrorMessage, placesEditable } from '../geo-admin.model';
 import { PlaceFormModal } from '../place-form-modal/place-form-modal';
-import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { ActionKeys } from '../../core-response.model';
 
-const CAN_MANAGE = true; // later from permission core.geo.manage
 const SEARCH_DEBOUNCE_MS = 300;
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
-
-/** The list search: a literal, case-insensitive substring of either name, as GeoService filters. */
-function containsSearch(item: { nameEn: string; nameAr: string }, search: string): boolean {
-  const term = search.trim().toLowerCase();
-  return !term || item.nameEn.toLowerCase().includes(term) || item.nameAr.toLowerCase().includes(term);
-}
 
 function compareCitiesByNameEn(a: GeoCity, b: GeoCity): number {
   const byBase = a.nameEn.localeCompare(b.nameEn, 'en', { sensitivity: 'base' });
@@ -77,7 +80,10 @@ function compareCitiesByNameEn(a: GeoCity, b: GeoCity): number {
     Switch,
   ],
   providers: [
-    provideTranslocoScope({ scope: 'ws-geo', alias: 'wsGeo' }, 'settings', { scope: 'ws-geo-places', alias: 'geoPlaces' }),
+    provideTranslocoScope({ scope: 'ws-geo', alias: 'wsGeo' }, 'settings', {
+      scope: 'ws-geo-places',
+      alias: 'geoPlaces',
+    }),
     provideIcons({
       tablerAlertTriangle,
       tablerBuildingCommunity,
@@ -89,9 +95,10 @@ function compareCitiesByNameEn(a: GeoCity, b: GeoCity): number {
     }),
   ],
   templateUrl: './cities-tab.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class CitiesTab {
+  private readonly api = inject(GeoAdminApi);
   private static nextId = 0;
   protected readonly uid = `cities-tab-${++CitiesTab.nextId}`;
 
@@ -104,10 +111,14 @@ export class CitiesTab {
   protected readonly language = inject(LanguageState).current;
 
   private readonly placeModal = viewChild.required(PlaceFormModal);
+  private readonly confirmDeactivate = viewChild.required<ConfirmDialog>('confirmDeactivate');
   private readonly confirmDelete = viewChild.required<ConfirmDialog>('confirmDelete');
   private readonly inUseModal = viewChild.required<Modal>('inUseModal');
 
-  protected readonly canManage = CAN_MANAGE;
+  private readonly session = inject(AuthSession);
+  protected readonly canManage = computed(
+    () => placesEditable(this.session.me()) && !this.api.placesDenied(),
+  );
   protected readonly skeletonRows = SKELETON_ROWS;
 
   protected readonly countries = signal<GeoCountry[]>([]);
@@ -134,6 +145,7 @@ export class CitiesTab {
   private statesSeq = 0;
   private resolveCountrySeq = 0;
   private citiesSeq = 0;
+  private cursorContext = '';
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly actionKeys = new ActionKeys(newIdempotencyKey);
 
@@ -152,14 +164,18 @@ export class CitiesTab {
     const lang = this.language();
     const state = this.selectedState();
     const country = this.selectedCountry();
-    return [state ? geoNameIn(state, lang) : '', country ? geoNameIn(country, lang) : ''].filter(Boolean).join(' · ');
+    return [state ? geoNameIn(state, lang) : '', country ? geoNameIn(country, lang) : '']
+      .filter(Boolean)
+      .join(' · ');
   });
 
   protected readonly countryOptions = computed<DropdownOption<string>[]>(() => {
     const lang = this.language();
     return this.countries()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }))
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      )
       .map((item) => ({ value: item.id, label: geoNameIn(item, lang) }));
   });
 
@@ -167,7 +183,9 @@ export class CitiesTab {
     const lang = this.language();
     return this.states()
       .slice()
-      .sort((a, b) => geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }))
+      .sort((a, b) =>
+        geoNameIn(a, lang).localeCompare(geoNameIn(b, lang), lang, { sensitivity: 'base' }),
+      )
       .map((item) => ({ value: item.id, label: geoNameIn(item, lang) }));
   });
 
@@ -180,9 +198,7 @@ export class CitiesTab {
   });
 
   protected readonly gridColumns = computed(() =>
-    this.canManage
-      ? 'grid-cols-geo-city-row-actions'
-      : 'grid-cols-geo-city-row',
+    this.canManage() ? 'grid-cols-geo-city-row-actions' : 'grid-cols-geo-city-row',
   );
 
   /** The API lists inactive cities too; the switch only hides them on screen. */
@@ -256,6 +272,8 @@ export class CitiesTab {
 
   protected onCountryChange(nextCountry: string): void {
     if (nextCountry === this.countryId()) return;
+    this.nextCursor.set(null);
+    this.citiesSeq++;
     this.resolveCountrySeq++;
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -270,6 +288,8 @@ export class CitiesTab {
 
   protected onStateChange(nextState: string): void {
     if (nextState === this.stateId()) return;
+    this.nextCursor.set(null);
+    this.citiesSeq++;
     this.resolveCountrySeq++;
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -283,6 +303,8 @@ export class CitiesTab {
 
   protected onShowInactiveChange(checked: boolean): void {
     this.showInactive.set(checked);
+    const stateId = this.selectedStateId();
+    if (stateId) void this.loadCities(stateId, this.debouncedSearch(), true);
   }
 
   protected clearSearch(): void {
@@ -325,7 +347,7 @@ export class CitiesTab {
 
   protected openCreate(): void {
     const state = this.selectedState();
-    if (!this.canManage || !state) return;
+    if (!this.canManage() || !state) return;
     this.placeModal().openCreateCity({
       stateId: state.id,
       locationPath: this.locationPath(),
@@ -357,13 +379,19 @@ export class CitiesTab {
   protected usedByText(usedBy: readonly GeoUsedBy[]): string {
     this.i18n();
     const separator = this.transloco.translate('geoPlaces.usedBy.separator');
-    return usedBy.map((kind) => this.transloco.translate('geoPlaces.usedBy.' + kind)).join(separator);
+    return usedBy
+      .map((kind) => this.transloco.translate('geoPlaces.usedBy.' + kind))
+      .join(separator);
   }
 
   protected formatDate(iso: string): string {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return iso;
-    return new Intl.DateTimeFormat(this.language() + '-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+    return new Intl.DateTimeFormat(this.language() + '-u-nu-latn', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
   }
 
   protected zoneName(zoneId: string | null): string | null {
@@ -432,25 +460,7 @@ export class CitiesTab {
   }
 
   protected onCitySaved(event: { city: GeoCity; isNew: boolean }): void {
-    const saved = event.city;
-    if (saved.stateId !== this.stateId()) return;
-
-    if (event.isNew) {
-      if (!containsSearch(saved, this.debouncedSearch())) return;
-      this.cities.update((list) => {
-        if (list.some((item) => item.id === saved.id)) {
-          return list.map((item) => (item.id === saved.id ? saved : item)).sort(compareCitiesByNameEn);
-        }
-        const last = list.at(-1);
-        if (!this.nextCursor() || !last || compareCitiesByNameEn(saved, last) <= 0) {
-          return [...list, saved].sort(compareCitiesByNameEn);
-        }
-        return list;
-      });
-      return;
-    }
-
-    this.applyCityUpdate(saved);
+    if (event.city.stateId === this.stateId()) this.reload();
   }
 
   protected onCityNotFound(id: string): void {
@@ -462,7 +472,7 @@ export class CitiesTab {
   }
 
   protected async requestDelete(city: GeoCity): Promise<void> {
-    if (!this.canManage || this.busy()) return;
+    if (!this.canManage() || this.busy()) return;
     this.deletingCity.set(city);
     const confirmed = await this.confirmDelete().open();
     if (!confirmed) {
@@ -472,8 +482,8 @@ export class CitiesTab {
 
     this.busy.set(true);
     try {
-      const signature = `delete:${city.id}`;
-      await deleteCity(city.id, this.actionKeys.keyFor(signature));
+      const signature = `delete:city:${city.id}`;
+      await this.api.deleteCity(city.id, this.actionKeys.keyFor(signature));
       this.actionKeys.done(signature);
       this.placeModal().close();
       this.removeCityFromList(city.id);
@@ -487,7 +497,7 @@ export class CitiesTab {
         this.inUseModal().open();
         return;
       }
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       if (code === 'GEO_CITY_NOT_FOUND') {
         this.placeModal().close();
         this.onCityNotFound(city.id);
@@ -505,18 +515,23 @@ export class CitiesTab {
 
   protected async deactivateInUseCity(): Promise<void> {
     const state = this.inUseState();
-    if (!state || this.deactivating()) return;
+    if (!state || !this.canManage() || this.deactivating()) return;
+    if (!(await this.confirmDeactivate().open())) return;
 
     this.deactivating.set(true);
     try {
-      const signature = `active:${state.city.id}:false`;
-      const updated = await updateCity(state.city.id, { isActive: false }, this.actionKeys.keyFor(signature));
+      const signature = `toggle:city:${state.city.id}:false`;
+      const updated = await this.api.updateCity(
+        state.city.id,
+        { isActive: false },
+        this.actionKeys.keyFor(signature),
+      );
       this.actionKeys.done(signature);
       this.applyCityUpdate(updated);
       this.notify.success(this.transloco.translate('geoPlaces.saved'));
       this.closeInUseModal();
     } catch (error) {
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       if (errorCodeOf(error) === 'GEO_CITY_NOT_FOUND') {
         this.onCityNotFound(state.city.id);
         this.closeInUseModal();
@@ -527,16 +542,22 @@ export class CitiesTab {
   }
 
   private async toggleActive(city: GeoCity): Promise<void> {
-    if (!this.canManage || this.busy() || this.togglingIds().has(city.id)) return;
+    if (!this.canManage() || this.busy() || this.togglingIds().has(city.id)) return;
+    if (city.isActive && !(await this.confirmDeactivate().open())) return;
+    if (!this.canManage()) return;
     this.togglingIds.update((set) => new Set(set).add(city.id));
     try {
-      const signature = `active:${city.id}:${!city.isActive}`;
-      const updated = await updateCity(city.id, { isActive: !city.isActive }, this.actionKeys.keyFor(signature));
+      const signature = `toggle:city:${city.id}:${!city.isActive}`;
+      const updated = await this.api.updateCity(
+        city.id,
+        { isActive: !city.isActive },
+        this.actionKeys.keyFor(signature),
+      );
       this.actionKeys.done(signature);
       this.applyCityUpdate(updated);
       this.notify.success(this.transloco.translate('geoPlaces.saved'));
     } catch (error) {
-      this.showErrorToast(error);
+      this.showErrorToast(error, true);
       if (errorCodeOf(error) === 'GEO_CITY_NOT_FOUND') {
         this.onCityNotFound(city.id);
       }
@@ -573,12 +594,15 @@ export class CitiesTab {
   }
 
   private async loadLookups(): Promise<void> {
-    const [countriesResult, zonesResult] = await Promise.allSettled([listCountries(), listAllZones()]);
+    const [countriesResult, zonesResult] = await Promise.allSettled([
+      this.api.listCountries(),
+      this.api.listAllZones(),
+    ]);
     if (countriesResult.status === 'fulfilled') {
       this.countries.set(countriesResult.value.items);
     }
     if (zonesResult.status === 'fulfilled') {
-      this.zones.set(zonesResult.value);
+      this.zones.set(zonesResult.value.items);
     }
     if (countriesResult.status === 'rejected') {
       this.showErrorToast(countriesResult.reason);
@@ -590,7 +614,10 @@ export class CitiesTab {
   private async resolveCountryFromState(stateId: string, countries: GeoCountry[]): Promise<void> {
     const seq = ++this.resolveCountrySeq;
     const results = await Promise.allSettled(
-      countries.map(async (country) => ({ country, states: (await listStates(country.id)).items })),
+      countries.map(async (country) => ({
+        country,
+        states: (await this.api.listStates(country.id)).items,
+      })),
     );
     if (seq !== this.resolveCountrySeq || this.stateId() !== stateId || this.countryId()) return;
 
@@ -619,9 +646,25 @@ export class CitiesTab {
     this.handleMissingState(stateId);
   }
 
+  private async loadZoneNames(cities: readonly GeoCity[]): Promise<void> {
+    const ids = [
+      ...new Set(
+        cities.flatMap((city) =>
+          city.zoneId && !this.zoneById().has(city.zoneId) ? [city.zoneId] : [],
+        ),
+      ),
+    ];
+    await Promise.allSettled(
+      ids.map(async (id) => {
+        const zone = await this.api.getZone(id);
+        this.zones.update((current) => [...current.filter((item) => item.id !== id), zone]);
+      }),
+    );
+  }
+
   private async loadZonesLookup(): Promise<void> {
     try {
-      this.zones.set(await listAllZones());
+      this.zones.set((await this.api.listAllZones()).items);
     } catch {
       // Keep existing zone names if background refresh fails.
     }
@@ -629,12 +672,13 @@ export class CitiesTab {
 
   private async loadStatesForCountry(countryId: string): Promise<void> {
     const seq = ++this.statesSeq;
+    this.states.set([]);
     if (!countryId) {
       this.states.set([]);
       return;
     }
     try {
-      const { items: loaded } = await listStates(countryId);
+      const { items: loaded } = await this.api.listStates(countryId);
       if (seq !== this.statesSeq) return;
       this.states.set(loaded);
       const currentState = this.stateId();
@@ -654,10 +698,15 @@ export class CitiesTab {
   }
 
   private async loadCities(stateId: string, search: string, reset: boolean): Promise<void> {
+    const context = JSON.stringify([stateId, search]);
+    reset = reset || context !== this.cursorContext;
+    this.cursorContext = context;
     const seq = ++this.citiesSeq;
     const cursor = reset ? null : this.nextCursor();
 
     if (reset) {
+      this.nextCursor.set(null);
+      this.loadingMore.set(false);
       this.loading.set(true);
       this.loadFailed.set(false);
     } else {
@@ -665,18 +714,20 @@ export class CitiesTab {
     }
 
     try {
-      const page = await listCities(stateId, {
+      const page = await this.api.listCities(stateId, {
         search: search || undefined,
         cursor,
         limit: GEO_LIMITS.pageSize,
       });
       if (seq !== this.citiesSeq) return;
+      void this.loadZoneNames(page.items);
       this.cities.update((current) => {
-        if (reset) return page.items;
+        if (reset || page.cursorReset) return page.items;
         const seen = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !seen.has(item.id))];
       });
       this.nextCursor.set(page.nextCursor);
+      this.notify.connectionRestored();
     } catch (error) {
       if (seq !== this.citiesSeq) return;
       if (errorCodeOf(error) === 'GEO_STATE_NOT_FOUND') {
@@ -685,6 +736,7 @@ export class CitiesTab {
         return;
       }
       if (reset) {
+        this.showErrorToast(error);
         this.loadFailed.set(true);
         this.cities.set([]);
         this.nextCursor.set(null);
@@ -699,18 +751,10 @@ export class CitiesTab {
     }
   }
 
-  private showErrorToast(error: unknown): void {
-    const code = errorCodeOf(error);
-    if (code) {
-      const scopedKey = `geoPlaces.errors.${code}`;
-      const scoped = this.transloco.translate(scopedKey);
-      if (scoped && scoped !== scopedKey) {
-        this.notify.error(scoped);
-        return;
-      }
-      this.notify.error(errorMessage(error, 'geoPlaces', this.transloco));
-      return;
-    }
-    this.notify.error(this.transloco.translate('geoPlaces.errors.generic'));
+  private showErrorToast(error: unknown, write = false): void {
+    if (errorCodeOf(error) === 'TENANT_WIDE_PERMISSION_REQUIRED') this.api.placesDenied.set(true);
+    const message = geoErrorMessage(error, 'geoPlaces', this.transloco, write);
+    if (error instanceof ApiError && error.status === 0) this.notify.connectionLost(message, '');
+    else this.notify.error(message);
   }
 }

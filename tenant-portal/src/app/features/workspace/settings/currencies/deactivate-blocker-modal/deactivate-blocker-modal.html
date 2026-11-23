@@ -14,6 +14,20 @@
         {{ 'wsCurrencies.blocker.record' | transloco: { name: info.currency.name, code: info.currency.code } }}
       </p>
 
+      @if (companyBlocker().companies.length) {
+        <p class="text-12 leading-18 text-text">{{ 'wsCurrencies.blocker.companies' | transloco }}</p>
+        <ul class="flex flex-col gap-4">
+          @for (company of companyBlocker().companies; track company.id) {
+            <li>
+              <a class="text-12 leading-18 text-accent" routerLink="/workspace/staff/companies" [queryParams]="{ open: company.id }">{{ company.name }}</a>
+            </li>
+          }
+        </ul>
+        @if (companyBlocker().more > 0) {
+          <p class="text-12 leading-18 text-text-muted">{{ ('wsCurrencies.blocker.more' | pluralKey: companyBlocker().more) | transloco: { count: companyBlocker().more } }}</p>
+        }
+      }
+
       @if (nextStepKey(); as nextKey) {
         <p class="text-12 leading-18 text-text-muted">{{ nextKey | transloco }}</p>
       }

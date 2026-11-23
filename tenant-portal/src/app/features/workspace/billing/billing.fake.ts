@@ -52,6 +52,23 @@ export let FAKE_ACCESS_MODE: AccessMode = 'FULL';
 export let FAKE_BILLING_FAIL_NEXT = false;
 export let FAKE_PAYMENT_OUTCOME: 'SUCCEEDED' | 'FAILED' = 'SUCCEEDED';
 
+const BILLING_FAILURE_STATUSES = {
+  PAYMENT_PROVIDER_UNCONFIGURED: 503,
+  PAYMENT_INTENT_UNAVAILABLE: 409,
+  WALLET_NOT_ACTIVE: 409,
+  WALLET_FROZEN: 409,
+  TOPUP_LIMITS_INVALID: 503,
+  ACCESS_POLICY_BLOCKED: 403,
+  ACCESS_POLICY_UNAVAILABLE: 503,
+  SEAT_MODULE_HOLDERS_EXCEED_PURCHASE: 422,
+} as const;
+type BillingFailureCode = keyof typeof BILLING_FAILURE_STATUSES;
+let nextBillingFailure: BillingFailureCode | null = null;
+
+export function setFakeBillingErrorNext(code: BillingFailureCode | null): void {
+  nextBillingFailure = code;
+}
+
 export function setFakeBillingOwner(value: boolean): void {
   FAKE_BILLING_OWNER = value;
 }
@@ -159,6 +176,13 @@ function divUnitsByRate(sourceUnits: bigint, rateStr: string): bigint {
 function assertPreconditions(): void {
   if (!FAKE_BILLING_OWNER) {
     throw new ApiError(403, 'TENANT_OWNER_REQUIRED');
+  }
+  if (nextBillingFailure) {
+    const code = nextBillingFailure;
+    nextBillingFailure = null;
+    const details = code === 'SEAT_MODULE_HOLDERS_EXCEED_PURCHASE'
+      ? { moduleKey: ['crm'], holders: ['4'], seats: ['2'] } : undefined;
+    throw new ApiError(BILLING_FAILURE_STATUSES[code], code, details);
   }
   if (FAKE_BILLING_FAIL_NEXT) {
     FAKE_BILLING_FAIL_NEXT = false;

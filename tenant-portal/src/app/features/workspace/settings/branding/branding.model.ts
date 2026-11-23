@@ -1,4 +1,7 @@
-import { ApiError } from '../../../../core/api/api-errors';
+import { ApiError, errorMessage } from '../../../../core/api/api-errors';
+import type { SettingsTranslator } from '../../../../core/api/settings-translator';
+import type { TenantMe } from '../../../../core/auth/auth-session.model';
+import { hasTenantWidePermission } from '../../../../core/auth/tenant-wide-permission';
 
 export interface Branding {
   id: string | null;
@@ -64,21 +67,20 @@ export const EMPTY_BRANDING: Branding = {
 
 export const BRANDING_TEXT_MAX = 120;
 export const BRANDING_COLOUR_MAX = 9;
-export const BRANDING_HEX_PATTERN = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+export const BRANDING_HEX_PATTERN = /^#?(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 export const BRANDING_MIME_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 export const BRANDING_ASSET_LIMITS = {
   logo: { maxBytes: 2 * 1024 * 1024, maxEdge: 4096 },
   icon: { maxBytes: 512 * 1024, maxEdge: 1024 },
 } as const;
-export const BRANDING_MULTIPART_MAX_BYTES = 2 * 1024 * 1024;
 
 const KNOWN_ERROR_CODES = new Set([
   'BRANDING_FILE_REQUIRED',
   'BRANDING_FILE_INVALID',
   'BRANDING_FILE_TYPE_UNSUPPORTED',
   'BRANDING_FILE_TOO_LARGE',
-  'IDEMPOTENCY_BODY_MISMATCH',
-  'IDEMPOTENCY_REQUEST_PROCESSING',
+  'BRANDING_IDEMPOTENCY_CONFLICT',
+  'BRANDING_ASSET_NOT_FOUND',
   'BRANDING_STATE_UNAVAILABLE',
   'BRANDING_STORAGE_UNAVAILABLE',
   'INVALID_IDEMPOTENCY_KEY',
@@ -126,17 +128,31 @@ export async function readImageSize(file: File): Promise<{ width: number; height
   });
 }
 
-export function brandingErrorKey(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (KNOWN_ERROR_CODES.has(error.code)) {
-      return `wsBranding.errors.${error.code}`;
-    }
-    if (error.status === 0) {
-      return 'wsBranding.errors.network';
-    }
-    return 'wsBranding.errors.generic';
+export function brandingErrorKey(
+  error: unknown,
+  t: SettingsTranslator,
+  operation: 'read' | 'write' = 'write',
+): string {
+  const translate = typeof t === 'function' ? t : (key: string) => t.translate(key);
+  if (operation === 'write' && error instanceof ApiError && error.status === 401) {
+    return translate('wsBranding.notSaved');
   }
-  return 'wsBranding.errors.generic';
+  if (error instanceof ApiError && KNOWN_ERROR_CODES.has(error.code)) {
+    const key = `wsBranding.errors.${error.code}`;
+    const message = translate(key);
+    if (message && message !== key) return message;
+  }
+  return errorMessage(error, 'wsBranding', t);
+}
+
+export function brandingAccess(me: TenantMe | null | undefined): {
+  readable: boolean;
+  editable: boolean;
+} {
+  return {
+    readable: me?.permissions.includes('branding.read') ?? false,
+    editable: hasTenantWidePermission(me, 'branding.manage'),
+  };
 }
 
 export function normaliseHex(value: string): string | null {
@@ -144,5 +160,5 @@ export function normaliseHex(value: string): string | null {
   if (!trimmed || !BRANDING_HEX_PATTERN.test(trimmed)) {
     return null;
   }
-  return trimmed;
+  return `#${trimmed.replace(/^#/, '').toLowerCase()}`;
 }

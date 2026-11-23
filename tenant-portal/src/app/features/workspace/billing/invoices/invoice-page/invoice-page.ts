@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowLeft,
@@ -17,6 +17,7 @@ import {
   tablerFileDescription,
   tablerFileInvoice,
 } from '@ng-icons/tabler-icons';
+import { Notify } from '../../../../../core/notify/notify';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { NotFoundPage } from '../../../../../layout/not-found/not-found-page';
 import { Button } from '../../../../../shared/ui/button/button';
@@ -26,7 +27,10 @@ import {
   InvoiceRead,
   PAYABLE_INVOICE_STATUSES,
   correlationIdOf,
-  getInvoice,
+  BillingApi,
+  TenantInvoiceView,
+  ActiveInvoicePaymentIntent,
+  billingErrorMessage,
 } from '../../billing.api';
 import { invoicePurposeBadge, invoiceStatusBadge } from '../../shared/billing-badges';
 import { BillingFailed } from '../../shared/billing-failed/billing-failed';
@@ -71,6 +75,9 @@ function readListQueryFromHistory(): Record<string, unknown> | null {
   host: { class: 'flex min-h-0 flex-1 flex-col gap-12 overflow-y-auto p-12' },
 })
 export class InvoicePage {
+  private readonly api = inject(BillingApi);
+  private readonly notify = inject(Notify);
+  private readonly transloco = inject(TranslocoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(BillingSession);
@@ -87,6 +94,11 @@ export class InvoicePage {
   protected readonly data = signal<InvoiceRead | null>(null);
   protected readonly loading = signal(true);
   protected readonly forbidden = signal(!this.session.isOwner());
+  protected readonly historyUnavailable = signal(false);
+  protected readonly rowHeader = signal<TenantInvoiceView | null>(null);
+  protected readonly activeIntent = signal<ActiveInvoicePaymentIntent | null>(null);
+  protected readonly activeFailed = signal(false);
+  protected readonly activeLoading = signal(false);
   protected readonly notFound = signal(false);
   protected readonly loadFailed = signal(false);
   protected readonly correlationId = signal<string | null>(null);
@@ -102,10 +114,16 @@ export class InvoicePage {
     () => this.session.isOwner() && !this.forbidden(),
   );
 
+  protected readonly canonicalUsd = computed(() => {
+    const inv = this.invoice();
+    return !!inv && inv.currencyCode === 'USD' && inv.settlementCurrencyCode === 'USD' &&
+      inv.settlementSubtotalUsd !== null && inv.settlementTaxTotalUsd !== null && inv.settlementTotalUsd !== null;
+  });
+
   protected readonly canPay = computed(() => {
     const inv = this.invoice();
     if (!inv) return false;
-    return PAYABLE_INVOICE_STATUSES.includes(inv.status) && inv.settlementTotalUsd !== null;
+    return PAYABLE_INVOICE_STATUSES.includes(inv.status) && this.canonicalUsd();
   });
 
   protected readonly showSettlementCurrency = computed(() => {
@@ -176,6 +194,27 @@ export class InvoicePage {
     });
   }
 
+  protected async loadActiveIntent(): Promise<void> {
+    const id = this.invoiceId();
+    const seq = this.loadSeq;
+    if (!id) return;
+    this.activeLoading.set(true);
+    this.activeFailed.set(false);
+    try {
+      const active = await this.api.getActivePaymentIntent(id);
+      if (seq === this.loadSeq) this.activeIntent.set(active);
+    } catch {
+      if (seq === this.loadSeq) this.activeFailed.set(true);
+    } finally {
+      if (seq === this.loadSeq) this.activeLoading.set(false);
+    }
+  }
+
+  protected resumePayment(): void {
+    const inv = this.invoice();
+    if (inv) this.payModal()?.open(inv.id, inv.number);
+  }
+
   protected reload(): void {
     this.reloadTick.update((n) => n + 1);
   }
@@ -216,14 +255,19 @@ export class InvoicePage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.notFound.set(false);
+    this.historyUnavailable.set(false);
+    this.activeIntent.set(null);
+    this.activeFailed.set(false);
     this.loadFailed.set(false);
     this.correlationId.set(null);
 
     try {
-      const result = await getInvoice(id);
+      const result = await this.api.getInvoice(id);
       if (seq !== this.loadSeq) return;
       this.forbidden.set(false);
       this.data.set(result);
+      this.notify.connectionRestored();
+      if (this.canPay()) void this.loadActiveIntent();
     } catch (error) {
       if (seq !== this.loadSeq) return;
       this.data.set(null);
@@ -235,6 +279,15 @@ export class InvoicePage {
       if ((error instanceof ApiError && error.status === 404) || code === 'INVOICE_NOT_FOUND') {
         this.notFound.set(true);
         return;
+      }
+      if (code === 'INVOICE_ACCEPTED_HISTORY_UNAVAILABLE') {
+        const row = history.state?.invoiceRow as TenantInvoiceView | undefined;
+        this.rowHeader.set(row?.id === id ? row : null);
+        this.historyUnavailable.set(true);
+        return;
+      }
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(billingErrorMessage(error, this.transloco), '');
       }
       this.loadFailed.set(true);
       this.correlationId.set(correlationIdOf(error));

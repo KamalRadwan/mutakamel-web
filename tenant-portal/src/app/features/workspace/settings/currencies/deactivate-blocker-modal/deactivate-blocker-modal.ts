@@ -1,12 +1,14 @@
 import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
+import { PluralKeyPipe } from '../../../../../core/i18n/plural';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerAlertTriangle } from '@ng-icons/tabler-icons';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { ApiError } from '../../../../../core/api/api-errors';
-import { Currency, currencyErrorMessage } from '../currencies.model';
+import { Currency, currencyCompanyBlocker, currencyErrorMessage } from '../currencies.model';
 
 export type CurrencyBlockerKind = 'deactivate' | 'setDefault' | 'reactivate';
 
@@ -16,10 +18,6 @@ interface BlockerState {
   error: ApiError;
 }
 
-/**
- * Core's CURRENCY_COMPANY_IN_USE carries no details (no company list or count), so the modal shows
- * the reason and the next step only.
- */
 const DEACTIVATION_NEXT_CODES: ReadonlySet<string> = new Set([
   'CURRENCY_DEFAULT_DELETE',
   'CURRENCY_IN_USE',
@@ -28,7 +26,7 @@ const DEACTIVATION_NEXT_CODES: ReadonlySet<string> = new Set([
 
 @Component({
   selector: 'app-deactivate-blocker-modal',
-  imports: [TranslocoPipe, Button, Modal],
+  imports: [TranslocoPipe, PluralKeyPipe, Button, Modal, RouterLink],
   providers: [provideIcons({ tablerAlertTriangle })],
   templateUrl: './deactivate-blocker-modal.html',
 })
@@ -38,6 +36,10 @@ export class DeactivateBlockerModal {
   private readonly modal = viewChild.required(Modal);
 
   protected readonly state = signal<BlockerState | null>(null);
+  protected readonly companyBlocker = computed(() => {
+    const error = this.state()?.error;
+    return error ? currencyCompanyBlocker(error) : { companies: [], more: 0 };
+  });
 
   protected readonly titleKey = computed(() => {
     const kind = this.state()?.kind ?? 'deactivate';

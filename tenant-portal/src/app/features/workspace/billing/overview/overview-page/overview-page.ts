@@ -17,7 +17,6 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   tablerArrowRight,
   tablerArrowsExchange,
-  tablerCircleCheck,
   tablerCreditCard,
   tablerExclamationCircle,
   tablerFileInvoice,
@@ -26,16 +25,11 @@ import {
 } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { ApiError, correlationIdOf } from '../../../../../core/api/api-errors';
 import { Button } from '../../../../../shared/ui/button/button';
 import { rectInPage, viewport } from '../../../../../shared/ui/overlay/zoom';
-import {
-  ApiError,
-  BillingSummary,
-  PAYABLE_INVOICE_STATUSES,
-  TenantInvoiceView,
-  correlationIdOf,
-  getBillingSummary,
-} from '../../billing.api';
+import { BillingApi, billingErrorMessage } from '../../billing.api';
+import { PAYABLE_INVOICE_STATUSES, type BillingSummary, type TenantInvoiceView, type WalletView } from '../../billing.model';
 import {
   accessModeBadge,
   invoiceStatusBadge,
@@ -87,7 +81,6 @@ const OVERVIEW_TABS: readonly OverviewTabItem[] = [
       tablerRepeat,
       tablerWallet,
       tablerFileInvoice,
-      tablerCircleCheck,
       tablerArrowRight,
       tablerExclamationCircle,
       tablerCreditCard,
@@ -106,6 +99,7 @@ export class OverviewPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(BillingSession);
+  private readonly api = inject(BillingApi);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   protected readonly language = inject(LanguageState).current;
@@ -122,6 +116,10 @@ export class OverviewPage {
   protected readonly loading = signal(true);
   protected readonly loadFailed = signal(false);
   protected readonly forbidden = signal(false);
+  protected readonly noSubscription = signal(false);
+  protected readonly wallet = signal<WalletView | null>(null);
+  protected readonly walletFailed = signal(false);
+  protected readonly walletLoading = signal(false);
   protected readonly correlationId = signal<string | null>(null);
   protected readonly tablesReloadToken = signal(0);
   protected readonly reservedTipPlace = signal({ top: 0, start: 0 });
@@ -138,6 +136,7 @@ export class OverviewPage {
   protected readonly invoiceStatusBadge = invoiceStatusBadge;
 
   private loadSeq = 0;
+  private walletSeq = 0;
   private lastHandledTopup: string | null = null;
 
   constructor() {
@@ -173,7 +172,7 @@ export class OverviewPage {
           this.notify.warning(this.transloco.translate('bill.errors.WALLET_NOT_ACTIVE'));
           return;
         }
-        modal.open({ amount: raw, currentBalanceUsd: summary.wallet.balanceUsd });
+        modal.open();
       });
     });
   }
@@ -186,20 +185,32 @@ export class OverviewPage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
+    this.noSubscription.set(false);
     this.correlationId.set(null);
 
     try {
-      const data = await getBillingSummary();
+      const data = await this.api.getBillingSummary();
       if (seq !== this.loadSeq) return;
       this.summary.set(data);
+      this.wallet.set(data.wallet);
+      this.notify.connectionRestored();
+      void this.loadWallet();
     } catch (error) {
       if (seq !== this.loadSeq) return;
       if (error instanceof ApiError && error.code === 'TENANT_OWNER_REQUIRED') {
         this.forbidden.set(true);
         return;
       }
+      if (error instanceof ApiError && error.status === 404 && error.code === 'SUBSCRIPTION_NOT_FOUND') {
+        this.summary.set(null);
+        this.noSubscription.set(true);
+        return;
+      }
       this.loadFailed.set(true);
       this.correlationId.set(correlationIdOf(error));
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(billingErrorMessage(error, this.transloco, 'read'), '');
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
@@ -207,10 +218,36 @@ export class OverviewPage {
     }
   }
 
+  protected async loadWallet(): Promise<void> {
+    const seq = ++this.walletSeq;
+    this.walletLoading.set(true);
+    this.walletFailed.set(false);
+    try {
+      const wallet = await this.api.getWallet();
+      if (seq !== this.walletSeq) return;
+      this.wallet.set(wallet);
+      this.notify.connectionRestored();
+    } catch (error) {
+      if (seq !== this.walletSeq) return;
+      if (error instanceof ApiError && error.code === 'TENANT_OWNER_REQUIRED') {
+        this.forbidden.set(true);
+      } else if (error instanceof ApiError && error.status === 404 && error.code === 'WALLET_NOT_FOUND') {
+        this.wallet.set(null);
+      } else {
+        this.walletFailed.set(true);
+        if (error instanceof ApiError && error.status === 0) {
+          this.notify.connectionLost(billingErrorMessage(error, this.transloco, 'read'), '');
+        }
+      }
+    } finally {
+      if (seq === this.walletSeq) this.walletLoading.set(false);
+    }
+  }
+
   protected openTopup(): void {
     const current = this.summary();
-    if (!current || current.wallet.status !== 'ACTIVE') return;
-    this.topupModal()?.open({ currentBalanceUsd: current.wallet.balanceUsd });
+    if (!current || this.wallet()?.status !== 'ACTIVE') return;
+    this.topupModal()?.open();
   }
 
   protected onTopupCompleted(): void {

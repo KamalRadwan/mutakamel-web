@@ -6,6 +6,8 @@
   [title]="'wsEmail.provider.smtpSettings' | transloco"
   [closeLabel]="'settings.common.close' | transloco"
   [dismissable]="!busy()"
+  [preventDismiss]="hasUnsavedDraft()"
+  (dismiss)="requestClose()"
   (closed)="onModalClosed()"
 >
   <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
@@ -14,7 +16,12 @@
         role="status"
         class="flex items-start gap-8 rounded-10 border border-border bg-surface-muted px-10 py-8 text-12 leading-18 text-text"
       >
-        <ng-icon name="tablerLoader2" size="14" class="mt-2 shrink-0 animate-spin text-accent" aria-hidden="true" />
+        <ng-icon
+          name="tablerLoader2"
+          size="14"
+          class="mt-2 shrink-0 animate-spin text-accent"
+          aria-hidden="true"
+        />
         <div class="min-w-0 flex-1">
           <p class="text-text-muted">{{ 'wsEmail.probe.note' | transloco }}</p>
         </div>
@@ -24,7 +31,12 @@
         role="status"
         class="flex items-start gap-8 rounded-10 border border-success bg-success-soft px-10 py-8 text-12 leading-18 text-on-success-soft"
       >
-        <ng-icon name="tablerCircleCheck" size="14" class="mt-2 shrink-0 text-success-text" aria-hidden="true" />
+        <ng-icon
+          name="tablerCircleCheck"
+          size="14"
+          class="mt-2 shrink-0 text-success-text"
+          aria-hidden="true"
+        />
         <div class="flex min-w-0 flex-1 flex-col gap-2">
           <span class="font-medium">{{ 'wsEmail.probe.ok' | transloco }}</span>
           <span>{{ 'wsEmail.probe.note' | transloco }}</span>
@@ -77,6 +89,7 @@
           [error]="hostError()"
         >
           <input
+            [attr.aria-describedby]="uid + '-host' + '-hint'"
             [id]="uid + '-host'"
             type="text"
             dir="ltr"
@@ -126,6 +139,7 @@
           [error]="usernameError()"
         >
           <input
+            [attr.aria-describedby]="uid + '-username' + '-hint'"
             [id]="uid + '-username'"
             type="text"
             dir="ltr"
@@ -174,13 +188,16 @@
           [error]="passwordError()"
         >
           <input
+            [attr.aria-describedby]="uid + '-password' + '-hint'"
             [id]="uid + '-password'"
             type="password"
             dir="ltr"
             maxlength="1024"
             autocomplete="new-password"
             class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none placeholder:text-text-placeholder"
-            [placeholder]="hasSavedPassword() ? ('wsEmail.smtp.passwordPlaceholder' | transloco) : ''"
+            [placeholder]="
+              hasSavedPassword() ? ('wsEmail.smtp.passwordPlaceholder' | transloco) : ''
+            "
             [value]="passwordDraft()"
             [readOnly]="isReadonly() || busy()"
             [attr.aria-readonly]="isReadonly() ? 'true' : null"
@@ -191,8 +208,10 @@
         </ui-field>
         @if (hasSavedPassword()) {
           <div class="mt-4 flex items-center">
-            <span class="inline-flex h-badge items-center rounded-8 bg-success-soft px-8 text-12 font-medium whitespace-nowrap text-on-success-soft">
-              {{ 'wsEmail.provider.configured' | transloco }}
+            <span
+              class="inline-flex h-badge items-center rounded-8 bg-success-soft px-8 text-12 font-medium whitespace-nowrap text-on-success-soft"
+            >
+              {{ 'wsEmail.smtp.passwordSaved' | transloco }}
             </span>
           </div>
         }
@@ -250,31 +269,39 @@
       </button>
 
       @if (dirty()) {
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="busy()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="busy()" (click)="undo()">
           {{ 'settings.common.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        <span class="text-12 leading-18 text-text-muted">{{
+          'settings.common.unsaved' | transloco
+        }}</span>
       } @else {
-        <button
-          type="button"
-          uiButton
-          variant="ghost"
-          [disabled]="busy()"
-          (click)="close()"
-        >
+        <button type="button" uiButton variant="ghost" [disabled]="busy()" (click)="requestClose()">
           {{ 'settings.common.cancel' | transloco }}
         </button>
       }
     } @else {
-      <button type="button" uiButton variant="ghost" (click)="close()">
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'settings.common.close' | transloco }}
       </button>
     }
   </div>
 </ui-modal>
+
+<ui-confirm-dialog
+  #suspendConfirm
+  tone="warning"
+  [title]="'wsEmail.suspendConfirm' | transloco"
+  [text]="'wsEmail.notice.resetsVerification' | transloco"
+  [confirmLabel]="'settings.common.save' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardConfirm
+  tone="warning"
+  [title]="'settings.common.unsaved' | transloco"
+  [text]="'wsEmail.discardDraft' | transloco"
+  [confirmLabel]="'wsEmail.discard' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

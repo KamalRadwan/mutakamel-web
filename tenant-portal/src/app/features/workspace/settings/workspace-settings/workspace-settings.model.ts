@@ -16,7 +16,6 @@ export interface WorkspaceSettings {
 /** PUT body: every field optional, PUT acts as a patch. null is NOT allowed for any field. */
 export interface UpdateWorkspaceSettingsRequest {
   defaultLanguage?: WorkspaceLanguage;
-  defaultCurrencyCode?: string;
   timezone?: string;
   allowSupport?: boolean;
 }
@@ -25,6 +24,33 @@ export interface CurrencyOption {
   code: string;
   name: string;
   symbol: string;
+}
+
+export interface ActiveCurrency extends CurrencyOption {
+  id: string;
+  isDefault: boolean;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export const SESSION_POLICY_FIELDS = [
+  'accessTokenTtlSeconds',
+  'idleTimeoutSeconds',
+  'absoluteTimeoutSeconds',
+] as const;
+export type SessionPolicyFieldKey = (typeof SESSION_POLICY_FIELDS)[number];
+export type Lifetimes = Record<SessionPolicyFieldKey, number>;
+export interface SessionPolicy {
+  override: Lifetimes | null;
+  effective: Lifetimes;
+  defaults: Lifetimes;
+  limits: Record<SessionPolicyFieldKey, { min: number; max: number }>;
+}
+export interface SessionPolicyResult {
+  data: SessionPolicy;
+  etag: string | null;
+}
+export interface UpdateSessionPolicyRequest {
+  override: Lifetimes | null;
 }
 
 export interface TimezoneOption {

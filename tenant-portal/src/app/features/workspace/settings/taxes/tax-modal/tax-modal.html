@@ -7,12 +7,6 @@
   [dismissable]="!saving()"
   (closed)="onModalClosed()"
 >
-  @if (validationNotice(); as notice) {
-    <div class="mb-8">
-      <app-settings-notice tone="warning">{{ notice }}</app-settings-notice>
-    </div>
-  }
-
   <form [id]="uid + '-form'" class="grid grid-cols-2 gap-x-10 gap-y-8" novalidate (submit)="save($event)">
     <div class="col-span-2">
       @if (mode() === 'create') {
@@ -87,7 +81,7 @@
       <ui-field
         [for]="uid + '-rate'"
         [label]="'wsTaxes.fields.rate' | transloco"
-        [hint]="'wsTaxes.fields.rateHint' | transloco"
+        [hint]="rateHint()"
         [required]="isEditable()"
         [error]="rateError()"
       >
@@ -141,11 +135,12 @@
         [for]="uid + '-inclusive'"
         [label]="'wsTaxes.fields.inclusive' | transloco"
         [hint]="'wsTaxes.fields.inclusiveHint' | transloco"
+        [error]="inclusiveError()"
       >
         <div class="flex h-field items-center gap-8">
           <ui-switch
             [id]="uid + '-inclusive'"
-            [describedBy]="uid + '-inclusive-hint'"
+            [describedBy]="uid + '-inclusive-hint' + (inclusiveError() ? ' ' + uid + '-inclusive-error' : '')"
             [label]="'wsTaxes.fields.inclusive' | transloco"
             [checked]="isInclusiveDraft()"
             [disabled]="!isEditable() || saving()"

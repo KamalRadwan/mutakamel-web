@@ -1,20 +1,25 @@
-export interface SecurityMe {
-  id: string;
-  email: string;
-  mfaEnabled: boolean;
-  mfaUpdatedAt: string | null;
-} // subset of GET auth/me
+import { ApiError } from '../../../../core/api/api-errors';
+import type { AuthMe } from '../../../../core/auth/auth-me';
+
+export type SecurityMe = Pick<AuthMe, 'id' | 'email' | 'mfaEnabled' | 'mfaUpdatedAt'>;
 
 export interface ChangePasswordBody {
   currentPassword: string;
   newPassword: string;
 }
 
-export interface MfaStep {
-  mfaRequired: true;
-  challengeId: string;
-  expiresIn: number;
-  resendAfterSeconds: number;
+export function retryAfterSecondsOf(error: unknown): number {
+  if (!(error instanceof ApiError)) return 60;
+  const raw = error.details?.['retryAfterSeconds'];
+  const seconds = Number(Array.isArray(raw) ? raw[0] : NaN);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 60;
+}
+
+export function isUnknownOutcome(error: unknown): boolean {
+  return (
+    (error instanceof ApiError && error.status === 0) ||
+    (error instanceof Error && error.name === 'TimeoutError')
+  );
 }
 
 export const PASSWORD_MIN = 12;

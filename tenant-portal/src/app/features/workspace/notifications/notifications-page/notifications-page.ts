@@ -4,21 +4,26 @@ import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerBell, tablerRefresh } from '@ng-icons/tabler-icons';
-import { errorMessage } from '../../../../core/api/api-errors';
 import { LanguageState } from '../../../../core/i18n/language';
 import { translationEvents } from '../../../../core/i18n/translation-events';
 import { Notify } from '../../../../core/notify/notify';
+import { notificationsErrorMessage } from '../../../../shared/widgets/notifications/notifications.api';
 import { Button } from '../../../../shared/ui/button/button';
 import { FullState } from '../../../../shared/ui/full-state/full-state';
 import { TabItem, Tabs, tabButtonId, tabPanelId } from '../../../../shared/ui/tabs/tabs';
 import { NotificationInbox } from '../../../../shared/widgets/notifications/notification-inbox';
 import { NotificationItem } from '../../../../shared/widgets/notifications/notification-item/notification-item';
-import { dayGroupOf, formatNotificationTime } from '../../../../shared/widgets/notifications/notification-time';
+import {
+  dayGroupOf,
+  formatNotificationTime,
+} from '../../../../shared/widgets/notifications/notification-time';
 import {
   NotificationDayGroup,
   NotificationView,
   inAppActionPath,
 } from '../../../../shared/widgets/notifications/notifications.model';
+
+import type { NotificationDetail } from '../notification-detail/notification-detail';
 
 type NotificationTab = 'all' | 'unread';
 
@@ -46,6 +51,7 @@ export class NotificationsPage {
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
 
+  protected readonly detail = signal<NotificationDetail | null>(null);
   protected readonly inbox = inject(NotificationInbox);
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly tabButtonId = tabButtonId;
@@ -57,7 +63,11 @@ export class NotificationsPage {
     this.i18n();
     return [
       { id: 'all', label: this.transloco.translate('notifications.tabs.all'), count: null },
-      { id: 'unread', label: this.transloco.translate('notifications.tabs.unread'), count: this.inbox.unreadCount() },
+      {
+        id: 'unread',
+        label: this.transloco.translate('notifications.tabs.unread'),
+        count: this.inbox.unreadCount(),
+      },
     ];
   });
 
@@ -71,11 +81,15 @@ export class NotificationsPage {
     for (const item of this.inbox.items()) {
       buckets[dayGroupOf(item.createdAt, now)].push(item);
     }
-    return DAY_ORDER.filter((key) => buckets[key].length > 0).map((key) => ({ key, items: buckets[key] }));
+    return DAY_ORDER.filter((key) => buckets[key].length > 0).map((key) => ({
+      key,
+      items: buckets[key],
+    }));
   });
 
   constructor() {
-    const initialTab: NotificationTab = this.route.snapshot.queryParamMap.get('tab') === 'unread' ? 'unread' : 'all';
+    const initialTab: NotificationTab =
+      this.route.snapshot.queryParamMap.get('tab') === 'unread' ? 'unread' : 'all';
     this.tab.set(initialTab);
     this.inbox.unreadOnly.set(initialTab === 'unread');
 
@@ -106,12 +120,17 @@ export class NotificationsPage {
   }
 
   protected async openItem(item: NotificationView): Promise<void> {
-    void this.inbox.markRead(item.id).catch(() => undefined);
+    void this.inbox.markRead(item.id).catch((error) => {
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
+    });
     const path = await inAppActionPath(item.actionUrl, this.router.config, this.injector);
     if (path) {
       void this.router.navigateByUrl(path);
     } else {
-      void this.router.navigate([item.id], { relativeTo: this.route, queryParamsHandling: 'preserve' });
+      void this.router.navigate([item.id], {
+        relativeTo: this.route,
+        queryParamsHandling: 'preserve',
+      });
     }
   }
 
@@ -119,7 +138,7 @@ export class NotificationsPage {
     try {
       await this.inbox.acknowledge(item.id);
     } catch (error) {
-      this.notify.error(errorMessage(error, 'wsNotif', this.transloco));
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
     }
   }
 
@@ -127,7 +146,7 @@ export class NotificationsPage {
     try {
       await this.inbox.dismiss(item.id);
     } catch (error) {
-      this.notify.error(errorMessage(error, 'wsNotif', this.transloco));
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
     }
   }
 
@@ -135,7 +154,7 @@ export class NotificationsPage {
     try {
       await this.inbox.markAllRead();
     } catch (error) {
-      this.notify.error(errorMessage(error, 'wsNotif', this.transloco));
+      this.notify.error(notificationsErrorMessage(error, 'wsNotif', this.transloco, 'write'));
     }
   }
 

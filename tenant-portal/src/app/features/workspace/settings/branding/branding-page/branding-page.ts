@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, resource, signal, untracked, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  resource,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -7,13 +16,15 @@ import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
+import { ApiError, fieldErrorsOf, isValidationError } from '../../../../../core/api/api-errors';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { BrandingAssetCard } from '../branding-asset-card/branding-asset-card';
 import { BrandingColoursCard } from '../branding-colours-card/branding-colours-card';
 import { BrandingIdentityCard } from '../branding-identity-card/branding-identity-card';
 import { BrandingPreviewModal } from '../branding-preview-modal/branding-preview-modal';
 import { BrandingUploadModal } from '../branding-upload-modal/branding-upload-modal';
-import { getBranding, updateBranding } from '../branding.api';
+import { BrandingApi } from '../branding.api';
 import {
   BRANDING_HEX_PATTERN,
   BRANDING_TEXT_MAX,
@@ -23,14 +34,13 @@ import {
   BrandingIdentityErrors,
   UpdateBrandingBody,
   brandingErrorKey,
+  brandingAccess,
+  normaliseHex,
 } from '../branding.model';
-import { coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
+import { fieldMessages, hasOtherFields } from '../../core-response.model';
 
 /** UpdateBrandingDto field -> the form field that shows its CORE_VALIDATION_FAILED message. */
 const SERVER_FIELDS = ['appName', 'tabTitle', 'primaryColor', 'secondaryColor'] as const;
-
-const CAN_READ = true; // later branding.read
-const CAN_MANAGE = true; // later branding.manage, tenant-wide only (not per company)
 
 type EditableField = 'appName' | 'tabTitle' | 'primary' | 'secondary';
 
@@ -95,6 +105,8 @@ export class BrandingPage {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
+  private readonly api = inject(BrandingApi);
+  private readonly session = inject(AuthSession);
 
   private readonly identityCard = viewChild(BrandingIdentityCard);
   private readonly coloursCard = viewChild(BrandingColoursCard);
@@ -102,16 +114,24 @@ export class BrandingPage {
   private readonly previewModal = viewChild.required(BrandingPreviewModal);
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
 
-  protected readonly canRead = CAN_READ;
-  protected readonly canManage = CAN_MANAGE;
+  private readonly access = computed(() => brandingAccess(this.session.me()));
+  protected readonly writeRejected = signal(false);
+  protected readonly canRead = computed(() => this.access().readable);
+  protected readonly canManage = computed(() => this.access().editable && !this.writeRejected());
+  protected readonly forbidden = computed(() => {
+    const error = this.loaded.error();
+    return !this.canRead() || (error instanceof ApiError && error.status === 403);
+  });
 
   private readonly loaded = resource({
-    loader: () => (this.canRead ? getBranding() : Promise.resolve(null)),
+    params: () => (this.canRead() ? this.session.me()?.id : undefined),
+    loader: () => this.api.getBranding(),
   });
 
   protected readonly baseline = signal<Branding | null>(null);
   protected readonly draft = signal<BrandingDraft>({ ...EMPTY_DRAFT });
   protected readonly saving = signal(false);
+  protected readonly removingKind = signal<BrandingAssetKind | null>(null);
   private readonly touched = signal<TouchedState>({ ...UNTOUCHED });
   private readonly submitAttempted = signal(false);
 
@@ -127,6 +147,7 @@ export class BrandingPage {
   protected readonly uploadingKind = computed(() =>
     this.uploadModal().uploading() ? this.uploadModal().activeKind() : null,
   );
+  protected readonly assetBusy = computed(() => this.uploading() || this.removingKind() !== null);
 
   protected readonly dirty = computed(() => {
     const base = this.baseline();
@@ -135,8 +156,10 @@ export class BrandingPage {
     return (
       valueOrNull(current.appName) !== (base.appName || null) ||
       valueOrNull(current.tabTitle) !== (base.tabTitle || null) ||
-      valueOrNull(current.primaryColor) !== (base.primaryColor || null) ||
-      valueOrNull(current.secondaryColor) !== (base.secondaryColor || null)
+      (normaliseHex(current.primaryColor) ?? valueOrNull(current.primaryColor)) !==
+        (base.primaryColor || null) ||
+      (normaliseHex(current.secondaryColor) ?? valueOrNull(current.secondaryColor)) !==
+        (base.secondaryColor || null)
     );
   });
 
@@ -145,11 +168,22 @@ export class BrandingPage {
     const primary = current.primaryColor.trim();
     const secondary = current.secondaryColor.trim();
     return {
-      appName: current.appName.trim().length > BRANDING_TEXT_MAX ? 'wsBranding.validation.textTooLong' : null,
-      tabTitle: current.tabTitle.trim().length > BRANDING_TEXT_MAX ? 'wsBranding.validation.textTooLong' : null,
-      primary: primary.length > 0 && !BRANDING_HEX_PATTERN.test(primary) ? 'wsBranding.validation.colourInvalid' : null,
+      appName:
+        current.appName.trim().length > BRANDING_TEXT_MAX
+          ? 'wsBranding.validation.textTooLong'
+          : null,
+      tabTitle:
+        current.tabTitle.trim().length > BRANDING_TEXT_MAX
+          ? 'wsBranding.validation.textTooLong'
+          : null,
+      primary:
+        primary.length > 0 && !BRANDING_HEX_PATTERN.test(primary)
+          ? 'wsBranding.validation.colourInvalid'
+          : null,
       secondary:
-        secondary.length > 0 && !BRANDING_HEX_PATTERN.test(secondary) ? 'wsBranding.validation.colourInvalid' : null,
+        secondary.length > 0 && !BRANDING_HEX_PATTERN.test(secondary)
+          ? 'wsBranding.validation.colourInvalid'
+          : null,
     };
   });
 
@@ -159,7 +193,9 @@ export class BrandingPage {
   });
 
   /** Messages of the last CORE_VALIDATION_FAILED, already in the request language; cleared on edit. */
-  private readonly serverErrors = signal<Partial<Record<(typeof SERVER_FIELDS)[number], string>>>({});
+  private readonly serverErrors = signal<Partial<Record<(typeof SERVER_FIELDS)[number], string>>>(
+    {},
+  );
 
   protected readonly identityErrors = computed<BrandingIdentityErrors>(() => {
     this.i18n();
@@ -168,8 +204,14 @@ export class BrandingPage {
     const force = this.submitAttempted();
     const server = this.serverErrors();
     return {
-      appName: (force || shown.appName) && errs.appName ? this.transloco.translate(errs.appName) : (server.appName ?? null),
-      tabTitle: (force || shown.tabTitle) && errs.tabTitle ? this.transloco.translate(errs.tabTitle) : (server.tabTitle ?? null),
+      appName:
+        (force || shown.appName) && errs.appName
+          ? this.transloco.translate(errs.appName)
+          : (server.appName ?? null),
+      tabTitle:
+        (force || shown.tabTitle) && errs.tabTitle
+          ? this.transloco.translate(errs.tabTitle)
+          : (server.tabTitle ?? null),
     };
   });
 
@@ -180,32 +222,45 @@ export class BrandingPage {
     const force = this.submitAttempted();
     const server = this.serverErrors();
     return {
-      primary: (force || shown.primary) && errs.primary ? this.transloco.translate(errs.primary) : (server.primaryColor ?? null),
+      primary:
+        (force || shown.primary) && errs.primary
+          ? this.transloco.translate(errs.primary)
+          : (server.primaryColor ?? null),
       secondary:
-        (force || shown.secondary) && errs.secondary ? this.transloco.translate(errs.secondary) : (server.secondaryColor ?? null),
+        (force || shown.secondary) && errs.secondary
+          ? this.transloco.translate(errs.secondary)
+          : (server.secondaryColor ?? null),
     };
   });
 
   protected readonly canSave = computed(
     () =>
-      this.canManage &&
+      this.canManage() &&
       this.baseline() !== null &&
       !this.loading() &&
       !this.saving() &&
-      !this.uploading() &&
+      !this.assetBusy() &&
       this.dirty() &&
       this.valid(),
   );
 
   constructor() {
     effect(() => {
-      if (!this.canRead || this.loaded.isLoading()) return;
+      if (!this.canRead() || this.loaded.isLoading()) return;
 
       const err = this.loaded.error();
       if (err && err !== this.lastHandledError) {
         this.lastHandledError = err;
-        if (untracked(() => this.baseline() !== null)) {
-          this.notify.error(this.transloco.translate(brandingErrorKey(err)));
+        if (err instanceof ApiError && err.status === 0) {
+          this.notify.connectionLost(
+            this.transloco.translate('session.connectionLost.title'),
+            this.transloco.translate('session.connectionLost.text'),
+          );
+        } else if (
+          untracked(() => this.baseline() !== null) &&
+          !(err instanceof ApiError && err.status === 403)
+        ) {
+          this.notify.error(brandingErrorKey(err, this.transloco, 'read'));
         }
         return;
       }
@@ -215,6 +270,7 @@ export class BrandingPage {
         if (value && value !== this.lastLoadedRecord) {
           this.lastLoadedRecord = value;
           this.lastHandledError = null;
+          this.notify.connectionRestored();
           untracked(() => this.applyLoadedRecord(value));
         }
       }
@@ -255,7 +311,7 @@ export class BrandingPage {
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     const base = this.baseline();
-    if (!this.canManage || !base || this.loading() || this.saving() || this.uploading()) return;
+    if (!this.canManage() || !base || this.loading() || this.saving() || this.assetBusy()) return;
 
     this.submitAttempted.set(true);
 
@@ -277,15 +333,17 @@ export class BrandingPage {
     this.saving.set(true);
     this.serverErrors.set({});
     try {
-      const updated = await updateBranding(body, idempotencyKey);
+      const updated = await this.api.updateBranding(body, idempotencyKey);
       this.pendingSave = null;
       this.applyLoadedRecord(updated);
       this.notify.success(this.transloco.translate('wsBranding.saved'));
     } catch (error) {
-      const fields = coreFieldErrors(error);
+      if (error instanceof ApiError && error.code === 'TENANT_WIDE_PERMISSION_REQUIRED')
+        this.writeRejected.set(true);
+      const fields = isValidationError(error) ? fieldErrorsOf(error) : null;
       if (fields) this.serverErrors.set(fieldMessages(fields, SERVER_FIELDS));
-      if (!fields || hasOtherFields(fields, SERVER_FIELDS)) {
-        this.notify.error(this.transloco.translate(brandingErrorKey(error)));
+      if (!fields || Object.keys(fields).length === 0 || hasOtherFields(fields, SERVER_FIELDS)) {
+        this.notify.error(brandingErrorKey(error, this.transloco));
       }
     } finally {
       this.saving.set(false);
@@ -293,7 +351,7 @@ export class BrandingPage {
   }
 
   protected undo(): void {
-    if (this.saving() || this.uploading()) return;
+    if (this.saving() || this.assetBusy()) return;
     const base = this.baseline();
     if (!base) return;
     this.draft.set(draftFromBranding(base));
@@ -301,7 +359,7 @@ export class BrandingPage {
   }
 
   protected async reload(): Promise<void> {
-    if (this.loading() || this.saving() || this.uploading()) return;
+    if (this.loading() || this.saving() || this.assetBusy()) return;
     if (this.dirty()) {
       const confirmed = await this.discardDialog().open();
       if (!confirmed) return;
@@ -320,32 +378,39 @@ export class BrandingPage {
       tabTitle: current.tabTitle,
       primary: current.primaryColor,
       secondary: current.secondaryColor,
-      logoUrl: base.logoUrl,
-      iconUrl: base.iconUrl,
+      logoUrl: base.hasLogo ? base.logoUrl : null,
+      iconUrl: base.hasIcon ? base.iconUrl : null,
     });
   }
 
   protected openUpload(kind: BrandingAssetKind): void {
-    if (!this.canManage || this.saving() || this.uploading()) return;
+    if (!this.canManage() || this.saving() || this.assetBusy()) return;
     const base = this.baseline();
-    this.uploadModal().open(kind, kind === 'logo' ? (base?.logoUrl ?? null) : (base?.iconUrl ?? null));
+    this.uploadModal().open(
+      kind,
+      kind === 'logo' ? (base?.logoUrl ?? null) : (base?.iconUrl ?? null),
+    );
   }
 
   protected onAssetSaved(event: { kind: BrandingAssetKind; branding: Branding }): void {
     const incoming = event.branding;
+    const asset =
+      event.kind === 'logo'
+        ? { hasLogo: incoming.hasLogo, logoUrl: incoming.logoUrl }
+        : { hasIcon: incoming.hasIcon, iconUrl: incoming.iconUrl };
+    this.baseline.update((current) => (current ? { ...current, ...asset } : current));
+  }
+
+  protected onAssetRemoved(kind: BrandingAssetKind): void {
     this.baseline.update((current) =>
       current
         ? {
             ...current,
-            id: incoming.id,
-            hasLogo: incoming.hasLogo,
-            hasIcon: incoming.hasIcon,
-            logoUrl: incoming.logoUrl,
-            iconUrl: incoming.iconUrl,
-            createdAt: incoming.createdAt,
-            updatedAt: incoming.updatedAt,
+            ...(kind === 'logo'
+              ? { hasLogo: false, logoUrl: null }
+              : { hasIcon: false, iconUrl: null }),
           }
-        : incoming,
+        : current,
     );
   }
 
@@ -371,12 +436,12 @@ export class BrandingPage {
     if (nextTabTitle !== (base.tabTitle || null)) {
       body.tabTitle = nextTabTitle;
     }
-    const nextPrimary = valueOrNull(current.primaryColor);
-    if (nextPrimary !== (base.primaryColor || null)) {
+    const nextPrimary = normaliseHex(current.primaryColor);
+    if (nextPrimary !== normaliseHex(base.primaryColor ?? '')) {
       body.primaryColor = nextPrimary;
     }
-    const nextSecondary = valueOrNull(current.secondaryColor);
-    if (nextSecondary !== (base.secondaryColor || null)) {
+    const nextSecondary = normaliseHex(current.secondaryColor);
+    if (nextSecondary !== normaliseHex(base.secondaryColor ?? '')) {
       body.secondaryColor = nextSecondary;
     }
     return body;

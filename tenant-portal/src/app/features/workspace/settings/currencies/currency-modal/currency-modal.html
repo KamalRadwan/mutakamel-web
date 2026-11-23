@@ -8,15 +8,12 @@
   (closed)="onModalClosed()"
 >
   <form [id]="uid + '-form'" class="flex flex-col gap-10" novalidate (submit)="save($event)">
+    @if (isReadOnly()) {
+      <app-settings-notice tone="info">{{ 'wsCurrencies.readOnly' | transloco }}</app-settings-notice>
+    }
     @if (mode() === 'reactivate') {
       <app-settings-notice tone="info">
         {{ 'wsCurrencies.modal.reactivateNote' | transloco }}
-      </app-settings-notice>
-    }
-
-    @if (topWarningError(); as warningMsg) {
-      <app-settings-notice tone="warning">
-        {{ warningMsg }}
       </app-settings-notice>
     }
 
@@ -128,8 +125,8 @@
       <div class="col-span-1">
         <ui-field
           [for]="uid + '-rate'"
-          [label]="'wsCurrencies.fields.rate' | transloco"
-          [hint]="(isEditingDefault() ? 'wsCurrencies.fields.rateLocked' : 'wsCurrencies.fields.rateHint') | transloco"
+          [label]="'wsCurrencies.fields.rateUnits' | transloco: { code: defaultCurrency()?.code ?? codeDraft().trim().toUpperCase() }"
+          [hint]="'wsCurrencies.fields.rateUnitsHint' | transloco: { code: defaultCurrency()?.code ?? codeDraft().trim().toUpperCase() }"
           [required]="!isReadOnly() && !isRateLocked()"
           [error]="rateError()"
         >
@@ -199,7 +196,7 @@
   </form>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (canManage()) {
+    @if (!isReadOnly()) {
       <button
         type="submit"
         [attr.form]="uid + '-form'"

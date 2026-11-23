@@ -19,6 +19,7 @@ import {
   tablerFileInvoice,
   tablerRefresh,
 } from '@ng-icons/tabler-icons';
+import { Notify } from '../../../../../core/notify/notify';
 import { LanguageState } from '../../../../../core/i18n/language';
 import {
   ActionItem,
@@ -31,7 +32,10 @@ import {
   PAYABLE_INVOICE_STATUSES,
   TenantInvoiceView,
   correlationIdOf,
-  listInvoices,
+  BillingApi,
+  InvoiceListQuery,
+  InvoiceStatus,
+  billingErrorMessage,
 } from '../../billing.api';
 import { invoicePurposeBadge, invoiceStatusBadge } from '../../shared/billing-badges';
 import { BillingFailed } from '../../shared/billing-failed/billing-failed';
@@ -67,6 +71,8 @@ function parsePageSize(raw: string | null | undefined): number {
   host: { class: 'flex flex-1 shrink-0 flex-col gap-8 p-12' },
 })
 export class InvoicesPage {
+  private readonly api = inject(BillingApi);
+  private readonly notify = inject(Notify);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -93,6 +99,15 @@ export class InvoicesPage {
       if (raw !== previous?.source) return parsePageSize(raw);
       return previous?.value ?? parsePageSize(raw);
     },
+  });
+
+  protected readonly filters = computed(() => {
+    const params = this.queryParams();
+    const statuses: InvoiceStatus[] = ['ISSUED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID'];
+    const status = (params?.get('status') ?? '').split(',').filter((value): value is InvoiceStatus =>
+      statuses.includes(value as InvoiceStatus));
+    return { status: status.length ? status : undefined, from: params?.get('from') || undefined,
+      to: params?.get('to') || undefined };
   });
 
   protected readonly rows = signal<TenantInvoiceView[]>([]);
@@ -123,7 +138,14 @@ export class InvoicesPage {
       this.host.nativeElement.scrollTo({ top: 0 });
     });
 
+    let lastFilters = JSON.stringify(this.filters());
     effect(() => {
+      const filters = this.filters();
+      const filterJson = JSON.stringify(filters);
+      if (filterJson !== lastFilters) {
+        lastFilters = filterJson;
+        this.onPageChange(DEFAULT_PAGE);
+      }
       const page = this.page();
       const limit = this.pageSize();
       this.reloadTick();
@@ -136,7 +158,7 @@ export class InvoicesPage {
         return;
       }
 
-      untracked(() => void this.load(page, limit));
+      untracked(() => void this.load({ page, limit, ...filters }));
     });
   }
 
@@ -221,26 +243,31 @@ export class InvoicesPage {
 
   protected openInvoice(inv: TenantInvoiceView, pay = false): void {
     const listQuery: Record<string, string | number> = {};
+    const filters = this.filters();
+    if (filters.status) listQuery['status'] = filters.status.join(',');
+    if (filters.from) listQuery['from'] = filters.from;
+    if (filters.to) listQuery['to'] = filters.to;
     if (this.page() > DEFAULT_PAGE) listQuery['page'] = this.page();
     if (this.pageSize() !== DEFAULT_PAGE_SIZE) listQuery['size'] = this.pageSize();
 
     void this.router.navigate(['/workspace/billing/invoices', inv.id], {
       queryParams: pay ? { pay: '1' } : undefined,
-      state: Object.keys(listQuery).length > 0 ? { listQuery } : undefined,
+      state: { listQuery, invoiceRow: inv },
     });
   }
 
-  private async load(page: number, limit: number): Promise<void> {
+  private async load(query: InvoiceListQuery): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.loadFailed.set(false);
     this.correlationId.set(null);
 
     try {
-      const res = await listInvoices({ page, limit });
+      const res = await this.api.listInvoices(query);
       if (seq !== this.loadSeq) return;
       this.forbidden.set(false);
-      this.rows.set(res.items);
+      this.rows.set(res.data);
+      this.notify.connectionRestored();
       this.total.set(res.meta.total);
     } catch (error) {
       if (seq !== this.loadSeq) return;
@@ -248,6 +275,9 @@ export class InvoicesPage {
       if ((error instanceof ApiError && error.status === 403) || code === 'TENANT_OWNER_REQUIRED') {
         this.forbidden.set(true);
         return;
+      }
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(billingErrorMessage(error, this.transloco), '');
       }
       this.loadFailed.set(true);
       this.correlationId.set(correlationIdOf(error));

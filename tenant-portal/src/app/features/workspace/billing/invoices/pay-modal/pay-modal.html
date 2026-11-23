@@ -28,6 +28,12 @@
     @case ('attempt') {
       @if (attempt(); as active) {
         <div class="flex flex-col items-center justify-center gap-8 py-16 text-center" role="status" aria-live="polite">
+          @if (offlinePayment()) {
+            <p class="text-13 leading-18 text-text">{{ 'binv.payments.offline' | transloco }}</p>
+          }
+          @if (pollTimedOut()) {
+            <p class="text-13 leading-18 text-text">{{ 'bill.poll.stillProcessing' | transloco }}</p>
+          }
           @switch (active.recoveryAction) {
             @case ('RECONCILIATION_REQUIRED') {
               <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
@@ -73,12 +79,13 @@
             [label]="'binv.pay.currency' | transloco"
             [for]="uid + '-currency'"
             [hint]="'binv.pay.currencyHint' | transloco"
+            [error]="currencyError()"
           >
             <ui-dropdown
               class="w-full"
               size="field"
               [id]="uid + '-currency'"
-              [describedBy]="uid + '-currency-hint'"
+              [describedBy]="uid + '-currency-hint' + (currencyError() ? ' ' + uid + '-currency-error' : '')"
               [options]="currencyOptions()"
               [value]="selectedCurrency()"
               [label]="'binv.pay.currency' | transloco"
@@ -168,12 +175,12 @@
       type="button"
       uiButton
       [loading]="paying()"
-      [disabled]="!quote() || quoteExpired() || quoting()"
+      [disabled]="!quote() || quoteExpired() || quoting() || intentInFlight()"
       (click)="confirmPay()"
     >
       {{ confirmLabel() }}
     </button>
-  } @else if (step() === 'attempt' && attempt()?.recoveryAction === 'CONTINUE_CHECKOUT') {
+  } @else if (step() === 'attempt' && !offlinePayment() && attempt()?.recoveryAction === 'CONTINUE_CHECKOUT' && !pollTimedOut()) {
     <button
       modal-footer
       type="button"
@@ -183,9 +190,9 @@
     >
       {{ (popupBlocked() ? 'binv.pay.openPaymentPage' : 'binv.pay.continuePayment') | transloco }}
     </button>
-  } @else if (step() === 'attempt' && attempt()?.recoveryAction === 'CHECK_STATUS' && pollTimedOut()) {
-    <button modal-footer type="button" uiButton (click)="retryPolling()">
-      {{ 'binv.pay.checkAgain' | transloco }}
+  } @else if (step() === 'attempt' && attempt()?.recoveryAction !== 'RECONCILIATION_REQUIRED' && pollTimedOut()) {
+    <button modal-footer type="button" uiButton [loading]="checking()" (click)="retryPolling()">
+      {{ 'bill.poll.checkNow' | transloco }}
     </button>
   } @else if (step() === 'error') {
     <button modal-footer type="button" uiButton (click)="retryOpen()">

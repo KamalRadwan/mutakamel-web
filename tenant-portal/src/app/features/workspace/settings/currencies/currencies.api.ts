@@ -1,10 +1,7 @@
-import {
-  fakeCreateCurrency,
-  fakeDeactivateCurrency,
-  fakeListCurrencies,
-  fakeSetDefaultCurrency,
-  fakeUpdateCurrency,
-} from './currencies.fake';
+import { Service, inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { CoreHttp } from '../../../../core/api/core-http';
+import { AuthSession } from '../../../../core/auth/auth-session';
 import {
   CURRENCY_LIMITS,
   CreateCurrencyBody,
@@ -45,33 +42,59 @@ function resolveCurrencySymbol(lang: 'en' | 'ar', code: string): string {
   return code;
 }
 
-export function listCurrencies(query?: CurrencyListQuery): Promise<CorePage<Currency>> {
-  // GET    /api/v1/tenant/currencies [currencies.currency.read] -> envelope { data: Currency[], meta }
-  return fakeListCurrencies(query);
-}
+const CURRENCIES_PATH = '/api/tenant/core/v1/currencies';
 
-export function createCurrency(body: CreateCurrencyBody, key: string): Promise<Currency> {
-  // POST   /api/v1/tenant/currencies [currencies.currency.manage, tenant-wide] (x-idempotency-key)
-  return fakeCreateCurrency(body, key);
-}
+@Service()
+export class CurrenciesApi {
+  private readonly http = inject(CoreHttp);
+  private readonly session = inject(AuthSession);
+  private readonly queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, networkMode: 'always', gcTime: 0 } },
+  });
 
-export function updateCurrency(id: string, body: UpdateCurrencyBody, key: string): Promise<Currency> {
-  // PATCH  /api/v1/tenant/currencies/:id [currencies.currency.manage, tenant-wide] (x-idempotency-key)
-  return fakeUpdateCurrency(id, body, key);
-}
+  listCurrencies(query: CurrencyListQuery = {}): Promise<CorePage<Currency>> {
+    const params = { ...query, page: Math.max(1, query.page ?? 1), limit: Math.min(100, Math.max(1, query.limit ?? 20)) };
+    return this.queries.fetchQuery({
+      queryKey: ['ws-currencies', this.session.me()?.id, params],
+      queryFn: () => this.http.readPage<Currency>(CURRENCIES_PATH, params),
+    });
+  }
 
-export function setDefaultCurrency(id: string, key: string): Promise<Currency> {
-  // POST   /api/v1/tenant/currencies/:id/set-default [currencies.currency.manage, tenant-wide] (x-idempotency-key, no body)
-  return fakeSetDefaultCurrency(id, key);
-}
+  async getDefaultCurrency(): Promise<Currency | null> {
+    return (await this.listCurrencies({ isDefault: true, limit: 1 })).data[0] ?? null;
+  }
 
-export function deactivateCurrency(id: string, key: string): Promise<void> {
-  // DELETE /api/v1/tenant/currencies/:id [currencies.currency.manage, tenant-wide] (x-idempotency-key)
-  return fakeDeactivateCurrency(id, key);
+  createCurrency(body: CreateCurrencyBody, key: string): Promise<Currency> {
+    return this.write('POST', CURRENCIES_PATH, body, key);
+  }
+
+  updateCurrency(id: string, body: UpdateCurrencyBody, key: string): Promise<Currency> {
+    return this.write('PATCH', `${CURRENCIES_PATH}/${encodeURIComponent(id)}`, body, key);
+  }
+
+  setDefaultCurrency(id: string, key: string): Promise<Currency> {
+    return this.write('POST', `${CURRENCIES_PATH}/${encodeURIComponent(id)}/set-default`, undefined, key);
+  }
+
+  async deactivateCurrency(id: string, key: string): Promise<void> {
+    await this.write<void>('DELETE', `${CURRENCIES_PATH}/${encodeURIComponent(id)}`, undefined, key);
+  }
+
+  listCurrencyCatalogue(lang: 'en' | 'ar'): Promise<CurrencyCatalogueEntry[]> {
+    return listCurrencyCatalogue(lang);
+  }
+
+  private async write<T = Currency>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body: unknown, key: string): Promise<T> {
+    const result = await this.http.write<T>(method, path, body, { key, noBody: body === undefined });
+    const filters = { queryKey: ['ws-currencies'] };
+    await this.queries.cancelQueries(filters);
+    await this.queries.invalidateQueries(filters);
+    return result.data;
+  }
 }
 
 export async function listCurrencyCatalogue(lang: 'en' | 'ar'): Promise<CurrencyCatalogueEntry[]> {
-  // no endpoint yet (plan D2)
+  // The ISO catalogue is client-side by contract (Intl).
   const cached = catalogueCache.get(lang);
   if (cached) {
     return cached.map((entry) => ({ ...entry }));
@@ -95,9 +118,4 @@ export async function listCurrencyCatalogue(lang: 'en' | 'ar'): Promise<Currency
 
   catalogueCache.set(lang, entries);
   return entries.map((entry) => ({ ...entry }));
-}
-
-export async function getDefaultCurrency(): Promise<Currency | null> {
-  const result = await listCurrencies({ isDefault: true, limit: 1 });
-  return result.data[0] ?? null;
 }

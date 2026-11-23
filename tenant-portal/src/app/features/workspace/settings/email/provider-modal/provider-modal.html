@@ -6,6 +6,8 @@
   [title]="'wsEmail.fields.providerDriver.label' | transloco"
   [closeLabel]="'settings.common.close' | transloco"
   [dismissable]="!saving()"
+  [preventDismiss]="hasUnsavedDraft()"
+  (dismiss)="requestClose()"
   (closed)="onModalClosed()"
 >
   <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
@@ -21,25 +23,41 @@
       </app-settings-notice>
     }
 
+    @if (managedProvider()) {
+      <app-settings-notice tone="info">{{
+        'wsEmail.managedBySupport' | transloco
+      }}</app-settings-notice>
+    }
+
     <ui-field
-      size="bare"
+      [size]="managedProvider() ? 'default' : 'bare'"
       [for]="uid + '-driver'"
       [label]="'wsEmail.fields.providerDriver.label' | transloco"
       [hint]="'wsEmail.fields.providerDriver.hint' | transloco"
       [required]="!isReadonly()"
       [error]="fieldError()"
     >
-      <ui-dropdown
-        class="w-full"
-        size="field"
-        [id]="uid + '-driver'"
-        [describedBy]="uid + '-driver-hint'"
-        [label]="'wsEmail.fields.providerDriver.label' | transloco"
-        [options]="driverOptions()"
-        [value]="driverDraft()"
-        [disabled]="isReadonly() || saving()"
-        (valueChange)="onDriverChange($event)"
-      />
+      @if (managedProvider()) {
+        <input
+          [id]="uid + '-driver'"
+          [value]="providerName()"
+          [attr.aria-describedby]="uid + '-driver-hint'"
+          readonly
+          class="min-w-0 flex-1 bg-transparent text-12 text-text outline-none"
+        />
+      } @else {
+        <ui-dropdown
+          class="w-full"
+          size="field"
+          [id]="uid + '-driver'"
+          [describedBy]="uid + '-driver-hint'"
+          [label]="'wsEmail.fields.providerDriver.label' | transloco"
+          [options]="driverOptions()"
+          [value]="driverDraft()"
+          [disabled]="isReadonly() || saving()"
+          (valueChange)="onDriverChange($event)"
+        />
+      }
     </ui-field>
   </form>
 
@@ -57,31 +75,45 @@
       </button>
 
       @if (dirty()) {
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="saving()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
           {{ 'settings.common.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        <span class="text-12 leading-18 text-text-muted">{{
+          'settings.common.unsaved' | transloco
+        }}</span>
       } @else {
         <button
           type="button"
           uiButton
           variant="ghost"
           [disabled]="saving()"
-          (click)="close()"
+          (click)="requestClose()"
         >
           {{ 'settings.common.cancel' | transloco }}
         </button>
       }
     } @else {
-      <button type="button" uiButton variant="ghost" (click)="close()">
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'settings.common.close' | transloco }}
       </button>
     }
   </div>
 </ui-modal>
+
+<ui-confirm-dialog
+  #suspendConfirm
+  tone="warning"
+  [title]="'wsEmail.suspendConfirm' | transloco"
+  [text]="'wsEmail.notice.resetsVerification' | transloco"
+  [confirmLabel]="'settings.common.save' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardConfirm
+  tone="warning"
+  [title]="'settings.common.unsaved' | transloco"
+  [text]="'wsEmail.discardDraft' | transloco"
+  [confirmLabel]="'wsEmail.discard' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

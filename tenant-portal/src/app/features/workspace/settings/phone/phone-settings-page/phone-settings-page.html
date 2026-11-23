@@ -20,53 +20,55 @@
       {{ 'wsPhone.states.retry' | transloco }}
     </button>
   </div>
-} @else if (fullState() === 'loadFailed') {
-  <div
-    role="alert"
-    class="flex flex-1 flex-col items-center justify-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-  >
-    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon">
-      <ng-icon name="tablerCloudOff" size="20" aria-hidden="true" />
-    </span>
-    <p class="text-12 leading-18 text-text-muted">{{ 'wsPhone.states.loadFailed' | transloco }}</p>
-    <button type="button" uiButton variant="primary" (click)="load()">
-      {{ 'wsPhone.states.retry' | transloco }}
-    </button>
-  </div>
+} @else if (fullState() === 'forbidden') {
+  <app-route-error kind="forbidden" />
 } @else {
-  @if (loading() && servers().length === 0) {
+  @if (moduleInactive()) {
+    <app-settings-notice tone="warning">{{ 'wsPhone.moduleInactiveNotice' | transloco }}</app-settings-notice>
+  } @else if (!canManage()) {
+    <app-settings-notice>{{ 'wsPhone.needsTenantWide' | transloco }}</app-settings-notice>
+  }
+
+  @if (cardErrors().config) {
+    <ng-container [ngTemplateOutlet]="cardFailure" [ngTemplateOutletContext]="{ card: 'config' }" />
+  } @else if (cardLoading().config) {
     <span class="h-skeleton-line w-picker-w-single max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse" aria-hidden="true"></span>
-  } @else if (config().enabled && seats(); as s) {
-    <p class="text-12 leading-18 text-text-muted">
-      {{ 'wsPhone.summary.on' | transloco: { servers: servers().length, occupied: s.occupied, allowed: s.allowed } }}
-    </p>
   } @else {
-    <p class="text-12 leading-18 text-text-muted">
-      {{ 'wsPhone.summary.off' | transloco }}
-    </p>
+    <p class="text-12 leading-18 text-text-muted">{{ (config()?.enabled ? 'wsPhone.summary.enabled' : 'wsPhone.summary.off') | transloco }}</p>
+  }
+
+  @if (cardErrors().seats) {
+    <ng-container [ngTemplateOutlet]="cardFailure" [ngTemplateOutletContext]="{ card: 'seats' }" />
+  } @else if (cardLoading().seats) {
+    <span class="h-skeleton-line w-picker-w-single max-w-full rounded-4 bg-neutral-soft motion-safe:animate-pulse" aria-hidden="true"></span>
+  } @else if (seats(); as s) {
+    <div class="flex flex-wrap items-center gap-8 rounded-10 border border-border bg-surface p-8 shadow-card" data-card="seats">
+      <p class="text-12 leading-18 text-text-muted">{{ 'wsPhone.summary.seats' | transloco: { occupied: s.occupied, allowed: s.allowed, available: s.available } }}</p>
+      @if (s.overCapacity && s.overCapacitySince) {
+        <span class="inline-flex h-badge items-center rounded-8 bg-warning px-8 text-12 font-medium text-on-warning">{{ 'wsPhone.overCapacitySince' | transloco: { date: date(s.overCapacitySince) } }}</span>
+      }
+      @if (s.graceUntil) {
+        <span class="text-12 leading-18 text-text-muted">{{ 'wsPhone.graceUntil' | transloco: { date: date(s.graceUntil) } }}</span>
+      }
+    </div>
   }
 
   <div class="flex shrink-0 items-center justify-between gap-8 rounded-10 border border-border bg-surface p-8 shadow-card">
-    @if (canManage) {
+    @if (canManage()) {
       <button
         type="button"
         class="inline-flex h-btn shrink-0 items-center justify-center gap-4 rounded-8 border border-transparent px-12 text-12 font-medium whitespace-nowrap outline-none transition-colors duration-fast ease-enter focus-visible:ring-3 focus-visible:ring-focus-halo-strong"
         [class]="
-          atLimit() || adding()
+          atLimit()
             ? 'cursor-not-allowed bg-neutral-soft text-text-placeholder'
             : 'cursor-pointer bg-brand text-on-brand hover:bg-brand-hover active:bg-brand-pressed'
         "
-        [attr.aria-disabled]="atLimit() || adding() ? 'true' : null"
-        [attr.aria-busy]="adding() ? 'true' : null"
+        [disabled]="atLimit() || cardLoading().servers || !!cardErrors().servers"
         [attr.aria-describedby]="atLimit() ? uid + '-limit-hint' : null"
         [attr.title]="atLimit() ? ('wsPhone.toolbar.limitHint' | transloco) : null"
         (click)="addServer()"
       >
-        @if (adding()) {
-          <ng-icon name="tablerLoader2" size="12" class="animate-spin" aria-hidden="true" />
-        } @else {
-          <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
-        }
+        <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
         <span>{{ 'wsPhone.toolbar.add' | transloco }}</span>
       </button>
       @if (atLimit()) {
@@ -88,15 +90,17 @@
     </button>
   </div>
 
-  @if (!loading() && servers().length === 0) {
+  @if (cardErrors().servers) {
+    <ng-container [ngTemplateOutlet]="cardFailure" [ngTemplateOutletContext]="{ card: 'servers' }" />
+  } @else if (!cardLoading().servers && servers().length === 0) {
     <div class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
       <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-neutral-soft text-text-muted">
         <ng-icon name="tablerServer" size="18" aria-hidden="true" />
       </span>
       <h2 class="text-14 leading-20 font-medium text-text">{{ 'wsPhone.states.emptyTitle' | transloco }}</h2>
       <p class="text-12 leading-18 text-text-muted">{{ 'wsPhone.states.emptyLine' | transloco }}</p>
-      @if (canManage) {
-        <button type="button" uiButton variant="primary" [loading]="adding()" (click)="addServer()">
+      @if (canManage()) {
+        <button type="button" uiButton variant="primary" (click)="addServer()">
           <ng-icon name="tablerPlus" size="15" aria-hidden="true" />
           {{ 'wsPhone.toolbar.add' | transloco }}
         </button>
@@ -115,7 +119,7 @@
           class="grid h-table-head rounded-10 bg-nav-gradient text-13 leading-18 font-medium text-on-nav"
           [class]="tableColumns()"
         >
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="flex items-center justify-center">
               <span class="sr-only">{{ 'wsPhone.table.dragHandle' | transloco }}</span>
             </span>
@@ -123,8 +127,8 @@
           <span
             role="columnheader"
             class="flex min-w-0 items-center truncate px-10"
-            [class.border-s]="canManage"
-            [class.border-on-nav-line]="canManage"
+            [class.border-s]="canManage()"
+            [class.border-on-nav-line]="canManage()"
           >
             {{ 'wsPhone.table.order' | transloco }}
           </span>
@@ -167,14 +171,14 @@
               </span>
             </span>
           </span>
-          @if (canManage) {
+          @if (canManage()) {
             <span role="columnheader" class="border-s border-on-nav-line">
               <span class="sr-only">{{ 'wsPhone.table.actions' | transloco }}</span>
             </span>
           }
         </div>
 
-        @if (loading() && servers().length === 0) {
+        @if (cardLoading().servers && servers().length === 0) {
           @for (row of skeletonRows; track row) {
             <div
               role="row"
@@ -182,12 +186,12 @@
               class="mt-6 grid h-table-row items-center rounded-10 border border-border bg-surface shadow-card"
               [class]="tableColumns()"
             >
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center">
                   <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
                 </span>
               }
-              <span role="cell" class="flex items-center px-10" [class.border-s]="canManage" [class.border-border]="canManage">
+              <span role="cell" class="flex items-center px-10" [class.border-s]="canManage()" [class.border-border]="canManage()">
                 <span class="h-skeleton-line w-16 rounded-4 bg-neutral-soft"></span>
               </span>
               <span role="cell" class="flex items-center gap-8 border-s border-border px-10">
@@ -206,7 +210,7 @@
               <span role="cell" class="flex items-center border-s border-border px-10">
                 <span class="h-switch-h w-switch-w rounded-full bg-neutral-soft"></span>
               </span>
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center border-s border-border">
                   <span class="size-btn-h-sm rounded-6 bg-neutral-soft"></span>
                 </span>
@@ -231,7 +235,7 @@
                 <span aria-hidden="true" class="pointer-events-none absolute inset-x-0 -top-4 h-2 rounded-full bg-brand"></span>
               }
 
-              @if (canManage) {
+              @if (canManage()) {
                 <span role="cell" class="flex items-center justify-center text-text-muted">
                   <span
                     data-drag-handle
@@ -246,8 +250,8 @@
               <span
                 role="cell"
                 class="flex min-w-0 items-center px-10 text-12 tabular-nums text-text-muted"
-                [class.border-s]="canManage"
-                [class.border-border]="canManage"
+                [class.border-s]="canManage()"
+                [class.border-border]="canManage()"
               >
                 <span dir="ltr">{{ server.priority }}</span>
               </span>
@@ -304,14 +308,14 @@
               >
                 <ui-switch
                   [checked]="server.enabled"
-                  [disabled]="!canManage || isToggling(server.id)"
+                  [disabled]="!canManage() || isToggling(server.id)"
                   [label]="'wsPhone.table.enabledFor' | transloco: { name: server.name }"
                   [describedBy]="uid + '-col-enabled-hint'"
                   (checkedChange)="toggleEnabled(server, $event)"
                 />
               </span>
 
-              @if (canManage) {
+              @if (canManage()) {
                 <span
                   role="cell"
                   data-row-action
@@ -342,7 +346,8 @@
 }
 
 <app-server-modal
-  [canManage]="canManage"
+  [canManage]="canManage()"
+  (writeFailed)="handleActionError($event)"
   (saved)="onModalSaved()"
   (serverPatched)="onServerPatched($event)"
   (deleteRequested)="requestDelete($event)"
@@ -357,3 +362,11 @@
   [confirmLabel]="'wsPhone.delete.confirm' | transloco"
   [cancelLabel]="'wsPhone.delete.cancel' | transloco"
 />
+
+<ng-template #cardFailure let-card="card">
+  <div role="alert" [attr.data-card]="card" class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card">
+    <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-red text-on-icon"><ng-icon name="tablerCloudOff" size="20" aria-hidden="true" /></span>
+    <p class="text-12 leading-18 text-text-muted">{{ ('wsPhone.states.' + card + 'LoadFailed') | transloco }}</p>
+    <button type="button" uiButton variant="primary" (click)="loadCard(card)">{{ 'wsPhone.states.retry' | transloco }}</button>
+  </div>
+</ng-template>

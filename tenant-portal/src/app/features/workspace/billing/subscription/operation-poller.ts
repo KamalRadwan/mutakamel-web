@@ -1,5 +1,6 @@
 import { DestroyRef, Injectable, inject } from '@angular/core';
-import { CommercialOperation, getOperation } from '../billing.api';
+import { BillingApi, CommercialOperation } from '../billing.api';
+import { operationPollDelay } from '../shared/billing-poll';
 
 export type OperationPollResult =
   | { kind: 'ready'; operation: CommercialOperation }
@@ -20,6 +21,7 @@ const DEFAULT_MAX_ATTEMPTS = 60;
 
 @Injectable()
 export class OperationPoller {
+  private readonly api = inject(BillingApi);
   private runId = 0;
   private destroyed = false;
   private activeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -38,14 +40,13 @@ export class OperationPoller {
     const myRun = this.runId;
     const maxAttempts = Math.max(1, opts?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS);
     let lastOp: CommercialOperation | null = null;
+    const startedAt = Date.now();
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const delayMs =
         attempt === 1
           ? (opts?.initialDelayMs ?? DEFAULT_DELAY_MS)
-          : lastOp?.retryAfterSeconds && lastOp.retryAfterSeconds > 0
-            ? lastOp.retryAfterSeconds * 1000
-            : DEFAULT_DELAY_MS;
+          : operationPollDelay(Date.now() - startedAt, lastOp?.retryAfterSeconds ?? null);
 
       if (delayMs > 0) {
         await this.sleep(delayMs);
@@ -56,7 +57,7 @@ export class OperationPoller {
 
       let op: CommercialOperation;
       try {
-        op = await getOperation(operationId);
+        op = await this.api.getOperation(operationId);
       } catch (error) {
         if (myRun !== this.runId) {
           return { kind: 'cancelled' };

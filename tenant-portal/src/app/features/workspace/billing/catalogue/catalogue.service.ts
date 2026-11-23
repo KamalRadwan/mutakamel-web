@@ -10,6 +10,19 @@ import { BillingBadge, offerStatusBadge } from '../shared/billing-badges';
 import { CatalogueNames } from '../shared/catalogue-names';
 import { changeLink } from '../shared/change-link';
 import { formatUnitPrice } from '../shared/money';
+import { BillingApi } from '../billing.api';
+
+export class CatalogueTooLargeError extends Error {}
+
+export async function loadAllCatalogue(api: BillingApi): Promise<SubscriptionOffer[]> {
+  const offers: SubscriptionOffer[] = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const result = await api.listCatalogue({ page, limit: 100 });
+    offers.push(...result.data);
+    if (!result.meta.hasNext) return offers;
+  }
+  throw new CatalogueTooLargeError();
+}
 
 export interface AppVisual {
   readonly icon: string;
@@ -40,12 +53,13 @@ export interface CatalogueTierItem {
   readonly status: OfferStatus;
   readonly current: boolean;
   readonly fromPrice: string | null;
+  readonly priceNotSet: boolean;
   readonly actionKind: TierActionKind;
   readonly actionLink: RouteLink | null;
   readonly priceTarget: PriceLadderTarget;
 }
 
-export type AddonActionKind = 'subscribed' | 'add' | 'upgradeTier' | 'none';
+export type AddonActionKind = 'subscribed' | 'add' | 'none';
 
 export interface CatalogueAddonItem {
   readonly id: string;
@@ -56,6 +70,7 @@ export interface CatalogueAddonItem {
   readonly statusBadge: BillingBadge;
   readonly subscribed: boolean;
   readonly fromPrice: string | null;
+  readonly priceNotSet: boolean;
   readonly actionKind: AddonActionKind;
   readonly actionLink: RouteLink | null;
   readonly priceTarget: PriceLadderTarget;
@@ -109,11 +124,11 @@ export function fromUnitPrice(ladders: readonly OfferLadder[], cycle: BillingCyc
 
 export function groupCatalogueOffers(
   offers: readonly SubscriptionOffer[],
-  subscription: SubscriptionView,
+  subscription: SubscriptionView | null,
 ): CatalogueAppGroup[] {
-  const cycle = subscription.subscription.billingCycle;
-  const baseByAppId = new Map(subscription.baseItems.map((item) => [item.applicationId, item]));
-  const subscribedAddonIds = new Set(subscription.addonSelections.map((sel) => sel.addonId));
+  const cycle = subscription?.subscription.billingCycle ?? 'MONTHLY';
+  const baseByAppId = new Map(subscription?.baseItems.map((item) => [item.applicationId, item]) ?? []);
+  const subscribedAddonIds = new Set(subscription?.addonSelections.map((sel) => sel.addonId) ?? []);
   const buckets = new Map<string, ApplicationBucket>();
 
   for (const offer of offers) {
@@ -152,7 +167,6 @@ export function groupCatalogueOffers(
         bucket.application,
         visual,
         baseItem,
-        sortedTierOffers,
         subscribedAddonIds,
         cycle,
       ),
@@ -209,7 +223,8 @@ function buildTierItem(
 ): CatalogueTierItem {
   const current = baseItem !== null && baseItem.tierId === offer.tier.id;
   const fromPrice = fromUnitPrice(offer.ladders, cycle);
-  const canPurchase = fromPrice !== null && offer.status !== 'UNAVAILABLE';
+  const priceNotSet = isPriceNotSet(offer, cycle);
+  const canPurchase = fromPrice !== null && !priceNotSet && offer.status === 'PREPARATION_REQUIRED';
 
   let actionKind: TierActionKind = 'none';
   let actionLink: RouteLink | null = null;
@@ -242,6 +257,7 @@ function buildTierItem(
     status: offer.status,
     current,
     fromPrice,
+    priceNotSet,
     actionKind,
     actionLink,
     priceTarget: {
@@ -260,12 +276,12 @@ function buildAddonItem(
   application: { readonly name: string },
   visual: AppVisual,
   baseItem: SubscriptionBaseItem | null,
-  sortedTierOffers: readonly ApplicationOffer[],
   subscribedAddonIds: ReadonlySet<string>,
   cycle: BillingCycle,
 ): CatalogueAddonItem {
   const isSubscribed = subscribedAddonIds.has(offer.addon.id);
   const fromPrice = fromUnitPrice(offer.ladders, cycle);
+  const priceNotSet = isPriceNotSet(offer, cycle);
   const statusBadge = offerStatusBadge(offer.status);
 
   let actionKind: AddonActionKind = 'none';
@@ -276,7 +292,7 @@ function buildAddonItem(
   } else if (
     offer.status === 'PREPARATION_REQUIRED' &&
     baseItem !== null &&
-    fromPrice !== null
+    fromPrice !== null && !priceNotSet
   ) {
     actionKind = 'add';
     actionLink = changeLink({
@@ -285,22 +301,6 @@ function buildAddonItem(
       definitionVersionId: offer.addon.definitionVersionId,
       parentItemId: baseItem.id,
     });
-  } else if (offer.status === 'INCOMPATIBLE' && baseItem !== null) {
-    const nextAllowedTier = sortedTierOffers.find(
-      (tierOffer) =>
-        tierOffer.tier.rank > baseItem.tierRank &&
-        tierOffer.status !== 'UNAVAILABLE' &&
-        (offer.addon.compatibility.mode === 'ALL_ACTIVE' ||
-          offer.addon.compatibility.tierIds.includes(tierOffer.tier.id)),
-    );
-    if (nextAllowedTier) {
-      actionKind = 'upgradeTier';
-      actionLink = changeLink({
-        kind: 'tier',
-        itemId: baseItem.id,
-        tierId: nextAllowedTier.tier.id,
-      });
-    }
   }
 
   return {
@@ -312,6 +312,7 @@ function buildAddonItem(
     statusBadge,
     subscribed: isSubscribed,
     fromPrice,
+    priceNotSet,
     actionKind,
     actionLink,
     priceTarget: {
@@ -323,4 +324,12 @@ function buildAddonItem(
       defaultCycle: cycle,
     },
   };
+}
+
+function isPriceNotSet(offer: SubscriptionOffer, cycle: BillingCycle): boolean {
+  const ladder = findLadder(offer.ladders, cycle);
+  return offer.status === 'UNAVAILABLE' ||
+    ['PRICE_UNAVAILABLE', 'PRICE_NOT_CONFIGURED'].includes(offer.safeReasonCode) ||
+    ladder?.safeReasonCode === 'PRICE_UNAVAILABLE' || ladder?.safeReasonCode === 'PRICE_NOT_CONFIGURED' ||
+    !isLadderConfigured(ladder);
 }

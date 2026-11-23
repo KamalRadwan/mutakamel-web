@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, linkedSignal, resource, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, resource, signal, untracked, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
@@ -21,21 +21,24 @@ import { Pagination } from '../../../../../shared/ui/pagination/pagination';
 import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsFrame } from '../../../../../shared/ui/settings-frame/settings-frame';
-import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
+import { Switch } from '../../../../../shared/ui/switch/switch';
+import { AuthSession } from '../../../../../core/auth/auth-session';
+import { WorkspaceLookups } from '../../../../../shared/widgets/workspace-lookups/workspace-lookups.api';
+import { ActionKeys } from '../../core-response.model';
 import { TaxModal } from '../tax-modal/tax-modal';
-import { deactivateTax, getTaxPermissions, listCompanyOptions, listTaxes, updateTax } from '../taxes.api';
+import { TaxesApi } from '../taxes.api';
 import {
   TAX_LIMITS,
   Tax,
   TaxListQuery,
   TaxSortBy,
   TaxStatus,
+  canManageTax,
+  taxPermissions,
+  taxCompanyOptions,
   formatRate,
   translateTaxError,
 } from '../taxes.model';
-
-// later from the session: taxes.tax.read (company-scoped) / taxes.tax.manage per company; workspace-wide taxes need a workspace-wide grant
-const CAN_READ = true;
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SKELETON_ROWS = [0, 1, 2, 3, 4] as const;
@@ -57,7 +60,7 @@ type StatusFilterValue = '' | TaxStatus;
     Modal,
     Pagination,
     SettingsFrame,
-    SettingsNotice,
+    Switch,
     TaxModal,
   ],
   providers: [
@@ -72,12 +75,16 @@ type StatusFilterValue = '' | TaxStatus;
     }),
   ],
   templateUrl: './taxes-page.html',
-  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  host: { class: 'flex flex-1 shrink-0 flex-col' },
 })
 export class TaxesPage {
   private static nextId = 0;
   protected readonly uid = `taxes-page-${++TaxesPage.nextId}`;
 
+  private readonly api = inject(TaxesApi);
+  private readonly auth = inject(AuthSession);
+  private readonly lookups = inject(WorkspaceLookups);
+  private readonly actionKeys = new ActionKeys(newIdempotencyKey);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
@@ -86,7 +93,6 @@ export class TaxesPage {
   private readonly deactivateConfirm = viewChild.required<ConfirmDialog>('deactivateConfirm');
   private readonly reactivateBlockerModal = viewChild.required<Modal>('reactivateBlockerModal');
 
-  protected readonly canRead = CAN_READ;
   protected readonly skeletonRows = SKELETON_ROWS;
   protected readonly pageSizes = [...TAX_LIMITS.pageSizes];
 
@@ -106,35 +112,24 @@ export class TaxesPage {
 
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private readonly permissionsResource = resource({
-    loader: () => getTaxPermissions(),
-  });
+  private readonly permissions = computed(() => taxPermissions(this.auth.me()));
+  protected readonly tenantWideAllowed = computed(() => this.permissions().tenantWideAllowed);
+  protected readonly showInactiveCompanies = signal(false);
 
   private readonly companiesResource = resource({
-    loader: () => listCompanyOptions(),
+    params: () => this.api.scopeRevision(),
+    loader: () => this.lookups.allCompanies(),
   });
 
-  protected readonly companies = computed(() =>
-    this.companiesResource.hasValue() ? this.companiesResource.value() : [],
-  );
-  protected readonly companiesLoading = this.companiesResource.isLoading;
-  protected readonly companiesFailed = computed(
-    () => !this.companiesResource.isLoading() && Boolean(this.companiesResource.error()),
-  );
-
-  private readonly companyById = computed(
-    () => new Map(this.companies().map((company) => [company.id, company])),
-  );
-
-  protected readonly tenantWideAllowed = computed(() =>
-    this.permissionsResource.hasValue() ? this.permissionsResource.value().tenantWideAllowed : false,
-  );
-
-  protected readonly canCreate = computed(
-    () =>
-      this.canRead &&
-      (this.tenantWideAllowed() || this.companies().some((company) => company.canManage && company.status === 'ACTIVE')),
-  );
+  protected readonly companyStatusesKnown = computed(() => this.companiesResource.hasValue());
+  protected readonly companies = computed(() => {
+    this.i18n();
+    return taxCompanyOptions(this.auth.me(), this.companiesResource.hasValue() ? this.companiesResource.value() : null,
+      (id) => this.transloco.translate('wsTaxes.companyFallback', { id }));
+  });
+  private readonly companyById = computed(() => new Map(this.companies().map((company) => [company.id, company])));
+  protected readonly canCreate = computed(() => this.tenantWideAllowed() ||
+    this.companies().some((company) => company.canManage && company.status !== 'INACTIVE'));
 
   private readonly listQuery = computed<TaxListQuery>(() => {
     const query: TaxListQuery = {
@@ -144,11 +139,11 @@ export class TaxesPage {
       sortDir: this.sortDir(),
     };
     const term = this.debouncedSearch();
-    if (term) query.search = term;
+    if (term) query.search = term.slice(0, 200);
     const status = this.statusFilter();
     if (status) query.status = status;
     const companyId = this.companyFilter();
-    if (!this.companiesFailed() && companyId) query.companyId = companyId;
+    if (companyId) query.companyId = companyId;
     const inclusive = this.inclusiveFilter();
     if (inclusive === 'true') query.isInclusive = true;
     else if (inclusive === 'false') query.isInclusive = false;
@@ -156,27 +151,26 @@ export class TaxesPage {
   });
 
   private readonly taxesResource = resource({
-    params: () => this.listQuery(),
-    loader: ({ params }) => listTaxes(params),
+    params: () => ({ query: this.listQuery(), scope: this.api.scopeRevision() }),
+    loader: ({ params }) => this.api.listTaxes(params.query),
   });
 
-  protected readonly taxes = computed(() =>
-    this.taxesResource.hasValue() ? this.taxesResource.value().data : [],
-  );
+  protected readonly taxes = computed(() => {
+    const taxes = this.taxesResource.hasValue() ? this.taxesResource.value().data : [];
+    if (!this.companyStatusesKnown() || this.showInactiveCompanies()) return taxes;
+    return taxes.filter((tax) => tax.companyId === null || this.companyById().get(tax.companyId)?.status === 'ACTIVE');
+  });
   protected readonly loading = this.taxesResource.isLoading;
-  protected readonly loadFailed = computed(
-    () => !this.loading() && Boolean(this.taxesResource.error()),
-  );
-  protected readonly loadForbidden = computed(() => {
+  private readonly listError = computed(() => {
     const error = this.taxesResource.error();
-    const cause = error instanceof ApiError ? error : (error as { cause?: unknown } | undefined)?.cause;
-    return this.loadFailed() && cause instanceof ApiError && cause.status === 403;
+    return error instanceof ApiError ? error : (error as { cause?: unknown } | undefined)?.cause;
   });
-  protected readonly displayTotal = linkedSignal<number | null, number>({
-    source: () =>
-      this.loadFailed() ? 0 : this.taxesResource.hasValue() ? this.taxesResource.value().meta.total : null,
-    computation: (next, previous) => (next !== null ? next : (previous?.value ?? 0)),
+  protected readonly loadFailed = computed(() => !this.loading() && Boolean(this.listError()));
+  protected readonly loadForbidden = computed(() => {
+    const error = this.listError();
+    return this.loadFailed() && error instanceof ApiError && error.status === 403;
   });
+  protected readonly displayTotal = computed(() => this.taxesResource.hasValue() ? this.taxesResource.value().meta.total : 0);
 
   protected readonly hasActiveFilters = computed(() =>
     Boolean(
@@ -231,6 +225,21 @@ export class TaxesPage {
 
   constructor() {
     effect(() => {
+      const error = this.listError();
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.connectionLost(this.transloco.translate('session.connectionLost.title'),
+          this.transloco.translate('session.connectionLost.text'));
+      } else if (this.taxesResource.hasValue()) {
+        this.notify.connectionRestored();
+      }
+      if (error instanceof ApiError && error.status === 422 && error.code === 'COMPANY_INVALID' && this.companyFilter()) {
+        this.notify.error(translateTaxError(error, this.transloco));
+        this.companyFilter.set('');
+        this.page.set(1);
+      }
+    });
+
+    effect(() => {
       const term = this.search().trim();
       if (this.searchTimer !== null) {
         clearTimeout(this.searchTimer);
@@ -262,11 +271,7 @@ export class TaxesPage {
   }
 
   protected canManageTax(tax: Tax): boolean {
-    if (!this.canRead) return false;
-    if (tax.companyId === null) {
-      return this.tenantWideAllowed();
-    }
-    return this.companyById().get(tax.companyId)?.canManage === true;
+    return canManageTax(tax, this.permissions());
   }
 
   protected scopeLabel(tax: Tax): string {
@@ -275,7 +280,7 @@ export class TaxesPage {
       return this.transloco.translate('wsTaxes.table.workspaceWide');
     }
     const company = this.companyById().get(tax.companyId);
-    return company ? company.name : this.transloco.translate('wsTaxes.table.unknownCompany');
+    return company ? company.name : this.transloco.translate('wsTaxes.companyFallback', { id: tax.companyId.slice(0, 8) });
   }
 
   protected formatRateValue(rate: string): string {
@@ -339,12 +344,6 @@ export class TaxesPage {
       clearTimeout(this.searchTimer);
       this.searchTimer = null;
     }
-    if (this.companiesFailed()) {
-      this.companiesResource.reload();
-    }
-    if (this.permissionsResource.error()) {
-      this.permissionsResource.reload();
-    }
     const term = this.search().trim();
     if (term !== this.debouncedSearch()) {
       this.page.set(1);
@@ -352,10 +351,6 @@ export class TaxesPage {
       return;
     }
     this.taxesResource.reload();
-  }
-
-  protected retryCompanies(): void {
-    this.companiesResource.reload();
   }
 
   protected openCreate(): void {
@@ -422,18 +417,16 @@ export class TaxesPage {
     if (!this.canManageTax(tax) || this.busyTaxIds().has(tax.id)) return;
     this.deactivatingTax.set(tax);
     const confirmed = await this.deactivateConfirm().open();
-    if (!confirmed) return;
+    if (!confirmed || !this.canManageTax(tax) || this.busyTaxIds().has(tax.id)) return;
 
     this.setBusy(tax.id, true);
     try {
-      await deactivateTax(tax.id, newIdempotencyKey());
+      await this.api.deactivateTax(tax.id, this.actionKeys.keyFor(`deactivate:${tax.id}`));
+      this.actionKeys.done(`deactivate:${tax.id}`);
       this.notify.success(this.transloco.translate('wsTaxes.toast.deactivated', { code: tax.code }));
       this.taxesResource.reload();
     } catch (error) {
-      this.notify.error(translateTaxError(error, this.transloco));
-      if (errorCodeOf(error) === 'TAX_NOT_FOUND') {
-        this.taxesResource.reload();
-      }
+      this.handleWriteError(error);
     } finally {
       this.setBusy(tax.id, false);
     }
@@ -444,7 +437,8 @@ export class TaxesPage {
 
     this.setBusy(tax.id, true);
     try {
-      const updated = await updateTax(tax.id, { status: 'ACTIVE' }, newIdempotencyKey());
+      const updated = await this.api.updateTax(tax.id, { status: 'ACTIVE' }, this.actionKeys.keyFor(`reactivate:${tax.id}`));
+      this.actionKeys.done(`reactivate:${tax.id}`);
       this.notify.success(this.transloco.translate('wsTaxes.toast.reactivated', { code: updated.code }));
       this.taxesResource.reload();
     } catch (error) {
@@ -453,12 +447,21 @@ export class TaxesPage {
         this.reactivateBlockerModal().open();
         return;
       }
-      this.notify.error(translateTaxError(error, this.transloco));
-      if (code === 'TAX_NOT_FOUND') {
-        this.taxesResource.reload();
-      }
+      this.handleWriteError(error);
     } finally {
       this.setBusy(tax.id, false);
+    }
+  }
+
+  private handleWriteError(error: unknown): void {
+    if (error instanceof ApiError && error.status === 0) {
+      this.notify.connectionLost(this.transloco.translate('session.connectionLost.title'),
+        this.transloco.translate('session.connectionLost.text'));
+    } else {
+      this.notify.error(translateTaxError(error, this.transloco, 'write'));
+    }
+    if (errorCodeOf(error) === 'TAX_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
+      this.taxesResource.reload();
     }
   }
 

@@ -1,4 +1,4 @@
-import { formatMoneyNumber } from '../../../../shared/ui/money/money-format';
+import { addThousands, formatMoneyNumber } from '../../../../shared/ui/money/money-format';
 import { Money } from '../billing.model';
 
 const MINUS = '\u2212';
@@ -34,10 +34,6 @@ function parseDecimal(raw: string): ParsedDecimal | null {
     intDigits: rawInt.replace(/^0+(?=\d)/, '') || '0',
     fracDigits: rawFrac,
   };
-}
-
-function groupThousands(intDigits: string): string {
-  return intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 function incrementDigits(digits: string): string {
@@ -97,7 +93,7 @@ export function formatRate(value: Money | null): string {
   const intDigits = digits.slice(0, -4) || '0';
   const frac = digits.slice(-4);
   const isZeroRate = /^0+$/.test(intDigits) && frac === '0000';
-  return `${parsed.negative && !isZeroRate ? MINUS : ''}${groupThousands(intDigits)}.${frac}`;
+  return `${parsed.negative && !isZeroRate ? MINUS : ''}${addThousands(intDigits)}.${frac}`;
 }
 
 export function formatUsd(value: Money | null, opts?: { signed?: boolean }): string {
@@ -122,7 +118,7 @@ export function formatUnitPrice(value: Money | null, currencyCode = 'USD'): stri
   }
 
   const sign = parsed.negative ? MINUS : '';
-  return `${sign}${currencyCode} ${groupThousands(parsed.intDigits)}.${significantFrac}`;
+  return `${sign}${currencyCode} ${addThousands(parsed.intDigits)}.${significantFrac}`;
 }
 
 /** True when decimal string `a` is strictly greater than `b`. Unparseable values return false. */

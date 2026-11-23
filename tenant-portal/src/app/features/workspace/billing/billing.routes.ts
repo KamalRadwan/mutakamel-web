@@ -1,11 +1,13 @@
 import { Routes } from '@angular/router';
 import { provideTranslocoScope } from '@jsverse/transloco';
 import type { ChangePage } from './subscription/change-page/change-page';
+import { requireOwner } from './shared/require-owner';
 
 export const billingRoutes: Routes = [
   {
     path: '',
     providers: [provideTranslocoScope('settings', { scope: 'ws-billing', alias: 'bill' })],
+    canActivate: [requireOwner],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
       {

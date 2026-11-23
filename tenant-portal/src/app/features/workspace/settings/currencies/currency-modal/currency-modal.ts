@@ -17,6 +17,7 @@ import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerCurrencyDollar, tablerLock } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
@@ -27,9 +28,7 @@ import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
 
-/** CreateCurrencyDto / UpdateCurrencyDto fields the form shows. */
-const DTO_FIELDS = ['code', 'name', 'symbol', 'exchangeRate'] as const;
-import { createCurrency, listCurrencyCatalogue, updateCurrency } from '../currencies.api';
+import { CurrenciesApi } from '../currencies.api';
 import {
   CURRENCY_CODE_PATTERN,
   CURRENCY_LIMITS,
@@ -38,10 +37,14 @@ import {
   CurrencyCatalogueEntry,
   UpdateCurrencyBody,
   currencyErrorMessage,
+  currencyPermissions,
   isSupportedCurrencyCode,
   isValidRateText,
   minorUnitsOf,
 } from '../currencies.model';
+
+/** CreateCurrencyDto / UpdateCurrencyDto fields the form shows. */
+const DTO_FIELDS = ['code', 'name', 'symbol', 'exchangeRate'] as const;
 
 type CurrencyModalMode = 'create' | 'edit' | 'reactivate';
 type CurrencyFormField = 'code' | 'name' | 'symbol' | 'rate';
@@ -57,11 +60,6 @@ const RATE_SERVER_ERRORS: ReadonlySet<string> = new Set([
   'CURRENCY_REBASE_PRECISION_LOSS',
 ]);
 
-const TOP_WARNING_ERRORS: ReadonlySet<string> = new Set([
-  'CURRENCY_PRECISION_MISMATCH',
-  'CORE_VALIDATION_FAILED',
-]);
-
 @Component({
   selector: 'app-currency-modal',
   imports: [NgIcon, TranslocoPipe, Button, Field, Modal, Switch, UnsavedDialog, SettingsNotice],
@@ -74,6 +72,8 @@ export class CurrencyModal {
 
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
+  private readonly api = inject(CurrenciesApi);
+  private readonly me = inject(AuthSession).me;
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState).current;
@@ -84,7 +84,7 @@ export class CurrencyModal {
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
   private readonly rateInput = viewChild<ElementRef<HTMLInputElement>>('rateInput');
 
-  readonly canManage = input(true);
+  readonly canManage = input(false);
   readonly defaultCurrency = input<Currency | null>(null);
   readonly hasCurrencies = input(true);
 
@@ -108,7 +108,6 @@ export class CurrencyModal {
   private readonly serverRateError = signal<string | null>(null);
   /** CORE_VALIDATION_FAILED messages per DTO field, already in the request language. */
   private readonly serverFieldErrors = signal<Partial<Record<(typeof DTO_FIELDS)[number], string>>>({});
-  protected readonly topWarningError = signal<string | null>(null);
 
   private nameManuallyEdited = false;
   private symbolManuallyEdited = false;
@@ -118,7 +117,7 @@ export class CurrencyModal {
 
   private readonly catalogue = resource({
     params: () => this.language(),
-    loader: ({ params }) => listCurrencyCatalogue(params),
+    loader: ({ params }) => this.api.listCurrencyCatalogue(params),
   });
 
   private readonly catalogueByCode = computed(() => {
@@ -130,7 +129,7 @@ export class CurrencyModal {
     return map;
   });
 
-  protected readonly isReadOnly = computed(() => !this.canManage());
+  protected readonly isReadOnly = computed(() => !this.canManage() || !currencyPermissions(this.me()).manage);
   protected readonly isCreate = computed(() => this.mode() === 'create');
   protected readonly isEditingDefault = computed(
     () => this.mode() !== 'create' && Boolean(this.baseCurrency()?.isDefault),
@@ -218,7 +217,7 @@ export class CurrencyModal {
       errors.name = { key: 'nameMax', params: { max: CURRENCY_LIMITS.name } };
     }
 
-    const symbol = this.symbolDraft().trim();
+    const symbol = this.symbolDraft();
     if (Array.from(symbol).length > CURRENCY_LIMITS.symbol) {
       errors.symbol = { key: 'symbolMax', params: { max: CURRENCY_LIMITS.symbol } };
     }
@@ -240,10 +239,10 @@ export class CurrencyModal {
 
         if (rateText) {
           if (!isValidRateText(rateText)) {
-            errors.rate = { key: 'rateInvalid' };
+            errors.rate = { key: 'rateRangeInvalid' };
           }
         } else if (rateRequired) {
-          errors.rate = { key: 'rateInvalid' };
+          errors.rate = { key: 'rateRangeInvalid' };
         }
       }
     }
@@ -259,7 +258,7 @@ export class CurrencyModal {
     if (this.mode() === 'create') {
       const hasCode = this.codeDraft().trim().length > 0;
       const hasName = this.nameDraft().trim().length > 0;
-      const hasSymbol = this.symbolDraft().trim().length > 0;
+      const hasSymbol = this.symbolDraft().length > 0;
       const hasRate = this.hasCurrencies() && this.rateDraft().trim().length > 0;
       const hasDefaultToggle = this.hasCurrencies() && this.makeDefaultDraft();
       return hasCode || hasName || hasSymbol || hasRate || hasDefaultToggle;
@@ -269,7 +268,7 @@ export class CurrencyModal {
     if (!base) return false;
 
     const nameChanged = this.nameDraft().trim() !== base.name;
-    const symbolChanged = this.symbolDraft().trim() !== (base.symbol ?? '');
+    const symbolChanged = this.symbolDraft() !== (base.symbol ?? '');
     const rateChanged = !base.isDefault && this.rateDraft().trim() !== (base.exchangeRate ?? '');
 
     if (this.mode() === 'reactivate') {
@@ -344,7 +343,6 @@ export class CurrencyModal {
     this.codeDraft.set(upper);
     this.serverCodeError.set(null);
     this.serverFieldErrors.update((e) => ({ ...e, code: undefined }));
-    this.topWarningError.set(null);
 
     const trimmed = upper.trim();
     const match = CURRENCY_CODE_PATTERN.test(trimmed) ? this.catalogueByCode().get(trimmed) : undefined;
@@ -366,7 +364,6 @@ export class CurrencyModal {
     this.nameManuallyEdited = true;
     this.nameDraft.set((event.target as HTMLInputElement).value);
     this.serverFieldErrors.update((e) => ({ ...e, name: undefined }));
-    this.topWarningError.set(null);
   }
 
   protected onSymbolInput(event: Event): void {
@@ -374,7 +371,6 @@ export class CurrencyModal {
     this.symbolManuallyEdited = true;
     this.symbolDraft.set((event.target as HTMLInputElement).value);
     this.serverFieldErrors.update((e) => ({ ...e, symbol: undefined }));
-    this.topWarningError.set(null);
   }
 
   protected onRateInput(event: Event): void {
@@ -382,14 +378,12 @@ export class CurrencyModal {
     this.rateDraft.set((event.target as HTMLInputElement).value);
     this.serverRateError.set(null);
     this.serverFieldErrors.update((e) => ({ ...e, exchangeRate: undefined }));
-    this.topWarningError.set(null);
   }
 
   protected onMakeDefaultChange(checked: boolean): void {
     if (this.isReadOnly() || this.mode() !== 'create' || !this.hasCurrencies()) return;
     this.makeDefaultDraft.set(checked);
     this.serverRateError.set(null);
-    this.topWarningError.set(null);
   }
 
   protected markTouched(field: CurrencyFormField): void {
@@ -436,7 +430,6 @@ export class CurrencyModal {
     this.submitted.set(true);
     this.serverCodeError.set(null);
     this.serverRateError.set(null);
-    this.topWarningError.set(null);
 
     if (!this.isValid()) return;
 
@@ -445,7 +438,7 @@ export class CurrencyModal {
       const key = this.keyForAction(`create:${JSON.stringify(payload)}`);
       this.saving.set(true);
       try {
-        const created = await createCurrency(payload, key);
+        const created = await this.api.createCurrency(payload, key);
         this.pendingAction = null;
         this.notify.success(this.transloco.translate('wsCurrencies.toast.created', { code: created.code }));
         this.saved.emit(created);
@@ -470,7 +463,7 @@ export class CurrencyModal {
     const key = this.keyForAction(`${actionMode}:${base.id}:${JSON.stringify(patch)}`);
     this.saving.set(true);
     try {
-      const updated = await updateCurrency(base.id, patch, key);
+      const updated = await this.api.updateCurrency(base.id, patch, key);
       this.pendingAction = null;
       this.notify.success(
         this.transloco.translate(
@@ -492,7 +485,7 @@ export class CurrencyModal {
       code: this.codeDraft().trim().toUpperCase(),
       name: this.nameDraft().trim(),
     };
-    const symbol = this.symbolDraft().trim();
+    const symbol = this.symbolDraft();
     if (symbol) {
       body.symbol = symbol;
     }
@@ -512,7 +505,7 @@ export class CurrencyModal {
       patch.name = name;
     }
 
-    const symbol = this.symbolDraft().trim();
+    const symbol = this.symbolDraft();
     if (symbol !== (base.symbol ?? '')) {
       patch.symbol = symbol;
     }
@@ -534,7 +527,9 @@ export class CurrencyModal {
   private handleSaveError(error: unknown, base: Currency | null): void {
     const code = errorCodeOf(error);
     if (code && CODE_SERVER_ERRORS.has(code)) {
-      this.serverCodeError.set(currencyErrorMessage(error, this.transloco));
+      this.serverCodeError.set(code === 'CURRENCY_CODE_INVALID'
+        ? this.transloco.translate('wsCurrencies.validation.unsupportedCode')
+        : currencyErrorMessage(error, this.transloco));
       return;
     }
     if (code && RATE_SERVER_ERRORS.has(code)) {
@@ -544,11 +539,7 @@ export class CurrencyModal {
     const fields = coreFieldErrors(error);
     if (fields) {
       this.serverFieldErrors.set(fieldMessages(fields, DTO_FIELDS));
-      if (hasOtherFields(fields, DTO_FIELDS)) this.topWarningError.set(currencyErrorMessage(error, this.transloco));
-      return;
-    }
-    if (code && TOP_WARNING_ERRORS.has(code)) {
-      this.topWarningError.set(currencyErrorMessage(error, this.transloco));
+      if (hasOtherFields(fields, DTO_FIELDS)) this.notify.error(currencyErrorMessage(error, this.transloco, 'write'));
       return;
     }
     if (code === 'CURRENCY_NOT_FOUND') {
@@ -560,7 +551,7 @@ export class CurrencyModal {
       this.closeImmediate();
       return;
     }
-    this.notify.error(currencyErrorMessage(error, this.transloco));
+    this.notify.error(currencyErrorMessage(error, this.transloco, 'write'));
   }
 
   private resolveClientError(field: CurrencyFormField): string | null {
@@ -605,7 +596,6 @@ export class CurrencyModal {
     this.serverCodeError.set(null);
     this.serverRateError.set(null);
     this.serverFieldErrors.set({});
-    this.topWarningError.set(null);
     this.pendingAction = null;
   }
 

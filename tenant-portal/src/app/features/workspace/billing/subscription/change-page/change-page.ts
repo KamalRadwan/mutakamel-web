@@ -33,6 +33,10 @@ import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-d
 import { errorCodeOf } from '../../../../../core/api/api-errors';
 import {
   ApiError,
+  BillingApi,
+  BillingSummary,
+  QuoteBody,
+  RecoveryBody,
   AppliedReceipt,
   CommercialChange,
   CommercialOperation,
@@ -40,26 +44,19 @@ import {
   PrepareBody,
   SubscriptionOffer,
   SubscriptionView,
-  applyChange,
   billingErrorMessage,
-  seatDowngradeDetails,
+  seatHoldersDetails,
   seatDowngradeMessage,
   correlationIdOf,
-  getOperation,
-  getReceipt,
-  getSubscription,
-  listCatalogue,
   newIdempotencyKey,
-  prepareChange,
-  quoteChange,
-  recoverOperation,
 } from '../../billing.api';
 import { BillingFailed } from '../../shared/billing-failed/billing-failed';
 import { BillingForbidden } from '../../shared/billing-forbidden/billing-forbidden';
 import { BillingSession } from '../../shared/billing-session';
 import { catalogueNames, localizeOffers, localizeSubscription } from '../../shared/catalogue-names';
 import { ChangePrefill, parseChangePrefill } from '../../shared/change-link';
-import { formatUsd } from '../../shared/money';
+import { operationPollDelay } from '../../shared/billing-poll';
+import { formatUsd, isGreater } from '../../shared/money';
 import {
   ChangeJournalEntry,
   clearChangeJournal,
@@ -89,7 +86,23 @@ const SKELETON_ROWS = [1, 2] as const;
 const MAX_REASON_LEN = 256;
 
 type StepNum = 1 | 2 | 3;
-type ReviewPhase = 'preparing' | 'quoting' | 'quoted';
+type ReviewPhase =
+  'preparing' | 'quoting' | 'quoted' | 'blocked' | 'review' | 'aborted' | 'timeout' | 'quote-error';
+interface HeldCommand {
+  key: string;
+  bodyJson: string;
+}
+
+function freezePreparation(body: PrepareBody): PrepareBody {
+  body.changes.forEach(Object.freeze);
+  Object.freeze(body.changes);
+  return Object.freeze(body);
+}
+
+function holdCommand(previous: HeldCommand | null, body: unknown): HeldCommand {
+  const bodyJson = JSON.stringify(body);
+  return previous?.bodyJson === bodyJson ? previous : { key: newIdempotencyKey(), bodyJson };
+}
 
 @Component({
   selector: 'app-billing-change-page',
@@ -107,7 +120,11 @@ type ReviewPhase = 'preparing' | 'quoting' | 'quoted';
     QuoteView,
   ],
   providers: [
-    provideTranslocoScope('settings', { scope: 'ws-billing', alias: 'bill' }, { scope: 'ws-billing-subscription', alias: 'bsub' }),
+    provideTranslocoScope(
+      'settings',
+      { scope: 'ws-billing', alias: 'bill' },
+      { scope: 'ws-billing-subscription', alias: 'bsub' },
+    ),
     OperationPoller,
     provideIcons({
       tablerAlertTriangle,
@@ -132,13 +149,16 @@ export class ChangePage {
   private static nextId = 0;
   protected readonly uid = `billing-change-${++ChangePage.nextId}`;
 
+  private readonly api = inject(BillingApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(BillingSession);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly bsubReady = toSignal(this.transloco.selectTranslation('ws-billing-subscription'));
+  private readonly bsubReady = toSignal(
+    this.transloco.selectTranslation('ws-billing-subscription'),
+  );
   private readonly poller = inject(OperationPoller);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -169,7 +189,9 @@ export class ChangePage {
     const sub = this.rawSubscription();
     return sub ? localizeSubscription(sub, this.names()) : null;
   });
-  protected readonly catalogueOffers = computed(() => localizeOffers(this.rawOffers(), this.names()));
+  protected readonly catalogueOffers = computed(() =>
+    localizeOffers(this.rawOffers(), this.names()),
+  );
 
   protected readonly step = signal<StepNum>(1);
   protected readonly cart = signal<CartRow[]>([]);
@@ -192,7 +214,19 @@ export class ChangePage {
   private activeOperation: CommercialOperation | null = null;
   private preparedBody: PrepareBody | null = null;
   private pendingJournalEntry: ChangeJournalEntry | null = null;
-  private applyKeyByPreviewId = new Map<string, string>();
+  private applyKeyByPreviewId = new Map<string, HeldCommand>();
+  private prepareCommand: HeldCommand | null = null;
+  private quoteCommand: HeldCommand | null = null;
+  private recoveryCommand: HeldCommand | null = null;
+  private frozenBodyJson: string | null = null;
+  protected readonly operation = signal<CommercialOperation | null>(null);
+  protected readonly noticeKey = signal<string | null>(null);
+  protected readonly summary = signal<BillingSummary | null>(null);
+  protected readonly receiptState = signal<'idle' | 'checking' | 'failed' | 'missing'>('idle');
+  protected readonly receiptError = signal<string | null>(null);
+  protected readonly walletRefused = signal(false);
+  protected readonly recovering = signal(false);
+  protected readonly applyConflict = signal(false);
   private destroyed = false;
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
   private loadSeq = 0;
@@ -216,7 +250,9 @@ export class ChangePage {
         .filter((r): r is Extract<CartRow, { kind: 'add-app' }> => r.kind === 'add-app')
         .map((r) => r.applicationId),
     );
-    return this.catalogueGroups().some((g) => !subAppIds.has(g.applicationId) && !cartAppIds.has(g.applicationId));
+    return this.catalogueGroups().some(
+      (g) => !subAppIds.has(g.applicationId) && !cartAppIds.has(g.applicationId),
+    );
   });
 
   protected readonly changeSeatsAvailable = computed(() => {
@@ -262,7 +298,13 @@ export class ChangePage {
     this.bsubReady();
     const sub = this.subscription();
     const rows = this.cart();
-    if (!sub || rows.length === 0) return false;
+    if (
+      !sub ||
+      rows.length === 0 ||
+      rows.length > 100 ||
+      this.summary()?.subscription.accessMode === 'DUNNING'
+    )
+      return false;
     if (this.reasonError() !== null) return false;
     const groups = this.catalogueGroups();
     return rows.every((row) => validateCartRow(row, sub, groups, rows, this.transloco) === null);
@@ -286,7 +328,11 @@ export class ChangePage {
       this.reviewPhase() === 'quoted' &&
       Boolean(p) &&
       !this.quoteExpired() &&
-      Boolean(p?.financial.canApply)
+      Boolean(p?.financial.canApply) &&
+      (p?.financial.walletShortfallUsd == null ||
+        !isGreater(p.financial.walletShortfallUsd, '0')) &&
+      !this.applyConflict() &&
+      (this.receiptState() === 'idle' || this.receiptState() === 'missing')
     );
   });
 
@@ -320,8 +366,13 @@ export class ChangePage {
           } else {
             const addon = sub?.addonSelections.find((a) => a.id === row.targetId);
             if (addon) {
-              const offer = offers.find((o) => o.sourceKind === 'ADDON' && o.addon.id === addon.addonId);
-              map.set(row.selectionKey, offer?.sourceKind === 'ADDON' ? offer.addon.name : addon.addonKey);
+              const offer = offers.find(
+                (o) => o.sourceKind === 'ADDON' && o.addon.id === addon.addonId,
+              );
+              map.set(
+                row.selectionKey,
+                offer?.sourceKind === 'ADDON' ? offer.addon.name : addon.addonKey,
+              );
             }
           }
           break;
@@ -399,6 +450,7 @@ export class ChangePage {
 
   protected addRow(kind: 'add-app' | 'change-seats' | 'upgrade-tier'): void {
     this.addMenuOpen.set(false);
+    this.discardFlow();
     const key = newIdempotencyKey();
     if (kind === 'add-app') {
       if (!this.addAppAvailable()) return;
@@ -431,14 +483,12 @@ export class ChangePage {
   }
 
   protected updateRow(index: number, next: CartRow): void {
+    this.discardFlow();
     this.cart.update((rows) => rows.map((row, idx) => (idx === index ? next : row)));
   }
 
-  protected removeRow(index: number): void {
-    this.cart.update((rows) => rows.filter((_, idx) => idx !== index));
-  }
-
   protected onReasonInput(event: Event): void {
+    this.discardFlow();
     this.reason.set((event.target as HTMLTextAreaElement).value);
     this.reasonTouched.set(true);
   }
@@ -446,7 +496,7 @@ export class ChangePage {
   protected async startReview(): Promise<void> {
     this.step1Submitted.set(true);
     const sub = this.subscription();
-    if (!sub || !this.canReview()) return;
+    if (!sub || !this.canReview() || this.step() !== 1) return;
 
     const changes: CommercialChange[] = [];
     for (const row of this.cart()) {
@@ -456,11 +506,13 @@ export class ChangePage {
     }
 
     const trimmedReason = this.reason().trim();
-    const body: PrepareBody = {
-      expectedSubscriptionRevision: sub.subscriptionRevision,
-      changes,
-      ...(trimmedReason ? { reason: trimmedReason } : {}),
-    };
+    const body =
+      this.preparedBody ??
+      freezePreparation({
+        expectedSubscriptionRevision: sub.subscriptionRevision,
+        changes,
+        ...(trimmedReason ? { reason: trimmedReason } : {}),
+      });
 
     this.clearRowErrors();
     this.stopCountdown();
@@ -471,22 +523,19 @@ export class ChangePage {
     this.preview.set(null);
     this.preparedBody = body;
 
-    // Retrying the same body reuses its key, so the server returns the same operation instead of a new one.
-    const bodySignature = JSON.stringify(body);
-    if (this.prepareKeyCache?.signature !== bodySignature) {
-      this.prepareKeyCache = { signature: bodySignature, key: newIdempotencyKey() };
-    }
-    const prepareKey = this.prepareKeyCache.key;
+    this.frozenBodyJson = JSON.stringify(body);
+    this.prepareCommand = holdCommand(this.prepareCommand, body);
+    const prepareKey = this.prepareCommand.key;
     let op: CommercialOperation;
     try {
-      op = await this.withSingleNetworkRetry(() => prepareChange(body, prepareKey));
+      op = await this.withSingleNetworkRetry(() => this.api.prepareChange(body, prepareKey));
     } catch (error) {
-      if (this.destroyed) return;
-      this.handlePrepareOrQuoteFailure(error, body);
+      if (this.destroyed || this.preparedBody !== body) return;
+      this.handlePrepareOrQuoteFailure(error);
       return;
     }
 
-    if (this.destroyed) return;
+    if (this.destroyed || this.preparedBody !== body) return;
     this.activeOperation = op;
     writeChangeJournal({
       operationId: op.operationId,
@@ -494,18 +543,28 @@ export class ChangePage {
       body,
     });
 
-    await this.pollAndQuote(op, body, op.retryAfterSeconds ? op.retryAfterSeconds * 1000 : 2000);
+    await this.pollAndQuote(op, body, operationPollDelay(0, op.retryAfterSeconds));
   }
 
-  private prepareKeyCache: { signature: string; key: string } | null = null;
-
   protected async refreshQuote(): Promise<void> {
-    if (!this.activeOperation || !this.preparedBody || this.refreshingQuote() || this.applying()) {
+    if (
+      !this.activeOperation ||
+      !this.preparedBody ||
+      this.refreshingQuote() ||
+      this.applying() ||
+      this.receiptState() === 'checking' ||
+      this.receiptState() === 'failed' ||
+      this.applyConflict()
+    ) {
       return;
     }
     this.refreshingQuote.set(true);
     try {
-      await this.executeQuote(this.preparedBody, this.activeOperation.operationId, true);
+      await this.executeQuote(
+        this.preparedBody,
+        this.activeOperation.operationId,
+        this.reviewPhase() !== 'quote-error',
+      );
     } finally {
       this.refreshingQuote.set(false);
     }
@@ -513,82 +572,116 @@ export class ChangePage {
 
   protected async confirmApply(): Promise<void> {
     const currentPreview = this.preview();
-    if (!currentPreview || !this.canConfirmApply() || this.applying() || this.cancelling()) return;
-
+    if (
+      !currentPreview ||
+      !this.canConfirmApply() ||
+      this.applying() ||
+      this.cancelling() ||
+      this.refreshingQuote()
+    )
+      return;
     this.applying.set(true);
     const previewId = currentPreview.previewId;
-    const applyKey = this.applyKeyByPreviewId.get(previewId) ?? newIdempotencyKey();
-    this.applyKeyByPreviewId.set(previewId, applyKey);
-
+    const command = holdCommand(this.applyKeyByPreviewId.get(previewId) ?? null, {});
+    this.applyKeyByPreviewId.set(previewId, command);
     try {
-      const res = await this.withSingleNetworkRetry(() => applyChange(previewId, applyKey));
-      this.finishWithReceipt(res);
+      // A lost response must be resolved with the receipt before another apply is offered.
+      const receipt = await this.api.applyChange(previewId, command.key);
+      if (!this.destroyed) this.finishWithReceipt(receipt);
     } catch (error) {
       if (this.destroyed) return;
       const code = errorCodeOf(error);
-      if (code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_EXPIRED') {
-        this.notify.warning(billingErrorMessage(error, this.transloco));
+      if (
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_ALREADY_APPLIED' ||
+        (error instanceof ApiError && (error.status === 0 || error.status >= 500))
+      ) {
+        await this.readReceipt(previewId);
+      } else if (
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_EXPIRED' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_STALE' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PRICING_CHANGED' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_PRICING_CHANGED'
+      ) {
+        this.noticeKey.set('bsub.preview.pricesChanged');
         this.applying.set(false);
         await this.refreshQuote();
-        return;
-      }
-      if (
-        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_STALE' ||
-        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_NOT_FOUND'
+      } else if (
+        code === 'SUBSCRIPTION_PLAN_CHANGE_IDEMPOTENCY_REUSED' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_IDEMPOTENCY_REUSED' ||
+        code === 'GW.IDEM.MISMATCH' ||
+        code === 'GW.IDEM.IN_FLIGHT'
       ) {
-        this.conflictModal()?.open();
-        return;
+        this.applyConflict.set(true);
+        const messageError =
+          code === 'GW.IDEM.IN_FLIGHT' ? error : new ApiError(409, 'GW.IDEM.MISMATCH');
+        this.notify.error(billingErrorMessage(messageError, this.transloco, 'write'));
+      } else {
+        this.walletRefused.set(
+          ['WALLET_INSUFFICIENT', 'WALLET_NOT_ACTIVE', 'WALLET_FROZEN'].includes(code ?? ''),
+        );
+        this.showWriteError(error);
       }
-      if (code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_ALREADY_APPLIED') {
-        try {
-          const existingReceipt = await getReceipt(previewId);
-          this.finishWithReceipt(existingReceipt);
-          return;
-        } catch (receiptError) {
-          this.notify.error(billingErrorMessage(receiptError, this.transloco));
-          return;
-        }
-      }
-      this.notify.error(billingErrorMessage(error, this.transloco));
     } finally {
       this.applying.set(false);
     }
   }
 
+  protected async retryReceipt(): Promise<void> {
+    const previewId = this.preview()?.previewId ?? this.activeOperation?.relatedPreviewId;
+    if (previewId && this.receiptState() !== 'checking') await this.readReceipt(previewId);
+  }
+
+  private async readReceipt(previewId: string): Promise<void> {
+    this.receiptState.set('checking');
+    this.receiptError.set(null);
+    try {
+      const receipt = await this.api.getReceipt(previewId);
+      if (!this.destroyed) this.finishWithReceipt(receipt);
+    } catch (error) {
+      if (this.destroyed) return;
+      this.receiptState.set(
+        error instanceof ApiError && error.status === 404 ? 'missing' : 'failed',
+      );
+      if (this.receiptState() === 'failed')
+        this.receiptError.set(billingErrorMessage(error, this.transloco));
+    }
+  }
+
   protected async goBackToStep1(): Promise<void> {
-    if (this.cancelling() || this.applying()) return;
+    if (
+      this.cancelling() ||
+      this.applying() ||
+      this.recovering() ||
+      this.receiptState() === 'checking' ||
+      this.receiptState() === 'failed' ||
+      this.applyConflict()
+    )
+      return;
     this.stopCountdown();
     this.poller.stop();
 
     const op = this.activeOperation;
     if (!op) {
-      clearChangeJournal();
-      this.preview.set(null);
-      this.preparedBody = null;
-      this.step.set(1);
+      this.discardFlow();
       return;
     }
 
     this.cancelling.set(true);
     try {
-      const ok = await this.cancelPreparationWithRecovery(op, 'Edited before confirming');
+      const ok = await this.cancelPreparationByIds(
+        op.operationId,
+        op.operationRevision,
+        'Edited before confirming',
+      );
       if (this.destroyed) return;
       if (!ok) {
-        // Recovery failed: the operation is still open, so bring the review step back to a working state.
         const current = this.preview();
-        const body = this.preparedBody;
         if (current) {
           this.startCountdown(current.expiresAt);
-        } else if (body) {
-          this.cancelling.set(false);
-          await this.pollAndQuote(op, body, 2000);
         }
         return;
       }
-      clearChangeJournal();
-      this.activeOperation = null;
-      this.preview.set(null);
-      this.preparedBody = null;
+      this.discardFlow();
       this.step.set(1);
     } finally {
       this.cancelling.set(false);
@@ -605,7 +698,8 @@ export class ChangePage {
     this.journalModal()?.close();
 
     this.restoreCartFromJournal(entry, sub);
-    this.preparedBody = entry.body;
+    this.preparedBody = freezePreparation(entry.body);
+    this.frozenBodyJson = JSON.stringify(entry.body);
     this.activeOperation = {
       operationId: entry.operationId,
       operationRevision: entry.operationRevision,
@@ -664,16 +758,18 @@ export class ChangePage {
     if (this.reloadingConflict()) return;
     this.reloadingConflict.set(true);
     try {
-      const [sub, offers] = await Promise.all([getSubscription(), this.loadAllCatalogue()]);
+      const [sub, offers, summary] = await Promise.all([
+        this.api.getSubscription(),
+        this.loadAllCatalogue(),
+        this.api.getBillingSummary(),
+      ]);
       this.rawSubscription.set(sub);
       this.rawOffers.set(offers);
+      this.summary.set(summary);
+      if (summary.subscription.accessMode === 'DUNNING')
+        this.noticeKey.set('bsub.dunning.settleFirst');
       this.cart.update((rows) => this.filterApplicableRows(rows, sub, offers));
-      clearChangeJournal();
-      this.activeOperation = null;
-      this.preview.set(null);
-      this.preparedBody = null;
-      this.stopCountdown();
-      this.poller.stop();
+      this.discardFlow();
       this.step.set(1);
       this.conflictModal()?.close();
     } catch (error) {
@@ -685,12 +781,7 @@ export class ChangePage {
 
   protected keepChangesOnConflict(): void {
     if (this.reloadingConflict()) return;
-    clearChangeJournal();
-    this.activeOperation = null;
-    this.preview.set(null);
-    this.preparedBody = null;
-    this.stopCountdown();
-    this.poller.stop();
+    this.discardFlow();
     this.step.set(1);
     this.conflictModal()?.close();
   }
@@ -708,10 +799,17 @@ export class ChangePage {
     this.correlationId.set(null);
 
     try {
-      const [sub, offers] = await Promise.all([getSubscription(), this.loadAllCatalogue()]);
+      const [sub, offers, summary] = await Promise.all([
+        this.api.getSubscription(),
+        this.loadAllCatalogue(),
+        this.api.getBillingSummary(),
+      ]);
       if (seq !== this.loadSeq) return;
       this.rawSubscription.set(sub);
       this.rawOffers.set(offers);
+      this.summary.set(summary);
+      if (summary.subscription.accessMode === 'DUNNING')
+        this.noticeKey.set('bsub.dunning.settleFirst');
 
       const journal = readChangeJournal();
       if (journal) {
@@ -723,7 +821,7 @@ export class ChangePage {
       }
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.code === 'TENANT_OWNER_REQUIRED') {
+      if (error instanceof ApiError && error.status === 403) {
         this.forbidden.set(true);
         return;
       }
@@ -739,9 +837,9 @@ export class ChangePage {
   private async loadAllCatalogue(): Promise<SubscriptionOffer[]> {
     const all: SubscriptionOffer[] = [];
     let page = 1;
-    while (true) {
-      const res = await listCatalogue({ page, limit: 100 });
-      all.push(...res.items);
+    while (page <= 20) {
+      const res = await this.api.listCatalogue({ page, limit: 100 });
+      all.push(...res.data);
       if (!res.meta.hasNext) break;
       page += 1;
     }
@@ -783,7 +881,7 @@ export class ChangePage {
         const tierId =
           requested && isAppTierAvailable(requested, cycle)
             ? requested.tier.id
-            : group.tiers.find((t) => isAppTierAvailable(t, cycle))?.tier.id ?? '';
+            : (group.tiers.find((t) => isAppTierAvailable(t, cycle))?.tier.id ?? '');
         return {
           kind: 'add-app',
           selectionKey: key,
@@ -919,68 +1017,123 @@ export class ChangePage {
     body: PrepareBody,
     initialDelayMs: number,
   ): Promise<void> {
-    let readyOp = op;
-    if (op.state !== 'READY') {
-      const result = await this.poller.poll(op.operationId, {
-        initialDelayMs,
-        maxAttempts: 60,
-        onTick: (updated) => {
-          this.activeOperation = updated;
-          writeChangeJournal({
-            operationId: updated.operationId,
-            operationRevision: updated.operationRevision,
-            body,
-          });
-        },
-      });
-
-      if (result.kind === 'cancelled') return;
-
-      if (result.kind === 'error') {
-        if (errorCodeOf(result.error) === 'TENANT_OPERATION_NOT_FOUND') {
-          clearChangeJournal();
-          this.activeOperation = null;
-        }
-        this.notify.error(billingErrorMessage(result.error, this.transloco));
-        this.step.set(1);
-        return;
-      }
-
-      if (result.kind === 'timeout') {
-        this.notify.warning(this.transloco.translate('bsub.change.toasts.pollTimeout'));
-        this.step.set(1);
-        return;
-      }
-
-      if (result.kind === 'terminal') {
-        this.notify.error(billingErrorMessage(result.operation.safeReasonCode ?? '', this.transloco));
-        clearChangeJournal();
-        this.activeOperation = null;
-        this.step.set(1);
-        return;
-      }
-
-      if (result.kind === 'committed') {
-        if (result.operation.relatedPreviewId) {
-          try {
-            const committedReceipt = await getReceipt(result.operation.relatedPreviewId);
-            this.finishWithReceipt(committedReceipt);
-            return;
-          } catch {
-            // Fall through to cleanup.
-          }
-        }
-        clearChangeJournal();
-        this.activeOperation = null;
-        this.step.set(1);
-        return;
-      }
-
-      readyOp = result.operation;
+    this.setOperation(op, body);
+    if (await this.handleOperation(op, body)) return;
+    this.reviewPhase.set('preparing');
+    const result = await this.poller.poll(op.operationId, {
+      initialDelayMs,
+      maxAttempts: 60,
+      onTick: (updated) => this.setOperation(updated, body),
+    });
+    if (result.kind === 'cancelled' || this.destroyed) return;
+    if (result.kind === 'error') {
+      this.notify.error(billingErrorMessage(result.error, this.transloco));
+      this.reviewPhase.set('timeout');
+      return;
     }
+    if (result.kind === 'timeout') {
+      this.reviewPhase.set('timeout');
+      return;
+    }
+    await this.handleOperation(result.operation, body);
+  }
 
-    this.activeOperation = readyOp;
-    await this.executeQuote(body, readyOp.operationId, false);
+  private setOperation(op: CommercialOperation, body: PrepareBody): void {
+    this.activeOperation = op;
+    this.operation.set(op);
+    writeChangeJournal({
+      operationId: op.operationId,
+      operationRevision: op.operationRevision,
+      ...(this.preview() ? { previewId: this.preview()!.previewId } : {}),
+      body,
+    });
+  }
+
+  private async handleOperation(op: CommercialOperation, body: PrepareBody): Promise<boolean> {
+    this.setOperation(op, body);
+    switch (op.state) {
+      case 'READY':
+        await this.executeQuote(body, op.operationId, false);
+        return true;
+      case 'BLOCKED':
+        this.reviewPhase.set('blocked');
+        return true;
+      case 'NEEDS_REVIEW':
+        this.reviewPhase.set('review');
+        return true;
+      case 'ABORTED':
+        this.reviewPhase.set('aborted');
+        return true;
+      case 'COMMITTED':
+        if (op.relatedPreviewId) await this.readReceipt(op.relatedPreviewId);
+        this.reviewPhase.set('timeout');
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  protected operationReason(): string {
+    return billingErrorMessage(this.operation()?.safeReasonCode ?? '', this.transloco);
+  }
+
+  protected async checkOperation(): Promise<void> {
+    if (!this.activeOperation || !this.preparedBody || this.recovering()) return;
+    this.recovering.set(true);
+    try {
+      const op = await this.api.getOperation(this.activeOperation.operationId);
+      if (this.destroyed) return;
+      if (!(await this.handleOperation(op, this.preparedBody))) this.reviewPhase.set('timeout');
+    } catch (error) {
+      this.notify.error(billingErrorMessage(error, this.transloco));
+    } finally {
+      this.recovering.set(false);
+    }
+  }
+
+  protected async recover(): Promise<void> {
+    if (
+      !this.activeOperation ||
+      !this.preparedBody ||
+      this.recovering() ||
+      this.operation()?.state !== 'BLOCKED'
+    )
+      return;
+    this.recovering.set(true);
+    try {
+      const body: RecoveryBody = {
+        expectedOperationRevision: this.activeOperation.operationRevision,
+        action: 'RECONCILE',
+        reason: 'Resume blocked plan change',
+      };
+      this.recoveryCommand = holdCommand(this.recoveryCommand, body);
+      const op = await this.withSingleNetworkRetry(() =>
+        this.api.recoverOperation(
+          this.activeOperation!.operationId,
+          body,
+          this.recoveryCommand!.key,
+        ),
+      );
+      if (!this.destroyed)
+        await this.pollAndQuote(op, this.preparedBody, operationPollDelay(0, op.retryAfterSeconds));
+    } catch (error) {
+      if (errorCodeOf(error) === 'COMMERCIAL_RECOVERY_REVISION_STALE') {
+        try {
+          const op = await this.api.getOperation(this.activeOperation!.operationId);
+          if (!this.destroyed && !(await this.handleOperation(op, this.preparedBody!)))
+            this.reviewPhase.set('timeout');
+        } catch (readError) {
+          this.notify.error(billingErrorMessage(readError, this.transloco));
+        }
+      } else this.showWriteError(error);
+    } finally {
+      this.recovering.set(false);
+    }
+  }
+
+  protected startAgain(): void {
+    this.discardFlow();
+    this.step.set(1);
   }
 
   private async executeQuote(
@@ -988,52 +1141,38 @@ export class ChangePage {
     operationId: string,
     isRefresh: boolean,
   ): Promise<void> {
-    if (!isRefresh) {
-      this.reviewPhase.set('quoting');
-    }
-    const quoteKey = newIdempotencyKey();
-
+    this.reviewPhase.set('quoting');
+    const quoteBody: QuoteBody = Object.freeze({ ...body, preparationId: operationId });
+    if (isRefresh) this.quoteCommand = null;
+    this.quoteCommand = holdCommand(this.quoteCommand, quoteBody);
+    const key = this.quoteCommand.key;
     try {
-      const quoted = await this.withSingleNetworkRetry(() =>
-        quoteChange({ ...body, preparationId: operationId }, quoteKey),
-      );
+      const quoted = await this.withSingleNetworkRetry(() => this.api.quoteChange(quoteBody, key));
       this.applyQuotedPreview(quoted, body);
     } catch (error) {
-      if (errorCodeOf(error) === 'ADDON_PREPARATION_REQUIRED') {
-        const pollOnce = await this.poller.poll(operationId, {
-          initialDelayMs: 2000,
-          maxAttempts: 1,
-        });
-        if (pollOnce.kind === 'cancelled') return;
-        if (pollOnce.kind === 'terminal') {
-          this.notify.error(billingErrorMessage(pollOnce.operation.safeReasonCode ?? '', this.transloco));
-          clearChangeJournal();
-          this.activeOperation = null;
-          this.step.set(1);
-          return;
-        }
-        if (pollOnce.kind === 'ready') {
-          this.activeOperation = pollOnce.operation;
-          const retryQuoteKey = newIdempotencyKey();
-          try {
-            const retryQuoted = await this.withSingleNetworkRetry(() =>
-              quoteChange({ ...body, preparationId: operationId }, retryQuoteKey),
-            );
-            this.applyQuotedPreview(retryQuoted, body);
-            return;
-          } catch (retryError) {
-            this.handlePrepareOrQuoteFailure(retryError, body);
-            return;
-          }
-        }
+      if (this.destroyed || this.preparedBody !== body) return;
+      const code = errorCodeOf(error);
+      if (
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_STALE' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PRICING_CHANGED' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_PRICING_CHANGED' ||
+        code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_EXPIRED'
+      ) {
+        this.noticeKey.set('bsub.preview.pricesChanged');
+        this.quoteCommand = null;
+        this.reviewPhase.set('quote-error');
+      } else {
+        this.handlePrepareOrQuoteFailure(error);
       }
-      this.handlePrepareOrQuoteFailure(error, body);
     }
   }
 
   private applyQuotedPreview(quoted: CommercialPreview, body: PrepareBody): void {
-    if (this.destroyed) return;
+    if (this.destroyed || this.preparedBody !== body) return;
     this.preview.set(quoted);
+    this.receiptState.set('idle');
+    this.applyConflict.set(false);
+    this.walletRefused.set(false);
     this.reviewPhase.set('quoted');
     if (this.activeOperation) {
       writeChangeJournal({
@@ -1046,32 +1185,76 @@ export class ChangePage {
     this.startCountdown(quoted.expiresAt);
   }
 
-  private handlePrepareOrQuoteFailure(error: unknown, body: PrepareBody): void {
+  private handlePrepareOrQuoteFailure(error: unknown): void {
     if (this.destroyed) return;
     const code = errorCodeOf(error);
-    const msg = billingErrorMessage(error, this.transloco);
-
-    if (code === 'SUBSCRIPTION_PLAN_CHANGE_PREVIEW_STALE') {
-      this.conflictModal()?.open();
-      return;
-    }
-
     if (code === 'SEAT_DOWNGRADE_FREE_UP_REQUIRED') {
-      const seatMsg = seatDowngradeMessage(error, this.transloco);
-      this.notify.error(seatMsg);
-      this.attachFreeSeatsRowError(seatMsg, seatDowngradeDetails(error)?.moduleKey ?? null);
-      this.step.set(1);
-      return;
+      const details = error instanceof ApiError ? error.details?.['moduleKey'] : null;
+      const moduleKey =
+        Array.isArray(details) && typeof details[0] === 'string' ? details[0] : null;
+      this.attachFreeSeatsRowError(seatDowngradeMessage(error, this.transloco), moduleKey);
+    } else if (code === 'SEAT_MODULE_HOLDERS_EXCEED_PURCHASE') {
+      const details = seatHoldersDetails(error);
+      this.attachFreeSeatsRowError(
+        details
+          ? this.transloco.translate('bsub.row.holdersExceed', details)
+          : billingErrorMessage(error, this.transloco, 'write'),
+        details?.moduleKey ?? null,
+      );
+    } else if (code === 'DOWNGRADE_NOT_ALLOWED') {
+      this.attachDowngradeRowError(this.transloco.translate('bsub.row.downgradeNotAllowed'));
+    } else if (code === 'ADDON_PREPARATION_STALE') {
+      this.showWriteError(error);
+      void this.reloadAfterConflict();
+    } else {
+      this.showWriteError(error);
     }
+    if (this.activeOperation && error instanceof ApiError && error.status === 401) {
+      this.reviewPhase.set('quote-error');
+    } else this.step.set(1);
+  }
 
-    if (code === 'DOWNGRADE_NOT_ALLOWED') {
-      this.notify.error(msg);
-      this.attachDowngradeRowError(msg, body);
-      this.step.set(1);
-      return;
-    }
+  private showWriteError(error: unknown): void {
+    const code = errorCodeOf(error);
+    const notice =
+      code === 'ACCESS_POLICY_BLOCKED' || code === 'SUBSCRIPTION_PLAN_CHANGE_PAST_DUE'
+        ? 'bsub.dunning.settleFirst'
+        : code === 'SUBSCRIPTION_PLAN_CHANGE_CANCELLED'
+          ? 'bsub.notice.cancelled'
+          : code === 'SUBSCRIPTION_PLAN_CHANGE_PROVISIONING'
+            ? 'bsub.notice.provisioning'
+            : code === 'SUBSCRIPTION_PLAN_CHANGE_COLLECTION_IN_PROGRESS' ||
+                code === 'SUBSCRIPTION_COLLECTION_OPEN'
+              ? 'bsub.notice.collection'
+              : null;
+    this.noticeKey.set(notice);
+    this.notify.error(
+      notice
+        ? this.transloco.translate(notice)
+        : billingErrorMessage(error, this.transloco, 'write'),
+    );
+  }
 
-    this.notify.error(msg);
+  private discardFlow(): void {
+    this.poller.stop();
+    this.stopCountdown();
+    clearChangeJournal();
+    this.activeOperation = null;
+    this.operation.set(null);
+    this.preparedBody = null;
+    this.frozenBodyJson = null;
+    this.prepareCommand = null;
+    this.quoteCommand = null;
+    this.recoveryCommand = null;
+    this.applyKeyByPreviewId.clear();
+    this.preview.set(null);
+    this.receiptState.set('idle');
+    this.receiptError.set(null);
+    this.applyConflict.set(false);
+    this.walletRefused.set(false);
+    this.noticeKey.set(
+      this.summary()?.subscription.accessMode === 'DUNNING' ? 'bsub.dunning.settleFirst' : null,
+    );
     this.step.set(1);
   }
 
@@ -1081,17 +1264,23 @@ export class ChangePage {
    */
   private attachFreeSeatsRowError(message: string, moduleKey: string | null): void {
     const sub = this.subscription();
-    const appKeyOf = (targetId: string) => sub?.baseItems.find((b) => b.id === targetId)?.applicationKey ?? null;
+    const appKeyOf = (targetId: string) =>
+      sub?.baseItems.find((b) => b.id === targetId)?.applicationKey ?? null;
 
     this.cart.update((rows) => {
       let matchedIndex =
         moduleKey === null
           ? -1
           : rows.findIndex(
-              (r) => r.kind === 'change-seats' && r.targetKind === 'APPLICATION' && appKeyOf(r.targetId) === moduleKey,
+              (r) =>
+                r.kind === 'change-seats' &&
+                r.targetKind === 'APPLICATION' &&
+                appKeyOf(r.targetId) === moduleKey,
             );
       if (matchedIndex === -1) {
-        matchedIndex = rows.findIndex((r) => r.kind === 'change-seats' && r.targetKind === 'APPLICATION');
+        matchedIndex = rows.findIndex(
+          (r) => r.kind === 'change-seats' && r.targetKind === 'APPLICATION',
+        );
       }
       if (matchedIndex === -1) {
         matchedIndex = rows.findIndex((r) => r.kind === 'change-seats');
@@ -1111,7 +1300,7 @@ export class ChangePage {
     });
   }
 
-  private attachDowngradeRowError(message: string, _body: PrepareBody): void {
+  private attachDowngradeRowError(message: string): void {
     const sub = this.subscription();
     const groups = this.catalogueGroups();
     this.cart.update((rows) => {
@@ -1123,7 +1312,9 @@ export class ChangePage {
         }
         if (row.kind === 'upgrade-tier') {
           const base = sub?.baseItems.find((b) => b.id === row.itemId);
-          const group = base ? groups.find((g) => g.applicationId === base.applicationId) : undefined;
+          const group = base
+            ? groups.find((g) => g.applicationId === base.applicationId)
+            : undefined;
           const tier = group?.tiers.find((t) => t.tier.id === row.tierId);
           return base !== undefined && tier !== undefined && tier.tier.rank < base.tierRank;
         }
@@ -1148,30 +1339,21 @@ export class ChangePage {
     );
   }
 
-  private async cancelPreparationWithRecovery(
-    op: CommercialOperation,
-    reasonText: string,
-  ): Promise<boolean> {
-    return this.cancelPreparationByIds(op.operationId, op.operationRevision, reasonText);
-  }
-
   private async cancelPreparationByIds(
     operationId: string,
     operationRevision: string,
     reasonText: string,
   ): Promise<boolean> {
-    const cancelKey = newIdempotencyKey();
+    const body: RecoveryBody = {
+      expectedOperationRevision: operationRevision,
+      action: 'CANCEL_PREPARATION',
+      reason: reasonText,
+    };
+    this.recoveryCommand = holdCommand(this.recoveryCommand, body);
+    const cancelKey = this.recoveryCommand.key;
     try {
       await this.withSingleNetworkRetry(() =>
-        recoverOperation(
-          operationId,
-          {
-            expectedOperationRevision: operationRevision,
-            action: 'CANCEL_PREPARATION',
-            reason: reasonText,
-          },
-          cancelKey,
-        ),
+        this.api.recoverOperation(operationId, body, cancelKey),
       );
       return true;
     } catch (error) {
@@ -1181,30 +1363,21 @@ export class ChangePage {
       }
       if (code === 'COMMERCIAL_RECOVERY_REVISION_STALE') {
         try {
-          const latest = await getOperation(operationId);
+          const latest = await this.api.getOperation(operationId);
           if (latest.state === 'ABORTED' || latest.state === 'COMMITTED') {
             return true;
           }
-          const retryCancelKey = newIdempotencyKey();
-          await this.withSingleNetworkRetry(() =>
-            recoverOperation(
-              operationId,
-              {
-                expectedOperationRevision: latest.operationRevision,
-                action: 'CANCEL_PREPARATION',
-                reason: reasonText,
-              },
-              retryCancelKey,
-            ),
-          );
-          return true;
+          this.activeOperation = latest;
+          this.operation.set(latest);
+          this.reviewPhase.set(latest.state === 'BLOCKED' ? 'blocked' : 'timeout');
+          return false;
         } catch (retryError) {
           if (errorCodeOf(retryError) === 'TENANT_OPERATION_NOT_FOUND') return true;
-          this.notify.error(billingErrorMessage(retryError, this.transloco));
+          this.showWriteError(retryError);
           return false;
         }
       }
-      this.notify.error(billingErrorMessage(error, this.transloco));
+      this.showWriteError(error);
       return false;
     }
   }
@@ -1287,7 +1460,9 @@ export class ChangePage {
     this.stopCountdown();
     const update = () => {
       const targetMs = Date.parse(expiresAt);
-      const secs = Number.isNaN(targetMs) ? 0 : Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+      const secs = Number.isNaN(targetMs)
+        ? 0
+        : Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
       this.remainingSeconds.set(secs);
       if (secs <= 0) {
         this.stopCountdown();
@@ -1310,7 +1485,8 @@ export class ChangePage {
     try {
       return await command();
     } catch (error) {
-      const isNetwork = (error instanceof ApiError && error.status === 0) || error instanceof TypeError;
+      const isNetwork =
+        (error instanceof ApiError && error.status === 0) || error instanceof TypeError;
       if (!isNetwork) {
         throw error;
       }

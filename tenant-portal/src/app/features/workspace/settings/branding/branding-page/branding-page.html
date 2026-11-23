@@ -1,10 +1,12 @@
-@if (!canRead) {
+@if (forbidden()) {
   <div class="flex flex-1 items-center justify-center">
     <div
       role="alert"
       class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
     >
-      <span class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon">
+      <span
+        class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+      >
         <ng-icon name="tablerLock" size="18" aria-hidden="true" />
       </span>
       <p class="text-12 leading-18 text-text-muted">
@@ -15,7 +17,7 @@
 } @else {
   @if (baseline() !== null) {
     <div class="flex shrink-0 flex-wrap items-center gap-8 rounded-10 bg-surface p-8 shadow-card">
-      @if (canManage) {
+      @if (canManage()) {
         <button
           type="submit"
           [attr.form]="uid + '-form'"
@@ -31,7 +33,7 @@
             type="button"
             uiButton
             variant="secondary"
-            [disabled]="saving() || uploading()"
+            [disabled]="saving() || assetBusy()"
             (click)="undo()"
           >
             {{ 'wsBranding.actions.undo' | transloco }}
@@ -57,12 +59,17 @@
         <button
           type="button"
           class="inline-flex size-btn shrink-0 cursor-pointer items-center justify-center rounded-8 text-text-muted outline-none transition-colors duration-fast hover:bg-neutral-soft hover:text-text active:bg-border focus-visible:ring-3 focus-visible:ring-focus-halo-strong disabled:cursor-not-allowed disabled:text-text-placeholder disabled:hover:bg-transparent"
-          [disabled]="loading() || saving() || uploading()"
+          [disabled]="loading() || saving() || assetBusy()"
           [attr.aria-label]="'wsBranding.actions.reload' | transloco"
           [title]="'wsBranding.actions.reload' | transloco"
           (click)="reload()"
         >
-          <ng-icon name="tablerRefresh" size="15" [class.animate-spin]="loading()" aria-hidden="true" />
+          <ng-icon
+            name="tablerRefresh"
+            size="15"
+            [class.animate-spin]="loading()"
+            aria-hidden="true"
+          />
         </button>
       </div>
     </div>
@@ -84,6 +91,11 @@
         role="alert"
         class="flex w-full max-w-modal-confirm flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
       >
+        <span
+          class="inline-flex size-icon-tile-lg items-center justify-center rounded-8 bg-icon-orange text-on-icon"
+        >
+          <ng-icon name="tablerPhoto" size="18" aria-hidden="true" />
+        </span>
         <p class="text-12 leading-18 text-danger-text">{{ 'wsBranding.loadFailed' | transloco }}</p>
         <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
           {{ 'wsBranding.actions.retry' | transloco }}
@@ -92,13 +104,18 @@
     </div>
   } @else if (baseline(); as current) {
     <div class="min-h-0 flex-1 overflow-y-auto flex flex-col gap-8">
-      @if (!canManage) {
+      @if (!canManage()) {
         <app-settings-notice tone="info">
-          {{ 'wsBranding.readOnlyNotice' | transloco }}
+          {{ 'wsBranding.needsTenantWide' | transloco }}
         </app-settings-notice>
       }
 
-      <form [id]="uid + '-form'" novalidate (submit)="save($event)" (keydown.enter)="onFormEnter($event)">
+      <form
+        [id]="uid + '-form'"
+        novalidate
+        (submit)="save($event)"
+        (keydown.enter)="onFormEnter($event)"
+      >
         <div class="grid grid-cols-2 gap-8">
           <app-branding-identity-card
             [appName]="draft().appName"
@@ -106,7 +123,7 @@
             [tabTitle]="draft().tabTitle"
             (tabTitleChange)="onTabTitleChange($event)"
             [errors]="identityErrors()"
-            [readOnly]="!canManage || saving()"
+            [readOnly]="!canManage() || saving()"
             (fieldBlur)="markTouched($event)"
           />
 
@@ -116,15 +133,19 @@
             [secondary]="draft().secondaryColor"
             (secondaryChange)="onSecondaryChange($event)"
             [errors]="coloursErrors()"
-            [readOnly]="!canManage || saving()"
+            [readOnly]="!canManage() || saving()"
             (fieldBlur)="markTouched($event)"
           />
         </div>
       </form>
 
-      <section class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-12 shadow-card">
+      <section
+        class="flex flex-col gap-8 rounded-10 border border-border bg-surface p-12 shadow-card"
+      >
         <div class="flex items-center gap-8">
-          <span class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon">
+          <span
+            class="inline-flex size-icon-tile shrink-0 items-center justify-center rounded-8 bg-icon-teal text-on-icon"
+          >
             <ng-icon name="tablerPhoto" size="15" aria-hidden="true" />
           </span>
           <h2 class="min-w-0 truncate text-13 leading-18 font-medium text-text">
@@ -132,7 +153,7 @@
           </h2>
         </div>
 
-        @if (canManage) {
+        @if (canManage()) {
           <p class="text-12 leading-18 text-text-muted">
             {{ 'wsBranding.assets.immediate' | transloco }}
           </p>
@@ -142,31 +163,41 @@
           <app-branding-asset-card
             kind="logo"
             [url]="current.logoUrl"
-            [canManage]="canManage"
+            [canManage]="canManage()"
+            [hasAsset]="current.hasLogo"
             [busy]="uploadingKind() === 'logo'"
-            [disabled]="saving() || uploading()"
+            [disabled]="saving() || assetBusy()"
             (upload)="openUpload('logo')"
+            (removed)="onAssetRemoved('logo')"
+            (refreshed)="onAssetSaved({ kind: 'logo', branding: $event })"
+            (removingChange)="removingKind.set($event ? 'logo' : null)"
+            (tenantWideRequired)="writeRejected.set(true)"
           />
 
           <app-branding-asset-card
             kind="icon"
             [url]="current.iconUrl"
-            [canManage]="canManage"
+            [canManage]="canManage()"
+            [hasAsset]="current.hasIcon"
             [busy]="uploadingKind() === 'icon'"
-            [disabled]="saving() || uploading()"
+            [disabled]="saving() || assetBusy()"
             (upload)="openUpload('icon')"
+            (removed)="onAssetRemoved('icon')"
+            (refreshed)="onAssetSaved({ kind: 'icon', branding: $event })"
+            (removingChange)="removingKind.set($event ? 'icon' : null)"
+            (tenantWideRequired)="writeRejected.set(true)"
           />
         </div>
-
-        <p class="text-12 leading-18 text-text-muted">
-          {{ 'wsBranding.assets.noRemove' | transloco }}
-        </p>
       </section>
     </div>
   }
 }
 
-<app-branding-upload-modal (saved)="onAssetSaved($event)" />
+<app-branding-upload-modal
+  [canManage]="canManage()"
+  (saved)="onAssetSaved($event)"
+  (tenantWideRequired)="writeRejected.set(true)"
+/>
 
 <app-branding-preview-modal />
 

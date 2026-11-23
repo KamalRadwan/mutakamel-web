@@ -1,47 +1,96 @@
-import { fakeGetBranding, fakeUpdateBranding, fakeUploadBrandingAsset } from './branding.fake';
-import { Branding, UpdateBrandingBody } from './branding.model';
+import { Service, inject } from '@angular/core';
+import { QueryClient } from '@tanstack/angular-query';
+import { ApiError } from '../../../../core/api/api-errors';
+import { CoreHttp } from '../../../../core/api/core-http';
+import { AuthSession } from '../../../../core/auth/auth-session';
+import {
+  Branding,
+  BrandingAssetKind,
+  EMPTY_BRANDING,
+  UpdateBrandingBody,
+  normaliseHex,
+} from './branding.model';
 
-function normaliseBrandingResponse(raw: Partial<Branding> | null | undefined): Branding {
-  return {
-    id: raw?.id ?? null,
-    primaryColor: raw?.primaryColor ?? null,
-    secondaryColor: raw?.secondaryColor ?? null,
-    fontFamily: raw?.fontFamily ?? null,
-    appName: raw?.appName ?? null,
-    tabTitle: raw?.tabTitle ?? null,
-    loginHtml: raw?.loginHtml ?? null,
-    hasLogo: Boolean(raw?.hasLogo),
-    hasIcon: Boolean(raw?.hasIcon),
-    logoUrl: raw?.logoUrl ?? null,
-    iconUrl: raw?.iconUrl ?? null,
-    createdAt: raw?.createdAt ?? null,
-    updatedAt: raw?.updatedAt ?? null,
-  };
+const PATH = '/api/tenant/core/v1/branding';
+
+function normaliseBrandingResponse(data: unknown): Branding {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+  }
+  const result = { ...EMPTY_BRANDING };
+  for (const key of Object.keys(result) as (keyof Branding)[]) {
+    if (!(key in data)) continue;
+    const value = (data as Record<string, unknown>)[key];
+    if (key === 'hasLogo' || key === 'hasIcon') {
+      if (typeof value !== 'boolean') throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+      result[key] = value;
+    } else {
+      if (value !== null && typeof value !== 'string')
+        throw new ApiError(502, 'COMMON.GENERIC.INTERNAL_ERROR');
+      result[key] = value;
+    }
+  }
+  result.primaryColor = normaliseHex(result.primaryColor ?? '') ?? result.primaryColor;
+  result.secondaryColor = normaliseHex(result.secondaryColor ?? '') ?? result.secondaryColor;
+  return result;
 }
 
-export async function getBranding(): Promise<Branding> {
-  // GET /api/v1/tenant/branding [branding.read]
-  const raw = await fakeGetBranding();
-  return normaliseBrandingResponse(raw);
-}
+@Service()
+export class BrandingApi {
+  private readonly http = inject(CoreHttp);
+  private readonly session = inject(AuthSession);
+  private readonly queries = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, networkMode: 'always' } },
+  });
 
-export function updateBranding(body: UpdateBrandingBody, idempotencyKey: string): Promise<Branding> {
-  // PUT /api/v1/tenant/branding [branding.manage, tenant-wide] (x-idempotency-key)
-  return fakeUpdateBranding(body, idempotencyKey);
-}
+  getBranding(): Promise<Branding> {
+    return this.queries.fetchQuery({
+      queryKey: this.queryKey(),
+      queryFn: async () => normaliseBrandingResponse(await this.http.read<unknown>(PATH)),
+    });
+  }
 
-export function uploadBrandingLogo(file: File, idempotencyKey: string): Promise<Branding> {
-  // POST /api/v1/tenant/branding/logo [branding.manage, tenant-wide] multipart "file" (x-idempotency-key)
-  // -> the branding object itself (BrandingService.setLogo); a replay returns the same object
-  const form = new FormData();
-  form.append('file', file, file.name);
-  return fakeUploadBrandingAsset('logo', form, idempotencyKey);
-}
+  async updateBranding(body: UpdateBrandingBody, key: string): Promise<Branding> {
+    const queryKey = this.queryKey();
+    const result = await this.http.write<unknown>('PUT', PATH, body, { key });
+    const branding = normaliseBrandingResponse(result.data);
+    await this.queries.invalidateQueries({ queryKey });
+    return branding;
+  }
 
-export function uploadBrandingIcon(file: File, idempotencyKey: string): Promise<Branding> {
-  // POST /api/v1/tenant/branding/icon [branding.manage, tenant-wide] multipart "file" (x-idempotency-key)
-  // -> the branding object itself (BrandingService.setIcon); a replay returns the same object
-  const form = new FormData();
-  form.append('file', file, file.name);
-  return fakeUploadBrandingAsset('icon', form, idempotencyKey);
+  uploadBrandingLogo(file: File, key: string): Promise<Branding> {
+    return this.upload('logo', file, key);
+  }
+
+  uploadBrandingIcon(file: File, key: string): Promise<Branding> {
+    return this.upload('icon', file, key);
+  }
+
+  removeBrandingLogo(key: string): Promise<void> {
+    return this.remove('logo', key);
+  }
+
+  removeBrandingIcon(key: string): Promise<void> {
+    return this.remove('icon', key);
+  }
+
+  private queryKey(): readonly unknown[] {
+    return ['ws-branding', this.session.me()?.id];
+  }
+
+  private async upload(kind: BrandingAssetKind, file: File, key: string): Promise<Branding> {
+    const queryKey = this.queryKey();
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const result = await this.http.writeMultipart<unknown>(`${PATH}/${kind}`, form, { key });
+    const branding = normaliseBrandingResponse(result.data);
+    await this.queries.invalidateQueries({ queryKey });
+    return branding;
+  }
+
+  private async remove(kind: BrandingAssetKind, key: string): Promise<void> {
+    const queryKey = this.queryKey();
+    await this.http.write<void>('DELETE', `${PATH}/${kind}`, undefined, { key, noBody: true });
+    await this.queries.invalidateQueries({ queryKey });
+  }
 }

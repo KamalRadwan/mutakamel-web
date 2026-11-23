@@ -1,14 +1,36 @@
-import { Component, ElementRef, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { tablerCircle, tablerCircleCheck, tablerEye, tablerEyeOff, tablerKey } from '@ng-icons/tabler-icons';
+import {
+  tablerCircle,
+  tablerCircleCheck,
+  tablerEye,
+  tablerEyeOff,
+  tablerKey,
+} from '@ng-icons/tabler-icons';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
-import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError, errorCodeOf, fieldErrorsOf } from '../../../../../core/api/api-errors';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { AccountSection } from '../../shared/account-section/account-section';
-import { changePassword } from '../security.api';
-import { PASSWORD_MAX, allPasswordChecksPass, passwordChecks } from '../security.model';
+import { SecurityApi } from '../security.api';
+import {
+  PASSWORD_MAX,
+  allPasswordChecksPass,
+  isUnknownOutcome,
+  passwordChecks,
+  retryAfterSecondsOf,
+} from '../security.model';
 
 interface ChecklistItem {
   key: 'length' | 'lower' | 'upper' | 'digit' | 'symbol' | 'match';
@@ -19,13 +41,17 @@ interface ChecklistItem {
 @Component({
   selector: 'app-password-card',
   imports: [NgIcon, TranslocoPipe, Button, Field, AccountSection],
-  providers: [provideIcons({ tablerKey, tablerEye, tablerEyeOff, tablerCircleCheck, tablerCircle })],
+  providers: [
+    provideIcons({ tablerKey, tablerEye, tablerEyeOff, tablerCircleCheck, tablerCircle }),
+  ],
   templateUrl: './password-card.html',
 })
 export class PasswordCard {
   private static nextId = 0;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(SecurityApi);
+  private readonly session = inject(AuthSession);
   private readonly transloco = inject(TranslocoService);
   private readonly currentInput = viewChild<ElementRef<HTMLInputElement>>('currentInput');
 
@@ -48,7 +74,9 @@ export class PasswordCard {
   protected readonly newErrorKey = signal<string | null>(null);
   protected readonly saving = signal(false);
 
-  protected readonly metCount = computed(() => this.checklistItems().filter((item) => item.met).length);
+  protected readonly metCount = computed(
+    () => this.checklistItems().filter((item) => item.met).length,
+  );
   protected readonly checks = computed(() => passwordChecks(this.newPassword()));
   protected readonly passwordsMatch = computed(() => {
     const next = this.newPassword();
@@ -99,10 +127,12 @@ export class PasswordCard {
     this.saving.set(true);
 
     try {
-      await changePassword({
+      const result = await this.api.changePassword({
         currentPassword: this.currentPassword(),
         newPassword: this.newPassword(),
       });
+      if (!result) return;
+      await this.session.signedIn(result);
       this.currentPassword.set('');
       this.newPassword.set('');
       this.confirmPassword.set('');
@@ -120,10 +150,30 @@ export class PasswordCard {
         this.newErrorKey.set('wsAccSec.errors.WEAK_PASSWORD');
       } else if (code === 'PASSWORD_TOO_LONG') {
         this.newErrorKey.set('wsAccSec.errors.PASSWORD_TOO_LONG');
-      } else if (code === 'CORE_VALIDATION_FAILED' && error instanceof ApiError && error.details?.['newPassword']) {
-        this.newErrorKey.set('wsAccSec.errors.CORE_VALIDATION_FAILED');
+      } else if (code === 'CORE_VALIDATION_FAILED') {
+        const fields = fieldErrorsOf(error);
+        if (fields['currentPassword'])
+          this.currentErrorKey.set('wsAccSec.errors.CORE_VALIDATION_FAILED');
+        if (fields['newPassword']) this.newErrorKey.set('wsAccSec.errors.CORE_VALIDATION_FAILED');
+        if (!fields['currentPassword'] && !fields['newPassword']) {
+          this.notify.error(this.transloco.translate('wsAccSec.errors.CORE_VALIDATION_FAILED'));
+        }
       } else if (error instanceof ApiError && error.status === 429) {
-        this.notify.error(this.transloco.translate('wsAccSec.errors.TOO_MANY_REQUESTS'));
+        this.notify.error(
+          this.transloco.translate('wsAccSec.errors.AUTH_MFA_THROTTLED', {
+            s: retryAfterSecondsOf(error),
+          }),
+        );
+      } else if (isUnknownOutcome(error)) {
+        try {
+          if ((await this.session.refresh()) === 'ended') {
+            await this.session.sessionEnded();
+          } else {
+            this.notify.error(this.transloco.translate('wsAccSec.unknown.text'));
+          }
+        } catch {
+          this.notify.error(this.transloco.translate('wsAccSec.errors.generic'));
+        }
       } else {
         this.notify.error(this.transloco.translate('wsAccSec.errors.generic'));
       }

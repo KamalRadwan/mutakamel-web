@@ -10,25 +10,27 @@ import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { UnsavedDialog } from '../../../../../shared/ui/unsaved-dialog/unsaved-dialog';
-import { errorCodeOf } from '../../../../../core/api/api-errors';
+import { ApiError, errorCodeOf } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
-import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
+import { AuthSession } from '../../../../../core/auth/auth-session';
 import { coreFieldErrors, fieldMessages, hasOtherFields } from '../../core-response.model';
 
-/** CreateTaxDto / UpdateTaxDto fields the form shows. */
-const DTO_FIELDS = ['code', 'name', 'rate', 'companyId'] as const;
-import { createTax, updateTax } from '../taxes.api';
+import { TaxesApi } from '../taxes.api';
 import {
   CompanyOption,
   CreateTaxBody,
   TAX_LIMITS,
   Tax,
   UpdateTaxBody,
+  taxPermissions,
+  canManageTax,
   formatRate,
   isValidRateText,
   toCanonicalRate,
   translateTaxError,
 } from '../taxes.model';
+
+const DTO_FIELDS = ['code', 'name', 'rate', 'companyId', 'isInclusive', 'status'] as const;
 
 type TaxFormField = 'scope' | 'code' | 'rate' | 'name';
 
@@ -43,7 +45,6 @@ const WORKSPACE_SCOPE = '__workspace__';
     Dropdown,
     Field,
     Modal,
-    SettingsNotice,
     Switch,
     UnsavedDialog,
   ],
@@ -54,6 +55,9 @@ export class TaxModal {
   private static nextId = 0;
   protected readonly uid = `tax-modal-${++TaxModal.nextId}`;
 
+  private readonly api = inject(TaxesApi);
+  private readonly auth = inject(AuthSession);
+  private readonly permissions = computed(() => taxPermissions(this.auth.me()));
   private readonly injector = inject(Injector);
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
@@ -65,7 +69,7 @@ export class TaxModal {
 
   readonly canManage = input(true);
   readonly companies = input<CompanyOption[]>([]);
-  readonly tenantWideAllowed = input(false);
+  readonly tenantWideAllowed = computed(() => this.permissions().tenantWideAllowed);
 
   readonly saved = output<Tax>();
   readonly notFound = output<string>();
@@ -86,7 +90,6 @@ export class TaxModal {
   protected readonly revealAllErrors = signal(false);
   protected readonly saving = signal(false);
 
-  protected readonly validationNotice = signal<string | null>(null);
   /** CORE_VALIDATION_FAILED messages per DTO field, already in the request language. */
   private readonly serverFieldErrors = signal<Partial<Record<(typeof DTO_FIELDS)[number], string>>>({});
   protected readonly serverScopeError = signal<string | null>(null);
@@ -95,10 +98,10 @@ export class TaxModal {
 
   private allowClose = false;
   private confirmingUnsaved = false;
-  private pendingKey: { signature: string; key: string } | null = null;
+  private pendingKey: { bodyJson: string; key: string } | null = null;
 
   private readonly manageableActiveCompanies = computed(() =>
-    this.companies().filter((company) => company.canManage && company.status === 'ACTIVE'),
+    this.companies().filter((company) => canManageTax({ companyId: company.id }, this.permissions()) && company.status !== 'INACTIVE'),
   );
 
   protected readonly scopeOptions = computed<DropdownOption<string>[]>(() => {
@@ -123,10 +126,7 @@ export class TaxModal {
     }
     const tax = this.baseTax();
     if (!tax) return false;
-    if (tax.companyId === null) {
-      return this.tenantWideAllowed();
-    }
-    return this.companies().some((company) => company.id === tax.companyId && company.canManage);
+    return canManageTax(tax, this.permissions());
   });
 
   protected readonly editScopeLabel = computed(() => {
@@ -137,7 +137,7 @@ export class TaxModal {
       return this.transloco.translate('wsTaxes.fields.workspaceWide');
     }
     const match = this.companies().find((company) => company.id === tax.companyId);
-    return match ? match.name : this.transloco.translate('wsTaxes.table.unknownCompany');
+    return match ? match.name : this.transloco.translate('wsTaxes.companyFallback', { id: tax.companyId.slice(0, 8) });
   });
 
   private readonly selectedCreateScopeLabel = computed(() => {
@@ -154,7 +154,7 @@ export class TaxModal {
     const errors: Partial<Record<TaxFormField, string>> = {};
 
     if (this.mode() === 'create') {
-      if (!this.scopeDraft()) {
+      if (!this.scopeOptions().some((option) => option.value === this.scopeDraft())) {
         errors.scope = 'scopeRequired';
       }
       const code = this.codeDraft().trim().toUpperCase();
@@ -206,7 +206,14 @@ export class TaxModal {
 
   protected readonly activeError = computed(() => {
     this.i18n();
-    return this.serverActiveError();
+    return this.serverActiveError() ?? this.serverFieldErrors().status ?? null;
+  });
+
+  protected readonly inclusiveError = computed(() => this.serverFieldErrors().isInclusive ?? null);
+  protected readonly rateHint = computed(() => {
+    this.i18n();
+    const hint = this.transloco.translate('wsTaxes.fields.rateHint');
+    return this.mode() === 'edit' ? `${hint} ${this.transloco.translate('wsTaxes.fields.rateEditHint')}` : hint;
   });
 
   protected readonly editPatch = computed<UpdateTaxBody>(() => {
@@ -317,7 +324,6 @@ export class TaxModal {
     this.markTouched('scope');
     this.serverScopeError.set(null);
     this.serverCodeError.set(null);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
   }
 
@@ -330,28 +336,24 @@ export class TaxModal {
     }
     this.codeDraft.set(upper);
     this.serverCodeError.set(null);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
   }
 
   protected onRateInput(event: Event): void {
     if (!this.isEditable() || this.saving()) return;
     this.rateDraft.set((event.target as HTMLInputElement).value);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
   }
 
   protected onNameInput(event: Event): void {
     if (!this.isEditable() || this.saving()) return;
     this.nameDraft.set((event.target as HTMLInputElement).value);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
   }
 
   protected onInclusiveChange(checked: boolean): void {
     if (!this.isEditable() || this.saving()) return;
     this.isInclusiveDraft.set(checked);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
   }
 
@@ -359,7 +361,6 @@ export class TaxModal {
     if (!this.isEditable() || this.mode() !== 'edit' || this.saving()) return;
     this.isActiveDraft.set(checked);
     this.serverActiveError.set(null);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
   }
 
@@ -418,7 +419,6 @@ export class TaxModal {
     this.revealAllErrors.set(true);
     if (!this.isValid()) return false;
 
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
     this.serverScopeError.set(null);
     this.serverCodeError.set(null);
@@ -434,17 +434,18 @@ export class TaxModal {
 
     const base = this.baseTax();
     const requestData = this.buildRequestPayload();
-    const signature = JSON.stringify({ mode: this.mode(), id: base?.id ?? null, payload: requestData });
-    if (!this.pendingKey || this.pendingKey.signature !== signature) {
-      this.pendingKey = { signature, key: newIdempotencyKey() };
+    const bodyJson = JSON.stringify(requestData);
+    if (!this.pendingKey || this.pendingKey.bodyJson !== bodyJson) {
+      this.pendingKey = { bodyJson, key: newIdempotencyKey() };
     }
     const idempotencyKey = this.pendingKey.key;
 
     this.saving.set(true);
     try {
       if (this.mode() === 'create') {
-        const created = await createTax(requestData as CreateTaxBody, idempotencyKey);
+        const created = await this.api.createTax(requestData as CreateTaxBody, idempotencyKey);
         this.pendingKey = null;
+        this.notify.connectionRestored();
         this.notify.success(this.transloco.translate('wsTaxes.toast.created', { code: created.code }));
         this.saved.emit(created);
         this.closeImmediate();
@@ -452,8 +453,9 @@ export class TaxModal {
       }
 
       if (!base) return false;
-      const updated = await updateTax(base.id, requestData as UpdateTaxBody, idempotencyKey);
+      const updated = await this.api.updateTax(base.id, requestData as UpdateTaxBody, idempotencyKey);
       this.pendingKey = null;
+      this.notify.connectionRestored();
       this.notify.success(this.transloco.translate('wsTaxes.toast.updated', { code: updated.code }));
       this.saved.emit(updated);
       this.closeImmediate();
@@ -486,6 +488,15 @@ export class TaxModal {
   }
 
   private handleSaveError(error: unknown): void {
+    if (error instanceof ApiError && error.status === 0) {
+      this.notify.connectionLost(this.transloco.translate('session.connectionLost.title'),
+        this.transloco.translate('session.connectionLost.text'));
+      return;
+    }
+    if (error instanceof ApiError && error.status === 401) {
+      this.notify.error(translateTaxError(error, this.transloco, 'write'));
+      return;
+    }
     const code = errorCodeOf(error);
 
     if (code === 'TAX_CODE_TAKEN') {
@@ -499,9 +510,9 @@ export class TaxModal {
 
     if (code === 'COMPANY_INVALID') {
       if (this.mode() === 'create') {
-        this.serverScopeError.set(this.transloco.translate('wsTaxes.errors.COMPANY_INVALID'));
+        this.serverScopeError.set(translateTaxError(error, this.transloco, 'create'));
       } else {
-        this.serverActiveError.set(this.transloco.translate('wsTaxes.errors.COMPANY_INVALID_REACTIVATE'));
+        this.serverActiveError.set(translateTaxError(error, this.transloco, 'reactivate'));
       }
       return;
     }
@@ -509,22 +520,25 @@ export class TaxModal {
     const fields = coreFieldErrors(error);
     if (fields) {
       this.serverFieldErrors.set(fieldMessages(fields, DTO_FIELDS));
-      if (hasOtherFields(fields, DTO_FIELDS) || Object.keys(fields).length === 0) {
-        this.validationNotice.set(this.transloco.translate('wsTaxes.errors.CORE_VALIDATION_FAILED'));
+      const displayedFields = this.mode() === 'create'
+        ? DTO_FIELDS.filter((field) => field !== 'status')
+        : DTO_FIELDS.filter((field) => field !== 'code' && field !== 'companyId');
+      if (hasOtherFields(fields, displayedFields) || Object.keys(fields).length === 0) {
+        this.notify.error(translateTaxError(error, this.transloco, 'write'));
       }
       return;
     }
 
-    if (code === 'TAX_NOT_FOUND') {
+    if (code === 'TAX_NOT_FOUND' || (error instanceof ApiError && error.status === 404)) {
       this.pendingKey = null;
-      this.notify.error(translateTaxError(error, this.transloco));
+      this.notify.error(translateTaxError(error, this.transloco, 'write'));
       const base = this.baseTax();
       if (base) this.notFound.emit(base.id);
       this.closeImmediate();
       return;
     }
 
-    this.notify.error(translateTaxError(error, this.transloco));
+    this.notify.error(translateTaxError(error, this.transloco, 'write'));
   }
 
   private clientErrorText(field: TaxFormField): string | null {
@@ -537,7 +551,6 @@ export class TaxModal {
   private resetErrors(): void {
     this.touched.set({});
     this.revealAllErrors.set(false);
-    this.validationNotice.set(null);
     this.serverFieldErrors.set({});
     this.serverScopeError.set(null);
     this.serverCodeError.set(null);

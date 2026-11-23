@@ -1,3 +1,6 @@
+@if (forbidden()) {
+  <ui-full-state kind="forbidden" [title]="'settings.errors.permission' | transloco" />
+} @else {
 <app-settings-frame
   [addLabel]="'wsNumbering.add' | transloco"
   [showAdd]="canCreate()"
@@ -51,6 +54,10 @@
     </app-settings-notice>
   }
 
+  @if (scopedReader()) {
+    <app-settings-notice notices tone="info">{{ 'wsNumbering.scopedNote' | transloco }}</app-settings-notice>
+  }
+
   @if (isReadOnly()) {
     <app-settings-notice notices tone="info">
       {{ 'wsNumbering.readOnlyNotice' | transloco }}
@@ -58,18 +65,12 @@
   }
 
   @if (loadFailed()) {
-    <div
-      class="flex flex-col items-center gap-8 rounded-10 border border-border bg-surface p-16 text-center shadow-card"
-      role="alert"
-    >
-      <p class="text-12 text-danger-text">{{ 'settings.common.loadFailed' | transloco }}</p>
-      <button type="button" uiButton variant="secondary" size="small" (click)="reload()">
-        {{ 'settings.common.retry' | transloco }}
-      </button>
-    </div>
+    <ui-full-state kind="load-failure"
+      [title]="'settings.common.loadFailed' | transloco"
+      [actionLabel]="'settings.common.retry' | transloco" (action)="reload()" />
   }
 
-  @if (!loadFailed() || rows().length > 0) {
+  @if (!loadFailed()) {
     <div class="overflow-x-auto pb-4">
       <div
         role="table"
@@ -184,7 +185,7 @@
               </span>
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
-                <span dir="ltr" class="truncate font-medium tabular-nums">{{ formatPreview(seq) }}</span>
+                <span dir="ltr" class="truncate font-medium tabular-nums">{{ seq.nextValue }}</span>
               </span>
 
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10">
@@ -250,3 +251,5 @@
   (saved)="onModalSaved()"
   (notFound)="onSequenceNotFound()"
 />
+
+}

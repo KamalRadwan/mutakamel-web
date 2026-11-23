@@ -1,3 +1,4 @@
+import { ApiError } from '../../../../../core/api/api-errors';
 import { Component, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../core/i18n/translation-events';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -5,13 +6,14 @@ import { provideIcons } from '@ng-icons/core';
 import { tablerGauge } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
+import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Button } from '../../../../../shared/ui/button/button';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
 import { Switch } from '../../../../../shared/ui/switch/switch';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
-import { patchEmailConfig } from '../email.api';
+import { EmailApi } from '../email.api';
 import {
   EMAIL_QUOTA_MAX,
   EmailConflictPayload,
@@ -28,7 +30,7 @@ type LimitField = 'dailyQuota' | 'rateLimitPerMin';
 
 @Component({
   selector: 'app-limits-modal',
-  imports: [TranslocoPipe, Button, Field, Modal, SettingsNotice, Switch],
+  imports: [ConfirmDialog, TranslocoPipe, Button, Field, Modal, SettingsNotice, Switch],
   providers: [provideIcons({ tablerGauge })],
   templateUrl: './limits-modal.html',
 })
@@ -37,14 +39,16 @@ export class LimitsModal {
   protected readonly uid = `ws-email-limits-modal-${++LimitsModal.nextId}`;
 
   private readonly notify = inject(Notify);
+  private readonly api = inject(EmailApi);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
   protected readonly language = inject(LanguageState).current;
+  private readonly discardConfirm = viewChild.required<ConfirmDialog>('discardConfirm');
   private readonly modal = viewChild.required<Modal>('modal');
 
   readonly config = input<TenantEmailConfig | null>(null);
-  readonly revision = input<number | null>(null);
-  readonly canManage = input(true);
+  readonly etag = input<string | null>(null);
+  readonly canManage = input(false);
 
   readonly saved = output<EmailResult>();
   readonly conflict = output<EmailConflictPayload>();
@@ -63,10 +67,13 @@ export class LimitsModal {
   protected readonly serverFieldErrors = signal<Partial<Record<LimitField, string>>>({});
   protected readonly topError = signal<string | null>(null);
 
-  private allowClose = false;
-  private saveOp: { fingerprint: string; key: string } | null = null;
+  private readonly opened = signal(false);
+  readonly hasUnsavedDraft = computed(() => this.opened() && this.dirty());
 
-  protected readonly isReadonly = computed(() => !this.canManage());
+  private allowClose = false;
+  private saveOp: { bodyJson: string; key: string } | null = null;
+
+  protected readonly isReadonly = computed(() => !this.canManage() || !this.api.gates().manage);
 
   protected readonly dailyCap = computed(() => {
     const cfg = this.config();
@@ -160,9 +167,7 @@ export class LimitsModal {
     return dailyChanged || perMinChanged;
   });
 
-  protected readonly isValid = computed(
-    () => !this.rawDailyError() && !this.rawPerMinuteError(),
-  );
+  protected readonly isValid = computed(() => !this.rawDailyError() && !this.rawPerMinuteError());
 
   protected readonly canSubmit = computed(
     () => !this.isReadonly() && !this.saving() && this.dirty() && this.isValid(),
@@ -174,10 +179,19 @@ export class LimitsModal {
     this.allowClose = false;
     this.saveOp = null;
     this.applyFromConfig(cfg);
+    this.opened.set(true);
     this.modal().open();
   }
 
+  protected async requestClose(): Promise<void> {
+    if (this.saving()) return;
+    if (this.hasUnsavedDraft() && !(await this.discardConfirm().open())) return;
+    this.close();
+  }
+
   close(): void {
+    this.opened.set(false);
+    this.saveOp = null;
     this.allowClose = true;
     this.modal().close();
   }
@@ -188,6 +202,7 @@ export class LimitsModal {
       return;
     }
     this.allowClose = false;
+    this.opened.set(false);
     this.saveOp = null;
   }
 
@@ -241,7 +256,6 @@ export class LimitsModal {
   protected async save(event?: Event): Promise<void> {
     event?.preventDefault();
     const cfg = this.config();
-    const rev = this.revision();
     if (!cfg || this.isReadonly() || this.saving() || !this.dirty()) return;
 
     this.submitted.set(true);
@@ -253,16 +267,21 @@ export class LimitsModal {
     const patch = this.buildPatch(cfg);
     if (Object.keys(patch).length === 0) return;
 
-    const key = this.keyForPatch(patch);
+    const etag = this.etag() ?? `"${cfg.revision}"`;
+    const key = this.keyForPatch(patch, etag);
     this.saving.set(true);
 
     try {
-      const result = await patchEmailConfig(patch, rev ?? cfg.revision, key);
+      const result = await this.api.patchEmailConfig(patch, etag, key);
       this.saveOp = null;
       this.notify.success(this.transloco.translate('wsEmail.toast.saved'));
       this.saved.emit(result);
       this.close();
     } catch (error) {
+      if (error instanceof ApiError && error.status === 428) {
+        this.notify.error(resolveEmailError(error, this.transloco));
+        return;
+      }
       if (isConflictError(error)) {
         this.saveOp = null;
         this.close();
@@ -293,7 +312,11 @@ export class LimitsModal {
       patch.dailyQuota = null;
     }
 
-    if (nextPerMinute !== null && !Number.isNaN(nextPerMinute) && nextPerMinute !== cfg.rateLimitPerMin) {
+    if (
+      nextPerMinute !== null &&
+      !Number.isNaN(nextPerMinute) &&
+      nextPerMinute !== cfg.rateLimitPerMin
+    ) {
       patch.rateLimitPerMin = nextPerMinute;
     } else if (nextPerMinute === null && cfg.rateLimitPerMin !== null) {
       patch.rateLimitPerMin = null;
@@ -326,13 +349,13 @@ export class LimitsModal {
     });
   }
 
-  private keyForPatch(patch: PatchEmailConfigRequest): string {
-    const fp = JSON.stringify(patch);
-    if (this.saveOp && this.saveOp.fingerprint === fp) {
+  private keyForPatch(patch: PatchEmailConfigRequest, etag: string): string {
+    const bodyJson = JSON.stringify([patch, etag]);
+    if (this.saveOp && this.saveOp.bodyJson === bodyJson) {
       return this.saveOp.key;
     }
     const key = newIdempotencyKey();
-    this.saveOp = { fingerprint: fp, key };
+    this.saveOp = { bodyJson, key };
     return key;
   }
 }

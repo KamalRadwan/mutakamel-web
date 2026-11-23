@@ -1,3 +1,13 @@
+import type { TenantMe } from '../../../../core/auth/auth-session.model';
+import { hasTenantWidePermission } from '../../../../core/auth/tenant-wide-permission';
+
+export function phonePermissions(me: TenantMe | null | undefined): { readable: boolean; editable: boolean } {
+  return {
+    readable: me?.permissions.includes('webphone.settings.read') ?? false,
+    editable: hasTenantWidePermission(me, 'webphone.settings.update'),
+  };
+}
+
 export type IceKind = 'STUN' | 'TURN';
 export type IceTransportPolicy = 'all' | 'relay';
 export type WebsocketProtocol = 'wss' | 'ws';
@@ -9,10 +19,14 @@ export interface IceEntry {
   username: string | null;
   credentialConfigured: boolean;
   enabled: boolean;
+  sortOrder: number;
 }
 
 export interface PhoneServer {
   id: string;
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
   name: string;
   priority: number;
   enabled: boolean;
@@ -30,12 +44,13 @@ export interface PhoneServer {
   traceSip: boolean;
   sessionTimers: boolean;
   allowInvalidTlsCertificate: boolean;
-  defaultTimeoutSeconds: number | null;
-  defaultMaxRetries: number | null;
+  defaultTimeoutSeconds: number;
+  defaultMaxRetries: number;
   iceServers: IceEntry[];
 }
 
 export interface PhoneConfig {
+  tenantId: string;
   enabled: boolean;
 }
 
@@ -44,9 +59,12 @@ export interface PhoneSeats {
   occupied: number;
   available: number;
   overAllowance: boolean;
+  graceUntil: string | null;
+  overCapacity: boolean;
+  overCapacitySince: string | null;
 }
 
-export interface CreatePhoneServerBody {
+export interface CreatePhoneServerBody extends UpdatePhoneServerPatch {
   name: string;
   sipDomain: string;
   websocketUrl: string;
@@ -70,8 +88,8 @@ export interface UpdatePhoneServerPatch {
   traceSip?: boolean;
   sessionTimers?: boolean;
   allowInvalidTlsCertificate?: boolean;
-  defaultTimeoutSeconds?: number | null;
-  defaultMaxRetries?: number | null;
+  defaultTimeoutSeconds?: number;
+  defaultMaxRetries?: number;
 }
 
 export interface CreateIceEntryBody {
@@ -80,6 +98,7 @@ export interface CreateIceEntryBody {
   username?: string | null;
   credential?: string | null;
   enabled?: boolean;
+  sortOrder?: number;
 }
 
 export interface UpdateIceEntryPatch {
@@ -88,6 +107,7 @@ export interface UpdateIceEntryPatch {
   username?: string | null;
   credential?: string | null;
   enabled?: boolean;
+  sortOrder?: number;
 }
 
 export interface IceEntryDraft {
@@ -109,7 +129,7 @@ export interface IceEntryValidationErrors {
   entry?: string | null;
 }
 
-export const PHONE_SERVER_LIMIT = 10;
+export const PHONE_SERVER_LIMIT = 50;
 export const PHONE_SERVER_NAME_MAX = 80;
 export const REGISTER_EXPIRES_MIN = 30;
 export const REGISTER_EXPIRES_MAX = 86_400;
@@ -124,7 +144,7 @@ export const MAX_RETRIES_DEFAULT = 2;
 export const WEBSOCKET_URL_PATTERN = /^wss?:\/\/\S+$/i;
 export const SIP_DOMAIN_PATTERN = /^[a-z0-9.-]+(:[0-9]+)?$/i;
 export const ICE_URL_PATTERN = /^(stun|stuns|turn|turns):\S+$/i;
-export const SIP_URI_PATTERN = /^sips?:\S+$/i;
+export const SIP_URI_PATTERN = /^sip:\S+$/i;
 export const CALLER_ID_PATTERN = /^\+?[0-9]+$/;
 
 export function protocolOfUrl(url: string): WebsocketProtocol {

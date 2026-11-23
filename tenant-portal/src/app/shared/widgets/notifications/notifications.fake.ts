@@ -3,28 +3,15 @@
 import { ApiError } from '../../../core/api/api-errors';
 import { fakeDelay } from '../../../core/fake/fake-utils';
 import {
-  KNOWN_NOTIFICATION_TYPES,
   NOTIFICATION_LIMITS,
   NotificationListResult,
   NotificationQuery,
   NotificationReadAllResult,
-  NotificationRuntimeConfig,
   NotificationUnreadCount,
   NotificationView,
 } from './notifications.model';
 
 type Lang = 'ar' | 'en';
-
-/** The server localises stored text by Accept-Language; the fake reads the active language the same way. */
-function activeLanguage(): Lang {
-  if (typeof document !== 'undefined' && document.documentElement.lang === 'ar') return 'ar';
-  try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('lang') === 'ar') return 'ar';
-  } catch {
-    // Storage blocked: fall back to English.
-  }
-  return 'en';
-}
 
 interface Seed {
   id: string;
@@ -45,7 +32,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'core.activity.reminder',
     priority: 'P1_HIGH',
     title: { en: 'Follow-up call due in 15 minutes', ar: 'موعد مكالمة المتابعة بعد 15 دقيقة' },
-    body: { en: 'Call with Horizon Retail at 15:00.', ar: 'مكالمة مع شركة أفق للتجزئة الساعة 15:00.' },
+    body: {
+      en: 'Call with Horizon Retail at 15:00.',
+      ar: 'مكالمة مع شركة أفق للتجزئة الساعة 15:00.',
+    },
     actionUrl: '/workspace/operations/activities',
     entityType: 'Activity',
     entityId: '019a7c20-0001-7000-8000-000000000001',
@@ -57,7 +47,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'crm.lead.assigned',
     priority: 'P2_NORMAL',
     title: { en: 'New lead assigned to you', ar: 'أُسند إليك عميل محتمل جديد' },
-    body: { en: 'Khaled Mansour from Delta Logistics.', ar: 'خالد منصور من شركة دلتا للخدمات اللوجستية.' },
+    body: {
+      en: 'Khaled Mansour from Delta Logistics.',
+      ar: 'خالد منصور من شركة دلتا للخدمات اللوجستية.',
+    },
     actionUrl: '/crm/leads',
     entityType: 'Lead',
     entityId: '019a7c20-0002-7000-8000-000000000002',
@@ -69,7 +62,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'core.activity.assigned',
     priority: 'P2_NORMAL',
     title: { en: 'Activity assigned to you', ar: 'أُسند إليك نشاط' },
-    body: { en: 'Prepare the quotation for Al Noor Trading.', ar: 'إعداد عرض السعر لشركة النور للتجارة.' },
+    body: {
+      en: 'Prepare the quotation for Al Noor Trading.',
+      ar: 'إعداد عرض السعر لشركة النور للتجارة.',
+    },
     actionUrl: '/workspace/operations/activities',
     entityType: 'Activity',
     entityId: '019a7c20-0003-7000-8000-000000000003',
@@ -81,7 +77,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'record.owner_changed',
     priority: 'P2_NORMAL',
     title: { en: 'You are now the owner of a record', ar: 'أصبحت مالك سجل' },
-    body: { en: 'Opportunity Enterprise Renewal was transferred to you.', ar: 'نُقلت إليك ملكية فرصة تجديد اشتراك المؤسسات.' },
+    body: {
+      en: 'Opportunity Enterprise Renewal was transferred to you.',
+      ar: 'نُقلت إليك ملكية فرصة تجديد اشتراك المؤسسات.',
+    },
     actionUrl: null,
     entityType: 'Opportunity',
     entityId: '019a7c20-0004-7000-8000-000000000004',
@@ -93,7 +92,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'core.activity.completed',
     priority: 'P2_NORMAL',
     title: { en: 'Activity completed', ar: 'اكتمل نشاط' },
-    body: { en: 'Sara Ahmed completed the demo meeting with Atlas Industrial.', ar: 'أكملت سارة أحمد اجتماع العرض مع شركة أطلس الصناعية.' },
+    body: {
+      en: 'Sara Ahmed completed the demo meeting with Atlas Industrial.',
+      ar: 'أكملت سارة أحمد اجتماع العرض مع شركة أطلس الصناعية.',
+    },
     actionUrl: '/workspace/operations/activities',
     entityType: 'Activity',
     entityId: '019a7c20-0005-7000-8000-000000000005',
@@ -105,7 +107,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'core.activity.updated',
     priority: 'P2_NORMAL',
     title: { en: 'Activity updated', ar: 'عُدِّل نشاط' },
-    body: { en: 'The site visit to Nile Foods moved to Thursday.', ar: 'نُقل موعد الزيارة الميدانية لشركة النيل للأغذية إلى يوم الخميس.' },
+    body: {
+      en: 'The site visit to Nile Foods moved to Thursday.',
+      ar: 'نُقل موعد الزيارة الميدانية لشركة النيل للأغذية إلى يوم الخميس.',
+    },
     actionUrl: '/workspace/operations/activities',
     entityType: 'Activity',
     entityId: '019a7c20-0006-7000-8000-000000000006',
@@ -117,7 +122,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'core.activity.cancelled',
     priority: 'P2_NORMAL',
     title: { en: 'Activity cancelled', ar: 'أُلغي نشاط' },
-    body: { en: 'The call with Oasis Tech was cancelled.', ar: 'أُلغيت المكالمة مع شركة واحة التقنية.' },
+    body: {
+      en: 'The call with Oasis Tech was cancelled.',
+      ar: 'أُلغيت المكالمة مع شركة واحة التقنية.',
+    },
     actionUrl: null,
     entityType: 'Activity',
     entityId: '019a7c20-0007-7000-8000-000000000007',
@@ -129,7 +137,10 @@ const SEEDS: readonly Seed[] = [
     notificationType: 'record.deleted',
     priority: 'P2_NORMAL',
     title: { en: 'A record you own was deleted', ar: 'حُذف سجل تملكه' },
-    body: { en: 'Lead Red Sea Shipping was deleted by Omar Hassan.', ar: 'حذف عمر حسن العميل المحتمل شركة البحر الأحمر للشحن.' },
+    body: {
+      en: 'Lead Red Sea Shipping was deleted by Omar Hassan.',
+      ar: 'حذف عمر حسن العميل المحتمل شركة البحر الأحمر للشحن.',
+    },
     actionUrl: null,
     entityType: 'Lead',
     entityId: '019a7c20-0008-7000-8000-000000000008',
@@ -233,7 +244,7 @@ function toView(row: StoredRow, lang: Lang): NotificationView {
   };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function active(): StoredRow[] {
   return rows.filter((row) => row.dismissedAt === null);
@@ -249,7 +260,10 @@ function bumpUnread(): void {
 }
 
 function encodeCursor(createdAt: string, id: string): string {
-  return btoa(JSON.stringify({ createdAt, id })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(JSON.stringify({ createdAt, id }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 function decodeCursor(raw: string): { createdAt: string; id: string } {
@@ -283,24 +297,24 @@ function findActive(id: string): StoredRow {
   return row;
 }
 
-/** `GET tenant/notifications/config` */
-export async function fakeGetNotificationConfig(): Promise<NotificationRuntimeConfig> {
-  await fakeDelay(120);
-  return {
-    enabled: true,
-    inAppEnabled: true,
-    realtimeEnabled: false,
-    previewLimit: 5,
-    pollIntervalMs: 60_000,
-    preferenceCatalogue: KNOWN_NOTIFICATION_TYPES.map((notificationType) => ({ notificationType, inAppEnabled: true })),
-  };
+function findOwned(id: string): StoredRow {
+  assertUuid(id);
+  const row = rows.find((item) => item.seed.id === id);
+  if (!row) throw new ApiError(404, 'NOTIFICATION_NOT_FOUND');
+  return row;
 }
 
 /** `GET tenant/notifications?limit&cursor&unreadOnly` */
-export async function fakeListNotifications(query: NotificationQuery = {}): Promise<NotificationListResult> {
+export async function fakeListNotifications(
+  query: NotificationQuery = {},
+): Promise<NotificationListResult> {
   await fakeDelay(200);
   const limit = query.limit ?? NOTIFICATION_LIMITS.defaultLimit;
-  if (!Number.isInteger(limit) || limit < NOTIFICATION_LIMITS.minLimit || limit > NOTIFICATION_LIMITS.maxLimit) {
+  if (
+    !Number.isInteger(limit) ||
+    limit < NOTIFICATION_LIMITS.minLimit ||
+    limit > NOTIFICATION_LIMITS.maxLimit
+  ) {
     throw new ApiError(400, 'CORE_VALIDATION_FAILED');
   }
   if (query.cursor !== undefined && query.cursor.length > NOTIFICATION_LIMITS.cursor) {
@@ -308,7 +322,7 @@ export async function fakeListNotifications(query: NotificationQuery = {}): Prom
   }
   const cursor = query.cursor ? decodeCursor(query.cursor) : null;
   assertAvailable();
-  const lang = activeLanguage();
+  const lang: Lang = 'en';
   const matching = active().filter((row) => {
     if (query.unreadOnly && row.readAt !== null) return false;
     if (cursor) {
@@ -342,7 +356,7 @@ export async function fakeGetNotification(id: string): Promise<NotificationView>
   await fakeDelay(120);
   const row = findActive(id);
   assertAvailable();
-  return toView(row, activeLanguage());
+  return toView(row, 'en');
 }
 
 /** `POST tenant/notifications/read-all` → `{ updated }` */
@@ -369,8 +383,9 @@ export async function fakeMarkAllNotificationsRead(
 export async function fakeMarkNotificationRead(id: string, idempotencyKey?: string): Promise<void> {
   receivedKeys.push({ action: `read:${id}`, key: idempotencyKey });
   await fakeDelay(100);
-  const row = findActive(id);
+  const row = findOwned(id);
   assertAvailable();
+  if (row.dismissedAt !== null) return;
   if (row.readAt === null) {
     row.readAt = new Date().toISOString();
     row.version += 1;
@@ -379,11 +394,15 @@ export async function fakeMarkNotificationRead(id: string, idempotencyKey?: stri
 }
 
 /** `POST tenant/notifications/:id/acknowledge` → 204 (also records the item as read) */
-export async function fakeAcknowledgeNotification(id: string, idempotencyKey?: string): Promise<void> {
+export async function fakeAcknowledgeNotification(
+  id: string,
+  idempotencyKey?: string,
+): Promise<void> {
   receivedKeys.push({ action: `acknowledge:${id}`, key: idempotencyKey });
   await fakeDelay(100);
-  const row = findActive(id);
+  const row = findOwned(id);
   assertAvailable();
+  if (row.dismissedAt !== null) return;
   const now = new Date().toISOString();
   let changed = false;
   if (row.acknowledgedAt === null) {
@@ -402,8 +421,9 @@ export async function fakeAcknowledgeNotification(id: string, idempotencyKey?: s
 export async function fakeDismissNotification(id: string, idempotencyKey?: string): Promise<void> {
   receivedKeys.push({ action: `dismiss:${id}`, key: idempotencyKey });
   await fakeDelay(100);
-  const row = findActive(id);
+  const row = findOwned(id);
   assertAvailable();
+  if (row.dismissedAt !== null) return;
   row.dismissedAt = new Date().toISOString();
   row.version += 1;
   if (row.readAt === null) bumpUnread();

@@ -59,6 +59,7 @@
           [for]="uid + '-companyId'"
           [label]="'wsNumbering.fields.company' | transloco"
           [hint]="'wsNumbering.fields.companyHint' | transloco"
+          [error]="errorOf('companyId')"
         >
           <input
             [id]="uid + '-companyId'"
@@ -76,7 +77,7 @@
       <ui-field
         [for]="uid + '-prefix'"
         [label]="'wsNumbering.fields.prefix' | transloco"
-        [hint]="'wsNumbering.fields.prefixHint' | transloco"
+        [hint]="('wsNumbering.fields.prefixHint' | transloco) + ' ' + ('wsNumbering.futureOnly' | transloco)"
         [count]="prefixCount()"
         [max]="prefixMax"
         [error]="errorOf('prefix')"
@@ -99,7 +100,7 @@
       <ui-field
         [for]="uid + '-padding'"
         [label]="'wsNumbering.fields.padding' | transloco"
-        [hint]="'wsNumbering.fields.paddingHint' | transloco"
+        [hint]="('wsNumbering.fields.paddingHint' | transloco) + ' ' + ('wsNumbering.futureOnly' | transloco)"
         [error]="errorOf('padding')"
       >
         <input
@@ -172,7 +173,7 @@
               </div>
             } @else if (peekStatus() === 'failed') {
               <div class="mt-4 flex flex-wrap items-center gap-6">
-                <span class="text-12 text-danger-text">{{ 'wsNumbering.preview.failed' | transloco }}</span>
+                <span class="text-12 text-danger-text">{{ peekMessage() }}</span>
                 <button type="button" uiButton variant="ghost" size="small" (click)="retryPeek()">
                   {{ 'settings.common.retry' | transloco }}
                 </button>

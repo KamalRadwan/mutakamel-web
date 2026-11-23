@@ -15,7 +15,7 @@
       </div>
     }
 
-    @if (!isLoadOnly() && phase() === 'reviewed') {
+    @if (latestResult() && patch()) {
       @if (diffRows().length === 0) {
         <app-settings-notice tone="info">
           {{ 'wsEmail.conflict.same' | transloco }}
@@ -29,10 +29,16 @@
             <span role="columnheader" class="flex min-w-0 items-center truncate px-10">
               {{ 'wsEmail.conflict.field' | transloco }}
             </span>
-            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            <span
+              role="columnheader"
+              class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+            >
               {{ 'wsEmail.conflict.mine' | transloco }}
             </span>
-            <span role="columnheader" class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10">
+            <span
+              role="columnheader"
+              class="flex min-w-0 items-center truncate border-s border-on-nav-line px-10"
+            >
               {{ 'wsEmail.conflict.latest' | transloco }}
             </span>
           </div>
@@ -46,18 +52,12 @@
                 <span class="truncate">{{ row.label }}</span>
               </span>
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-6">
-                <span
-                  [attr.dir]="row.mineLtr ? 'ltr' : 'auto'"
-                  class="min-w-0 break-words"
-                >
+                <span [attr.dir]="row.mineLtr ? 'ltr' : 'auto'" class="min-w-0 break-words">
                   {{ row.mineText }}
                 </span>
               </span>
               <span role="cell" class="flex min-w-0 items-center border-s border-border px-10 py-6">
-                <span
-                  [attr.dir]="row.latestLtr ? 'ltr' : 'auto'"
-                  class="min-w-0 break-words"
-                >
+                <span [attr.dir]="row.latestLtr ? 'ltr' : 'auto'" class="min-w-0 break-words">
                   {{ row.latestText }}
                 </span>
               </span>
@@ -69,75 +69,25 @@
   </div>
 
   <div modal-footer class="flex flex-1 flex-wrap items-center gap-8">
-    @if (isLoadOnly()) {
-      <button
-        type="button"
-        uiButton
-        variant="primary"
-        [loading]="busy()"
-        [disabled]="busy()"
-        (click)="loadLatest()"
-      >
-        {{ 'wsEmail.conflict.load' | transloco }}
-      </button>
-    } @else if (phase() === 'initial') {
-      <button
-        type="button"
-        uiButton
-        variant="primary"
-        [loading]="busy()"
-        [disabled]="busy()"
-        (click)="reviewLatest()"
-      >
-        {{ 'wsEmail.conflict.review' | transloco }}
-      </button>
-      <button
-        type="button"
-        uiButton
-        variant="ghost"
-        [disabled]="busy()"
-        (click)="close()"
-      >
-        {{ 'settings.common.cancel' | transloco }}
-      </button>
-    } @else if (diffRows().length === 0) {
-      <button
-        type="button"
-        uiButton
-        variant="primary"
-        [disabled]="busy()"
-        (click)="useLatestSaved()"
-      >
-        {{ 'wsEmail.conflict.useLatest' | transloco }}
-      </button>
-    } @else {
-      <button
-        type="button"
-        uiButton
-        variant="primary"
-        [loading]="busy()"
-        [disabled]="busy()"
-        (click)="keepMyChanges()"
-      >
-        {{ 'wsEmail.conflict.keep' | transloco }}
-      </button>
+    <button
+      type="button"
+      uiButton
+      variant="primary"
+      [loading]="busy()"
+      [disabled]="busy()"
+      (click)="loadLatest()"
+    >
+      {{ 'settings.common.reload' | transloco }}
+    </button>
+    @if (canManage()) {
       <button
         type="button"
         uiButton
         variant="secondary"
         [disabled]="busy()"
-        (click)="useLatestSaved()"
+        (click)="keepMyChanges()"
       >
-        {{ 'wsEmail.conflict.useLatest' | transloco }}
-      </button>
-      <button
-        type="button"
-        uiButton
-        variant="ghost"
-        [disabled]="busy()"
-        (click)="close()"
-      >
-        {{ 'settings.common.cancel' | transloco }}
+        {{ 'wsEmail.conflict.keep' | transloco }}
       </button>
     }
   </div>

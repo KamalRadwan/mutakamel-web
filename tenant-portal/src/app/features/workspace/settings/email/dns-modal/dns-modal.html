@@ -6,10 +6,17 @@
   [title]="'wsEmail.dns.modal' | transloco"
   [closeLabel]="'settings.common.close' | transloco"
   [dismissable]="!busy()"
+  [preventDismiss]="hasUnsavedDraft()"
+  (dismiss)="requestClose()"
   (closed)="onModalClosed()"
 >
   @if (effectiveConfig(); as cfg) {
-    <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="saveSelector($event)">
+    <form
+      [id]="uid + '-form'"
+      novalidate
+      class="flex flex-col gap-10"
+      (submit)="saveSelector($event)"
+    >
       @if (topError(); as err) {
         <div role="alert">
           <app-settings-notice tone="warning">{{ err }}</app-settings-notice>
@@ -25,9 +32,14 @@
       <div class="flex flex-wrap items-center gap-8">
         <span
           class="inline-flex h-badge shrink-0 items-center rounded-8 px-8 text-12 font-medium whitespace-nowrap"
-          [class]="cfg.dkimVerified ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'"
+          [class]="
+            cfg.dkimVerified ? 'bg-success text-on-success' : 'bg-neutral-soft text-text-muted'
+          "
         >
-          {{ (cfg.dkimVerified ? 'wsEmail.domain.verified' : 'wsEmail.domain.notVerified') | transloco }}
+          {{
+            (cfg.dkimVerified ? 'wsEmail.domain.verified' : 'wsEmail.domain.notVerified')
+              | transloco
+          }}
         </span>
         @if (cfg.dkimVerified && verifiedDateText(); as verifiedDate) {
           <span class="text-12 leading-18 text-text-muted">
@@ -44,6 +56,7 @@
             [hint]="'wsEmail.fields.senderDomain.hint' | transloco"
           >
             <input
+              [attr.aria-describedby]="uid + '-sender-domain' + '-hint'"
               [id]="uid + '-sender-domain'"
               type="text"
               dir="ltr"
@@ -63,6 +76,7 @@
             [error]="selectorError()"
           >
             <input
+              [attr.aria-describedby]="uid + '-dkim-selector' + '-hint'"
               [id]="uid + '-dkim-selector'"
               type="text"
               dir="ltr"
@@ -88,9 +102,12 @@
             [hint]="'wsEmail.fields.dkimHost.hint' | transloco"
           >
             <div class="flex items-center gap-8">
-              <div class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8">
+              <div
+                class="flex h-field min-w-0 flex-1 items-center rounded-8 border border-border-field bg-surface-field px-8"
+              >
                 @if (dkimRecordName(); as recordName) {
                   <input
+                    [attr.aria-describedby]="uid + '-dkim-host' + '-hint'"
                     [id]="uid + '-dkim-host'"
                     type="text"
                     dir="ltr"
@@ -100,7 +117,10 @@
                     [value]="recordName"
                   />
                 } @else {
-                  <span [id]="uid + '-dkim-host'" class="min-w-0 flex-1 truncate text-12 text-text-muted">
+                  <span
+                    [id]="uid + '-dkim-host'"
+                    class="min-w-0 flex-1 truncate text-12 text-text-muted"
+                  >
                     {{ 'wsEmail.dns.notSet' | transloco }}
                   </span>
                 }
@@ -144,16 +164,12 @@
           {{ 'wsEmail.dns.saveSelector' | transloco }}
         </button>
 
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="busy()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="busy()" (click)="undo()">
           {{ 'settings.common.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        <span class="text-12 leading-18 text-text-muted">{{
+          'settings.common.unsaved' | transloco
+        }}</span>
       } @else {
         <button
           type="button"
@@ -166,20 +182,40 @@
           {{ 'wsEmail.domain.verify' | transloco }}
         </button>
 
-        <button
-          type="button"
-          uiButton
-          variant="ghost"
-          [disabled]="busy()"
-          (click)="close()"
-        >
+        <button type="button" uiButton variant="ghost" [disabled]="busy()" (click)="requestClose()">
           {{ 'settings.common.close' | transloco }}
         </button>
       }
     } @else {
-      <button type="button" uiButton variant="ghost" (click)="close()">
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'settings.common.close' | transloco }}
       </button>
     }
   </div>
 </ui-modal>
+
+<ui-confirm-dialog
+  #suspendConfirm
+  tone="warning"
+  [title]="'wsEmail.suspendConfirm' | transloco"
+  [text]="'wsEmail.notice.resetsVerification' | transloco"
+  [confirmLabel]="'settings.common.save' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
+
+<ui-confirm-dialog
+  #turnOnConfirm
+  tone="warning"
+  [title]="'wsEmail.turnOnPrompt' | transloco"
+  [confirmLabel]="'settings.common.yes' | transloco"
+  [cancelLabel]="'settings.common.no' | transloco"
+/>
+
+<ui-confirm-dialog
+  #discardConfirm
+  tone="warning"
+  [title]="'settings.common.unsaved' | transloco"
+  [text]="'wsEmail.discardDraft' | transloco"
+  [confirmLabel]="'wsEmail.discard' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>

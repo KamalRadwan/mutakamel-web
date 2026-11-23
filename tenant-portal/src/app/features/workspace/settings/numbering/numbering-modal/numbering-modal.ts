@@ -15,28 +15,18 @@ import { FormField, form, readonly, submit, validate } from '@angular/forms/sign
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { provideIcons } from '@ng-icons/core';
 import { tablerHash } from '@ng-icons/tabler-icons';
-import { LanguageState } from '../../../../../core/i18n/language';
 import { Notify } from '../../../../../core/notify/notify';
 import { Button } from '../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { Dropdown, DropdownOption } from '../../../../../shared/ui/dropdown/dropdown';
 import { Field } from '../../../../../shared/ui/field/field';
 import { Modal } from '../../../../../shared/ui/modal/modal';
-import { errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
+import { ApiError, errorCodeOf, errorMessage } from '../../../../../core/api/api-errors';
 import { newIdempotencyKey } from '../../../../../core/api/idempotency';
 import { SettingsNotice } from '../../../../../shared/ui/settings-notice/settings-notice';
 import { coreFieldErrors } from '../../core-response.model';
 
-/** CreateNumberingSequenceDto / UpdateNumberingSequenceDto field -> form field. */
-const DTO_FIELD_MAP: Record<string, NumberingField> = {
-  code: 'code',
-  companyId: 'companyId',
-  prefix: 'prefix',
-  padding: 'padding',
-  startValue: 'counter',
-  nextValue: 'counter',
-};
-import { createNumbering, peekNumbering, updateNumbering } from '../numbering.api';
+import { NumberingApi } from '../numbering.api';
 import {
   CompanyOption,
   CreateNumberingBody,
@@ -50,12 +40,21 @@ import {
   NumberingSequence,
   UpdateNumberingBody,
   canManageScope,
-  companyNameIn,
   compareCounters,
   formatNumber,
   isCounterString,
   stripLeadingZeros,
 } from '../numbering.model';
+
+/** CreateNumberingSequenceDto / UpdateNumberingSequenceDto field -> form field. */
+const DTO_FIELD_MAP: Record<string, NumberingField> = {
+  code: 'code',
+  companyId: 'companyId',
+  prefix: 'prefix',
+  padding: 'padding',
+  startValue: 'counter',
+  nextValue: 'counter',
+};
 
 type NumberingField = 'code' | 'companyId' | 'prefix' | 'padding' | 'counter';
 
@@ -116,7 +115,7 @@ export class NumberingModal {
   private readonly notify = inject(Notify);
   private readonly transloco = inject(TranslocoService);
   private readonly i18n = translationEvents(this.transloco);
-  private readonly language = inject(LanguageState).current;
+  private readonly api = inject(NumberingApi);
 
   private readonly modal = viewChild.required(Modal);
   private readonly discardDialog = viewChild.required<ConfirmDialog>('discardDialog');
@@ -139,6 +138,16 @@ export class NumberingModal {
   protected readonly peekLoading = signal(false);
   protected readonly peekFormatted = signal<string | null>(null);
   protected readonly peekStatus = signal<'idle' | 'ready' | 'notFound' | 'failed'>('idle');
+  private readonly peekError = signal<unknown>(null);
+  protected readonly peekMessage = computed(() => {
+    this.i18n();
+    const error = this.peekError();
+    const code = errorCodeOf(error);
+    if (code === 'TENANT_WIDE_PERMISSION_REQUIRED') return this.transloco.translate('wsNumbering.peekNeedsTenantWide');
+    if (code === 'COMPANY_INVALID') return this.transloco.translate('wsNumbering.peekCompanyInactive');
+    if (error instanceof ApiError && error.status === 429) return errorMessage(error, 'wsNumbering', this.transloco);
+    return this.transloco.translate('wsNumbering.preview.failed');
+  });
 
   private readonly defaultCreateCompany = signal('');
   private readonly draft = signal<NumberingDraft>({ ...EMPTY_DRAFT });
@@ -181,9 +190,9 @@ export class NumberingModal {
     });
 
     validate(path.prefix, ({ value }) => {
-      const raw = value();
-      if (raw === '') return undefined;
-      if (Array.from(raw).length > NUMBERING_PREFIX_MAX || !NUMBERING_PREFIX_PATTERN.test(raw)) {
+      const raw = value().trim();
+      if (value() === '') return undefined;
+      if (!raw || Array.from(raw).length > NUMBERING_PREFIX_MAX || !NUMBERING_PREFIX_PATTERN.test(raw)) {
         return { kind: 'prefixFormat' };
       }
       return undefined;
@@ -214,7 +223,6 @@ export class NumberingModal {
 
   protected readonly createCompanyOptions = computed<DropdownOption<string>[]>(() => {
     this.i18n();
-    const lang = this.language();
     const access = this.access();
     const manageable = new Set(access.manageCompanyIds);
     const options: DropdownOption<string>[] = [];
@@ -225,10 +233,10 @@ export class NumberingModal {
       });
     }
     for (const company of this.companies()) {
-      if (company.active && manageable.has(company.id)) {
+      if (company.active && (access.tenantWideManage || manageable.has(company.id))) {
         options.push({
           value: company.id,
-          label: companyNameIn(company, lang),
+          label: company.label,
         });
       }
     }
@@ -244,9 +252,9 @@ export class NumberingModal {
     }
     const match = this.companies().find((company) => company.id === base.companyId);
     if (match) {
-      return companyNameIn(match, this.language());
+      return match.label;
     }
-    return this.transloco.translate('wsNumbering.scope.unknown');
+    return this.transloco.translate('wsNumbering.companyFallback', { id: base.companyId.slice(0, 8) });
   });
 
   protected readonly companyDescribedBy = computed(() => {
@@ -255,7 +263,8 @@ export class NumberingModal {
   });
 
   protected readonly draftPreview = computed<string | null>(() => {
-    const value = this.draft();
+    const draft = this.draft();
+    const value = { ...draft, prefix: draft.prefix.trim() };
     if (value.prefix !== '' && (Array.from(value.prefix).length > NUMBERING_PREFIX_MAX || !NUMBERING_PREFIX_PATTERN.test(value.prefix))) {
       return null;
     }
@@ -446,13 +455,13 @@ export class NumberingModal {
               startValue: Number(stripLeadingZeros(value.counter)),
             };
             if (value.prefix !== '') {
-              body.prefix = value.prefix;
+              body.prefix = value.prefix.trim();
             }
             if (value.companyId && value.companyId !== WORKSPACE_SCOPE) {
               body.companyId = value.companyId;
             }
             const key = this.keyForPayload('create', body);
-            const created = await createNumbering(body, key);
+            const created = await this.api.createNumbering(body, key);
             this.pendingIdem = null;
             this.notify.success(this.transloco.translate('wsNumbering.toast.created'));
             this.saved.emit({ sequence: created, isNew: true });
@@ -465,7 +474,7 @@ export class NumberingModal {
 
           const patch: UpdateNumberingBody = {};
           if (value.prefix !== (base.prefix ?? '')) {
-            patch.prefix = value.prefix;
+            patch.prefix = value.prefix.trim();
           }
           const nextPadding = parsePadding(value.padding);
           if (nextPadding !== null && nextPadding !== base.padding) {
@@ -482,7 +491,7 @@ export class NumberingModal {
           }
 
           const key = this.keyForPayload(`update:${base.id}`, patch);
-          const updated = await updateNumbering(base.id, patch, key);
+          const updated = await this.api.updateNumbering(base.id, patch, key);
           this.pendingIdem = null;
           this.baseSequence.set(updated);
           this.notify.success(this.transloco.translate('wsNumbering.toast.updated'));
@@ -542,13 +551,15 @@ export class NumberingModal {
     this.peekLoading.set(true);
     this.peekFormatted.set(null);
     this.peekStatus.set('idle');
+    this.peekError.set(null);
     try {
-      const peek = await peekNumbering(code, companyId);
+      const peek = await this.api.peekNumbering(code, companyId);
       if (seq !== this.peekSeq) return;
       this.peekFormatted.set(peek.formatted);
       this.peekStatus.set('ready');
     } catch (error) {
       if (seq !== this.peekSeq) return;
+      this.peekError.set(error);
       if (errorCodeOf(error) === 'SEQUENCE_NOT_FOUND') {
         this.peekStatus.set('notFound');
       } else {
@@ -562,6 +573,14 @@ export class NumberingModal {
   }
 
   private handleSaveError(error: unknown): void {
+    if (error instanceof ApiError && error.status === 401) {
+      this.notify.error(this.transloco.translate('wsNumbering.notSaved'));
+      return;
+    }
+    if (error instanceof ApiError && error.status === 403) {
+      this.notify.error(errorMessage(error, 'wsNumbering', this.transloco));
+      return;
+    }
     const code = errorCodeOf(error);
     if (code === 'SEQUENCE_CODE_TAKEN') {
       this.serverErrors.set({ code: 'wsNumbering.errors.SEQUENCE_CODE_TAKEN' });

@@ -1,220 +1,187 @@
-import { Component, Injectable } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Component, Injectable, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
-import { RouterTestingHarness } from '@angular/router/testing';
-import { TranslocoLoader, type Translation, provideTransloco } from '@jsverse/transloco';
-import { of } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import {
+  TranslocoLoader,
+  provideTransloco,
+  provideTranslocoScope,
+  type Translation,
+} from '@jsverse/transloco';
+import { BehaviorSubject, of } from 'rxjs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '../../../../../../public/i18n/en.json';
 import ar from '../../../../../../public/i18n/ar.json';
 import wsEn from '../../../../../../public/i18n/ws-notifications/en.json';
 import wsAr from '../../../../../../public/i18n/ws-notifications/ar.json';
-import { ApiError } from '../../../../core/api/api-errors';
 import { Notify } from '../../../../core/notify/notify';
-import { NOTIFICATION_INBOX_PAGE_SIZE } from '../../../../shared/widgets/notifications/notification-inbox';
+import { NotificationsFeed } from '../../../../core/realtime/notifications-feed';
 import {
-  getNotification,
-  getUnreadNotificationCount,
-  listNotifications,
-} from '../../../../shared/widgets/notifications/notifications.api';
-import {
+  fakeListNotifications,
   resetFakeNotifications,
-  setFakeNotificationError,
-  setFakeNotificationUserInactive,
 } from '../../../../shared/widgets/notifications/notifications.fake';
-import { notificationsRoutes } from '../notifications.routes';
 import { NotificationsPage } from './notifications-page';
 
+const settle = async () => {
+  for (let i = 0; i < 25; i++) await Promise.resolve();
+};
+const BASE = '/api/tenant/core/v1/notifications';
+
 @Injectable()
-class TestLoader implements TranslocoLoader {
+class Loader implements TranslocoLoader {
   getTranslation(path: string) {
-    if (path === 'en') return of(en as Translation);
-    if (path === 'ar') return of(ar as Translation);
-    if (path === 'ws-notifications/en') return of(wsEn as Translation);
-    if (path === 'ws-notifications/ar') return of(wsAr as Translation);
-    return of({});
+    return of(
+      (
+        { en, ar, 'ws-notifications/en': wsEn, 'ws-notifications/ar': wsAr } as Record<
+          string,
+          Translation
+        >
+      )[path] ?? {},
+    );
   }
 }
 
-@Component({ selector: 'test-leads-target', template: '<p>Leads</p>' })
-class DummyLeadsTarget {}
+@Component({ template: '' })
+class Target {}
 
-async function until(check: () => boolean | Promise<boolean>, timeoutMs = 3000): Promise<void> {
-  const start = Date.now();
-  while (!(await check())) {
-    if (Date.now() - start > timeoutMs) throw new Error('timed out');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
+describe('Workspace notifications page', () => {
+  let http: HttpTestingController;
+  let params: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  const notify = { error: vi.fn(), connectionLost: vi.fn(), connectionRestored: vi.fn() };
 
-const dialogProto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-const originalDialog = { showModal: dialogProto['showModal'], close: dialogProto['close'] };
-
-describe('NotificationsPage', () => {
   beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.lang = 'en';
     resetFakeNotifications();
-    dialogProto['showModal'] = function (this: HTMLDialogElement) {
-      this.setAttribute('open', '');
-    };
-    dialogProto['close'] = function (this: HTMLDialogElement) {
-      if (!this.hasAttribute('open')) return;
-      this.removeAttribute('open');
-      this.dispatchEvent(new Event('close'));
-    };
-  });
-
-  afterEach(() => {
-    dialogProto['showModal'] = originalDialog.showModal;
-    dialogProto['close'] = originalDialog.close;
-    setFakeNotificationError(null);
-    setFakeNotificationUserInactive(false);
-    localStorage.clear();
-  });
-
-  async function openPage(url = '/workspace/notifications', pageSize = 20) {
+    vi.clearAllMocks();
+    params = new BehaviorSubject(convertToParamMap({}));
+    document.cookie = 'mutakamel-http-tenant-csrf=csrf; path=/';
     TestBed.configureTestingModule({
       providers: [
-        { provide: NOTIFICATION_INBOX_PAGE_SIZE, useValue: pageSize },
-        provideRouter([
-          { path: 'workspace/notifications', children: notificationsRoutes },
-          { path: 'crm/leads', component: DummyLeadsTarget },
-        ]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([{ path: 'crm/leads', component: Target }]),
         provideTransloco({
-          config: { availableLangs: ['ar', 'en'], defaultLang: 'en', reRenderOnLangChange: true },
-          loader: TestLoader,
+          config: { availableLangs: ['en', 'ar'], defaultLang: 'en', reRenderOnLangChange: true },
+          loader: Loader,
         }),
+        provideTranslocoScope({ scope: 'ws-notifications', alias: 'wsNotif' }),
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
+        },
+        { provide: Notify, useValue: notify },
+        {
+          provide: NotificationsFeed,
+          useValue: { unread: signal(null), onEvent: () => () => undefined },
+        },
       ],
     });
-    const harness = await RouterTestingHarness.create();
-    const page = await harness.navigateByUrl(url, NotificationsPage);
-    const router = TestBed.inject(Router);
-    const notify = TestBed.inject(Notify);
-    const el = harness.routeNativeElement!;
-    await until(() => el.querySelectorAll('app-notification-item').length > 0 || el.querySelector('ui-full-state') !== null);
-    harness.detectChanges();
-    return { harness, page, router, notify, el };
+    http = TestBed.inject(HttpTestingController);
+  });
+  afterEach(() => {
+    http.verify();
+    document.cookie = 'mutakamel-http-tenant-csrf=; Max-Age=0; path=/';
+  });
+
+  async function setup(empty = false) {
+    const snapshot = await fakeListNotifications();
+    const fixture = TestBed.createComponent(NotificationsPage);
+    fixture.detectChanges();
+    http
+      .expectOne((r) => r.url === BASE)
+      .flush({ success: true, data: { ...snapshot, items: empty ? [] : snapshot.items } });
+    await settle();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return { fixture, el: fixture.nativeElement as HTMLElement, snapshot };
   }
 
-  it('shows All without a count, Unread with count, and switches tabs via ?tab query param', async () => {
-    const { harness, router, el } = await openPage();
-    const tabs = Array.from(el.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  it('shows All and Unread, switches with a server filter, and renders the empty state', async () => {
+    const { fixture, el, snapshot } = await setup();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const tabs = el.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     expect(tabs).toHaveLength(2);
-    expect(tabs[0].textContent?.trim()).toBe('All');
-    expect(tabs[1].textContent).toContain('Unread');
-    expect(tabs[1].textContent).toContain('4');
-
-    // Only P1_HIGH gets the inline Acknowledge button on the list.
-    const ackButtons = Array.from(el.querySelectorAll<HTMLButtonElement>('app-notification-item button')).filter((b) =>
-      b.textContent?.includes('Acknowledge'),
-    );
-    expect(ackButtons).toHaveLength(1);
-
+    expect(tabs[1].textContent).toContain(String(snapshot.unreadCount));
     tabs[1].click();
-    harness.detectChanges();
-    await until(() => el.querySelectorAll('app-notification-item').length === 4);
-    harness.detectChanges();
-
-    expect(router.url).toContain('tab=unread');
-    expect(el.querySelectorAll('app-notification-item')).toHaveLength(4);
-
-    tabs[0].click();
-    harness.detectChanges();
-    await until(() => el.querySelectorAll('app-notification-item').length === 8);
-    harness.detectChanges();
-    expect(router.url).toBe('/workspace/notifications');
-  });
-
-  it('shows empty state when all items are dismissed or unread is empty', async () => {
-    const { harness, el } = await openPage();
-    const markAllBtn = Array.from(el.querySelectorAll('header button')).find((b) =>
-      b.textContent?.includes('Mark all as read'),
-    ) as HTMLButtonElement;
-    markAllBtn.click();
-    harness.detectChanges();
-    await until(async () => (await getUnreadNotificationCount()).unreadCount === 0);
-
-    const unreadTab = el.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1];
-    unreadTab.click();
-    harness.detectChanges();
-    await until(() => el.textContent?.includes(en.notifications.emptyUnread) ?? false);
+    http
+      .expectOne((r) => r.url === BASE && r.params.get('unreadOnly') === 'true')
+      .flush({ success: true, data: { ...snapshot, items: [] } });
+    await settle();
+    await fixture.whenStable();
+    fixture.detectChanges();
     expect(el.textContent).toContain(en.notifications.emptyUnread);
+    expect(navigate).toHaveBeenCalled();
+  });
 
-    const allTab = el.querySelectorAll<HTMLButtonElement>('[role="tab"]')[0];
-    allTab.click();
-    harness.detectChanges();
-    await until(() => el.querySelectorAll('app-notification-item').length === 8);
-    for (let i = 0; i < 8; i++) {
-      const dismissBtn = el.querySelector<HTMLButtonElement>('app-notification-item button[aria-label="Dismiss notification"]')!;
-      dismissBtn.click();
-      harness.detectChanges();
-    }
-    await until(() => el.textContent?.includes(en.notifications.empty) ?? false);
+  it('renders the no-notifications state', async () => {
+    const { el } = await setup(true);
     expect(el.textContent).toContain(en.notifications.empty);
-    await until(async () => (await listNotifications()).items.length === 0);
   });
 
-  it('renders load-failure state and recovers on Retry', async () => {
-    setFakeNotificationError(new ApiError(500, 'COMMON.GENERIC.INTERNAL_ERROR'));
-    const { harness, el } = await openPage();
-
-    expect(el.querySelector('ui-full-state')?.textContent).toContain(wsEn.loadFailed.title);
-    setFakeNotificationError(null);
-    const retryBtn = el.querySelector<HTMLButtonElement>('ui-full-state button')!;
-    retryBtn.click();
-    harness.detectChanges();
-
-    await until(() => el.querySelectorAll('app-notification-item').length === 8);
-    expect(el.querySelector('ui-full-state')).toBeNull();
-  });
-
-  it('renders unavailable state without action when recipient is missing', async () => {
-    setFakeNotificationUserInactive(true);
-    const { el } = await openPage();
-
-    const fullState = el.querySelector('ui-full-state')!;
-    expect(fullState.textContent).toContain(wsEn.unavailable.title);
-    expect(fullState.querySelector('button')).toBeNull();
-  });
-
-  it('keeps loaded items and shows an error toast when loadMore fails', async () => {
-    const { harness, notify, el } = await openPage('/workspace/notifications', 2);
-    expect(el.querySelectorAll('app-notification-item')).toHaveLength(2);
-
-    setFakeNotificationError(new ApiError(500, 'COMMON.GENERIC.INTERNAL_ERROR'));
-    const loadMoreBtn = Array.from(el.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes(en.notifications.loadMore),
+  it('shows load-failure with Retry and the unavailable state', async () => {
+    const fixture = TestBed.createComponent(NotificationsPage);
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === BASE).flush({}, { status: 500, statusText: 'Server error' });
+    await settle();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain(wsEn.loadFailed.title);
+    const retry = Array.from(el.querySelectorAll<HTMLButtonElement>('ui-full-state button')).find(
+      (b) => b.textContent?.trim() === wsEn.retry,
     )!;
-    loadMoreBtn.click();
-    await until(() => notify.toasts().some((t) => t.title === en.notifications.loadError));
-    harness.detectChanges();
-
-    expect(el.querySelectorAll('app-notification-item')).toHaveLength(2);
+    retry.click();
+    http
+      .expectOne((r) => r.url === BASE)
+      .flush(
+        { errorCode: 'NOTIFICATION_USER_NOT_FOUND' },
+        { status: 404, statusText: 'Not found' },
+      );
+    await settle();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).toContain(wsEn.unavailable.title);
   });
 
-  it('navigates to ./<id> when actionUrl is missing or unregistered, and follows registered routes', async () => {
-    const { harness, router, el } = await openPage();
-    const openButtons = Array.from(el.querySelectorAll<HTMLButtonElement>('app-notification-item button')).filter(
-      (b) => b.textContent?.includes('Follow-up call due') || b.textContent?.includes('New lead assigned'),
-    );
+  it('routes an unlinked item to detail and follows a registered action route', async () => {
+    const { el, fixture, snapshot } = await setup();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const navigateByUrl = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    const noLink = snapshot.items.find((row) => row.actionUrl === null && row.readAt !== null)!;
+    const index = snapshot.items.indexOf(noLink);
+    el.querySelectorAll('app-notification-item')
+      [index].querySelector<HTMLButtonElement>('button')!
+      .click();
+    await settle();
+    await fixture.whenStable();
+    expect(navigate).toHaveBeenCalledWith([noLink.id], expect.anything());
+    const linked = snapshot.items.find((row) => row.actionUrl === '/crm/leads')!;
+    const row = el.querySelectorAll('app-notification-item')[snapshot.items.indexOf(linked)];
+    row.querySelector<HTMLButtonElement>('button')!.click();
+    http
+      .expectOne(BASE + '/' + linked.id + '/read')
+      .flush(null, { status: 204, statusText: 'No content' });
+    await settle();
+    await fixture.whenStable();
+    http.expectOne(BASE + '/unread-count').flush({ success: true, data: { unreadCount: 3 } });
+    await settle();
+    await fixture.whenStable();
+    expect(navigateByUrl).toHaveBeenCalledWith('/crm/leads');
+  });
 
-    // Item #1 has unregistered /workspace/operations/activities -> opens detail child route
-    openButtons[0].click();
-    await until(() => router.url === '/workspace/notifications/019a7c10-0001-7000-8000-000000000001');
-    harness.detectChanges();
-    await until(() => el.querySelector('dialog[open]') !== null);
-    await until(async () => (await getNotification('019a7c10-0001-7000-8000-000000000001')).readAt !== null);
-
-    // Navigate back to list and open item #2 (/crm/leads, registered)
-    await harness.navigateByUrl('/workspace/notifications');
-    await until(() => el.querySelectorAll('app-notification-item').length > 0);
-    harness.detectChanges();
-    const leadBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('app-notification-item button')).find((b) =>
-      b.textContent?.includes('New lead assigned'),
-    )!;
-    leadBtn.click();
-    await until(() => router.url === '/crm/leads');
-    await until(async () => (await getNotification('019a7c10-0002-7000-8000-000000000002')).readAt !== null);
+  it('shows notSaved on a 401 write without navigation', async () => {
+    const { fixture, el, snapshot } = await setup();
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    el.querySelector<HTMLButtonElement>(
+      'app-notification-item button[aria-label="' + en.notifications.actions.dismiss + '"]',
+    )!.click();
+    http
+      .expectOne(BASE + '/' + snapshot.items[0].id)
+      .flush({ code: 'GW.AUTH.UNAUTHORIZED' }, { status: 401, statusText: 'Unauthorized' });
+    await settle();
+    await fixture.whenStable();
+    expect(notify.error).toHaveBeenCalledWith(wsEn.errors.notSaved);
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

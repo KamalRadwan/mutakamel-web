@@ -1,6 +1,7 @@
 import { Component, DestroyRef, inject, signal, viewChild } from '@angular/core';
 import { translationEvents } from '../../../../../../core/i18n/translation-events';
-import { Router } from '@angular/router';
+import { AuthSession as AuthSessionState } from '../../../../../../core/auth/auth-session';
+import { ApiError } from '../../../../../../core/api/api-errors';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
@@ -16,7 +17,8 @@ import { Button } from '../../../../../../shared/ui/button/button';
 import { ConfirmDialog } from '../../../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { AccountSection } from '../../../shared/account-section/account-section';
 import { SessionRow } from '../session-row/session-row';
-import { listSessions, logoutAll, revokeSession } from '../sessions.api';
+import { SessionsApi } from '../sessions.api';
+import { retryAfterSecondsOf } from '../../security.model';
 import {
   AuthSession,
   formatSessionDate,
@@ -47,7 +49,8 @@ export class SessionsCard {
   private readonly i18n = translationEvents(this.transloco);
   private readonly language = inject(LanguageState);
   private readonly notify = inject(Notify);
-  private readonly router = inject(Router);
+  private readonly session = inject(AuthSessionState);
+  private readonly api = inject(SessionsApi);
 
   private readonly allDialog = viewChild.required<ConfirmDialog>('allDialog');
   private readonly endCurrentDialog = viewChild.required<ConfirmDialog>('endCurrentDialog');
@@ -88,11 +91,10 @@ export class SessionsCard {
 
     this.signingOutAll.set(true);
     try {
-      await logoutAll();
-      this.notify.success(this.transloco.translate('wsAccSessions.toast.allEnded'));
-      await this.router.navigate(['/login']);
-    } catch {
-      this.notify.error(this.transloco.translate('wsAccSessions.errors.generic'));
+      await this.api.logoutAll();
+      await this.session.signedOutByServer('security.allSessionsEnded');
+    } catch (error) {
+      this.showError(error);
     } finally {
       this.signingOutAll.set(false);
     }
@@ -112,23 +114,16 @@ export class SessionsCard {
 
     this.setRevoking(session.id, true);
     try {
-      await revokeSession(session.id);
+      await this.api.revokeSession(session.id);
       if (session.current) {
-        await this.router.navigate(['/login']);
+        await this.session.signedOutByServer('security.allSessionsEnded');
         return;
       }
 
-      const ended: AuthSession = {
-        ...session,
-        endedAt: new Date().toISOString(),
-        endReason: 'LOGOUT',
-        current: false,
-      };
-      this.activeSessions.update((list) => list.filter((item) => item.id !== session.id));
-      this.endedSessions.update((list) => [ended, ...list.filter((item) => item.id !== session.id)]);
+      await this.loadInitial();
       this.notify.success(this.transloco.translate('wsAccSessions.toast.ended'));
-    } catch {
-      this.notify.error(this.transloco.translate('wsAccSessions.errors.generic'));
+    } catch (error) {
+      this.showError(error);
     } finally {
       this.setRevoking(session.id, false);
     }
@@ -145,7 +140,7 @@ export class SessionsCard {
 
     this.loadingMore.set(true);
     try {
-      const result = await listSessions(nextPage);
+      const result = await this.api.listSessions(nextPage);
       if (seq !== this.loadSeq) return;
 
       const existingIds = new Set(this.endedSessions().map((s) => s.id));
@@ -155,9 +150,9 @@ export class SessionsCard {
       }
       this.historyPage.set(result.endedHistory.page);
       this.hasMoreHistory.set(result.endedHistory.hasMore);
-    } catch {
+    } catch (error) {
       if (seq === this.loadSeq) {
-        this.notify.error(this.transloco.translate('wsAccSessions.errors.generic'));
+        this.showError(error);
       }
     } finally {
       if (seq === this.loadSeq) {
@@ -176,7 +171,10 @@ export class SessionsCard {
 
   protected sessionLabel(session: AuthSession): string {
     this.i18n();
-    return session.deviceLabel?.trim() || this.transloco.translate(`wsAccSessions.client.${session.clientType}`);
+    return (
+      session.deviceLabel?.trim() ||
+      this.transloco.translate(`wsAccSessions.client.${session.clientType}`)
+    );
   }
 
   protected formatEndedDate(iso: string): string {
@@ -194,7 +192,7 @@ export class SessionsCard {
     this.loadingMore.set(false);
 
     try {
-      const result = await listSessions(1);
+      const result = await this.api.listSessions(1);
       if (seq !== this.loadSeq) return;
 
       const active = result.items
@@ -216,6 +214,22 @@ export class SessionsCard {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
+    }
+  }
+
+  private showError(error: unknown): void {
+    if (error instanceof ApiError && error.status === 429) {
+      this.notify.error(
+        this.transloco.translate('wsAccSessions.errors.TOO_MANY_REQUESTS', {
+          seconds: retryAfterSecondsOf(error),
+        }),
+      );
+    } else if (error instanceof ApiError && error.code === 'COMMON.VALIDATION.UUID_V7_INVALID') {
+      this.notify.error(
+        this.transloco.translate('wsAccSessions.errors.COMMON.VALIDATION.UUID_V7_INVALID'),
+      );
+    } else {
+      this.notify.error(this.transloco.translate('wsAccSessions.errors.generic'));
     }
   }
 

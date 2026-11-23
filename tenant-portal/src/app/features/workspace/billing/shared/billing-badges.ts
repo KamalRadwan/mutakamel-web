@@ -57,7 +57,7 @@ export const SUBSCRIPTION_STATUS_BADGES: Readonly<Record<SubscriptionStatus, Bil
 export const ACCESS_MODE_BADGES: Readonly<Record<AccessMode, BillingBadge>> = {
   FULL: badge('bill.access.FULL', 'bg-success text-on-success'),
   DUNNING: badge('bill.access.DUNNING', 'bg-warning text-on-warning'),
-  READ_ONLY: badge('bill.access.READ_ONLY', 'bg-neutral-soft text-text-muted'),
+  READ_ONLY: badge('bill.badges.access.READ_ONLY', 'bg-neutral-soft text-text-muted'),
   BLOCKED: badge('bill.access.BLOCKED', 'bg-danger text-on-danger'),
 };
 

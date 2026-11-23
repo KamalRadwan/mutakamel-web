@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { TranslocoPipe, provideTranslocoScope } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, provideTranslocoScope } from '@jsverse/transloco';
+import { Notify } from '../../../../../core/notify/notify';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { tablerArrowRight, tablerRefresh, tablerRepeat } from '@ng-icons/tabler-icons';
 import { LanguageState } from '../../../../../core/i18n/language';
@@ -10,11 +11,11 @@ import { getSeatUsage } from '../../../seats/seats.api';
 import { SeatUsage } from '../../../seats/seats.model';
 import {
   ApiError,
+  BillingApi,
+  billingErrorMessage,
   BillingSummary,
   SubscriptionView,
   correlationIdOf,
-  getBillingSummary,
-  getSubscription,
 } from '../../billing.api';
 import { BillingFailed } from '../../shared/billing-failed/billing-failed';
 import { BillingForbidden } from '../../shared/billing-forbidden/billing-forbidden';
@@ -42,7 +43,11 @@ const SKELETON_TABLE_ROWS = [1, 2, 3, 4, 5] as const;
     SeatsSection,
   ],
   providers: [
-    provideTranslocoScope('settings', { scope: 'ws-billing', alias: 'bill' }, { scope: 'ws-billing-subscription', alias: 'bsub' }),
+    provideTranslocoScope(
+      'settings',
+      { scope: 'ws-billing', alias: 'bill' },
+      { scope: 'ws-billing-subscription', alias: 'bsub' },
+    ),
     provideIcons({ tablerArrowRight, tablerRefresh, tablerRepeat }),
   ],
   templateUrl: './subscription-page.html',
@@ -53,6 +58,9 @@ export class SubscriptionPage {
   protected readonly uid = `billing-sub-${++SubscriptionPage.nextId}`;
 
   private readonly router = inject(Router);
+  private readonly api = inject(BillingApi);
+  private readonly notify = inject(Notify);
+  private readonly transloco = inject(TranslocoService);
   private readonly session = inject(BillingSession);
   private readonly language = inject(LanguageState).current;
 
@@ -62,6 +70,7 @@ export class SubscriptionPage {
 
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
+  protected readonly empty = signal(false);
   protected readonly correlationId = signal<string | null>(null);
   protected readonly subscription = signal<SubscriptionView | null>(null);
   protected readonly summary = signal<BillingSummary | null>(null);
@@ -87,6 +96,7 @@ export class SubscriptionPage {
   });
 
   protected readonly changeDisabled = computed(() => {
+    if (this.summary()?.subscription.accessMode === 'DUNNING') return true;
     const sub = this.subscription()?.subscription;
     if (!sub) return true;
     if (sub.currentCollectionInvoiceId) return true;
@@ -94,6 +104,7 @@ export class SubscriptionPage {
   });
 
   protected readonly changeDisabledReasonKey = computed<string | null>(() => {
+    if (this.summary()?.subscription.accessMode === 'DUNNING') return 'bsub.dunning.settleFirst';
     const sub = this.subscription()?.subscription;
     if (!sub) return null;
     if (sub.currentCollectionInvoiceId) {
@@ -143,13 +154,14 @@ export class SubscriptionPage {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.failed.set(false);
+    this.empty.set(false);
     this.correlationId.set(null);
     this.hasUnfinishedChange.set(hasChangeJournal());
 
     try {
       const [sub, sum, usage] = await Promise.all([
-        getSubscription(),
-        getBillingSummary(),
+        this.api.getSubscription(),
+        this.api.getBillingSummary(),
         getSeatUsage().catch(() => null),
       ]);
       if (seq !== this.loadSeq) return;
@@ -158,12 +170,20 @@ export class SubscriptionPage {
       this.seatUsage.set(usage);
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      if (error instanceof ApiError && error.code === 'TENANT_OWNER_REQUIRED') {
+      if (error instanceof ApiError && error.status === 404) {
+        this.subscription.set(null);
+        this.empty.set(true);
+        return;
+      }
+      if (error instanceof ApiError && error.status === 403) {
         this.forbidden.set(true);
         return;
       }
       this.failed.set(true);
       this.correlationId.set(correlationIdOf(error));
+      if (error instanceof ApiError && error.status === 0) {
+        this.notify.error(billingErrorMessage(error, this.transloco));
+      }
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);

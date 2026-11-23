@@ -6,6 +6,8 @@
   [title]="'wsEmail.limits.title' | transloco"
   [closeLabel]="'settings.common.close' | transloco"
   [dismissable]="!saving()"
+  [preventDismiss]="hasUnsavedDraft()"
+  (dismiss)="requestClose()"
   (closed)="onModalClosed()"
 >
   <form [id]="uid + '-form'" novalidate class="flex flex-col gap-10" (submit)="save($event)">
@@ -51,6 +53,7 @@
                 "
               >
                 <input
+                  [attr.aria-describedby]="uid + '-daily-switch' + '-hint'"
                   [id]="uid + '-daily-value'"
                   type="number"
                   min="1"
@@ -105,6 +108,7 @@
                 "
               >
                 <input
+                  [attr.aria-describedby]="uid + '-per-min-switch' + '-hint'"
                   [id]="uid + '-per-min-value'"
                   type="number"
                   min="1"
@@ -144,31 +148,36 @@
       </button>
 
       @if (dirty()) {
-        <button
-          type="button"
-          uiButton
-          variant="secondary"
-          [disabled]="saving()"
-          (click)="undo()"
-        >
+        <button type="button" uiButton variant="secondary" [disabled]="saving()" (click)="undo()">
           {{ 'settings.common.undo' | transloco }}
         </button>
-        <span class="text-12 leading-18 text-text-muted">{{ 'settings.common.unsaved' | transloco }}</span>
+        <span class="text-12 leading-18 text-text-muted">{{
+          'settings.common.unsaved' | transloco
+        }}</span>
       } @else {
         <button
           type="button"
           uiButton
           variant="ghost"
           [disabled]="saving()"
-          (click)="close()"
+          (click)="requestClose()"
         >
           {{ 'settings.common.cancel' | transloco }}
         </button>
       }
     } @else {
-      <button type="button" uiButton variant="ghost" (click)="close()">
+      <button type="button" uiButton variant="ghost" (click)="requestClose()">
         {{ 'settings.common.close' | transloco }}
       </button>
     }
   </div>
 </ui-modal>
+
+<ui-confirm-dialog
+  #discardConfirm
+  tone="warning"
+  [title]="'settings.common.unsaved' | transloco"
+  [text]="'wsEmail.discardDraft' | transloco"
+  [confirmLabel]="'wsEmail.discard' | transloco"
+  [cancelLabel]="'settings.common.cancel' | transloco"
+/>
